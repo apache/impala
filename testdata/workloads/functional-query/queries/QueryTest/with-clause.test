@@ -19,9 +19,36 @@ select x, y from t order by y limit 10
 BIGINT, STRING
 ====
 ---- QUERY
+# Basic tests with a single with-clause view with column labels.
+with t(c1, c2) as (select int_col, bigint_col y from functional.alltypestiny)
+select * from t limit 1
+---- RESULTS
+0,0
+---- TYPES
+INT, BIGINT
+---- LABELS
+C1, C2
+====
+---- QUERY
+with t(c1) as (select int_col, bigint_col from functional.alltypestiny)
+select * from t limit 1
+---- RESULTS
+0,0
+---- TYPES
+INT, BIGINT
+---- LABELS
+C1, BIGINT_COL
+====
+---- QUERY
+with t(c1, c2) as (select int_col from functional.alltypestiny)
+select * from t limit 1
+---- CATCH
+AnalysisException: WITH-clause view 't' returns 1 columns, but 2 labels were specified.
+====
+---- QUERY
 # Multiple views in with-clause. Only one view is used.
 with t1 as (select int_col x, bigint_col y from functional.alltypestiny),
-t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
+t2 as (select 1 x, 10 y), t3 as (values(2 x, 20 y), (3, 30))
 select x, y from t2
 ---- RESULTS
 1,10
@@ -31,7 +58,7 @@ TINYINT, TINYINT
 ---- QUERY
 # Multiple views in with-clause. All views are used in a union.
 with t1 as (select int_col x, bigint_col y from functional.alltypestiny),
-t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
+t2 as (select 1 x, 10 y), t3 as (values(2 x, 20 y), (3, 30))
 select * from t1 union all select * from t2 union all (select * from t3) order by x limit 20
 ---- RESULTS
 0,0
@@ -47,6 +74,18 @@ select * from t1 union all select * from t2 union all (select * from t3) order b
 3,30
 ---- TYPES
 INT, BIGINT
+====
+---- QUERY
+with t1(c1, c2) as (select int_col x, bigint_col y from functional.alltypestiny),
+t2(c3, c4) as (select 1 x, 10 y)
+select * from t1 limit 1 union all select * from t2 limit 1
+---- RESULTS
+0,0
+1,10
+---- TYPES
+INT, BIGINT
+---- LABELS
+C1, C2
 ====
 ---- QUERY
 # Multiple views in with-clause. All views are used in a join.

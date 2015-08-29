@@ -93,6 +93,14 @@ public class ToSqlUtils {
     return ident;
   }
 
+  public static List<String> getIdentSqlList(List<String> identList) {
+    List<String> identSqlList = Lists.newArrayList();
+    for (String ident: identList) {
+      identSqlList.add(getIdentSql(ident));
+    }
+    return identSqlList;
+  }
+
   public static String getPathSql(List<String> path) {
     StringBuilder result = new StringBuilder();
     for (String p: path) {

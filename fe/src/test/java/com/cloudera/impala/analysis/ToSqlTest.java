@@ -774,6 +774,14 @@ public class ToSqlTest extends AnalyzerTest {
     // WITH clause in select stmt.
     testToSql("with t as (select * from functional.alltypes) select * from t",
         "WITH t AS (SELECT * FROM functional.alltypes) SELECT * FROM t");
+    testToSql("with t(c1) as (select * from functional.alltypes) select * from t",
+        "WITH t(c1) AS (SELECT * FROM functional.alltypes) SELECT * FROM t");
+    testToSql("with t(`table`, col, `create`) as (select * from functional.alltypes) " +
+        "select * from t",
+        "WITH t(`table`, col, `create`) AS (SELECT * FROM functional.alltypes) " +
+        "SELECT * FROM t");
+    testToSql("with t(c1, c2) as (select * from functional.alltypes) select * from t",
+        "WITH t(c1, c2) AS (SELECT * FROM functional.alltypes) SELECT * FROM t");
     testToSql("with t as (select sum(int_col) over(partition by tinyint_col, " +
         "bool_col order by float_col rows between unbounded preceding and " +
         "current row) as x from functional.alltypes) " +
@@ -787,6 +795,10 @@ public class ToSqlTest extends AnalyzerTest {
         "select * from t a inner join t b on (a.int_col = b.int_col)",
         "WITH t AS (SELECT * FROM functional.alltypes) " +
         "SELECT * FROM t a INNER JOIN t b ON (a.int_col = b.int_col)");
+    testToSql("with t(c1, c2) as (select * from functional.alltypes) " +
+        "select a.c1, a.c2 from t a inner join t b on (a.c1 = b.c2)",
+        "WITH t(c1, c2) AS (SELECT * FROM functional.alltypes) " +
+        "SELECT a.c1, a.c2 FROM t a INNER JOIN t b ON (a.c1 = b.c2)");
     // WITH clause in select stmt with a join and a USING clause.
     testToSql("with t as (select * from functional.alltypes) " +
         "select * from t a inner join t b using(int_col)",

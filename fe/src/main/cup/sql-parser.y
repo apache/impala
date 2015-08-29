@@ -1488,9 +1488,14 @@ opt_with_clause ::=
 
 with_view_def ::=
   IDENT:alias KW_AS LPAREN query_stmt:query RPAREN
-  {: RESULT = new View(alias, query); :}
+  {: RESULT = new View(alias, query, null); :}
   | STRING_LITERAL:alias KW_AS LPAREN query_stmt:query RPAREN
-  {: RESULT = new View(alias, query); :}
+  {: RESULT = new View(alias, query, null); :}
+  | IDENT:alias LPAREN ident_list:col_names RPAREN KW_AS LPAREN query_stmt:query RPAREN
+  {: RESULT = new View(alias, query, col_names); :}
+  | STRING_LITERAL:alias LPAREN ident_list:col_names RPAREN
+    KW_AS LPAREN query_stmt:query RPAREN
+  {: RESULT = new View(alias, query, col_names); :}
   ;
 
 with_view_def_list ::=

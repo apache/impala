@@ -416,10 +416,21 @@ public class Analyzer {
 
   /**
    * Registers a local view definition with this analyzer. Throws an exception if a view
-   * definition with the same alias has already been registered.
+   * definition with the same alias has already been registered or if the number of
+   * explicit column labels is greater than the number of columns in the view statement.
    */
   public void registerLocalView(View view) throws AnalysisException {
     Preconditions.checkState(view.isLocalView());
+    if (view.hasColLabels()) {
+      List<String> viewLabels = view.getColLabels();
+      List<String> queryStmtLabels = view.getQueryStmt().getColLabels();
+      if (viewLabels.size() > queryStmtLabels.size()) {
+        throw new AnalysisException("WITH-clause view '" + view.getName() +
+            "' returns " + queryStmtLabels.size() + " columns, but " +
+            viewLabels.size() + " labels were specified. The number of column " +
+            "labels must be smaller or equal to the number of returned columns.");
+      }
+    }
     if (localViews_.put(view.getName().toLowerCase(), view) != null) {
       throw new AnalysisException(
           String.format("Duplicate table alias: '%s'", view.getName()));

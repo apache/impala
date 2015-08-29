@@ -750,11 +750,16 @@ public class ParserTest {
   @Test
   public void TestWithClause() throws AnalysisException {
     ParsesOk("with t as (select 1 as a) select a from t");
+    ParsesOk("with t(x) as (select 1 as a) select x from t");
     ParsesOk("with t as (select c from tab) select * from t");
+    ParsesOk("with t(x, y) as (select * from tab) select * from t");
     ParsesOk("with t as (values(1, 2, 3), (4, 5, 6)) select * from t");
+    ParsesOk("with t(x, y, z) as (values(1, 2, 3), (4, 5, 6)) select * from t");
     ParsesOk("with t1 as (select 1 as a), t2 as (select 2 as a) select a from t1");
     ParsesOk("with t1 as (select c from tab), t2 as (select c from tab)" +
         "select c from t2");
+    ParsesOk("with t1(x) as (select c from tab), t2(x) as (select c from tab)" +
+        "select x from t2");
     // With clause and union statement.
     ParsesOk("with t1 as (select 1 as a), t2 as (select 2 as a)" +
         "select a from t1 union all select a from t2");
@@ -763,16 +768,19 @@ public class ParserTest {
         "select a from t1 inner join t2 on t1.a = t2.a");
     // With clause in inline view.
     ParsesOk("select * from (with t as (select 1 as a) select * from t) as a");
+    ParsesOk("select * from (with t(x) as (select 1 as a) select * from t) as a");
     // With clause in query statement of insert statement.
     ParsesOk("insert into x with t as (select * from tab) select * from t");
+    ParsesOk("insert into x with t(x, y) as (select * from tab) select * from t");
     ParsesOk("insert into x with t as (values(1, 2, 3)) select * from t");
+    ParsesOk("insert into x with t(x, y) as (values(1, 2, 3)) select * from t");
     // With clause before insert statement.
     ParsesOk("with t as (select 1) insert into x select * from t");
+    ParsesOk("with t(x) as (select 1) insert into x select * from t");
 
     // Test quoted identifier or string literal as table alias.
     ParsesOk("with `t1` as (select 1 a), 't2' as (select 2 a), \"t3\" as (select 3 a)" +
         "select a from t1 union all select a from t2 union all select a from t3");
-
     // Multiple with clauses. Operands must be in parenthesis to
     // have their own with clause.
     ParsesOk("with t as (select 1) " +
@@ -783,9 +791,14 @@ public class ParserTest {
         "(with t as (select 3) select * from t) order by 1 limit 1");
     // Multiple with clauses. One before the insert and one inside the query statement.
     ParsesOk("with t as (select 1) insert into x with t as (select 2) select * from t");
+    ParsesOk("with t(c1) as (select 1) " +
+        "insert into x with t(c2) as (select 2) select * from t");
 
     // Empty with clause.
     ParserError("with t as () select 1");
+    ParserError("with t(x) as () select 1");
+    // No labels inside parenthesis.
+    ParserError("with t() as (select 1 as a) select a from t");
     // Missing select, union or insert statement after with clause.
     ParserError("select * from (with t as (select 1 as a)) as a");
     ParserError("with t as (select 1)");
@@ -794,8 +807,11 @@ public class ParserTest {
     ParserError("with t as select 1 as a union all select a from t");
     ParserError("with t1 as (select 1 as a), t2 as select 2 as a select a from t");
     ParserError("with t as select 1 as a select a from t");
+    // Missing parenthesis around column labels.
+    ParserError("with t c1 as (select 1 as a) select c1 from t");
     // Insert in with clause is not valid.
     ParserError("with t as (insert into x select * from tab) select * from t");
+    ParserError("with t(c1) as (insert into x select * from tab) select * from t");
     // Union operands need to be parenthesized to have their own with clause.
     ParserError("select * from t union all with t as (select 2) select * from t");
   }

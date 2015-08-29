@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -29,6 +30,7 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.google.common.collect.Lists;
 
 /**
  * Table metadata representing a catalog view or a local view from a WITH clause.
@@ -64,6 +66,9 @@ public class View extends Table {
   // Set if this View is from a WITH clause and not persisted in the catalog.
   private final boolean isLocalView_;
 
+  // Set if this View is from a WITH clause with column labels.
+  private List<String> colLabels_;
+
   public View(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
     super(id, msTable, db, name, owner);
@@ -71,12 +76,14 @@ public class View extends Table {
   }
 
   /**
-   * C'tor for WITH-clause views that already have a parsed QueryStmt.
+   * C'tor for WITH-clause views that already have a parsed QueryStmt and an optional
+   * list of column labels.
    */
-  public View(String alias, QueryStmt queryStmt) {
+  public View(String alias, QueryStmt queryStmt, List<String> colLabels) {
     super(null, null, null, alias, null);
     isLocalView_ = true;
     queryStmt_ = queryStmt;
+    colLabels_ = colLabels;
   }
 
   @Override
@@ -146,6 +153,27 @@ public class View extends Table {
   public String getOriginalViewDef() { return originalViewDef_; }
   public String getInlineViewDef() { return inlineViewDef_; }
   public boolean isLocalView() { return isLocalView_; }
+
+  /**
+   * Returns the column labels the user specified in the WITH-clause.
+   */
+  public List<String> getOriginalColLabels() { return colLabels_; }
+
+  /**
+   * Returns the explicit column labels for this view, or null if they need to be derived
+   * entirely from the underlying query statement. The returned list has at least as many
+   * elements as the number of column labels in the query stmt.
+   */
+  public List<String> getColLabels() {
+    if (colLabels_ == null) return null;
+    if (colLabels_.size() >= queryStmt_.getColLabels().size()) return colLabels_;
+    List<String> explicitColLabels = Lists.newArrayList(colLabels_);
+    explicitColLabels.addAll(queryStmt_.getColLabels().subList(
+        colLabels_.size(), queryStmt_.getColLabels().size()));
+    return explicitColLabels;
+  }
+
+  public boolean hasColLabels() { return colLabels_ != null; }
 
   @Override
   public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {

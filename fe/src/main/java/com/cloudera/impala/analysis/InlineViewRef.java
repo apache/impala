@@ -97,6 +97,7 @@ public class InlineViewRef extends TableRef {
     smap_ = new ExprSubstitutionMap();
     baseTblSmap_ = new ExprSubstitutionMap();
     setJoinAttrs(origTblRef);
+    explicitColLabels_ = view.getColLabels();
     // Set implicit aliases if no explicit one was given.
     if (hasExplicitAlias()) return;
     aliases_ = new String[] {

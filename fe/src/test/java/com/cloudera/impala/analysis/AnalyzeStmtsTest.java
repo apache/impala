@@ -2345,12 +2345,28 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Single view in WITH clause.
     AnalyzesOk("with t as (select int_col x, bigint_col y from functional.alltypes) " +
         "select x, y from t");
+    // Single view in WITH clause with column labels.
+    AnalyzesOk("with t(c1, c2) as (select int_col x, bigint_col y " +
+        "from functional.alltypes) " +
+        "select c1, c2 from t");
+    // Single view in WITH clause with the number of column labels less than the number
+    // of columns.
+    AnalyzesOk("with t(c1) as (select int_col, bigint_col y " +
+        "from functional.alltypes) " +
+        "select c1, y from t");
     // Multiple views in WITH clause. Only one view is used.
     AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes), " +
-        "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
+        "t2 as (select 1 x, 10 y), t3 as (values(2 x, 20 y), (3, 30)), " +
         "t4 as (select 4 x, 40 y union all select 5, 50), " +
         "t5 as (select * from (values(6 x, 60 y)) as a) " +
         "select x, y from t3");
+    // Multiple views in WITH clause with column labels. Only one view is used.
+    AnalyzesOk("with t1(c1, c2) as (select int_col, bigint_col " +
+        "from functional.alltypes), " +
+        "t2(c1, c2) as (select 1, 10), t3(a, b) as (values(2, 5), (3, 30)), " +
+        "t4(c1, c2) as (select 4, 40 union all select 5, 50), " +
+        "t5 as (select * from (values(6, 60)) as a) " +
+        "select a, b from t3");
     // Multiple views in WITH clause. All views used in a union.
     AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes), " +
         "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
@@ -2365,8 +2381,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "t5 as (select * from (values(6 x, 60 y)) as a) " +
         "select t1.y, t2.y, t3.y, t4.y, t5.y from t1, t2, t3, t4, t5 " +
         "where t1.y = t2.y and t2.y = t3.y and t3.y = t4.y and t4.y = t5.y");
+    // Multiple views in WITH clause with column labels. All views used in a join.
+    AnalyzesOk("with t1(c1, c2) as (select int_col x, bigint_col y " +
+        "from functional.alltypes), " +
+        "t2(c1, c2) as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
+        "t4 as (select 4 x, 40 y union all select 5, 50), " +
+        "t5 as (select * from (values(6 x, 60 y)) as a) " +
+        "select t1.c2, t2.c2, t3.y, t4.y, t5.y from t1, t2, t3, t4, t5 " +
+        "where t1.c2 = t2.c2 and t2.c2 = t3.y and t3.y = t4.y and t4.y = t5.y");
     // WITH clause in insert statement.
     AnalyzesOk("with t1 as (select * from functional.alltypestiny)" +
+        "insert into functional.alltypes partition(year, month) select * from t1");
+    AnalyzesOk("with t1(c1, c2) as (select * from functional.alltypestiny)" +
         "insert into functional.alltypes partition(year, month) select * from t1");
     // WITH clause in insert statement with a select statement that has a WITH
     // clause and an inline view (IMPALA-1100)
@@ -2385,6 +2411,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("with t1 as (select id from functional.alltypestiny) " +
         "insert into functional.alltypes partition(year, month) " +
         "with t1 as (select * from functional.alltypessmall) select * from t1");
+    AnalyzesOk("with t(c1, c2) as (select * from functional.alltypes) " +
+        "select a.c1, a.c2 from t a");
     // WITH-clause view used in inline view.
     AnalyzesOk("with t1 as (select 'a') select * from (select * from t1) as t2");
     AnalyzesOk("with t1 as (select 'a') " +
@@ -2413,6 +2441,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Aliases are resolved from inner-most to the outer-most scope.
     AnalyzesOk("with t1 as (select 'a') " +
         "select t2.* from (with t1 as (select 'b') select * from t1) as t2");
+    // Column labels do not conflict because they are in different scopes.
+    AnalyzesOk("with t1(c1) as (select 'a') " +
+        "select c1 from (with t1(c1) as (select 'b') select c1 from t1) as t2");
     // Table aliases do not conflict because t1 from the inline view is never used.
     AnalyzesOk("with t1 as (select 1), t2 as (select 2)" +
         "select * from functional.alltypes as t1");
@@ -2421,6 +2452,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Fully-qualified table does not conflict with WITH-clause table.
     AnalyzesOk("with alltypes as (select * from functional.alltypes) " +
         "select * from functional.alltypes union all select * from alltypes");
+    // Column labels can be used with table aliases.
+    AnalyzesOk("with t(c1) as (select id from functional.alltypes) " +
+        "select a.c1 from t a");
 
     // Use a custom analyzer to change the default db to functional.
     // Recursion is prevented because 'alltypes' in t1 refers to the table
@@ -2491,6 +2525,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Duplicate table alias: 't1'");
     AnalysisError("with t1 as (select 1) select * from (select 2) as t1 inner join t1",
         "Duplicate table alias: 't1'");
+    // With clause column labels must be used intead of aliases.
+    AnalysisError("with t1(c1) as (select id cnt from functional.alltypes) "+
+        "select cnt from t1",
+        "Could not resolve column/field reference: 'cnt'");
+    // With clause column labels must not exceed the number of columns in the query.
+    AnalysisError("with t(c1, c2) as (select id from functional.alltypes) " +
+        "select * from t",
+        "WITH-clause view 't' returns 1 columns, but 2 labels were specified. The " +
+        "number of column labels must be smaller or equal to the number of returned " +
+        "columns.");
     // Multiple references in same select statement require aliases.
     AnalysisError("with t1 as (select 'a' x) select * from t1 inner join t1",
         "Duplicate table alias: 't1'");

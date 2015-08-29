@@ -104,7 +104,8 @@ public class WithClause implements ParseNode {
     Preconditions.checkNotNull(other);
     views_ = Lists.newArrayList();
     for (View view: other.views_) {
-      views_.add(new View(view.getName(), view.getQueryStmt().clone()));
+      views_.add(new View(view.getName(), view.getQueryStmt().clone(),
+          view.getOriginalColLabels()));
     }
   }
 
@@ -119,9 +120,13 @@ public class WithClause implements ParseNode {
   public String toSql() {
     List<String> viewStrings = Lists.newArrayList();
     for (View view: views_) {
-      // Enclose the view alias in quotes if Hive cannot parse it without quotes.
-      // This is needed for view compatibility between Impala and Hive.
+      // Enclose the view alias and explicit labels in quotes if Hive cannot parse it
+      // without quotes. This is needed for view compatibility between Impala and Hive.
       String aliasSql = ToSqlUtils.getIdentSql(view.getName());
+      if (view.hasColLabels()) {
+        aliasSql += "(" + Joiner.on(", ").join(
+            ToSqlUtils.getIdentSqlList(view.getOriginalColLabels())) + ")";
+      }
       viewStrings.add(aliasSql + " AS (" + view.getQueryStmt().toSql() + ")");
     }
     return "WITH " + Joiner.on(",").join(viewStrings);
