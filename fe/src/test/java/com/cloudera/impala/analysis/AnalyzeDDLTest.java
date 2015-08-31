@@ -33,6 +33,7 @@ import org.junit.Test;
 import com.cloudera.impala.catalog.ArrayType;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
+import com.cloudera.impala.analysis.CreateTableStmt;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -344,6 +345,55 @@ public class AnalyzeDDLTest extends AnalyzerTest {
                "set tblproperties('a'='1')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
                "set serdeproperties ('a'='2')");
+
+    {
+      // Check that long_properties fail at the analysis layer
+      String long_property_key = "";
+      for (int i = 0; i < MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH; ++i) {
+        long_property_key += 'k';
+      }
+      String long_property_value = "";
+      for (int i = 0; i < MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH; ++i) {
+        long_property_value += 'v';
+      }
+
+      // At this point long_property_{key_value} are actually not quite long enough to
+      // cause analysis to fail.
+
+      AnalyzesOk("alter table functional.alltypes "
+          + "set serdeproperties ('" + long_property_key + "'='" + long_property_value
+          + "') ");
+
+      AnalyzesOk("alter table functional.alltypes "
+          + "set tblproperties ('" + long_property_key + "'='" + long_property_value
+          + "') ");
+
+      long_property_key += 'X';
+      long_property_value += 'X';
+      // Now that long_property_{key,value} are one character longer, they are too long
+      // for the analyzer.
+
+      AnalysisError("alter table functional.alltypes set "
+              + "tblproperties ('" + long_property_key + "'='value')",
+          "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + ": "
+              + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
+
+      AnalysisError("alter table functional.alltypes set "
+              + "tblproperties ('key'='" + long_property_value + "')",
+          "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
+              + ": " + (MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + 1));
+
+      AnalysisError("alter table functional.alltypes set "
+              + "serdeproperties ('" + long_property_key + "'='value')",
+          "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + ": "
+              + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
+
+      AnalysisError("alter table functional.alltypes set "
+              + "serdeproperties ('key'='" + long_property_value + "')",
+          "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
+              + ": " + (MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + 1));
+    }
+
     // Arbitrary exprs as partition key values. Constant exprs are ok.
     AnalyzesOk("alter table functional.alltypes PARTITION " +
                "(year=cast(100*20+10 as INT), month=cast(2+9 as INT)) " +
@@ -1177,6 +1227,52 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (s varchar(3))");
     AnalyzesOk("create table functional.new_table (c char(250))");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (c char(3))");
+
+    {
+      // Check that long_properties fail at the analysis layer
+      String long_property_key = "";
+      for (int i = 0; i < MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH; ++i) {
+        long_property_key += 'k';
+      }
+      String long_property_value = "";
+      for (int i = 0; i < MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH; ++i) {
+        long_property_value += 'v';
+      }
+
+      // At this point long_property_{key_value} are actually not quite long enough to
+      // cause analysis to fail.
+
+      AnalyzesOk("create table new_table (i int) "
+          + "with serdeproperties ('" + long_property_key + "'='" + long_property_value
+          + "') "
+          + "tblproperties ('" + long_property_key + "'='" + long_property_value + "')");
+
+      long_property_key += 'X';
+      long_property_value += 'X';
+      // Now that long_property_{key,value} are one character longer, they are too long
+      // for the analyzer.
+
+      AnalysisError("create table new_table (i int) "
+              + "tblproperties ('" + long_property_key + "'='value')",
+          "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + ": "
+              + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
+
+      AnalysisError("create table new_table (i int) "
+              + "tblproperties ('key'='" + long_property_value + "')",
+          "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
+              + ": " + (MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + 1));
+
+      AnalysisError("create table new_table (i int) "
+              + "with serdeproperties ('" + long_property_key + "'='value')",
+          "Serde property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH
+              + ": " + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
+
+      AnalysisError("create table new_table (i int) "
+              + "with serdeproperties ('key'='" + long_property_value + "')",
+          "Serde property value length must be <= "
+              + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + ": "
+              + (MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + 1));
+    }
 
     // Supported file formats. Exclude Avro since it is tested separately.
     String [] fileFormats =

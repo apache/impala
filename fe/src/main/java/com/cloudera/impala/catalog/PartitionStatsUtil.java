@@ -18,6 +18,7 @@ import com.cloudera.impala.thrift.TPartitionStats;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.cloudera.impala.util.MetaStoreUtil;
 
 import java.util.Iterator;
 import java.util.List;
@@ -42,9 +43,6 @@ public class PartitionStatsUtil {
 
   public static final String INTERMEDIATE_STATS_CHUNK_PREFIX =
       "impala_intermediate_stats_chunk";
-
-  // HMS-imposed maximum length of a string parameter for a partition.
-  private static final int HMS_MAX_CHUNKLEN = 4000;
 
   private final static Logger LOG = LoggerFactory.getLogger(PartitionStatsUtil.class);
 
@@ -103,9 +101,10 @@ public class PartitionStatsUtil {
       TSerializer serializer = new TSerializer(protocolFactory);
       byte[] serialized = serializer.serialize(partStats);
       String base64 = new String(Base64.encodeBase64(serialized));
-      List<String> chunks = chunkStringForHms(base64, HMS_MAX_CHUNKLEN);
-      partition.putToParameters(INTERMEDIATE_STATS_NUM_CHUNKS,
-          Integer.toString(chunks.size()));
+      List<String> chunks =
+          chunkStringForHms(base64, MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH);
+      partition.putToParameters(
+          INTERMEDIATE_STATS_NUM_CHUNKS, Integer.toString(chunks.size()));
       for (int i = 0; i < chunks.size(); ++i) {
         partition.putToParameters(INTERMEDIATE_STATS_CHUNK_PREFIX + i, chunks.get(i));
       }

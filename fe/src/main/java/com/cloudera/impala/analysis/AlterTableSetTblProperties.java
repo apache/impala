@@ -25,6 +25,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.*;
 import com.cloudera.impala.util.AvroSchemaParser;
 import com.cloudera.impala.util.AvroSchemaUtils;
+import com.cloudera.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -68,6 +69,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+
+    MetaStoreUtil.checkShortPropertyMap("Property", tblProperties_);
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
     // avoid potential metadata corruption (see IMPALA-2042).

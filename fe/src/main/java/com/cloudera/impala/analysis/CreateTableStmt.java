@@ -36,6 +36,7 @@ import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.util.AvroSchemaConverter;
 import com.cloudera.impala.util.AvroSchemaParser;
 import com.cloudera.impala.util.AvroSchemaUtils;
+import com.cloudera.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -190,6 +191,9 @@ public class CreateTableStmt extends StatementBase {
     tableName_ = analyzer.getFqTableName(tableName_);
     tableName_.analyze();
     owner_ = analyzer.getUser().getName();
+
+    MetaStoreUtil.checkShortPropertyMap("Property", tblProperties_);
+    MetaStoreUtil.checkShortPropertyMap("Serde property", serdeProperties_);
 
     if (analyzer.dbContainsTable(tableName_.getDb(), tableName_.getTbl(), Privilege.CREATE)
         && !ifNotExists_) {
