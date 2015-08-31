@@ -122,7 +122,13 @@ class HashUtil {
   /// This technique is recommended instead of FNV-32 since the LSB of an FNV hash is the
   /// XOR of the LSBs of its input bytes, leading to poor results for duplicate inputs.
   /// The input seed 'hash' is duplicated so the top half of the seed is not all zero.
+  /// Data length must be at least 1 byte: zero-length data should be handled separately,
+  /// for example using CombineHash with a unique constant value to avoid returning the
+  /// hash argument. Zero-length data gives terrible results: the initial hash value is
+  /// xored with itself cancelling all bits.
   static uint32_t FnvHash64to32(const void* data, int32_t bytes, uint32_t hash) {
+    // IMPALA-2270: this function should never be used for zero-byte inputs.
+    DCHECK_GT(bytes, 0);
     uint64_t hash_u64 = hash | ((uint64_t)hash << 32);
     hash_u64 = FnvHash64(data, bytes, hash_u64);
     return (hash_u64 >> 32) ^ (hash_u64 & 0xFFFFFFFF);
@@ -138,6 +144,17 @@ class HashUtil {
     } else {
       return MurmurHash2_64(data, bytes, seed);
     }
+  }
+
+  /// The magic number (used in hash_combine()) 0x9e3779b9 = 2^32 / (golden ratio).
+  static const uint32_t HASH_COMBINE_SEED = 0x9e3779b9;
+
+  /// Combine hashes 'value' and 'seed' to get a new hash value.  Similar to
+  /// boost::hash_combine(), but for uint32_t. This function should be used with a
+  /// constant first argument to update the hash value for zero-length values such as
+  /// NULL, boolean, and empty strings.
+  static inline uint32_t HashCombine32(uint32_t value, uint32_t seed) {
+    return seed ^ (HASH_COMBINE_SEED + value + (seed << 6) + (seed >> 2));
   }
 
 };

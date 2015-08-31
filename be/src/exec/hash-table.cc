@@ -161,6 +161,7 @@ uint32_t HashTableCtx::HashVariableLenRow() {
       hash = Hash(loc, sizeof(StringValue), hash);
     } else {
       // Hash the string
+      // TODO: when using CRC hash on empty string, this only swaps bytes.
       StringValue* str = reinterpret_cast<StringValue*>(loc);
       hash = Hash(str->ptr, str->len, hash);
     }

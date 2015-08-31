@@ -44,9 +44,11 @@ using namespace llvm;
 //
 // The different hash functions benchmarked:
 //   1. FNV Hash: Fowler-Noll-Vo hash function
-//   2. Boost Hash: boost hash function
-//   3. Crc: hash using sse4 crc hash instruction
-//   4. Codegen: hash using sse4 with the tuple types baked into the codegen function
+//   2. FNV Hash with empty string handling: FNV with special-case for empty string
+//   3. Murmur2_64 Hash: Murmur2 hash function
+//   4. Boost Hash: boost hash function
+//   5. Crc: hash using sse4 crc hash instruction
+//   6. Codegen: hash using sse4 with the tuple types baked into the codegen function
 //
 // n is the number of buckets, k is the number of items
 // Expected(collisions) = n - k + E(X)
@@ -56,20 +58,23 @@ using namespace llvm;
 //                      = n / e
 //                      = 367
 
-// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
+// Machine Info: Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
 // Int Hash:             Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                            Fnv               76.46                  1X
-//                          Boost               203.7              2.665X
-//                            Crc               305.3              3.993X
-//                        Codegen               703.4              9.199X
-
+//                            Fnv               114.6                  1X
+//                     Murmur2_64               129.9              1.134X
+//                          Boost               294.1              2.567X
+//                            Crc               536.2               4.68X
+//                        Codegen                1413              12.33X
+//
 // Mixed Hash:           Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                            Fnv               55.51                  1X
-//                          Boost               82.86              1.493X
-//                            Crc               215.1              3.874X
-//                        Codegen               219.8              3.959X
+//                            Fnv               90.88                  1X
+//                       FnvEmpty               91.58              1.008X
+//                     Murmur2_64               124.9              1.374X
+//                          Boost               133.5              1.469X
+//                            Crc               435.8              4.795X
+//                        Codegen               379.3              4.174X
 
 typedef uint32_t (*CodegenHashFn)(int rows, char* data, int32_t* results);
 
@@ -143,7 +148,25 @@ void TestCodegenIntHash(int batch, void* d) {
   }
 }
 
-void TestFnvMixedHash(int batch, void* d) {
+void TestMurmur2_64IntHash(int batch, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  int rows = data->num_rows;
+  int cols = data->num_cols;
+  for (int i = 0; i < batch; ++i) {
+    char* values = reinterpret_cast<char*>(data->data);
+    for (int j = 0; j < rows; ++j) {
+      uint64_t hash = 0;
+      for (int k = 0; k < cols; ++k) {
+        hash = HashUtil::MurmurHash2_64(&values[k], sizeof(uint32_t), hash);
+      }
+      data->results[j] = hash;
+      values += cols;
+    }
+  }
+}
+
+template <bool handle_empty>
+void TestFnvMixedHashTemplate(int batch, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   int rows = data->num_rows;
   for (int i = 0; i < batch; ++i) {
@@ -161,12 +184,24 @@ void TestFnvMixedHash(int batch, void* d) {
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash = HashUtil::FnvHash64to32(str->ptr, str->len, hash);
+      if (handle_empty && str->len == 0) {
+        hash = HashUtil::HashCombine32(0, hash);
+      } else {
+        hash = HashUtil::FnvHash64to32(str->ptr, str->len, hash);
+      }
       values += sizeof(StringValue);
 
       data->results[j] = hash;
     }
   }
+}
+
+void TestFnvMixedHash(int batch, void* d) {
+  return TestFnvMixedHashTemplate<false>(batch, d);
+}
+
+void TestFnvEmptyMixedHash(int batch, void* d) {
+  return TestFnvMixedHashTemplate<true>(batch, d);
 }
 
 void TestCrcMixedHash(int batch, void* d) {
@@ -231,6 +266,32 @@ void TestBoostMixedHash(int batch, void* d) {
       values += sizeof(StringValue);
 
       data->results[j] = h;
+    }
+  }
+}
+
+void TestMurmur2_64MixedHash(int batch, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  int rows = data->num_rows;
+  for (int i = 0; i < batch; ++i) {
+    char* values = reinterpret_cast<char*>(data->data);
+    for (int j = 0; j < rows; ++j) {
+      uint64_t hash = 0;
+
+      hash = HashUtil::MurmurHash2_64(values, sizeof(int8_t), hash);
+      values += sizeof(int8_t);
+
+      hash = HashUtil::MurmurHash2_64(values, sizeof(int32_t), hash);
+      values += sizeof(int32_t);
+
+      hash = HashUtil::MurmurHash2_64(values, sizeof(int64_t), hash);
+      values += sizeof(int64_t);
+
+      StringValue* str = reinterpret_cast<StringValue*>(values);
+      hash = HashUtil::MurmurHash2_64(str->ptr, str->len, hash);
+      values += sizeof(StringValue);
+
+      data->results[j] = hash;
     }
   }
 }
@@ -426,6 +487,7 @@ int main(int argc, char **argv) {
 
   Benchmark int_suite("Int Hash");
   int_suite.AddBenchmark("Fnv", TestFnvIntHash, &int_data);
+  int_suite.AddBenchmark("Murmur2_64", TestMurmur2_64IntHash, &int_data);
   int_suite.AddBenchmark("Boost", TestBoostIntHash, &int_data);
   int_suite.AddBenchmark("Crc", TestCrcIntHash, &int_data);
   int_suite.AddBenchmark("Codegen", TestCodegenIntHash, &int_data);
@@ -433,6 +495,8 @@ int main(int argc, char **argv) {
 
   Benchmark mixed_suite("Mixed Hash");
   mixed_suite.AddBenchmark("Fnv", TestFnvMixedHash, &mixed_data);
+  mixed_suite.AddBenchmark("FnvEmpty", TestFnvEmptyMixedHash, &mixed_data);
+  mixed_suite.AddBenchmark("Murmur2_64", TestMurmur2_64MixedHash, &mixed_data);
   mixed_suite.AddBenchmark("Boost", TestBoostMixedHash, &mixed_data);
   mixed_suite.AddBenchmark("Crc", TestCrcMixedHash, &mixed_data);
   mixed_suite.AddBenchmark("Codegen", TestCodegenMixedHash, &mixed_data);

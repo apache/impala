@@ -73,6 +73,52 @@ TEST_F(RawValueTest, TypeChar) {
   EXPECT_EQ(memcmp(&val, s.data(), sizeof(int)), 0);
 }
 
+// IMPALA-2270: "", false, and NULL should hash to distinct values.
+TEST_F(RawValueTest, HashEmptyAndNull) {
+  uint32_t seed = 12345;
+  uint32_t null_hash = RawValue::GetHashValue(NULL, TYPE_STRING, seed);
+  uint32_t null_hash_fnv = RawValue::GetHashValueFnv(NULL, TYPE_STRING, seed);
+  StringValue empty(NULL, 0);
+  uint32_t empty_hash = RawValue::GetHashValue(&empty, TYPE_STRING, seed);
+  uint32_t empty_hash_fnv = RawValue::GetHashValueFnv(&empty, TYPE_STRING, seed);
+  bool false_val = false;
+  uint32_t false_hash = RawValue::GetHashValue(&false_val, TYPE_BOOLEAN, seed);
+  uint32_t false_hash_fnv = RawValue::GetHashValue(&false_val, TYPE_BOOLEAN, seed);
+  EXPECT_NE(seed, null_hash);
+  EXPECT_NE(seed, empty_hash);
+  EXPECT_NE(seed, false_hash);
+  EXPECT_NE(seed, null_hash_fnv);
+  EXPECT_NE(seed, empty_hash_fnv);
+  EXPECT_NE(seed, false_hash_fnv);
+  EXPECT_NE(null_hash, empty_hash);
+  EXPECT_NE(null_hash_fnv, empty_hash_fnv);
+  EXPECT_NE(null_hash, false_hash);
+  EXPECT_NE(false_hash, null_hash_fnv);
+}
+
+/// IMPALA-2270: Test that FNV hash of (int, "") is not skewed.
+TEST(HashUtil, IntNullSkew) {
+  int num_values = 100000;
+  int num_buckets = 16;
+  int buckets[num_buckets];
+  memset(buckets, 0, sizeof(buckets));
+  for (int32_t i = 0; i < num_values; ++i) {
+    uint32_t hash = RawValue::GetHashValueFnv(&i, TYPE_INT, 9999);
+    StringValue empty(NULL, 0);
+    hash = RawValue::GetHashValueFnv(&empty, TYPE_STRING, hash);
+    ++buckets[hash % num_buckets];
+  }
+
+  for (int i = 0; i < num_buckets; ++i) {
+    LOG(INFO) << "Bucket " << i << ": " << buckets[i];
+    double exp_count = num_values / (double) num_buckets;
+    EXPECT_GT(buckets[i], 0.9 * exp_count) << "Bucket " << i
+                                           << " has <= 90%% of expected";
+    EXPECT_LT(buckets[i], 1.1 * exp_count) << "Bucket " << i
+                                           << " has >= 110%% of expected";
+  }
+}
+
 }
 
 int main(int argc, char **argv) {

@@ -454,6 +454,19 @@ TEST_F(HashTableTest, QuadraticInsertFullTest) {
   InsertFullTest(true, 65536);
 }
 
+// Test that hashing empty string updates hash value.
+TEST_F(HashTableTest, HashEmpty) {
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 2, 1);
+  uint32_t seed = 9999;
+  ht_ctx.set_level(0);
+  EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, seed));
+  // TODO: level 0 uses CRC hash, which only swaps bytes around on empty input.
+  // EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, ht_ctx.Hash(NULL, 0, seed)));
+  ht_ctx.set_level(1);
+  EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, seed));
+  EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, ht_ctx.Hash(NULL, 0, seed)));
+}
+
 }
 
 int main(int argc, char** argv) {

@@ -90,17 +90,6 @@ class RawValue {
   /// This is more performant than Compare() == 0 for string equality, mostly because of
   /// the length comparison check.
   static bool Eq(const void* v1, const void* v2, const ColumnType& type);
-
- private:
-  /// The magic number (used in hash_combine()) 0x9e3779b9 = 2^32 / (golden ratio).
-  static const uint32_t HASH32_COMBINE_SEED = 0x9e3779b9;
-
-  /// Combine hashes 'value' and 'seed' to get a new hash value.
-  /// Similar to boost::hash_combine(), but for uint32_t.
-  /// Used for NULL and boolean inputs in GetHashValue().
-  static inline uint32_t HashCombine32(uint32_t value, uint32_t seed) {
-    return seed ^ (HASH32_COMBINE_SEED + value + (seed << 6) + (seed >> 2));
-  }
 };
 
 inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type) {
@@ -163,20 +152,28 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
   };
 }
 
-/// Use boost::hash_combine for corner cases.  boost::hash_combine is reimplemented
-/// here to use uint32_t's (instead of size_t)
+/// Arbitrary constants used to compute hash values for special cases. Constants were
+/// obtained by taking lower bytes of generated UUID. NULL and empty strings should
+/// hash to different values.
+static const uint32_t HASH_VAL_NULL = 0x58081667;
+static const uint32_t HASH_VAL_EMPTY = 0x7dca7eee;
+
 inline uint32_t RawValue::GetHashValue(const void* v, const ColumnType& type,
     uint32_t seed) {
-  // Hash_combine with v = 0
-  if (v == NULL) return HashCombine32(0, seed);
+  // Use HashCombine with arbitrary constant to ensure we don't return seed.
+  if (v == NULL) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
 
   switch (type.type) {
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
+      if (string_value->len == 0) {
+        return HashUtil::HashCombine32(HASH_VAL_EMPTY, seed);
+      }
       return HashUtil::Hash(string_value->ptr, string_value->len, seed);
     }
-    case TYPE_BOOLEAN: return HashCombine32(*reinterpret_cast<const bool*>(v), seed);
+    case TYPE_BOOLEAN:
+      return HashUtil::HashCombine32(*reinterpret_cast<const bool*>(v), seed);
     case TYPE_TINYINT: return HashUtil::Hash(v, 1, seed);
     case TYPE_SMALLINT: return HashUtil::Hash(v, 2, seed);
     case TYPE_INT: return HashUtil::Hash(v, 4, seed);
@@ -195,16 +192,20 @@ inline uint32_t RawValue::GetHashValue(const void* v, const ColumnType& type,
 
 inline uint32_t RawValue::GetHashValueFnv(const void* v, const ColumnType& type,
     uint32_t seed) {
-  // Hash_combine with v = 0
-  if (v == NULL) return HashCombine32(0, seed);
+  // Use HashCombine with arbitrary constant to ensure we don't return seed.
+  if (v == NULL) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
 
   switch (type.type ) {
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
+      if (string_value->len == 0) {
+        return HashUtil::HashCombine32(HASH_VAL_EMPTY, seed);
+      }
       return HashUtil::FnvHash64to32(string_value->ptr, string_value->len, seed);
     }
-    case TYPE_BOOLEAN: return HashCombine32(*reinterpret_cast<const bool*>(v), seed);
+    case TYPE_BOOLEAN:
+      return HashUtil::HashCombine32(*reinterpret_cast<const bool*>(v), seed);
     case TYPE_TINYINT: return HashUtil::FnvHash64to32(v, 1, seed);
     case TYPE_SMALLINT: return HashUtil::FnvHash64to32(v, 2, seed);
     case TYPE_INT: return HashUtil::FnvHash64to32(v, 4, seed);

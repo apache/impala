@@ -171,6 +171,7 @@ class HashTableCtx {
 
  private:
   friend class HashTable;
+  friend class HashTableTest_HashEmpty_Test;
 
   /// Compute the hash of the values in expr_values_buffer_.
   /// This will be replaced by codegen.  We don't want this inlined for replacing
