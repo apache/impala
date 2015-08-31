@@ -1184,6 +1184,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Alter table is not supported and should fail
     AnalysisError("ALTER TABLE functional_kudu.testtbl ADD COLUMNS (other int)",
         "ALTER TABLE not allowed on Kudu table: functional_kudu.testtbl");
+
+    // Kudu tables can only be renamed or the table properties can be changed
+    AnalyzesOk("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('kudu.table_name' = 'Hans')");
+
+    AnalyzesOk("ALTER TABLE functional_kudu.testtbl RENAME TO new_testtbl");
   }
 
   @Test

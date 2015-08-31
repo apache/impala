@@ -20,12 +20,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.cloudera.impala.analysis.AlterTableOrViewRenameStmt;
+import com.cloudera.impala.analysis.AlterTableSetTblProperties;
+import com.cloudera.impala.analysis.AlterTableStmt;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TKuduTable;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
-import com.cloudera.impala.util.KuduUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -34,7 +36,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.net.HostAndPort;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -81,6 +82,11 @@ public class KuduTable extends Table {
 
   // The set of columns that are key columns in Kudu.
   private List<String> kuduKeyColumnNames_;
+
+  public static boolean alterTableAllowed(AlterTableStmt stmt) {
+    return stmt instanceof AlterTableSetTblProperties ||
+        stmt instanceof AlterTableOrViewRenameStmt;
+  }
 
   protected KuduTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {

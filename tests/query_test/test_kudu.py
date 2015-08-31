@@ -46,3 +46,6 @@ class TestKuduOperations(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_insert_update_delete(self, vector):
     self.run_test_case('QueryTest/kudu_crud', vector, use_db="kududb_test")
+
+  def test_kudu_alter_table(self, vector):
+    self.run_test_case('QueryTest/kudu_alter', vector, use_db="kududb_test")
