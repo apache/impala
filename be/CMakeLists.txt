@@ -266,7 +266,7 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}
   kudu_client
-  -lrt -lboost_date_time
+  -lrt
 )
 
 

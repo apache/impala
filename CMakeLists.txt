@@ -38,7 +38,7 @@ ENDIF (DEFINED ENV{BOOST_ROOT})
 
 set(Boost_DEBUG TRUE)
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost REQUIRED COMPONENTS thread regex-mt system-mt filesystem-mt)
+find_package(Boost REQUIRED COMPONENTS thread regex-mt system-mt filesystem-mt date_time)
 include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
