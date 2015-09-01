@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
@@ -67,6 +68,8 @@ public class KuduDdlDelegate implements DdlDelegate {
 
     String splitsJson = msTbl.getParameters().get(KuduTable.KEY_SPLIT_KEYS);
 
+    String replication = msTbl.getParameters().get(KuduTable.KEY_TABLET_REPLICAS);
+
     try {
       KuduClientBuilder builder = new KuduClientBuilder(kuduMasters);
       KuduClient client = builder.build();
@@ -115,6 +118,18 @@ public class KuduDdlDelegate implements DdlDelegate {
       CreateTableBuilder ctb = new CreateTableBuilder();
       for (PartialRow splitRow : parseSplits(schema, splitsJson)) {
         ctb.addSplitRow(splitRow);
+      }
+
+      if (Strings.isNullOrEmpty(replication)) {
+        ctb.setNumReplicas(1);
+      } else {
+        int r = Integer.parseInt(replication);
+        if (r <= 0) {
+          throw new ImpalaRuntimeException(
+              "Number of tablet replicas must be greater than zero. " +
+              "Given number of replicas is: " + Integer.toString(r));
+        }
+        ctb.setNumReplicas(r);
       }
 
       client.createTable(kuduTableName, schema, ctb);

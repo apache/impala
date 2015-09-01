@@ -80,6 +80,10 @@ public class KuduTable extends Table {
 
   public static final String KEY_SPLIT_KEYS = "kudu.split_keys";
 
+  // Key to specify the number of tablet replicas.
+  // TODO(KUDU): Allow modification in alter table.
+  public static final String KEY_TABLET_REPLICAS = "kudu.num_tablet_replicas";
+
   public static final long KUDU_RPC_TIMEOUT_MS = 50000;
 
   // The name of the table in Kudu.

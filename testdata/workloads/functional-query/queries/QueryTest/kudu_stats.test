@@ -6,16 +6,17 @@ TBLPROPERTIES(
  'kudu.table_name' = 'simple',
  'kudu.split_keys' = '[[10], [30]]',
  'kudu.master_addresses' = '127.0.0.1',
- 'kudu.key_columns' = 'id'
+ 'kudu.key_columns' = 'id',
+ 'kudu.num_tablet_replicas' = '2'
 )
 ---- RESULTS
 ====
 ---- QUERY
 show table stats simple
 ---- RESULTS
--1,'','8000000A',regex:.*?:\d+,1
--1,'8000000A','8000001E',regex:.*?:\d+,1
--1,'8000001E','',regex:.*?:\d+,1
+-1,'','8000000A',regex:.*?:\d+,2
+-1,'8000000A','8000001E',regex:.*?:\d+,2
+-1,'8000001E','',regex:.*?:\d+,2
 ---- TYPES
 INT,STRING,STRING,STRING,INT
 ---- LABELS
