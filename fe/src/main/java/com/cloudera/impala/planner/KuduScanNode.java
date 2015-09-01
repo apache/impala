@@ -152,9 +152,15 @@ public class KuduScanNode extends ScanNode {
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-
     // Update the number of nodes to reflect the hosts that have relevant data.
     numNodes_ = hostIndexSet_.size();
+
+    // Update the cardinality
+    inputCardinality_ = cardinality_ = kuduTable_.getNumRows();
+    cardinality_ *= computeSelectivity();
+    cardinality_ = Math.max(1, cardinality_);
+    cardinality_ = capAtLimit(cardinality_);
+    LOG.debug("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
   }
 
   @Override
