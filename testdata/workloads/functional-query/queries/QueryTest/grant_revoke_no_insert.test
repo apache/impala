@@ -59,20 +59,20 @@ STRING
 ---- QUERY
 show grant role grant_revoke_test_ALL_SERVER
 ---- RESULTS
-'SERVER','','','','ALL',FALSE,regex:.+
+'SERVER','','','','','ALL',FALSE,regex:.+
 ---- LABELS
-scope, database, table, uri, privilege, grant_option, create_time
+scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 show grant role grant_revoke_test_ALL_SERVER on server
 ---- RESULTS
-'SERVER','','','','ALL',FALSE,regex:.+
+'SERVER','','','','','ALL',FALSE,regex:.+
 ---- LABELS
-scope, database, table, uri, privilege, grant_option, create_time
+scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- USER
 does_not_exist
@@ -184,11 +184,11 @@ STRING
 ---- QUERY
 show grant role grant_revoke_test_ALL_URI
 ---- RESULTS
-'URI','','','$NAMENODE/test-warehouse/grant_rev_test_tbl2','ALL',FALSE,regex:.+
+'URI','','','','$NAMENODE/test-warehouse/grant_rev_test_tbl2','ALL',FALSE,regex:.+
 ---- LABELS
-scope, database, table, uri, privilege, grant_option, create_time
+scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # To create a database server-level privileges are required.
@@ -233,12 +233,12 @@ GRANT INSERT ON TABLE grant_rev_db.test_tbl1 TO grant_revoke_test_SELECT_INSERT_
 ---- QUERY
 show grant role grant_revoke_test_SELECT_INSERT_TEST_TBL on table grant_rev_db.test_tbl1
 ---- RESULTS
-'TABLE','grant_rev_db','test_tbl1','','SELECT',FALSE,regex:.+
-'TABLE','grant_rev_db','test_tbl1','','INSERT',FALSE,regex:.+
+'TABLE','grant_rev_db','test_tbl1','','','SELECT',FALSE,regex:.+
+'TABLE','grant_rev_db','test_tbl1','','','INSERT',FALSE,regex:.+
 ---- LABELS
-scope, database, table, uri, privilege, grant_option, create_time
+scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # Attempt to INSERT to S3 will give an error about inserting to non-HDFS filesystem.
@@ -331,12 +331,12 @@ root
 ---- QUERY
 show grant role grant_revoke_test_ROOT
 ---- RESULTS
-'DATABASE','functional','','','ALL',TRUE,regex:.+
-'TABLE','functional','alltypes','','ALL',FALSE,regex:.+
+'DATABASE','functional','','','','ALL',TRUE,regex:.+
+'TABLE','functional','alltypes','','','ALL',FALSE,regex:.+
 ---- LABELS
-scope, database, table, uri, privilege, grant_option, create_time
+scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ---- USER
 root
 ====
@@ -393,13 +393,220 @@ STRING
 # Privilege still exists, but grant option is set to false
 show grant role grant_revoke_test_ROOT
 ---- RESULTS
-'DATABASE','functional','','','ALL',FALSE,regex:.+
+'DATABASE','functional','','','','ALL',FALSE,regex:.+
 ---- LABELS
-scope, database, table, uri, privilege, grant_option, create_time
+scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ---- USER
 root
+====
+---- QUERY
+REVOKE ROLE grant_revoke_test_ALL_URI FROM GROUP $GROUP_NAME;
+REVOKE ROLE grant_revoke_test_SELECT_INSERT_TEST_TBL FROM GROUP $GROUP_NAME;
+---- RESULTS
+====
+---- QUERY
+GRANT ROLE grant_revoke_test_ALL_SERVER TO GROUP $GROUP_NAME
+---- RESULTS
+====
+---- QUERY
+show current roles
+---- RESULTS: VERIFY_IS_SUBSET
+'grant_revoke_test_ALL_SERVER'
+---- TYPES
+STRING
+====
+---- QUERY
+# Create a table with multiple columns to test column-level security.
+create table grant_rev_db.test_tbl3(a int, b int, c int, d int, e int) partitioned by (x int, y int)
+---- RESULTS
+====
+---- QUERY
+GRANT SELECT (a, b, x) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','a','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','b','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','x','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+GRANT SELECT (c, d, y) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','a','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','b','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','c','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','d','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','x','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','y','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+GRANT SELECT (a, a, e, x) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','a','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','b','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','c','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','d','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','e','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','x','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','y','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+# Revoke SELECT privileges from columns
+REVOKE SELECT (a, b, b, y) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','c','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','d','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','e','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','x','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+REVOKE SELECT (a, b, c, x) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','d','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','e','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+REVOKE SELECT (a, b, c, d, e) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_ALL_SERVER;
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+# Grant SELECT on table to 'root' without 'WITH GRANT' option.
+GRANT ROLE grant_revoke_test_ROOT TO GROUP root;
+GRANT SELECT ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ROOT;
+REVOKE ALL ON DATABASE functional FROM grant_revoke_test_ROOT;
+---- RESULTS
+====
+---- USER
+root
+---- QUERY
+show grant role grant_revoke_test_ROOT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'TABLE','grant_rev_db','test_tbl3','','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- USER
+root
+---- QUERY
+GRANT SELECT (a) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ROOT
+---- CATCH
+User 'root' does not have privileges to execute: GRANT_PRIVILEGE
+====
+---- QUERY
+REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_ROOT
+---- RESULTS
+====
+---- QUERY
+# Grant SELECT on table to 'root' with 'WITH GRANT' option.
+GRANT SELECT ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ROOT WITH GRANT OPTION
+---- RESULTS
+====
+---- USER
+root
+---- QUERY
+GRANT SELECT (a) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ROOT
+---- RESULTS
+====
+---- USER
+root
+---- QUERY
+show grant role grant_revoke_test_ROOT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'TABLE','grant_rev_db','test_tbl3','','','SELECT',TRUE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','a','','SELECT',FALSE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+GRANT SELECT (a, c, e) ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_ALL_SERVER  WITH GRANT OPTION
+---- RESULTS
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','a','','SELECT',TRUE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','c','','SELECT',TRUE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','e','','SELECT',TRUE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+REVOKE GRANT OPTION FOR SELECT (a, c) ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+# TODO: Add a test case that exercises the cascading effect of REVOKE ALL.
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'SERVER','','','','','ALL',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','a','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','c','','SELECT',FALSE,regex:.+
+'COLUMN','grant_rev_db','test_tbl3','e','','SELECT',TRUE,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 # Cleanup test roles
