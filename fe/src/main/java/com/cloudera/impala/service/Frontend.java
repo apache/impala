@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.cloudera.impala.catalog.KuduTable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
@@ -647,6 +648,8 @@ public class Frontend {
       return ((HBaseTable) table).getTableStats();
     } else if (table instanceof DataSourceTable) {
       return ((DataSourceTable) table).getTableStats();
+    } else if (table instanceof KuduTable) {
+      return ((KuduTable) table).getTableStats();
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());
     }

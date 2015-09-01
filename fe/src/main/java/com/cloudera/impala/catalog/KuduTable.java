@@ -19,15 +19,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.xml.bind.DatatypeConverter;
 
 import com.cloudera.impala.analysis.AlterTableOrViewRenameStmt;
 import com.cloudera.impala.analysis.AlterTableSetTblProperties;
 import com.cloudera.impala.analysis.AlterTableStmt;
+import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TKuduTable;
+import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.cloudera.impala.util.TResultRowBuilder;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -41,6 +47,8 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.log4j.Logger;
+import org.kududb.client.KuduClient;
+import org.kududb.client.LocatedTablet;
 
 /**
  * Impala representation of a Kudu table.
@@ -229,4 +237,45 @@ public class KuduTable extends Table {
   public int getNumNodes() { return -1; }
 
   public List<String> getKuduKeyColumnNames() { return kuduKeyColumnNames_; }
+
+  public TResultSet getTableStats() throws ImpalaRuntimeException {
+    TResultSet result = new TResultSet();
+    TResultSetMetadata resultSchema = new TResultSetMetadata();
+    result.setSchema(resultSchema);
+
+    resultSchema.addToColumns(new TColumn("# Rows", Type.INT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Start Key", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Stop Key", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Leader Replica", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("# Replicas", Type.INT.toThrift()));
+
+    KuduClient client = new KuduClient.KuduClientBuilder(getKuduMasterAddresses()).build();
+
+    try {
+      org.kududb.client.KuduTable kuduTable = client.openTable(kuduTableName_);
+      List<LocatedTablet> tablets =
+          kuduTable.getTabletsLocations(KUDU_RPC_TIMEOUT_MS);
+      for(LocatedTablet tab : tablets) {
+        TResultRowBuilder builder = new TResultRowBuilder();
+        builder.add("-1");
+        builder.add(DatatypeConverter.printHexBinary(tab.getStartKey()));
+        builder.add(DatatypeConverter.printHexBinary(tab.getEndKey()));
+        LocatedTablet.Replica leader = tab.getLeaderReplica();
+        if (leader == null) {
+          // Leader might be null, if it is not yet available (e.g. during
+          // leader election in Kudu)
+          builder.add("Leader n/a");
+        } else {
+          builder.add(tab.getLeaderReplica().getRpcHost() + ":" +
+              tab.getLeaderReplica().getRpcPort().toString());
+        }
+        builder.add(tab.getReplicas().size());
+        result.addToRows(builder.get());
+      }
+
+    } catch (Exception e) {
+      throw new ImpalaRuntimeException("Could not communicate with Kudu.", e);
+    }
+    return result;
+  }
 }
