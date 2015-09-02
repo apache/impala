@@ -233,8 +233,16 @@ public abstract class QueryStmt extends StatementBase {
    * TODO: We could do something more sophisticated than simply copying input
    * slotrefs - e.g. compute some order-by expressions.
    */
-  protected void createSortTupleInfo(Analyzer analyzer) {
+  protected void createSortTupleInfo(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(evaluateOrderBy_);
+
+    for (Expr orderingExpr: sortInfo_.getOrderingExprs()) {
+      if (orderingExpr.getType().isComplexType()) {
+        throw new AnalysisException(String.format("ORDER BY expression '%s' with " +
+            "complex type '%s' is not supported.", orderingExpr.toSql(),
+            orderingExpr.getType().toSql()));
+      }
+    }
 
     // sourceSlots contains the slots from the input row to materialize.
     Set<SlotRef> sourceSlots = Sets.newHashSet();

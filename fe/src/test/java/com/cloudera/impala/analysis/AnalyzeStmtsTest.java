@@ -2113,6 +2113,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select extract(timestamp_col, 'hour') AS timestamp_col " +
                "FROM functional.alltypes " +
                "ORDER BY timestamp_col");
+
+    // Ordering by complex-typed expressions is not allowed.
+    AnalysisError("select * from functional_parquet.allcomplextypes " +
+        "order by int_struct_col", "ORDER BY expression 'int_struct_col' with " +
+        "complex type 'STRUCT<f1:INT,f2:INT>' is not supported.");
+    AnalysisError("select * from functional_parquet.allcomplextypes " +
+        "order by int_array_col", "ORDER BY expression 'int_array_col' with " +
+        "complex type 'ARRAY<INT>' is not supported.");
   }
 
   @Test

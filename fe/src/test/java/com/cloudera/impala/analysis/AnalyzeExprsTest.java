@@ -998,6 +998,14 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       "select ntile(int_col) over(order by tinyint_col) "
         + "from functional.alltypestiny",
       "NTILE() requires a constant argument");
+
+    // Cannot order or partition by complex-typed expression.
+    AnalysisError("select id, row_number() over (order by int_array_col) " +
+        "from functional_parquet.allcomplextypes", "ORDER BY expression " +
+        "'int_array_col' with complex type 'ARRAY<INT>' is not supported.");
+    AnalysisError("select id, count() over (partition by int_struct_col) " +
+        "from functional_parquet.allcomplextypes", "PARTITION BY expression " +
+        "'int_struct_col' with complex type 'STRUCT<f1:INT,f2:INT>' is not supported.");
   }
 
   /**
