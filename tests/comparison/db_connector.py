@@ -35,7 +35,7 @@ from json import dumps
 from logging import getLogger
 from os import chmod, symlink, unlink
 from os.path import basename, dirname
-from pg8000 import connect as postgresql_connect
+from psycopg2 import connect as postgresql_connect
 from random import randint
 from re import compile
 import shelve
