@@ -33,8 +33,7 @@ from tests.comparison.db_connector import (
     IMPALA,
     MYSQL,
     ORACLE,
-    POSTGRESQL,
-    HIVE_FOR_IMPALA)
+    POSTGRESQL)
 from tests.comparison.common import Column, Table
 from tests.comparison.types import (
     Boolean,
@@ -153,7 +152,7 @@ class DatabasePopulator(object):
         # The Impala table creator needs help from Hive for some storage formats.
         # Eventually Impala should be able to write in all formats and this can be
         # removed.
-        hive_connection = DbConnector(HIVE_FOR_IMPALA).create_connection(db_name=db_name)
+        hive_connection = DbConnector(HIVE).create_connection(db_name=db_name)
         connection.hive_connection = hive_connection
     for table_idx in xrange(randint(min_number_of_tables, max_number_of_tables)):
       table = self.create_random_table(

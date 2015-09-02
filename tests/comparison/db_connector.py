@@ -72,9 +72,8 @@ IMPALA = 'IMPALA'
 MYSQL = 'MYSQL'
 ORACLE = 'ORACLE'
 POSTGRESQL = 'POSTGRESQL'
-HIVE_FOR_IMPALA = 'HIVE_FOR_IMPALA'
 
-DATABASES = [HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL, HIVE_FOR_IMPALA]
+DATABASES = [HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL]
 
 class DbConnector(object):
   '''Wraps a DB API 2 implementation to provide a standard way of obtaining a
@@ -129,23 +128,13 @@ class DbConnector(object):
       connection = impala_connect(
           host=self.host_name,
           port=self.port,
-          ldap_user=self.user_name,
-          ldap_password=self.password,
-          timeout=maxint)
+          user=self.user_name,
+          password=self.password,
+          timeout=maxint,
+          auth_mechanism='PLAIN')
       return HiveDbConnection(self, connection, user_name=self.user_name,
           user_pass=self.password, db_name=db_name, hdfs_host=self.hdfs_host,
           hdfs_port=self.hdfs_port)
-    elif self.db_type == HIVE_FOR_IMPALA:
-      try:
-        from pyhs2 import connect as hive_connect
-      except:
-        print('Error importing pyhs2. Please make sure it is installed. '
-          'See the README for details.')
-        raise
-      connection = hive_connect(
-          host=self.host_name,
-          port=self.port or 11050,
-          authMechanism='NOSASL')
     elif self.db_type == IMPALA:
       connection_class = ImpalaDbConnection
       connection = impala_connect(
