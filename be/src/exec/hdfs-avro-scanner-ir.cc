@@ -30,7 +30,7 @@ int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** dat
     if (EvalConjuncts(tuple_row)) {
       ++num_to_commit;
       tuple_row = next_row(tuple_row);
-      tuple = next_tuple(tuple);
+      tuple = next_tuple(tuple_byte_size_, tuple);
     }
   }
   return num_to_commit;

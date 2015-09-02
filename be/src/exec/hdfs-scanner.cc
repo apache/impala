@@ -26,6 +26,7 @@
 #include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr-context.h"
+#include "runtime/array-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
@@ -55,6 +56,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       state_(state),
       context_(NULL),
       stream_(NULL),
+      scanner_conjunct_ctxs_(NULL),
       template_tuple_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_(NULL),
@@ -76,12 +78,21 @@ HdfsScanner::~HdfsScanner() {
 Status HdfsScanner::Prepare(ScannerContext* context) {
   context_ = context;
   stream_ = context->GetStream();
-  // The cloned contexts must be closed by the caller.
-  RETURN_IF_ERROR(Expr::CloneIfNotExists(scan_node_->conjunct_ctxs(),
-      scan_node_->runtime_state(), &scanner_conjunct_ctxs_));
+
+  // Clone the scan node's conjuncts map. The cloned contexts must be closed by the
+  // caller.
+  HdfsScanNode::ConjunctsMap::const_iterator iter = scan_node_->conjuncts_map().begin();
+  for (; iter != scan_node_->conjuncts_map().end(); ++iter) {
+    RETURN_IF_ERROR(Expr::CloneIfNotExists(iter->second,
+        scan_node_->runtime_state(), &scanner_conjuncts_map_[iter->first]));
+  }
+  DCHECK(scanner_conjuncts_map_.find(scan_node_->tuple_desc()->id()) !=
+         scanner_conjuncts_map_.end());
+  scanner_conjunct_ctxs_ = &scanner_conjuncts_map_[scan_node_->tuple_desc()->id()];
 
   template_tuple_ = scan_node_->InitTemplateTuple(
       state_, context_->partition_descriptor()->partition_key_value_ctxs());
+  template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
   StartNewRowBatch();
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   return Status::OK();
@@ -89,7 +100,10 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
 
 void HdfsScanner::Close() {
   if (decompressor_.get() != NULL) decompressor_->Close();
-  Expr::Close(scanner_conjunct_ctxs_, state_);
+  HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();
+  for (; iter != scanner_conjuncts_map_.end(); ++iter) {
+    Expr::Close(iter->second, state_);
+  }
 }
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
@@ -129,6 +143,24 @@ int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_r
   return batch_->capacity() - batch_->num_rows();
 }
 
+int HdfsScanner::GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool,
+    Tuple** tuple_mem, TupleRow** tuple_row_mem) {
+  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_";
+  *pool = builder->pool();
+  int max_num_rows = builder->GetFreeMemory(tuple_mem);
+  if (max_num_rows == 0) {
+    parse_status_ = Status::MEM_LIMIT_EXCEEDED;
+    parse_status_.SetErrorMsg(ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED,
+        PrintPath(*scan_node_->hdfs_table(), builder->tuple_desc().tuple_path())));
+    state_->SetMemLimitExceeded();
+    return 0;
+  }
+  // Treat tuple as a single-tuple row
+  *tuple_row_mem = reinterpret_cast<TupleRow*>(tuple_mem);
+  return max_num_rows;
+}
+
+// TODO(skye): have this check scan_node_->ReachedLimit() and get rid of manual check?
 Status HdfsScanner::CommitRows(int num_rows) {
   DCHECK(batch_ != NULL);
   DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
@@ -146,7 +178,10 @@ Status HdfsScanner::CommitRows(int num_rows) {
   if (context_->cancelled()) return Status::CANCELLED;
   RETURN_IF_ERROR(state_->CheckQueryState());
   // Free local expr allocations for this thread
-  ExprContext::FreeLocalAllocations(scanner_conjunct_ctxs_);
+  HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();
+  for (; iter != scanner_conjuncts_map_.end(); ++iter) {
+    ExprContext::FreeLocalAllocations(iter->second);
+  }
   return Status::OK();
 }
 

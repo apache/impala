@@ -167,6 +167,13 @@ error_codes = (
   ("SSL_SOCKET_CREATION_FAILED", 52, "SSL socket creation failed: $0"),
 
   ("MEM_ALLOC_FAILED", 53, "Memory allocation of $0 bytes failed"),
+
+  ("PARQUET_REP_LEVEL_ERROR", 54, "Could not read repetition level, even though metadata"
+   " states there are $0 values remaining in data page. file=$1"),
+
+  ("PARQUET_UNRECOGNIZED_SCHEMA", 55, "Unrecognized $0 schema:\\n$1"),
+
+  ("COLLECTION_ALLOC_FAILED", 56, "Failed to allocate buffer for collection '$0'."),
 )
 
 import sys

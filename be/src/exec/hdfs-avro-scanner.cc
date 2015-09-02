@@ -251,7 +251,7 @@ Status HdfsAvroScanner::WriteDefaultValue(
     SlotDescriptor* slot_desc, avro_datum_t default_value, const char* field_name) {
   if (avro_header_->template_tuple == NULL) {
     avro_header_->template_tuple = template_tuple_ != NULL ?
-        template_tuple_ : scan_node_->InitEmptyTemplateTuple();
+        template_tuple_ : scan_node_->InitEmptyTemplateTuple(*scan_node_->tuple_desc());
   }
   switch (default_value->type) {
     case AVRO_BOOLEAN: {

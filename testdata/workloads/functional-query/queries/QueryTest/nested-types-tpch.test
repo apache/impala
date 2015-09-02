@@ -1,0 +1,174 @@
+====
+---- QUERY
+use tpch_nested_parquet
+====
+---- QUERY
+select c_custkey, o_orderkey
+from tpch_nested_parquet.customer c, c.c_orders o
+where c_custkey in (1, 2)
+---- RESULTS
+2,3986496
+2,430243
+2,2992930
+2,1842406
+2,1374019
+2,1071617
+2,1763205
+1,579908
+1,4808192
+1,3868359
+1,4273923
+1,5133509
+1,454791
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Relational version of above query (same results)
+select c_custkey, o_orderkey
+from tpch_parquet.customer c join tpch_parquet.orders o on c_custkey = o_custkey
+where c_custkey in (1, 2)
+---- RESULTS
+2,3986496
+2,430243
+2,2992930
+2,1842406
+2,1374019
+2,1071617
+2,1763205
+1,579908
+1,4808192
+1,3868359
+1,4273923
+1,5133509
+1,454791
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+select c_custkey, o_orderkey, l_linenumber
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
+where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
+---- RESULTS
+2,1374019,1
+2,1374019,2
+2,1374019,3
+2,1374019,4
+2,1374019,5
+1,4808192,1
+1,4808192,2
+---- TYPES
+bigint,bigint,int
+====
+---- QUERY
+# Relational version of above query (same results)
+select c_custkey, o_orderkey, l_linenumber
+from tpch_parquet.customer c join tpch_parquet.orders o on c_custkey = o_custkey
+join tpch_parquet.lineitem on o_orderkey = l_orderkey
+where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
+---- RESULTS
+2,1374019,1
+2,1374019,2
+2,1374019,3
+2,1374019,4
+2,1374019,5
+1,4808192,1
+1,4808192,2
+---- TYPES
+bigint,bigint,int
+====
+---- QUERY
+select count(l_linenumber)
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
+where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
+---- RESULTS
+7
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*)
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
+where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
+---- RESULTS
+7
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*)
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
+---- RESULTS
+6001215
+---- TYPES
+bigint
+====
+---- QUERY
+select count(l_linenumber)
+from tpch_nested_parquet.customer.c_orders.o_lineitems i
+---- RESULTS
+6001215
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*)
+from tpch_nested_parquet.customer.c_orders.o_lineitems i
+---- RESULTS
+6001215
+---- TYPES
+bigint
+====
+---- QUERY
+# Relational version of above queries (same results)
+select count(l_linenumber) from tpch_parquet.lineitem
+---- RESULTS
+6001215
+---- TYPES
+bigint
+====
+---- QUERY
+select c_custkey, cnt from tpch_nested_parquet.customer c,
+  (select count(*) cnt from c.c_orders) v
+where c_custkey < 10
+order by c_custkey
+---- RESULTS
+1,6
+2,7
+3,0
+4,20
+5,4
+6,0
+7,16
+8,13
+9,0
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Relation version (almost) of above query
+select c_custkey, count(*)
+from tpch_parquet.customer join tpch_parquet.orders on c_custkey = o_custkey
+where c_custkey < 10
+group by c_custkey
+order by c_custkey
+---- RESULTS
+1,6
+2,7
+4,20
+5,4
+7,16
+8,13
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+select c_custkey from tpch_nested_parquet.customer c left anti join c.c_orders
+where c_custkey < 10 order by c_custkey
+---- RESULTS
+3
+6
+9
+---- TYPES
+bigint
+====

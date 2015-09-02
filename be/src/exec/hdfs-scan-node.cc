@@ -116,6 +116,24 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
 HdfsScanNode::~HdfsScanNode() {
 }
 
+Status HdfsScanNode::Init(const TPlanNode& tnode) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode));
+
+  // Add collection item conjuncts
+  const map<TTupleId, vector<TExpr> >& collection_conjuncts =
+      tnode.hdfs_scan_node.collection_conjuncts;
+  map<TTupleId, vector<TExpr> >::const_iterator iter = collection_conjuncts.begin();
+  for (; iter != collection_conjuncts.end(); ++iter) {
+    DCHECK(conjuncts_map_[iter->first].empty());
+    RETURN_IF_ERROR(
+        Expr::CreateExprTrees(pool_, iter->second, &conjuncts_map_[iter->first]));
+  }
+  // Add row batch conjuncts
+  DCHECK(conjuncts_map_[tuple_id_].empty());
+  conjuncts_map_[tuple_id_] = conjunct_ctxs_;
+  return Status::OK();
+}
+
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
@@ -282,7 +300,7 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
   // Look to protect access to partition_key_pool_ and value_ctxs
   // TODO: we can push the lock to the mempool and exprs_values should not
   // use internal memory.
-  Tuple* template_tuple = InitEmptyTemplateTuple();
+  Tuple* template_tuple = InitEmptyTemplateTuple(*tuple_desc_);
 
   unique_lock<mutex> l(lock_);
   for (int i = 0; i < partition_key_slots_.size(); ++i) {
@@ -294,13 +312,13 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
   return template_tuple;
 }
 
-Tuple* HdfsScanNode::InitEmptyTemplateTuple() {
+Tuple* HdfsScanNode::InitEmptyTemplateTuple(const TupleDescriptor& tuple_desc) {
   Tuple* template_tuple = NULL;
   {
     unique_lock<mutex> l(lock_);
-    template_tuple = Tuple::Create(tuple_desc_->byte_size(), scan_node_pool_.get());
+    template_tuple = Tuple::Create(tuple_desc.byte_size(), scan_node_pool_.get());
   }
-  memset(template_tuple, 0, tuple_desc_->byte_size());
+  memset(template_tuple, 0, tuple_desc.byte_size());
   return template_tuple;
 }
 
@@ -316,6 +334,20 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
+
+  // Prepare collection conjuncts
+  ConjunctsMap::const_iterator iter = conjuncts_map_.begin();
+  for (; iter != conjuncts_map_.end(); ++iter) {
+    TupleDescriptor* tuple_desc = state->desc_tbl().GetTupleDescriptor(iter->first);
+
+    // conjuncts_ are already prepared in ExecNode::Prepare(), don't try to prepare again
+    if (tuple_desc == tuple_desc_) continue;
+
+    RowDescriptor* collection_row_desc =
+        state->obj_pool()->Add(new RowDescriptor(tuple_desc, /* is_nullable */ false));
+    RETURN_IF_ERROR(
+        Expr::Prepare(iter->second, state, *collection_row_desc, expr_mem_tracker()));
+  }
 
   if (!state->cgroup().empty()) {
     scanner_threads_.SetCgroupsMgr(state->exec_env()->cgroups_mgr());
@@ -498,6 +530,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     random_shuffle(file_descs.begin(), file_descs.end());
 
     // Create reusable codegen'd functions for each file type type needed
+    // TODO: do this for conjuncts_map_
     Function* fn;
     switch (format) {
       case THdfsFileFormat::TEXT:
@@ -529,6 +562,14 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 // to queue up a non-zero number of those splits to the io mgr (via the ScanNode).
 Status HdfsScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
+
+  // Open collection conjuncts
+  ConjunctsMap::const_iterator iter = conjuncts_map_.begin();
+  for (; iter != conjuncts_map_.end(); ++iter) {
+    // conjuncts_ are already opened in ExecNode::Open()
+    if (iter->first == tuple_id_) continue;
+    RETURN_IF_ERROR(Expr::Open(iter->second, state));
+  }
 
   // We need at least one scanner thread to make progress. We need to make this
   // reservation before any ranges are issued.
@@ -681,6 +722,15 @@ void HdfsScanNode::Close(RuntimeState* state) {
     }
     partition_desc->CloseExprs(state);
   }
+
+  // Close collection conjuncts
+  ConjunctsMap::const_iterator iter = conjuncts_map_.begin();
+  for (; iter != conjuncts_map_.end(); ++iter) {
+    // conjuncts_ are already closed in ExecNode::Close()
+    if (iter->first == tuple_id_) continue;
+    Expr::Close(iter->second, state);
+  }
+
   ScanNode::Close(state);
 }
 

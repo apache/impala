@@ -539,7 +539,7 @@ Status HdfsRCFileScanner::ProcessRange() {
         if (EvalConjuncts(current_row)) {
           ++num_to_commit;
           current_row = next_row(current_row);
-          tuple = next_tuple(tuple);
+          tuple = next_tuple(tuple_byte_size_, tuple);
         }
       }
       COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);

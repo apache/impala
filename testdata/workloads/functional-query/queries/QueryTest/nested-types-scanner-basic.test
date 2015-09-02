@@ -1,0 +1,236 @@
+====
+---- QUERY
+select id from complextypestbl
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypestbl
+---- RESULTS
+8
+---- TYPES
+bigint
+====
+---- QUERY
+select id from complextypestbl where id > 3
+---- RESULTS
+4
+5
+6
+7
+8
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypestbl.int_array
+---- RESULTS
+1
+2
+3
+NULL
+1
+2
+NULL
+3
+NULL
+-1
+---- TYPES
+int
+====
+---- QUERY
+select count(*) from complextypestbl.int_array
+---- RESULTS
+10
+---- TYPES
+bigint
+====
+---- QUERY
+select count(item) from complextypestbl.int_array
+---- RESULTS
+7
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypestbl.int_array_array.item
+---- RESULTS
+1
+2
+3
+4
+NULL
+1
+2
+NULL
+3
+NULL
+4
+5
+6
+-1
+-2
+---- TYPES
+int
+====
+---- QUERY
+select item from complextypestbl.int_array_array.item where item > 3
+---- RESULTS
+4
+4
+5
+6
+---- TYPES
+int
+====
+---- QUERY
+select count(*) from complextypestbl.int_array_array.item
+---- RESULTS
+15
+---- TYPES
+bigint
+====
+---- QUERY
+select count(item) from complextypestbl.int_array_array.item
+---- RESULTS
+12
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypestbl.int_array_array
+---- RESULTS
+11
+---- TYPES
+bigint
+====
+---- QUERY
+select nested_struct.a from complextypestbl
+---- RESULTS
+1
+NULL
+NULL
+NULL
+NULL
+NULL
+7
+-1
+---- TYPES
+int
+====
+---- QUERY
+select count(nested_struct.a) from complextypestbl
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypestbl.nested_struct.b
+---- RESULTS
+1
+NULL
+2
+3
+NULL
+-1
+---- TYPES
+int
+====
+---- QUERY
+select count(*) from complextypestbl.nested_struct.b
+---- RESULTS
+6
+---- TYPES
+bigint
+====
+---- QUERY
+select count(item) from complextypestbl.nested_struct.b
+---- RESULTS
+4
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypestbl.nested_struct.b where item is null;
+---- RESULTS
+NULL
+NULL
+---- TYPES
+int
+====
+---- QUERY
+select inner_array.item.e from complextypestbl.nested_struct.c.d.item inner_array
+---- RESULTS
+10
+-10
+11
+NULL
+10
+NULL
+-10
+NULL
+11
+NULL
+NULL
+-1
+---- TYPES
+int
+====
+---- QUERY
+select count(inner_array.item.e) from complextypestbl.nested_struct.c.d.item inner_array
+---- RESULTS
+7
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypestbl.nested_struct.c.d.item inner_array
+---- RESULTS
+12
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypestbl.nested_struct.c.d.item inner_array
+where inner_array.item.f = 'bbb'
+---- RESULTS
+2
+---- TYPES
+bigint
+====
+---- QUERY
+select inner_array.item.e, inner_array.item.f
+from complextypestbl.nested_struct.c.d.item inner_array
+---- RESULTS
+10,'aaa'
+-10,'bbb'
+11,'c'
+NULL,'NULL'
+10,'aaa'
+NULL,'NULL'
+-10,'bbb'
+NULL,'NULL'
+11,'c'
+NULL,'NULL'
+NULL,'NULL'
+-1,'nonnullable'
+---- TYPES
+int,string
+====
+---- QUERY
+select count(*) from complextypestbl.nested_struct.c.d
+---- RESULTS
+10
+---- TYPES
+bigint
+====

@@ -1,0 +1,60 @@
+====
+---- QUERY
+select id, key, value from complextypestbl t, t.int_map
+---- RESULTS
+1,'k1',1
+1,'k2',100
+2,'k1',2
+2,'k2',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+select id, value from complextypestbl t, t.int_map
+---- RESULTS
+1,1
+1,100
+2,2
+2,NULL
+7,NULL
+7,NULL
+8,-1
+---- TYPES
+bigint,int
+====
+---- QUERY
+select key, value from complextypestbl.int_map
+---- RESULTS
+'k1',1
+'k2',100
+'k1',2
+'k2',NULL
+'k1',NULL
+'k3',NULL
+'k1',-1
+---- TYPES
+string,int
+====
+---- QUERY
+select id, key, value from complextypestbl t, t.int_map_array.item
+---- RESULTS
+1,'k1',1
+2,'k3',NULL
+2,'k1',1
+8,'k1',1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+select id, a.pos, m.key, m.value from complextypestbl t, t.int_map_array a, a.item m
+---- RESULTS
+1,0,'k1',1
+2,0,'k3',NULL
+2,0,'k1',1
+8,1,'k1',1
+---- TYPES
+bigint,bigint,string,int
+====

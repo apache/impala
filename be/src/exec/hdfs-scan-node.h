@@ -110,6 +110,7 @@ class HdfsScanNode : public ScanNode {
   ~HdfsScanNode();
 
   /// ExecNode methods
+  virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
@@ -140,6 +141,9 @@ class HdfsScanNode : public ScanNode {
   RuntimeState* runtime_state() { return runtime_state_; }
 
   DiskIoMgr::RequestContext* reader_context() { return reader_context_; }
+
+  typedef std::map<TupleId, std::vector<ExprContext*> > ConjunctsMap;
+  const ConjunctsMap& conjuncts_map() const { return conjuncts_map_; }
 
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length() {
     return max_compressed_text_file_length_;
@@ -213,7 +217,7 @@ class HdfsScanNode : public ScanNode {
   /// Allocates and return an empty template tuple (i.e. with no values filled in).
   /// Scanners can use this method to initialize a template tuple even if there are no
   /// materialized partition keys (e.g. to hold Avro default values).
-  Tuple* InitEmptyTemplateTuple();
+  Tuple* InitEmptyTemplateTuple(const TupleDescriptor& tuple_desc);
 
   /// Acquires all allocations from pool into scan_node_pool_. Thread-safe.
   void TransferToScanNodePool(MemPool* pool);
@@ -270,7 +274,7 @@ class HdfsScanNode : public ScanNode {
 
   RuntimeState* runtime_state_;
 
-  /// Tuple id resolved in Prepare() to set tuple_desc_;
+  /// Tuple id resolved in Prepare() to set tuple_desc_
   const int tuple_id_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.
@@ -300,6 +304,10 @@ class HdfsScanNode : public ScanNode {
   /// File format => file descriptors.
   typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
   FileFormatsMap per_type_files_;
+
+  /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
+  /// item tuples). Includes a copy of ExecNode.conjuncts_.
+  ConjunctsMap conjuncts_map_;
 
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
   /// the first call to GetNext(). The token manager, in a different thread, will read

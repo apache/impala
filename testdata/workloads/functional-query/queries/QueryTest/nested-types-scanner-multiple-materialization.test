@@ -1,0 +1,71 @@
+====
+---- QUERY
+-- Materialize two instances of the same array
+select id, item from complextypestbl t,
+(select item from t.int_array where item = 2
+ union all
+ select item from t.int_array where item != 2
+ union all
+ select item from t.int_array where item is null) v
+---- RESULTS
+1,1
+1,2
+1,3
+2,NULL
+2,1
+2,2
+2,NULL
+2,3
+2,NULL
+8,-1
+---- TYPES
+bigint,int
+====
+---- QUERY
+-- Materialize two instances of the same flattened array, with structs in the schema
+select id, e, f from complextypestbl t,
+(select e, f from t.nested_struct.c.d.item where e = 10
+ union all
+ select e, f from t.nested_struct.c.d.item where e != 10
+ union all
+ select e, f from t.nested_struct.c.d.item where e is null) v
+---- RESULTS
+1,10,'aaa'
+1,-10,'bbb'
+1,11,'c'
+2,NULL,'NULL'
+2,10,'aaa'
+2,NULL,'NULL'
+2,-10,'bbb'
+2,NULL,'NULL'
+2,11,'c'
+2,NULL,'NULL'
+7,NULL,'NULL'
+8,-1,'nonnullable'
+---- TYPES
+bigint,int,string
+====
+---- QUERY
+select id, int_array.item, a2.item, a3.item,
+nested_struct.a, b.item, d2.e, d2.f, d3.e, d3.f
+from complextypestbl t,
+t.int_array,
+t.int_array_array a1, a1.item a2,
+t.int_array_array.item a3,
+t.nested_struct.b,
+t.nested_struct.c.d, d.item d2,
+t.nested_struct.c.d.item d3
+where a2.item = 1 and a3.item = 2 and d2.e = 10 and d3.e = -10
+---- RESULTS
+1,1,1,2,1,1,10,'aaa',-10,'bbb'
+1,2,1,2,1,1,10,'aaa',-10,'bbb'
+1,3,1,2,1,1,10,'aaa',-10,'bbb'
+2,NULL,1,2,NULL,NULL,10,'aaa',-10,'bbb'
+2,1,1,2,NULL,NULL,10,'aaa',-10,'bbb'
+2,2,1,2,NULL,NULL,10,'aaa',-10,'bbb'
+2,NULL,1,2,NULL,NULL,10,'aaa',-10,'bbb'
+2,3,1,2,NULL,NULL,10,'aaa',-10,'bbb'
+2,NULL,1,2,NULL,NULL,10,'aaa',-10,'bbb'
+---- TYPES
+bigint,int,int,int,int,int,int,string,int,string
+====

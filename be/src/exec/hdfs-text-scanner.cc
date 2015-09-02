@@ -705,7 +705,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
 
       if (EvalConjuncts(tuple_row)) {
         ++num_tuples_materialized;
-        tuple_ = next_tuple(tuple_);
+        tuple_ = next_tuple(tuple_byte_size_, tuple_);
         tuple_row = next_row(tuple_row);
       }
     }

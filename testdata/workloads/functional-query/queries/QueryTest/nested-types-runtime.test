@@ -1,0 +1,17 @@
+====
+---- QUERY
+-- Serializes collections over the network
+select straight_join t1.id, m.key
+from complextypestbl t1, complextypestbl t2, t2.int_map m
+where t1.id = t2.id
+---- RESULTS
+1,'k1'
+1,'k2'
+2,'k1'
+2,'k2'
+7,'k1'
+7,'k3'
+8,'k1'
+---- TYPES
+bigint,string
+====

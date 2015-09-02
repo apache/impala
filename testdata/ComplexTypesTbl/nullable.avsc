@@ -1,0 +1,31 @@
+{"type": "record",
+ "namespace": "com.cloudera.impala",
+ "name": "ComplexTypesTbl",
+ "fields": [
+     {"name": "id", "type": ["null", "long"]},
+     {"name": "int_array", "type": ["null", {"type": "array", "items": ["null", "int"]}]},
+     {"name": "int_array_array", "type": ["null", {"type": "array", "items":
+         ["null", {"type": "array", "items": ["null", "int"]}]}]},
+     {"name": "int_map", "type": ["null", {"type": "map", "values": ["null", "int"]}]},
+     {"name": "int_map_array", "type": ["null", {"type": "array", "items":
+         ["null", {"type": "map", "values": ["null", "int"]}]}]},
+     {"name": "nested_struct", "type":
+         ["null", {"type": "record", "name": "r1", "fields": [
+              {"name": "a", "type": ["null", "int"]},
+              {"name": "b", "type": ["null", {"type": "array", "items": ["null", "int"]}]},
+              {"name": "c", "type": ["null", {"type": "record", "name": "r2", "fields": [
+                  {"name": "d", "type": ["null", {"type": "array", "items":
+                      ["null", {"type": "array", "items":
+                          ["null", {"type": "record", "name": "r3", "fields": [
+                              {"name": "e", "type": ["null", "int"]},
+                              {"name": "f", "type": ["null", "string"]}]}]}]}]}
+               ]}]},
+               {"name": "g", "type": ["null", {"type": "map", "values":
+                   ["null", {"type": "record", "name": "r4", "fields": [
+                       {"name": "h", "type":
+                           ["null", {"type": "record", "name": "r5", "fields": [
+                               {"name": "i", "type": ["null", {"type": "array", "items":
+                                   ["null", "double"]}]}]}]}]}]}]}
+          ]}]}
+ ]
+}

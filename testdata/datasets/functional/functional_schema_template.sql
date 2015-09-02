@@ -555,6 +555,25 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+complextypestbl
+---- COLUMNS
+id bigint
+int_array array<int>
+int_array_array array<array<int>>
+int_map map<string, int>
+int_map_array array<map<string, int>>
+nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<float>>>>>
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/complextypestbl_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nullable.parq \
+/test-warehouse/complextypestbl_parquet/ && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nonnullable.parq \
+/test-warehouse/complextypestbl_parquet/
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypes_fileformat
 ---- CREATE_HIVE
 -- Used for positive/negative testing of complex types on various file formats.

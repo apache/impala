@@ -31,6 +31,7 @@
 
 namespace impala {
 
+class ArrayValueBuilder;
 class Compression;
 class DescriptorTbl;
 class Expr;
@@ -149,21 +150,31 @@ class HdfsScanner {
   /// The first stream for context_
   ScannerContext::Stream* stream_;
 
-  /// ExprContext for each conjunct. Each scanner has its own ExprContexts so the
-  /// conjuncts can be safely evaluated in parallel.
-  std::vector<ExprContext*> scanner_conjunct_ctxs_;
+  /// Clones of the conjuncts ExprContexts in scan_node_->conjuncts_map(). Each scanner
+  /// has its own ExprContexts so the conjuncts can be safely evaluated in parallel.
+  HdfsScanNode::ConjunctsMap scanner_conjuncts_map_;
 
-  /// A partially materialized tuple with only partition key slots set.
-  /// The non-partition key slots are set to NULL.  The template tuple
-  /// must be copied into tuple_ before any of the other slots are
-  /// materialized.
-  /// Pointer is NULL if there are no partition key slots.
-  /// This template tuple is computed once for each file and valid for
-  /// the duration of that file.
-  /// It is owned by the HDFS scan node.
+  // Convenience reference to scanner_conjuncts_map_[scan_node_->tuple_idx()] for scanners
+  // that do not support nested types.
+  const std::vector<ExprContext*>* scanner_conjunct_ctxs_;
+
+  /// A template tuple is a partially-materialized tuple with only partition key slots set
+  /// (or other default values, such as NULL for columns missing in a file).  The other
+  /// slots are set to NULL.  The template tuple must be copied into output tuples before
+  /// any of the other slots are materialized.
+  ///
+  /// Each tuple descriptor (i.e. scan_node_->tuple_desc() and any collection item tuple
+  /// descs) has a template tuple, or NULL if there are no partition key or default slots.
+  /// Template tuples are computed once for each file and valid for the duration of that
+  /// file.  They are owned by the HDFS scan node, although each scanner has its own
+  /// template tuples.
+  std::map<const TupleDescriptor*, Tuple*> template_tuple_map_;
+
+  /// Convenience variable set to the top-level template tuple
+  /// (i.e. template_tuple_map_[scan_node_->tuple_desc()]).
   Tuple* template_tuple_;
 
-  /// Fixed size of each tuple, in bytes
+  /// Fixed size of each top-level tuple, in bytes
   int tuple_byte_size_;
 
   /// Current tuple pointer into tuple_mem_.
@@ -185,7 +196,7 @@ class HdfsScanner {
   /// Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 
-  /// Number of null bytes in the tuple.
+  /// Number of null bytes in the top-level tuple.
   int32_t num_null_bytes_;
 
   /// Contains current parse status to minimize the number of Status objects returned.
@@ -237,6 +248,13 @@ class HdfsScanner {
   /// call GetMemory again after calling this function.
   int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
 
+  /// Gets memory for outputting tuples into the ArrayValue being constructed via
+  /// 'builder.' Same output params as GetMemory(). Returns the maximum number of tuples
+  /// that can be output, or 0 if OOM. Sets parse_status_ if OOM (parse_status_ should not
+  /// already be set when calling this function to avoid overwriting it).
+  int GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool, Tuple** tuple_mem,
+      TupleRow** tuple_row_mem);
+
   /// Commit num_rows to the current row batch.  If this completes, the row batch is
   /// enqueued with the scan node and StartNewRowBatch() is called.
   /// Returns Status::OK if the query is not cancelled and hasn't exceeded any mem limits.
@@ -264,8 +282,8 @@ class HdfsScanner {
   /// This must always be inlined so we can correctly replace the call to
   /// ExecNode::EvalConjuncts() during codegen.
   bool IR_ALWAYS_INLINE EvalConjuncts(TupleRow* row)  {
-    return ExecNode::EvalConjuncts(&scanner_conjunct_ctxs_[0],
-                                   scanner_conjunct_ctxs_.size(), row);
+    return ExecNode::EvalConjuncts(&(*scanner_conjunct_ctxs_)[0],
+                                   scanner_conjunct_ctxs_->size(), row);
   }
 
   /// Utility method to write out tuples when there are no materialized
@@ -353,6 +371,16 @@ class HdfsScanner {
   /// Initialize a tuple.
   /// TODO: only copy over non-null slots.
   /// TODO: InitTuple is called frequently, avoid the if, perhaps via templatization.
+  void InitTuple(const TupleDescriptor* desc, Tuple* template_tuple, Tuple* tuple) {
+    if (template_tuple != NULL) {
+      memcpy(tuple, template_tuple, desc->byte_size());
+    } else {
+      memset(tuple, 0, sizeof(uint8_t) * desc->num_null_bytes());
+    }
+  }
+
+  // TODO: replace this function with above once we can inline constants from
+  // scan_node_->tuple_desc() via codegen
   void InitTuple(Tuple* template_tuple, Tuple* tuple) {
     if (template_tuple != NULL) {
       memcpy(tuple, template_tuple, tuple_byte_size_);
@@ -361,9 +389,9 @@ class HdfsScanner {
     }
   }
 
-  inline Tuple* next_tuple(Tuple* t) const {
+  inline Tuple* next_tuple(int tuple_byte_size, Tuple* t) const {
     uint8_t* mem = reinterpret_cast<uint8_t*>(t);
-    return reinterpret_cast<Tuple*>(mem + tuple_byte_size_);
+    return reinterpret_cast<Tuple*>(mem + tuple_byte_size);
   }
 
   inline TupleRow* next_row(TupleRow* r) const {

@@ -15,6 +15,7 @@
 #include "exec/hdfs-parquet-scanner.h"
 
 #include <limits> // for std::numeric_limits
+#include <queue>
 
 #include <boost/algorithm/string.hpp>
 #include <gflags/gflags.h>
@@ -26,6 +27,7 @@
 #include "exec/scanner-context.inline.h"
 #include "exec/read-write-util.h"
 #include "exprs/expr.h"
+#include "runtime/array-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
@@ -89,6 +91,20 @@ const int MAX_DICT_HEADER_SIZE = 100;
     runtime_state->LogError(error_msg);                                 \
   } while (false)                                                       \
 
+// FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
+// input file. They differentiate these cases from DCHECKs, which indicate conditions that
+// are true unless there's a bug in Impala. We would ideally always return a bad Status
+// instead of failing a FILE_CHECK, but in many cases we use FILE_CHECK instead because
+// there's a performance cost to doing the check in a release build, or just due to legacy
+// code.
+#define FILE_CHECK(a) DCHECK(a)
+#define FILE_CHECK_EQ(a, b) DCHECK_EQ(a, b)
+#define FILE_CHECK_NE(a, b) DCHECK_NE(a, b)
+#define FILE_CHECK_GT(a, b) DCHECK_GT(a, b)
+#define FILE_CHECK_LT(a, b) DCHECK_LT(a, b)
+#define FILE_CHECK_GE(a, b) DCHECK_GE(a, b)
+#define FILE_CHECK_LE(a, b) DCHECK_LE(a, b)
+
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
   vector<DiskIoMgr::ScanRange*> footer_ranges;
@@ -150,15 +166,209 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* st
 HdfsParquetScanner::~HdfsParquetScanner() {
 }
 
-// Reader for a single column from the parquet file.  It's associated with a
-// ScannerContext::Stream and is responsible for decoding the data.
-// Super class for per-type column readers. This contains most of the logic,
-// the type specific functions must be implemented in the subclass.
-class HdfsParquetScanner::BaseColumnReader {
- public:
-  virtual ~BaseColumnReader() {}
+// TODO for 2.3: move column readers to separate file
 
-  // This is called once for each row group in the file.
+/// Base class for reading a column. Reads a logical column, not necessarily a column
+/// materialized in the file (e.g. arrays). The two subclasses are BaseScalarColumnReader
+/// and CollectionColumnReader. Column readers read one def and rep level pair at a
+/// time. The current def and rep level are exposed to the user, and the corresponding
+/// value (if defined) can optionally be copied into a slot via ReadValue(). Can also
+/// write position slots.
+class HdfsParquetScanner::ColumnReader {
+ public:
+  virtual ~ColumnReader() { }
+
+  int def_level() const { return def_level_; }
+  int rep_level() const { return rep_level_; }
+
+  const SlotDescriptor* slot_desc() const { return slot_desc_; }
+  const parquet::SchemaElement& schema_element() const { return *node_.element; }
+  int max_def_level() const { return node_.max_def_level; }
+  int max_rep_level() const { return node_.max_rep_level; }
+  int def_level_of_immediate_repeated_ancestor() const {
+    return node_.def_level_of_immediate_repeated_ancestor;
+  }
+  const SlotDescriptor* pos_slot_desc() const { return pos_slot_desc_; }
+  void set_pos_slot_desc(const SlotDescriptor* pos_slot_desc) {
+    DCHECK(pos_slot_desc_ == NULL);
+    pos_slot_desc_ = pos_slot_desc;
+  }
+
+  bool reading_collection() const { return node_.is_repeated(); }
+  virtual const char* filename() const = 0;
+
+  /// Read the current value (or null) into 'tuple' for this column. This should only be
+  /// called when a value is defined, i.e., def_level() >=
+  /// def_level_of_immediate_repeated_ancestor() (since empty or NULL arrays produce no
+  /// output values), otherwise NextLevels() should be called instead.
+  ///
+  /// Advances this column reader to the next value (i.e. NextLevels() doesn't need to be
+  /// called after calling ReadValue()).
+  ///
+  /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
+  /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
+  /// true.
+  ///
+  /// *conjuncts_failed is an in/out parameter. ReadValue() sets to true if the current
+  /// row should be filtered based on this column's value. If already true on input, the
+  /// row has already been filtered and ReadValue() only needs to advance the value.
+  ///
+  /// NextLevels() must be called on this reader before calling ReadValue() for the first
+  /// time. This is to initialize the current value that ReadValue() will read.
+  ///
+  /// TODO: this is the function that needs to be codegen'd (e.g. CodegenReadValue())
+  /// The codegened functions from all the materialized cols will then be combined
+  /// into one function.
+  /// TODO: another option is to materialize col by col for the entire row batch in
+  /// one call.  e.g. MaterializeCol would write out 1024 values.  Our row batches
+  /// are currently dense so we'll need to figure out something there.
+  bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_failed);
+
+  /// Advances this column reader's def and rep levels to the next logical value, i.e. to
+  /// the next scalar value or the beginning of the next array, without attempting to read
+  /// the value. This is used to skip past def/rep levels that don't materialize a value,
+  /// such as the def/rep levels corresponding to an empty containing array.
+  ///
+  /// NextLevels() must be called on this reader before calling ReadValue() for the first
+  /// time. This is to initialize the current value that ReadValue() will read.
+  ///
+  /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
+  /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
+  /// true.
+  virtual bool NextLevels() = 0;
+
+  /// Should only be called if pos_slot_desc_ is non-NULL. Writes pos_current_value_ to
+  /// 'tuple' (i.e. "reads" the synthetic position field of the parent collection into
+  /// 'tuple') and increments pos_current_value_.
+  void ReadPosition(Tuple* tuple);
+
+ protected:
+  HdfsParquetScanner* parent_;
+  const SchemaNode& node_;
+  const SlotDescriptor* slot_desc_;
+
+  /// The slot descriptor for the position field of the tuple, if there is one. NULL if
+  /// there's not. Only one column reader for a given tuple desc will have this set.
+  const SlotDescriptor* pos_slot_desc_;
+
+  /// The next value to write into the position slot, if there is one. 64-bit int because
+  /// the pos slot is always a BIGINT Set to -1 when this column reader does not have a
+  /// current rep and def level (i.e. before the first NextLevels() call or after the last
+  /// value in the column has been read).
+  int64_t pos_current_value_;
+
+  /// The current repetition and definition levels of this reader. Advanced via
+  /// ReadValue() and NextLevels(). Set to -1 when this column reader does not have a
+  /// current rep and def level (i.e. before the first NextLevels() call or after the last
+  /// value in the column has been read).
+  int rep_level_;
+  int def_level_;
+
+  ColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
+      const SlotDescriptor* slot_desc)
+    : parent_(parent),
+      node_(node),
+      slot_desc_(slot_desc),
+      pos_slot_desc_(NULL),
+      pos_current_value_(-1),
+      rep_level_(-1),
+      def_level_(-1) {
+    DCHECK_GE(node_.max_def_level, 0);
+    DCHECK_GE(node_.max_rep_level, 0);
+  }
+
+  /// Writes the next value into *slot using pool if necessary. Also advances rep_level_
+  /// and def_level_ via NextLevels().
+  ///
+  /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
+  /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
+  /// true.
+  ///
+  /// TODO: we need to remove this with codegen.
+  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed) = 0;
+};
+
+/// Collections are not materialized directly in parquet files; only scalar values appear
+/// in the file. CollectionColumnReader uses the definition and repetition levels of child
+/// column readers to figure out the boundaries of each collection in this column.
+class HdfsParquetScanner::CollectionColumnReader :
+      public HdfsParquetScanner::ColumnReader {
+ public:
+  CollectionColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
+      const SlotDescriptor* slot_desc)
+    : ColumnReader(parent, node, slot_desc) {
+    DCHECK(node_.is_repeated());
+    if (slot_desc != NULL) DCHECK(slot_desc->type().IsCollectionType());
+  }
+
+  virtual ~CollectionColumnReader() { }
+
+  vector<ColumnReader*>* children() { return &children_; }
+
+  virtual const char* filename() const {
+    // TODO: this won't be completely accurate if/when we support columns in separate
+    // files
+    DCHECK(!children_.empty());
+    return children_[0]->filename();
+  }
+
+  /// The repetition level indicating that the current value is the first in a new
+  /// collection (meaning the last value read was the final item in the previous
+  /// collection).
+  int new_collection_rep_level() const { return max_rep_level() - 1; }
+
+  /// Advances all child readers to the beginning of the next collection and updates this
+  /// reader's state.
+  virtual bool NextLevels();
+
+ protected:
+  /// Recursively reads from children_ to assemble a single ArrayValue.
+  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed);
+
+ private:
+  /// Column readers of fields contained within this collection. There is at least one
+  /// child reader per collection reader. Child readers either materialize slots in the
+  /// collection item tuples, or there is a single child reader that does not materialize
+  /// any slot and is only used by this reader to read def and rep levels.
+  vector<ColumnReader*> children_;
+
+  /// Updates this reader's def_level_, rep_level_, and pos_current_value_ based on child
+  /// reader's state.
+  void UpdateDerivedState();
+};
+
+/// Reader for a single column from the parquet file.  It's associated with a
+/// ScannerContext::Stream and is responsible for decoding the data.  Super class for
+/// per-type column readers. This contains most of the logic, the type specific functions
+/// must be implemented in the subclass.
+class HdfsParquetScanner::BaseScalarColumnReader :
+      public HdfsParquetScanner::ColumnReader {
+ public:
+  BaseScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
+      const SlotDescriptor* slot_desc)
+    : ColumnReader(parent, node, slot_desc),
+      metadata_(NULL),
+      stream_(NULL),
+      decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
+      num_buffered_values_(0),
+      num_values_read_(0),
+      bitmap_filter_(NULL),
+      rows_returned_(0),
+      bitmap_filter_rows_rejected_(0) {
+    DCHECK_GE(node_.col_idx, 0);
+
+    RuntimeState* state = parent_->scan_node_->runtime_state();
+    hash_seed_ = state->fragment_hash_seed();
+    // The bitmap filter is only valid for the top-level tuple
+    if (slot_desc_ != NULL &&
+        slot_desc_->parent() == parent_->scan_node_->tuple_desc()) {
+      bitmap_filter_ = state->GetBitmapFilter(slot_desc_->id());
+    }
+  }
+
+  virtual ~BaseScalarColumnReader() { }
+
+  /// This is called once for each row group in the file.
   Status Reset(const parquet::ColumnMetaData* metadata, ScannerContext::Stream* stream) {
     DCHECK(stream != NULL);
     DCHECK(metadata != NULL);
@@ -169,6 +379,10 @@ class HdfsParquetScanner::BaseColumnReader {
     metadata_ = metadata;
     dict_decoder_base_ = NULL;
     num_values_read_ = 0;
+    def_level_ = -1;
+    rep_level_ = -1;
+    pos_current_value_ = -1;
+
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
           NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
@@ -176,173 +390,139 @@ class HdfsParquetScanner::BaseColumnReader {
     return Status::OK();
   }
 
-  // Called once when the scanner is complete for final cleanup.
+  /// Called once when the scanner is complete for final cleanup.
   void Close() {
     if (decompressor_.get() != NULL) decompressor_->Close();
   }
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
-  const SlotDescriptor* slot_desc() const { return node_.slot_desc; }
-  const parquet::SchemaElement& schema_element() const { return *node_.element; }
   int col_idx() const { return node_.col_idx; }
-  int max_def_level() const { return node_.max_def_level; }
-  int max_rep_level() const { return node_.max_rep_level; }
   THdfsCompression::type codec() const {
     if (metadata_ == NULL) return THdfsCompression::NONE;
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
   }
+  MemPool* decompressed_data_pool() const { return decompressed_data_pool_.get(); }
 
-  // Reads the next value into 'tuple' for this column, unless this column chunk has
-  // already been read completely. In that case, sets output parameter 'end_of_col_chunk'
-  // to true (otherwise does not set 'end_of_col_chunk' at all, so the caller should
-  // initialize it).  Returns true on success, or false on error and sets the scan node's
-  // parse_status_.
-  //
-  // *conjuncts_failed should be initialized to false by the caller at the beginning of a
-  // row, and is set to true when this row should be filtered out.
-  // TODO: skip values after *conjuncts_failed is true? Revisit this and bitmap logic.
-  //
-  // TODO: this is the function that needs to be codegen'd (e.g. CodegenReadValue())
-  // The codegened functions from all the materialized cols will then be combined
-  // into one function.
-  // TODO: another option is to materialize col by col for the entire row batch in
-  // one call.  e.g. MaterializeCol would write out 1024 values.  Our row batches
-  // are currently dense so we'll need to figure out something there.
-  bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_failed,
-      bool* end_of_col_chunk);
+  virtual const char* filename() const { return stream_->filename(); }
+
+  /// Reads the next definition and repetition levels for this column. Initializes the
+  /// next data page if necessary.
+  virtual bool NextLevels();
 
   // TODO: Some encodings might benefit a lot from a SkipValues(int num_rows) if
   // we know this row can be skipped. This could be very useful with stats and big
   // sections can be skipped. Implement that when we can benefit from it.
 
  protected:
+  // Friend parent scanner so it can perform validation (e.g. ValidateEndOfRowGroup())
   friend class HdfsParquetScanner;
-
-  HdfsParquetScanner* parent_;
-  const SchemaNode& node_;
 
   const parquet::ColumnMetaData* metadata_;
   scoped_ptr<Codec> decompressor_;
   ScannerContext::Stream* stream_;
 
-  // Pool to allocate decompression buffers from.
+  /// Pool to allocate decompression buffers from.
   boost::scoped_ptr<MemPool> decompressed_data_pool_;
 
-  // Header for current data page.
+  /// Header for current data page.
   parquet::PageHeader current_page_header_;
 
-  // Num values remaining in the current data page
+  /// Num values remaining in the current data page
   int num_buffered_values_;
 
-  // Pointer to start of next value in data page
+  /// Pointer to start of next value in data page
   uint8_t* data_;
 
-  // Decoder for definition levels. Only one of these is valid at a time, depending on the
-  // data page metadata.
+  /// Decoder for definition levels. Only one of these is valid at a time, depending on
+  /// the data page metadata.
   RleDecoder rle_def_levels_;
   BitReader bit_packed_def_levels_;
 
-  // Decoder for repetition levels. Only one of these is valid at a time, depending on the
-  // data page metadata.
+  /// Decoder for repetition levels. Only one of these is valid at a time, depending on
+  /// the data page metadata.
   RleDecoder rle_rep_levels_;
   BitReader bit_packed_rep_levels_;
 
-  // Decoder for dictionary-encoded columns. Set by the subclass.
+  /// Decoder for dictionary-encoded columns. Set by the subclass.
   DictDecoderBase* dict_decoder_base_;
 
-  // The number of values seen so far. Updated per data page.
+  /// The number of values seen so far. Updated per data page.
   int64_t num_values_read_;
 
-  // Cache of the bitmap_filter_ (if any) for this slot.
+  /// Cache of the bitmap_filter_ (if any) for this slot.
   const Bitmap* bitmap_filter_;
-  // Cache of hash_seed_ to use with bitmap_filter_.
+  /// Cache of hash_seed_ to use with bitmap_filter_.
   uint32_t hash_seed_;
 
-  // Bitmap filters are optional (i.e. they can be ignored and the results will be
-  // correct). Keep track of stats to determine if the filter is not effective. If
-  // the number of rows filtered out is too low, this is not worth the cost.
-  // TODO: this should be cost based taking into account how much we save when we
-  // filter a row.
+  /// Bitmap filters are optional (i.e. they can be ignored and the results will be
+  /// correct). Keep track of stats to determine if the filter is not effective. If the
+  /// number of rows filtered out is too low, this is not worth the cost.
+  /// TODO: this should be cost based taking into account how much we save when we
+  /// filter a row.
   int64_t rows_returned_;
   int64_t bitmap_filter_rows_rejected_;
 
-  BaseColumnReader(HdfsParquetScanner* parent, const SchemaNode& node)
-    : parent_(parent),
-      node_(node),
-      metadata_(NULL),
-      stream_(NULL),
-      decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
-      num_buffered_values_(0),
-      num_values_read_(0) {
-    DCHECK(node.slot_desc != NULL);
-    DCHECK_GE(node.col_idx, 0);
-    DCHECK_GE(node.max_def_level, 0);
-
-    RuntimeState* state = parent_->scan_node_->runtime_state();
-    bitmap_filter_ = state->GetBitmapFilter(slot_desc()->id());
-    hash_seed_ = state->fragment_hash_seed();
-    rows_returned_ = 0;
-    bitmap_filter_rows_rejected_ = 0;
-  }
-
-  // Read the next data page.  If a dictionary page is encountered, that will
-  // be read and this function will continue reading for the next data page.
+  /// Read the next data page.  If a dictionary page is encountered, that will be read and
+  /// this function will continue reading for the next data page.
   Status ReadDataPage();
 
-  // Returns the definition level for the next value
-  // Returns -1 if there was a error parsing it.
+  /// Returns the definition level for the next value
+  /// Returns -1 and sets parse_status_ if there was a error parsing it.
   int ReadDefinitionLevel();
 
-  // Returns the repetition level for the next value
-  // Returns -1 if there was a error parsing it.
+  /// Returns the repetition level for the next value
+  /// Returns -1 and sets parse_status_ if there was a error parsing it.
   int ReadRepetitionLevel();
 
-  // Creates a dictionary decoder from values/size. Subclass must implement this
-  // and set dict_decoder_base_.
+  /// Creates a dictionary decoder from values/size. Subclass must implement this
+  /// and set dict_decoder_base_.
   virtual void CreateDictionaryDecoder(uint8_t* values, int size) = 0;
 
-  // Initializes the reader with the data contents. This is the content for
-  // the entire decompressed data page. Decoders can initialize state from
-  // here.
+  /// Initializes the reader with the data contents. This is the content for the entire
+  /// decompressed data page. Decoders can initialize state from here.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
-  // Writes the next value into *slot using pool if necessary.
-  // Returns false if there was an error.
-  // Subclass must implement this.
-  // TODO: we need to remove this with codegen.
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed) = 0;
 
  private:
-  // Helper method for creating definition and repetition level decoders
+  /// Helper method for creating definition and repetition level decoders
   Status InitLevelDecoders(parquet::Encoding::type encoding, int max_level,
       uint8_t** data, int* data_size, RleDecoder* rle_decoder, BitReader* bit_reader);
 
-  // Helper method for ReadDefinitionLevel() and ReadRepetitionLevel().
+  /// Helper method for ReadDefinitionLevel() and ReadRepetitionLevel().
   int ReadLevel(parquet::Encoding::type encoding, RleDecoder* rle_decoder,
       BitReader* bit_reader);
 };
 
-// Per column type reader.
+/// Per column type reader.
 template<typename T>
-class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnReader {
+class HdfsParquetScanner::ScalarColumnReader :
+      public HdfsParquetScanner::BaseScalarColumnReader {
  public:
-  ColumnReader(HdfsParquetScanner* parent, const SchemaNode& node)
-    : BaseColumnReader(parent, node) {
-    DCHECK_NE(slot_desc()->type().type, TYPE_BOOLEAN);
-    if (slot_desc()->type().type == TYPE_DECIMAL) {
-      fixed_len_size_ = ParquetPlainEncoder::DecimalSize(slot_desc()->type());
-    } else if (slot_desc()->type().type == TYPE_VARCHAR) {
-      fixed_len_size_ = slot_desc()->type().len;
+  ScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
+      const SlotDescriptor* slot_desc)
+    : BaseScalarColumnReader(parent, node, slot_desc) {
+    // We're not materializing any values, just counting them. No need (or ability) to
+    // initialize state used to materialize values.
+    if (slot_desc_ == NULL) return;
+
+    DCHECK_NE(slot_desc_->type().type, TYPE_BOOLEAN);
+    if (slot_desc_->type().type == TYPE_DECIMAL) {
+      fixed_len_size_ = ParquetPlainEncoder::DecimalSize(slot_desc_->type());
+    } else if (slot_desc_->type().type == TYPE_VARCHAR) {
+      fixed_len_size_ = slot_desc_->type().len;
     } else {
       fixed_len_size_ = -1;
     }
-    needs_conversion_ = slot_desc()->type().type == TYPE_CHAR ||
+    needs_conversion_ = slot_desc_->type().type == TYPE_CHAR ||
         // TODO: Add logic to detect file versions that have unconverted TIMESTAMP
         // values. Currently all versions have converted values.
         (FLAGS_convert_legacy_hive_parquet_utc_timestamps &&
-        slot_desc()->type().type == TYPE_TIMESTAMP &&
+        slot_desc_->type().type == TYPE_TIMESTAMP &&
         parent->file_version_.application == "parquet-mr");
   }
+
+  virtual ~ScalarColumnReader() { }
 
  protected:
   virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
@@ -351,8 +531,9 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   }
 
   virtual Status InitDataPage(uint8_t* data, int size) {
+    // If slot_desc_ is NULL, dict_decoder_ is uninitialized
     if (current_page_header_.data_page_header.encoding ==
-          parquet::Encoding::PLAIN_DICTIONARY) {
+          parquet::Encoding::PLAIN_DICTIONARY && slot_desc_ != NULL) {
       if (dict_decoder_.get() == NULL) {
         return Status("File corrupt. Missing dictionary page.");
       }
@@ -369,7 +550,16 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     return Status::OK();
   }
 
-  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
+  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed) {
+    // NextLevels() should have already been called and def and rep levels should be in
+    // valid range.
+    // TODO(skye): these could be DCHECKs if we check upper bound in Read*Level(). Add
+    // check if not perf sensitive (here and other ReadSlot()/NextLevels() definitions)
+    FILE_CHECK_GE(rep_level_, 0);
+    FILE_CHECK_LE(rep_level_, max_rep_level());
+    FILE_CHECK_GE(def_level_, 0);
+    FILE_CHECK_LE(def_level_, max_def_level());
+
     parquet::Encoding::type page_encoding =
         current_page_header_.data_page_header.encoding;
     T val;
@@ -381,7 +571,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
         return false;
       }
     } else {
-      DCHECK(page_encoding == parquet::Encoding::PLAIN);
+      FILE_CHECK_EQ(page_encoding, parquet::Encoding::PLAIN);
       data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
     }
     if (needs_conversion_) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
@@ -391,7 +581,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
       *conjuncts_failed = !bitmap_filter_->Get<true>(h);
       ++bitmap_filter_rows_rejected_;
     }
-    return true;
+    return NextLevels();
   }
 
  private:
@@ -399,7 +589,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     // no-op for non-string columns.
   }
 
-  // Converts and writes src into dst based on desc_->type()
+  /// Converts and writes src into dst based on desc_->type()
   void ConvertSlot(const T* src, T* dst, MemPool* pool) {
     DCHECK(false);
   }
@@ -415,7 +605,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
 };
 
 template<>
-void HdfsParquetScanner::ColumnReader<StringValue>::CopySlot(
+void HdfsParquetScanner::ScalarColumnReader<StringValue>::CopySlot(
     StringValue* slot, MemPool* pool) {
   if (slot->len == 0) return;
   uint8_t* buffer = pool->Allocate(slot->len);
@@ -424,8 +614,9 @@ void HdfsParquetScanner::ColumnReader<StringValue>::CopySlot(
 }
 
 template<>
-void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
+void HdfsParquetScanner::ScalarColumnReader<StringValue>::ConvertSlot(
     const StringValue* src, StringValue* dst, MemPool* pool) {
+  DCHECK(slot_desc() != NULL);
   DCHECK(slot_desc()->type().type == TYPE_CHAR);
   int len = slot_desc()->type().len;
   StringValue sv;
@@ -443,7 +634,7 @@ void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
 }
 
 template<>
-void HdfsParquetScanner::ColumnReader<TimestampValue>::ConvertSlot(
+void HdfsParquetScanner::ScalarColumnReader<TimestampValue>::ConvertSlot(
     const TimestampValue* src, TimestampValue* dst, MemPool* pool) {
   // Conversion should only happen when this flag is enabled.
   DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
@@ -451,12 +642,16 @@ void HdfsParquetScanner::ColumnReader<TimestampValue>::ConvertSlot(
   if (dst->HasDateAndTime()) dst->UtcToLocal();
 }
 
-class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColumnReader {
+class HdfsParquetScanner::BoolColumnReader :
+      public HdfsParquetScanner::BaseScalarColumnReader {
  public:
-  BoolColumnReader(HdfsParquetScanner* parent, const SchemaNode& node)
-    : BaseColumnReader(parent, node) {
-    DCHECK_EQ(slot_desc()->type().type, TYPE_BOOLEAN);
+  BoolColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
+      const SlotDescriptor* slot_desc)
+    : BaseScalarColumnReader(parent, node, slot_desc) {
+    if (slot_desc_ != NULL) DCHECK_EQ(slot_desc_->type().type, TYPE_BOOLEAN);
   }
+
+  virtual ~BoolColumnReader() { }
 
  protected:
   virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
@@ -471,9 +666,17 @@ class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColu
   }
 
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
-    bool valid = bool_values_.GetValue(1, reinterpret_cast<bool*>(slot));
-    if (!valid) parent_->parse_status_ = Status("Invalid bool column.");
-    return valid;
+    // Def and rep levels should be in valid range.
+    FILE_CHECK_GE(rep_level_, 0);
+    FILE_CHECK_LE(rep_level_, max_rep_level());
+    FILE_CHECK_GE(def_level_, 0);
+    FILE_CHECK_LE(def_level_, max_def_level());
+
+    if (!bool_values_.GetValue(1, reinterpret_cast<bool*>(slot))) {
+      parent_->parse_status_ = Status("Invalid bool column.");
+      return false;
+    }
+    return NextLevels();
   }
 
  private:
@@ -493,14 +696,30 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
 
 void HdfsParquetScanner::Close() {
   vector<THdfsCompression::type> compression_types;
-  for (int i = 0; i < column_readers_.size(); ++i) {
-    if (column_readers_[i]->decompressed_data_pool_.get() != NULL) {
+
+  // Visit each column reader, including collection reader children.
+  stack<ColumnReader*> readers;
+  BOOST_FOREACH(ColumnReader* r, column_readers_) readers.push(r);
+  while (!readers.empty()) {
+    ColumnReader* col_reader = readers.top();
+    readers.pop();
+
+    if (col_reader->reading_collection()) {
+      CollectionColumnReader* collection_reader =
+          static_cast<CollectionColumnReader*>(col_reader);
+      BOOST_FOREACH(ColumnReader* r, *collection_reader->children()) readers.push(r);
+      continue;
+    }
+
+    BaseScalarColumnReader* scalar_reader =
+        static_cast<BaseScalarColumnReader*>(col_reader);
+    if (scalar_reader->decompressed_data_pool() != NULL) {
       // No need to commit the row batches with the AttachPool() calls
       // since AddFinalRowBatch() already does below.
-      AttachPool(column_readers_[i]->decompressed_data_pool_.get(), false);
+      AttachPool(scalar_reader->decompressed_data_pool(), false);
     }
-    column_readers_[i]->Close();
-    compression_types.push_back(column_readers_[i]->codec());
+    scalar_reader->Close();
+    compression_types.push_back(scalar_reader->codec());
   }
   AttachPool(dictionary_pool_.get(), false);
   AddFinalRowBatch();
@@ -514,56 +733,97 @@ void HdfsParquetScanner::Close() {
   HdfsScanner::Close();
 }
 
-HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
-    const SchemaNode& node) {
-  BaseColumnReader* reader = NULL;
-  switch (node.slot_desc->type().type) {
-    case TYPE_BOOLEAN:
-      reader = new BoolColumnReader(this, node);
-      break;
-    case TYPE_TINYINT:
-      reader = new ColumnReader<int8_t>(this, node);
-      break;
-    case TYPE_SMALLINT:
-      reader = new ColumnReader<int16_t>(this, node);
-      break;
-    case TYPE_INT:
-      reader = new ColumnReader<int32_t>(this, node);
-      break;
-    case TYPE_BIGINT:
-      reader = new ColumnReader<int64_t>(this, node);
-      break;
-    case TYPE_FLOAT:
-      reader = new ColumnReader<float>(this, node);
-      break;
-    case TYPE_DOUBLE:
-      reader = new ColumnReader<double>(this, node);
-      break;
-    case TYPE_TIMESTAMP:
-      reader = new ColumnReader<TimestampValue>(this, node);
-      break;
-    case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_CHAR:
-      reader = new ColumnReader<StringValue>(this, node);
-      break;
-    case TYPE_DECIMAL:
-      switch (node.slot_desc->type().GetByteSize()) {
-        case 4:
-          reader = new ColumnReader<Decimal4Value>(this, node);
-          break;
-        case 8:
-          reader = new ColumnReader<Decimal8Value>(this, node);
-          break;
-        case 16:
-          reader = new ColumnReader<Decimal16Value>(this, node);
-          break;
-      }
-      break;
-    default:
-      DCHECK(false);
+HdfsParquetScanner::ColumnReader* HdfsParquetScanner::CreateReader(
+    const SchemaNode& node, const SlotDescriptor* slot_desc) {
+  ColumnReader* reader = NULL;
+  if (node.is_repeated()) {
+    // Create collection reader (note this handles both NULL and non-NULL 'slot_desc')
+    reader = new CollectionColumnReader(this, node, slot_desc);
+  } else if (slot_desc != NULL) {
+    // Create the appropriate ScalarColumnReader type to read values into 'slot_desc'
+    switch (slot_desc->type().type) {
+      case TYPE_BOOLEAN:
+        reader = new BoolColumnReader(this, node, slot_desc);
+        break;
+      case TYPE_TINYINT:
+        reader = new ScalarColumnReader<int8_t>(this, node, slot_desc);
+        break;
+      case TYPE_SMALLINT:
+        reader = new ScalarColumnReader<int16_t>(this, node, slot_desc);
+        break;
+      case TYPE_INT:
+        reader = new ScalarColumnReader<int32_t>(this, node, slot_desc);
+        break;
+      case TYPE_BIGINT:
+        reader = new ScalarColumnReader<int64_t>(this, node, slot_desc);
+        break;
+      case TYPE_FLOAT:
+        reader = new ScalarColumnReader<float>(this, node, slot_desc);
+        break;
+      case TYPE_DOUBLE:
+        reader = new ScalarColumnReader<double>(this, node, slot_desc);
+        break;
+      case TYPE_TIMESTAMP:
+        reader = new ScalarColumnReader<TimestampValue>(this, node, slot_desc);
+        break;
+      case TYPE_STRING:
+      case TYPE_VARCHAR:
+      case TYPE_CHAR:
+        reader = new ScalarColumnReader<StringValue>(this, node, slot_desc);
+        break;
+      case TYPE_DECIMAL:
+        switch (slot_desc->type().GetByteSize()) {
+          case 4:
+            reader = new ScalarColumnReader<Decimal4Value>(this, node, slot_desc);
+            break;
+          case 8:
+            reader = new ScalarColumnReader<Decimal8Value>(this, node, slot_desc);
+            break;
+          case 16:
+            reader = new ScalarColumnReader<Decimal16Value>(this, node, slot_desc);
+            break;
+        }
+        break;
+      default:
+        DCHECK(false);
+    }
+  } else {
+    // Special case for counting scalar values (e.g. count(*), no materialized columns in
+    // the file, only materializing a position slot). We won't actually read any values,
+    // only the rep and def levels, so it doesn't matter what kind of reader we make.
+    reader = new ScalarColumnReader<int8_t>(this, node, slot_desc);
   }
   return scan_node_->runtime_state()->obj_pool()->Add(reader);
+}
+
+inline bool HdfsParquetScanner::ColumnReader::ReadValue(
+    MemPool* pool, Tuple* tuple, bool* conjuncts_failed) {
+  DCHECK(slot_desc_ != NULL);
+  DCHECK_GE(rep_level_, 0);
+  DCHECK_GE(def_level_, 0);
+  DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
+      "Caller should have called NextLevels() until we are ready to read a value";
+
+  if (def_level_ >= max_def_level()) {
+    return ReadSlot(tuple->GetSlot(slot_desc()->tuple_offset()), pool, conjuncts_failed);
+  } else {
+    // Null value
+    tuple->SetNull(slot_desc()->null_indicator_offset());
+    return NextLevels();
+  }
+}
+
+inline void HdfsParquetScanner::ColumnReader::ReadPosition(Tuple* tuple) {
+  DCHECK(pos_slot_desc() != NULL);
+  // NextLevels() should have already been called
+  DCHECK_GE(rep_level_, 0);
+  DCHECK_GE(def_level_, 0);
+  DCHECK_GE(pos_current_value_, 0);
+  DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
+      "Caller should have called NextLevels() until we are ready to read a value";
+
+  void* slot = tuple->GetSlot(pos_slot_desc()->tuple_offset());
+  *reinterpret_cast<int64_t*>(slot) = pos_current_value_++;
 }
 
 // In 1.1, we had a bug where the dictionary page metadata was not set. Returns true
@@ -574,7 +834,7 @@ static bool RequiresSkippedDictionaryHeaderCheck(
   return v.VersionEq(1,1,0) || (v.VersionEq(1,2,0) && v.is_impala_internal);
 }
 
-Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
+Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
   Status status;
   uint8_t* buffer;
 
@@ -594,8 +854,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     } else if (num_values_read_ > metadata_->num_values) {
       // The data pages contain more values than stated in the column metadata.
       return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
-         metadata_->num_values, num_values_read_,
-         slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys(),
+         metadata_->num_values, num_values_read_, node_.element->name,
          stream_->filename());
     }
 
@@ -605,10 +864,9 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       // The data pages contain fewer values than stated in the column metadata.
       DCHECK(stream_->eosr());
       DCHECK_LT(num_values_read_, metadata_->num_values);
-      return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
-         metadata_->num_values, num_values_read_,
-         slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys(),
-         stream_->filename());
+      // TODO for 2.3: node_.element->name isn't necessarily useful
+      return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID, metadata_->num_values,
+          num_values_read_, node_.element->name, stream_->filename());
     }
 
     // We don't know the actual header size until the thrift object is deserialized.  Loop
@@ -655,10 +913,19 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     int uncompressed_size = current_page_header_.uncompressed_page_size;
 
     if (current_page_header_.type == parquet::PageType::DICTIONARY_PAGE) {
+      if (slot_desc_ == NULL) {
+        // Skip processing the dictionary page if we don't need to decode any values. In
+        // addition to being unnecessary, we are likely unable to successfully decode the
+        // dictionary values because we don't necessarily create the right type of scalar
+        // reader if there's no slot to read into (see CreateReader()).
+        if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
+        continue;
+      }
+
       if (dict_decoder_base_ != NULL) {
         return Status("Column chunk should not contain two dictionary pages.");
       }
-      if (slot_desc()->type().type == TYPE_BOOLEAN) {
+      if (node_.element->type == parquet::Type::BOOLEAN) {
         return Status("Unexpected dictionary page. Dictionary page is not"
             " supported for booleans.");
       }
@@ -687,7 +954,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
         VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
         data_size = uncompressed_size;
       } else {
-        DCHECK_EQ(data_size, current_page_header_.uncompressed_page_size);
+        FILE_CHECK_EQ(data_size, current_page_header_.uncompressed_page_size);
         // Copy dictionary from io buffer (which will be recycled as we read
         // more data) to a new buffer
         dict_values = parent_->dictionary_pool_->Allocate(data_size);
@@ -724,12 +991,12 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
           &decompressed_buffer));
       VLOG_FILE << "Decompressed " << current_page_header_.compressed_page_size
                 << " to " << uncompressed_size;
-      DCHECK_EQ(current_page_header_.uncompressed_page_size, uncompressed_size);
+      FILE_CHECK_EQ(current_page_header_.uncompressed_page_size, uncompressed_size);
       data_ = decompressed_buffer;
       data_size = current_page_header_.uncompressed_page_size;
     } else {
       DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
-      DCHECK_EQ(current_page_header_.compressed_page_size, uncompressed_size);
+      FILE_CHECK_EQ(current_page_header_.compressed_page_size, uncompressed_size);
     }
 
     if (max_rep_level() > 0) {
@@ -752,7 +1019,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   return Status::OK();
 }
 
-Status HdfsParquetScanner::BaseColumnReader::InitLevelDecoders(
+Status HdfsParquetScanner::BaseScalarColumnReader::InitLevelDecoders(
     parquet::Encoding::type encoding, int max_level, uint8_t** data, int* data_size,
     RleDecoder* rle_decoder, BitReader* bit_reader) {
   int32_t num_bytes = 0;
@@ -786,7 +1053,7 @@ Status HdfsParquetScanner::BaseColumnReader::InitLevelDecoders(
 }
 
 // TODO More codegen here as well.
-inline int HdfsParquetScanner::BaseColumnReader::ReadLevel(
+inline int HdfsParquetScanner::BaseScalarColumnReader::ReadLevel(
     parquet::Encoding::type encoding, RleDecoder* rle_decoder, BitReader* bit_reader) {
   uint8_t level;
   bool valid = false;
@@ -799,60 +1066,139 @@ inline int HdfsParquetScanner::BaseColumnReader::ReadLevel(
       break;
     }
     default:
-      DCHECK(false);
+      FILE_CHECK(false);
   }
   if (!valid) return -1;
   return level;
 }
 
-inline int HdfsParquetScanner::BaseColumnReader::ReadDefinitionLevel() {
+// TODO(skye): try reading + caching many levels at once to avoid error checking etc on
+// each call (here and RLE decoder) for perf
+inline int HdfsParquetScanner::BaseScalarColumnReader::ReadDefinitionLevel() {
   if (max_def_level() == 0) {
     // This column and any containing structs are required so there is nothing encoded for
     // the definition levels.
     return 0;
   }
-  return ReadLevel(current_page_header_.data_page_header.definition_level_encoding,
+  int def_level = ReadLevel(
+      current_page_header_.data_page_header.definition_level_encoding,
       &rle_def_levels_, &bit_packed_def_levels_);
+
+  if (def_level < 0) {
+    parent_->parse_status_ = Status(TErrorCode::PARQUET_DEF_LEVEL_ERROR,
+        num_buffered_values_, stream_->filename());
+    return -1;
+  }
+  FILE_CHECK_LE(def_level_, max_def_level());
+  return def_level;
 }
 
-inline int HdfsParquetScanner::BaseColumnReader::ReadRepetitionLevel() {
+inline int HdfsParquetScanner::BaseScalarColumnReader::ReadRepetitionLevel() {
   if (max_rep_level() == 0) {
     // This column is not nested in any collection types so there is nothing encoded for
     // the repetition levels.
     return 0;
   }
-  return ReadLevel(current_page_header_.data_page_header.repetition_level_encoding,
+  int rep_level = ReadLevel(
+      current_page_header_.data_page_header.repetition_level_encoding,
       &rle_rep_levels_, &bit_packed_rep_levels_);
+
+  if (rep_level < 0) {
+    parent_->parse_status_ = Status(TErrorCode::PARQUET_REP_LEVEL_ERROR,
+        num_buffered_values_, stream_->filename());
+    return -1;
+  }
+  FILE_CHECK_LE(rep_level, max_rep_level());
+  return rep_level;
 }
 
-inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(
-    MemPool* pool, Tuple* tuple, bool* conjuncts_failed, bool* end_of_col_chunk) {
+bool HdfsParquetScanner::BaseScalarColumnReader::NextLevels() {
   if (num_buffered_values_ == 0) {
     parent_->assemble_rows_timer_.Stop();
     parent_->parse_status_ = ReadDataPage();
     if (!parent_->parse_status_.ok()) return false;
     if (num_buffered_values_ == 0) {
-      *end_of_col_chunk = true;
+      rep_level_ = -1;
+      def_level_ = -1;
+      pos_current_value_ = -1;
       return true;
     }
     parent_->assemble_rows_timer_.Start();
   }
-
   --num_buffered_values_;
-  int definition_level = ReadDefinitionLevel();
-  if (definition_level < 0) {
-    parent_->parse_status_ = Status(TErrorCode::PARQUET_DEF_LEVEL_ERROR,
-        num_buffered_values_, stream_->filename());
-    return false;
+
+  rep_level_ = ReadRepetitionLevel();
+  def_level_ = ReadDefinitionLevel();
+
+  // Reset position counter if we are at the start of a new parent collection.
+  if (rep_level_ <= max_rep_level() - 1) pos_current_value_ = 0;
+
+  return parent_->parse_status_.ok();
+}
+
+bool HdfsParquetScanner::CollectionColumnReader::NextLevels() {
+  DCHECK(!children_.empty());
+  DCHECK_LE(rep_level_, new_collection_rep_level());
+  for (int c = 0; c < children_.size(); ++c) {
+    do {
+      // TODO(skye): verify somewhere that all column readers are at end
+      if (!children_[c]->NextLevels()) return false;
+    } while (children_[c]->rep_level() > new_collection_rep_level());
+  }
+  UpdateDerivedState();
+  return true;
+}
+
+// TODO for 2.3: test query where *conjuncts_failed == true
+bool HdfsParquetScanner::CollectionColumnReader::ReadSlot(
+    void* slot, MemPool* pool, bool* conjuncts_failed) {
+  DCHECK(!children_.empty());
+  DCHECK_LE(rep_level_, new_collection_rep_level());
+
+  // TODO: do something with conjuncts_failed? We still need to "read" the value in order
+  // to advance children_ but we don't need to materialize the array.
+
+  // Recursively read the collection into a new ArrayValue.
+  ArrayValue* array_slot = reinterpret_cast<ArrayValue*>(slot);
+  *array_slot = ArrayValue();
+  ArrayValueBuilder builder(array_slot, *slot_desc_->collection_item_descriptor(), pool);
+  bool continue_execution = parent_->AssembleRows(
+      slot_desc_->collection_item_descriptor(), children_, new_collection_rep_level(), -1,
+      &builder);
+  if (!continue_execution) return false;
+
+  // AssembleRows() advances child readers, so we don't need to call NextLevels()
+  UpdateDerivedState();
+  return true;
+}
+
+void HdfsParquetScanner::CollectionColumnReader::UpdateDerivedState() {
+  // We don't need to cap our def_level_ at max_def_level(). We always check def_level_
+  // >= max_def_level() to check if the collection is defined.
+  // TODO(skye): consider capping def_level_ at max_def_level()
+  def_level_ = children_[0]->def_level();
+  rep_level_ = children_[0]->rep_level();
+
+  // All children should have been advanced to the beginning of the next collection
+  for (int i = 0; i < children_.size(); ++i) {
+    DCHECK_EQ(children_[i]->rep_level(), rep_level_);
+    if (def_level_ < max_def_level()) {
+      // Array not defined
+      FILE_CHECK_EQ(children_[i]->def_level(), def_level_);
+    } else {
+      // Array is defined
+      FILE_CHECK_GE(children_[i]->def_level(), max_def_level());
+    }
   }
 
-  if (definition_level != max_def_level()) {
-    // Null value
-    DCHECK_LT(definition_level, max_def_level());
-    tuple->SetNull(slot_desc()->null_indicator_offset());
-    return true;
+  if (rep_level_ == -1) {
+    // No more values
+    pos_current_value_ = -1;
+  } else if (rep_level_ <= max_rep_level() - 2) {
+    // Reset position counter if we are at the start of a new parent collection (i.e.,
+    // the current collection is the first item in a new parent collection).
+    pos_current_value_ = 0;
   }
-  return ReadSlot(tuple->GetSlot(slot_desc()->tuple_offset()), pool, conjuncts_failed);
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
@@ -862,8 +1208,7 @@ Status HdfsParquetScanner::ProcessSplit() {
   if (eosr) return Status::OK();
 
   // We've processed the metadata and there are columns that need to be materialized.
-  RETURN_IF_ERROR(CreateColumnReaders());
-  COUNTER_SET(num_cols_counter_, static_cast<int64_t>(column_readers_.size()));
+  RETURN_IF_ERROR(CreateColumnReaders(*scan_node_->tuple_desc(), &column_readers_));
 
   // The scanner-wide stream was used only to read the file footer.  Each column has added
   // its own stream.
@@ -882,12 +1227,25 @@ Status HdfsParquetScanner::ProcessSplit() {
     // Commit the rows to flush the row batch from the previous row group
     CommitRows(0);
 
-    RETURN_IF_ERROR(InitColumns(i));
-    // TODO: this status is actually parse_status_. Consider getting rid of parse_status_,
-    // at least for the parquet scanner.
-    Status status = AssembleRows(i);
-    if (status.IsMemLimitExceeded()) return status;
-    if (!status.ok()) LOG_OR_RETURN_ON_ERROR(status.msg(), state_);
+    RETURN_IF_ERROR(InitColumns(i, column_readers_));
+
+    assemble_rows_timer_.Start();
+
+    // Prepare column readers for first read
+    bool continue_execution = true;
+    BOOST_FOREACH(ColumnReader* col_reader, column_readers_) {
+      continue_execution |= col_reader->NextLevels();
+      if (!continue_execution) break;
+    }
+
+    continue_execution =
+        AssembleRows(scan_node_->tuple_desc(), column_readers_, -1, i, NULL);
+    assemble_rows_timer_.Stop();
+
+    if (!parse_status_.ok()) LOG_OR_RETURN_ON_ERROR(parse_status_.msg(), state_);
+    if (!continue_execution) return Status::OK();
+    // We should be at the end of the the row group if we get this far
+    DCHECK_EQ(column_readers_[0]->rep_level(), -1);
 
     // Reset parse_status_ for the next row group.
     parse_status_ = Status::OK();
@@ -897,95 +1255,144 @@ Status HdfsParquetScanner::ProcessSplit() {
 
 // TODO: this needs to be codegen'd.  The ReadValue function needs to be codegen'd,
 // specific to type and encoding and then inlined into AssembleRows().
-Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
-  assemble_rows_timer_.Start();
+bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
+    const vector<ColumnReader*>& column_readers, int new_collection_rep_level,
+    int row_group_idx, ArrayValueBuilder* array_value_builder) {
+  DCHECK(!column_readers.empty());
+  // TODO(skye): check if removing this extra local variable improves perf due to
+  // decreased register pressure
+  bool materializing_collection = array_value_builder != NULL;
+  if (materializing_collection) {
+    DCHECK_GE(new_collection_rep_level, 0);
+  } else {
+    DCHECK_EQ(new_collection_rep_level, -1);
+  }
+
+  Tuple* template_tuple = template_tuple_map_[tuple_desc];
+  const vector<ExprContext*> conjunct_ctxs = scanner_conjuncts_map_[tuple_desc->id()];
 
   int64_t rows_read = 0;
-  bool continue_execution = !(scan_node_->ReachedLimit() || context_->cancelled());
-  bool end_of_row_group = false;
-  int num_column_readers = column_readers_.size();
-  MemPool* pool;
+  bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
+  // Note that this will be set to true at the end of the row group or the end of the
+  // current collection (if applicable).
+  bool end_of_collection = column_readers[0]->rep_level() == -1;
+  // We only initialize end_of_collection to true here if we're at the end of the row
+  // group (otherwise it would always be true because we're on the "edge" of two
+  // collections), and only ProcessSplit() should call AssembleRows() at the end of the
+  // row group.
+  if (array_value_builder != NULL) DCHECK(!end_of_collection);
 
-  while (!end_of_row_group && continue_execution) {
+  while (!end_of_collection && continue_execution) {
+    MemPool* pool;
     Tuple* tuple;
-    TupleRow* row;
-    int64_t num_rows = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
+    TupleRow* row = NULL;
 
+    int64_t num_rows;
+    if (!materializing_collection) {
+      // We're assembling the top-level tuples into row batches
+      num_rows = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
+    } else {
+      // We're assembling item tuples into an ArrayValue
+      num_rows = static_cast<int64_t>(
+          GetCollectionMemory(array_value_builder, &pool, &tuple, &row));
+      if (num_rows == 0) {
+        DCHECK(!parse_status_.ok());
+        continue_execution = false;
+        break;
+      }
+      // 'num_rows' can be very high if we're writing to a large ArrayValue. Limit the
+      // number of rows we read at one time so we don't spend too long in the 'num_rows'
+      // loop below before checking for cancellation or limit reached.
+      num_rows = std::min(
+          num_rows, static_cast<int64_t>(scan_node_->runtime_state()->batch_size()));
+    }
     int num_to_commit = 0;
     int row_idx = 0;
-    if (num_column_readers > 0) {
-      for (row_idx = 0; row_idx < num_rows; ++row_idx) {
-        DCHECK(!end_of_row_group);
-        bool conjuncts_failed = false;
-        // Local end-of-row-group variable for this row (so we don't update
-        // end_of_row_group if we bail in the middle of the row or if parse_status is set)
-        bool eorg = false;
-        InitTuple(template_tuple_, tuple);
-        for (int c = 0; c < num_column_readers; ++c) {
-          DCHECK(continue_execution);
-          continue_execution = column_readers_[c]->ReadValue(
-              pool, tuple, &conjuncts_failed, &eorg);
-          if (UNLIKELY(!continue_execution)) goto commit_rows;
-          DCHECK(parse_status_.ok());
-        }
-        end_of_row_group = eorg;
-        if (UNLIKELY(end_of_row_group)) goto commit_rows;
-        if (conjuncts_failed) continue;
-        row->SetTuple(scan_node_->tuple_idx(), tuple);
-        if (EvalConjuncts(row)) {
-          row = next_row(row);
-          tuple = next_tuple(tuple);
+    for (row_idx = 0; row_idx < num_rows && !end_of_collection; ++row_idx) {
+      DCHECK(continue_execution);
+      bool tuple_materialized;
+      InitTuple(tuple_desc, template_tuple, tuple);
+      continue_execution =
+          ReadRow(column_readers, tuple, pool, &tuple_materialized);
+      if (UNLIKELY(!continue_execution)) break;
+      end_of_collection = column_readers[0]->rep_level() <= new_collection_rep_level;
+
+      if (tuple_materialized) {
+        if (!materializing_collection) row->SetTuple(scan_node_->tuple_idx(), tuple);
+        if (ExecNode::EvalConjuncts(&conjunct_ctxs[0], conjunct_ctxs.size(), row)) {
+          if (!materializing_collection) row = next_row(row);
+          tuple = next_tuple(tuple_desc->byte_size(), tuple);
           ++num_to_commit;
         }
       }
-    } else {
-      // Special case when there is no data for the accessed column(s) in the file.
-      // This can happen, for example, due to schema evolution (alter table add column).
-      // Since all the tuples are same, evaluating conjuncts only for the first tuple.
-      DCHECK_GT(num_rows, 0);
-      InitTuple(template_tuple_, tuple);
-      row->SetTuple(scan_node_->tuple_idx(), tuple);
-      if (EvalConjuncts(row)) {
-        row = next_row(row);
-        tuple = next_tuple(tuple);
-
-        for (row_idx = 1; row_idx < num_rows; ++row_idx) {
-          InitTuple(template_tuple_, tuple);
-          row->SetTuple(scan_node_->tuple_idx(), tuple);
-          row = next_row(row);
-          tuple = next_tuple(tuple);
-        }
-        num_to_commit += num_rows;
-      }
     }
- commit_rows:
+
     rows_read += row_idx;
     COUNTER_ADD(scan_node_->rows_read_counter(), row_idx);
-    RETURN_IF_ERROR(CommitRows(num_to_commit));
-
-    continue_execution &= !(scan_node_->ReachedLimit() || context_->cancelled());
+    if (!materializing_collection) {
+      Status query_status = CommitRows(num_to_commit);
+      if (!query_status.ok()) continue_execution = false;
+    } else {
+      array_value_builder->CommitTuples(num_to_commit);
+    }
+    continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
   }
 
-  if (end_of_row_group && num_column_readers > 0) {
-    // We have reached the end of the row group.
-    DCHECK(parse_status_.ok());
-
-    // TODO: check that each column reader's num_values_read_ corresponds to reported
-    // number of values in the metadata
-
-    // Test if the expected number of rows from the file metadata matches the actual
-    // number of rows read from the file.
-    int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
-    if (rows_read != expected_rows_in_group) {
-      HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
-      DCHECK(reader->stream_ != NULL);
-      parse_status_ = Status(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR,
-          reader->stream_->filename(), row_group_idx, expected_rows_in_group, rows_read);
+  if (end_of_collection) {
+    // All column readers should report the start of the same collection.
+    for (int c = 1; c < column_readers.size(); ++c) {
+      FILE_CHECK_EQ(column_readers[c]->rep_level(), column_readers[0]->rep_level());
     }
   }
 
-  assemble_rows_timer_.Stop();
-  return parse_status_;
+  bool end_of_row_group = column_readers[0]->rep_level() == -1;
+  if (end_of_row_group && parse_status_.ok()) {
+    parse_status_ = ValidateEndOfRowGroup(column_readers, row_group_idx, rows_read);
+    if (!parse_status_.ok()) continue_execution = false;
+  }
+  return continue_execution;
+}
+
+inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_readers,
+    Tuple* tuple, MemPool* pool, bool* tuple_materialized) {
+  DCHECK(!column_readers.empty());
+  *tuple_materialized = false;
+  bool continue_execution = true;
+  bool conjuncts_failed = false;
+  for (int c = 0; c < column_readers.size(); ++c) {
+    ColumnReader* col_reader = column_readers[c];
+    // A value is produced iff the collection that contains it is not empty and
+    // non-NULL. (Empty or NULL collections produce no output values, whereas NULL is
+    // output for the fields of NULL structs.)
+    bool containing_collection_defined = col_reader->def_level() >=
+        col_reader->def_level_of_immediate_repeated_ancestor();
+    if (containing_collection_defined) {
+      // All column readers for this tuple should have materialized a value
+      // TODO(skye): check if hoisting tuple_materialized (and getting rid of
+      // containing_collection_defined) out of the inner loops helps perf
+      if (c > 0) FILE_CHECK(*tuple_materialized);
+      *tuple_materialized = true;
+      // Fill in position slot if applicable
+      if (col_reader->pos_slot_desc() != NULL) col_reader->ReadPosition(tuple);
+      // TODO(skye): hoist this check
+      if (col_reader->slot_desc() != NULL) {
+        // We found a value, read it
+        continue_execution = col_reader->ReadValue(pool, tuple, &conjuncts_failed);
+      } else {
+        // Special case for counting the number of values. Note that we never call
+        // ReadValue().
+        DCHECK_EQ(column_readers.size(), 1);
+        continue_execution = col_reader->NextLevels();
+      }
+    } else {
+      // A containing repeated field is empty or NULL
+      FILE_CHECK(!(*tuple_materialized));
+      continue_execution = col_reader->NextLevels();
+    }
+    if (UNLIKELY(!continue_execution)) break;
+  }
+  if (conjuncts_failed) *tuple_materialized = false;
+  return continue_execution;
 }
 
 Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
@@ -1084,9 +1491,10 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   // Parse file schema
   RETURN_IF_ERROR(CreateSchemaTree(file_metadata_.schema, &schema_));
 
-  if (scan_node_->materialized_slots().empty()) {
-    // No materialized columns.  We can serve this query from just the metadata.  We
-    // don't need to read the column data.
+  if (scan_node_->materialized_slots().empty() &&
+      scan_node_->tuple_desc()->tuple_path().empty()) {
+    // This is a count(*) over the table.  We can serve this query from just the file
+    // metadata.  We don't need to read the column data.
     int64_t num_tuples = file_metadata_.num_rows;
     COUNTER_ADD(scan_node_->rows_read_counter(), num_tuples);
 
@@ -1117,50 +1525,256 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   return Status::OK();
 }
 
-Status HdfsParquetScanner::CreateColumnReaders() {
-  DCHECK(column_readers_.empty());
-  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
-    SlotDescriptor* slot_desc = scan_node_->materialized_slots()[i];
-    const SchemaPath& path = slot_desc->col_path();
-    SchemaNode* node = &schema_;
-    // Traverse path and resolve node to this slot's SchemaNode, or NULL if this slot
-    // doesn't exist in this file's schema
-    for (int j = 0; j < path.size(); ++j) {
-      int idx = j > 0 ? path[j] : path[j] - scan_node_->num_partition_keys();
-      if (node->children.size() <= idx) {
-        // The selected column is not in the file
-        VLOG_FILE << Substitute("File '$0' does not contain path '$1'",
-            stream_->filename(), PrintPath(*scan_node_->hdfs_table(), path));
-        node = NULL;
-        break;
+Status HdfsParquetScanner::ResolvePath(const SchemaPath& path, SchemaNode** node,
+    bool* pos_field, bool* missing_field) {
+  DCHECK(schema_.element != NULL)
+      << "schema_ must be initialized before calling ResolvePath()";
+
+  *pos_field = false;
+  *missing_field = false;
+  *node = &schema_;
+  const ColumnType* col_type = NULL;
+
+  // Traverse 'path' and resolve 'node' to the corresponding SchemaNode in 'schema_' (by
+  // ordinal), or set 'node' to NULL if 'path' doesn't exist in this file's schema.
+  for (int i = 0; i < path.size(); ++i) {
+    int table_idx = path[i];
+    // The first index in a path includes the table's partition keys
+    int file_idx = i == 0 ? path[i] - scan_node_->num_partition_keys() : path[i];
+    if ((*node)->children.size() <= file_idx) {
+      // The selected field is not in the file
+      VLOG_FILE << Substitute("File '$0' does not contain path '$1'",
+          stream_->filename(), PrintPath(*scan_node_->hdfs_table(), path));
+      *missing_field = true;
+      *node = NULL;
+      return Status::OK();
+    }
+    *node = &(*node)->children[file_idx];
+
+    col_type = i == 0 ? &scan_node_->hdfs_table()->col_descs()[table_idx].type()
+               : &col_type->children[table_idx];
+
+    if (col_type->type == TYPE_ARRAY) {
+      DCHECK_EQ(col_type->children.size(), 1);
+      // According to the parquet spec, array columns are represented like:
+      // <list-repetition> group <name> (LIST) {
+      //   repeated group list {
+      //     <element-repetition> <element-type> element;
+      //   }
+      // }
+      // See https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#lists
+      // for more details.
+      // TODO: implement support for all backwards-compat rules
+      if ((*node)->children.size() != 1) {
+        return Status(
+            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "array", (*node)->DebugString());
       }
-      node = &node->children[idx];
-    }
+      SchemaNode* list = &(*node)->children[0];
+      if (list->element->repetition_type != parquet::FieldRepetitionType::REPEATED ||
+          list->children.empty()) {
+        return Status(
+            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "array", (*node)->DebugString());
+      }
+      *node = list;
 
-    if (node != NULL && node->children.size() > 0) {
-      string error = Substitute("Path '$0' is not a supported type in file '$1'",
-          PrintPath(*scan_node_->hdfs_table(), path), stream_->filename());
-      VLOG_QUERY << error << endl << schema_.DebugString();
-      return Status(error);
-    }
+      if (i + 1 < path.size()) {
+        if (path[i + 1] == 1) {
+          // The next index in 'path' is the artifical position field. Set 'pos_field' and
+          // return the parent list node.
+          DCHECK_EQ(path.size(), i + 2) << "position field cannot have children!";
+          *pos_field = true;
+          *node = NULL;
+          return Status::OK();
+        } else {
+          // The next value in 'path' should be the item index
+          DCHECK_EQ(path[i + 1], 0);
+        }
+      }
 
-    if (node == NULL) {
+      if (list->children.size() != 1) {
+        DCHECK_GT(list->children.size(), 1) << "Other collection representations NYI";
+        // Backwards compatibility: some data does not contain the inner 'element' node if
+        // the element is a struct. For example, the SQL schema
+        // array_col array<struct<a: int, b:string>> should be encoded as:
+        // <list-repetition> group array_col (LIST) {
+        //   repeated group list {
+        //     <element-repetition> group element {
+        //       <a-repetition> int a;
+        //       <b-repetition> binary b;
+        //     }
+        //   }
+        // }
+        //
+        // However, it may be encoded as:
+        // <list-repetition> group array_col (LIST) {
+        //   repeated group list {
+        //     <a-repetition> int a;
+        //     <b-repetition> binary b;
+        //   }
+        // }
+        //
+        // In this case, we skip the item index in 'path'.
+        col_type = &col_type->children[0];
+        ++i;
+      }
+    } else if (col_type->type == TYPE_MAP) {
+      DCHECK_EQ(col_type->children.size(), 2);
+      // According to the parquet spec, map columns are represented like:
+      // <map-repetition> group <name> (MAP) {
+      //   repeated group key_value {
+      //     required <key-type> key;
+      //     <value-repetition> <value-type> value;
+      //   }
+      // }
+      // See https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#maps for
+      // more details.
+      // TODO: implement support for all backwards-compat rules
+      if ((*node)->children.size() != 1) {
+        return Status(
+            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "map", (*node)->DebugString());
+      }
+      SchemaNode* key_value = &(*node)->children[0];
+      if (key_value->element->repetition_type != parquet::FieldRepetitionType::REPEATED ||
+          key_value->children.size() != 2) {
+        return Status(
+            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "map", (*node)->DebugString());
+      }
+      *node = key_value;
+
+      // The next index in 'path' should be the key or the value. Note that map elements
+      // do not have a synthetic position field.
+      if (i + 1 < path.size()) DCHECK(path[i + 1] == 0 || path[i + 1] == 1);
+    }
+  }
+  DCHECK(*node != NULL);
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc,
+    vector<ColumnReader*>* column_readers) {
+  DCHECK(column_readers != NULL);
+  DCHECK(column_readers->empty());
+
+  // Each tuple can have at most one position slot. We'll process this slot desc last.
+  SlotDescriptor* pos_slot_desc = NULL;
+
+  BOOST_FOREACH(SlotDescriptor* slot_desc, tuple_desc.slots()) {
+    if (!slot_desc->is_materialized()) continue;
+    // Skip partition columns
+    if (&tuple_desc == scan_node_->tuple_desc() &&
+        slot_desc->col_pos() < scan_node_->num_partition_keys()) continue;
+
+    SchemaNode* node = NULL;
+    bool pos_field;
+    bool missing_field;
+    RETURN_IF_ERROR(
+        ResolvePath(slot_desc->col_path(), &node, &pos_field, &missing_field));
+
+    if (missing_field) {
       // In this case, we are selecting a column that is not in the file.
       // Update the template tuple to put a NULL in this slot.
-      if (template_tuple_ == NULL) {
-        template_tuple_ = scan_node_->InitEmptyTemplateTuple();
+      Tuple** template_tuple = &template_tuple_map_[&tuple_desc];
+      if (*template_tuple == NULL) {
+        *template_tuple = scan_node_->InitEmptyTemplateTuple(tuple_desc);
       }
-      template_tuple_->SetNull(slot_desc->null_indicator_offset());
+      (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
       continue;
     }
-    node->slot_desc = slot_desc;
 
-    column_readers_.push_back(CreateReader(*node));
+    if (pos_field) {
+      DCHECK(pos_slot_desc == NULL) << "There should only be one position slot per tuple";
+      pos_slot_desc = slot_desc;
+      continue;
+    }
+
+    ColumnReader* col_reader = CreateReader(*node, slot_desc);
+    column_readers->push_back(col_reader);
+
+    if (col_reader->reading_collection()) {
+      // Recursively populate col_reader's children
+      DCHECK(slot_desc->collection_item_descriptor() != NULL);
+      const TupleDescriptor* item_tuple_desc = slot_desc->collection_item_descriptor();
+      CollectionColumnReader* collection_reader =
+          static_cast<CollectionColumnReader*>(col_reader);
+      RETURN_IF_ERROR(CreateColumnReaders(
+          *item_tuple_desc, collection_reader->children()));
+    }
+  }
+
+  if (column_readers->empty()) {
+    // This is either a count(*) over a collection type (count(*) over the table is
+    // handled in ProcessFooter()), or no materialized columns appear in this file
+    // (e.g. due to schema evolution, or if there's only a position slot). Create a single
+    // column reader that we will use to count the number of tuples we should output. We
+    // will not read any values from this reader.
+    ColumnReader* reader;
+    RETURN_IF_ERROR(CreateCountingReader(tuple_desc.tuple_path(), &reader));
+    column_readers->push_back(reader);
+  }
+
+  if (pos_slot_desc != NULL) {
+    // 'tuple_desc' has a position slot. Use an existing column reader to populate it.
+    DCHECK(!column_readers->empty());
+    (*column_readers)[0]->set_pos_slot_desc(pos_slot_desc);
+  }
+
+  COUNTER_ADD(num_cols_counter_, column_readers->size());
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::CreateCountingReader(
+    const SchemaPath& parent_path, HdfsParquetScanner::ColumnReader** reader) {
+  SchemaNode* parent_node;
+  bool pos_field;
+  bool missing_field;
+  RETURN_IF_ERROR(ResolvePath(parent_path, &parent_node, &pos_field, &missing_field));
+
+  if (missing_field) {
+    // TODO: can we do anything else here?
+    return Status(Substitute("Could not find '$0' in file.",
+        PrintPath(*scan_node_->hdfs_table(), parent_path), stream_->filename()));
+  }
+  DCHECK(!pos_field);
+  DCHECK(!parent_node->children.empty());
+  DCHECK(parent_path.empty() || parent_node->is_repeated());
+
+  // Find a non-struct (i.e. array or scalar) child of 'parent_node', which we will use to
+  // create the item reader
+  const SchemaNode* target_node = &parent_node->children[0];
+  while (!target_node->children.empty() && !target_node->is_repeated()) {
+    target_node = &target_node->children[0];
+  }
+
+  *reader = CreateReader(*target_node, NULL);
+
+  if (target_node->is_repeated()) {
+    // Find the closest scalar descendent of 'target_node' via breadth-first search, and
+    // create scalar reader to drive 'reader'. We find the closest (i.e. least-nested)
+    // descendent as a heuristic for picking a descendent with fewer values, so it's
+    // faster to scan.
+    // TODO: use different heuristic than least-nested? Fewest values?
+    const SchemaNode* node = NULL;
+    queue<const SchemaNode*> nodes;
+    nodes.push(target_node);
+    while (!nodes.empty()) {
+      node = nodes.front();
+      nodes.pop();
+      if (node->children.size() > 0) {
+        BOOST_FOREACH(const SchemaNode& child, node->children) nodes.push(&child);
+      } else {
+        // node is the least-nested scalar descendent of 'target_node'
+        break;
+      }
+    }
+    DCHECK(node->children.empty()) << node->DebugString();
+    CollectionColumnReader* parent_reader = static_cast<CollectionColumnReader*>(*reader);
+    parent_reader->children()->push_back(CreateReader(*node, NULL));
   }
   return Status::OK();
 }
 
-Status HdfsParquetScanner::InitColumns(int row_group_idx) {
+Status HdfsParquetScanner::InitColumns(
+    int row_group_idx, const vector<ColumnReader*>& column_readers) {
   const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
   DCHECK(file_desc != NULL);
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
@@ -1170,20 +1784,34 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   // Used to validate that the number of values in each reader in column_readers_ is the
   // same.
   int num_values = -1;
+  // Used to validate we issued the right number of scan ranges
+  int num_scalar_readers = 0;
 
-  for (int i = 0; i < column_readers_.size(); ++i) {
-    const parquet::ColumnChunk& col_chunk =
-        row_group.columns[column_readers_[i]->col_idx()];
+  BOOST_FOREACH(ColumnReader* col_reader, column_readers) {
+    if (col_reader->reading_collection()) {
+      // Recursively init child readers
+      CollectionColumnReader* collection_reader =
+          static_cast<CollectionColumnReader*>(col_reader);
+      RETURN_IF_ERROR(InitColumns(row_group_idx, *collection_reader->children()));
+      continue;
+    }
+    ++num_scalar_readers;
+
+    BaseScalarColumnReader* scalar_reader =
+        static_cast<BaseScalarColumnReader*>(col_reader);
+    const parquet::ColumnChunk& col_chunk = row_group.columns[scalar_reader->col_idx()];
+    int64_t col_start = col_chunk.meta_data.data_page_offset;
+
     if (num_values == -1) {
       num_values = col_chunk.meta_data.num_values;
     } else if (col_chunk.meta_data.num_values != num_values) {
       // TODO for 2.3: improve this error message by saying which columns are different,
       // and also specify column in other error messages as appropriate
-      return Status(TErrorCode::PARQUET_NUM_COL_VALS_ERROR, column_readers_[i]->col_idx(),
+      return Status(TErrorCode::PARQUET_NUM_COL_VALS_ERROR, scalar_reader->col_idx(),
           col_chunk.meta_data.num_values, num_values, stream_->filename());
     }
-    RETURN_IF_ERROR(ValidateColumn(*column_readers_[i], row_group_idx));
-    int64_t col_start = col_chunk.meta_data.data_page_offset;
+
+    RETURN_IF_ERROR(ValidateColumn(*scalar_reader, row_group_idx));
 
     // If there is a dictionary page, the file format requires it to come before
     // any data pages.  We need to start reading the column from the data page.
@@ -1202,7 +1830,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     if (col_end <= 0 || col_end > file_desc->file_length) {
       stringstream ss;
       ss << "File " << file_desc->filename << ": metadata is corrupt. "
-         << "Column " << column_readers_[i]->col_idx() << " has invalid column offsets "
+         << "Column " << scalar_reader->col_idx() << " has invalid column offsets "
          << "(offset=" << col_start << ", size=" << col_len << ", "
          << "file_size=" << file_desc->file_length << ").";
       return Status(ss.str());
@@ -1219,12 +1847,12 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     // TODO: this will need to change when we have co-located files and the columns
     // are different files.
     if (!col_chunk.file_path.empty()) {
-      DCHECK_EQ(col_chunk.file_path, string(metadata_range_->file()));
+      FILE_CHECK_EQ(col_chunk.file_path, string(metadata_range_->file()));
     }
 
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
         metadata_range_->fs(), metadata_range_->file(), col_len, col_start,
-        column_readers_[i]->col_idx(), metadata_range_->disk_id(),
+        scalar_reader->col_idx(), metadata_range_->disk_id(),
         metadata_range_->try_cache(), metadata_range_->expected_local(),
         file_desc->mtime);
     col_ranges.push_back(col_range);
@@ -1233,18 +1861,18 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     ScannerContext::Stream* stream = context_->AddStream(col_range);
     DCHECK(stream != NULL);
 
-    RETURN_IF_ERROR(column_readers_[i]->Reset(&col_chunk.meta_data, stream));
+    RETURN_IF_ERROR(scalar_reader->Reset(&col_chunk.meta_data, stream));
 
-    if (!scan_node_->materialized_slots()[i]->type().IsStringType() ||
+    const SlotDescriptor* slot_desc = scalar_reader->slot_desc();
+    if (slot_desc == NULL || !slot_desc->type().IsStringType() ||
         col_chunk.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED) {
-      // Non-string types are always compact.  Compressed columns don't reference data
-      // in the io buffers after tuple materialization.  In both cases, we can set compact
-      // to true and recycle buffers more promptly.
+      // Non-string types are always compact.  Compressed columns don't reference data in
+      // the io buffers after tuple materialization.  In both cases, we can set compact to
+      // true and recycle buffers more promptly.
       stream->set_contains_tuple_data(false);
     }
   }
-  DCHECK_EQ(col_ranges.size(), column_readers_.size());
-  DCHECK_GE(scan_node_->materialized_slots().size(), column_readers_.size());
+  DCHECK_EQ(col_ranges.size(), num_scalar_readers);
 
   // Issue all the column chunks to the io mgr and have them scheduled immediately.
   // This means these ranges aren't returned via DiskIoMgr::GetNextRange and
@@ -1257,16 +1885,15 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
 
 Status HdfsParquetScanner::CreateSchemaTree(const vector<parquet::SchemaElement>& schema,
     HdfsParquetScanner::SchemaNode* node) const {
-  int max_def_level = 0;
-  int max_rep_level = 0;
   int idx = 0;
   int col_idx = 0;
-  return CreateSchemaTree(schema, max_def_level, max_rep_level, &idx, &col_idx, node);
+  return CreateSchemaTree(schema, 0, 0, 0, &idx, &col_idx, node);
 }
 
 Status HdfsParquetScanner::CreateSchemaTree(
     const vector<parquet::SchemaElement>& schema, int max_def_level, int max_rep_level,
-    int* idx, int* col_idx, HdfsParquetScanner::SchemaNode* node) const {
+    int ira_def_level, int* idx, int* col_idx, HdfsParquetScanner::SchemaNode* node)
+    const {
   if (*idx >= schema.size()) {
     return Status(Substitute("File $0 corrupt: could not reconstruct schema tree from "
             "flattened schema in file metadata", stream_->filename()));
@@ -1281,6 +1908,10 @@ Status HdfsParquetScanner::CreateSchemaTree(
     ++(*col_idx);
   }
 
+  // def_level_of_immediate_repeated_ancestor does not include this node, so set before
+  // updating ira_def_level
+  node->def_level_of_immediate_repeated_ancestor = ira_def_level;
+
   if (node->element->repetition_type == parquet::FieldRepetitionType::OPTIONAL) {
     ++max_def_level;
   } else if (node->element->repetition_type == parquet::FieldRepetitionType::REPEATED) {
@@ -1288,14 +1919,16 @@ Status HdfsParquetScanner::CreateSchemaTree(
     // Repeated fields add a definition level. This is used to distinguish between an
     // empty list and a list with an item in it.
     ++max_def_level;
+    // node is the new most immediate repeated ancestor
+    ira_def_level = max_def_level;
   }
   node->max_def_level = max_def_level;
   node->max_rep_level = max_rep_level;
 
   node->children.resize(node->element->num_children);
   for (int i = 0; i < node->element->num_children; ++i) {
-    RETURN_IF_ERROR(CreateSchemaTree(
-        schema, max_def_level, max_rep_level, idx, col_idx, &node->children[i]));
+    RETURN_IF_ERROR(CreateSchemaTree(schema, max_def_level, max_rep_level, ira_def_level,
+        idx, col_idx, &node->children[i]));
   }
   return Status::OK();
 }
@@ -1376,14 +2009,13 @@ bool IsEncodingSupported(parquet::Encoding::type e) {
 }
 
 Status HdfsParquetScanner::ValidateColumn(
-    const BaseColumnReader& col_reader, int row_group_idx) {
-  const SlotDescriptor* slot_desc = col_reader.slot_desc();
+    const BaseScalarColumnReader& col_reader, int row_group_idx) {
   int col_idx = col_reader.col_idx();
   const parquet::SchemaElement& schema_element = col_reader.schema_element();
   parquet::ColumnChunk& file_data =
       file_metadata_.row_groups[row_group_idx].columns[col_idx];
 
-  // Check the encodings are supported
+  // Check the encodings are supported.
   vector<parquet::Encoding::type>& encodings = file_data.meta_data.encodings;
   for (int i = 0; i < encodings.size(); ++i) {
     if (!IsEncodingSupported(encodings[i])) {
@@ -1395,7 +2027,7 @@ Status HdfsParquetScanner::ValidateColumn(
     }
   }
 
-  // Check the compression is supported
+  // Check the compression is supported.
   if (file_data.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED &&
       file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY &&
       file_data.meta_data.codec != parquet::CompressionCodec::GZIP) {
@@ -1406,6 +2038,20 @@ Status HdfsParquetScanner::ValidateColumn(
     return Status(ss.str());
   }
 
+  // Check that this column is optional or required.
+  if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
+      schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
+    stringstream ss;
+    ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
+       << "' contains an unsupported column repetition type: "
+       << schema_element.repetition_type;
+    return Status(ss.str());
+  }
+
+  // Validation after this point is only if col_reader is reading values.
+  const SlotDescriptor* slot_desc = col_reader.slot_desc();
+  if (slot_desc == NULL) return Status::OK();
+
   // Check the type in the file is compatible with the catalog metadata.
   parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
   if (type != file_data.meta_data.type) {
@@ -1413,16 +2059,6 @@ Status HdfsParquetScanner::ValidateColumn(
     ss << "File '" << metadata_range_->file() << "' has an incompatible type with the"
        << " table schema for column '" << schema_element.name << "'.  Expected type: "
        << type << ".  Actual type: " << file_data.meta_data.type;
-    return Status(ss.str());
-  }
-
-  // Check that this column is optional or required
-  if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
-      schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
-    stringstream ss;
-    ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
-       << "' contains an unsupported column repetition type: "
-       << schema_element.repetition_type;
     return Status(ss.str());
   }
 
@@ -1505,6 +2141,46 @@ Status HdfsParquetScanner::ValidateColumn(
   return Status::OK();
 }
 
+Status HdfsParquetScanner::ValidateEndOfRowGroup(
+    const vector<ColumnReader*>& column_readers, int row_group_idx, int64_t rows_read) {
+  DCHECK(!column_readers.empty());
+  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_";
+
+  if (column_readers[0]->max_rep_level() == 0) {
+    // These column readers materialize table-level values (vs. collection values). Test
+    // if the expected number of rows from the file metadata matches the actual number of
+    // rows read from the file.
+    int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
+    if (rows_read != expected_rows_in_group) {
+      HdfsParquetScanner::ColumnReader* reader = column_readers_[0];
+      return Status(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR, reader->filename(),
+          row_group_idx, expected_rows_in_group, rows_read);
+    }
+  }
+
+  // Validate scalar column readers' state
+  int num_values_read = -1;
+  for (int c = 0; c < column_readers.size(); ++c) {
+    if (column_readers[c]->reading_collection()) continue;
+    BaseScalarColumnReader* reader =
+        static_cast<BaseScalarColumnReader*>(column_readers[c]);
+    // All readers should have exhausted the final data page. This could fail if one
+    // column has more values than stated in the metadata, meaning the final data page
+    // will still have unread values.
+    // TODO for 2.3: make this a bad status
+    FILE_CHECK_EQ(reader->num_buffered_values_, 0);
+    // Sanity check that the num_values_read_ value is the same for all readers. All
+    // readers should have been advanced in lockstep (the above check is more likely to
+    // fail if this not the case though, since num_values_read_ is only updated at the end
+    // of a data page).
+    if (num_values_read == -1) num_values_read = reader->num_values_read_;
+    DCHECK_EQ(reader->num_values_read_, num_values_read);
+    // ReadDataPage() uses metadata_->num_values to determine when the column's done
+    DCHECK_EQ(reader->num_values_read_, reader->metadata_->num_values);
+  }
+  return Status::OK();
+}
+
 string PrintRepetitionType(const parquet::FieldRepetitionType::type& t) {
   switch (t) {
     case parquet::FieldRepetitionType::REQUIRED: return "required";
@@ -1537,7 +2213,8 @@ string HdfsParquetScanner::SchemaNode::DebugString(int indent) const {
   } else {
     ss << PrintParquetType(element->type);
   }
-  ss << " " << element->name << " [i:" << col_idx << " d:" << max_def_level << "]";
+  ss << " " << element->name << " [i:" << col_idx << " d:" << max_def_level
+     << " r:" << max_rep_level << "]";
   if (element->num_children > 0) {
     ss << " {" << endl;
     for (int i = 0; i < element->num_children; ++i) {

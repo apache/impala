@@ -55,6 +55,9 @@ class ArrayValueBuilder {
       int new_buffer_size = buffer_size_ * 2;
       uint8_t* new_buf = pool_->TryAllocate(new_buffer_size);
       if (new_buf == NULL) {
+        LOG(INFO) << "Array allocation failure: failed to allocate " << new_buffer_size
+                  << " bytes. Current buffer size: " << buffer_size_
+                  << ", num tuples: " << array_value_->num_tuples;
         *tuple_mem = NULL;
         return 0;
       }
@@ -76,6 +79,8 @@ class ArrayValueBuilder {
     DCHECK_LE(array_value_->ByteSize(tuple_desc_), buffer_size_);
   }
 
+  const TupleDescriptor& tuple_desc() const { return tuple_desc_; }
+  MemPool* pool() const { return pool_; }
 
  private:
   ArrayValue* array_value_;

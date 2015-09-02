@@ -94,6 +94,7 @@ struct ColumnType {
     DCHECK_NE(type, TYPE_DECIMAL);
     DCHECK_NE(type, TYPE_STRUCT);
     DCHECK_NE(type, TYPE_ARRAY);
+    DCHECK_NE(type, TYPE_MAP);
   }
 
   static ColumnType CreateCharType(int len) {
