@@ -40,10 +40,8 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnTyp
   slot_desc.__set_id(id);
   slot_desc.__set_parent(parent_id);
   slot_desc.__set_slotType(type.ToThrift());
-  // Make the column path empty to avoid having to also construct a table descriptor (see
-  // the SlotDescriptor ctor that takes a TSlotDescriptor, which modifies the column path
-  // based on the table schema)
-  slot_desc.__set_columnPath(vector<int>());
+  // For now no tests depend on the materialized path being populated correctly.
+  slot_desc.__set_materializedPath(vector<int>());
   slot_desc.__set_byteOffset(byte_offset);
   slot_desc.__set_nullIndicatorByte(null_byte);
   slot_desc.__set_nullIndicatorBit(null_bit);

@@ -149,23 +149,62 @@ public class SlotDescriptor {
   }
 
   /**
-   * Assembles the absolute physical path to this slot starting from the schema root.
+   * Assembles the absolute materialized path to this slot starting from the schema
+   * root. The materialized path points to the first non-struct schema element along the
+   * path starting from the parent's tuple path to this slot's path.
+   *
+   * The materialized path is used to determine when a new tuple (containing a new
+   * instance of this slot) should be created. A tuple is emitted for every data item
+   * pointed to by the materialized path. For scalar slots this trivially means that every
+   * data item goes into a different tuple. For collection slots, the materialized path
+   * specifies how many data items go into a single collection value.
+   *
+   * For scalar slots, the materialized path is the same as its path. However, for
+   * collection slots, the materialized path may be different than path_. This happens
+   * when the query materializes a "flattened" collection composed of concatenated nested
+   * collections.
+   *
+   * For example, given the table:
+   *   CREATE TABLE tbl (id bigint, outer_array array<array<int>>);
+   *
+   * And the query:
+   *   select id, inner_array.item from tbl t, t.outer_array.item inner_array
+   *
+   * The path 't.outer_array.item' corresponds to the absolute path [1,0]. However, the
+   * 'inner_array' slot appears in the table-level tuple, with tuplePath [] (i.e. one
+   * tuple materialized per table row). There is a single array materialized per
+   * 'outer_array', not per 'inner_array'. Thus the materializedPath for this slot will be
+   * [1], not [1,0].
    */
-  public List<Integer> getAbsolutePath() {
+  public List<Integer> getMaterializedPath() {
     Preconditions.checkNotNull(parent_);
     // A slot descriptor typically only has a path if the parent also has one.
     // However, we sometimes materialize inline-view tuples when generating plan trees
     // with EmptySetNode portions. In that case, a slot descriptor could have a non-empty
     // path pointing into the inline-view tuple (which has no path).
     if (path_ == null || parent_.getPath() == null) return Collections.emptyList();
-    return Lists.newArrayList(path_.getAbsolutePath());
+    Preconditions.checkState(path_.isResolved());
+
+    List<Integer> materializedPath = Lists.newArrayList(path_.getAbsolutePath());
+    // For scalar types, the materialized path is the same as path_
+    if (type_.isScalarType()) return materializedPath;
+    Preconditions.checkState(type_.isCollectionType());
+    Preconditions.checkState(path_.getFirstCollectionIndex() != -1);
+    // Truncate materializedPath after first collection element
+    // 'offset' adjusts for the index returned by path_.getFirstCollectionIndex() being
+    // relative to path_.getRootDesc()
+    int offset = path_.getRootDesc() == null ? 0 :
+        path_.getRootDesc().getPath().getAbsolutePath().size();
+    materializedPath.subList(
+        offset + path_.getFirstCollectionIndex() + 1, materializedPath.size()).clear();
+    return materializedPath;
   }
 
   public TSlotDescriptor toThrift() {
-    List<Integer> slotPath = getAbsolutePath();
+    List<Integer> materializedPath = getMaterializedPath();
     TSlotDescriptor result = new TSlotDescriptor(
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
-        slotPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
+        materializedPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, isMaterialized_);
     if (itemTupleDesc_ != null) result.setItemTupleId(itemTupleDesc_.getId().asInt());
     return result;

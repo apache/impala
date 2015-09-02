@@ -27,13 +27,20 @@ struct TSlotDescriptor {
   4: required Types.TColumnType slotType
 
   // Absolute path into the table schema pointing to the column/field materialized into
-  // this slot. Contains only a single element for slots that do not materialize a
-  // table column/field, e.g., slots materializing an aggregation result.
-  // columnPath[i] is the the ordinal position of the column/field of the table schema
-  // at level i. For example, columnPos[0] is an ordinal into the list of table columns,
-  // columnPos[1] is an ordinal into the list of fields of the complex-typed column at
-  // position columnPos[0], etc.
-  5: required list<i32> columnPath
+  // this slot. Empty for slots that do not materialize a table column/field, e.g., slots
+  // materializing an aggregation result.
+  //
+  // materializedPath[i] is the ordinal position of the column/field of the table schema
+  // at level i. For example, materializedPath[0] is an ordinal into the list of table
+  // columns, materializedPath[1] is an ordinal into the list of fields of the
+  // complex-typed column at position materializedPath[0], etc.
+  //
+  // The materialized path is used to determine when a new tuple (containing a new
+  // instance of this slot) should be created. A tuple is emitted for every data item
+  // pointed to by the materialized path. For scalar slots this trivially means that every
+  // data item goes into a different tuple. For collection slots, the materialized path
+  // determines how many data items go into a single collection value.
+  5: required list<i32> materializedPath
 
   6: required i32 byteOffset  // into tuple
   7: required i32 nullIndicatorByte

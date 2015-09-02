@@ -140,6 +140,7 @@ class SlotDescriptor {
   const TupleDescriptor* parent_;
   /// Non-NULL only for collection slots
   const TupleDescriptor* collection_item_descriptor_;
+  // TODO for 2.3: rename to materialized_path_
   const SchemaPath col_path_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;

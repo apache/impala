@@ -236,7 +236,7 @@ public class Path {
         // Do not consume a raw-path element.
         continue;
       }
-      // After an explicit match we could have an implicit matche again.
+      // After an explicit match we could have an implicit match again.
       expectExplicitMatch = false;
       matchedTypes_.add(field.getType());
       matchedPositions_.add(field.getPosition());
@@ -301,6 +301,11 @@ public class Path {
     Preconditions.checkState(isResolved_);
     if (firstCollectionTypeIdx_ == -1) return null;
     return matchedTypes_.get(firstCollectionTypeIdx_);
+  }
+
+  public int getFirstCollectionIndex() {
+    Preconditions.checkState(isResolved_);
+    return firstCollectionTypeIdx_;
   }
 
   public Type destType() {

@@ -319,19 +319,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   /**
    * Checks that the given SQL analyzes ok, and asserts that the last result expr in the
-   * parsed SelectStmt is a SlotRef whose absolute physical path is identical to the
-   * given expected one. Intentionally allows multiple result exprs to be analyzed to
-   * test absolute path caching, though only the last path is validated.
+   * parsed SelectStmt is a SlotRef whose absolute materialized path is identical to the
+   * given expected one. Intentionally allows multiple result exprs to be analyzed to test
+   * absolute path caching, though only the last path is validated.
    */
-  private void testSlotRefPath(String sql, List<Integer> expectedPhysPath) {
+  private void testSlotRefPath(String sql, List<Integer> expectedMaterializedPath) {
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
     Expr e = stmt.getResultExprs().get(stmt.getResultExprs().size() - 1);
     Preconditions.checkState(e instanceof SlotRef);
     SlotRef slotRef = (SlotRef) e;
-    List<Integer> actualPhysPath = slotRef.getDesc().getAbsolutePath();
+    List<Integer> actualMaterializedPath = slotRef.getDesc().getMaterializedPath();
     Assert.assertTrue(String.format("Expected path: %s\nActual path:%s",
-        expectedPhysPath, actualPhysPath),
-        actualPhysPath.equals(expectedPhysPath));
+        expectedMaterializedPath, actualMaterializedPath),
+        actualMaterializedPath.equals(expectedMaterializedPath));
   }
 
   /**
@@ -346,7 +346,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       Expr e = stmt.getResultExprs().get(i);
       Preconditions.checkState(e instanceof SlotRef);
       SlotRef slotRef = (SlotRef) e;
-      actualPaths.add(slotRef.getDesc().getAbsolutePath());
+      actualPaths.add(slotRef.getDesc().getMaterializedPath());
     }
     List<List<Integer>> expectedPaths = Lists.newArrayList(expectedPhysPaths);
     Assert.assertTrue(String.format("Expected paths: %s\nActual paths:%s",
@@ -356,9 +356,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   /**
    * Checks that the given SQL analyzes ok, and asserts that the last table ref in the
-   * parsed SelectStmt has an absolute physical path identical to the given expected one.
+   * parsed SelectStmt has an absolute path identical to the given expected one.
    */
   private void testTableRefPath(String sql, List<Integer> expectedPhysPath) {
+    // TODO for 2.3: augment this test or write new test that verifies collection
+    // slots' materialized paths
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
     TableRef lastTblRef = stmt.getTableRefs().get(stmt.getTableRefs().size() - 1);
     List<Integer> actualPhysPath = lastTblRef.getDesc().getPath().getAbsolutePath();

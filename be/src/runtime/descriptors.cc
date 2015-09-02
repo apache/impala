@@ -56,7 +56,7 @@ SlotDescriptor::SlotDescriptor(
     type_(ColumnType::FromThrift(tdesc.slotType)),
     parent_(parent),
     collection_item_descriptor_(collection_item_descriptor),
-    col_path_(tdesc.columnPath),
+    col_path_(tdesc.materializedPath),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),

@@ -255,7 +255,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_parent(0);
     ColumnType type(TYPE_BIGINT);
     slot_desc.__set_slotType(type.ToThrift());
-    slot_desc.__set_columnPath(vector<int>(1, 0));
+    slot_desc.__set_materializedPath(vector<int>(1, 0));
     slot_desc.__set_byteOffset(0);
     slot_desc.__set_nullIndicatorByte(0);
     slot_desc.__set_nullIndicatorBit(-1);
