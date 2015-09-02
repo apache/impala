@@ -23,6 +23,11 @@
 
 namespace impala {
 
+class MemPool;
+class RowBatch;
+class RuntimeState;
+class Tuple;
+
 /// Executes scans in Kudu based on the provided set of scan ranges.
 class KuduScanner {
  public:
@@ -45,8 +50,11 @@ class KuduScanner {
   void Close();
 
  private:
-  // Set 'tuple' slot 'mat_slot_idx' to null.
-  void SetSlotToNull(Tuple* tuple, int mat_slot_idx);
+  /// Set 'tuple' slot 'mat_slot_idx' to null.
+  void SetSlotToNull(Tuple* tuple, const SlotDescriptor& slot);
+
+  /// Returns true if the slot is null.
+  bool IsSlotNull(Tuple* tuple, const SlotDescriptor& slot);
 
   /// Returns true if the current block hasn't been fully scanned.
   bool CurrentBlockHasMoreRows() {
@@ -70,9 +78,14 @@ class KuduScanner {
   /// Closes the current scanner.
   void CloseCurrentScanner();
 
-  /// Transforms a kudu row in an impala row. For non string values data is copied
-  /// directly to the right slot. For string values data is copied to the row batch's
-  /// tuple data pool and a prt/len is set on the slot.
+  /// Given a tuple, relocates the values of those columns that require additional memory
+  /// from their current location into memory owned by the RowBatch. Assumes that the
+  /// other columns are already materialized.
+  Status RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool);
+
+  /// Transforms a kudu row into an Impala row. Columns that don't require auxiliary
+  /// memory are copied to the tuple directly. String columns are stored as a reference to
+  /// the memory of the KuduRowResult and need to be relocated later.
   Status KuduRowToImpalaTuple(const kudu::client::KuduRowResult& row,
       RowBatch* row_batch, Tuple* tuple);
 
@@ -98,13 +111,20 @@ class KuduScanner {
   std::vector<kudu::client::KuduRowResult> cur_rows_;
   size_t rows_scanned_current_block_;
 
-  // The scanner's cloned copy of the conjuncts to apply.
+  /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
 
   std::vector<SlotDescriptor*> materialized_slots_;
   std::vector<std::string> projected_columns_;
+
+  /// Size of the materialized tuple in the row batch.
   int tuple_byte_size_;
+
+  /// Number of bytes needed to represent the null bits in the tuple.
   int tuple_num_null_bytes_;
+
+  /// List of string slots that need relocation for their auxiliary memory.
+  std::vector<SlotDescriptor*> string_slots_;
 };
 
 } /// namespace impala
