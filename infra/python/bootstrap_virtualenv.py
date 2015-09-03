@@ -112,8 +112,11 @@ def install_deps():
   # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
   # virtualenv using an absolute path. If the path to the virtualenv is very long, the
   # hashbang won't work.
+  # --no-cache-dir is used because the dev version of Impyla may be the same even though
+  # the contents are different. Since the version doesn't change, pip may use its cached
+  # build.
   exec_cmd([os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
-    "install", "--no-index", "--find-links",
+    "install", "--no-cache-dir", "--no-index", "--find-links",
     "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR)), "-r", REQS_PATH])
   shutil.copyfile(REQS_PATH, INSTALLED_REQS_PATH)
 

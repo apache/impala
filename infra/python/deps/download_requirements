@@ -1,4 +1,6 @@
 #!/bin/bash -e
 
 DIR=$(dirname "$0")
-pip install --download "$DIR" -r "$DIR"/requirements.txt
+# Ignore the dev version of Impyla, it can't be downloaded (it needs to be built and
+# copied into the deps folder).
+pip install --download "$DIR" -r <(cat "$DIR"/requirements.txt | grep -v "impyla.*dev")

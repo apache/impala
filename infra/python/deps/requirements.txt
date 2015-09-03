@@ -3,10 +3,11 @@
 # Remember, all modules below need to support python 2.6.
 
 allpairs == 2.0.1
+bitarray == 0.8.1  # Needed by impyla
 cm-api == 10.0.0
 Fabric == 1.10.2
 
-# This is a custom build of impyla that includes commit c5dfcf which is not in the latest
+# This is a custom build of impyla that includes commit c83a11 which is not in the latest
 # release 0.10.0.
 impyla == 0.11.0.dev0
 
