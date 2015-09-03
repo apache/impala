@@ -349,7 +349,7 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_ra
   Status status = scanner.Open(client_, table_);
   if (!status.ok()) goto done;
 
-  while (true) {
+  while (!done_) {
     status = scanner.OpenNextScanner(*key_range);
     if (!status.ok()) goto done;
 
@@ -362,6 +362,7 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_ra
       status = scanner.GetNext(row_batch.get(), &eos);
       if (!status.ok()) goto done;
       materialized_row_batches_->AddBatch(row_batch.release());
+      if (done_) goto done;
     }
 
     if (state_->resource_pool()->optional_exceeded()) goto done;

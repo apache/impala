@@ -137,7 +137,7 @@ class KuduScanNode : public ScanNode {
 
   // If set to true, the scanners are all done. This can be because of an error or all
   // scan ranges are processed. There can still be batches queued in materialized_row_batches_.
-  bool done_;
+  volatile bool done_;
 
   /// Maximum size of materialized_row_batches_.
   int max_materialized_row_batches_;
