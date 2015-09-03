@@ -36,6 +36,7 @@ namespace impala {
 /// described by a user-supplied TProcessor object.
 /// If TThreadPoolServer is used, client must use TSocket as transport.
 /// TODO: Need a builder to help with the unwieldy constructor
+/// TODO: shutdown is buggy (which only harms tests)
 class ThriftServer {
  public:
   /// Username.

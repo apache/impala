@@ -59,10 +59,12 @@ shared_ptr<TProcessor> MakeProcessor() {
 TEST(SslTest, Connectivity) {
   // Start a server using SSL and confirm that an SSL client can connect, while a non-SSL
   // client cannot.
-  ThriftServer server("DummyStatestore", MakeProcessor(),
+  // Here and elsewhere - allocate ThriftServers on the heap to avoid race during
+  // destruction. See IMPALA-2283.
+  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(),
       FLAGS_state_store_port + 1, NULL, NULL, 5);
-  EXPECT_TRUE(server.EnableSsl(SERVER_CERT, PRIVATE_KEY, "echo password").ok());
-  server.Start();
+  EXPECT_TRUE(server->EnableSsl(SERVER_CERT, PRIVATE_KEY, "echo password").ok());
+  EXPECT_TRUE(server->Start().ok());
 
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
   ThriftClient<StatestoreServiceClient> ssl_client(
@@ -84,15 +86,14 @@ TEST(SslTest, Connectivity) {
 TEST(PasswordProtectedPemFile, CorrectOperation) {
   // Require the server to execute a shell command to read the password to the private key
   // file.
-  ThriftServer server("DummyStatestore", MakeProcessor(),
-      FLAGS_state_store_port + 1, NULL, NULL, 5);
-  EXPECT_TRUE(server.EnableSsl(
+  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(),
+      FLAGS_state_store_port + 4, NULL, NULL, 5);
+  EXPECT_TRUE(server->EnableSsl(
       SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY, "echo password").ok());
-  server.Start();
-
+  EXPECT_TRUE(server->Start().ok());
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
   ThriftClient<StatestoreServiceClient> ssl_client(
-      "localhost", FLAGS_state_store_port + 1, "", NULL, true);
+      "localhost", FLAGS_state_store_port + 4, "", NULL, true);
   EXPECT_TRUE(ssl_client.Open().ok());
   TRegisterSubscriberResponse resp;
   EXPECT_NO_THROW({
@@ -106,12 +107,7 @@ TEST(PasswordProtectedPemFile, BadPassword) {
       FLAGS_state_store_port + 2, NULL, NULL, 5);
   EXPECT_TRUE(server.EnableSsl(
       SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY, "echo wrongpassword").ok());
-  server.Start();
-
-  FLAGS_ssl_client_ca_certificate = SERVER_CERT;
-  ThriftClient<StatestoreServiceClient> ssl_client(
-      "localhost", FLAGS_state_store_port + 2, "", NULL, true);
-  EXPECT_FALSE(ssl_client.Open().ok());
+  EXPECT_FALSE(server.Start().ok());
 }
 
 TEST(PasswordProtectedPemFile, BadCommand) {
@@ -123,8 +119,7 @@ TEST(PasswordProtectedPemFile, BadCommand) {
 }
 
 int main(int argc, char** argv) {
-  InitCommonRuntime(argc, argv, true);
-  InitFeSupport();
+  InitCommonRuntime(argc, argv, false);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
