@@ -82,6 +82,7 @@ Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
         subplan_is_open_ = false;
       } else {
         // Continue fetching rows from the open subplan into the output row_batch.
+        DCHECK(!row_batch->AtCapacity());
         RETURN_IF_ERROR(child(1)->GetNext(state, row_batch, &subplan_eos_));
         // Apply limit and check whether the output batch is at capacity.
         if (limit_ != -1 && num_rows_returned_ + row_batch->num_rows() >= limit_) {
@@ -106,6 +107,8 @@ Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
         *eos = true;
         break;
       }
+      // Could be at capacity after resources have been transferred to it.
+      if (row_batch->AtCapacity()) return Status::OK();
       // Continue fetching input rows.
       input_batch_->Reset();
       RETURN_IF_ERROR(child(0)->GetNext(state, input_batch_.get(), &input_eos_));

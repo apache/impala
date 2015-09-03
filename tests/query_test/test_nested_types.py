@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 
 import pytest
 from tests.common.test_vector import *

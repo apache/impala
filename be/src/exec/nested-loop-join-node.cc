@@ -134,6 +134,7 @@ Status NestedLoopJoinNode::InitGetNext(TupleRow* first_left_row) {
 
 Status NestedLoopJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch,
     bool* eos) {
+  DCHECK(!output_batch->AtCapacity());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
