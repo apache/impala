@@ -228,6 +228,7 @@ Status Webserver::Start() {
     LOG(INFO)<< "Document root disabled";
   }
 
+  string key_password;
   if (IsSecure()) {
     options.push_back("ssl_certificate");
     options.push_back(FLAGS_webserver_certificate_file.c_str());
@@ -237,7 +238,6 @@ Status Webserver::Start() {
       options.push_back(FLAGS_webserver_private_key_file.c_str());
 
       if (!FLAGS_webserver_private_key_password_cmd.empty()) {
-        string key_password;
         if (!RunShellProcess(FLAGS_webserver_private_key_password_cmd, &key_password)) {
           return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED,
               FLAGS_webserver_private_key_password_cmd, key_password);
