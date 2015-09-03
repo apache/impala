@@ -113,7 +113,7 @@ public class KuduDdlDelegate implements DdlDelegate {
 
       Schema schema = new Schema(columns);
       CreateTableBuilder ctb = new CreateTableBuilder();
-      for (PartialRow splitRow : parseSplits(schema.getRowKeyProjection(), splitsJson)) {
+      for (PartialRow splitRow : parseSplits(schema, splitsJson)) {
         ctb.addSplitRow(splitRow);
       }
 

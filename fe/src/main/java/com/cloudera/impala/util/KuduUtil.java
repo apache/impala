@@ -78,10 +78,10 @@ public class KuduUtil {
    * Split keys are expected to be in json, as an array of arrays, in the form:
    * '[[value1_col1, value1_col2, ...], [value2_col1, value2_col2, ...], ...]'
    *
-   * Each inner array corresponds to a split key and is expected to have the same
-   * number and type of values as specified in 'keyProjection'.
+   * Each inner array corresponds to a split key and should have one matching entry for
+   * each key column specified in 'schema'.
    */
-  public static List<PartialRow> parseSplits(Schema keyProjection, String kuduSplits)
+  public static List<PartialRow> parseSplits(Schema schema, String kuduSplits)
       throws ImpalaRuntimeException {
 
     // If there are no splits return early.
@@ -96,14 +96,14 @@ public class KuduUtil {
       JsonReader jr = Json.createReader(new StringReader(kuduSplits));
       JsonArray keysList = jr.readArray();
       for (int i = 0; i < keysList.size(); i++) {
-        PartialRow splitRow = new PartialRow(keyProjection);
+        PartialRow splitRow = new PartialRow(schema);
         JsonArray compoundKey = keysList.getJsonArray(i);
-        if (compoundKey.size() != keyProjection.getKeysCount()) {
+        if (compoundKey.size() != schema.getKeysCount()) {
           throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE +
               " Wrong number of keys.");
         }
         for (int j = 0; j < compoundKey.size(); j++) {
-          setKey(splitRow, keyProjection.getColumn(j).getType(), compoundKey, j);
+          setKey(splitRow, schema.getColumn(j).getType(), compoundKey, j);
         }
         splitRows.add(splitRow);
       }
