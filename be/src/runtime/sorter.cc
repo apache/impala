@@ -916,10 +916,12 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
 
 Sorter::~Sorter() {
   // Delete blocks from the block mgr.
-  for (list<Run*>::iterator it = sorted_runs_.begin(); it != sorted_runs_.end(); ++it) {
+  for (deque<Run*>::iterator it = sorted_runs_.begin();
+      it != sorted_runs_.end(); ++it) {
     (*it)->DeleteAllBlocks();
   }
-  for (list<Run*>::iterator it = merging_runs_.begin(); it != merging_runs_.end(); ++it) {
+  for (deque<Run*>::iterator it = merging_runs_.begin();
+      it != merging_runs_.end(); ++it) {
     (*it)->DeleteAllBlocks();
   }
   if (unsorted_run_ != NULL) unsorted_run_->DeleteAllBlocks();
@@ -1170,7 +1172,8 @@ Status Sorter::CreateMerger(int num_runs) {
   DCHECK_GT(num_runs, 1);
 
   // Clean up the runs from the previous merge.
-  for (list<Run*>::iterator it = merging_runs_.begin(); it != merging_runs_.end(); ++it) {
+  for (deque<Run*>::iterator it = merging_runs_.begin();
+      it != merging_runs_.end(); ++it) {
     (*it)->DeleteAllBlocks();
   }
   merging_runs_.clear();

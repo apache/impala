@@ -15,6 +15,8 @@
 #ifndef IMPALA_RUNTIME_SORTER_H_
 #define IMPALA_RUNTIME_SORTER_H_
 
+#include <deque>
+
 #include "runtime/buffered-block-mgr.h"
 #include "util/tuple-row-compare.h"
 
@@ -185,7 +187,7 @@ class Sorter {
   /// List of sorted runs that have been produced but not merged. unsorted_run_ is added
   /// to this list after an in-memory sort. Sorted runs produced by intermediate merges
   /// are also added to this list. Runs are added to the object pool.
-  std::list<Run*> sorted_runs_;
+  std::deque<Run*> sorted_runs_;
 
   /// Merger object (intermediate or final) currently used to produce sorted runs.
   /// Only one merge is performed at a time. Will never be used if the input fits in
@@ -194,7 +196,7 @@ class Sorter {
 
   /// Runs that are currently processed by the merge_.
   /// These runs can be deleted when we are done with the current merge.
-  std::list<Run*> merging_runs_;
+  std::deque<Run*> merging_runs_;
 
   /// Pool of owned Run objects. Maintains Runs objects across non-freeing Reset() calls.
   ObjectPool obj_pool_;

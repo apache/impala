@@ -54,6 +54,10 @@ using std::stack;
 using std::queue;
 #endif
 
+#ifdef _GLIBCXX_DEQUE
+using std::deque;
+#endif
+
 #ifdef _GLIBCXX_STRING
 using std::string;
 #endif
