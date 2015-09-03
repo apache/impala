@@ -1567,7 +1567,7 @@ float_col float,
 double_col double,
 date_string_col string,
 string_col string,
-timestamp_col timestamp)
+timestamp_col string)
 PARTITIONED BY (year int, month int)
 STORED AS AVRO
 LOCATION '/test-warehouse/alltypes_avro_snap';
