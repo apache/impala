@@ -147,6 +147,8 @@ void Tuple::CopyVarlenData(const TupleDescriptor& desc, char** data, int* offset
     *data += array_byte_size;
     *offset += array_byte_size;
 
+    // Copy per-tuple varlen data if necessary.
+    if (!item_desc.HasVarlenSlots()) continue;
     for (int i = 0; i < array_val->num_tuples; ++i) {
       reinterpret_cast<Tuple*>(array_data)->CopyVarlenData(
           item_desc, data, offset, convert_ptrs);

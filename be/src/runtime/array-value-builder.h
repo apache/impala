@@ -52,7 +52,14 @@ class ArrayValueBuilder {
     DCHECK_GE(buffer_size_, bytes_written);
     if (buffer_size_ == bytes_written) {
       // Double tuple buffer
-      int new_buffer_size = buffer_size_ * 2;
+      int64_t new_buffer_size = max<int64_t>(buffer_size_ * 2, tuple_desc_.byte_size());
+      // TODO: actual allocation limit is lower than INT_MAX - see IMPALA-1619.
+      if (UNLIKELY(new_buffer_size > INT_MAX)) {
+        LOG(INFO) << "Array allocation failure: failed to allocate " << new_buffer_size
+                  << " bytes. Cannot allocate more than " << INT_MAX
+                  << " bytes in a single allocation. Current buffer size: "
+                  << buffer_size_ << ", num tuples: " << array_value_->num_tuples;
+      }
       uint8_t* new_buf = pool_->TryAllocate(new_buffer_size);
       if (new_buf == NULL) {
         LOG(INFO) << "Array allocation failure: failed to allocate " << new_buffer_size

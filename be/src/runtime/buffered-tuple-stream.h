@@ -248,6 +248,8 @@ class BufferedTupleStream {
   std::string DebugString() const;
 
  private:
+  friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
+
   /// If true, this stream is still using small buffers.
   bool use_small_buffers_;
 
@@ -281,6 +283,9 @@ class BufferedTupleStream {
 
   /// Vector of all the strings slots grouped by tuple_idx.
   std::vector<std::pair<int, std::vector<SlotDescriptor*> > > string_slots_;
+
+  /// Vector of all the collection slots grouped by tuple_idx.
+  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > collection_slots_;
 
   /// Block manager and client used to allocate, pin and release blocks. Not owned.
   BufferedBlockMgr* block_mgr_;
@@ -353,6 +358,16 @@ class BufferedTupleStream {
   template <bool HasNullableTuple>
   bool DeepCopyInternal(TupleRow* row, uint8_t** dst);
 
+  // Helper function to copy strings from tuple into write_block_. Increments
+  // bytes_allocated by the number of bytes allocated from write_block_.
+  bool CopyStrings(const Tuple* tuple, const std::vector<SlotDescriptor*>& string_slots,
+      int* bytes_allocated);
+
+  // Helper function to deep copy collections from tuple into write_block_. Increments
+  // bytes_allocated by the number of bytes allocated from write_block_.
+  bool CopyCollections(const Tuple* tuple,
+      const std::vector<SlotDescriptor*>& collection_slots, int* bytes_allocated);
+
   /// Wrapper of the templated DeepCopyInternal() function.
   bool DeepCopy(TupleRow* row, uint8_t** dst);
 
@@ -360,14 +375,14 @@ class BufferedTupleStream {
   /// setting *got_block. If there are no blocks available, *got_block is set to false
   /// and write_block_ is unchanged.
   /// min_size is the minimum number of bytes required for this block.
-  Status NewBlockForWrite(int min_size, bool* got_block);
+  Status NewBlockForWrite(int64_t min_size, bool* got_block);
 
   /// Reads the next block from the block_mgr_. This blocks if necessary.
   /// Updates read_block_, read_ptr_, read_tuple_idx_ and read_bytes_.
   Status NextBlockForRead();
 
   /// Returns the byte size of this row when encoded in a block.
-  int ComputeRowSize(TupleRow* row) const;
+  int64_t ComputeRowSize(TupleRow* row) const;
 
   /// Unpins block if it is an io sized block and updates tracking stats.
   Status UnpinBlock(BufferedBlockMgr::Block* block);
@@ -375,6 +390,16 @@ class BufferedTupleStream {
   /// Templated GetNext implementation.
   template <bool HasNullableTuple>
   Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
+
+  /// Read strings from stream by converting pointers and updating read_ptr_ and
+  /// read_bytes_.
+  void ReadStrings(const vector<SlotDescriptor*>& string_slots, int data_len,
+      Tuple* tuple);
+
+  /// Read collections from stream by converting pointers and updating read_ptr_ and
+  /// read_bytes_.
+  void ReadCollections(const vector<SlotDescriptor*>& collection_slots, int data_len,
+      Tuple* tuple);
 
   /// Computes the number of bytes needed for null indicators for a block of 'block_size'
   int ComputeNumNullIndicatorBytes(int block_size) const;

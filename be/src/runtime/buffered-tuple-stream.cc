@@ -17,6 +17,7 @@
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "runtime/array-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
@@ -74,8 +75,12 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const TupleDescriptor* tuple_desc = desc_.tuple_descriptors()[i];
     const int tuple_byte_size = tuple_desc->byte_size();
     fixed_tuple_row_size_ += tuple_byte_size;
-    if (tuple_desc->string_slots().empty()) continue;
-    string_slots_.push_back(make_pair(i, tuple_desc->string_slots()));
+    if (!tuple_desc->string_slots().empty()) {
+      string_slots_.push_back(make_pair(i, tuple_desc->string_slots()));
+    }
+    if (!tuple_desc->collection_slots().empty()) {
+      collection_slots_.push_back(make_pair(i, tuple_desc->collection_slots()));
+    }
   }
 }
 
@@ -175,7 +180,7 @@ Status BufferedTupleStream::UnpinBlock(BufferedBlockMgr::Block* block) {
   return Status::OK();
 }
 
-Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
+Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) {
   DCHECK(!closed_);
   if (min_size > block_mgr_->max_block_size()) {
     return Status(Substitute("Cannot process row that is bigger than the IO size "
@@ -559,17 +564,16 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
     for (int j = 0; j < string_slots_.size(); ++j) {
       Tuple* tuple = row->GetTuple(string_slots_[j].first);
       if (HasNullableTuple && tuple == NULL) continue;
-      DCHECK(tuple != NULL);
-      for (int k = 0; k < string_slots_[j].second.size(); ++k) {
-        const SlotDescriptor* slot_desc = string_slots_[j].second[k];
-        if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+      ReadStrings(string_slots_[j].second, data_len, tuple);
+    }
 
-        StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-        DCHECK_LE(sv->len, data_len - read_bytes_);
-        sv->ptr = reinterpret_cast<char*>(read_ptr_);
-        read_ptr_ += sv->len;
-        read_bytes_ += sv->len;
-      }
+    // Update collection slot ptrs. We traverse the array structure in the same order as
+    // it was written to the stream, allowing us to infer the data layout based on the
+    // length of arrays and strings.
+    for (int j = 0; j < collection_slots_.size(); ++j) {
+      Tuple* tuple = row->GetTuple(collection_slots_[j].first);
+      if (HasNullableTuple && tuple == NULL) continue;
+      ReadCollections(collection_slots_[j].second, data_len, tuple);
     }
     ++last_read_row;
     ++i;
@@ -588,22 +592,55 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   return Status::OK();
 }
 
-// TODO: Move this somewhere in general. We don't want this function inlined
-// for the buffered tuple stream case though.
-// TODO: In case of null-able tuples we ignore the space we could have saved from the
-// null tuples of this row.
-int BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
-  int size = fixed_tuple_row_size_;
-  for (int i = 0; i < string_slots_.size(); ++i) {
-    Tuple* tuple = row->GetTuple(string_slots_[i].first);
-    if (nullable_tuple_ && tuple == NULL) continue;
-    DCHECK(tuple != NULL);
-    for (int j = 0; j < string_slots_[i].second.size(); ++j) {
-      const SlotDescriptor* slot_desc = string_slots_[i].second[j];
-      if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
-      const StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-      size += sv->len;
+void BufferedTupleStream::ReadStrings(const vector<SlotDescriptor*>& string_slots,
+    int data_len, Tuple* tuple) {
+  DCHECK(tuple != NULL);
+  for (int i = 0; i < string_slots.size(); ++i) {
+    const SlotDescriptor* slot_desc = string_slots[i];
+    if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+
+    StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
+    DCHECK_LE(sv->len, data_len - read_bytes_);
+    sv->ptr = reinterpret_cast<char*>(read_ptr_);
+    read_ptr_ += sv->len;
+    read_bytes_ += sv->len;
+  }
+}
+
+void BufferedTupleStream::ReadCollections(const vector<SlotDescriptor*>& collection_slots,
+    int data_len, Tuple* tuple) {
+  DCHECK(tuple != NULL);
+  for (int i = 0; i < collection_slots.size(); ++i) {
+    const SlotDescriptor* slot_desc = collection_slots[i];
+    if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+
+    ArrayValue* av = tuple->GetCollectionSlot(slot_desc->tuple_offset());
+    const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
+    int array_byte_size = av->num_tuples * item_desc.byte_size();
+    DCHECK_LE(array_byte_size, data_len - read_bytes_);
+    av->ptr = reinterpret_cast<uint8_t*>(read_ptr_);
+    read_ptr_ += array_byte_size;
+    read_bytes_ += array_byte_size;
+
+    if (!item_desc.HasVarlenSlots()) continue;
+    uint8_t* array_data = av->ptr;
+    for (int j = 0; j < av->num_tuples; ++j) {
+      Tuple* item = reinterpret_cast<Tuple*>(array_data);
+      ReadStrings(item_desc.string_slots(), data_len, item);
+      ReadCollections(item_desc.collection_slots(), data_len, item);
+      array_data += item_desc.byte_size();
     }
+  }
+}
+
+int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
+  int64_t size = 0;
+  for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
+    const TupleDescriptor* tuple_desc = desc_.tuple_descriptors()[i];
+    Tuple* tuple = row->GetTuple(i);
+    DCHECK(nullable_tuple_ || tuple != NULL);
+    if (tuple == NULL) continue;
+    size += tuple->TotalByteSize(*tuple_desc);
   }
   return size;
 }

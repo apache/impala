@@ -26,7 +26,8 @@ inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status, uint8_t**
   DCHECK(!closed_);
   if (LIKELY(DeepCopy(row, dst))) return true;
   bool got_block = false;
-  *status = NewBlockForWrite(ComputeRowSize(row), &got_block);
+  int64_t row_size = ComputeRowSize(row);
+  *status = NewBlockForWrite(row_size, &got_block);
   if (!status->ok() || !got_block) return false;
   return DeepCopy(row, dst);
 }

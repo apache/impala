@@ -39,12 +39,10 @@ class TestNestedTypes(ImpalaTestSuite):
 
   def test_runtime(self, vector):
     """Queries that send collections through the execution runtime."""
-    pytest.skip("IMPALA-2295")
     self.run_test_case('QueryTest/nested-types-runtime', vector)
 
   def test_tpch(self, vector):
     """Queries over the larger nested TPCH dataset."""
-    pytest.skip("IMPALA-2295")
     # This test takes a long time (minutes), only run in exhaustive
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
     self.run_test_case('QueryTest/nested-types-tpch', vector)

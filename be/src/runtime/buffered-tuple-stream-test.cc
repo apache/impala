@@ -23,6 +23,9 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
+#include "gutil/gscoped_ptr.h"
+#include "runtime/array-value.h"
+#include "runtime/array-value-builder.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/tmp-file-mgr.h"
@@ -35,6 +38,8 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 #include "common/names.h"
+
+using base::FreeDeleter;
 
 const int BATCH_SIZE = 250;
 
@@ -487,6 +492,37 @@ class MultiNullableTupleStreamTest : public SimpleTupleStreamTest {
   }
 };
 
+/// Tests with collection types.
+class ArrayTupleStreamTest : public SimpleTupleStreamTest {
+ protected:
+  RowDescriptor* array_desc_;
+
+  virtual void CreateDescriptors() {
+    // tuples: (array<string>, array<array<int>>) (array<int>)
+    vector<bool> nullable_tuples(2, true);
+    vector<TTupleId> tuple_ids;
+    tuple_ids.push_back(static_cast<TTupleId>(0));
+    tuple_ids.push_back(static_cast<TTupleId>(1));
+    ColumnType string_array_type;
+    string_array_type.type = TYPE_ARRAY;
+    string_array_type.children.push_back(TYPE_STRING);
+
+    ColumnType int_array_type;
+    int_array_type.type = TYPE_ARRAY;
+    int_array_type.children.push_back(TYPE_STRING);
+
+    ColumnType nested_array_type;
+    nested_array_type.type = TYPE_ARRAY;
+    nested_array_type.children.push_back(int_array_type);
+
+    DescriptorTblBuilder builder(&pool_);
+    builder.DeclareTuple() << string_array_type << nested_array_type;
+    builder.DeclareTuple() << int_array_type;
+    array_desc_ = pool_.Add(new RowDescriptor(
+        *builder.Build(), tuple_ids, nullable_tuples));
+  }
+};
+
 // Basic API test. No data should be going to disk.
 TEST_F(SimpleTupleStreamTest, Basic) {
   CreateMgr(-1, 8 * 1024 * 1024);
@@ -706,6 +742,105 @@ TEST_F(MultiNullableTupleStreamTest, MultiNullableTupleManyBufferSpill) {
   TestIntValuesInterleaved(1, 1);
   TestIntValuesInterleaved(10, 5);
   TestIntValuesInterleaved(100, 15);
+}
+
+/// Test that deep copy works with arrays by copying into a BufferedTupleStream, freeing
+/// the original rows, then reading back the rows and verifying the contents.
+TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
+  CreateMgr(-1, 8 * 1024 * 1024);
+  const int NUM_ROWS = 4000;
+  BufferedTupleStream stream(runtime_state_.get(), *array_desc_, block_mgr_.get(),
+      client_, false);
+  Status status;
+  const vector<TupleDescriptor*>& tuple_descs = array_desc_->tuple_descriptors();
+  // Write out a predictable pattern of data by iterating over arrays of constants.
+  int strings_index = 0; // we take the mod of this as index into STRINGS.
+  int array_lens[] = { 0, 1, 5, 10, 1000, 2, 49, 20 };
+  int num_array_lens = sizeof(array_lens) / sizeof(array_lens[0]);
+  int array_len_index = 0;
+  for (int i = 0; i < NUM_ROWS; ++i) {
+    int expected_row_size = tuple_descs[0]->byte_size() + tuple_descs[1]->byte_size();
+    gscoped_ptr<TupleRow, FreeDeleter> row(reinterpret_cast<TupleRow*>(
+          malloc(tuple_descs.size() * sizeof(Tuple*))));
+    gscoped_ptr<Tuple, FreeDeleter> tuple0(reinterpret_cast<Tuple*>(
+          malloc(tuple_descs[0]->byte_size())));
+    gscoped_ptr<Tuple, FreeDeleter> tuple1(reinterpret_cast<Tuple*>(
+          malloc(tuple_descs[1]->byte_size())));
+    memset(tuple0.get(), 0, tuple_descs[0]->byte_size());
+    memset(tuple1.get(), 0, tuple_descs[1]->byte_size());
+    row->SetTuple(0, tuple0.get());
+    row->SetTuple(1, tuple1.get());
+
+    // Only array<string> is non-null.
+    tuple0->SetNull(tuple_descs[0]->slots()[1]->null_indicator_offset());
+    tuple1->SetNull(tuple_descs[1]->slots()[0]->null_indicator_offset());
+    const SlotDescriptor* array_slot_desc = tuple_descs[0]->slots()[0];
+    const TupleDescriptor* item_desc = array_slot_desc->collection_item_descriptor();
+
+    int array_len = array_lens[array_len_index++ % num_array_lens];
+    ArrayValue* av = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
+    av->ptr = NULL;
+    av->num_tuples = 0;
+    ArrayValueBuilder builder(av, *item_desc, mem_pool_.get(), array_len);
+    Tuple* array_data;
+    builder.GetFreeMemory(&array_data);
+    expected_row_size += item_desc->byte_size() * array_len;
+
+    // Fill the array with pointers to our constant strings.
+    for (int j = 0; j < array_len; ++j) {
+      const StringValue* string = &STRINGS[strings_index++ % NUM_STRINGS];
+      array_data->SetNotNull(item_desc->slots()[0]->null_indicator_offset());
+      RawValue::Write(string, array_data, item_desc->slots()[0], mem_pool_.get());
+      array_data += item_desc->byte_size();
+      expected_row_size += string->len;
+    }
+    builder.CommitTuples(array_len);
+
+    // Check that internal row size computation gives correct result.
+    EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
+    bool b = stream.AddRow(row.get(), &status);
+    ASSERT_TRUE(b);
+    ASSERT_TRUE(status.ok());
+    mem_pool_->FreeAll(); // Free data as soon as possible to smoke out issues.
+  }
+
+  // Read back and verify data.
+  stream.PrepareForRead();
+  strings_index = 0;
+  array_len_index = 0;
+  bool eos = false;
+  int rows_read = 0;
+  RowBatch batch(*array_desc_, BATCH_SIZE, &tracker_);
+  do {
+    batch.Reset();
+    ASSERT_TRUE(stream.GetNext(&batch, &eos).ok());
+    for (int i = 0; i < batch.num_rows(); ++i) {
+      TupleRow* row = batch.GetRow(i);
+      Tuple* tuple0 = row->GetTuple(0);
+      Tuple* tuple1 = row->GetTuple(1);
+      ASSERT_TRUE(tuple0 != NULL);
+      ASSERT_TRUE(tuple1 != NULL);
+      const SlotDescriptor* array_slot_desc = tuple_descs[0]->slots()[0];
+      ASSERT_FALSE(tuple0->IsNull(array_slot_desc->null_indicator_offset()));
+      ASSERT_TRUE(tuple0->IsNull(tuple_descs[0]->slots()[1]->null_indicator_offset()));
+      ASSERT_TRUE(tuple1->IsNull(tuple_descs[1]->slots()[0]->null_indicator_offset()));
+
+      const TupleDescriptor* item_desc = array_slot_desc->collection_item_descriptor();
+      int expected_array_len = array_lens[array_len_index++ % num_array_lens];
+      ArrayValue* av = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
+      ASSERT_EQ(expected_array_len, av->num_tuples);
+      for (int j = 0; j < av->num_tuples; ++j) {
+        Tuple* item = reinterpret_cast<Tuple*>(av->ptr + j * item_desc->byte_size());
+        const SlotDescriptor* string_desc = item_desc->slots()[0];
+        ASSERT_FALSE(item->IsNull(string_desc->null_indicator_offset()));
+        const StringValue* expected = &STRINGS[strings_index++ % NUM_STRINGS];
+        const StringValue* actual = item->GetStringSlot(string_desc->tuple_offset());
+        ASSERT_EQ(*expected, *actual);
+      }
+    }
+    rows_read += batch.num_rows();
+  } while (!eos);
+  ASSERT_EQ(NUM_ROWS, rows_read);
 }
 
 // TODO: more tests.
