@@ -488,6 +488,7 @@ def generate_statements(output_name, test_vectors, sections,
       if create_hive or file_format == 'hbase':
         output = hive_output
       elif codec == 'lzo':
+        # Impala CREATE TABLE doesn't allow INPUTFORMAT.
         output = hive_output
 
       # If a CREATE section is provided, use that. Otherwise a COLUMNS section
@@ -533,15 +534,22 @@ def generate_statements(output_name, test_vectors, sections,
       # TODO: Consider splitting the ALTER subsection into specific components. At the
       # moment, it assumes we're only using ALTER for partitioning the table.
       if alter and file_format != "hbase":
-        use_table = 'USE {db_name};\n'.format(db_name=db)
+        use_db = 'USE {db_name};\n'.format(db_name=db)
         if output == hive_output and codec == 'lzo':
-          if not options.force_reload:
+          # Hive ALTER TABLE ADD PARTITION doesn't handle null partitions, so
+          # we can't run the ALTER section in this case.
+          if options.force_reload:
+            # IMPALA-2278: Hive INSERT OVERWRITE won't clear out partition directories
+            # that weren't already added to the table. So, for force reload, manually
+            # delete the partition directories.
+            output.create.append(("DFS -rm -R {data_path};").format(
+              data_path=data_path));
+          else:
             # If this is not a force reload use msck repair to add the partitions
-            # into the table. This is to work around a problem where the null
-            # partition cannot be explicitly created in Hive.
-            output.create.append(use_table + 'msck repair table %s;' % (table_name,))
+            # into the table.
+            output.create.append(use_db + 'msck repair table %s;' % (table_name))
         else:
-          output.create.append(use_table + alter.format(table_name=table_name))
+          output.create.append(use_db + alter.format(table_name=table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
