@@ -191,4 +191,20 @@ set num_nodes=0
 ---- RESULTS
 ---- TYPES
 string,string
+=======
+# IMPALA-2289: Test nested-loop join with right anti join mode inside a subplan.
+select count(*) from tpch_nested_parquet.customer c left anti join c.c_orders
+where c_custkey between 8000 and 10000
+---- RESULTS
+667
+---- TYPES
+bigint
+====
+# IMPALA-2289: Test nested-loop join with left anti join mode inside a subplan.
+select straight_join count(*) from tpch_nested_parquet.customer c left anti join c.c_orders
+where c_custkey between 8000 and 10000
+---- RESULTS
+667
+---- TYPES
+bigint
 ====

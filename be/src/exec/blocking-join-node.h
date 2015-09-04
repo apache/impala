@@ -132,6 +132,14 @@ class BlockingJoinNode : public ExecNode {
   /// This is replaced by codegen.
   void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
 
+  /// Returns true if the join needs to process unmatched build rows, false
+  /// otherwise.
+  bool NeedToProcessUnmatchedBuildRows() {
+    return join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+        join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
+        join_op_ == TJoinOp::FULL_OUTER_JOIN;
+  }
+
  private:
   /// Supervises ConstructBuildSide in a separate thread, and returns its status in the
   /// promise parameter.

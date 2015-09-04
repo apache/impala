@@ -573,9 +573,7 @@ Status NestedLoopJoinNode::NextProbeRow(RuntimeState* state, RowBatch* output_ba
     // memory referenced by this batch to be deleted (see IMPALA-2191).
     if (output_batch->AtCapacity()) return Status::OK();
     if (probe_side_eos_) {
-      eos_ = join_op_ != TJoinOp::RIGHT_ANTI_JOIN &&
-          join_op_ != TJoinOp::RIGHT_OUTER_JOIN &&
-          join_op_ != TJoinOp::FULL_OUTER_JOIN;
+      eos_ = !NeedToProcessUnmatchedBuildRows();
       return Status::OK();
     } else {
       RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));

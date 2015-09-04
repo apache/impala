@@ -197,7 +197,9 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     if (probe_batch_->num_rows() == 0) {
       if (probe_side_eos_) {
         RETURN_IF_ERROR(InitGetNext(NULL /* eos */));
-        eos_ = true;
+        // If the probe side is exhausted, set the eos_ to true for only those
+        // join modes that don't need to process unmatched build rows.
+        eos_ = !NeedToProcessUnmatchedBuildRows();
         break;
       }
       probe_batch_->Reset();
