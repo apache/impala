@@ -36,9 +36,6 @@ class FileSystemUtil {
   /// Create a file at the specified path.
   static Status CreateFile(const std::string& file_path);
 
-  /// Resize a file to a specified length - uses unistd truncate().
-  static Status ResizeFile(const std::string& file_path, int64_t trunc_len);
-
   /// Remove the specified paths and their enclosing files/directories.
   static Status RemovePaths(const std::vector<std::string>& directories);
 

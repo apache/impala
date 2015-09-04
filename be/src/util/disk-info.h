@@ -43,24 +43,8 @@ class DiskInfo {
     return disks_.size();
   }
 
-#if 0
-  /// Returns the number of (logical) disks the data node is using.
-  /// It is possible for this to be more than num_disks since the datanode
-  /// can be configured to have multiple data directories on the same physical
-  /// disk.
-  static int num_datanode_dirs() {
-    DCHECK(initialized_);
-    return num_datanode_dirs_;
-  }
-
-  /// Returns a 0-based disk index for the data node dirs index.
-  static int disk_id(int datanode_dir_idx) {
-    return 0;
-  }
-#endif
-
   /// Returns the 0-based disk index for 'path' (path must be a FS path, not
-  /// hdfs path).
+  /// hdfs path). Returns -1 if the disk index is unknown.
   static int disk_id(const char* path);
 
   /// Returns the device name (e.g. sda) for disk_id
@@ -100,15 +84,11 @@ class DiskInfo {
 
   /// mapping of dev_ts to disk ids
   static std::map<dev_t, int> device_id_to_disk_id_;
-  
+
   /// mapping of devices names to disk ids
   static std::map<std::string, int> disk_name_to_disk_id_;
 
-  static int num_datanode_dirs_;
-
   static void GetDeviceNames();
 };
-
-
 }
 #endif

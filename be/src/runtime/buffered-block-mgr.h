@@ -20,7 +20,7 @@
 
 #include "runtime/disk-io-mgr.h"
 #include "runtime/tmp-file-mgr.h"
-#include "util/openssl-util.h"
+#include "util/mem-range.h"
 
 namespace impala {
 
@@ -175,6 +175,13 @@ class BufferedBlockMgr {
       return buffer_desc_->buffer;
     }
 
+    /// Returns a reference to the valid data in the block's buffer. Only guaranteed to
+    /// be valid if the block is pinned.
+    MemRange valid_data() const {
+      DCHECK(buffer_desc_ != NULL);
+      return MemRange(buffer_desc_->buffer, valid_data_len_);
+    }
+
     /// Return the number of bytes allocated in this block.
     int64_t valid_data_len() const { return valid_data_len_; }
 
@@ -223,37 +230,15 @@ class BufferedBlockMgr {
     /// The client that owns this block.
     Client* client_;
 
-    /// WriteRange object representing the on-disk location used to persist a block.
-    /// Is created the first time a block is persisted, and retained until the block
-    /// object is destroyed. The file location and offset in write_range_ are valid
-    /// throughout the lifetime of this object, but the data and length in the
-    /// write_range_ are only valid while the block is being written.
-    /// write_range_ instance is owned by the block manager.
-    DiskIoMgr::WriteRange* write_range_;
-
-    /// The file this block belongs to. The lifetime is the same as the file location
-    /// and offset in write_range_. The File is owned by BufferedBlockMgr, not TmpFileMgr.
-    TmpFileMgr::File* tmp_file_;
+    /// Non-NULL when the block data is written to scratch or is in the process of being
+    /// written.
+    std::unique_ptr<TmpFileMgr::WriteHandle> write_handle_;
 
     /// Length of valid (i.e. allocated) data within the block.
     int64_t valid_data_len_;
 
     /// Number of rows in this block.
     int num_rows_;
-
-    /// If --disk_spill_encryption is on, in the write path we allocate a new buffer to
-    /// hold encrypted data while it's being written to disk. In the read path, we can
-    /// instead decrypt data in place since no one else because the read buffer isn't
-    /// accessible to any other threads until Pin() returns.
-    boost::scoped_array<uint8_t> encrypted_write_buffer_;
-
-    /// If --disk_spill_encryption is on, a AES 256-bit key and initialization vector.
-    /// Regenerated on each write.
-    EncryptionKey key_;
-
-    /// If --disk_spill_encryption is on, our hash of the data being written. Filled in
-    /// on writes; verified on reads. This is calculated _after_ encryption.
-    IntegrityHash hash_;
 
     /// Block state variables. The block's buffer can be freed only if is_pinned_ and
     /// in_write_ are both false.
@@ -335,8 +320,8 @@ class BufferedBlockMgr {
   ///   - If there is memory pressure, block will get the buffer from 'unpin_block'.
   Status GetNewBlock(Client* client, Block* unpin_block, Block** block, int64_t len = -1);
 
-  /// Cancels the block mgr. All subsequent calls that return a Status fail with
-  /// Status::CANCELLED. Idempotent.
+  /// Test helper to cancel the block mgr. All subsequent calls that return a Status fail
+  /// with Status::CANCELLED. Idempotent.
   void Cancel();
 
   /// Returns true if the block manager was cancelled.
@@ -360,10 +345,6 @@ class BufferedBlockMgr {
   /// ReleaseMemory() call.
   void ReleaseMemory(Client* client, int64_t size);
 
-  /// The number of buffers available for client. That is, if all other clients were
-  /// stopped, the number of buffers this client could get.
-  int64_t available_buffers(Client* client) const;
-
   /// Returns a MEM_LIMIT_EXCEEDED error which includes the minimum memory required by
   /// this 'client' that acts on behalf of the node with id 'node_id'. 'node_id' is used
   /// only for error reporting.
@@ -381,6 +362,7 @@ class BufferedBlockMgr {
   void set_debug_write_delay_ms(int val) { debug_write_delay_ms_ = val; }
 
  private:
+  friend class BufferedBlockMgrTest;
   friend struct Client;
 
   /// Descriptor for a single memory buffer in the pool.
@@ -415,6 +397,12 @@ class BufferedBlockMgr {
   void DeleteBlock(Block* block);
   void DeleteBlockLocked(const boost::unique_lock<boost::mutex>& lock, Block* block);
 
+  /// If there is an in-flight write, cancel the write and restore the contents of the
+  /// block's buffer. If no write has been started for 'block', does nothing. 'block'
+  /// must have an associated buffer. Returns an error status if an error is encountered
+  /// while cancelling the write or CANCELLED if the block mgr is cancelled.
+  Status CancelWrite(Block* block);
+
   /// If the 'block' is NULL, checks if cancelled and returns. Otherwise, depending on
   /// 'unpin' calls either  DeleteBlock() or UnpinBlock(), which both first check for
   /// cancellation. It should be called without the lock_ acquired.
@@ -427,6 +415,10 @@ class BufferedBlockMgr {
   /// completed.
   /// The caller should not hold 'lock_'.
   Status TransferBuffer(Block* dst, Block* src, bool unpin);
+
+  /// The number of buffers available for client. That is, if all other clients were
+  /// stopped, the number of buffers this client could get.
+  int64_t available_buffers(Client* client) const;
 
   /// Returns the total number of unreserved buffers. This is the sum of unpinned,
   /// free and buffers we can still allocate minus the total number of reserved buffers
@@ -461,8 +453,8 @@ class BufferedBlockMgr {
   /// Issues the write for this block to the DiskIoMgr.
   Status WriteUnpinnedBlock(Block* block);
 
-  /// Wait until either the write for 'block' completes or the block mgr is cancelled.
-  /// 'lock_' must be held with 'lock'.
+  /// Wait until either there is no in-flight write for 'block' or the block mgr is
+  /// cancelled. 'lock_' must be held with 'lock'.
   void WaitForWrite(boost::unique_lock<boost::mutex>& lock, Block* block);
 
   /// Callback used by DiskIoMgr to indicate a block write has completed.  write_status
@@ -480,6 +472,9 @@ class BufferedBlockMgr {
   /// Checks unused_blocks_ for an unused block object, else allocates a new one.
   /// Non-blocking and needs no lock_.
   Block* GetUnusedBlock(Client* client);
+
+  // Test helper to get the number of block writes currently outstanding.
+  int64_t GetNumWritesOutstanding();
 
   /// Used to debug the state of the block manager. Lock must already be taken.
   bool Validate() const;
@@ -559,10 +554,6 @@ class BufferedBlockMgr {
   /// blocks may be written. Blocks are round-robined across these files.
   boost::scoped_ptr<TmpFileMgr::FileGroup> tmp_file_group_;
 
-  /// DiskIoMgr handles to read and write blocks.
-  DiskIoMgr* io_mgr_;
-  DiskIoRequestContext* io_request_context_;
-
   /// If true, a disk write failed and all API calls return.
   /// Status::CANCELLED. Set to true if there was an error writing a block, or if
   /// WriteComplete() needed to reissue the write and that failed.
@@ -584,20 +575,11 @@ class BufferedBlockMgr {
   /// Number of Pin() calls that did not require a disk read.
   RuntimeProfile::Counter* buffered_pin_counter_;
 
-  /// Time taken for disk reads.
-  RuntimeProfile::Counter* disk_read_timer_;
-
   /// Time spent waiting for a free buffer.
   RuntimeProfile::Counter* buffer_wait_timer_;
 
-  /// Number of bytes written to disk (includes writes still queued in the IO manager).
-  RuntimeProfile::Counter* bytes_written_counter_;
-
   /// Number of writes outstanding (issued but not completed).
   RuntimeProfile::Counter* outstanding_writes_counter_;
-
-  /// Time spent in disk spill encryption, decryption, and integrity checking.
-  RuntimeProfile::Counter* encryption_timer_;
 
   /// Number of writes issued.
   int writes_issued_;
@@ -609,20 +591,8 @@ class BufferedBlockMgr {
   /// map contains only weak ptrs. BufferedBlockMgrs that are handed out are shared ptrs.
   /// When all the shared ptrs are no longer referenced, the BufferedBlockMgr
   /// d'tor will be called at which point the weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, std::weak_ptr<BufferedBlockMgr>>
-      BlockMgrsMap;
+  typedef boost::unordered_map<TUniqueId, std::weak_ptr<BufferedBlockMgr>> BlockMgrsMap;
   static BlockMgrsMap query_to_block_mgrs_;
-
-  /// Takes the data in buffer(), allocates 'encrypted_write_buffer_', encrypts the data
-  /// into 'encrypted_write_buffer_' and computes 'hash_'. Returns a pointer to the
-  /// encrypted data in 'outbuf'.
-  Status EncryptAndHash(Block* block, uint8_t** outbuf);
-
-  /// Deallocates the block's encrypted write buffer alloced in EncryptAndHash().
-  void EncryptedWriteComplete(Block* block);
-
-  /// Verifies the integrity hash and decrypts the contents of buffer() in place.
-  Status CheckHashAndDecrypt(Block* block);
 
   /// Debug option to delay write completion.
   int debug_write_delay_ms_;

@@ -78,6 +78,8 @@ static const int LOW_MEMORY = 64 * 1024 * 1024;
 
 const int DiskIoMgr::DEFAULT_QUEUE_CAPACITY = 2;
 
+AtomicInt32 DiskIoMgr::next_disk_id_;
+
 namespace detail {
 // Indicates if file handle caching should be used
 static inline bool is_file_handle_caching_enabled() {
@@ -262,6 +264,11 @@ void DiskIoMgr::BufferDescriptor::Return() {
 DiskIoMgr::WriteRange::WriteRange(
     const string& file, int64_t file_offset, int disk_id, WriteDoneCallback callback)
   : RequestRange(RequestType::WRITE), callback_(callback) {
+  SetRange(file, file_offset, disk_id);
+}
+
+void DiskIoMgr::WriteRange::SetRange(
+    const std::string& file, int64_t file_offset, int disk_id) {
   file_ = file;
   offset_ = file_offset;
   disk_id_ = disk_id;
@@ -947,8 +954,11 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
   return false;
 }
 
-void DiskIoMgr::HandleWriteFinished(DiskIoRequestContext* writer, WriteRange* write_range,
-    const Status& write_status) {
+void DiskIoMgr::HandleWriteFinished(
+    DiskIoRequestContext* writer, WriteRange* write_range, const Status& write_status) {
+  // Copy disk_id before running callback: the callback may modify write_range.
+  int disk_id = write_range->disk_id_;
+
   // Execute the callback before decrementing the thread count. Otherwise CancelContext()
   // that waits for the disk ref count to be 0 will return, creating a race, e.g.
   // between BufferedBlockMgr::WriteComplete() and BufferedBlockMgr::~BufferedBlockMgr().
@@ -958,7 +968,7 @@ void DiskIoMgr::HandleWriteFinished(DiskIoRequestContext* writer, WriteRange* wr
   {
     unique_lock<mutex> writer_lock(writer->lock_);
     DCHECK(writer->Validate()) << endl << writer->DebugString();
-    DiskIoRequestContext::PerDiskState& state = writer->disk_states_[write_range->disk_id_];
+    DiskIoRequestContext::PerDiskState& state = writer->disk_states_[disk_id];
     if (writer->state_ == DiskIoRequestContext::Cancelled) {
       state.DecrementRequestThreadAndCheckDone(writer);
     } else {
@@ -1152,13 +1162,24 @@ DiskIoMgr::BufferDescriptor* DiskIoMgr::TryAllocateNextBufferForRange(
 }
 
 void DiskIoMgr::Write(DiskIoRequestContext* writer_context, WriteRange* write_range) {
-  FILE* file_handle = fopen(write_range->file(), "rb+");
-  Status ret_status;
-  if (file_handle == NULL) {
+  Status ret_status = Status::OK();
+  FILE* file_handle = NULL;
+  // Raw open() syscall will create file if not present when passed these flags.
+  int fd = open(write_range->file(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  if (fd < 0) {
     ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
-        Substitute("fopen($0, \"rb+\") failed with errno=$1 description=$2",
-            write_range->file_, errno, GetStrErrMsg())));
+        Substitute("Opening '$0' for write failed with errno=$1 description=$2",
+                                     write_range->file_, errno, GetStrErrMsg())));
   } else {
+    file_handle = fdopen(fd, "wb");
+    if (file_handle == NULL) {
+      ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+          Substitute("fdopen($0, \"wb\") failed with errno=$1 description=$2", fd, errno,
+                                       GetStrErrMsg())));
+    }
+  }
+
+  if (file_handle != NULL) {
     ret_status = WriteRangeHelper(file_handle, write_range);
 
     int success = fclose(file_handle);
@@ -1225,9 +1246,8 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
   // Assign to a local disk queue.
   DCHECK(!IsS3APath(file)); // S3 is always remote.
   if (disk_id == -1) {
-    // disk id is unknown, assign it a random one.
-    static int next_disk_id = 0;
-    disk_id = next_disk_id++;
+    // disk id is unknown, assign it an arbitrary one.
+    disk_id = next_disk_id_.Add(1);
   }
   // TODO: we need to parse the config for the number of dirs configured for this
   // data node.

@@ -15,16 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "runtime/tmp-file-mgr.h"
+
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread/locks.hpp>
-#include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
-#include <boost/filesystem.hpp>
-#include <gutil/strings/substitute.h>
+#include <boost/uuid/uuid_io.hpp>
 #include <gutil/strings/join.h>
+#include <gutil/strings/substitute.h>
 
-#include "runtime/tmp-file-mgr.h"
+#include "runtime/runtime-state.h"
+#include "runtime/tmp-file-mgr-internal.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
@@ -32,9 +35,13 @@
 
 #include "common/names.h"
 
+DEFINE_bool(disk_spill_encryption, false,
+    "Set this to encrypt and perform an integrity "
+    "check on all data spilled to disk during a query");
 DEFINE_string(scratch_dirs, "/tmp", "Writable scratch directories");
-
-#include "common/names.h"
+DEFINE_bool(allow_multiple_scratch_dirs_per_device, false,
+    "If false and --scratch_dirs contains multiple directories on the same device, "
+    "then only the first writable directory is used");
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
@@ -55,8 +62,10 @@ const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS = "tmp-file-mgr.active-scratch-dir
 const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST =
     "tmp-file-mgr.active-scratch-dirs.list";
 
-TmpFileMgr::TmpFileMgr() : initialized_(false), dir_status_lock_(), tmp_dirs_(),
-  num_active_scratch_dirs_metric_(NULL), active_scratch_dirs_metric_(NULL) {}
+TmpFileMgr::TmpFileMgr()
+  : initialized_(false),
+    num_active_scratch_dirs_metric_(nullptr),
+    active_scratch_dirs_metric_(nullptr) {}
 
 Status TmpFileMgr::Init(MetricGroup* metrics) {
   string tmp_dirs_spec = FLAGS_scratch_dirs;
@@ -65,7 +74,7 @@ Status TmpFileMgr::Init(MetricGroup* metrics) {
   if (!tmp_dirs_spec.empty()) {
     split(all_tmp_dirs, tmp_dirs_spec, is_any_of(","), token_compress_on);
   }
-  return InitCustom(all_tmp_dirs, true, metrics);
+  return InitCustom(all_tmp_dirs, !FLAGS_allow_multiple_scratch_dirs_per_device, metrics);
 }
 
 Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_device,
@@ -108,7 +117,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
         if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
         LOG(INFO) << "Using scratch directory " << scratch_subdir_path.string() << " on "
                   << "disk " << disk_id;
-        tmp_dirs_.push_back(Dir(scratch_subdir_path.string(), false));
+        tmp_dirs_.push_back(scratch_subdir_path.string());
       } else {
         LOG(WARNING) << "Could not remove and recreate directory "
                      << scratch_subdir_path.string() << ": cannot use it for scratch. "
@@ -117,14 +126,14 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
     }
   }
 
-  DCHECK(metrics != NULL);
+  DCHECK(metrics != nullptr);
   num_active_scratch_dirs_metric_ =
       metrics->AddGauge<int64_t>(TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS, 0);
-  active_scratch_dirs_metric_ = SetMetric<string>::CreateAndRegister(metrics,
-      TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST, set<string>());
+  active_scratch_dirs_metric_ = SetMetric<string>::CreateAndRegister(
+      metrics, TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST, set<string>());
   num_active_scratch_dirs_metric_->set_value(tmp_dirs_.size());
   for (int i = 0; i < tmp_dirs_.size(); ++i) {
-    active_scratch_dirs_metric_->Add(tmp_dirs_[i].path());
+    active_scratch_dirs_metric_->Add(tmp_dirs_[i]);
   }
 
   initialized_ = true;
@@ -137,24 +146,20 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
   return Status::OK();
 }
 
-Status TmpFileMgr::NewFile(FileGroup* file_group, const DeviceId& device_id,
-    const TUniqueId& query_id, unique_ptr<File>* new_file) {
+Status TmpFileMgr::NewFile(
+    FileGroup* file_group, DeviceId device_id, unique_ptr<File>* new_file) {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
   DCHECK_LT(device_id, tmp_dirs_.size());
-  DCHECK(file_group != NULL);
-  if (IsBlacklisted(device_id)) {
-    return Status(TErrorCode::TMP_DEVICE_BLACKLISTED, tmp_dirs_[device_id].path());
-  }
-
+  DCHECK(file_group != nullptr);
   // Generate the full file path.
   string unique_name = lexical_cast<string>(random_generator()());
   stringstream file_name;
-  file_name << PrintId(query_id) << "_" << unique_name;
-  path new_file_path(tmp_dirs_[device_id].path());
+  file_name << PrintId(file_group->unique_id()) << "_" << unique_name;
+  path new_file_path(tmp_dirs_[device_id]);
   new_file_path /= file_name.str();
 
-  new_file->reset(new File(this, file_group, device_id, new_file_path.string()));
+  new_file->reset(new File(file_group, device_id, new_file_path.string()));
   return Status::OK();
 }
 
@@ -162,162 +167,133 @@ string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
   DCHECK_LT(device_id, tmp_dirs_.size());
-  return tmp_dirs_[device_id].path();
+  return tmp_dirs_[device_id];
 }
 
-void TmpFileMgr::BlacklistDevice(DeviceId device_id) {
+int TmpFileMgr::NumActiveTmpDevices() {
   DCHECK(initialized_);
-  DCHECK(device_id >= 0 && device_id < tmp_dirs_.size());
-  bool added;
-  {
-    lock_guard<SpinLock> l(dir_status_lock_);
-    added = tmp_dirs_[device_id].blacklist();
-  }
-  if (added) {
-    num_active_scratch_dirs_metric_->Increment(-1);
-    active_scratch_dirs_metric_->Remove(tmp_dirs_[device_id].path());
-  }
+  return tmp_dirs_.size();
 }
 
-bool TmpFileMgr::IsBlacklisted(DeviceId device_id) {
-  DCHECK(initialized_);
-  DCHECK(device_id >= 0 && device_id < tmp_dirs_.size());
-  lock_guard<SpinLock> l(dir_status_lock_);
-  return tmp_dirs_[device_id].is_blacklisted();
-}
-
-int TmpFileMgr::num_active_tmp_devices() {
-  DCHECK(initialized_);
-  lock_guard<SpinLock> l(dir_status_lock_);
-  int num_active = 0;
-  for (int device_id = 0; device_id < tmp_dirs_.size(); ++device_id) {
-    if (!tmp_dirs_[device_id].is_blacklisted()) ++num_active;
-  }
-  return num_active;
-}
-
-vector<TmpFileMgr::DeviceId> TmpFileMgr::active_tmp_devices() {
+vector<TmpFileMgr::DeviceId> TmpFileMgr::ActiveTmpDevices() {
   vector<TmpFileMgr::DeviceId> devices;
-  // Allocate vector before we grab lock
-  devices.reserve(tmp_dirs_.size());
-  {
-    lock_guard<SpinLock> l(dir_status_lock_);
-    for (DeviceId device_id = 0; device_id < tmp_dirs_.size(); ++device_id) {
-      if (!tmp_dirs_[device_id].is_blacklisted()) {
-        devices.push_back(device_id);
-      }
-    }
+  for (DeviceId device_id = 0; device_id < tmp_dirs_.size(); ++device_id) {
+    devices.push_back(device_id);
   }
   return devices;
 }
 
-TmpFileMgr::File::File(TmpFileMgr* mgr, FileGroup* file_group, DeviceId device_id,
-    const string& path)
-  : mgr_(mgr),
-    file_group_(file_group),
+TmpFileMgr::File::File(FileGroup* file_group, DeviceId device_id, const string& path)
+  : file_group_(file_group),
     path_(path),
     device_id_(device_id),
-    current_size_(0),
+    disk_id_(DiskInfo::disk_id(path.c_str())),
+    bytes_allocated_(0),
     blacklisted_(false) {
-  DCHECK(file_group != NULL);
+  DCHECK(file_group != nullptr);
 }
 
 Status TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
   DCHECK_GT(num_bytes, 0);
-  Status status;
-  if (mgr_->IsBlacklisted(device_id_)) {
-    blacklisted_ = true;
-    return Status(TErrorCode::TMP_FILE_BLACKLISTED, path_);
-  }
-  if (current_size_ == 0) {
-    // First call to AllocateSpace. Create the file.
-    status = FileSystemUtil::CreateFile(path_);
-    if (!status.ok()) {
-      ReportIOError(status.msg());
-      return status;
-    }
-    disk_id_ = DiskInfo::disk_id(path_.c_str());
-  }
-  int64_t new_size = current_size_ + num_bytes;
-  status = FileSystemUtil::ResizeFile(path_, new_size);
-  if (!status.ok()) {
-    ReportIOError(status.msg());
-    return status;
-  }
-  *offset = current_size_;
-  current_size_ = new_size;
+  *offset = bytes_allocated_;
+  bytes_allocated_ += num_bytes;
   return Status::OK();
 }
 
-void TmpFileMgr::File::ReportIOError(const ErrorMsg& msg) {
+int TmpFileMgr::File::AssignDiskQueue() const {
+  return file_group_->io_mgr_->AssignQueue(path_.c_str(), disk_id_, false);
+}
+
+void TmpFileMgr::File::Blacklist(const ErrorMsg& msg) {
   LOG(ERROR) << "Error for temporary file '" << path_ << "': " << msg.msg();
-  // IMPALA-2305: avoid blacklisting to prevent test failures.
-  // blacklisted_ = true;
-  // mgr_->BlacklistDevice(device_id_);
+  blacklisted_ = true;
 }
 
 Status TmpFileMgr::File::Remove() {
-  if (current_size_ > 0) FileSystemUtil::RemovePaths(vector<string>(1, path_));
+  // Remove the file if present (it may not be present if no writes completed).
+  FileSystemUtil::RemovePaths({path_});
   return Status::OK();
 }
 
-TmpFileMgr::FileGroup::FileGroup(
-    TmpFileMgr* tmp_file_mgr, RuntimeProfile* profile, int64_t bytes_limit)
-  : tmp_file_mgr_(tmp_file_mgr),
-    current_bytes_allocated_(0),
-    bytes_limit_(bytes_limit),
-    next_allocation_index_(0) {
-  DCHECK(tmp_file_mgr != NULL);
-  scratch_space_bytes_used_counter_ =
-      ADD_COUNTER(profile, "ScratchFileUsedBytes", TUnit::BYTES);
+string TmpFileMgr::File::DebugString() {
+  return Substitute("File $0 path '$1' device id $2 disk id $3 bytes allocated $4 "
+      "blacklisted $5", this, path_, device_id_, disk_id_, bytes_allocated_,
+      blacklisted_);
 }
 
-Status TmpFileMgr::FileGroup::CreateFiles(const TUniqueId& query_id) {
+TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
+    RuntimeProfile* profile, const TUniqueId& unique_id, int64_t block_size,
+    int64_t bytes_limit)
+  : tmp_file_mgr_(tmp_file_mgr),
+    io_mgr_(io_mgr),
+    io_ctx_(nullptr),
+    unique_id_(unique_id),
+    block_size_(block_size),
+    bytes_limit_(bytes_limit),
+    write_counter_(ADD_COUNTER(profile, "ScratchWrites", TUnit::UNIT)),
+    bytes_written_counter_(ADD_COUNTER(profile, "ScratchBytesWritten", TUnit::BYTES)),
+    read_counter_(ADD_COUNTER(profile, "ScratchReads", TUnit::UNIT)),
+    bytes_read_counter_(ADD_COUNTER(profile, "ScratchBytesRead", TUnit::BYTES)),
+    scratch_space_bytes_used_counter_(
+        ADD_COUNTER(profile, "ScratchFileUsedBytes", TUnit::BYTES)),
+    disk_read_timer_(ADD_TIMER(profile, "TotalReadBlockTime")),
+    encryption_timer_(ADD_TIMER(profile, "TotalEncryptionTime")),
+    current_bytes_allocated_(0),
+    next_allocation_index_(0) {
+  DCHECK_GT(block_size_, 0);
+  DCHECK(tmp_file_mgr != nullptr);
+  io_mgr_->RegisterContext(&io_ctx_, nullptr);
+}
+
+TmpFileMgr::FileGroup::~FileGroup() {
+  DCHECK_EQ(tmp_files_.size(), 0);
+}
+
+Status TmpFileMgr::FileGroup::CreateFiles() {
+  lock_.DCheckLocked();
   DCHECK(tmp_files_.empty());
-  vector<Status> errs;
-  vector<DeviceId> tmp_devices = tmp_file_mgr_->active_tmp_devices();
+  vector<DeviceId> tmp_devices = tmp_file_mgr_->ActiveTmpDevices();
   int files_allocated = 0;
   // Initialize the tmp files and the initial file to use.
   for (int i = 0; i < tmp_devices.size(); ++i) {
-    TmpFileMgr::DeviceId tmp_device_id = tmp_devices[i];
+    TmpFileMgr::DeviceId device_id = tmp_devices[i];
     // It is possible for a device to be blacklisted after it was returned by
-    // active_tmp_devices(), handle this gracefully by skipping devices if NewFile()
+    // ActiveTmpDevices(), handle this gracefully by skipping devices if NewFile()
     // fails.
-    Status status = NewFile(tmp_device_id, query_id);
+    unique_ptr<TmpFileMgr::File> tmp_file;
+    Status status = tmp_file_mgr_->NewFile(this, device_id, &tmp_file);
     if (status.ok()) {
+      tmp_files_.emplace_back(std::move(tmp_file));
       ++files_allocated;
     } else {
-      errs.push_back(std::move(status));
+      scratch_errors_.push_back(std::move(status));
     }
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
   if (tmp_files_.size() == 0) {
-    Status err_status("Could not create files in any configured scratch directories "
-        "(--scratch_dirs).");
-    for (Status& err : errs) err_status.MergeStatus(err);
+    // TODO: IMPALA-4697: the merged errors do not show up in the query error log,
+    // so we must point users to the impalad error log.
+    Status err_status(
+        "Could not create files in any configured scratch directories (--scratch_dirs). "
+        "See logs for previous errors that may have caused this.");
+    for (Status& err : scratch_errors_) err_status.MergeStatus(err);
     return err_status;
   }
-
   // Start allocating on a random device to avoid overloading the first device.
   next_allocation_index_ = rand() % tmp_files_.size();
   return Status::OK();
 }
 
-Status TmpFileMgr::FileGroup::NewFile(const DeviceId& device_id,
-    const TUniqueId& query_id, File** new_file) {
-  unique_ptr<TmpFileMgr::File> tmp_file;
-  RETURN_IF_ERROR(tmp_file_mgr_->NewFile(this, device_id, query_id, &tmp_file));
-  if (new_file != NULL) *new_file = tmp_file.get();
-  tmp_files_.emplace_back(std::move(tmp_file));
-  return Status::OK();
-}
-
 void TmpFileMgr::FileGroup::Close() {
-  for (std::unique_ptr<TmpFileMgr::File>& file: tmp_files_) {
+  // Cancel writes before deleting the files, since in-flight writes could re-create
+  // deleted files.
+  if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_);
+  io_ctx_ = nullptr;
+  for (std::unique_ptr<TmpFileMgr::File>& file : tmp_files_) {
     Status status = file->Remove();
     if (!status.ok()) {
-      LOG(WARNING) << "Error removing scratch file '" << file->path() << "': "
-                   << status.msg().msg();
+      LOG(WARNING) << "Error removing scratch file '" << file->path()
+                   << "': " << status.msg().msg();
     }
   }
   tmp_files_.clear();
@@ -325,18 +301,31 @@ void TmpFileMgr::FileGroup::Close() {
 
 Status TmpFileMgr::FileGroup::AllocateSpace(
     int64_t num_bytes, File** tmp_file, int64_t* file_offset) {
-  if (bytes_limit_ != -1 && current_bytes_allocated_ + num_bytes > bytes_limit_) {
+  DCHECK_LE(num_bytes, block_size_);
+  lock_guard<SpinLock> lock(lock_);
+
+  if (!free_ranges_.empty()) {
+    *tmp_file = free_ranges_.back().first;
+    *file_offset = free_ranges_.back().second;
+    free_ranges_.pop_back();
+    return Status::OK();
+  }
+
+  if (bytes_limit_ != -1 && current_bytes_allocated_ + block_size_ > bytes_limit_) {
     return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_);
   }
-  vector<Status> errs;
+
+  // Lazily create the files on the first write.
+  if (tmp_files_.empty()) RETURN_IF_ERROR(CreateFiles());
+
   // Find the next physical file in round-robin order and allocate a range from it.
   for (int attempt = 0; attempt < tmp_files_.size(); ++attempt) {
     *tmp_file = tmp_files_[next_allocation_index_].get();
     next_allocation_index_ = (next_allocation_index_ + 1) % tmp_files_.size();
     if ((*tmp_file)->is_blacklisted()) continue;
-    Status status = (*tmp_file)->AllocateSpace(num_bytes, file_offset);
+    Status status = (*tmp_file)->AllocateSpace(block_size_, file_offset);
     if (status.ok()) {
-      scratch_space_bytes_used_counter_->Add(num_bytes);
+      scratch_space_bytes_used_counter_->Add(block_size_);
       current_bytes_allocated_ += num_bytes;
       return Status::OK();
     }
@@ -345,12 +334,261 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
     LOG(WARNING) << "Error while allocating range in scratch file '"
                  << (*tmp_file)->path() << "': " << status.msg().msg()
                  << ". Will try another scratch file.";
-    errs.push_back(status);
+    scratch_errors_.push_back(status);
   }
-  Status err_status("No usable scratch files: space could not be allocated in any "
-                    "of the configured scratch directories (--scratch_dirs).");
-  for (Status& err : errs) err_status.MergeStatus(err);
+  // TODO: IMPALA-4697: the merged errors do not show up in the query error log,
+  // so we must point users to the impalad error log.
+  Status err_status(
+      "No usable scratch files: space could not be allocated in any of "
+      "the configured scratch directories (--scratch_dirs). See logs for previous "
+      "errors that may have caused this.");
+  // Include all previous errors that may have caused the failure.
+  for (Status& err : scratch_errors_) err_status.MergeStatus(err);
   return err_status;
 }
 
+void TmpFileMgr::FileGroup::AddFreeRange(File* file, int64_t offset) {
+  lock_guard<SpinLock> lock(lock_);
+  free_ranges_.emplace_back(file, offset);
+}
+
+Status TmpFileMgr::FileGroup::Write(
+    MemRange buffer, WriteDoneCallback cb, unique_ptr<TmpFileMgr::WriteHandle>* handle) {
+  DCHECK_GE(buffer.len(), 0);
+
+  File* tmp_file;
+  int64_t file_offset;
+  RETURN_IF_ERROR(AllocateSpace(buffer.len(), &tmp_file, &file_offset));
+
+  unique_ptr<WriteHandle> tmp_handle(new WriteHandle(encryption_timer_, cb));
+  WriteHandle* tmp_handle_ptr = tmp_handle.get(); // Pass ptr by value into lambda.
+  DiskIoMgr::WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
+      const Status& write_status) { WriteComplete(tmp_handle_ptr, write_status); };
+  RETURN_IF_ERROR(
+      tmp_handle->Write(io_mgr_, io_ctx_, tmp_file, file_offset, buffer, callback));
+  write_counter_->Add(1);
+  bytes_written_counter_->Add(buffer.len());
+  *handle = move(tmp_handle);
+  return Status::OK();
+}
+
+Status TmpFileMgr::FileGroup::Read(WriteHandle* handle, MemRange buffer) {
+  DCHECK(handle->write_range_ != nullptr);
+  DCHECK(!handle->is_cancelled_);
+  DCHECK_EQ(buffer.len(), handle->len());
+
+  // Don't grab 'lock_' in this method - it is not necessary because we don't touch
+  // any members that it protects and could block other threads for the duration of
+  // the synchronous read.
+  DCHECK(!handle->write_in_flight_);
+  DCHECK(handle->write_range_ != nullptr);
+  // Don't grab handle->lock_, it is safe to touch all of handle's state since the
+  // write is not in flight.
+  DiskIoMgr::ScanRange* scan_range = scan_range_pool_.Add(new DiskIoMgr::ScanRange);
+  scan_range->Reset(nullptr, handle->write_range_->file(), handle->write_range_->len(),
+      handle->write_range_->offset(), handle->write_range_->disk_id(), false,
+      DiskIoMgr::BufferOpts::ReadInto(buffer.data(), buffer.len()));
+  DiskIoMgr::BufferDescriptor* io_mgr_buffer;
+  {
+    SCOPED_TIMER(disk_read_timer_);
+    read_counter_->Add(1);
+    bytes_read_counter_->Add(buffer.len());
+    RETURN_IF_ERROR(io_mgr_->Read(io_ctx_, scan_range, &io_mgr_buffer));
+  }
+
+  if (FLAGS_disk_spill_encryption) {
+    RETURN_IF_ERROR(handle->CheckHashAndDecrypt(buffer));
+  }
+
+  DCHECK_EQ(io_mgr_buffer->buffer(), buffer.data());
+  DCHECK_EQ(io_mgr_buffer->len(), buffer.len());
+  DCHECK(io_mgr_buffer->eosr());
+  io_mgr_buffer->Return();
+  return Status::OK();
+}
+
+Status TmpFileMgr::FileGroup::CancelWriteAndRestoreData(
+    unique_ptr<WriteHandle> handle, MemRange buffer) {
+  DCHECK_EQ(handle->write_range_->data(), buffer.data());
+  DCHECK_EQ(handle->len(), buffer.len());
+  handle->Cancel();
+
+  // Decrypt regardless of whether the write is still in flight or not. An in-flight
+  // write may write bogus data to disk but this lets us get some work done while the
+  // write is being cancelled.
+  Status status;
+  if (FLAGS_disk_spill_encryption) {
+    status = handle->CheckHashAndDecrypt(buffer);
+  }
+  handle->WaitForWrite();
+  AddFreeRange(handle->file_, handle->write_range_->offset());
+  handle.reset();
+  return status;
+}
+
+void TmpFileMgr::FileGroup::DestroyWriteHandle(unique_ptr<WriteHandle> handle) {
+  handle->Cancel();
+  handle->WaitForWrite();
+  AddFreeRange(handle->file_, handle->write_range_->offset());
+  handle.reset();
+}
+
+void TmpFileMgr::FileGroup::WriteComplete(
+    WriteHandle* handle, const Status& write_status) {
+  Status status;
+  if (!write_status.ok()) {
+    status = RecoverWriteError(handle, write_status);
+    if (status.ok()) return;
+  } else {
+    status = write_status;
+  }
+  handle->WriteComplete(status);
+}
+
+Status TmpFileMgr::FileGroup::RecoverWriteError(
+    WriteHandle* handle, const Status& write_status) {
+  DCHECK(!write_status.ok());
+  DCHECK(handle->file_ != nullptr);
+
+  // We can't recover from cancellation or memory limit exceeded.
+  if (write_status.IsCancelled() || write_status.IsMemLimitExceeded()) {
+    return write_status;
+  }
+
+  // Save and report the error before retrying so that the failure isn't silent.
+  {
+    lock_guard<SpinLock> lock(lock_);
+    scratch_errors_.push_back(write_status);
+  }
+  handle->file_->Blacklist(write_status.msg());
+
+  // Do not retry cancelled writes or propagate the error, simply return CANCELLED.
+  if (handle->is_cancelled_) return Status::CANCELLED;
+
+  TmpFileMgr::File* tmp_file;
+  int64_t file_offset;
+  // Discard the scratch file range - we will not reuse ranges from a bad file.
+  // Choose another file to try. Blacklisting ensures we don't retry the same file.
+  // If this fails, the status will include all the errors in 'scratch_errors_'.
+  RETURN_IF_ERROR(AllocateSpace(handle->len(), &tmp_file, &file_offset));
+  return handle->RetryWrite(io_mgr_, io_ctx_, tmp_file, file_offset);
+}
+
+string TmpFileMgr::FileGroup::DebugString() {
+  lock_guard<SpinLock> lock(lock_);
+  stringstream ss;
+  ss << "FileGroup " << this << " block size " << block_size_
+     << " bytes limit " << bytes_limit_
+     << " current bytes allocated " << current_bytes_allocated_
+     << " next allocation index " << next_allocation_index_
+     << " writes " << write_counter_->value()
+     << " bytes written " << bytes_written_counter_->value()
+     << " reads " << read_counter_->value()
+     << " bytes read " << bytes_read_counter_->value()
+     << " scratch bytes used " << scratch_space_bytes_used_counter_
+     << " dist read timer " << disk_read_timer_->value()
+     << " encryption timer " << encryption_timer_->value() << endl
+     << "  " << tmp_files_.size() << " files:" << endl;
+  for (unique_ptr<File>& file : tmp_files_) {
+    ss << "    " << file->DebugString() << endl;
+  }
+  return ss.str();
+}
+
+TmpFileMgr::WriteHandle::WriteHandle(
+    RuntimeProfile::Counter* encryption_timer, WriteDoneCallback cb)
+  : cb_(cb),
+    encryption_timer_(encryption_timer),
+    file_(nullptr),
+    is_cancelled_(false),
+    write_in_flight_(false) {}
+
+string TmpFileMgr::WriteHandle::TmpFilePath() const {
+  if (file_ == nullptr) return "";
+  return file_->path();
+}
+
+Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx,
+    File* file, int64_t offset, MemRange buffer,
+    DiskIoMgr::WriteRange::WriteDoneCallback callback) {
+  DCHECK(!write_in_flight_);
+
+  if (FLAGS_disk_spill_encryption) RETURN_IF_ERROR(EncryptAndHash(buffer));
+
+  file_ = file;
+  write_in_flight_ = true;
+  write_range_.reset(
+      new DiskIoMgr::WriteRange(file->path(), offset, file->AssignDiskQueue(), callback));
+  write_range_->SetData(buffer.data(), buffer.len());
+  return io_mgr->AddWriteRange(io_ctx, write_range_.get());
+}
+
+Status TmpFileMgr::WriteHandle::RetryWrite(
+    DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file, int64_t offset) {
+  DCHECK(write_in_flight_);
+  file_ = file;
+  write_in_flight_ = true;
+  write_range_->SetRange(file->path(), offset, file->AssignDiskQueue());
+  return io_mgr->AddWriteRange(io_ctx, write_range_.get());
+}
+
+void TmpFileMgr::WriteHandle::WriteComplete(const Status& write_status) {
+  WriteDoneCallback cb;
+  {
+    lock_guard<mutex> lock(write_state_lock_);
+    DCHECK(write_in_flight_);
+    write_in_flight_ = false;
+    // Need to extract 'cb_' because once 'write_in_flight_' is false, the WriteHandle
+    // may be destroyed.
+    cb = move(cb_);
+  }
+  write_complete_cv_.NotifyAll();
+  // Call 'cb' once we've updated the state. We must do this last because once 'cb' is
+  // called, it is valid to call Read() on the handle.
+  cb(write_status);
+}
+
+void TmpFileMgr::WriteHandle::Cancel() {
+  unique_lock<mutex> lock(write_state_lock_);
+  is_cancelled_ = true;
+  // TODO: in future, if DiskIoMgr supported cancellation, we could cancel it here.
+}
+
+void TmpFileMgr::WriteHandle::WaitForWrite() {
+  unique_lock<mutex> lock(write_state_lock_);
+  while (write_in_flight_) write_complete_cv_.Wait(lock);
+}
+
+Status TmpFileMgr::WriteHandle::EncryptAndHash(MemRange buffer) {
+  DCHECK(FLAGS_disk_spill_encryption);
+  SCOPED_TIMER(encryption_timer_);
+  // Since we're using AES-CFB mode, we must take care not to reuse a key/IV pair.
+  // Regenerate a new key and IV for every data buffer we write.
+  key_.InitializeRandom();
+  RETURN_IF_ERROR(key_.Encrypt(buffer.data(), buffer.len(), buffer.data()));
+  hash_.Compute(buffer.data(), buffer.len());
+  return Status::OK();
+}
+
+Status TmpFileMgr::WriteHandle::CheckHashAndDecrypt(MemRange buffer) {
+  DCHECK(FLAGS_disk_spill_encryption);
+  SCOPED_TIMER(encryption_timer_);
+  if (!hash_.Verify(buffer.data(), buffer.len())) {
+    return Status("Block verification failure");
+  }
+  return key_.Decrypt(buffer.data(), buffer.len(), buffer.data());
+}
+
+string TmpFileMgr::WriteHandle::DebugString() {
+  unique_lock<mutex> lock(write_state_lock_);
+  stringstream ss;
+  ss << "Write handle " << this << " file '" << file_->path() << "'"
+     << " is cancelled " << is_cancelled_ << " write in flight " << write_in_flight_;
+  if (write_range_ != NULL) {
+    ss << " data " << write_range_->data() << " len " << write_range_->len()
+       << " file offset " << write_range_->offset()
+       << " disk id " << write_range_->disk_id();
+  }
+  return ss.str();
+}
 } // namespace impala

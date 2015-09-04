@@ -48,7 +48,6 @@ bool DiskInfo::initialized_;
 vector<DiskInfo::Disk> DiskInfo::disks_;
 map<dev_t, int> DiskInfo::device_id_to_disk_id_;
 map<string, int> DiskInfo::disk_name_to_disk_id_;
-int DiskInfo::num_datanode_dirs_;
 
 // Parses /proc/partitions to get the number of disks.  A bit of looking around
 // seems to indicate this as the best way to do this.

@@ -15,13 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gutil/strings/substitute.h>
-#include <sys/stat.h>
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
+#include <gutil/strings/substitute.h>
+#include <sys/stat.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
@@ -37,6 +38,7 @@
 #include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
+#include "util/error-util.h"
 #include "util/filesystem-util.h"
 #include "util/promise.h"
 #include "util/test-info.h"
@@ -49,6 +51,7 @@
 
 using boost::filesystem::directory_iterator;
 using boost::filesystem::remove;
+using boost::regex;
 
 // Note: This is the default scratch dir created by impala.
 // FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.
@@ -100,7 +103,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
       created_tmp_dirs_.push_back(dir);
     }
     test_env_->InitTmpFileMgr(tmp_dirs, false);
-    EXPECT_EQ(num_dirs, test_env_->tmp_file_mgr()->num_active_tmp_devices());
+    EXPECT_EQ(num_dirs, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
     return tmp_dirs;
   }
 
@@ -254,9 +257,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   }
 
   static bool AllWritesComplete(BufferedBlockMgr* block_mgr) {
-    RuntimeProfile::Counter* writes_outstanding =
-        block_mgr->profile()->GetCounter("BlockWritesOutstanding");
-    return writes_outstanding->value() == 0;
+    return block_mgr->GetNumWritesOutstanding() == 0;
   }
 
   static bool AllWritesComplete(const vector<BufferedBlockMgr*>& block_mgrs) {
@@ -266,13 +267,12 @@ class BufferedBlockMgrTest : public ::testing::Test {
     return true;
   }
 
-  // Delete the temporary file backing a block - all subsequent writes to the file
-  // should fail. Expects backing file has already been allocated.
-  static void DeleteBackingFile(BufferedBlockMgr::Block* block) {
-    const string& path = block->TmpFilePath();
-    ASSERT_GT(path.size(), 0);
-    ASSERT_TRUE(remove(path));
-    LOG(INFO) << "Injected fault by deleting file " << path;
+  // Remove permissions for the temporary file at 'path' - all subsequent writes
+  // to the file should fail. Expects backing file has already been allocated.
+  static void DisableBackingFile(const string& path) {
+    EXPECT_GT(path.size(), 0);
+    EXPECT_EQ(0, chmod(path.c_str(), 0));
+    LOG(INFO) << "Injected fault by removing file permissions " << path;
   }
 
   // Check that the file backing the block has dir as a prefix of its path.
@@ -910,9 +910,11 @@ void BufferedBlockMgrTest::TestRuntimeStateTeardown(
     UnpinBlocks(blocks);
     vector<BufferedBlockMgr::Block*> more_blocks;
     AllocateBlocks(block_mgr.get(), client, max_num_buffers, &more_blocks);
+
+    const string& tmp_file_path = blocks[0]->TmpFilePath();
     DeleteBlocks(more_blocks);
     PinBlocks(blocks);
-    DeleteBackingFile(blocks[0]);
+    DisableBackingFile(tmp_file_path);
   }
 
   // Unpin will initiate writes. If the write error propagates fast enough, some Unpin()
@@ -968,14 +970,15 @@ TEST_F(BufferedBlockMgrTest, WriteCompleteWithCancelledRuntimeState) {
   DeleteBlocks(blocks);
 }
 
-// Clear scratch directory. Return # of files deleted.
-static int clear_scratch_dir() {
+// Remove write permissions on scratch files. Return # of scratch files.
+static int remove_scratch_perms() {
   int num_files = 0;
   directory_iterator dir_it(SCRATCH_DIR);
   for (; dir_it != directory_iterator(); ++dir_it) {
     ++num_files;
-    remove_all(dir_it->path());
+    chmod(dir_it->path().c_str(), 0);
   }
+
   return num_files;
 }
 
@@ -997,7 +1000,7 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   // Repin the blocks
   PinBlocks(blocks);
   // Remove the backing storage so that future writes will fail
-  int num_files = clear_scratch_dir();
+  int num_files = remove_scratch_perms();
   ASSERT_GT(num_files, 0);
   UnpinBlocks(blocks, true);
   WaitForWrites(block_mgr);
@@ -1024,23 +1027,25 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   ASSERT_OK(blocks[0]->Unpin());
   WaitForWrites(block_mgr);
   // Remove temporary files - subsequent operations will fail.
-  int num_files = clear_scratch_dir();
-  ASSERT_GT(num_files, 0);
-  // Current implementation will fail here because it tries to expand the tmp file
-  // immediately. This behavior is not contractual but we want to know if it changes
-  // accidentally.
-  Status status = blocks[1]->Unpin();
-  ASSERT_FALSE(status.ok());
+  int num_files = remove_scratch_perms();
+  ASSERT_TRUE(num_files > 0);
+  // Current implementation will not fail here until it attempts to write the file.
+  // This behavior is not contractual but we want to know if it changes accidentally.
+  ASSERT_OK(blocks[1]->Unpin());
+
+  // Write failure should cancel query
+  WaitForWrites(block_mgr);
+  ASSERT_TRUE(block_mgr->IsCancelled());
 
   DeleteBlocks(blocks);
   TearDownMgrs();
 }
 
 // Test that the block manager is able to blacklist a temporary device correctly after a
-// write error. We should not allocate more blocks on that device, but existing blocks
-// on the device will remain in use.
-/// Disabled because blacklisting was disabled as workaround for IMPALA-2305.
-TEST_F(BufferedBlockMgrTest, DISABLED_WriteErrorBlacklist) {
+// write error. The query that encountered the write error should not allocate more
+// blocks on that device, but existing blocks on the device will remain in use and future
+// queries will use the device.
+TEST_F(BufferedBlockMgrTest, WriteErrorBlacklist) {
   // Set up two buffered block managers with two temporary dirs.
   vector<string> tmp_dirs = InitMultipleTmpDirs(2);
   // Simulate two concurrent queries.
@@ -1074,50 +1079,71 @@ TEST_F(BufferedBlockMgrTest, DISABLED_WriteErrorBlacklist) {
   // Delete one file from first scratch dir for first block manager.
   BufferedBlockMgr::Block* error_block = FindBlockForDir(blocks[error_mgr], error_dir);
   ASSERT_TRUE(error_block != NULL) << "Expected a tmp file in dir " << error_dir;
+  const string& error_file_path = error_block->TmpFilePath();
   PinBlocks(all_blocks);
-  DeleteBackingFile(error_block);
-  UnpinBlocks(all_blocks); // Should succeed since tmp file space was already allocated.
+  DisableBackingFile(error_file_path);
+  UnpinBlocks(all_blocks); // Should succeed since writes occur asynchronously
   WaitForWrites(block_mgrs);
-  ASSERT_TRUE(block_mgrs[error_mgr]->IsCancelled());
+  // Both block managers have a usable tmp directory so should still be usable.
+  ASSERT_FALSE(block_mgrs[error_mgr]->IsCancelled());
   ASSERT_FALSE(block_mgrs[no_error_mgr]->IsCancelled());
-  // Temporary device with error should no longer be active.
+  // Temporary device with error should still be active.
   vector<TmpFileMgr::DeviceId> active_tmp_devices =
-      test_env_->tmp_file_mgr()->active_tmp_devices();
-  ASSERT_EQ(tmp_dirs.size() - 1, active_tmp_devices.size());
+      test_env_->tmp_file_mgr()->ActiveTmpDevices();
+  ASSERT_EQ(tmp_dirs.size(), active_tmp_devices.size());
   for (int i = 0; i < active_tmp_devices.size(); ++i) {
     const string& device_path =
         test_env_->tmp_file_mgr()->GetTmpDirPath(active_tmp_devices[i]);
     ASSERT_EQ(string::npos, error_dir.find(device_path));
   }
-  // The second block manager should continue using allocated scratch space, since it
-  // didn't encounter a write error itself. In future this could change but for now it is
-  // the intended behaviour.
+
+  // The error block manager should only allocate from the device that had no error.
+  // The non-error block manager should continue using both devices, since it didn't
+  // encounter a write error itself.
+  vector<BufferedBlockMgr::Block*> error_new_blocks;
+  AllocateBlocks(
+      block_mgrs[error_mgr], clients[error_mgr], blocks_per_mgr, &error_new_blocks);
+  UnpinBlocks(error_new_blocks);
+  WaitForWrites(block_mgrs);
+  EXPECT_TRUE(FindBlockForDir(error_new_blocks, good_dir) != NULL);
+  EXPECT_TRUE(FindBlockForDir(error_new_blocks, error_dir) == NULL);
+  for (int i = 0; i < error_new_blocks.size(); ++i) {
+    LOG(INFO) << "Newly created block backed by file "
+              << error_new_blocks[i]->TmpFilePath();
+    EXPECT_TRUE(BlockInDir(error_new_blocks[i], good_dir));
+  }
+  DeleteBlocks(error_new_blocks);
+
   PinBlocks(blocks[no_error_mgr]);
   UnpinBlocks(blocks[no_error_mgr]);
-  ASSERT_TRUE(FindBlockForDir(blocks[no_error_mgr], good_dir) != NULL);
-  ASSERT_TRUE(FindBlockForDir(blocks[no_error_mgr], error_dir) != NULL);
-  // The second block manager should avoid using bad directory for new blocks.
+  WaitForWrites(block_mgrs);
+  EXPECT_TRUE(FindBlockForDir(blocks[no_error_mgr], good_dir) != NULL);
+  EXPECT_TRUE(FindBlockForDir(blocks[no_error_mgr], error_dir) != NULL);
+
+  // The second block manager should use the bad directory for new blocks since
+  // blacklisting is per-manager, not global.
   vector<BufferedBlockMgr::Block*> no_error_new_blocks;
   AllocateBlocks(block_mgrs[no_error_mgr], clients[no_error_mgr], blocks_per_mgr,
       &no_error_new_blocks);
   UnpinBlocks(no_error_new_blocks);
-  for (int i = 0; i < no_error_new_blocks.size(); ++i) {
-    LOG(INFO) << "Newly created block backed by file "
-              << no_error_new_blocks[i]->TmpFilePath();
-    ASSERT_TRUE(BlockInDir(no_error_new_blocks[i], good_dir));
-  }
-  // A new block manager should only use the good dir for backing storage.
+  WaitForWrites(block_mgrs);
+  EXPECT_TRUE(FindBlockForDir(no_error_new_blocks, good_dir) != NULL);
+  EXPECT_TRUE(FindBlockForDir(no_error_new_blocks, error_dir) != NULL);
+  DeleteBlocks(no_error_new_blocks);
+
+  // A new block manager should use the both dirs for backing storage.
   BufferedBlockMgr::Client* new_client;
   BufferedBlockMgr* new_block_mgr =
       CreateMgrAndClient(9999, blocks_per_mgr, block_size_, 0, false, &new_client);
   vector<BufferedBlockMgr::Block*> new_mgr_blocks;
   AllocateBlocks(new_block_mgr, new_client, blocks_per_mgr, &new_mgr_blocks);
   UnpinBlocks(new_mgr_blocks);
-  for (int i = 0; i < blocks_per_mgr; ++i) {
-    LOG(INFO) << "New manager Block " << i << " backed by file "
-              << new_mgr_blocks[i]->TmpFilePath();
-    ASSERT_TRUE(BlockInDir(new_mgr_blocks[i], good_dir));
-  }
+  WaitForWrites(block_mgrs);
+  EXPECT_TRUE(FindBlockForDir(new_mgr_blocks, good_dir) != NULL);
+  EXPECT_TRUE(FindBlockForDir(new_mgr_blocks, error_dir) != NULL);
+  DeleteBlocks(new_mgr_blocks);
+
+  DeleteBlocks(all_blocks);
 }
 
 // Check that allocation error resulting from removal of directory results in blocks
@@ -1151,7 +1177,7 @@ TEST_F(BufferedBlockMgrTest, AllocationErrorHandling) {
   // use the good dir.
   UnpinBlocks(blocks[0]);
   // Directories remain on active list even when they experience errors.
-  ASSERT_EQ(2, test_env_->tmp_file_mgr()->num_active_tmp_devices());
+  ASSERT_EQ(2, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
   // Blocks should not be written to bad dir even if it remains non-writable.
   UnpinBlocks(blocks[1]);
   // All writes should succeed.
@@ -1165,18 +1191,39 @@ TEST_F(BufferedBlockMgrTest, AllocationErrorHandling) {
 TEST_F(BufferedBlockMgrTest, NoDirsAllocationError) {
   vector<string> tmp_dirs = InitMultipleTmpDirs(2);
   int max_num_buffers = 2;
+  RuntimeState* runtime_state;
   BufferedBlockMgr::Client* client;
-  BufferedBlockMgr* block_mgr =
-      CreateMgrAndClient(0, max_num_buffers, block_size_, 0, false, &client);
+  BufferedBlockMgr* block_mgr = CreateMgrAndClient(
+      0, max_num_buffers, block_size_, 0, false, &client, &runtime_state);
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   for (int i = 0; i < tmp_dirs.size(); ++i) {
     const string& tmp_scratch_subdir = tmp_dirs[i] + SCRATCH_SUFFIX;
     chmod(tmp_scratch_subdir.c_str(), 0);
   }
+  ErrorLogMap error_log;
+  runtime_state->GetErrors(&error_log);
+  ASSERT_TRUE(error_log.empty());
   for (int i = 0; i < blocks.size(); ++i) {
-    ASSERT_FALSE(blocks[i]->Unpin().ok());
+    // Writes won't fail until the actual I/O is attempted.
+    ASSERT_OK(blocks[i]->Unpin());
   }
+
+  LOG(INFO) << "Waiting for writes.";
+  // Write failure should cancel query.
+  WaitForWrites(block_mgr);
+  LOG(INFO) << "writes done.";
+  ASSERT_TRUE(block_mgr->IsCancelled());
+  runtime_state->GetErrors(&error_log);
+  ASSERT_FALSE(error_log.empty());
+  stringstream error_string;
+  PrintErrorMap(&error_string, error_log);
+  LOG(INFO) << "Errors: " << error_string.str();
+  ASSERT_NE(
+      string::npos, error_string.str().find("No usable scratch files: space could "
+                                            "not be allocated in any of the configured "
+                                            "scratch directories (--scratch_dirs)"))
+      << error_string.str();
   DeleteBlocks(blocks);
 }
 

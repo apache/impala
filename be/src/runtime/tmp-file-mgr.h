@@ -18,146 +18,211 @@
 #ifndef IMPALA_RUNTIME_TMP_FILE_MGR_H
 #define IMPALA_RUNTIME_TMP_FILE_MGR_H
 
+#include <functional>
+#include <utility>
+
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
+
+#include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h" // for TUniqueId
+#include "runtime/disk-io-mgr.h"
+#include "util/mem-range.h"
 #include "util/collection-metrics.h"
+#include "util/condition-variable.h"
+#include "util/openssl-util.h"
 #include "util/runtime-profile.h"
 #include "util/spinlock.h"
 
 namespace impala {
 
-/// TmpFileMgr creates and manages temporary files and directories on the local
-/// filesystem. It can manage multiple temporary directories across multiple devices.
-/// TmpFileMgr ensures that at most one directory per device is used unless overridden
-/// for testing.
+/// TmpFileMgr provides an abstraction for management of temporary (a.k.a. scratch) files
+/// on the filesystem and I/O to and from them. TmpFileMgr manages multiple scratch
+/// directories across multiple devices, configured via the --scratch_dirs option.
+/// TmpFileMgr manages I/O to scratch files in order to abstract away details of which
+/// files are allocated and recovery from certain I/O errors. I/O is done via DiskIoMgr.
+/// TmpFileMgr encrypts data written to disk if enabled by the --disk_spill_encryption
+/// command-line flag.
 ///
-/// Every temporary File belongs to a FileGroup: to allocate temporary files, first a
-/// FileGroup is created, then FileGroup::NewFile() is called to create a new File with
-/// a unique filename on the specified temporary device. The client can use the File
-/// handle to allocate space in the file. FileGroups can be created with a limit on
-/// the total number of bytes allocated across all files in the group.
+/// FileGroups manage scratch space across multiple devices. To write to scratch space,
+/// first a FileGroup is created, then FileGroup::Write() is called to asynchronously
+/// write a memory buffer to one of the scratch files. FileGroup::Write() returns a
+/// WriteHandle, which is used by the caller to identify that write operation. The
+/// caller is notified when the asynchronous write completes via a callback, after which
+/// the caller can use the WriteHandle to read back the data.
 ///
-/// TODO: we could notify block managers about the failure so they can more take
-/// proactive action to avoid using the device.
+/// Each WriteHandle is backed by a range of data in a scratch file. The first call to
+/// Write() will create files for the FileGroup with unique filenames on the configured
+/// temporary devices. At most one directory per device is used (unless overridden for
+/// testing). Free space is managed within a FileGroup: once a WriteHandle is destroyed,
+/// the file range backing it can be recycled for a different WriteHandle. The file range
+/// of a WriteHandle can be replaced with a different one if a write error is encountered
+/// and the data instead needs to be written to a different disk.
+///
+/// Resource Management:
+/// TmpFileMgr provides some basic support for managing local disk space consumption.
+/// A FileGroup can be created with a limit on the total number of bytes allocated across
+/// all files. Writes that would exceed the limit fail with an error status.
+///
+/// TODO: each FileGroup can manage only fixed length scratch file ranges of 'block_size',
+/// to simplify the recycling logic. BufferPool will require variable length ranges.
+/// TODO: IMPALA-4683: we could implement smarter handling of failures, e.g. to
+/// temporarily blacklist devices that show I/O errors.
 class TmpFileMgr {
  public:
-  class FileGroup;
+  class File; // Needs to be public for TmpFileMgrTest.
+  class WriteHandle;
 
-  /// DeviceId is a unique identifier for a temporary device managed by TmpFileMgr.
-  /// It is used as a handle for external classes to identify devices.
+  /// DeviceId is an internal unique identifier for a temporary device managed by
+  /// TmpFileMgr. DeviceIds in the range [0, num tmp devices) are allocated arbitrarily.
+  /// Needs to be public for TmpFileMgrTest.
   typedef int DeviceId;
 
-  /// File is a handle to a physical file in a temporary directory. Clients
-  /// can allocate file space and remove files using AllocateSpace() and Remove().
-  /// Creation of the file is deferred until the first call to AllocateSpace().
-  class File {
-   public:
-    /// Called to notify TmpFileMgr that an IO error was encountered for this file
-    void ReportIOError(const ErrorMsg& msg);
-
-    const std::string& path() const { return path_; }
-    int disk_id() const { return disk_id_; }
-    bool is_blacklisted() const { return blacklisted_; }
-
-   private:
-    friend class FileGroup;
-    friend class TmpFileMgr;
-    friend class TmpFileMgrTest;
-
-    /// Allocates 'num_bytes' bytes in this file for a new block of data.
-    /// The file size is increased by a call to truncate() if necessary.
-    /// The physical file is created on the first call to AllocateSpace().
-    /// Returns Status::OK() and sets offset on success.
-    /// Returns an error status if an unexpected error occurs, e.g. the file could not
-    /// be created.
-    Status AllocateSpace(int64_t num_bytes, int64_t* offset);
-
-    /// Delete the physical file on disk, if one was created.
-    /// It is not valid to read or write to a file after calling Remove().
-    Status Remove();
-
-    /// The name of the sub-directory that Impala created within each configured scratch
-    /// directory.
-    const static std::string TMP_SUB_DIR_NAME;
-
-    /// Space (in MB) that must ideally be available for writing on a scratch
-    /// directory. A warning is issued if available space is less than this threshold.
-    const static uint64_t AVAILABLE_SPACE_THRESHOLD_MB;
-
-    File(TmpFileMgr* mgr, FileGroup* file_group, DeviceId device_id,
-        const std::string& path);
-
-    /// TmpFileMgr this belongs to.
-    TmpFileMgr* mgr_;
-
-    /// The FileGroup this belongs to. Cannot be null.
-    FileGroup* file_group_;
-
-    /// Path of the physical file in the filesystem.
-    std::string path_;
-
-    /// The temporary device this file is stored on.
-    DeviceId device_id_;
-
-    /// The id of the disk on which the physical file lies.
-    int disk_id_;
-
-    /// Current file size. Modified by AllocateSpace(). Size is 0 before file creation.
-    int64_t current_size_;
-
-    /// Set to true to indicate that file can't be expanded. This is useful to keep here
-    /// even though it is redundant with the global per-device blacklisting in TmpFileMgr
-    /// because it can be checked without acquiring a global lock. If a file is
-    /// blacklisted, the corresponding device will always be blacklisted.
-    bool blacklisted_;
-  };
+  typedef std::function<void(const Status&)> WriteDoneCallback;
 
   /// Represents a group of temporary files - one per disk with a scratch directory. The
   /// total allocated bytes of the group can be bound by setting the space allocation
   /// limit. The owner of the FileGroup object is responsible for calling the Close()
   /// method to delete all the files in the group.
+  ///
+  /// Public methods of FileGroup and WriteHandle are safe to call concurrently from
+  /// multiple threads as long as different WriteHandle arguments are provided.
   class FileGroup {
    public:
-    /// Initialize a new file group, which will create files using 'tmp_file_mgr'.
-    /// Adds counters to 'profile' to track scratch space used. 'bytes_limit' is
-    /// the limit on the total file space to allocate.
-    FileGroup(
-        TmpFileMgr* tmp_file_mgr, RuntimeProfile* profile, int64_t bytes_limit = -1);
+    /// Initialize a new file group, which will create files using 'tmp_file_mgr'
+    /// and perform I/O using 'io_mgr'. Adds counters to 'profile' to track scratch
+    /// space used. 'unique_id' is a unique ID that is used to prefix any scratch file
+    /// names. It is an error to create multiple FileGroups with the same 'unique_id'.
+    /// 'block_size' is the size of blocks in bytes that space will be allocated in.
+    /// 'bytes_limit' is the limit on the total file space to allocate.
+    FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr, RuntimeProfile* profile,
+        const TUniqueId& unique_id, int64_t block_size, int64_t bytes_limit = -1);
 
-    ~FileGroup() { DCHECK_EQ(NumFiles(), 0); }
+    ~FileGroup();
 
-    /// Initializes the file group with one temporary file per disk with a scratch
-    /// directory. 'unique_id' is a unique ID that should be used to prefix any
-    /// scratch file names. It is an error to create multiple FileGroups with the
-    /// same 'unique_id'. Returns OK if at least one temporary file could be created.
-    /// Returns an error if no temporary files were successfully created. Must only be
-    /// called once.
-    Status CreateFiles(const TUniqueId& unique_id);
+    /// Asynchronously writes 'buffer' to a temporary file of this file group. If there
+    /// are multiple scratch files, this can write to any of them, and will attempt to
+    /// recover from I/O errors on one file by writing to a different file. The memory
+    /// referenced by 'buffer' must remain valid until the write completes. The callee
+    /// may rewrite the data in 'buffer' in-place (e.g. to do in-place encryption or
+    /// compression). The caller should not modify the data in 'buffer' until the write
+    /// completes or is cancelled, otherwise invalid data may be written to disk.
+    ///
+    /// TODO: buffer->len must be <= 'block_size' until FileGroup supports allocating
+    /// variable-length scratch files ranges.
+    ///
+    /// Returns an error if the scratch space cannot be allocated or the write cannot
+    /// be started. Otherwise 'handle' is set and 'cb' will be called asynchronously from
+    /// a different thread when the write completes successfully or unsuccessfully or is
+    /// cancelled.
+    ///
+    /// 'handle' must be destroyed by passing the DestroyWriteHandle() or
+    /// CancelWriteAndRestoreData().
+    Status Write(
+        MemRange buffer, WriteDoneCallback cb, std::unique_ptr<WriteHandle>* handle);
 
-    /// Allocate num_bytes bytes in a temporary file. Try multiple disks if error occurs.
-    /// Returns an error only if no temporary files are usable or the scratch limit is
-    /// exceeded.
-    Status AllocateSpace(int64_t num_bytes, File** tmp_file, int64_t* file_offset);
+    /// Synchronously read the data referenced by 'handle' from the temporary file into
+    /// 'buffer'. buffer.len() must be the same as handle->len(). Can only be called
+    /// after a write successfully completes.
+    Status Read(WriteHandle* handle, MemRange buffer);
+
+    /// Cancels the write referenced by 'handle' and destroy associate resources. Also
+    /// restore the original data in the 'buffer' passed to Write(), decrypting or
+    /// decompressing as necessary. The cancellation always succeeds, but an error
+    /// is returned if restoring the data fails.
+    Status CancelWriteAndRestoreData(
+        std::unique_ptr<WriteHandle> handle, MemRange buffer);
+
+    /// Wait for the in-flight I/Os to complete and destroy resources associated with
+    /// 'handle'.
+    void DestroyWriteHandle(std::unique_ptr<WriteHandle> handle);
 
     /// Calls Remove() on all the files in the group and deletes them.
     void Close();
 
-    /// Returns the number of files that are a part of the group.
-    int NumFiles() { return tmp_files_.size(); }
+    std::string DebugString();
+
+    const TUniqueId& unique_id() const { return unique_id_; }
 
    private:
+    friend class File;
     friend class TmpFileMgrTest;
 
-    /// Creates a new File with a unique path for a query instance, adds it to the
-    /// group and returns a handle for that file. The file path is within the (single)
-    /// tmp directory on the specified device id.
-    /// If an error is encountered, e.g. the device is blacklisted, the file is not
-    /// added to this group and a non-ok status is returned.
-    Status NewFile(
-        const DeviceId& device_id, const TUniqueId& unique_id, File** new_file = NULL);
+    /// Initializes the file group with one temporary file per disk with a scratch
+    /// directory. Returns OK if at least one temporary file could be created.
+    /// Returns an error if no temporary files were successfully created. Must only be
+    /// called once. Must be called with 'lock_' held.
+    Status CreateFiles();
+
+    /// Allocate 'num_bytes' bytes in a temporary file. Try multiple disks if error
+    /// occurs. Returns an error only if no temporary files are usable or the scratch
+    /// limit is exceeded. Must be called without 'lock_' held.
+    Status AllocateSpace(int64_t num_bytes, File** tmp_file, int64_t* file_offset);
+
+    /// Add a free scratch range to 'free_ranges_'. Must be called without 'lock_' held.
+    void AddFreeRange(File* file, int64_t offset);
+
+    /// Called when the DiskIoMgr write completes for 'handle'. On error, will attempt
+    /// to retry the write. On success or if the write can't be retried, calls
+    /// handle->WriteComplete().
+    void WriteComplete(WriteHandle* handle, const Status& write_status);
+
+    /// Handles a write error. Logs the write error and blacklists the device for this
+    /// file group if the cause was an I/O error. Blacklisting limits the number of times
+    /// a write is retried because each device will only be tried once. Returns OK if it
+    /// successfully reissued the write. Returns an error status if the original error
+    /// was unrecoverable or an unrecoverable error is encountered when reissuing the
+    /// write. The error status will include all previous I/O errors in its details.
+    Status RecoverWriteError(WriteHandle* handle, const Status& write_status);
 
     /// The TmpFileMgr it is associated with.
-    TmpFileMgr* tmp_file_mgr_;
+    TmpFileMgr* const tmp_file_mgr_;
+
+    /// DiskIoMgr used for all I/O to temporary files.
+    DiskIoMgr* const io_mgr_;
+
+    /// I/O context used for all reads and writes. Registered in constructor.
+    DiskIoRequestContext* io_ctx_;
+
+    /// Stores scan ranges allocated in Read(). Needed because ScanRange objects may be
+    /// touched by DiskIoMgr even after the scan is finished.
+    /// TODO: IMPALA-4249: remove once lifetime of ScanRange objects is better defined.
+    ObjectPool scan_range_pool_;
+
+    /// Unique across all FileGroups. Used to prefix file names.
+    const TUniqueId unique_id_;
+
+    /// Size of the blocks in bytes that scratch space is managed in.
+    /// TODO: support variable-length scratch file ranges.
+    const int64_t block_size_;
+
+    /// Max write space allowed (-1 means no limit).
+    const int64_t bytes_limit_;
+
+    /// Number of write operations (includes writes started but not yet complete).
+    RuntimeProfile::Counter* const write_counter_;
+
+    /// Number of bytes written to disk (includes writes started but not yet complete).
+    RuntimeProfile::Counter* const bytes_written_counter_;
+
+    /// Number of read operations (includes reads started but not yet complete).
+    RuntimeProfile::Counter* const read_counter_;
+
+    /// Number of bytes read from disk (includes reads started but not yet complete).
+    RuntimeProfile::Counter* const bytes_read_counter_;
+
+    /// Amount of scratch space allocated in bytes.
+    RuntimeProfile::Counter* const scratch_space_bytes_used_counter_;
+
+    /// Time taken for disk reads.
+    RuntimeProfile::Counter* const disk_read_timer_;
+
+    /// Time spent in disk spill encryption, decryption, and integrity checking.
+    RuntimeProfile::Counter* encryption_timer_;
+
+    /// Protects below members.
+    SpinLock lock_;
 
     /// List of files representing the FileGroup.
     std::vector<std::unique_ptr<File>> tmp_files_;
@@ -165,16 +230,117 @@ class TmpFileMgr {
     /// Total space allocated in this group's files.
     int64_t current_bytes_allocated_;
 
-    /// Max write space allowed (-1 means no limit).
-    const int64_t bytes_limit_;
-
     /// Index into 'tmp_files' denoting the file to which the next temporary file range
     /// should be allocated from. Used to implement round-robin allocation from temporary
     /// files.
     int next_allocation_index_;
 
-    /// Amount of scratch space allocated in bytes.
-    RuntimeProfile::Counter* scratch_space_bytes_used_counter_;
+    /// List of File/offset pairs for free scratch ranges of size 'block_size_' bytes.
+    std::vector<std::pair<File*, int64_t>> free_ranges_;
+
+    /// Errors encountered when creating/writing scratch files. We store the history so
+    /// that we can report the original cause of the scratch errors if we run out of
+    /// devices to write to.
+    std::vector<Status> scratch_errors_;
+  };
+
+  /// A handle to a write operation, backed by a range of a temporary file. The operation
+  /// is either in-flight or has completed. If it completed with no error and wasn't
+  /// cancelled then the data is in the file and can be read back.
+  ///
+  /// WriteHandle is returned from FileGroup::Write(). After the write completes, the
+  /// handle can be passed to FileGroup::Read() to read back the data zero or more times.
+  /// FileGroup::DestroyWriteHandle() can be called at any time to destroy the handle and
+  /// allow reuse of the scratch file range written to. Alternatively,
+  /// FileGroup::CancelWriteAndRestoreData() can be called to reverse the effects of
+  /// FileGroup::Write() by destroying the handle and restoring the original data to the
+  /// buffer, so long as the data in the buffer was not modified by the caller.
+  ///
+  /// Public methods of WriteHandle are safe to call concurrently from multiple threads.
+  class WriteHandle {
+   public:
+    // The write must be destroyed by FileGroup::DestroyWriteHandle().
+    ~WriteHandle() {
+      DCHECK(!write_in_flight_);
+      DCHECK(is_cancelled_);
+    }
+
+    /// Path of temporary file backing the block. Intended for use in testing.
+    /// Returns empty string if no backing file allocated.
+    std::string TmpFilePath() const;
+
+    /// The length of the write range in bytes.
+    int64_t len() const { return write_range_->len(); }
+
+    std::string DebugString();
+
+   private:
+    friend class FileGroup;
+
+    WriteHandle(RuntimeProfile::Counter* encryption_timer, WriteDoneCallback cb);
+
+    /// Starts a write of 'buffer' to 'offset' of 'file'.
+    Status Write(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
+        int64_t offset, MemRange buffer,
+        DiskIoMgr::WriteRange::WriteDoneCallback callback);
+
+    /// Retry the write after the initial write failed with an error, instead writing to
+    /// 'offset' of 'file'.
+    Status RetryWrite(
+        DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file, int64_t offset);
+
+    /// Cancels the write asynchronously. After Cancel() is called, writes are not
+    /// retried.
+    void Cancel();
+
+    /// Blocks until the write completes either successfully or unsuccessfully.
+    void WaitForWrite();
+
+    /// Called when the write has completed successfully or not. Sets 'write_in_flight_'
+    /// then calls 'cb_'.
+    void WriteComplete(const Status& write_status);
+
+    /// Encrypts the data in 'buffer' in-place and computes 'hash_'.
+    Status EncryptAndHash(MemRange buffer);
+
+    /// Verifies the integrity hash and decrypts the contents of 'buffer' in place.
+    Status CheckHashAndDecrypt(MemRange buffer);
+
+    /// Callback to be called when the write completes.
+    WriteDoneCallback cb_;
+
+    /// Reference to the FileGroup's 'encryption_timer_'.
+    RuntimeProfile::Counter* encryption_timer_;
+
+    /// The DiskIoMgr write range for this write.
+    boost::scoped_ptr<DiskIoMgr::WriteRange> write_range_;
+
+    /// The temporary file being written to.
+    File* file_;
+
+    /// If --disk_spill_encryption is on, a AES 256-bit key and initialization vector.
+    /// Regenerated for each write.
+    EncryptionKey key_;
+
+    /// If --disk_spill_encryption is on, our hash of the data being written. Filled in
+    /// on writes; verified on reads. This is calculated _after_ encryption.
+    IntegrityHash hash_;
+
+    /// Protects all fields below while 'write_in_flight_' is true. At other times, it is
+    /// invalid to call WriteRange/FileGroup methods concurrently from multiple threads,
+    /// so no locking is required. This is a terminal lock and should not be held while
+    /// acquiring other locks or invoking 'cb_'.
+    boost::mutex write_state_lock_;
+
+    // True if the the write has been cancelled (but is not necessarily complete).
+    bool is_cancelled_;
+
+    // True if a write is in flight.
+    bool write_in_flight_;
+
+    /// Signalled when the write completes and 'write_in_flight_' becomes false, before
+    /// 'cb_' is invoked.
+    ConditionVariable write_complete_cv_;
   };
 
   TmpFileMgr();
@@ -194,59 +360,27 @@ class TmpFileMgr {
 
   /// Total number of devices with tmp directories that are active. There is one tmp
   /// directory per device.
-  int num_active_tmp_devices();
+  int NumActiveTmpDevices();
 
   /// Return vector with device ids of all tmp devices being actively used.
   /// I.e. those that haven't been blacklisted.
-  std::vector<DeviceId> active_tmp_devices();
+  std::vector<DeviceId> ActiveTmpDevices();
 
  private:
-  /// Return a new File handle with a unique path for a query instance. The file is
-  /// associated with the file_group and the file path is within the (single) tmp
+  friend class TmpFileMgrTest;
+
+  /// Return a new File handle with a path based on file_group->unique_id. The file is
+  /// associated with the 'file_group' and the file path is within the (single) scratch
   /// directory on the specified device id. The caller owns the returned handle and is
   /// responsible for deleting it. The file is not created - creation is deferred until
-  /// the first call to File::AllocateSpace().
-  Status NewFile(FileGroup* file_group, const DeviceId& device_id,
-      const TUniqueId& unique_id, std::unique_ptr<File>* new_file);
-
-  /// Dir stores information about a temporary directory.
-  class Dir {
-   public:
-    const std::string& path() const { return path_; }
-
-    // Return true if it was newly added to blacklist.
-    bool blacklist() {
-      bool was_blacklisted = blacklisted_;
-      blacklisted_ = true;
-      return !was_blacklisted;
-    }
-    bool is_blacklisted() const { return blacklisted_; }
-
-   private:
-    friend class TmpFileMgr;
-
-    /// path should be a absolute path to a writable scratch directory.
-    Dir(const std::string& path, bool blacklisted)
-        : path_(path), blacklisted_(blacklisted) {}
-
-    std::string path_;
-
-    bool blacklisted_;
-  };
-
-  /// Remove a device from the rotation. Subsequent attempts to allocate a file on that
-  /// device will fail and the device will not be included in active tmp devices.
-  void BlacklistDevice(DeviceId device_id);
-
-  bool IsBlacklisted(DeviceId device_id);
+  /// the file is written.
+  Status NewFile(
+      FileGroup* file_group, DeviceId device_id, std::unique_ptr<File>* new_file);
 
   bool initialized_;
 
-  /// Protects the status of tmp dirs (i.e. whether they're blacklisted).
-  SpinLock dir_status_lock_;
-
-  /// The created tmp directories.
-  std::vector<Dir> tmp_dirs_;
+  /// The paths of the created tmp directories.
+  std::vector<std::string> tmp_dirs_;
 
   /// Metrics to track active scratch directories.
   IntGauge* num_active_scratch_dirs_metric_;

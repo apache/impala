@@ -114,17 +114,6 @@ Status FileSystemUtil::CreateFile(const string& file_path) {
   return Status::OK();
 }
 
-Status FileSystemUtil::ResizeFile(const string& file_path, int64_t trunc_len) {
-  int success = truncate(file_path.c_str(), trunc_len);
-  if (success != 0) {
-    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
-        "Truncate file $0 to length $1 failed with errno $2 ($3)",
-        file_path, trunc_len, errno, GetStrErrMsg())));
-  }
-
-  return Status::OK();
-}
-
 Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
   error_code errcode;
   bool exists = filesystem::exists(directory_path, errcode);

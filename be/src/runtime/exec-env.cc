@@ -171,7 +171,7 @@ ExecEnv::ExecEnv()
     scheduler_.reset(new SimpleScheduler(
         addresses, metrics_.get(), webserver_.get(), request_pool_service_.get()));
   }
-  if (exec_env_ == NULL) exec_env_ = this;
+  exec_env_ = this;
 }
 
 // TODO: Need refactor to get rid of duplicated code.
@@ -224,12 +224,10 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     scheduler_.reset(new SimpleScheduler(
         addresses, metrics_.get(), webserver_.get(), request_pool_service_.get()));
   }
-  if (exec_env_ == NULL) exec_env_ = this;
+  exec_env_ = this;
 }
 
-
-ExecEnv::~ExecEnv() {
-}
+ExecEnv::~ExecEnv() {}
 
 Status ExecEnv::InitForFeTests() {
   mem_tracker_.reset(new MemTracker(-1, "Process"));

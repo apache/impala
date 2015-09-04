@@ -61,7 +61,7 @@ class ExecEnv {
 
   /// Returns the first created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
-  /// we return the first instance.
+  /// we return the most recently created instance.
   static ExecEnv* GetInstance() { return exec_env_; }
 
   /// Empty destructor because the compiler-generated one requires full

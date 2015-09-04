@@ -64,7 +64,7 @@ enum TParquetFallbackSchemaResolution {
 // metadata which overrides everything else.
 struct TQueryOptions {
   1: optional bool abort_on_error = 0
-  2: optional i32 max_errors = 0
+  2: optional i32 max_errors = 100
   3: optional bool disable_codegen = 0
   4: optional i32 batch_size = 0
   5: optional i32 num_nodes = NUM_NODES_ALL

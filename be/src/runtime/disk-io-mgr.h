@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_RUNTIME_DISK_IO_MGR_H
 #define IMPALA_RUNTIME_DISK_IO_MGR_H
 
+#include <functional>
 #include <list>
 #include <vector>
 
@@ -599,13 +599,21 @@ class DiskIoMgr {
     /// (TStatusCode::CANCELLED). The callback is only invoked if this WriteRange was
     /// successfully added (i.e. AddWriteRange() succeeded). No locks are held while
     /// the callback is invoked.
-    typedef boost::function<void (const Status&)> WriteDoneCallback;
+    typedef std::function<void(const Status&)> WriteDoneCallback;
     WriteRange(const std::string& file, int64_t file_offset, int disk_id,
         WriteDoneCallback callback);
 
+    /// Change the file and offset of this write range. Data and callbacks are unchanged.
+    /// Can only be called when the write is not in flight (i.e. before AddWriteRange()
+    /// is called or after the write callback was called).
+    void SetRange(const std::string& file, int64_t file_offset, int disk_id);
+
     /// Set the data and number of bytes to be written for this WriteRange.
-    /// File data can be over-written by calling SetData() and AddWriteRange().
+    /// Can only be called when the write is not in flight (i.e. before AddWriteRange()
+    /// is called or after the write callback was called).
     void SetData(const uint8_t* buffer, int64_t len);
+
+    const uint8_t* data() const { return data_; }
 
    private:
     friend class DiskIoMgr;
@@ -854,6 +862,11 @@ class DiskIoMgr {
   /// allocated for each local disk on the system and for each remote filesystem type.
   /// It is indexed by disk id.
   std::vector<DiskQueue*> disk_queues_;
+
+  /// The next disk queue to write to if the actual 'disk_id_' is unknown (i.e. the file
+  /// is not associated with a particular local disk or remote queue). Used to implement
+  /// round-robin assignment for that case.
+  static AtomicInt32 next_disk_id_;
 
   // Caching structure that maps file names to cached file handles. The cache has an upper
   // limit of entries defined by FLAGS_max_cached_file_handles. Evicted cached file

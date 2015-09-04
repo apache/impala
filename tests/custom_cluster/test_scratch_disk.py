@@ -52,22 +52,7 @@ class TestScratchDir(CustomClusterTestSuite):
   def get_dirs(dirs):
     return ','.join(dirs)
 
-  @classmethod
-  def setup_class(cls):
-    super(TestScratchDir, cls).setup_class()
-    cls.normal_dirs = cls.generate_dirs(5)
-    cls.non_writable_dirs = cls.generate_dirs(5, writable=False)
-    cls.non_existing_dirs = cls.generate_dirs(5, non_existing=True)
-
-  @classmethod
-  def teardown_class(cls):
-    for dir_path in cls.normal_dirs:
-      shutil.rmtree(dir_path)
-    for dir_path in cls.non_writable_dirs:
-      shutil.rmtree(dir_path)
-
-  @classmethod
-  def generate_dirs(cls, num, writable=True, non_existing=False):
+  def generate_dirs(self, num, writable=True, non_existing=False):
     result = []
     for i in xrange(num):
       dir_path = tempfile.mkdtemp()
@@ -75,27 +60,30 @@ class TestScratchDir(CustomClusterTestSuite):
         shutil.rmtree(dir_path)
       elif not writable:
         os.chmod(dir_path, stat.S_IREAD)
+      if not non_existing:
+        self.created_dirs.append(dir_path)
       result.append(dir_path)
+      print "Generated dir" + dir_path
     return result
 
   def setup_method(self, method):
-    # We are overriding this method to prevent starting Impala before each test. In this
-    # file, each test is responsible for doing that because we want to use class
-    # variables like cls.normal_dirs to generate the parameter string to
-    # start-impala-cluster, which are generated in setup_class (so using the with_args
-    # decorator does not work).
-    pass
+    # Don't call the superclass method to prevent starting Impala before each test. In
+    # this file, each test is responsible for doing that because we want to generate
+    # the parameter string to start-impala-cluster in each test method.
+    self.created_dirs = []
 
   def teardown_method(self, method):
-    pass
+    for dir_path in self.created_dirs:
+      shutil.rmtree(dir_path, ignore_errors=True)
 
   @pytest.mark.execute_serially
   def test_multiple_dirs(self, vector):
     """ 5 empty directories are created in the /tmp directory and we verify that only
         one of those directories is used as scratch disk. Only one should be used as
         scratch because all directories are on same disk."""
+    normal_dirs = self.generate_dirs(5)
     self._start_impala_cluster([
-      '--impalad_args="-scratch_dirs={0}"'.format(','.join(self.normal_dirs))])
+      '--impalad_args="-scratch_dirs={0}"'.format(','.join(normal_dirs))])
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=1)
     exec_option = vector.get_value('exec_option')
@@ -103,10 +91,9 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     self.execute_query_expect_success(client, self.spill_query, exec_option)
-    assert self.count_nonempty_dirs(self.normal_dirs) == 1
+    assert self.count_nonempty_dirs(normal_dirs) == 1
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("-scratch_dirs=")
   def test_no_dirs(self, vector):
     """ Test we can execute a query with no scratch dirs """
     self._start_impala_cluster(['--impalad_args="-scratch_dirs="'])
@@ -124,8 +111,9 @@ class TestScratchDir(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_non_writable_dirs(self, vector):
     """ Test we can execute a query with only bad non-writable scratch """
+    non_writable_dirs = self.generate_dirs(5, writable=False)
     self._start_impala_cluster([
-      '--impalad_args="-scratch_dirs={0}"'.format(','.join(self.non_writable_dirs))])
+      '--impalad_args="-scratch_dirs={0}"'.format(','.join(non_writable_dirs))])
     self.assert_impalad_log_contains("ERROR", "Running without spill to disk: could "
         + "not use any scratch directories in list:.*. See previous "
         + "warnings for information on causes.")
@@ -139,13 +127,14 @@ class TestScratchDir(CustomClusterTestSuite):
     self.execute_query_expect_failure(client, self.spill_query, exec_option)
     # Should be able to execute in-memory query
     self.execute_query_expect_success(client, self.in_mem_query, exec_option)
-    assert self.count_nonempty_dirs(self.non_writable_dirs) == 0
+    assert self.count_nonempty_dirs(non_writable_dirs) == 0
 
   @pytest.mark.execute_serially
   def test_non_existing_dirs(self, vector):
     """ Test that non-existing directories are not created or used """
+    non_existing_dirs = self.generate_dirs(5, non_existing=True)
     self._start_impala_cluster([
-      '--impalad_args="-scratch_dirs={0}"'.format(','.join(self.non_existing_dirs))])
+      '--impalad_args="-scratch_dirs={0}"'.format(','.join(non_existing_dirs))])
     self.assert_impalad_log_contains("ERROR", "Running without spill to disk: could "
         + "not use any scratch directories in list:.*. See previous "
         + "warnings for information on causes.")
@@ -160,4 +149,27 @@ class TestScratchDir(CustomClusterTestSuite):
     self.execute_query_expect_failure(client, self.spill_query, exec_option)
     # Should be able to execute in-memory query
     self.execute_query_expect_success(client, self.in_mem_query, exec_option)
-    assert self.count_nonempty_dirs(self.non_existing_dirs) == 0
+    assert self.count_nonempty_dirs(non_existing_dirs) == 0
+
+  @pytest.mark.execute_serially
+  def test_write_error_failover(self, vector):
+    """ Test that we can fail-over to writable directories if other directories
+        have permissions changed or are removed after impalad startup."""
+    dirs = self.generate_dirs(3);
+    self._start_impala_cluster([
+      '--impalad_args="-scratch_dirs={0}"'.format(','.join(dirs)),
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'])
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+                                    expected_count=len(dirs))
+    exec_option = vector.get_value('exec_option')
+    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    # Trigger errors when writing the first two directories.
+    shutil.rmtree(dirs[0]) # Remove the first directory.
+    # Make all subdirectories in the second directory non-writable.
+    for dirpath, dirnames, filenames in os.walk(dirs[1]):
+      os.chmod(dirpath, stat.S_IREAD)
+
+    # Should still be able to spill to the third directory.
+    impalad = self.cluster.get_any_impalad()
+    client = impalad.service.create_beeswax_client()
+    self.execute_query_expect_success(client, self.spill_query, exec_option)

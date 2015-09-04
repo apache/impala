@@ -239,12 +239,12 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
   read_io_mgr.reset();
 }
 
-// Perform invalid writes (e.g. non-existent file, negative offset) and validate
-// that an error status is returned via the write callback.
+// Perform invalid writes (e.g. file in non-existent directory, negative offset) and
+// validate that an error status is returned via the write callback.
 TEST_F(DiskIoMgrTest, InvalidWrite) {
   MemTracker mem_tracker(LARGE_MEM_LIMIT);
   num_ranges_written_ = 0;
-  string tmp_file = "/tmp/non-existent.txt";
+  string tmp_file = "/non-existent/file.txt";
   DiskIoMgr io_mgr(1, 1, 1, 10);
   ASSERT_OK(io_mgr.Init(&mem_tracker));
   DiskIoRequestContext* writer;
@@ -252,12 +252,12 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   int32_t* data = pool_->Add(new int32_t);
   *data = rand();
 
-  // Write to a non-existent file.
+  // Write to file in non-existent directory.
   DiskIoMgr::WriteRange** new_range = pool_->Add(new DiskIoMgr::WriteRange*);
   DiskIoMgr::WriteRange::WriteDoneCallback callback =
-      bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2,
-          new_range, (DiskIoMgr*)NULL, (DiskIoRequestContext*)NULL,
-          data, Status(TErrorCode::RUNTIME_ERROR, "Test Failure"), _1);
+      bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2, new_range,
+          (DiskIoMgr*)NULL, (DiskIoRequestContext*)NULL, data,
+          Status(TErrorCode::RUNTIME_ERROR, "Test Failure"), _1);
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));

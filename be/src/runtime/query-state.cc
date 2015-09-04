@@ -45,8 +45,6 @@ QueryState::QueryState(const TQueryCtx& query_ctx)
   // how many are distinct. It is defined as the sum of the number of generic errors and
   // the number of distinct other errors.
   if (query_options.max_errors <= 0) {
-    // TODO: fix linker error and uncomment this
-    //query_options_.max_errors = FLAGS_max_errors;
     query_options.max_errors = 100;
   }
   if (query_options.batch_size <= 0) {

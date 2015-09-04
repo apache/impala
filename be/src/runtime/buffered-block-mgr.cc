@@ -29,12 +29,9 @@
 
 #include <gutil/strings/substitute.h>
 
-DEFINE_bool(disk_spill_encryption, false, "Set this to encrypt and perform an integrity "
-  "check on all data spilled to disk during a query");
-
 #include "common/names.h"
 
-using namespace strings;   // for Substitute
+using namespace strings; // for Substitute
 
 namespace impala {
 
@@ -132,11 +129,8 @@ BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
   : buffer_desc_(NULL),
     block_mgr_(block_mgr),
     client_(NULL),
-    write_range_(NULL),
-    tmp_file_(NULL),
     valid_data_len_(0),
-    num_rows_(0) {
-}
+    num_rows_(0) {}
 
 Status BufferedBlockMgr::Block::Pin(bool* pinned, Block* release_block, bool unpin) {
   return block_mgr_->PinBlock(this, pinned, release_block, unpin);
@@ -185,8 +179,8 @@ bool BufferedBlockMgr::Block::Validate() const {
 }
 
 string BufferedBlockMgr::Block::TmpFilePath() const {
-  if (tmp_file_ == NULL) return "";
-  return tmp_file_->path();
+  if (write_handle_ == NULL) return "";
+  return write_handle_->TmpFilePath();
 }
 
 string BufferedBlockMgr::Block::DebugString() const {
@@ -200,6 +194,9 @@ string BufferedBlockMgr::Block::DebugString() const {
      << "  Pinned: " << is_pinned_ << endl
      << "  Write Issued: " << in_write_ << endl
      << "  Client Local: " << client_local_ << endl;
+  if (write_handle_ != NULL) {
+    ss << "  Write handle: " << write_handle_->DebugString() << endl;
+  }
   if (client_ != NULL) ss << "  Client: " << client_->DebugString();
   return ss.str();
 }
@@ -208,7 +205,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr
     int64_t block_size, int64_t scratch_limit)
   : max_block_size_(block_size),
     // Keep two writes in flight per scratch disk so the disks can stay busy.
-    block_write_threshold_(tmp_file_mgr->num_active_tmp_devices() * 2),
+    block_write_threshold_(tmp_file_mgr->NumActiveTmpDevices() * 2),
     disable_spill_(state->query_ctx().disable_spilling || block_write_threshold_ == 0
         || scratch_limit == 0),
     query_id_(state->query_id()),
@@ -217,7 +214,6 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr
     total_pinned_buffers_(0),
     non_local_outstanding_writes_(0),
     tmp_file_group_(NULL),
-    io_mgr_(state->io_mgr()),
     is_cancelled_(false),
     writes_issued_(0),
     debug_write_delay_ms_(0) {}
@@ -356,7 +352,7 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   // If we either couldn't acquire enough buffers or WriteUnpinnedBlocks() failed, undo
   // the reservation.
   if (buffers_acquired != buffers_needed || !status.ok()) {
-    if (!status.ok()) {
+    if (!status.ok() && !status.IsCancelled()) {
       VLOG_QUERY << "Query: " << query_id_ << " write unpinned buffers failed.";
       client->state_->LogError(status.msg());
     }
@@ -388,8 +384,6 @@ void BufferedBlockMgr::Cancel() {
     if (is_cancelled_) return;
     is_cancelled_ = true;
   }
-  // Cancel the underlying io mgr to unblock any waiting threads.
-  io_mgr_->CancelContext(io_request_context_);
 }
 
 bool BufferedBlockMgr::IsCancelled() {
@@ -548,14 +542,13 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   // Do not do that with 'static_block_mgrs_lock_' held.
   other_mgr_ptr.reset();
 
-  if (io_request_context_ != NULL) io_mgr_->UnregisterContext(io_request_context_);
+  // Delete tmp files and cancel any in-flight writes.
+  tmp_file_group_->Close();
 
   // If there are any outstanding writes and we are here it means that when the
   // WriteComplete() callback gets executed it is going to access invalid memory.
   // See IMPALA-1890.
   DCHECK_EQ(non_local_outstanding_writes_, 0) << endl << DebugInternal();
-  // Delete tmp files.
-  tmp_file_group_->Close();
 
   // Validate that clients deleted all of their blocks. Since all writes have
   // completed at this point, any deleted blocks should be in unused_blocks_.
@@ -591,6 +584,13 @@ MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
   return client->tracker_;
 }
 
+int64_t BufferedBlockMgr::GetNumWritesOutstanding() {
+  // Acquire lock to avoid returning mid-way through WriteComplete() when the
+  // state may be inconsistent.
+  lock_guard<mutex> lock(lock_);
+  return profile()->GetCounter("BlockWritesOutstanding")->value();
+}
+
 Status BufferedBlockMgr::DeleteOrUnpinBlock(Block* block, bool unpin) {
   if (block == NULL) {
     return IsCancelled() ? Status::CANCELLED : Status::OK();
@@ -619,8 +619,10 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   if (!status.ok()) goto error;
   *pinned = block->is_pinned_;
 
-  // Block was not evicted or had no data, nothing left to do.
-  if (in_mem || block->valid_data_len_ == 0) {
+  if (in_mem) {
+    // The block's buffer is still in memory with the original data.
+    status = CancelWrite(block);
+    if (!status.ok()) goto error;
     return DeleteOrUnpinBlock(release_block, unpin);
   }
 
@@ -628,6 +630,9 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
     if (release_block == NULL) return Status::OK();
 
     if (block->buffer_desc_ != NULL) {
+      // The block's buffer is still in memory but we couldn't get an additional buffer
+      // because it would eat into another client's reservation. However, we can use
+      // release_block's reservation, so reclaim the buffer.
       {
         lock_guard<mutex> lock(lock_);
         if (free_io_buffers_.Contains(block->buffer_desc_)) {
@@ -646,9 +651,12 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
         status = WriteUnpinnedBlocks();
         if (!status.ok()) goto error;
       }
+      status = CancelWrite(block);
+      if (!status.ok()) goto error;
       return DeleteOrUnpinBlock(release_block, unpin);
     }
-
+    // FindBufferForBlock() wasn't able to find a buffer so transfer the one from
+    // 'release_block'.
     status = TransferBuffer(block, release_block, unpin);
     if (!status.ok()) goto error;
     DCHECK(!release_block->is_pinned_);
@@ -657,33 +665,14 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
     *pinned = true;
   }
 
-  DCHECK(block->write_range_ != NULL) << block->DebugString() << endl << release_block;
+  DCHECK(block->write_handle_ != NULL) << block->DebugString() << endl << release_block;
 
-  {
-    // Read the block from disk if it was not in memory.
-    SCOPED_TIMER(disk_read_timer_);
-    // Create a ScanRange to perform the read.
-    DiskIoMgr::ScanRange* scan_range =
-        obj_pool_.Add(new DiskIoMgr::ScanRange());
-    scan_range->Reset(NULL, block->write_range_->file(), block->write_range_->len(),
-        block->write_range_->offset(), block->write_range_->disk_id(), false,
-        DiskIoMgr::BufferOpts::ReadInto(block->buffer(), block->buffer_len()));
-    DiskIoMgr::BufferDescriptor* io_mgr_buffer;
-    status = io_mgr_->Read(io_request_context_, scan_range, &io_mgr_buffer);
-    if (!status.ok()) goto error;
-
-    DCHECK_EQ(io_mgr_buffer->buffer(), block->buffer());
-    DCHECK_EQ(io_mgr_buffer->len(), block->valid_data_len());
-    DCHECK(io_mgr_buffer->eosr());
-    io_mgr_buffer->Return();
-  }
-
-  if (FLAGS_disk_spill_encryption) {
-    // Decryption is done in-place, since the buffer can't be accessed by anyone else.
-    status = CheckHashAndDecrypt(block);
+  // The block is on disk - read it back into memory.
+  if (block->valid_data_len() > 0) {
+    status = tmp_file_group_->Read(block->write_handle_.get(), block->valid_data());
     if (!status.ok()) goto error;
   }
-
+  tmp_file_group_->DestroyWriteHandle(move(block->write_handle_));
   return DeleteOrUnpinBlock(release_block, unpin);
 
 error:
@@ -691,6 +680,24 @@ error:
   // Make sure to delete the block if we hit an error before calling DeleteOrUnpin().
   if (release_block != NULL && !unpin) DeleteBlock(release_block);
   return status;
+}
+
+Status BufferedBlockMgr::CancelWrite(Block* block) {
+  {
+    unique_lock<mutex> lock(lock_);
+    DCHECK(block->buffer_desc_ != NULL);
+    // If there is an in-flight write, wait for it to finish. This is sub-optimal
+    // compared to just cancelling the write, but reduces the number of possible
+    // code paths in this legacy code.
+    WaitForWrite(lock, block);
+    if (is_cancelled_) return Status::CANCELLED;
+  }
+  if (block->write_handle_ != NULL) {
+    // Restore the in-memory data without reading from disk (e.g. decrypt it).
+    RETURN_IF_ERROR(tmp_file_group_->CancelWriteAndRestoreData(
+        move(block->write_handle_), block->valid_data()));
+  }
+  return Status::OK();
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
@@ -738,49 +745,17 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
   // Assumes block manager lock is already taken.
   DCHECK(!block->is_pinned_) << block->DebugString();
   DCHECK(!block->in_write_) << block->DebugString();
+  DCHECK(block->write_handle_ == NULL) << block->DebugString();
   DCHECK_EQ(block->buffer_desc_->len, max_block_size_);
 
-  if (block->write_range_ == NULL) {
-    if (tmp_file_group_->NumFiles() == 0) {
-      RETURN_IF_ERROR(tmp_file_group_->CreateFiles(query_id_));
-    }
+  // The block is on disk - read it back into memory.
+  RETURN_IF_ERROR(tmp_file_group_->Write(block->valid_data(),
+      [this, block](const Status& write_status) { WriteComplete(block, write_status); },
+      &block->write_handle_));
 
-    // First time the block is being persisted - need to allocate tmp file space.
-    TmpFileMgr::File* tmp_file;
-    int64_t file_offset;
-    RETURN_IF_ERROR(
-        tmp_file_group_->AllocateSpace(max_block_size_, &tmp_file, &file_offset));
-    int disk_id = tmp_file->disk_id();
-    if (disk_id < 0) {
-      // Assign a valid disk id to the write range if the tmp file was not assigned one.
-      static unsigned int next_disk_id = 0;
-      disk_id = ++next_disk_id;
-    }
-    disk_id %= io_mgr_->num_local_disks();
-    DiskIoMgr::WriteRange::WriteDoneCallback callback =
-        bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block, _1);
-    block->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(
-        tmp_file->path(), file_offset, disk_id, callback));
-    block->tmp_file_ = tmp_file;
-  }
-
-  uint8_t* outbuf = NULL;
-  if (FLAGS_disk_spill_encryption) {
-    // The block->buffer() could be accessed during the write path, so we have to
-    // make a copy of it while writing.
-    RETURN_IF_ERROR(EncryptAndHash(block, &outbuf));
-  } else {
-    outbuf = block->buffer();
-  }
-
-  block->write_range_->SetData(outbuf, block->valid_data_len_);
-
-  // Issue write through DiskIoMgr.
-  RETURN_IF_ERROR(io_mgr_->AddWriteRange(io_request_context_, block->write_range_));
   block->in_write_ = true;
   DCHECK(block->Validate()) << endl << block->DebugString();
   outstanding_writes_counter_->Add(1);
-  bytes_written_counter_->Add(block->valid_data_len_);
   ++writes_issued_;
   if (writes_issued_ == 1) {
     if (ImpaladMetrics::NUM_QUERIES_SPILLED != NULL) {
@@ -805,25 +780,22 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
 #endif
   Status status = Status::OK();
   lock_guard<mutex> lock(lock_);
-  outstanding_writes_counter_->Add(-1);
   DCHECK(Validate()) << endl << DebugInternal();
   DCHECK(is_cancelled_ || block->in_write_) << "WriteComplete() for block not in write."
-                                            << endl << block->DebugString();
+                                            << endl
+                                            << block->DebugString();
   DCHECK(block->buffer_desc_ != NULL);
+
+  outstanding_writes_counter_->Add(-1);
   if (!block->client_local_) {
     DCHECK_GT(non_local_outstanding_writes_, 0) << block->DebugString();
     --non_local_outstanding_writes_;
   }
   block->in_write_ = false;
 
-  // Explicitly release our temporarily allocated buffer here so that it doesn't
-  // hang around needlessly.
-  if (FLAGS_disk_spill_encryption) EncryptedWriteComplete(block);
-
   // ReturnUnusedBlock() will clear the block, so save required state in local vars.
   // state is not valid if the block was deleted because the state may be torn down
   // after the state's fragment has deleted all of its blocks.
-  TmpFileMgr::File* tmp_file = block->tmp_file_;
   RuntimeState* state = block->is_deleted_ ? NULL : block->client_->state_;
 
   // If the block was re-pinned when it was in the IOMgr queue, don't free it.
@@ -847,18 +819,17 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
 
   if (!write_status.ok() || !status.ok() || is_cancelled_) {
     VLOG_FILE << "Query: " << query_id_ << ". Write did not complete successfully: "
-        "write_status=" << write_status.GetDetail() << ", status=" << status.GetDetail()
-        << ". is_cancelled_=" << is_cancelled_;
-
+                                           "write_status="
+              << write_status.GetDetail() << ", status=" << status.GetDetail()
+              << ". is_cancelled_=" << is_cancelled_;
     // If the instance is already cancelled, don't confuse things with these errors.
     if (!write_status.ok() && !write_status.IsCancelled()) {
       // Report but do not attempt to recover from write error.
-      DCHECK(tmp_file != NULL);
-      if (!write_status.IsMemLimitExceeded()) tmp_file->ReportIOError(write_status.msg());
       VLOG_QUERY << "Query: " << query_id_ << " write complete callback with error.";
+
       if (state != NULL) state->LogError(write_status.msg());
     }
-    if (!status.ok()) {
+    if (!status.ok() && !status.IsCancelled()) {
       VLOG_QUERY << "Query: " << query_id_ << " error while writing unpinned blocks.";
       if (state != NULL) state->LogError(status.msg());
     }
@@ -875,6 +846,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   if (!block->client_local_) buffer_available_cv_.notify_all();
   if (block->is_deleted_) {
     // Finish the DeleteBlock() work.
+    tmp_file_group_->DestroyWriteHandle(move(block->write_handle_));
     block->buffer_desc_->block = NULL;
     block->buffer_desc_ = NULL;
     ReturnUnusedBlock(block);
@@ -913,7 +885,9 @@ void BufferedBlockMgr::DeleteBlockLocked(const unique_lock<mutex>& lock, Block* 
   if (block->in_write_) {
     DCHECK(block->buffer_desc_ != NULL && block->buffer_desc_->len == max_block_size_)
         << "Should never be writing a small buffer";
-    // If a write is still pending, return. Cleanup will be done in WriteComplete().
+    // If a write is still pending, cancel it and return. Cleanup will be done in
+    // WriteComplete(). Cancelling the write ensures that it won't try to log to the
+    // RuntimeState (which may be torn down before the block manager).
     DCHECK(block->Validate()) << endl << block->DebugString();
     return;
   }
@@ -934,6 +908,12 @@ void BufferedBlockMgr::DeleteBlockLocked(const unique_lock<mutex>& lock, Block* 
       block->buffer_desc_->block = NULL;
       block->buffer_desc_ = NULL;
     }
+  }
+
+  // Discard any on-disk data. The write is finished so this won't call back into
+  // BufferedBlockMgr.
+  if (block->write_handle_ != NULL) {
+    tmp_file_group_->DestroyWriteHandle(move(block->write_handle_));
   }
   ReturnUnusedBlock(block);
   DCHECK(block->Validate()) << endl << block->DebugString();
@@ -1224,7 +1204,7 @@ string BufferedBlockMgr::DebugString(Client* client) {
 
 string BufferedBlockMgr::DebugInternal() const {
   stringstream ss;
-  ss << "Buffered block mgr" << endl
+  ss << "Buffered block mgr " << this << endl
      << "  Num writes outstanding: " << outstanding_writes_counter_->value() << endl
      << "  Num free io buffers: " << free_io_buffers_.size() << endl
      << "  Num unpinned blocks: " << unpinned_blocks_.size() << endl
@@ -1234,6 +1214,7 @@ string BufferedBlockMgr::DebugInternal() const {
      << "  Remaining memory: " << mem_tracker_->SpareCapacity()
      << " (#blocks=" << (mem_tracker_->SpareCapacity() / max_block_size_) << ")" << endl
      << "  Block write threshold: " << block_write_threshold_;
+  if (tmp_file_group_ != NULL) ss << tmp_file_group_->DebugString();
   return ss.str();
 }
 
@@ -1243,13 +1224,11 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, TmpFileMgr* tmp_file_mgr,
   unique_lock<mutex> l(lock_);
   if (initialized_) return;
 
-  io_mgr->RegisterContext(&io_request_context_, NULL);
-
   profile_.reset(new RuntimeProfile(&obj_pool_, "BlockMgr"));
   parent_profile->AddChild(profile_.get());
 
-  tmp_file_group_.reset(
-      new TmpFileMgr::FileGroup(tmp_file_mgr, profile_.get(), scratch_limit));
+  tmp_file_group_.reset(new TmpFileMgr::FileGroup(
+      tmp_file_mgr, io_mgr, profile_.get(), query_id_, max_block_size_, scratch_limit));
 
   mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TUnit::BYTES);
   mem_limit_counter_->Set(mem_limit);
@@ -1257,60 +1236,16 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, TmpFileMgr* tmp_file_mgr,
   block_size_counter_->Set(max_block_size_);
   created_block_counter_ = ADD_COUNTER(profile_.get(), "BlocksCreated", TUnit::UNIT);
   recycled_blocks_counter_ = ADD_COUNTER(profile_.get(), "BlocksRecycled", TUnit::UNIT);
-  bytes_written_counter_ = ADD_COUNTER(profile_.get(), "BytesWritten", TUnit::BYTES);
   outstanding_writes_counter_ =
       ADD_COUNTER(profile_.get(), "BlockWritesOutstanding", TUnit::UNIT);
   buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TUnit::UNIT);
-  disk_read_timer_ = ADD_TIMER(profile_.get(), "TotalReadBlockTime");
   buffer_wait_timer_ = ADD_TIMER(profile_.get(), "TotalBufferWaitTime");
-  encryption_timer_ = ADD_TIMER(profile_.get(), "TotalEncryptionTime");
 
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(
       new MemTracker(profile(), mem_limit, "Block Manager", parent_tracker));
 
   initialized_ = true;
-}
-
-Status BufferedBlockMgr::EncryptAndHash(Block* block, uint8_t** outbuf) {
-  DCHECK(FLAGS_disk_spill_encryption);
-  DCHECK(block->buffer());
-  DCHECK(!block->is_pinned_);
-  DCHECK(!block->in_write_);
-  DCHECK(outbuf);
-  SCOPED_TIMER(encryption_timer_);
-  // Encrypt to a temporary buffer since so that the original data is still in the buffer
-  // if the block is re-pinned while the write is still in-flight.
-  block->encrypted_write_buffer_.reset(new uint8_t[block->valid_data_len_]);
-  // Since we're using AES-CFB mode, we must take care not to reuse a key/IV pair.
-  // Regenerate a new key and IV for every block of data we write, including between
-  // writes of the same Block.
-  block->key_.InitializeRandom();
-  RETURN_IF_ERROR(block->key_.Encrypt(
-      block->buffer(), block->valid_data_len_, block->encrypted_write_buffer_.get()));
-
-  block->hash_.Compute(block->encrypted_write_buffer_.get(), block->valid_data_len_);
-
-  *outbuf = block->encrypted_write_buffer_.get();
-  return Status::OK();
-}
-
-void BufferedBlockMgr::EncryptedWriteComplete(Block* block) {
-  DCHECK(FLAGS_disk_spill_encryption);
-  DCHECK(block->encrypted_write_buffer_.get());
-  block->encrypted_write_buffer_.reset();
-}
-
-Status BufferedBlockMgr::CheckHashAndDecrypt(Block* block) {
-  DCHECK(FLAGS_disk_spill_encryption);
-  DCHECK(block->buffer());
-  SCOPED_TIMER(encryption_timer_);
-
-  if (!block->hash_.Verify(block->buffer(), block->valid_data_len_)) {
-    return Status("Block verification failure");
-  }
-  // Decrypt block->buffer() in-place. Safe because no one is accessing it.
-  return block->key_.Decrypt(block->buffer(), block->valid_data_len_, block->buffer());
 }
 
 } // namespace impala
