@@ -23,9 +23,10 @@ import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.kududb.Common.HostPortPB;
 import org.kududb.client.KuduClient;
 import org.kududb.client.LocatedTablet;
 import org.slf4j.Logger;
@@ -119,6 +120,11 @@ public class KuduScanNode extends ScanNode {
         // We're using the leader to avoid querying a lagging replica. This hinders
         // scheduling a scan with different replicas.
         LocatedTablet.Replica replica = tablet.getLeaderReplica();
+        if (replica == null) {
+          throw new ImpalaRuntimeException(String.format(
+              "At least one tablet does not have a leader. Tablet ID: %s",
+              new String(tablet.getTabletId(), Charsets.UTF_8)));
+        }
         TNetworkAddress address = new TNetworkAddress(replica.getRpcHost(),
             replica.getRpcPort());
 
