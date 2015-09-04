@@ -267,7 +267,7 @@ ${SHELL_CMD} -q "
 hive -e "
 
   SET mapred.min.split.size=1073741824;
-  SET parquet.block.size=1125899906842624;
+  SET parquet.block.size=10737418240;
   SET dfs.block.size=1073741824;
 
   USE $TARGET_DATABASE;
