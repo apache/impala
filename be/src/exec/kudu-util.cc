@@ -16,6 +16,8 @@
 
 #include <algorithm>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
@@ -23,6 +25,8 @@
 #include "runtime/descriptors.h"
 
 #include "common/names.h"
+
+using boost::algorithm::to_lower_copy;
 
 namespace impala {
 
@@ -96,9 +100,16 @@ Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_typ
 }
 
 Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-    vector<string>* projected_columns) {
+    vector<string>* projected_columns, const kudu::client::KuduSchema& schema) {
   DCHECK(projected_columns != NULL);
   projected_columns->clear();
+
+  // Map lowercase Impala column names to correctly cased Kudu column names
+  unordered_map<string, string> impala_to_kudu_names;
+  for(size_t i = 0; i < schema.num_columns(); ++i) {
+    string name = schema.Column(i).name();
+    impala_to_kudu_names[to_lower_copy(name)] = name;
+  }
 
   // In debug mode try a dynamic cast. If it fails it means that the
   // TableDescriptor is not an instance of KuduTableDescriptor.
@@ -113,7 +124,7 @@ Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
   for (int i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
     int col_idx = slots[i]->col_pos();
-    const string& col_name = table_desc->col_names()[col_idx];
+    const string& col_name = impala_to_kudu_names[table_desc->col_names()[col_idx]];
     projected_columns->push_back(col_name);
   }
 

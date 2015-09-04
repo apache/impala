@@ -102,7 +102,6 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   GetMaterializedSlots(*tuple_desc_, &materialized_slots_);
-  RETURN_IF_ERROR(ProjectedColumnsFromTupleDescriptor(*tuple_desc_, &projected_columns_));
 
   // Convert TScanRangeParams to ScanRanges.
   CHECK(scan_range_params_ != NULL)
@@ -143,7 +142,8 @@ Status KuduScanNode::Open(RuntimeState* state) {
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");
-
+  RETURN_IF_ERROR(ProjectedColumnsFromTupleDescriptor(*tuple_desc_, &projected_columns_,
+      table_->schema()));
   // Must happen after table_ is opened.
   RETURN_IF_ERROR(TransformPushableConjunctsToRangePredicates());
 

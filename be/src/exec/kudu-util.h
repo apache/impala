@@ -37,9 +37,10 @@ Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
     const KuduTableDescriptor& table_desc, kudu::client::KuduSchema* schema);
 
 /// Gets the projected columns from the TupleDescriptor.
+/// Translates Impalas lower case column names to the version used by Kudu.
 /// 'projected_columns' is expected to be not NULL and will be cleared.
 Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-    std::vector<std::string>* projected_columns);
+    std::vector<std::string>* projected_columns, const kudu::client::KuduSchema& schema);
 
 /// Initializes Kudu'd logging by binding a callback that logs back to Impala's Glog. This
 /// also sets Kudu's verbose logging to whatever level is set in Impala.

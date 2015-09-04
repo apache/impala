@@ -155,3 +155,25 @@ select id, name from tdata where id = 320;
 ---- TYPES
 INT,STRING
 ====
+---- QUERY
+-- Test that string case is ignored
+create table ignore_column_case ( Id int, NAME string, vAlf float, vali bigint)
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'ignore_column_case',
+'kudu.split_keys' = '[[10,"b"], [30,"a"]]',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'Id,NAME'
+ )
+---- RESULTS
+====
+---- QUERY
+insert into ignore_column_case values (1, 'Martin', 1.0, 10);
+====
+---- QUERY
+select ID, nAmE, VALF, VALI from ignore_column_case;
+---- RESULTS
+1,'Martin',1.0,10
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====

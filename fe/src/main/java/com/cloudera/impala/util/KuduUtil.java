@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -133,18 +134,10 @@ public class KuduUtil {
 
   /**
    * Parses a string of the form "a, b, c" and returns a set of values split by ',' and
-   * stripped of the whitespace.
+   * stripped of the whitespace. Normalizes the strings to lower case.
    */
   public static HashSet<String> parseKeyColumns(String cols) {
-
-    Function<String, String> strip = new Function<String, String>() {
-      @Override
-      public String apply(String input) {
-        return input.trim();
-      }
-    };
-
-    return Sets.newHashSet(Lists.transform(Lists.newArrayList(cols.split(",")), strip));
+    return Sets.newHashSet(Splitter.on(",").trimResults().split(cols));
   }
 
   /**

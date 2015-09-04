@@ -34,11 +34,10 @@ import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.util.TResultRowBuilder;
+import com.cloudera.impala.util.KuduUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -187,9 +186,10 @@ public class KuduTable extends Table {
     kuduTableName_ = msTbl.getParameters().get(KEY_TABLE_NAME);
     kuduMasters_ = msTbl.getParameters().get(KEY_MASTER_ADDRESSES);
 
-    Set<String> keyColumns = ImmutableSet.copyOf(Splitter.on(",").trimResults().split(
-        Preconditions.checkNotNull(msTbl.getParameters().get(KEY_KEY_COLUMNS),
-            "'kudu.key_columns' cannot be null.")));
+    Set<String> keyColumns = KuduUtil.parseKeyColumns(
+        Preconditions.checkNotNull(
+            msTbl.getParameters().get(KEY_KEY_COLUMNS).toLowerCase(),
+        "'kudu.key_columns' cannot be null."));
 
     // Load the rest of the data from the table parameters directly
     loadColumns(msTbl.getSd().getCols(), client, keyColumns);
