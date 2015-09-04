@@ -571,9 +571,9 @@ StringVal StringFunctions::Chr(FunctionContext* ctx, const IntVal& val) {
 
 void StringFunctions::BTrimPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  if (scope != FunctionContext::THREAD_LOCAL) return;
   // Create a bitset to hold the unique characters to trim.
-  bitset<256>* unique_chars = new bitset<256>;
+  bitset<256>* unique_chars = new bitset<256>();
   context->SetFunctionState(scope, unique_chars);
   if (!context->IsArgConstant(1)) return;
   DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
@@ -585,16 +585,17 @@ void StringFunctions::BTrimPrepare(
 
 void StringFunctions::BTrimClose(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
-  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(context->GetFunctionState(scope));
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
+      context->GetFunctionState(scope));
   if (unique_chars != NULL) delete unique_chars;
 }
 
 StringVal StringFunctions::BTrimString(FunctionContext* ctx,
     const StringVal& str, const StringVal& chars_to_trim) {
   if (str.is_null) return StringVal::null();
-  bitset<256>* unique_chars =
-      reinterpret_cast<bitset<256>*>(ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
+      ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
   // When 'chars_to_trim' is unique for each element (e.g. when 'chars_to_trim'
   // is each element of a table column), we need to prepare a bitset of unique
   // characters here instead of using the bitset from function context.

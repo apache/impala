@@ -2214,3 +2214,12 @@ select split_part(tmp.str, tmp.delim, pos) from (values
 ---- TYPES
 string
 ====
+---- QUERY
+# Regression test for IMPALA-2290: non-constant args to btrim in parallel context
+# (i.e. predicates evaluated by scans)
+select count(*) from tpch_parquet.lineitem where btrim(l_comment, l_comment) != ""
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
