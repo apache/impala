@@ -50,15 +50,6 @@ from Status.ttypes import TStatus
 #    Test that only the subscribed-to topics are sent
 #    Test that topic deletions take effect correctly.
 
-
-def get_unused_port():
-  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  s.bind(('localhost', 0))
-  _, port = s.getsockname()
-  s.close()
-  return port
-
-
 def get_statestore_subscribers(host='localhost', port=25010):
   response = urllib2.urlopen("http://{0}:{1}/subscribers?json".format(host, port))
   page = response.read()
@@ -68,6 +59,26 @@ STATUS_OK = TStatus(TErrorCode.OK)
 DEFAULT_UPDATE_STATE_RESPONSE = TUpdateStateResponse(status=STATUS_OK, topic_updates=[],
                                                      skipped=False)
 
+class WildcardServerSocket(TSocket.TSocketBase, TTransport.TServerTransportBase):
+  """Specialised server socket that binds to a random port at construction"""
+  def __init__(self, host=None, port=0):
+    self.host = host
+    self.handle = None
+    self.handle = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    self.handle.bind(('localhost', 0))
+    _, self.port = self.handle.getsockname()
+
+  def listen(self):
+    self.handle.listen(128)
+
+  def accept(self):
+    client, addr = self.handle.accept()
+    result = TSocket.TSocket()
+    result.setHandle(client)
+    return result
+
+
 class KillableThreadedServer(TServer):
   """Based on TServer.TThreadedServer, this server may be shutdown (by calling
   shutdown()), after which no new connections may be made. Most of the implementation is
@@ -75,7 +86,6 @@ class KillableThreadedServer(TServer):
   def __init__(self, *args, **kwargs):
     TServer.__init__(self, *args)
     self.daemon = kwargs.get("daemon", False)
-    self.port = kwargs.get("port")
     self.is_shutdown = False
     self.transports = set()
 
@@ -107,6 +117,7 @@ class KillableThreadedServer(TServer):
     raise Exception("Server did not stop")
 
   def serve(self):
+    self.port = self.serverTransport.port
     self.serverTransport.listen()
     while not self.is_shutdown:
       client = self.serverTransport.accept()
@@ -153,8 +164,7 @@ class StatestoreSubscriber(object):
   The methods that may be called by a test deliberately return 'self' to allow for
   chaining, see test_failure_detected() for an example of how this makes the test flow
   more readable."""
-  def __init__(self, port=None, heartbeat_cb=None, update_cb=None):
-    self.port = port if port else get_unused_port()
+  def __init__(self, heartbeat_cb=None, update_cb=None):
     self.heartbeat_event, self.heartbeat_count = threading.Condition(), 0
     self.update_event, self.update_count = threading.Condition(), 0
     self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
@@ -194,15 +204,16 @@ class StatestoreSubscriber(object):
 
   def __init_server(self):
     processor = Subscriber.Processor(self)
-    transport = TSocket.TServerSocket(port=self.port)
+    transport = WildcardServerSocket()
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     self.server = KillableThreadedServer(processor, transport, tfactory, pfactory,
-                                         daemon=True, port=self.port)
+                                         daemon=True)
     self.server_thread = threading.Thread(target=self.server.serve)
     self.server_thread.setDaemon(True)
     self.server_thread.start()
     self.server.wait_until_up()
+    self.port = self.server.port
 
   def __init_client(self):
     self.client_transport = \
