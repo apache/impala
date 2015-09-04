@@ -1,0 +1,11 @@
+====
+---- QUERY
+SHOW CREATE TABLE functional_kudu.dimtbl
+---- RESULTS
+CREATE TABLE functional_kudu.dimtbl (
+  id BIGINT,
+  name STRING,
+  zip INT
+)
+TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1:7051', 'kudu.split_keys'='[[1003], [1007]]', 'kudu.key_columns'='id', 'kudu.table_name'='dimtbl', 'transient_lastDdlTime'='1441325601', 'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')
+====

@@ -58,6 +58,9 @@ class TestShowCreateTable(ImpalaTestSuite):
   def test_show_create_table(self, vector):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector)
 
+  def test_kudu_show_create_table(self, vector):
+    self.__run_show_create_table_test_case('QueryTest/kudu-show-create', vector)
+
   def __run_show_create_table_test_case(self, test_file_name, vector):
     """
     Runs a show-create-table test file, containing the following sections:
