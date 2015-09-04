@@ -319,54 +319,77 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   /**
    * Checks that the given SQL analyzes ok, and asserts that the last result expr in the
-   * parsed SelectStmt is a SlotRef whose absolute materialized path is identical to the
-   * given expected one. Intentionally allows multiple result exprs to be analyzed to test
+   * parsed SelectStmt is a scalar SlotRef whose absolute path is identical to the given
+   * expected one. Also asserts that the slot's absolute path is equal to its
+   * materialized path. Intentionally allows multiple result exprs to be analyzed to test
    * absolute path caching, though only the last path is validated.
    */
-  private void testSlotRefPath(String sql, List<Integer> expectedMaterializedPath) {
+  private void testSlotRefPath(String sql, List<Integer> expectedAbsPath) {
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
     Expr e = stmt.getResultExprs().get(stmt.getResultExprs().size() - 1);
     Preconditions.checkState(e instanceof SlotRef);
+    Preconditions.checkState(e.getType().isScalarType());
     SlotRef slotRef = (SlotRef) e;
-    List<Integer> actualMaterializedPath = slotRef.getDesc().getMaterializedPath();
-    Assert.assertTrue(String.format("Expected path: %s\nActual path:%s",
-        expectedMaterializedPath, actualMaterializedPath),
-        actualMaterializedPath.equals(expectedMaterializedPath));
+    List<Integer> actualAbsPath = slotRef.getDesc().getPath().getAbsolutePath();
+    Assert.assertEquals("Mismatched absolute paths.", expectedAbsPath, actualAbsPath);
+    List<Integer> actualMatPath = slotRef.getDesc().getMaterializedPath();
+    Assert.assertEquals("Mismatched absolute/materialized paths.",
+        actualAbsPath, actualMatPath);
   }
 
   /**
    * Checks that the given SQL analyzes ok, and asserts that all result exprs in the
-   * parsed SelectStmt are SlotRefs and that the absolute physical path of result expr at
-   * position i matches expectedPhysPaths[i].
+   * parsed SelectStmt are SlotRefs and that the absolute path of result expr at
+   * position i matches expectedAbsPaths[i]. Also asserts for all SlotRefs that the
+   * materialized path of its SlotDescriptor is identical to its absolute path.
    */
-  private void testStarPath(String sql, List<Integer>... expectedPhysPaths) {
+  private void testStarPath(String sql, List<Integer>... expectedAbsPaths) {
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
-    List<List<Integer>> actualPaths = Lists.newArrayList();
+    List<List<Integer>> actualAbsPaths = Lists.newArrayList();
     for (int i = 0; i < stmt.getResultExprs().size(); ++i) {
       Expr e = stmt.getResultExprs().get(i);
       Preconditions.checkState(e instanceof SlotRef);
       SlotRef slotRef = (SlotRef) e;
-      actualPaths.add(slotRef.getDesc().getMaterializedPath());
+      List<Integer> actualAbsPath = slotRef.getDesc().getPath().getAbsolutePath();
+      List<Integer> actualMatPath = slotRef.getDesc().getMaterializedPath();
+      Assert.assertEquals("Mismatched paths.", actualAbsPath, actualMatPath);
+      actualAbsPaths.add(actualAbsPath);
     }
-    List<List<Integer>> expectedPaths = Lists.newArrayList(expectedPhysPaths);
-    Assert.assertTrue(String.format("Expected paths: %s\nActual paths:%s",
-        expectedPaths, actualPaths),
-        actualPaths.equals(expectedPaths));
+    List<List<Integer>> expectedPaths = Lists.newArrayList(expectedAbsPaths);
+    Assert.assertEquals("Mismatched absolute paths.", expectedPaths, actualAbsPaths);
+
   }
 
   /**
-   * Checks that the given SQL analyzes ok, and asserts that the last table ref in the
-   * parsed SelectStmt has an absolute path identical to the given expected one.
+   * Checks that the given SQL analyzes ok. Asserts that the last table ref in the
+   * parsed SelectStmt has an absolute path identical to the given expected one, and
+   * likewise for the materialized path. For non-relative table refs the materialized
+   * path is expected to be null, otherwise the given materialized path must be identical
+   * to the materialized path of the slot that materializes the referenced collection in
+   * the parent tuple.
    */
-  private void testTableRefPath(String sql, List<Integer> expectedPhysPath) {
-    // TODO for 2.3: augment this test or write new test that verifies collection
-    // slots' materialized paths
+  private void testTableRefPath(String sql, List<Integer> expectedAbsPath,
+      List<Integer> expectedMatPath) {
     SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
     TableRef lastTblRef = stmt.getTableRefs().get(stmt.getTableRefs().size() - 1);
-    List<Integer> actualPhysPath = lastTblRef.getDesc().getPath().getAbsolutePath();
-    Assert.assertTrue(String.format("Expected path: %s\nActual path:%s",
-        expectedPhysPath, actualPhysPath),
-        actualPhysPath.equals(expectedPhysPath));
+    // Check absolute path.
+    List<Integer> actualAbsPath = lastTblRef.getDesc().getPath().getAbsolutePath();
+    Assert.assertEquals("Mismatched absolute paths.", expectedAbsPath, actualAbsPath);
+    // Check materialized path.
+    if (!lastTblRef.isRelative()) {
+      Assert.assertNull("There is no materialized path for non-relative table refs.\n" +
+          "The expected materialized path should be null.", expectedMatPath);
+      return;
+    }
+    CollectionTableRef collectionTblRef = (CollectionTableRef) lastTblRef;
+    Expr collectionExpr = collectionTblRef.getCollectionExpr();
+    Preconditions.checkState(collectionExpr instanceof SlotRef);
+    SlotRef collectionSlotRef = (SlotRef) collectionExpr;
+    SlotDescriptor collectionSlotDesc = collectionSlotRef.getDesc();
+    Assert.assertEquals("Mismatched paths.",
+        actualAbsPath, collectionSlotDesc.getPath().getAbsolutePath());
+    Assert.assertEquals("Mismatched materialized paths.",
+        expectedMatPath, collectionSlotDesc.getMaterializedPath());
   }
 
   @SuppressWarnings("unchecked")
@@ -479,52 +502,61 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "                  m2:map<int,struct<x:int,y:int,m3:map<int,int>>>>>)");
 
     // Test paths with c3.
-    testTableRefPath("select 1 from d.t7.c3.a1", path(2, 0, 0));
-    testTableRefPath("select 1 from d.t7.c3.item.a1", path(2, 0, 0));
+    testTableRefPath("select 1 from d.t7.c3.a1", path(2, 0, 0), null);
+    testTableRefPath("select 1 from d.t7.c3.item.a1", path(2, 0, 0), null);
     testSlotRefPath("select item from d.t7.c3.a1", path(2, 0, 0, 0));
     testSlotRefPath("select item from d.t7.c3.item.a1", path(2, 0, 0, 0));
-    testTableRefPath("select 1 from d.t7.c3.a2", path(2, 0, 1));
-    testTableRefPath("select 1 from d.t7.c3.item.a2", path(2, 0, 1));
+    testTableRefPath("select 1 from d.t7.c3.a2", path(2, 0, 1), null);
+    testTableRefPath("select 1 from d.t7.c3.item.a2", path(2, 0, 1), null);
     testSlotRefPath("select x from d.t7.c3.a2", path(2, 0, 1, 0, 0));
     testSlotRefPath("select x from d.t7.c3.item.a2", path(2, 0, 1, 0, 0));
-    testTableRefPath("select 1 from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2));
-    testTableRefPath("select 1 from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2));
+    testTableRefPath("select 1 from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2), null);
+    testTableRefPath("select 1 from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2), null);
     testSlotRefPath("select item from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2, 0));
     testSlotRefPath("select item from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2, 0));
     // Test path assembly with multiple tuple descriptors.
-    testTableRefPath("select 1 from d.t7, t7.c3, c3.a2, a2.a3", path(2, 0, 1, 0, 2));
+    testTableRefPath("select 1 from d.t7, t7.c3, c3.a2, a2.a3",
+        path(2, 0, 1, 0, 2), path(2, 0, 1, 0, 2));
     testTableRefPath("select 1 from d.t7, t7.c3, c3.item.a2, a2.item.a3",
-        path(2, 0, 1, 0, 2));
+        path(2, 0, 1, 0, 2), path(2, 0, 1, 0, 2));
     testSlotRefPath("select y from d.t7, t7.c3, c3.a2, a2.a3", path(2, 0, 1, 0, 1));
     testSlotRefPath("select y, x from d.t7, t7.c3, c3.a2, a2.a3", path(2, 0, 1, 0, 0));
     testSlotRefPath("select x, y from d.t7, t7.c3.item.a2, a2.a3", path(2, 0, 1, 0, 1));
     testSlotRefPath("select a1.item from d.t7, t7.c3, c3.a1, c3.a2, a2.a3",
         path(2, 0, 0, 0));
+    // Test materialized path.
+    testTableRefPath("select 1 from d.t7, t7.c3.a1", path(2, 0, 0), path(2));
+    testTableRefPath("select 1 from d.t7, t7.c3.a2", path(2, 0, 1), path(2));
+    testTableRefPath("select 1 from d.t7, t7.c3.a2.a3", path(2, 0, 1, 0, 2), path(2));
+    testTableRefPath("select 1 from d.t7, t7.c3, c3.a2.a3",
+        path(2, 0, 1, 0, 2), path(2, 0, 1));
 
     // Test paths with c5.
-    testTableRefPath("select 1 from d.t7.c5.m1", path(4, 1, 0));
-    testTableRefPath("select 1 from d.t7.c5.value.m1", path(4, 1, 0));
+    testTableRefPath("select 1 from d.t7.c5.m1", path(4, 1, 0), null);
+    testTableRefPath("select 1 from d.t7.c5.value.m1", path(4, 1, 0), null);
     testSlotRefPath("select key from d.t7.c5.m1", path(4, 1, 0, 0));
     testSlotRefPath("select key from d.t7.c5.value.m1", path(4, 1, 0, 0));
     testSlotRefPath("select value from d.t7.c5.m1", path(4, 1, 0, 1));
     testSlotRefPath("select value from d.t7.c5.value.m1", path(4, 1, 0, 1));
-    testTableRefPath("select 1 from d.t7.c5.m2", path(4, 1, 1));
-    testTableRefPath("select 1 from d.t7.c5.value.m2", path(4, 1, 1));
+    testTableRefPath("select 1 from d.t7.c5.m2", path(4, 1, 1), null);
+    testTableRefPath("select 1 from d.t7.c5.value.m2", path(4, 1, 1), null);
     testSlotRefPath("select key from d.t7.c5.m2", path(4, 1, 1, 0));
     testSlotRefPath("select key from d.t7.c5.value.m2", path(4, 1, 1, 0));
     testSlotRefPath("select x from d.t7.c5.m2", path(4, 1, 1, 1, 0));
     testSlotRefPath("select x from d.t7.c5.value.m2", path(4, 1, 1, 1, 0));
-    testTableRefPath("select 1 from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2));
-    testTableRefPath("select 1 from d.t7.c5.value.m2.value.m3", path(4, 1, 1, 1, 2));
+    testTableRefPath("select 1 from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2), null);
+    testTableRefPath("select 1 from d.t7.c5.value.m2.value.m3",
+        path(4, 1, 1, 1, 2), null);
     testSlotRefPath("select key from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2, 0));
     testSlotRefPath("select key from d.t7.c5.value.m2.value.m3", path(4, 1, 1, 1, 2, 0));
     testSlotRefPath("select value from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2, 1));
     testSlotRefPath("select value from d.t7.c5.value.m2.value.m3",
         path(4, 1, 1, 1, 2, 1));
     // Test path assembly with multiple tuple descriptors.
-    testTableRefPath("select 1 from d.t7, t7.c5, c5.m2, m2.m3", path(4, 1, 1, 1, 2));
+    testTableRefPath("select 1 from d.t7, t7.c5, c5.m2, m2.m3",
+        path(4, 1, 1, 1, 2), path(4, 1, 1, 1, 2));
     testTableRefPath("select 1 from d.t7, t7.c5, c5.value.m2, m2.value.m3",
-        path(4, 1, 1, 1, 2));
+        path(4, 1, 1, 1, 2), path(4, 1, 1, 1, 2));
     testSlotRefPath("select y from d.t7, t7.c5, c5.m2, m2.m3",
         path(4, 1, 1, 1, 1));
     testSlotRefPath("select y, x from d.t7, t7.c5, c5.m2, m2.m3",
@@ -533,6 +565,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         path(4, 1, 1, 1, 1));
     testSlotRefPath("select m1.key from d.t7, t7.c5, c5.m1, c5.m2, m2.m3",
         path(4, 1, 0, 0));
+    // Test materialized path.
+    testTableRefPath("select 1 from d.t7, t7.c5.m1", path(4, 1, 0), path(4));
+    testTableRefPath("select 1 from d.t7, t7.c5.m2", path(4, 1, 1), path(4));
+    testTableRefPath("select 1 from d.t7, t7.c5.m2.m3", path(4, 1, 1, 1, 2), path(4));
+    testTableRefPath("select 1 from d.t7, t7.c5, c5.m2.m3",
+        path(4, 1, 1, 1, 2), path(4, 1, 1));
 
     // Tests that an attempted implicit match must be succeeded by an explicit match.
     addTestTable("create table d.t8 (" +
