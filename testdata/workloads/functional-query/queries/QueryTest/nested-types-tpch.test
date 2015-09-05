@@ -210,3 +210,24 @@ where c_custkey between 8000 and 10000
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Exercise TOP-N node with array data
+select c_custkey, c_name, o_orderkey, o_orderpriority
+from tpch_nested_parquet.customer c, c.c_orders o
+where c_custkey < 100
+order by o_orderpriority, o_orderkey
+limit 10;
+---- RESULTS
+29,'Customer#000000029',24322,'1-URGENT'
+46,'Customer#000000046',74055,'1-URGENT'
+76,'Customer#000000076',309891,'1-URGENT'
+53,'Customer#000000053',322501,'1-URGENT'
+25,'Customer#000000025',330404,'1-URGENT'
+22,'Customer#000000022',346693,'1-URGENT'
+20,'Customer#000000020',360067,'1-URGENT'
+79,'Customer#000000079',400101,'1-URGENT'
+79,'Customer#000000079',410595,'1-URGENT'
+65,'Customer#000000065',438881,'1-URGENT'
+---- TYPES
+bigint,string,bigint,string
+====

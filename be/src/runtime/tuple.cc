@@ -70,18 +70,40 @@ Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
   return result;
 }
 
+// TODO: the logic is very similar to the other DeepCopy implementation aside from how
+// memory is allocated - can we templatise it somehow to avoid redundancy without runtime
+// overhead.
 void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
-  DCHECK(desc.collection_slots().empty()) << "DeepCopy() for ArrayValues NYI";
   memcpy(dst, this, desc.byte_size());
-  // allocate in the same pool and then copy all non-null string slots
+  dst->CopyVarlenData(desc, pool);
+}
+
+void Tuple::CopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
+  // allocate then copy all non-null string and collection slots
   for (vector<SlotDescriptor*>::const_iterator slot = desc.string_slots().begin();
        slot != desc.string_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsVarLenStringType());
-    if (!dst->IsNull((*slot)->null_indicator_offset())) {
-      StringValue* string_v = dst->GetStringSlot((*slot)->tuple_offset());
-      char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->len));
-      memcpy(string_copy, string_v->ptr, string_v->len);
-      string_v->ptr = string_copy;
+    if (IsNull((*slot)->null_indicator_offset())) continue;
+    StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
+    char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->len));
+    memcpy(string_copy, string_v->ptr, string_v->len);
+    string_v->ptr = string_copy;
+  }
+
+  for (vector<SlotDescriptor*>::const_iterator slot = desc.collection_slots().begin();
+       slot != desc.collection_slots().end(); ++slot) {
+    DCHECK((*slot)->type().IsCollectionType());
+    if (IsNull((*slot)->null_indicator_offset())) continue;
+    ArrayValue* av = GetCollectionSlot((*slot)->tuple_offset());
+    const TupleDescriptor* item_desc = (*slot)->collection_item_descriptor();
+    int array_byte_size = av->num_tuples * item_desc->byte_size();
+    uint8_t* array_data = reinterpret_cast<uint8_t*>(pool->Allocate(array_byte_size));
+    memcpy(array_data, av->ptr, array_byte_size);
+    if (!item_desc->HasVarlenSlots()) continue;
+    for (int i = 0; i < av->num_tuples; ++i) {
+      int item_offset = i * item_desc->byte_size();
+      Tuple* dst_item = reinterpret_cast<Tuple*>(array_data + item_offset);
+      dst_item->CopyVarlenData(*item_desc, pool);
     }
   }
 }
