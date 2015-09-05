@@ -88,6 +88,7 @@ class KillableThreadedServer(TServer):
     self.daemon = kwargs.get("daemon", False)
     self.is_shutdown = False
     self.transports = set()
+    self.port = self.serverTransport.port
 
   def shutdown(self):
     self.is_shutdown = True
@@ -117,7 +118,6 @@ class KillableThreadedServer(TServer):
     raise Exception("Server did not stop")
 
   def serve(self):
-    self.port = self.serverTransport.port
     self.serverTransport.listen()
     while not self.is_shutdown:
       client = self.serverTransport.accept()
