@@ -450,6 +450,13 @@ class Coordinator {
   typedef boost::unordered_map<std::string, std::pair<bool, short> > PermissionCache;
   void PopulatePathPermissionCache(hdfsFS fs, const std::string& path_str,
       PermissionCache* permissions_cache);
+
+  /// Validates that all collection-typed slots in the given batch are set to NULL.
+  /// See SubplanNode for details on when collection-typed slots are set to NULL.
+  /// TODO: This validation will become obsolete when we can return collection values.
+  /// We will then need a different mechanism to assert the correct behavior of the
+  /// SubplanNode with respect to setting collection-slots to NULL.
+  void ValidateCollectionSlots(RowBatch* batch);
 };
 
 }

@@ -820,7 +820,8 @@ public class Analyzer {
    */
   public SlotDescriptor registerSlotRef(Path slotPath) throws AnalysisException {
     Preconditions.checkNotNull(slotPath.getRootDesc());
-    // Always register a new slot descriptor for collection types.
+    // Always register a new slot descriptor for collection types. The BE currently
+    // relies on this behavior for setting unnested collection slots to NULL.
     if (slotPath.destType().isCollectionType()) {
       SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
       result.setPath(slotPath);

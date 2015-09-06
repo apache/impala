@@ -43,6 +43,16 @@ class TupleRow;
 /// The resources owned by batches from the first child of this node are always
 /// transferred to the output batch right before fetching a new batch from the
 /// first child.
+///
+/// Poor man's projection: Collection-typed slots are expensive to copy, e.g., during
+/// data exchanges or when writing into a buffered-tuple-stream. Such slots are often
+/// duplicated many times after unnesting in a SubplanNode. To alleviate this problem,
+/// we set all collection-typed slots in the input row that are unnested inside the
+/// second child of this SubplanNde to NULL. The FE guarantees that the contents of any
+/// collection-typed slot are never referenced outside of a single UnnestNode, so setting
+/// those slots to NULL is safe after the unnesting has been performed.
+/// TODO: Setting the collection-typed slots to NULL should be replaced by a proper
+/// projection at materialization points.
 class SubplanNode : public ExecNode {
  public:
   SubplanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -58,10 +68,10 @@ class SubplanNode : public ExecNode {
   friend class SingularRowSrcNode;
   friend class UnnestNode;
 
-  /// Sets 'ancestor' as the containing Subplan in all unnest and singular-row-src nodes
-  /// inside the exec-node tree rooted at 'node'.
-  /// Does not traverse the second child of SubplanNodes within 'node'
-  void SetContainingSubplan(SubplanNode* ancestor, ExecNode* node);
+  /// Sets 'ancestor' as the containing Subplan in all exec nodes inside the exec-node
+  /// tree rooted at 'node'. Does not traverse the second child of SubplanNodes
+  /// within 'node'. Populates unnested_array_slots_ during the traversal.
+  void SetContainingSubplan(SubplanNode* ancestor, ExecNode* node, RuntimeState* state);
 
   /// Returns the current row from child(0) or NULL if no rows from child(0) have been
   /// retrieved yet (GetNext() has not yet been called). This function is called by
@@ -80,6 +90,15 @@ class SubplanNode : public ExecNode {
   /// Current row from the first child that dependent nodes in the subplan (unnests and
   /// nested row sources) will pick up.
   TupleRow* current_input_row_;
+
+  /// List of collection-typed slots in the input row from the first child that are
+  /// unnested in this subplan. These slots are set to NULL in the current_input_row_
+  /// after we are done with the subplan iteration for it (second child is at eos).
+  /// Populated in SetContainingSubplan() which is called in Prepare();
+  std::vector<const SlotDescriptor*> unnested_array_slots_;
+
+  /// Tuple indexes corresponding to the slots in unnested_array_slots_. Set in Prepare().
+  std::vector<int> unnested_array_tuple_idxs_;
 
   /// Indicates whether the subplan (second child) is open.
   bool subplan_is_open_;

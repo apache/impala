@@ -39,6 +39,8 @@ class UnnestNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  private:
+  friend class SubplanNode;
+
   /// Size of an array item tuple in bytes. Set in Prepare().
   int item_byte_size_;
 

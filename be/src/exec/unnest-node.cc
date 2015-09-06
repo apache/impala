@@ -119,8 +119,9 @@ Status UnnestNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
     *eos = true;
     row_batch->set_num_rows(row_batch->num_rows() - (num_rows_returned_ - limit_));
     num_rows_returned_ = limit_;
+  } else if (item_idx_ == array_val_.num_tuples) {
+    *eos = true;
   }
-  if (item_idx_ == array_val_.num_tuples) *eos = true;
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
 }

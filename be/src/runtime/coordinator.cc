@@ -883,8 +883,31 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
       // If the query completed successfully, report aggregate query profiles.
       ReportQuerySummary();
     }
+  } else {
+#ifndef NDEBUG
+    ValidateCollectionSlots(*batch);
+#endif
   }
+
   return Status::OK();
+}
+
+void Coordinator::ValidateCollectionSlots(RowBatch* batch) {
+  const RowDescriptor& row_desc = executor_->row_desc();
+  if (!row_desc.HasVarlenSlots()) return;
+  for (int i = 0; i < batch->num_rows(); ++i) {
+    TupleRow* row = batch->GetRow(i);
+    for (int j = 0; j < row_desc.tuple_descriptors().size(); ++j) {
+      const TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[j];
+      if (tuple_desc->collection_slots().empty()) continue;
+      for (int k = 0; k < tuple_desc->collection_slots().size(); ++k) {
+        const SlotDescriptor* slot_desc = tuple_desc->collection_slots()[k];
+        int tuple_idx = row_desc.GetTupleIdx(slot_desc->parent()->id());
+        const Tuple* tuple = row->GetTuple(tuple_idx);
+        DCHECK(tuple->IsNull(slot_desc->null_indicator_offset()));
+      }
+    }
+  }
 }
 
 void Coordinator::PrintBackendInfo() {
