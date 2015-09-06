@@ -150,7 +150,8 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
 }
 
 /// Test that reporting a write error takes directory out of usage.
-TEST_F(TmpFileMgrTest, TestReportError) {
+/// Disabled because blacklisting was disabled as workaround for IMPALA-2305.
+TEST_F(TmpFileMgrTest, DISABLED_TestReportError) {
   vector<string> tmp_dirs;
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");

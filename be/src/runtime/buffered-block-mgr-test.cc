@@ -792,7 +792,8 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
 // Test that the block manager is able to blacklist a temporary device correctly after a
 // write error. We should not allocate more blocks on that device, but existing blocks
 // on the device will remain in use.
-TEST_F(BufferedBlockMgrTest, WriteErrorBlacklist) {
+/// Disabled because blacklisting was disabled as workaround for IMPALA-2305.
+TEST_F(BufferedBlockMgrTest, DISABLED_WriteErrorBlacklist) {
   // Set up two buffered block managers with two temporary dirs.
   shared_ptr<TmpFileMgr> tmp_file_mgr;
   vector<string> tmp_dirs = InitMultipleTmpDirs(2, &tmp_file_mgr);
@@ -875,7 +876,8 @@ TEST_F(BufferedBlockMgrTest, WriteErrorBlacklist) {
 
 // Check that allocation error resulting from removal of directory results in blacklisting
 // of directory.
-TEST_F(BufferedBlockMgrTest, AllocationErrorBlacklist) {
+/// Disabled because blacklisting was disabled as workaround for IMPALA-2305.
+TEST_F(BufferedBlockMgrTest, DISABLED_AllocationErrorBlacklist) {
   // Set up two buffered block managers with two temporary dirs.
   shared_ptr<TmpFileMgr> tmp_file_mgr;
   vector<string> tmp_dirs = InitMultipleTmpDirs(2, &tmp_file_mgr);

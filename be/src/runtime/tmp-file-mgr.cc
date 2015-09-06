@@ -244,8 +244,9 @@ Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
 
 void TmpFileMgr::File::ReportIOError(const ErrorMsg& msg) {
   LOG(ERROR) << "Error for temporary file '" << path_ << "': " << msg.msg();
-  blacklisted_ = true;
-  mgr_->BlacklistDevice(device_id_);
+  // IMPALA-2305: avoid blacklisting to prevent test failures.
+  // blacklisted_ = true;
+  // mgr_->BlacklistDevice(device_id_);
 }
 
 Status TmpFileMgr::File::Remove() {
