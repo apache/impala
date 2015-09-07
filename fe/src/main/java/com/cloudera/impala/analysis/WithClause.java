@@ -131,4 +131,6 @@ public class WithClause implements ParseNode {
     }
     return "WITH " + Joiner.on(",").join(viewStrings);
   }
+
+  public List<View> getViews() { return views_; }
 }
