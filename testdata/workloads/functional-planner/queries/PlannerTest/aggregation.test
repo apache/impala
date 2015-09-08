@@ -631,3 +631,32 @@ where v.a = v.b and v.b = v.c and v.c = v.d and v.a = v.c and v.a = v.d
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.tinyint_col = functional.alltypes.smallint_col
 ====
+# IMPALA-1917: Test NULL literals inside inline view with grouping aggregation.
+select cnt from
+  (select bool_col, count(*) cnt, cast(NULL as int) as x, cast(NULL as int) as y
+   from functional.alltypestiny
+   group by bool_col, x) v
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: bool_col, CAST(NULL AS INT)
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-1917: Test NULL literals inside inline view with grouping aggregation.
+select cnt from
+  (select bool_col, count(distinct int_col) cnt, NULL as x, NULL as y
+   from functional.alltypestiny
+   group by bool_col, x) v
+---- PLAN
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col)
+|  group by: bool_col, NULL
+|
+01:AGGREGATE
+|  group by: bool_col, NULL, int_col
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====

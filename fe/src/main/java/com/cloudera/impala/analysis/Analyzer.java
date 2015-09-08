@@ -1003,8 +1003,16 @@ public class Analyzer {
    * Create and register an auxiliary predicate to express an equivalence between two
    * exprs (BinaryPredicate with EQ); this predicate does not need to be assigned, but
    * it's used for equivalence class computation.
+   * Does nothing if the lhs or rhs expr are NULL. Registering an equivalence with NULL
+   * would be incorrect, because <expr> = NULL is false (even NULL = NULL).
    */
   public void createAuxEquivPredicate(Expr lhs, Expr rhs) {
+    // Check the expr type as well as the class because  NullLiteral could have been
+    // implicitly cast to a type different than NULL.
+    if (lhs instanceof NullLiteral || rhs instanceof NullLiteral ||
+        lhs.getType().isNull() || rhs.getType().isNull()) {
+      return;
+    }
     // create an eq predicate between lhs and rhs
     BinaryPredicate p = new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs);
     p.setIsAuxExpr();
@@ -1638,10 +1646,8 @@ public class Analyzer {
         for (int j = 0; j < i; ++j) {
           SlotId lhs = slotIds.get(j);
           if (!partialEquivSlots.union(lhs, rhs)) continue;
-          T newEqPred = (T) createEqPredicate(lhs, rhs);
-          newEqPred.analyzeNoThrow(this);
           if (!hasMutualValueTransfer(lhs, rhs)) continue;
-          conjuncts.add(newEqPred);
+          conjuncts.add((T) createEqPredicate(lhs, rhs));
           // Check for early termination.
           if (partialEquivSlots.get(lhs).size() == slotIds.size()) {
             done = true;

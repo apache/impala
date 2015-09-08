@@ -14,17 +14,10 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Lists;
 
 public abstract class Predicate extends Expr {
   protected boolean isEqJoinConjunct_;
