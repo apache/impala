@@ -180,10 +180,13 @@ void ExecNode::Close(RuntimeState* state) {
   }
   Expr::Close(conjunct_ctxs_, state);
 
-  if (mem_tracker() != NULL) {
-    if (mem_tracker()->consumption() != 0) {
-      LOG(WARNING) << "Query " << state->query_id() << " leaked memory." << endl
-          << state->instance_mem_tracker()->LogUsage();
+  if (mem_tracker() != NULL && mem_tracker()->consumption() != 0) {
+    LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
+                 << state->instance_mem_tracker()->LogUsage();
+    // Workaround: Until IMPALA-1867 is fixed, single I/O block MemTracker accounting
+    // leaks are possible.  These are harmless, see IMPALA-1867.
+    // TODO: remove guard when IMPALA-1867 is fixed.
+    if (mem_tracker()->consumption() != state->block_mgr()->max_block_size()) {
       DCHECK_EQ(mem_tracker()->consumption(), 0)
           << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
     }
