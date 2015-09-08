@@ -889,10 +889,9 @@ TEST_F(BufferedBlockMgrTest, DISABLED_WriteErrorBlacklist) {
   }
 }
 
-// Check that allocation error resulting from removal of directory results in blacklisting
-// of directory.
-/// Disabled because blacklisting was disabled as workaround for IMPALA-2305.
-TEST_F(BufferedBlockMgrTest, DISABLED_AllocationErrorBlacklist) {
+// Check that allocation error resulting from removal of directory results in blocks
+/// being allocated in other directories.
+TEST_F(BufferedBlockMgrTest, AllocationErrorHandling) {
   // Set up two buffered block managers with two temporary dirs.
   shared_ptr<TmpFileMgr> tmp_file_mgr;
   vector<string> tmp_dirs = InitMultipleTmpDirs(2, &tmp_file_mgr);
@@ -921,18 +920,10 @@ TEST_F(BufferedBlockMgrTest, DISABLED_AllocationErrorBlacklist) {
   // cause an error when it tries to create/expand the file. It should recover and just
   // use the good dir.
   UnpinBlocks(blocks[0]);
-  EXPECT_EQ(1, tmp_file_mgr->num_active_tmp_devices());
-  const string& active_tmp_dir = tmp_file_mgr->GetTmpDirPath(
-      tmp_file_mgr->active_tmp_devices()[0]);
-  EXPECT_EQ(good_scratch_subdir, active_tmp_dir);
-  chmod(bad_scratch_subdir.c_str(), S_IRWXU);
-  // Blocks should not be written to bad dir even if writable again.
+  // Directories remain on active list even when they experience errors.
+  EXPECT_EQ(2, tmp_file_mgr->num_active_tmp_devices());
+  // Blocks should not be written to bad dir even if it remains non-writable.
   UnpinBlocks(blocks[1]);
-  for (int i = 0; i < num_block_mgrs; ++i) {
-    for (int j = 0; j < blocks_per_mgr; ++j) {
-      EXPECT_TRUE(BlockInDir(blocks[i][j], good_dir));
-    }
-  }
   // All writes should succeed.
   WaitForWrites(block_mgrs);
   for (int i = 0; i < blocks.size(); ++i) {

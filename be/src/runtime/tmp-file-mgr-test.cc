@@ -149,9 +149,9 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
   CheckMetrics(&tmp_file_mgr);
 }
 
-/// Test that reporting a write error takes directory out of usage.
-/// Disabled because blacklisting was disabled as workaround for IMPALA-2305.
-TEST_F(TmpFileMgrTest, DISABLED_TestReportError) {
+/// Test that reporting a write error is possible but does not result in
+/// blacklisting, which is disabled.
+TEST_F(TmpFileMgrTest, TestReportError) {
   vector<string> tmp_dirs;
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
@@ -174,28 +174,58 @@ TEST_F(TmpFileMgrTest, DISABLED_TestReportError) {
   ErrorMsg errmsg(TErrorCode::GENERAL, "A fake error");
   bad_file->ReportIOError(errmsg);
 
-  // Bad file should be blacklisted.
-  EXPECT_TRUE(bad_file->is_blacklisted());
-  // The second device should no longer be in use.
-  EXPECT_EQ(1, tmp_file_mgr.num_active_tmp_devices());
+  // Blacklisting is disabled.
+  EXPECT_FALSE(bad_file->is_blacklisted());
+  // The second device should still be active.
+  EXPECT_EQ(2, tmp_file_mgr.num_active_tmp_devices());
   vector<TmpFileMgr::DeviceId> devices_after = tmp_file_mgr.active_tmp_devices();
-  EXPECT_EQ(1, devices_after.size());
-  EXPECT_EQ(devices[good_device], devices_after[0]);
+  EXPECT_EQ(2, devices_after.size());
   CheckMetrics(&tmp_file_mgr);
 
-  // Attempts to expand bad file should fail.
+  // Attempts to expand bad file should succeed.
   int64_t offset;
-  EXPECT_FALSE(bad_file->AllocateSpace(128, &offset).ok());
+  EXPECT_TRUE(bad_file->AllocateSpace(128, &offset).ok());
   EXPECT_TRUE(bad_file->Remove().ok());
   // The good device should still be usable.
   TmpFileMgr::File* good_file;
   EXPECT_TRUE(tmp_file_mgr.GetFile(devices[good_device], id, &good_file).ok());
   EXPECT_TRUE(good_file != NULL);
   EXPECT_TRUE(good_file->AllocateSpace(128, &offset).ok());
-  // Attempts to allocate new files on bad device should fail.
-  EXPECT_FALSE(tmp_file_mgr.GetFile(devices[bad_device], id, &bad_file).ok());
+  // Attempts to allocate new files on bad device should succeed.
+  EXPECT_TRUE(tmp_file_mgr.GetFile(devices[bad_device], id, &bad_file).ok());
   FileSystemUtil::RemovePaths(tmp_dirs);
   CheckMetrics(&tmp_file_mgr);
+}
+
+TEST_F(TmpFileMgrTest, TestAllocateFails) {
+  string tmp_dir("/tmp/tmp-file-mgr-test.1");
+  string scratch_subdir = tmp_dir + "/impala-scratch";
+  vector<string> tmp_dirs(1, tmp_dir);
+  EXPECT_TRUE(FileSystemUtil::CreateDirectory(tmp_dir).ok());
+  TmpFileMgr tmp_file_mgr;
+  tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+
+  TUniqueId id;
+  TmpFileMgr::File* allocated_file1;
+  TmpFileMgr::File* allocated_file2;
+  int64_t offset;
+  EXPECT_TRUE(tmp_file_mgr.GetFile(0, id, &allocated_file1).ok());
+  EXPECT_TRUE(tmp_file_mgr.GetFile(0, id, &allocated_file2).ok());
+  EXPECT_TRUE(allocated_file1->AllocateSpace(1, &offset).ok());
+
+  // Make scratch non-writable and test for allocation errors at different stages:
+  // new file creation, files with no allocated blocks. files with allocated space.
+  chmod(scratch_subdir.c_str(), 0);
+  // allocated_file1 already has space allocated.
+  EXPECT_FALSE(allocated_file1->AllocateSpace(1, &offset).ok());
+  // allocated_file2 has no space allocated.
+  EXPECT_FALSE(allocated_file2->AllocateSpace(1, &offset).ok());
+  // Creating a new File object can succeed because it is not immediately created on disk.
+  TmpFileMgr::File* unallocated_file;
+  EXPECT_TRUE(tmp_file_mgr.GetFile(0, id, &unallocated_file).ok());
+
+  chmod(scratch_subdir.c_str(), S_IRWXU);
+  FileSystemUtil::RemovePaths(tmp_dirs);
 }
 
 }
