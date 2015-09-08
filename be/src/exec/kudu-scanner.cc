@@ -41,6 +41,10 @@ using kudu::client::KuduPredicate;
 using kudu::client::KuduRowResult;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
+using strings::Substitute;
+
+DEFINE_bool(pick_only_leaders_for_tests, false,
+            "Whether to pick only leader replicas, for tests purposes only.");
 
 namespace impala {
 
@@ -141,13 +145,16 @@ Status KuduScanner::OpenNextScanner(const TKuduKeyRange& key_range)  {
       "Unable to set projected columns");
 
   RETURN_IF_ERROR(SetupScanRangePredicate(key_range, scanner_.get()));
-  KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(
-      kudu::client::KuduScanner::READ_AT_SNAPSHOT), "Unable to set snapshot read mode.");
 
   vector<KuduPredicate*> predicates;
   scan_node_->ClonePredicates(&predicates);
   BOOST_FOREACH(KuduPredicate* predicate, predicates) {
     scanner_->AddConjunctPredicate(predicate);
+  }
+
+  if (UNLIKELY(FLAGS_pick_only_leaders_for_tests)) {
+    KUDU_RETURN_IF_ERROR(scanner_->SetSelection(kudu::client::KuduClient::LEADER_ONLY),
+                         "Could not set replica selection.");
   }
 
   {

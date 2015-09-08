@@ -40,6 +40,7 @@ DEFINE_int32(bench_num_splits, 40, "Num tablets to create in benchmarks");
 DEFINE_int32(bench_num_runs, 10, "Num times to run each benchmark.");
 DEFINE_bool(skip_delete_table, false, "Skips deleting the tables at the end of the tests.");
 DEFINE_string(use_existing_table, "", "The name of the existing table to use.");
+DECLARE_bool(pick_only_leaders_for_tests);
 
 using apache::thrift::ThriftDebugString;
 using strings::Substitute;
@@ -64,6 +65,7 @@ class KuduScanNodeTest : public testing::Test {
     DCHECK_OK(exec_env_->InitForFeTests());
     exec_env_->disk_io_mgr()->Init(mem_tracker_.get());
 
+    FLAGS_pick_only_leaders_for_tests = true;
     if (FLAGS_use_existing_table != "") FLAGS_skip_delete_table = true;
   }
 

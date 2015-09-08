@@ -529,6 +529,10 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     int64_t scan_range_length = 0;
     if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
       scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;
+    } else if (scan_range_locations.scan_range.__isset.kudu_key_range) {
+      // Hack so that kudu ranges are well distributed.
+      // TODO: KUDU-1133 Use the tablet size instead.
+      scan_range_length = 1000;
     }
     bool remote_read = min_assigned_bytes >= numeric_limits<int64_t>::max();
     if (remote_read) {

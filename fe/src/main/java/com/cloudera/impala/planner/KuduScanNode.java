@@ -116,22 +116,22 @@ public class KuduScanNode extends ScanNode {
           rpcTable.getTabletsLocations(KuduTable.KUDU_RPC_TIMEOUT_MS);
 
       for (LocatedTablet tablet : tabletLocations) {
-        TScanRangeLocations locs = new TScanRangeLocations();
-        // We're using the leader to avoid querying a lagging replica. This hinders
-        // scheduling a scan with different replicas.
-        LocatedTablet.Replica replica = tablet.getLeaderReplica();
-        if (replica == null) {
+        List<TScanRangeLocation> locations = Lists.newArrayList();
+        if (tablet.getReplicas().isEmpty()) {
           throw new ImpalaRuntimeException(String.format(
-              "At least one tablet does not have a leader. Tablet ID: %s",
+              "At least one tablet does not have any replicas. Tablet ID: %s",
               new String(tablet.getTabletId(), Charsets.UTF_8)));
         }
-        TNetworkAddress address = new TNetworkAddress(replica.getRpcHost(),
-            replica.getRpcPort());
+        for (LocatedTablet.Replica replica : tablet.getReplicas()) {
+          TNetworkAddress address = new TNetworkAddress(replica.getRpcHost(),
+              replica.getRpcPort());
+          // Use the network address to look up the host in the global list
+          Integer hostIndex = analyzer.getHostIndex().getIndex(address);
+          locations.add(new TScanRangeLocation(hostIndex));
+          hostIndexSet_.add(hostIndex);
+        }
 
-        // Use the network address to look up the host in the global list
-        Integer hostIndex = analyzer.getHostIndex().getIndex(address);
-        locs.addToLocations(new TScanRangeLocation(hostIndex));
-        hostIndexSet_.add(hostIndex);
+        TScanRangeLocations locs = new TScanRangeLocations();
 
         // Now set the scan range of this tablet
         TKuduKeyRange keyRange = new TKuduKeyRange();
@@ -142,6 +142,8 @@ public class KuduScanNode extends ScanNode {
 
         // Set the scan range for this set of locations
         locs.setScan_range(scanRange);
+        locs.locations = locations;
+
         scanRanges_.add(locs);
       }
     } catch (Exception e) {
