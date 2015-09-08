@@ -1211,7 +1211,7 @@ Status BufferedBlockMgr::InitTmpFiles() {
   }
   if (tmp_files_.empty()) {
     return Status("No spilling directories configured. Cannot spill. Set --scratch_dirs"
-        "or see log for previous errors that prevented use of provided directories");
+        " or see log for previous errors that prevented use of provided directories");
   }
   next_block_index_ = rand() % tmp_files_.size();
   return Status::OK();
