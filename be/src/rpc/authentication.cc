@@ -64,8 +64,7 @@ DECLARE_string(krb5_conf);
 DECLARE_string(krb5_debug_file);
 
 DEFINE_int32(kerberos_reinit_interval, 60,
-    "Interval, in minutes, between kerberos ticket renewals. Each renewal will request "
-    "a ticket with a lifetime that is at least 2x the renewal interval.");
+    "Interval, in minutes, between kerberos ticket renewals.");
 DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2:"
     "/usr/lib/x86_64-linux-gnu/sasl2", "Colon separated list of paths to look for SASL "
     "security library plugins.");
@@ -437,21 +436,12 @@ static int SaslGetPath(void* context, const char** path) {
 //              the parent thread
 // Return: Only if the first call to 'kinit' fails
 void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
-  // Minumum lifetime to request for each ticket renewal.
-  static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
-
-  // Set the ticket lifetime to an arbitrarily large value or 2x the renewal interval,
-  // whichever is larger. The KDC will automatically fall back to using the maximum
-  // allowed allowed value if a longer lifetime is requested, so it is okay to be greedy
-  // here.
-  int ticket_lifetime_mins =
-      max(MIN_TICKET_LIFETIME_IN_MINS, FLAGS_kerberos_reinit_interval * 2);
 
   // Pass the path to the key file and the principal. Make the ticket renewable.
   // Calling kinit -R ensures the ticket makes it to the cache, and should be a separate
   // call to kinit.
-  const string kinit_cmd = Substitute("kinit -r $0m -k -t $1 $2 2>&1",
-      ticket_lifetime_mins, keytab_file_, principal_);
+  const string kinit_cmd = Substitute("kinit -k -t $0 $1 2>&1",
+      keytab_file_, principal_);
 
   bool first_time = true;
   int failures_since_renewal = 0;
