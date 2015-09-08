@@ -502,8 +502,25 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
 BufferedBlockMgr::~BufferedBlockMgr() {
   {
     lock_guard<SpinLock> lock(static_block_mgrs_lock_);
-    DCHECK(query_to_block_mgrs_.find(query_id_) != query_to_block_mgrs_.end());
-    query_to_block_mgrs_.erase(query_id_);
+    BlockMgrsMap::iterator it = query_to_block_mgrs_.find(query_id_);
+    // IMPALA-2286: Another fragment may have called Create() for this query_id_ and
+    // saw that this BufferedBlockMgr is being destructed.  That fragement will
+    // overwrite the map entry for query_id_, pointing it to a different
+    // BufferedBlockMgr object.  We should let that object's destructor remove the
+    // entry.  On the other hand, if the second BufferedBlockMgr is destructed before
+    // this thread acquires the lock, then we'll remove the entry (because we can't
+    // distinguish between the two expired pointers), and when the other
+    // ~BufferedBlockMgr() call occurs, it won't find an entry for this query_id_.
+    if (it != query_to_block_mgrs_.end()) {
+      shared_ptr<BufferedBlockMgr> mgr = it->second.lock();
+      if (mgr.get() == NULL) {
+        // The BufferBlockMgr object referenced by this entry is being deconstructed.
+        query_to_block_mgrs_.erase(it);
+      } else {
+        // The map references another (still valid) BufferedBlockMgr.
+        DCHECK_NE(mgr.get(), this);
+      }
+    }
   }
 
   if (io_request_context_ != NULL) io_mgr_->UnregisterContext(io_request_context_);

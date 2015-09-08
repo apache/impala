@@ -433,6 +433,27 @@ class BufferedBlockMgrTest : public ::testing::Test {
     EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
   }
 
+  // Repeatedly call BufferedBlockMgr::Create() and BufferedBlockMgr::~BufferedBlockMgr().
+  void CreateDestroyThread() {
+    const int num_buffers = 10;
+    const int iters = 10000;
+    for (int i = 0; i < iters; ++i) {
+      shared_ptr<BufferedBlockMgr> mgr = CreateMgr(num_buffers);
+    }
+  }
+
+  // IMPALA-2286: Test for races between BufferedBlockMgr::Create() and
+  // BufferedBlockMgr::~BufferedBlockMgr().
+  void CreateDestroyMulti() {
+    const int num_threads = 8;
+    thread_group workers;
+    for (int i = 0; i < num_threads; ++i) {
+      thread* t = new thread(bind(&BufferedBlockMgrTest::CreateDestroyThread, this));
+      workers.add_thread(t);
+    }
+    workers.join_all();
+  }
+
   scoped_ptr<ExecEnv> exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
   scoped_ptr<MemTracker> block_mgr_parent_tracker_;
@@ -1196,6 +1217,11 @@ TEST_F(BufferedBlockMgrTest, Multi4Random_encryption) {
 //   FLAGS_disk_spill_encryption = true;
 //   TestRandomInternalMulti(8);
 // }
+
+
+TEST_F(BufferedBlockMgrTest, CreateDestroyMulti) {
+  CreateDestroyMulti();
+}
 
 }
 
