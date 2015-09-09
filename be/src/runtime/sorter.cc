@@ -344,7 +344,7 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc,
     sort_tuple_desc_(sort_tuple_desc),
     sort_tuple_size_(sort_tuple_desc->byte_size()),
     block_size_(parent->block_mgr_->max_block_size()),
-    has_var_len_slots_(sort_tuple_desc->string_slots().size() > 0),
+    has_var_len_slots_(sort_tuple_desc->HasVarlenSlots()),
     materialize_slots_(materialize_slots),
     is_sorted_(!materialize_slots),
     is_pinned_(true),
@@ -398,8 +398,8 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
   // cur_input_index is the index into the input 'batch' of the current input row being
   // processed.
   int cur_input_index = start_index;
-  vector<StringValue*> var_values;
-  var_values.reserve(sort_tuple_desc_->string_slots().size());
+  vector<StringValue*> string_values;
+  string_values.reserve(sort_tuple_desc_->string_slots().size());
   while (cur_input_index < batch->num_rows()) {
     // tuples_remaining is the number of tuples to copy/materialize into
     // cur_fixed_len_block.
@@ -412,7 +412,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       Tuple* new_tuple = cur_fixed_len_block->Allocate<Tuple>(sort_tuple_size_);
       if (materialize_slots_) {
         new_tuple->MaterializeExprs<has_var_len_data>(input_row, *sort_tuple_desc_,
-            sorter_->sort_tuple_slot_expr_ctxs_, NULL, &var_values, &total_var_len);
+            sorter_->sort_tuple_slot_expr_ctxs_, NULL, &string_values, &total_var_len);
         if (total_var_len > sorter_->block_mgr_->max_block_size()) {
           return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, Substitute(
               "Variable length data in a single tuple larger than block size $0 > $1",
@@ -421,7 +421,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       } else {
         memcpy(new_tuple, input_row->GetTuple(0), sort_tuple_size_);
         if (has_var_len_data) {
-          CollectNonNullVarSlots(new_tuple, &var_values, &total_var_len);
+          CollectNonNullVarSlots(new_tuple, &string_values, &total_var_len);
         }
       }
 
@@ -441,13 +441,20 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
           }
         }
 
+        // Sorting of tuples containing array values is not implemented. The planner
+        // combined with projection should guarantee that none are in each tuple.
+        BOOST_FOREACH(const SlotDescriptor* collection_slot,
+            sort_tuple_desc_->collection_slots()) {
+          DCHECK(new_tuple->IsNull(collection_slot->null_indicator_offset()));
+        }
+
         char* var_data_ptr = cur_var_len_block->Allocate<char>(total_var_len);
         if (materialize_slots_) {
-          CopyVarLenData(var_data_ptr, var_values);
+          CopyVarLenData(var_data_ptr, string_values);
         } else {
           int64_t offset = (var_len_blocks_.size() - 1) * block_size_;
           offset += var_data_ptr - reinterpret_cast<char*>(cur_var_len_block->buffer());
-          CopyVarLenDataConvertOffset(var_data_ptr, offset, var_values);
+          CopyVarLenDataConvertOffset(var_data_ptr, offset, string_values);
         }
       }
       ++num_tuples_;
@@ -504,10 +511,10 @@ void Sorter::Run::DeleteAllBlocks() {
 Status Sorter::Run::UnpinAllBlocks() {
   vector<BufferedBlockMgr::Block*> sorted_var_len_blocks;
   sorted_var_len_blocks.reserve(var_len_blocks_.size());
-  vector<StringValue*> var_values;
+  vector<StringValue*> string_values;
   int64_t var_data_offset = 0;
   int total_var_len;
-  var_values.reserve(sort_tuple_desc_->string_slots().size());
+  string_values.reserve(sort_tuple_desc_->string_slots().size());
   BufferedBlockMgr::Block* cur_sorted_var_len_block = NULL;
   if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
     DCHECK(var_len_copy_block_ != NULL);
@@ -524,7 +531,7 @@ Status Sorter::Run::UnpinAllBlocks() {
           block_offset += sort_tuple_size_) {
         Tuple* cur_tuple =
             reinterpret_cast<Tuple*>(cur_fixed_block->buffer() + block_offset);
-        CollectNonNullVarSlots(cur_tuple, &var_values, &total_var_len);
+        CollectNonNullVarSlots(cur_tuple, &string_values, &total_var_len);
         if (cur_sorted_var_len_block->BytesRemaining() < total_var_len) {
           bool added;
           RETURN_IF_ERROR(TryAddBlock(&sorted_var_len_blocks, &added));
@@ -534,7 +541,7 @@ Status Sorter::Run::UnpinAllBlocks() {
         char* var_data_ptr = cur_sorted_var_len_block->Allocate<char>(total_var_len);
         var_data_offset = block_size_ * (sorted_var_len_blocks.size() - 1) +
             (var_data_ptr - reinterpret_cast<char*>(cur_sorted_var_len_block->buffer()));
-        CopyVarLenDataConvertOffset(var_data_ptr, var_data_offset, var_values);
+        CopyVarLenDataConvertOffset(var_data_ptr, var_data_offset, string_values);
       }
     }
     RETURN_IF_ERROR(cur_fixed_block->Unpin());
@@ -672,9 +679,9 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
 
     if (convert_offset_to_ptr) {
       // Convert the offsets in the var-len slots in input_tuple back to pointers.
-      const vector<SlotDescriptor*>& var_slots = sort_tuple_desc_->string_slots();
-      for (int i = 0; i < var_slots.size(); ++i) {
-        SlotDescriptor* slot_desc = var_slots[i];
+      const vector<SlotDescriptor*>& string_slots = sort_tuple_desc_->string_slots();
+      for (int i = 0; i < string_slots.size(); ++i) {
+        SlotDescriptor* slot_desc = string_slots[i];
         if (input_tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
         DCHECK(slot_desc->type().IsVarLenStringType());
@@ -703,7 +710,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
           value->ptr = reinterpret_cast<char*>(
               var_len_blocks_[var_len_blocks_index_]->buffer() + block_offset);
         } // if (block_index > var_len_blocks_index_)
-      } // for (int i = 0; i < var_slots.size(); ++i)
+      } // for (int i = 0; i < string_slots.size(); ++i)
 
       // The var-len data is in the next block, so end this call to GetNext().
       if (pin_next_var_len_block_) break;
@@ -726,14 +733,14 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
 }
 
 void Sorter::Run::CollectNonNullVarSlots(Tuple* src,
-    vector<StringValue*>* var_len_values, int* total_var_len) {
-  var_len_values->clear();
+    vector<StringValue*>* string_values, int* total_var_len) {
+  string_values->clear();
   *total_var_len = 0;
-  BOOST_FOREACH(const SlotDescriptor* var_slot, sort_tuple_desc_->string_slots()) {
-    if (!src->IsNull(var_slot->null_indicator_offset())) {
+  BOOST_FOREACH(const SlotDescriptor* string_slot, sort_tuple_desc_->string_slots()) {
+    if (!src->IsNull(string_slot->null_indicator_offset())) {
       StringValue* string_val =
-          reinterpret_cast<StringValue*>(src->GetSlot(var_slot->tuple_offset()));
-      var_len_values->push_back(string_val);
+          reinterpret_cast<StringValue*>(src->GetSlot(string_slot->tuple_offset()));
+      string_values->push_back(string_val);
       *total_var_len += string_val->len;
     }
   }
@@ -762,21 +769,21 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
   return Status::OK();
 }
 
-void Sorter::Run::CopyVarLenData(char* dest, const vector<StringValue*>& var_values) {
-  BOOST_FOREACH(StringValue* var_val, var_values) {
-    memcpy(dest, var_val->ptr, var_val->len);
-    var_val->ptr = dest;
-    dest += var_val->len;
+void Sorter::Run::CopyVarLenData(char* dest, const vector<StringValue*>& string_values) {
+  BOOST_FOREACH(StringValue* string_val, string_values) {
+    memcpy(dest, string_val->ptr, string_val->len);
+    string_val->ptr = dest;
+    dest += string_val->len;
   }
 }
 
 void Sorter::Run::CopyVarLenDataConvertOffset(char* dest, int64_t offset,
-    const vector<StringValue*>& var_values) {
-  BOOST_FOREACH(StringValue* var_val, var_values) {
-    memcpy(dest, var_val->ptr, var_val->len);
-    var_val->ptr = reinterpret_cast<char*>(offset);
-    dest += var_val->len;
-    offset += var_val->len;
+    const vector<StringValue*>& string_values) {
+  BOOST_FOREACH(StringValue* string_val, string_values) {
+    memcpy(dest, string_val->ptr, string_val->len);
+    string_val->ptr = reinterpret_cast<char*>(offset);
+    dest += string_val->len;
+    offset += string_val->len;
   }
 }
 
@@ -931,7 +938,7 @@ Sorter::~Sorter() {
 Status Sorter::Init() {
   DCHECK(unsorted_run_ == NULL) << "Already initialized";
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
-  has_var_len_slots_ = sort_tuple_desc->string_slots().size() > 0;
+  has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than_,
       block_mgr_->max_block_size(), sort_tuple_desc->byte_size(), state_));
   unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
@@ -944,7 +951,7 @@ Status Sorter::Init() {
   int min_blocks_required = BLOCKS_REQUIRED_FOR_MERGE;
   // Fixed and var-length blocks are separate, so we need BLOCKS_REQUIRED_FOR_MERGE
   // blocks for both if there is var-length data.
-  if (output_row_desc_->tuple_descriptors()[0]->string_slots().size() > 0) {
+  if (output_row_desc_->tuple_descriptors()[0]->HasVarlenSlots()) {
     min_blocks_required *= 2;
   }
   RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state_,
@@ -1085,7 +1092,7 @@ Status Sorter::SortRun() {
 
 uint64_t Sorter::EstimateMergeMem(uint64_t available_blocks,
     RowDescriptor* row_desc, int merge_batch_size) {
-  bool has_var_len_slots = row_desc->tuple_descriptors()[0]->string_slots().size() > 0;
+  bool has_var_len_slots = row_desc->tuple_descriptors()[0]->HasVarlenSlots();
   int blocks_per_run = has_var_len_slots ? 2 : 1;
   int max_input_runs_per_merge = (available_blocks / blocks_per_run) - 1;
   // During a merge, the batches corresponding to the input runs contain only TupleRows.

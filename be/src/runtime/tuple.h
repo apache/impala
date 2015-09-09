@@ -102,13 +102,14 @@ class Tuple {
   /// (Memory for this tuple itself must already be allocated.)
   /// If collect_string_vals is true, the materialized non-NULL string value
   /// slots and the total length of the string slots are returned in var_values
-  /// and total_var_len.
+  /// and total_string.
+  /// TODO: this function does not collect other var-len types such as collections.
   template <bool collect_string_vals>
   void MaterializeExprs(
       TupleRow* row, const TupleDescriptor& desc,
       const std::vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
-      std::vector<StringValue*>* non_null_var_len_values = NULL,
-      int* total_var_len = NULL);
+      std::vector<StringValue*>* non_null_string_values = NULL,
+      int* total_string = NULL);
 
   /// Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
   /// this is a no-op (but we don't have to branch to check is slots are nulalble).

@@ -192,10 +192,10 @@ template <bool collect_string_vals>
 void Tuple::MaterializeExprs(
     TupleRow* row, const TupleDescriptor& desc,
     const vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
-    vector<StringValue*>* non_null_var_len_values, int* total_var_len) {
+    vector<StringValue*>* non_null_string_values, int* total_string) {
   if (collect_string_vals) {
-    non_null_var_len_values->clear();
-    *total_var_len = 0;
+    non_null_string_values->clear();
+    *total_string = 0;
   }
   memset(this, 0, desc.num_null_bytes());
   // Evaluate the output_slot_exprs and place the results in the tuples.
@@ -214,8 +214,8 @@ void Tuple::MaterializeExprs(
       RawValue::Write(src, dst, slot_desc->type(), pool);
       if (collect_string_vals && slot_desc->type().IsVarLenStringType()) {
         StringValue* string_val = reinterpret_cast<StringValue*>(dst);
-        non_null_var_len_values->push_back(string_val);
-        *total_var_len += string_val->len;
+        non_null_string_values->push_back(string_val);
+        *total_string += string_val->len;
       }
     } else {
       SetNull(slot_desc->null_indicator_offset());
