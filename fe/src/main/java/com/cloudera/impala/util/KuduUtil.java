@@ -98,12 +98,12 @@ public class KuduUtil {
       for (int i = 0; i < keysList.size(); i++) {
         PartialRow splitRow = new PartialRow(schema);
         JsonArray compoundKey = keysList.getJsonArray(i);
-        if (compoundKey.size() != schema.getKeysCount()) {
+        if (compoundKey.size() != schema.getPrimaryKeyColumnCount()) {
           throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE +
               " Wrong number of keys.");
         }
         for (int j = 0; j < compoundKey.size(); j++) {
-          setKey(splitRow, schema.getColumn(j).getType(), compoundKey, j);
+          setKey(splitRow, schema.getColumnByIndex(j).getType(), compoundKey, j);
         }
         splitRows.add(splitRow);
       }
