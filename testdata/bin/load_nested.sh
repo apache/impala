@@ -261,6 +261,9 @@ ${SHELL_CMD} -q "
   STORED AS PARQUET
   AS SELECT * FROM $SOURCE_DATABASE.part;"
 
+# Hive runs out of heap space while writing tables in tpch_parquet_nested, bump up the
+# heap size for this cli call.
+export HADOOP_CLIENT_OPTS="-Xmx2g"
 # Hive is used to convert the data into parquet and drop all the temp tables.
 # The Hive SET values are necessary to prevent Impala remote reads of parquet files.
 # These values are taken from http://blog.cloudera.com/blog/2014/12/the-impala-cookbook.
