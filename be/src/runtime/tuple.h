@@ -169,12 +169,12 @@ class Tuple {
 
   /// Copy all referenced string and collection data by allocating memory from pool,
   /// copying data, then updating pointers in tuple to reference copied data.
-  void CopyVarlenData(const TupleDescriptor& desc, MemPool* pool);
+  void DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool);
 
   /// Copies all referenced string and collection data into 'data'. Increments 'data' and
   /// 'offset' by the number of bytes written. Recursively writes collection tuple data
   /// and referenced collection and string data.
-  void CopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
+  void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
 };
 

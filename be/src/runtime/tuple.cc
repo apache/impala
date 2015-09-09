@@ -75,10 +75,10 @@ Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
 // overhead.
 void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
   memcpy(dst, this, desc.byte_size());
-  dst->CopyVarlenData(desc, pool);
+  if (desc.HasVarlenSlots()) dst->DeepCopyVarlenData(desc, pool);
 }
 
-void Tuple::CopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
+void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
   // allocate then copy all non-null string and collection slots
   for (vector<SlotDescriptor*>::const_iterator slot = desc.string_slots().begin();
        slot != desc.string_slots().end(); ++slot) {
@@ -100,10 +100,11 @@ void Tuple::CopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
     uint8_t* array_data = reinterpret_cast<uint8_t*>(pool->Allocate(array_byte_size));
     memcpy(array_data, av->ptr, array_byte_size);
     if (!item_desc->HasVarlenSlots()) continue;
+
     for (int i = 0; i < av->num_tuples; ++i) {
       int item_offset = i * item_desc->byte_size();
       Tuple* dst_item = reinterpret_cast<Tuple*>(array_data + item_offset);
-      dst_item->CopyVarlenData(*item_desc, pool);
+      dst_item->DeepCopyVarlenData(*item_desc, pool);
     }
   }
 }
@@ -114,10 +115,10 @@ void Tuple::DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
   memcpy(dst, this, desc.byte_size());
   *data += desc.byte_size();
   *offset += desc.byte_size();
-  if (desc.HasVarlenSlots()) dst->CopyVarlenData(desc, data, offset, convert_ptrs);
+  if (desc.HasVarlenSlots()) dst->DeepCopyVarlenData(desc, data, offset, convert_ptrs);
 }
 
-void Tuple::CopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
+void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
     bool convert_ptrs) {
   vector<SlotDescriptor*>::const_iterator slot = desc.string_slots().begin();
   for (; slot != desc.string_slots().end(); ++slot) {
@@ -150,7 +151,7 @@ void Tuple::CopyVarlenData(const TupleDescriptor& desc, char** data, int* offset
     // Copy per-tuple varlen data if necessary.
     if (!item_desc.HasVarlenSlots()) continue;
     for (int i = 0; i < array_val->num_tuples; ++i) {
-      reinterpret_cast<Tuple*>(array_data)->CopyVarlenData(
+      reinterpret_cast<Tuple*>(array_data)->DeepCopyVarlenData(
           item_desc, data, offset, convert_ptrs);
       array_data += item_desc.byte_size();
     }
