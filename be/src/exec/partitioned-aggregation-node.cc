@@ -754,8 +754,10 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
 
   DCHECK(hash_partitions_.empty());
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    hash_partitions_.push_back(partition_pool_->Add(new Partition(this, level)));
-    RETURN_IF_ERROR(hash_partitions_[i]->InitStreams());
+    Partition* new_partition = new Partition(this, level);
+    DCHECK(new_partition != NULL);
+    hash_partitions_.push_back(partition_pool_->Add(new_partition));
+    RETURN_IF_ERROR(new_partition->InitStreams());
   }
   DCHECK_GT(state_->block_mgr()->num_reserved_buffers_remaining(block_mgr_client_), 0);
 

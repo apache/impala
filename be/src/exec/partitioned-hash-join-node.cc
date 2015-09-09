@@ -541,10 +541,10 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   }
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    hash_partitions_.push_back(partition_pool_->Add(
-        new Partition(state, this, level, using_small_buffers_)));
-    RETURN_IF_ERROR(
-        hash_partitions_[i]->build_rows()->Init(id(), runtime_profile(), true));
+    Partition* new_partition = new Partition(state, this, level, using_small_buffers_);
+    DCHECK(new_partition != NULL);
+    hash_partitions_.push_back(partition_pool_->Add(new_partition));
+    RETURN_IF_ERROR(new_partition->build_rows()->Init(id(), runtime_profile(), true));
 
     // Initialize a buffer for the probe here to make sure why have it if we need it.
     // While this is not strictly necessary (there are some cases where we won't need this
@@ -553,8 +553,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     // buffer, there is only a small range of build input sizes where this is beneficial
     // (an IO buffer size). It makes the logic much more complex to enable this
     // optimization.
-    RETURN_IF_ERROR(
-        hash_partitions_[i]->probe_rows()->Init(id(), runtime_profile(), false));
+    RETURN_IF_ERROR(new_partition->probe_rows()->Init(id(), runtime_profile(), false));
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
@@ -758,8 +757,10 @@ int64_t PartitionedHashJoinNode::LargestSpilledPartition() const {
   int64_t max_rows = 0;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
+    DCHECK(partition != NULL) << i << " " << hash_partitions_.size();
     if (partition->is_spilled()) {
       int64_t rows = partition->build_rows()->num_rows();
+      rows += partition->probe_rows()->num_rows();
       if (rows > max_rows) max_rows = rows;
     }
   }
