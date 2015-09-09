@@ -1,0 +1,45 @@
+====
+---- QUERY
+# Query is allowed because it only references scalars.
+select * from complextypestbl
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+---- TYPES
+bigint
+====
+---- QUERY
+# Query is allowed because it executes without a subplan.
+select * from complextypestbl.int_array
+---- RESULTS
+-1
+1
+1
+2
+2
+3
+3
+NULL
+NULL
+NULL
+---- TYPES
+int
+====
+---- QUERY
+# Query is not supported because it requires a subplan.
+select item from complextypestbl t, t.int_array
+---- CATCH
+Query referencing nested types is not supported because the --enable_partitioned_hash_join and/or --enable_partitioned_aggregation Impala Daemon start-up flags are set to false.
+====
+---- QUERY
+# Query is not supported because it requires a subplan.
+select key, value from complextypestbl t, t.int_map
+---- CATCH
+Query referencing nested types is not supported because the --enable_partitioned_hash_join and/or --enable_partitioned_aggregation Impala Daemon start-up flags are set to false.
+====

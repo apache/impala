@@ -331,6 +331,13 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new SingularRowSrcNode(pool, tnode, descs));
       break;
     case TPlanNodeType::SUBPLAN_NODE:
+      if (!FLAGS_enable_partitioned_hash_join || !FLAGS_enable_partitioned_aggregation) {
+        error_msg << "Query referencing nested types is not supported because the "
+            << "--enable_partitioned_hash_join and/or --enable_partitioned_aggregation "
+            << "Impala Daemon start-up flags are set to false.\nTo enable nested types "
+            << "support please set those flags to true (they are enabled by default).";
+        return Status(error_msg.str());
+      }
       *node = pool->Add(new SubplanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::UNNEST_NODE:
