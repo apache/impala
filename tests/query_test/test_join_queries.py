@@ -54,6 +54,12 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-nlj', new_vector)
 
+  def test_single_node_nested_loop_joins_exhaustive(self, vector):
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/single-node-nlj-exhaustive', new_vector)
+
 class TestTPCHJoinQueries(ImpalaTestSuite):
   # Uses the tpch dataset in order to have larger joins. Needed for example to test
   # the repartitioning codepaths.

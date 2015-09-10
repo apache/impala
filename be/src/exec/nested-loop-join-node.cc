@@ -19,6 +19,7 @@
 
 #include "exec/row-batch-cache.h"
 #include "exprs/expr.h"
+#include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/bitmap.h"
@@ -35,6 +36,7 @@ NestedLoopJoinNode::NestedLoopJoinNode(ObjectPool* pool, const TPlanNode& tnode,
   : BlockingJoinNode("NestedLoopJoinNode", tnode.nested_loop_join_node.join_op, pool,
         tnode, descs),
     build_batch_cache_(NULL),
+    build_batches_(NULL),
     current_build_row_idx_(0),
     matching_build_rows_(NULL),
     process_unmatched_build_rows_(false),
@@ -80,7 +82,9 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status NestedLoopJoinNode::Reset(RuntimeState* state) {
-  build_batches_.Reset();
+  raw_build_batches_.Reset();
+  copied_build_batches_.Reset();
+  build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
     delete matching_build_rows_;
     matching_build_rows_ = NULL;
@@ -95,7 +99,9 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state) {
 
 void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  build_batches_.Reset();
+  raw_build_batches_.Reset();
+  copied_build_batches_.Reset();
+  build_batches_ = NULL;
   Expr::Close(join_conjunct_ctxs_, state);
   if (matching_build_rows_ != NULL) {
     delete matching_build_rows_;
@@ -117,22 +123,57 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
     RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
     SCOPED_TIMER(build_timer_);
-    build_batches_.AddRowBatch(batch);
-    VLOG_ROW << Substitute("BuildList($0)",
-        build_batches_.DebugString(child(1)->row_desc()));
-    COUNTER_SET(build_row_counter_,
-        static_cast<int64_t>(build_batches_.total_num_rows()));
+    raw_build_batches_.AddRowBatch(batch);
+    if (batch->need_to_return()) {
+      // This batch and earlier batches may refer to resources passed from the child
+      // that aren't owned by the row batch itself. Deep copying ensures that the row
+      // batches are backed by memory owned by this node that is safe to hold on to.
+      DeepCopyBuildBatches(state);
+    }
+
+    VLOG_ROW << Substitute("raw_build_batches_: BuildList($0)",
+        raw_build_batches_.DebugString(child(1)->row_desc()));
+    VLOG_ROW << Substitute("copied_build_batches_: BuildList($0)",
+        copied_build_batches_.DebugString(child(1)->row_desc()));
+    COUNTER_SET(build_row_counter_, raw_build_batches_.total_num_rows() +
+        copied_build_batches_.total_num_rows());
   } while (!eos);
+
+  if (copied_build_batches_.total_num_rows() > 0) {
+    // To simplify things, we only want to process one list, so we need to copy
+    // the remaining raw batches.
+    DeepCopyBuildBatches(state);
+    build_batches_ = &copied_build_batches_;
+  } else {
+    // We didn't need to copy anything so we can just use raw batches.
+    build_batches_ = &raw_build_batches_;
+  }
 
   if (use_matching_build_rows_bitmap_) {
     // TODO Account for the memory used by the bitmap.
-    matching_build_rows_ = new Bitmap(build_batches_.total_num_rows());
+    matching_build_rows_ = new Bitmap(build_batches_->total_num_rows());
   }
   return Status::OK();
 }
 
+void NestedLoopJoinNode::DeepCopyBuildBatches(RuntimeState* state) {
+  for (RowBatchList::BatchIterator it = raw_build_batches_.BatchesBegin();
+    it != raw_build_batches_.BatchesEnd(); ++it) {
+    RowBatch* raw_batch = *it;
+    // TODO: it would be more efficient to do the deep copy within the same batch, rather
+    // than to a new batch.
+    RowBatch* copied_batch = build_batch_cache_->GetNextBatch();
+    raw_batch->DeepCopyTo(copied_batch);
+    copied_build_batches_.AddRowBatch(copied_batch);
+    // Reset raw batches as we go to free up memory if possible.
+    raw_batch->Reset();
+  }
+  raw_build_batches_.Reset();
+}
+
 Status NestedLoopJoinNode::InitGetNext(TupleRow* first_left_row) {
-  build_row_iterator_ = build_batches_.Iterator();
+  DCHECK(build_batches_ != NULL);
+  build_row_iterator_ = build_batches_->Iterator();
   current_build_row_idx_ = 0;
   matched_probe_ = false;
   return Status::OK();
@@ -194,7 +235,7 @@ end:
   if (eos_) {
     *eos = true;
     probe_batch_->TransferResourceOwnership(output_batch);
-    build_batches_.TransferResourceOwnership(output_batch);
+    build_batches_->TransferResourceOwnership(output_batch);
   }
   return Status::OK();
 }
@@ -465,7 +506,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
     RuntimeState* state, RowBatch* output_batch) {
   if (!process_unmatched_build_rows_) {
     // Reset the build row iterator to start processing the unmatched build rows.
-    build_row_iterator_ = build_batches_.Iterator();
+    build_row_iterator_ = build_batches_->Iterator();
     current_build_row_idx_ = 0;
     process_unmatched_build_rows_ = true;
   }
@@ -588,7 +629,7 @@ Status NestedLoopJoinNode::NextProbeRow(RuntimeState* state, RowBatch* output_ba
   }
   current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
   // We have a valid probe row; reset the build row iterator.
-  build_row_iterator_ = build_batches_.Iterator();
+  build_row_iterator_ = build_batches_->Iterator();
   current_build_row_idx_ = 0;
   VLOG_ROW << "left row: " << GetLeftChildRowString(current_probe_row_);
   return Status::OK();

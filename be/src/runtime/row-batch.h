@@ -175,6 +175,8 @@ class RowBatch {
   /// tree.
   void MarkNeedToReturn() { need_to_return_ = true; }
 
+  bool need_to_return() { return need_to_return_; }
+
   /// Transfer ownership of resources to dest.  This includes tuple data in mem
   /// pool and io buffers.
   void TransferResourceOwnership(RowBatch* dest);
@@ -207,6 +209,10 @@ class RowBatch {
   /// this up.
   /// TOOD: rename this or unify with TransferResourceOwnership()
   void AcquireState(RowBatch* src);
+
+  /// Deep copy all rows this row batch into dst, using memory allocated from
+  /// dst's tuple_data_pool_. Only valid when this row batch is empty.
+  void DeepCopyTo(RowBatch* dst);
 
   /// Create a serialized version of this row batch in output_batch, attaching all of the
   /// data it references to output_batch.tuple_data. This function attempts to

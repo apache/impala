@@ -35,6 +35,8 @@ class RowBatchList {
  public:
   RowBatchList() : total_num_rows_(0) { }
 
+  typedef std::vector<RowBatch*>::iterator BatchIterator;
+
   /// A simple iterator used to scan over all the rows stored in the list.
   class TupleRowIterator {
    public:
@@ -73,7 +75,7 @@ class RowBatchList {
     }
 
     RowBatchList* list_;
-    std::vector<RowBatch*>::iterator batch_it_;
+    BatchIterator batch_it_;
     int64_t row_idx_;
   };
 
@@ -120,6 +122,11 @@ class RowBatchList {
   TupleRowIterator Iterator() {
     return TupleRowIterator(this);
   }
+
+  /// Returns an iterator over the batches.
+  BatchIterator BatchesBegin() { return row_batches_.begin(); }
+
+  BatchIterator BatchesEnd() { return row_batches_.end(); }
 
  private:
   friend class TupleRowIterator;

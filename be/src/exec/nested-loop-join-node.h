@@ -35,6 +35,11 @@ class RowBatchCache;
 /// Operator to perform nested-loop join.
 /// This operator does not support spill to disk. Supports all join modes except
 /// null-aware left anti-join.
+/// This operator will operate in one of two modes depending on the memory ownership of
+/// row batches pulled from the child node on the build side. If the row batches own all
+/// tuple memory, the non-copying mode is used and row batches are simply accumulated in
+/// this node. If the batches reference tuple data they do not own, the copying mode is
+/// used and all data is deep copied into memory owned by this node.
 ///
 /// TODO: Add support for null-aware left-anti join.
 class NestedLoopJoinNode : public BlockingJoinNode {
@@ -63,8 +68,15 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   /// RowBatches after a Reset().
   RowBatchCache* build_batch_cache_;
 
-  /// List of build batches. The batches are owned by build_batch_pool_.
-  RowBatchList build_batches_;
+  /// List of build batches from child.
+  RowBatchList raw_build_batches_;
+
+  /// List of build batches that were deep copied and are backed by each row batch's pool.
+  RowBatchList copied_build_batches_;
+
+  /// Pointer to either raw_build_batches_ or copied_build_batches_ that contains the
+  /// batches to use during the probe phase.
+  RowBatchList* build_batches_;
 
   RowBatchList::TupleRowIterator build_row_iterator_;
 
@@ -133,6 +145,10 @@ class NestedLoopJoinNode : public BlockingJoinNode {
     DCHECK((current_probe_row_ == NULL) == (probe_batch_pos_ == 0));
     return current_probe_row_ != NULL;
   }
+
+  /// Deep copy all build batches in raw_build_batches_ to copied_build_batches_.
+  /// Resets all the source batches and clears raw_build_batches_.
+  void DeepCopyBuildBatches(RuntimeState* state);
 };
 
 }

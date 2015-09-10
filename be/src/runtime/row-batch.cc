@@ -398,6 +398,21 @@ void RowBatch::AcquireState(RowBatch* src) {
   auxiliary_mem_usage_ += src->tuple_data_pool_->total_allocated_bytes();
 }
 
+void RowBatch::DeepCopyTo(RowBatch* dst) {
+  DCHECK(dst->row_desc_.Equals(row_desc_));
+  DCHECK_EQ(dst->num_rows_, 0);
+  DCHECK_GE(dst->capacity_, num_rows_);
+  dst->AddRows(num_rows_);
+  for (int i = 0; i < num_rows_; ++i) {
+    TupleRow* src_row = GetRow(i);
+    TupleRow* dst_row = reinterpret_cast<TupleRow*>(dst->tuple_ptrs_ +
+        i * num_tuples_per_row_);
+    src_row->DeepCopy(dst_row, row_desc_.tuple_descriptors(),
+        dst->tuple_data_pool_.get(), false);
+  }
+  dst->CommitRows(num_rows_);
+}
+
 // TODO: consider computing size of batches as they are built up
 int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
   DCHECK(distinct_tuples == NULL || distinct_tuples->size() == 0);
