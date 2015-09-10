@@ -920,9 +920,11 @@ public class AuthorizationTest {
     // User has permissions.
     AuthzOk("drop database tpch");
     AuthzOk("drop database tpch cascade");
+    AuthzOk("drop database tpch restrict");
     // User has permissions, database does not exists and IF EXISTS specified.
     AuthzOk("drop database if exists newdb");
     AuthzOk("drop database if exists newdb cascade");
+    AuthzOk("drop database if exists newdb restrict");
     // User has permission, database does not exists, IF EXISTS not specified.
     try {
       AuthzOk("drop database newdb");
@@ -936,6 +938,12 @@ public class AuthorizationTest {
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
     }
+    try {
+      AuthzOk("drop database newdb restrict");
+      fail("Expected analysis error");
+    } catch (AnalysisException e) {
+      Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
+    }
 
     // Database exists, user doesn't have permission to drop.
     AuthzError("drop database functional",
@@ -944,6 +952,8 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'DROP' on: functional");
     AuthzError("drop database if exists functional cascade",
         "User '%s' does not have privileges to execute 'DROP' on: functional");
+    AuthzError("drop database if exists functional restrict",
+        "User '%s' does not have privileges to execute 'DROP' on: functional");
 
     // Database does not exist, user doesn't have permission to drop.
     AuthzError("drop database nodb",
@@ -951,6 +961,8 @@ public class AuthorizationTest {
     AuthzError("drop database if exists nodb",
         "User '%s' does not have privileges to execute 'DROP' on: nodb");
     AuthzError("drop database if exists nodb cascade",
+        "User '%s' does not have privileges to execute 'DROP' on: nodb");
+    AuthzError("drop database if exists nodb restrict",
         "User '%s' does not have privileges to execute 'DROP' on: nodb");
 
     AuthzError("drop database _impala_builtins",

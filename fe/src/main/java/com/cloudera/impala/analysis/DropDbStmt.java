@@ -20,7 +20,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropDbParams;
 
 /**
- * Represents a DROP [IF EXISTS] DATABASE [CASCADE] statement
+ * Represents a DROP [IF EXISTS] DATABASE [CASCADE | RESTRICT] statement
  */
 public class DropDbStmt extends StatementBase {
   private final String dbName_;

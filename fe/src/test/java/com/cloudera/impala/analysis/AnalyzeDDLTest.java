@@ -830,6 +830,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   public void TestDrop() throws AnalysisException {
     AnalyzesOk("drop database functional");
     AnalyzesOk("drop database functional cascade");
+    AnalyzesOk("drop database functional restrict");
     AnalyzesOk("drop table functional.alltypes");
     AnalyzesOk("drop view functional.alltypes_view");
 
@@ -839,6 +840,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Database does not exist: db_does_not_exist");
     AnalysisError("drop database db_does_not_exist cascade",
         "Database does not exist: db_does_not_exist");
+    AnalysisError("drop database db_does_not_exist restrict",
+        "Database does not exist: db_does_not_exist");
     AnalysisError("drop table db_does_not_exist.alltypes",
         "Database does not exist: db_does_not_exist");
     AnalysisError("drop view db_does_not_exist.alltypes_view",
@@ -847,6 +850,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("drop database `???`",
         "Database does not exist: ???");
     AnalysisError("drop database `???` cascade",
+        "Database does not exist: ???");
+    AnalysisError("drop database `???` restrict",
         "Database does not exist: ???");
     AnalysisError("drop table functional.`%^&`",
         "Table does not exist: functional.%^&");
@@ -863,6 +868,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // No error is thrown if the user specifies IF EXISTS
     AnalyzesOk("drop database if exists db_does_not_exist");
     AnalyzesOk("drop database if exists db_does_not_exist cascade");
+    AnalyzesOk("drop database if exists db_does_not_exist restrict");
 
     // No error is thrown if the database does not exist
     AnalyzesOk("drop table if exists db_does_not_exist.alltypes");
