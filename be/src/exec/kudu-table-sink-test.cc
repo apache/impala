@@ -171,7 +171,7 @@ class KuduTableSinkTest : public testing::Test {
       int skip_val) {
     kudu::client::KuduScanner scanner(kudu_test_helper_.table().get());
     scanner.SetReadMode(kudu::client::KuduScanner::READ_AT_SNAPSHOT);
-    scanner.SetOrderMode(kudu::client::KuduScanner::ORDERED);
+    scanner.SetFaultTolerant();
     KUDU_ASSERT_OK(scanner.Open());
     int row_idx = 0;
     while (scanner.HasMoreRows()) {
