@@ -42,7 +42,9 @@ class TupleDescriptor;
 /// A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
 /// The maximum number of rows is fixed at the time of construction.
 /// The row batch reference a few different sources of memory.
-///   1. TupleRow ptrs - this is always owned and managed by the row batch.
+///   1. TupleRow ptrs - may be malloc'd and owned by the RowBatch or allocated from
+///      the tuple pool, depending on whether legacy joins and aggs are enabled.
+///      See the comment on tuple_ptrs_ for more details.
 ///   2. Tuple memory - this is allocated (or transferred to) the row batches tuple pool.
 ///   3. Auxiliary tuple memory (e.g. string data) - this can either be stored externally
 ///      (don't copy strings) or from the tuple pool (strings are copied).  If external,
@@ -266,8 +268,22 @@ class RowBatch {
   int num_tuples_per_row_;
   RowDescriptor row_desc_;
 
-  /// array of pointers (w/ capacity_ * num_tuples_per_row_ elements)
-  /// TODO: replace w/ tr1 array?
+  /// Array of pointers with capacity_ * num_tuples_per_row_ elements.
+  /// The memory ownership depends on whether legacy joins and aggs are enabled.
+  ///
+  /// Memory is malloc'd and owned by RowBatch:
+  /// If enable_partitioned_hash_join=true and enable_partitioned_aggregation=true
+  /// then the memory is owned by this RowBatch and is freed upon its destruction.
+  /// This mode is more performant especially with SubplanNodes in the ExecNode tree
+  /// because the tuple pointers are not transferred and do not have to be re-created
+  /// in every Reset().
+  ///
+  /// Memory is allocated from MemPool:
+  /// Otherwise, the memory is allocated from tuple_data_pool_. As a result, the
+  /// pointer memory is transferred just like tuple data, and must be re-created
+  /// in Reset(). This mode is required for the legacy join and agg which rely on
+  /// the tuple pointers being allocated from the tuple_data_pool_, so they can
+  /// acquire ownership of the tuple pointers.
   Tuple** tuple_ptrs_;
   int tuple_ptrs_size_;
 

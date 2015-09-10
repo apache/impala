@@ -160,7 +160,7 @@ select 1
 set mem_limit=1
 ====
 ---- QUERY
-select 1
+select count(string_col) from functional.alltypestiny
 ---- CATCH
 Memory limit exceeded
 ====
@@ -169,7 +169,9 @@ Memory limit exceeded
 set mem_limit=0
 ====
 ---- QUERY
-select 1
+select count(string_col) from functional.alltypestiny
 ---- RESULTS
-1
+8
+---- TYPES
+BIGINT
 ====

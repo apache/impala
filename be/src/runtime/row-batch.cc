@@ -28,6 +28,10 @@
 
 #include "common/names.h"
 
+// Used to determine memory ownership of a RowBatch's tuple pointers.
+DECLARE_bool(enable_partitioned_hash_join);
+DECLARE_bool(enable_partitioned_aggregation);
+
 namespace impala {
 
 const int RowBatch::AT_CAPACITY_MEM_USAGE = 8 * 1024 * 1024;
@@ -46,7 +50,12 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
   DCHECK(mem_tracker_ != NULL);
   DCHECK_GT(capacity, 0);
   tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
-  tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
+  } else {
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(
+        tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  }
 }
 
 // TODO: we want our input_batch's tuple_data to come from our (not yet implemented)
@@ -67,7 +76,12 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     tuple_data_pool_(new MemPool(mem_tracker)) {
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
-  tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
+  } else {
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(
+        tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  }
   uint8_t* tuple_data;
   if (input_batch.compression_type != THdfsCompression::NONE) {
     // Decompress tuple data into data pool
@@ -134,6 +148,11 @@ RowBatch::~RowBatch() {
   }
   for (int i = 0; i < blocks_.size(); ++i) {
     blocks_[i]->Delete();
+  }
+  if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
+    DCHECK(tuple_ptrs_ != NULL);
+    delete tuple_ptrs_;
+    tuple_ptrs_ = NULL;
   }
 }
 
@@ -300,7 +319,10 @@ void RowBatch::Reset() {
   blocks_.clear();
   tuple_streams_.clear();
   auxiliary_mem_usage_ = 0;
-  tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(
+        tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  }
   need_to_return_ = false;
 }
 
@@ -326,7 +348,9 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   blocks_.clear();
   dest->need_to_return_ |= need_to_return_;
   auxiliary_mem_usage_ = 0;
-  tuple_ptrs_ = NULL;
+  if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
+    tuple_ptrs_ = NULL;
+  }
   Reset();
 }
 
