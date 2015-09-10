@@ -116,6 +116,7 @@ class RowBatch {
   /// used in the limit case where more rows were added than necessary.
   void set_num_rows(int num_rows) {
     DCHECK_LE(num_rows, num_rows_);
+    DCHECK_GE(num_rows, 0);
     num_rows_ = num_rows;
   }
 

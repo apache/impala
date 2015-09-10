@@ -180,11 +180,12 @@ Status NestedLoopJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch,
   }
 
 end:
+  if (ReachedLimit()) {
+    output_batch->set_num_rows(
+        output_batch->num_rows() - (num_rows_returned_ - limit_));
+    eos_ = true;
+  }
   if (eos_) {
-    if (ReachedLimit()) {
-      output_batch->set_num_rows(
-          output_batch->num_rows() - (num_rows_returned_ - limit_));
-    }
     *eos = true;
     probe_batch_->TransferResourceOwnership(output_batch);
     build_batches_.TransferResourceOwnership(output_batch);

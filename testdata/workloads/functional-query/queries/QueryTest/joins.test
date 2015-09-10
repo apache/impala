@@ -552,3 +552,13 @@ on v1.int_col != v2.tinyint_col
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-2319: NLJ with limit
+select straight_join t1.id, t2.bool_col
+from functional.alltypes t1
+cross join functional.alltypes t2 where t1.id = 0 limit 1;
+---- RESULTS
+0,true
+---- TYPES
+INT,BOOLEAN
+====
