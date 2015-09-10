@@ -1,8 +1,8 @@
 ====
 ---- QUERY
--- Serializes collections over the network
+# Test sending collections through a broadcast exchange as the build of a hash join.
 select straight_join t1.id, m.key
-from complextypestbl t1, complextypestbl t2, t2.int_map m
+from complextypestbl t1 join [broadcast] complextypestbl t2, t2.int_map m
 where t1.id = t2.id
 ---- RESULTS
 1,'k1'
@@ -15,6 +15,176 @@ where t1.id = t2.id
 ---- TYPES
 bigint,string
 ====
+---- QUERY
+# Test top-n after a subplan flattening an array.
+select id, item from complextypestbl t, t.int_array
+order by id limit 5
+---- RESULTS
+1,1
+1,2
+1,3
+2,1
+2,NULL
+---- TYPES
+bigint,int
+====
+---- QUERY
+# Test top-n after a subplan flattening a map.
+select id, key, value from complextypestbl t, t.int_map_array.item
+order by id limit 3
+---- RESULTS
+1,'k1',1
+2,'k1',1
+2,'k3',NULL
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Test sort after a subplan that flattens a map.
+select id, key, value from complextypestbl t, t.int_map
+order by id
+---- RESULTS
+1,'k1',1
+1,'k2',100
+2,'k1',2
+2,'k2',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Test non-grouping aggregation after a subplan that flattens a map.
+select count(id), max(key), avg(value) from complextypestbl t, t.int_map
+---- RESULTS
+7,'k3',25.5
+---- TYPES
+bigint,string,double
+====
+---- QUERY
+# Test grouping aggregation after a subplan that flattens a map.
+select key, count(id), avg(value) from complextypestbl t, t.int_map
+group by key
+---- RESULTS
+'k1',4,0.6666666666666666
+'k2',2,100
+'k3',1,NULL
+---- TYPES
+string,bigint,double
+====
+---- QUERY
+# Test analytic function without partition by or order by on top of a subplan
+# that flattens a map.
+select id, avg(value) over (), max(key) over() from complextypestbl t, t.int_map
+---- RESULTS
+1,25.5,'k3'
+1,25.5,'k3'
+2,25.5,'k3'
+2,25.5,'k3'
+7,25.5,'k3'
+7,25.5,'k3'
+8,25.5,'k3'
+---- TYPES
+bigint,double,string
+====
+---- QUERY
+# Test analytic function with partition by on top of a subplan that flattens an array.
+select id, sum(item) over (partition by id) from complextypestbl t, t.int_array
+---- RESULTS
+1,6
+1,6
+1,6
+2,6
+2,6
+2,6
+2,6
+2,6
+2,6
+8,-1
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Test analytic function with partition by on top of a subplan that flattens a map.
+select id, max(key) over(partition by id), sum(value) over (partition by id)
+from complextypestbl t, t.int_map
+---- RESULTS
+1,'k2',101
+1,'k2',101
+2,'k2',2
+2,'k2',2
+7,'k3',NULL
+7,'k3',NULL
+8,'k1',-1
+---- TYPES
+bigint,string,bigint
+====
+---- QUERY
+# Test several analytic functions with incompatible partition by and order by clauses
+# on top of a subplan that flattens a map.
+select id, key, value, max(key) over(partition by id), row_number() over (order by value)
+from complextypestbl t, t.int_map
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'k1',1,'k2',2
+1,'k2',100,'k2',4
+2,'k1',2,'k2',3
+2,'k2',NULL,'k2',5
+7,'k1',NULL,'k3',6
+7,'k3',NULL,'k3',7
+8,'k1',-1,'k1',1
+---- TYPES
+bigint,string,int,string,bigint
+====
+---- QUERY
+# Test union of subplans.
+select id, "test" key, item from complextypestbl t, t.int_array
+union all
+select id, key, value from complextypestbl t, t.int_map
+---- RESULTS
+1,'k1',1
+1,'k2',100
+1,'test',1
+1,'test',2
+1,'test',3
+2,'k1',2
+2,'k2',NULL
+2,'test',1
+2,'test',2
+2,'test',3
+2,'test',NULL
+2,'test',NULL
+2,'test',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+8,'test',-1
+---- TYPES
+bigint,string,int
+====
+---- QUERY
+# Tesh union distinct of subplans.
+select id, "test" key, item from complextypestbl t, t.int_array
+union distinct
+select id, key, value from complextypestbl t, t.int_map
+---- RESULTS
+1,'k1',1
+1,'k2',100
+1,'test',1
+1,'test',2
+1,'test',3
+2,'k1',2
+2,'k2',NULL
+2,'test',1
+2,'test',2
+2,'test',3
+2,'test',NULL
+7,'k1',NULL
+7,'k3',NULL
+8,'k1',-1
+8,'test',-1
+---- TYPES
+bigint,string,int
 ====
 ---- QUERY
 # Tests that unnested collection-typed slots are set to NULL. Relies on DCHECKs in the
@@ -77,83 +247,6 @@ where t1.id = 1
 1,1,3,3
 ---- TYPES
 bigint,bigint,int,int
-====
----- QUERY
-# Test analytic function on top of a subplan that flattens an array.
-select id, sum(item) over (partition by id) from complextypestbl t, t.int_array
----- RESULTS
-1,6
-1,6
-1,6
-2,6
-2,6
-2,6
-2,6
-2,6
-2,6
-8,-1
----- TYPES
-bigint,bigint
-====
----- QUERY
-# Test analytic function on top of a subplan that flattens a map.
-select id, max(key) over(partition by id), sum(value) over (partition by id)
-from complextypestbl t, t.int_map
----- RESULTS
-1,'k2',101
-1,'k2',101
-2,'k2',2
-2,'k2',2
-7,'k3',NULL
-7,'k3',NULL
-8,'k1',-1
----- TYPES
-bigint,string,bigint
-====
----- QUERY
-# Tesh union of subplans.
-select id, item from complextypestbl t, t.int_array
-union all
-select id, value from complextypestbl t, t.int_map
----- RESULTS
-1,1
-1,1
-1,2
-1,3
-1,100
-2,1
-2,2
-2,2
-2,3
-2,NULL
-2,NULL
-2,NULL
-2,NULL
-7,NULL
-7,NULL
-8,-1
-8,-1
----- TYPES
-bigint,int
-====
----- QUERY
-# Tesh union distinct of subplans.
-select id, item from complextypestbl t, t.int_array
-union distinct
-select id, value from complextypestbl t, t.int_map
----- RESULTS
-1,1
-1,2
-1,3
-1,100
-2,1
-2,2
-2,3
-2,NULL
-7,NULL
-8,-1
----- TYPES
-bigint,int
 ====
 ---- QUERY
 # Test unnested collection from an outer-joined parent table.

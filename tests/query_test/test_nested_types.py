@@ -41,6 +41,10 @@ class TestNestedTypes(ImpalaTestSuite):
     """Queries that send collections through the execution runtime."""
     self.run_test_case('QueryTest/nested-types-runtime', vector)
 
+  def test_subplan(self, vector):
+    """Test subplans with various exec nodes inside it."""
+    self.run_test_case('QueryTest/nested-types-subplan', vector)
+
   def test_tpch(self, vector):
     """Queries over the larger nested TPCH dataset."""
     # This test takes a long time (minutes), only run in exhaustive

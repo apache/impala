@@ -1,0 +1,276 @@
+====
+---- QUERY
+use tpch_nested_parquet
+====
+---- QUERY
+# Basic subplan with an unnest + join.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c, c.c_orders o
+where c_custkey in (1, 2)
+---- RESULTS
+1,'BUILDING',454791,'1992-04-19'
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',3868359,'1992-08-22'
+1,'BUILDING',4273923,'1997-03-23'
+1,'BUILDING',4808192,'1996-06-29'
+1,'BUILDING',5133509,'1996-07-01'
+2,'AUTOMOBILE',430243,'1994-12-24'
+2,'AUTOMOBILE',1071617,'1995-03-10'
+2,'AUTOMOBILE',1374019,'1992-04-05'
+2,'AUTOMOBILE',1763205,'1994-08-28'
+2,'AUTOMOBILE',1842406,'1996-08-05'
+2,'AUTOMOBILE',2992930,'1994-05-21'
+2,'AUTOMOBILE',3986496,'1997-02-22'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Basic subplan with a predicate on parent and nested collection.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c, c.c_orders o
+where c_custkey in (1, 2) and o_orderkey % 2 = 0
+---- RESULTS
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',4808192,'1996-06-29'
+2,'AUTOMOBILE',1842406,'1996-08-05'
+2,'AUTOMOBILE',2992930,'1994-05-21'
+2,'AUTOMOBILE',3986496,'1997-02-22'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Test subplan with limit.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c, c.c_orders o
+where c_custkey = 1
+limit 3
+---- RESULTS
+1,regex:.*,regex:.*,regex:.*
+1,regex:.*,regex:.*,regex:.*
+1,regex:.*,regex:.*,regex:.*
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Subplan with a limit applied by the unnest inside the subplan.
+# Use regex as expected values because this test depends on the insertion
+# order of the orders in data loading which is non-deterministic.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c, (select * from c.c_orders limit 3) v
+where c_custkey < 4
+---- RESULTS
+1,regex:.+,regex:.+,regex:.+
+1,regex:.+,regex:.+,regex:.+
+1,regex:.+,regex:.+,regex:.+
+2,regex:.+,regex:.+,regex:.+
+2,regex:.+,regex:.+,regex:.+
+2,regex:.+,regex:.+,regex:.+
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Subplan with an unnest that evaluates a conjunct.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate, o_shippriority
+from customer c, (select *, coalesce(o_orderkey, o_shippriority) x from c.c_orders) v
+where c_custkey < 4 and x % 2 = 0
+---- RESULTS
+1,'BUILDING',579908,'1996-12-09',0
+1,'BUILDING',4808192,'1996-06-29',0
+2,'AUTOMOBILE',1842406,'1996-08-05',0
+2,'AUTOMOBILE',2992930,'1994-05-21',0
+2,'AUTOMOBILE',3986496,'1997-02-22',0
+---- TYPES
+bigint,string,bigint,string,int
+====
+---- QUERY
+# Subplan with select node on top of the unnest+limit.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c, (select * from c.c_orders limit 3) v
+where c_custkey < 4 and o_orderdate != ""
+---- RESULTS
+1,regex:.+,regex:.+,regex:.+
+1,regex:.+,regex:.+,regex:.+
+1,regex:.+,regex:.+,regex:.+
+2,regex:.+,regex:.+,regex:.+
+2,regex:.+,regex:.+,regex:.+
+2,regex:.+,regex:.+,regex:.+
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Top-n inside a subplan.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c, (select * from c.c_orders order by o_totalprice limit 2) v
+where c_custkey < 5
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',4808192,'1996-06-29'
+2,'AUTOMOBILE',430243,'1994-12-24'
+2,'AUTOMOBILE',1763205,'1994-08-28'
+4,'MACHINERY',1755398,'1997-06-12'
+4,'MACHINERY',2765152,'1996-08-11'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Union inside a subplan.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c,
+  (select * from c.c_orders where o_orderkey % 2 = 0
+   union all
+   select * from c.c_orders where o_orderkey % 2 = 1) v
+where c_custkey < 4
+---- RESULTS
+1,'BUILDING',454791,'1992-04-19'
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',3868359,'1992-08-22'
+1,'BUILDING',4273923,'1997-03-23'
+1,'BUILDING',4808192,'1996-06-29'
+1,'BUILDING',5133509,'1996-07-01'
+2,'AUTOMOBILE',430243,'1994-12-24'
+2,'AUTOMOBILE',1071617,'1995-03-10'
+2,'AUTOMOBILE',1374019,'1992-04-05'
+2,'AUTOMOBILE',1763205,'1994-08-28'
+2,'AUTOMOBILE',1842406,'1996-08-05'
+2,'AUTOMOBILE',2992930,'1994-05-21'
+2,'AUTOMOBILE',3986496,'1997-02-22'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Non-grouping aggregation inside subplan.
+select c_custkey, v.* from customer c,
+  (select count(o_orderkey) c, sum(o_totalprice) s, avg(o_totalprice) a,
+          max(o_orderstatus) mx, min(o_orderdate) mn
+   from c.c_orders) v
+where c_custkey < 4
+---- RESULTS
+1,6,587762.91,97960.48,'O','1992-04-19'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+3,0,NULL,NULL,'NULL','NULL'
+---- TYPES
+bigint,bigint,decimal,decimal,string,string
+====
+---- QUERY
+# Non-grouping count(*) aggregation inside subplan.
+# Test count(*) in isolation to test a collection table ref with an item tuple
+# that has no materialized slots.
+select c_custkey, v.* from customer c,
+  (select count(*) cnt from c.c_orders) v
+where c_custkey < 4
+---- RESULTS
+1,6
+2,7
+3,0
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Non-grouping count(*) aggregation inside subplan.
+# Test count(*) in isolation to test a collection table ref with an item tuple
+# that has no materialized slots.
+select c_custkey, v.* from customer c,
+  (select count(*) cnt from c.c_orders.o_lineitems) v
+where c_custkey < 4
+---- RESULTS
+1,15
+2,26
+3,0
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Test grouping aggregation inside a subplan.
+select c_custkey, v.* from customer c,
+  (select o_orderpriority, count(o_orderkey) c, sum(o_totalprice) s,
+          avg(o_totalprice) a, max(o_orderstatus) mx,
+          min(o_orderdate) mn
+   from c.c_orders
+   group by o_orderpriority) v
+where c_custkey < 4
+---- RESULTS
+1,'1-URGENT',2,249248.75,124624.37,'O','1992-04-19'
+1,'2-HIGH',1,65478.05,65478.05,'O','1996-06-29'
+1,'3-MEDIUM',1,95911.01,95911.01,'O','1997-03-23'
+1,'5-LOW',2,177125.10,88562.55,'O','1992-08-22'
+2,'1-URGENT',4,670495.57,167623.89,'O','1992-04-05'
+2,'2-HIGH',1,221397.35,221397.35,'P','1995-03-10'
+2,'4-NOT SPECIFIED',2,136380.51,68190.25,'F','1994-05-21'
+---- TYPES
+bigint,string,bigint,decimal,decimal,string,string
+====
+---- QUERY
+# Test hash join inside a subplan.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c,
+  (select o1.o_orderkey, o2.o_orderdate
+   from c.c_orders o1, c.c_orders o2
+   where o1.o_orderkey = o2.o_orderkey) v
+where c_custkey < 4
+---- RESULTS
+1,'BUILDING',454791,'1992-04-19'
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',3868359,'1992-08-22'
+1,'BUILDING',4273923,'1997-03-23'
+1,'BUILDING',4808192,'1996-06-29'
+1,'BUILDING',5133509,'1996-07-01'
+2,'AUTOMOBILE',430243,'1994-12-24'
+2,'AUTOMOBILE',1071617,'1995-03-10'
+2,'AUTOMOBILE',1374019,'1992-04-05'
+2,'AUTOMOBILE',1763205,'1994-08-28'
+2,'AUTOMOBILE',1842406,'1996-08-05'
+2,'AUTOMOBILE',2992930,'1994-05-21'
+2,'AUTOMOBILE',3986496,'1997-02-22'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Nested subplans with predicates on every table ref.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate, l_linenumber, l_shipdate
+from customer c, c.c_orders o, o.o_lineitems i
+where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019) and l_linenumber % 2 = 0
+---- RESULTS
+1,'BUILDING',4808192,'1996-06-29',2,'1996-09-15'
+2,'AUTOMOBILE',1374019,'1992-04-05',2,'1992-06-21'
+2,'AUTOMOBILE',1374019,'1992-04-05',4,'1992-07-06'
+---- TYPES
+bigint,string,bigint,string,int,string
+====
+---- QUERY
+# IMPALA-2289: Test proper handling of AtCapacity() inside the subplan node.
+# Setting the number of nodes to 1 makes it very likely to hit the once buggy
+# code path because a single scan node instance must process all input files.
+set num_nodes=1;
+select c_custkey, o_orderkey
+from customer c left outer join c.c_orders
+where c_custkey = 67974;
+---- RESULTS
+67974,NULL
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Set the num_nodes query option back to its default value.
+set num_nodes=0
+---- RESULTS
+---- TYPES
+string,string
+====
+---- QUERY
+# IMPALA-2289: Test nested-loop join with right anti join mode inside a subplan.
+select count(*) from customer c left anti join c.c_orders
+where c_custkey between 8000 and 10000
+---- RESULTS
+667
+---- TYPES
+bigint
+====
+---- QUERY
+# IMPALA-2289: Test nested-loop join with left anti join mode inside a subplan.
+select straight_join count(*) from customer c left anti join c.c_orders
+where c_custkey between 8000 and 10000
+---- RESULTS
+667
+---- TYPES
+bigint
+====

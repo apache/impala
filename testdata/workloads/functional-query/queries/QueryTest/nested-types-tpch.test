@@ -3,90 +3,6 @@
 use tpch_nested_parquet
 ====
 ---- QUERY
-select c_custkey, o_orderkey
-from tpch_nested_parquet.customer c, c.c_orders o
-where c_custkey in (1, 2)
----- RESULTS
-2,3986496
-2,430243
-2,2992930
-2,1842406
-2,1374019
-2,1071617
-2,1763205
-1,579908
-1,4808192
-1,3868359
-1,4273923
-1,5133509
-1,454791
----- TYPES
-bigint,bigint
-====
----- QUERY
-# Relational version of above query (same results)
-select c_custkey, o_orderkey
-from tpch_parquet.customer c join tpch_parquet.orders o on c_custkey = o_custkey
-where c_custkey in (1, 2)
----- RESULTS
-2,3986496
-2,430243
-2,2992930
-2,1842406
-2,1374019
-2,1071617
-2,1763205
-1,579908
-1,4808192
-1,3868359
-1,4273923
-1,5133509
-1,454791
----- TYPES
-bigint,bigint
-====
----- QUERY
-select c_custkey, o_orderkey, l_linenumber
-from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
-where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
----- RESULTS
-2,1374019,1
-2,1374019,2
-2,1374019,3
-2,1374019,4
-2,1374019,5
-1,4808192,1
-1,4808192,2
----- TYPES
-bigint,bigint,int
-====
----- QUERY
-# Relational version of above query (same results)
-select c_custkey, o_orderkey, l_linenumber
-from tpch_parquet.customer c join tpch_parquet.orders o on c_custkey = o_custkey
-join tpch_parquet.lineitem on o_orderkey = l_orderkey
-where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
----- RESULTS
-2,1374019,1
-2,1374019,2
-2,1374019,3
-2,1374019,4
-2,1374019,5
-1,4808192,1
-1,4808192,2
----- TYPES
-bigint,bigint,int
-====
----- QUERY
-select count(l_linenumber)
-from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
-where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
----- RESULTS
-7
----- TYPES
-bigint
-====
----- QUERY
 select count(*)
 from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
 where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
@@ -128,24 +44,6 @@ select count(l_linenumber) from tpch_parquet.lineitem
 bigint
 ====
 ---- QUERY
-select c_custkey, cnt from tpch_nested_parquet.customer c,
-  (select count(*) cnt from c.c_orders) v
-where c_custkey < 10
-order by c_custkey
----- RESULTS
-1,6
-2,7
-3,0
-4,20
-5,4
-6,0
-7,16
-8,13
-9,0
----- TYPES
-bigint,bigint
-====
----- QUERY
 # Relational version (almost) of above query
 select c_custkey, count(*)
 from tpch_parquet.customer join tpch_parquet.orders on c_custkey = o_custkey
@@ -173,44 +71,6 @@ where c_custkey < 10 order by c_custkey
 bigint
 ====
 ---- QUERY
-# IMPALA-2289: Test proper handling of AtCapacity() inside the subplan node.
-# Setting the number of nodes to 1 makes it very likely to hit the once buggy
-# code path because a single scan node instance must process all input files.
-set num_nodes=1;
-select c_custkey, o_orderkey
-from tpch_nested_parquet.customer c left outer join c.c_orders
-where c_custkey = 67974;
----- RESULTS
-67974,NULL
----- TYPES
-bigint,bigint
-====
----- QUERY
-# Set the num_nodes query option back to its default value.
-set num_nodes=0
----- RESULTS
----- TYPES
-string,string
-====
----- QUERY
-# IMPALA-2289: Test nested-loop join with right anti join mode inside a subplan.
-select count(*) from tpch_nested_parquet.customer c left anti join c.c_orders
-where c_custkey between 8000 and 10000
----- RESULTS
-667
----- TYPES
-bigint
-====
----- QUERY
-# IMPALA-2289: Test nested-loop join with left anti join mode inside a subplan.
-select straight_join count(*) from tpch_nested_parquet.customer c left anti join c.c_orders
-where c_custkey between 8000 and 10000
----- RESULTS
-667
----- TYPES
-bigint
-====
----- QUERY
 # Exercise TOP-N node with array data
 select c_custkey, c_name, o_orderkey, o_orderpriority
 from tpch_nested_parquet.customer c, c.c_orders o
@@ -228,65 +88,6 @@ limit 10;
 79,'Customer#000000079',400101,'1-URGENT'
 79,'Customer#000000079',410595,'1-URGENT'
 65,'Customer#000000065',438881,'1-URGENT'
----- TYPES
-bigint,string,bigint,string
-====
----- QUERY
-# TODO: These tests will be re-organized when adding more functional tests.
-# Test subplan with limit.
-select c_custkey, c_mktsegment, o_orderkey, o_orderdate
-from customer c, c.c_orders o
-where c_custkey = 1
-limit 3
----- RESULTS
-1,regex:.*,regex:.*,regex:.*
-1,regex:.*,regex:.*,regex:.*
-1,regex:.*,regex:.*,regex:.*
----- TYPES
-bigint,string,bigint,string
-====
----- QUERY
-# Test grouping aggregation inside a subplan.
-select c_custkey, v.* from customer c,
-  (select o_orderpriority, count(o_orderkey) c, sum(o_totalprice) s,
-          avg(o_totalprice) a, max(o_orderstatus) mx,
-          min(o_orderdate) mn
-   from c.c_orders
-   group by o_orderpriority) v
-where c_custkey < 4
----- RESULTS
-1,'1-URGENT',2,249248.75,124624.37,'O','1992-04-19'
-1,'2-HIGH',1,65478.05,65478.05,'O','1996-06-29'
-1,'3-MEDIUM',1,95911.01,95911.01,'O','1997-03-23'
-1,'5-LOW',2,177125.10,88562.55,'O','1992-08-22'
-2,'1-URGENT',4,670495.57,167623.89,'O','1992-04-05'
-2,'2-HIGH',1,221397.35,221397.35,'P','1995-03-10'
-2,'4-NOT SPECIFIED',2,136380.51,68190.25,'F','1994-05-21'
----- TYPES
-bigint,string,bigint,decimal,decimal,string,string
-====
----- QUERY
-# Test hash join inside a subplan.
-select c_custkey, c_mktsegment, o_orderkey, o_orderdate
-from customer c,
-  (select o1.o_orderkey, o2.o_orderdate
-   from c.c_orders o1, c.c_orders o2
-   where o1.o_orderkey = o2.o_orderkey) v
-where c_custkey < 4
----- RESULTS
-1,'BUILDING',454791,'1992-04-19'
-1,'BUILDING',579908,'1996-12-09'
-1,'BUILDING',3868359,'1992-08-22'
-1,'BUILDING',4273923,'1997-03-23'
-1,'BUILDING',4808192,'1996-06-29'
-1,'BUILDING',5133509,'1996-07-01'
-2,'AUTOMOBILE',430243,'1994-12-24'
-2,'AUTOMOBILE',1071617,'1995-03-10'
-2,'AUTOMOBILE',1374019,'1992-04-05'
-2,'AUTOMOBILE',1763205,'1994-08-28'
-2,'AUTOMOBILE',1842406,'1996-08-05'
-2,'AUTOMOBILE',2992930,'1994-05-21'
-2,'AUTOMOBILE',3986496,'1997-02-22'
 ---- TYPES
 bigint,string,bigint,string
 ====
