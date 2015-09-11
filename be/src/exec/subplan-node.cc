@@ -13,17 +13,11 @@
 // limitations under the License.
 
 #include "exec/subplan-node.h"
-
-#include <algorithm>
 #include "exec/singular-row-src-node.h"
 #include "exec/subplan-node.h"
 #include "exec/unnest-node.h"
-#include "exprs/slot-ref.h"
-#include "exprs/expr-context.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-
-using std::find;
 
 namespace impala {
 
@@ -41,47 +35,26 @@ SubplanNode::SubplanNode(ObjectPool* pool, const TPlanNode& tnode,
 Status SubplanNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
   DCHECK_EQ(children_.size(), 2);
+  SetContainingSubplan(this, child(1));
   return Status::OK();
 }
 
-void SubplanNode::SetContainingSubplan(SubplanNode* ancestor, ExecNode* node,
-    RuntimeState* state) {
+void SubplanNode::SetContainingSubplan(SubplanNode* ancestor, ExecNode* node) {
   node->set_containing_subplan(ancestor);
-  if (node->type() == TPlanNodeType::UNNEST_NODE) {
-    // Gather the collection-typed slots that are unnested in this subplan.
-    UnnestNode* unnestNode = static_cast<UnnestNode*>(node);
-    DCHECK(unnestNode->array_expr_ctx_->root()->is_slotref());
-    const SlotRef* slot_ref = static_cast<SlotRef*>(unnestNode->array_expr_ctx_->root());
-    const SlotDescriptor* array_slot_desc =
-        state->desc_tbl().GetSlotDescriptor(slot_ref->slot_id());
-    DCHECK(array_slot_desc != NULL);
-    // Make sure that a collection-typed slot is only referenced once.
-    DCHECK(find(unnested_array_slots_.begin(), unnested_array_slots_.end(),
-        array_slot_desc) == unnested_array_slots_.end());
-    unnested_array_slots_.push_back(array_slot_desc);
-    // Find and cache the corresponding tuple index.
-    const RowDescriptor& input_row_desc = children_[0]->row_desc();
-    int tuple_idx = input_row_desc.GetTupleIdx(array_slot_desc->parent()->id());
-    unnested_array_tuple_idxs_.push_back(tuple_idx);
-  }
   if (node->type() == TPlanNodeType::SUBPLAN_NODE) {
     // Only traverse the first child and not the second one, because the Subplan
     // parent of nodes inside it should be 'node' and not 'ancestor'.
-    SetContainingSubplan(ancestor, node->child(0), state);
+    SetContainingSubplan(ancestor, node->child(0));
   } else {
     int num_children = node->num_children();
     for (int i = 0; i < num_children; ++i) {
-      SetContainingSubplan(ancestor, node->child(i), state);
+      SetContainingSubplan(ancestor, node->child(i));
     }
   }
 }
 
 Status SubplanNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  // Set the containing subplan before calling ExecNode::Prepare() because
-  // the Prepare() of our children rely on it.
-  DCHECK(unnested_array_slots_.empty());
-  SetContainingSubplan(this, child(1), state);
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   input_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
@@ -103,14 +76,6 @@ Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
   while (true) {
     if (subplan_is_open_) {
       if (subplan_eos_) {
-        // Poor man's projection of the unnested slots.
-        DCHECK_EQ(unnested_array_slots_.size(), unnested_array_tuple_idxs_.size());
-        DCHECK(current_input_row_ != NULL);
-        for (int i = 0; i < unnested_array_slots_.size(); ++i) {
-          Tuple* tuple = current_input_row_->GetTuple(unnested_array_tuple_idxs_[i]);
-          if (tuple == NULL) continue;
-          tuple->SetNull(unnested_array_slots_[i]->null_indicator_offset());
-        }
         // Reset the subplan before opening it again. At this point, all resources from
         // the subplan are assumed to have been transferred to the output row_batch.
         RETURN_IF_ERROR(child(1)->Reset(state));

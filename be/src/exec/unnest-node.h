@@ -27,6 +27,18 @@ class TupleDescriptor;
 /// tuple - the collection's item tuple.
 /// An UnnestNode does not have children and can only appear in the right child of a
 /// SubplanNode. The UnnestNode gets its 'input' from its containing SubplanNode.
+///
+/// Projection: Collection-typed slots are expensive to copy, e.g., during data exchanges
+/// or when writing into a buffered-tuple-stream. Such slots are often duplicated many
+/// times after unnesting in a SubplanNode. To alleviate this problem, we set the
+/// collection-typed slot to be unnested in this node to NULL immediately after
+/// evaluating its SlotRef. Setting the slot to NULL as early as possible ensures that
+/// all rows returned by the containing SubplanNode will have the slot set to NULL.
+/// The FE guarantees that the contents of any collection-typed slot are never referenced
+/// outside of a single UnnestNode, so setting such a slot to NULL is safe after the
+/// UnnestNode has retrieved the array value from the corresponding slot.
+/// TODO: Setting the collection-typed slots to NULL should be replaced by a proper
+/// projection at materialization points.
 class UnnestNode : public ExecNode {
  public:
   UnnestNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -48,6 +60,13 @@ class UnnestNode : public ExecNode {
   /// current row of the containing subplan node, and is currently always a SlotRef into
   /// an array-typed slot.
   ExprContext* array_expr_ctx_;
+
+  /// Descriptor of the array-typed slot referenced by array_expr_ctx_. Set in Prepare().
+  /// This slot is set to NULL in Open() immediately after evaluating array_expr_ctx_.
+  const SlotDescriptor* array_slot_desc_;
+
+  /// Tuple index corresponding to array_slot_desc_. Set in Prepare().
+  int array_tuple_idx_;
 
   /// Current evaluation of array_expr_ctx_. Set in Open().
   ArrayVal array_val_;

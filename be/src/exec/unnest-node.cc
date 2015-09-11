@@ -16,6 +16,7 @@
 #include "exec/unnest-node.h"
 #include "exec/subplan-node.h"
 #include "exprs/expr-context.h"
+#include "exprs/slot-ref.h"
 #include "runtime/runtime-state.h"
 #include "util/runtime-profile.h"
 
@@ -26,6 +27,8 @@ UnnestNode::UnnestNode(ObjectPool* pool, const TPlanNode& tnode,
   : ExecNode(pool, tnode, descs),
     item_byte_size_(0),
     array_expr_ctx_(NULL),
+    array_slot_desc_(NULL),
+    array_tuple_idx_(-1),
     array_val_(ArrayVal::null()),
     item_idx_(0),
     num_collections_(0),
@@ -65,6 +68,15 @@ Status UnnestNode::Prepare(RuntimeState* state) {
   item_byte_size_ = item_tuple_desc->byte_size();
   RETURN_IF_ERROR(array_expr_ctx_->Prepare(
       state, containing_subplan_->child(0)->row_desc(), expr_mem_tracker()));
+
+  // Set the array_slot_desc_ and the corresponding tuple index used for projection.
+  DCHECK(array_expr_ctx_->root()->is_slotref());
+  const SlotRef* slot_ref = static_cast<SlotRef*>(array_expr_ctx_->root());
+  array_slot_desc_ = state->desc_tbl().GetSlotDescriptor(slot_ref->slot_id());
+  DCHECK(array_slot_desc_ != NULL);
+  const RowDescriptor& row_desc = containing_subplan_->child(0)->row_desc();
+  array_tuple_idx_ = row_desc.GetTupleIdx(array_slot_desc_->parent()->id());
+
   return Status::OK();
 }
 
@@ -75,6 +87,10 @@ Status UnnestNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(array_expr_ctx_->Open(state));
   // Set the array value to be unnested.
   array_val_ = array_expr_ctx_->GetArrayVal(containing_subplan_->current_row());
+
+  // Projection: Set the slot containing the array value to NULL.
+  Tuple* tuple = containing_subplan_->current_input_row_->GetTuple(array_tuple_idx_);
+  if (tuple != NULL) tuple->SetNull(array_slot_desc_->null_indicator_offset());
 
   ++num_collections_;
   COUNTER_SET(num_collections_counter_, num_collections_);
