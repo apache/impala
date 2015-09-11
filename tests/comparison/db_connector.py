@@ -485,8 +485,9 @@ class DbConnection(object):
 
     return sql
 
-  def begin_bulk_load_table(self, table):
-    self.create_table(table)
+  def begin_bulk_load_table(self, table, create_tables):
+    if create_tables:
+      self.create_table(table)
     self._bulk_load_table = table
     if not self._bulk_load_data_file:
       self._bulk_load_data_file = NamedTemporaryFile()
@@ -510,7 +511,7 @@ class DbConnection(object):
     if data:
       self._bulk_load_data_file.writelines(data)
 
-  def end_bulk_load_table(self):
+  def end_bulk_load_table(self, create_tables):
     self._bulk_load_data_file.flush()
 
   #########################################
@@ -711,14 +712,16 @@ class ImpalaDbConnection(DbConnection):
   def hdfs_file_path(self):
     return self.hdfs_db_dir + '/%s/data' % self._bulk_load_table.name
 
-  def begin_bulk_load_table(self, table):
-    if table.storage_format.upper() == 'TEXTFILE':
+  def begin_bulk_load_table(self, table, create_tables):
+    if create_tables and table.storage_format.upper() == 'TEXTFILE':
+      # New Text table, simply copy the file over.
       self._bulk_load_table = table
-      super(ImpalaDbConnection, self).begin_bulk_load_table(table)
+      super(ImpalaDbConnection, self).begin_bulk_load_table(table, create_tables)
     else:
       # There is no python writer for all the various formats. Instead an additional text
-      # table will be created then either Impala or Hive will be used to write the data
+      # table will be created then either Impala or Hive will be used to insert the data
       # in the desired format into the final table.
+      # This is also used when inserting data to pre-existing table to avoid overriding.
       if not self.natively_supports_writing_format(table.storage_format) \
           and not self.hive_connection:
         raise Exception("Creating a " + table.storage_format + " table requires that"
@@ -729,15 +732,15 @@ class ImpalaDbConnection(DbConnection):
       self.execute(table_sql)
       self._bulk_load_table.name += "_temp_%03d" % randint(1, 999)
       self._bulk_load_table.storage_format = 'textfile'
-      super(ImpalaDbConnection, self).begin_bulk_load_table(self._bulk_load_table)
+      super(ImpalaDbConnection, self).begin_bulk_load_table(self._bulk_load_table, create_tables=True)
 
   def natively_supports_writing_format(self, storage_format):
     for supported_format in self.natively_supported_writing_formats:
       if supported_format == storage_format.upper():
         return True
 
-  def end_bulk_load_table(self):
-    super(ImpalaDbConnection, self).end_bulk_load_table()
+  def end_bulk_load_table(self, create_tables):
+    super(ImpalaDbConnection, self).end_bulk_load_table(create_tables)
     hdfs = create_default_hdfs_client()
     pywebhdfs_dirname = dirname(self.hdfs_file_path).lstrip('/')
     hdfs.make_dir(pywebhdfs_dirname)
@@ -752,7 +755,9 @@ class ImpalaDbConnection(DbConnection):
     self._bulk_load_data_file.close()
     self.execute("INVALIDATE METADATA %s" % self._bulk_load_table.name)
     if self._bulk_load_non_text_table:
-      self.hive_connection.execute('CREATE TABLE %s AS SELECT * FROM %s'
+      if create_tables:
+        self.create_table(self._bulk_load_non_text_table)
+      self.execute('INSERT INTO TABLE %s SELECT * FROM %s'
           % (self._bulk_load_non_text_table.name, self._bulk_load_table.name))
       self.drop_table(self._bulk_load_table.name)
       self.execute("INVALIDATE METADATA %s" % self._bulk_load_non_text_table)
@@ -798,22 +803,24 @@ class HiveDbConnection(ImpalaDbConnection):
       sql += "\nSTORED AS " + table.storage_format
     return sql
 
-  def begin_bulk_load_table(self, table):
-    if table.storage_format.upper() == 'TEXTFILE':
+  def begin_bulk_load_table(self, table, create_tables):
+    if create_tables and table.storage_format.upper() == 'TEXTFILE':
+      # New Text table, simply copy the file over.
       self._bulk_load_table = table
-      DbConnection.begin_bulk_load_table(self, table)
+      DbConnection.begin_bulk_load_table(self, table, create_tables)
     else:
       # There is no python writer for all the various formats. Instead an additional text
-      # table will be created then use Insert statement to write the data in the desired
-      # format into the final table.
+      # table will be created then either Impala or Hive will be used to insert the data
+      # in the desired format into the final table.
+      # This is also used when inserting data to pre-existing table to avoid overriding.
       self._bulk_load_non_text_table = table
       self._bulk_load_table = copy(table)
       self._bulk_load_table.name += "_temp_%03d" % randint(1, 999)
       self._bulk_load_table.storage_format = 'textfile'
-      DbConnection.begin_bulk_load_table(self, self._bulk_load_table)
+      DbConnection.begin_bulk_load_table(self, self._bulk_load_table, create_tables=True)
 
-  def end_bulk_load_table(self):
-    DbConnection.end_bulk_load_table(self)
+  def end_bulk_load_table(self, create_tables):
+    DbConnection.end_bulk_load_table(self, create_tables)
     if self.hdfs_host is None:
       hdfs = create_default_hdfs_client()
     else:
@@ -830,11 +837,13 @@ class HiveDbConnection(ImpalaDbConnection):
       hdfs.create_file(pywebhdfs_file_path, readable_file)
     self._bulk_load_data_file.close()
     if self._bulk_load_non_text_table:
-      self.create_table(self._bulk_load_non_text_table)
+      if create_tables:
+        self.create_table(self._bulk_load_non_text_table)
       self.execute('INSERT INTO TABLE %s SELECT * FROM %s'
           % (self._bulk_load_non_text_table.name, self._bulk_load_table.name))
       self.drop_table(self._bulk_load_table.name)
     self._bulk_load_data_file = None
+
 
 #########################################
 ## Postgresql                          ##
@@ -949,8 +958,8 @@ class PostgresqlDbConnection(DbConnection):
 
     return sql
 
-  def end_bulk_load_table(self):
-    super(PostgresqlDbConnection, self).end_bulk_load_table()
+  def end_bulk_load_table(self, create_tables):
+    super(PostgresqlDbConnection, self).end_bulk_load_table(create_tables)
     chmod(self._bulk_load_data_file.name, 0666)
     self.execute("COPY %s FROM '%s'"
         % (self._bulk_load_table.name, self._bulk_load_data_file.name))

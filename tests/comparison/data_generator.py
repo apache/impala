@@ -154,17 +154,39 @@ class DatabasePopulator(object):
         # removed.
         hive_connection = DbConnector(HIVE).create_connection(db_name=db_name)
         connection.hive_connection = hive_connection
+    tables = list()
     for table_idx in xrange(randint(min_number_of_tables, max_number_of_tables)):
       table = self.create_random_table(
           'table_%s' % (table_idx + 1),
           min_number_of_cols,
           max_number_of_cols,
           allowed_storage_formats)
+      tables.append(table)
 
+    self.populate_tables_with_random_data(
+        tables,
+        connections,
+        min_number_of_rows,
+        max_number_of_rows,
+        create_tables=True)
+
+    for connection in connections:
+      connection.close()
+    if hive_connection:
+      hive_connection.close()
+
+  def populate_tables_with_random_data(self,
+      tables,
+      connections,
+      min_number_of_rows,
+      max_number_of_rows,
+      create_tables):
+    '''Populate given tables with random data.'''
+    for table in tables:
       for connection in connections:
         connection.bulk_load_data_file = open(
             "/tmp/%s_%s.data" % (table.name, connection.db_type.lower()), "w")
-        connection.begin_bulk_load_table(table)
+        connection.begin_bulk_load_table(table, create_tables)
 
       row_count = randint(min_number_of_rows, max_number_of_rows)
       LOG.info('Inserting %s rows into %s', row_count, table.name)
@@ -176,14 +198,37 @@ class DatabasePopulator(object):
           connection.handle_bulk_load_table_data(rows)
 
       for connection in connections:
-        connection.end_bulk_load_table()
+        connection.end_bulk_load_table(create_tables)
 
     self.index_tables_in_database(connections)
 
+  def populate_existing(self, db_name, db_connectors, min_number_of_rows, max_number_of_rows,
+    include_table_names=None):
+    '''Read existing tables and populate with random data.'''
+    for db_connector in db_connectors:
+      connection = db_connector.create_connection(db_name)
+      tables = list()
+      for table_name in connection.list_table_names():
+        if include_table_names and table_name not in include_table_names:
+          continue
+        try:
+          table = connection.describe_table(table_name)
+        except Exception as e:
+          LOG.warn('Error fetching metadata for %s: %s', table_name, e)
+          continue
+        tables.append(table)
+      connections = list()
+      connections.append(connection)
+
+    self.populate_tables_with_random_data(
+        tables,
+        connections,
+        min_number_of_rows,
+        max_number_of_rows,
+        create_tables=False)
+
     for connection in connections:
       connection.close()
-    if hive_connection:
-      hive_connection.close()
 
   def migrate_database(self,
       db_name,
@@ -331,6 +376,12 @@ if __name__ == '__main__':
           'tables.')
   parser.add_option_group(group)
 
+  group = OptionGroup(parser, 'Database Population Options')
+  group.add_option('--populate-table-names',
+      help='Table names should be separated with commas. The default is to populate all '
+          'tables.')
+  parser.add_option_group(group)
+
   for group in parser.option_groups + [parser]:
     for option in group.option_list:
       if option.default != NO_DEFAULT:
@@ -338,8 +389,8 @@ if __name__ == '__main__':
 
   options, args = parser.parse_args()
   command = args[0] if args else 'populate'
-  if len(args) > 1 or command not in ['populate', 'migrate']:
-    raise Exception('Command must either be "populate" or "migrate" but was "%s"' %
+  if len(args) > 1 or command not in ['populate', 'migrate', 'populate_existing']:
+    raise Exception('Command must either be "populate", "populate_existing" or "migrate" but was "%s"' %
         ' '.join(args))
   if command == 'migrate' and \
       not any((options.use_mysql, options.use_postgresql, options.use_oracle)):
@@ -395,6 +446,15 @@ if __name__ == '__main__':
         options.max_row_count,
         options.storage_file_formats.split(','),
         options.create_data_files)
+  elif command == 'populate_existing':
+    if options.populate_table_names:
+      table_names = options.populate_table_names.split(',')
+    populator.populate_existing(
+        options.db_name,
+        db_connectors,
+        options.min_row_count,
+        options.max_row_count,
+        include_table_names=table_names)
   else:
     populator.drop_and_create_database(options.db_name, db_connectors)
     if options.migrate_table_names:
