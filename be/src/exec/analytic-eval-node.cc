@@ -131,6 +131,7 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   curr_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
+  fn_pool_.reset(new MemPool(mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
 
   DCHECK_EQ(result_tuple_desc_->slots().size(), evaluators_.size());
@@ -138,7 +139,7 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     impala_udf::FunctionContext* ctx;
     RETURN_IF_ERROR(evaluators_[i]->Prepare(state, child(0)->row_desc(),
         intermediate_tuple_desc_->slots()[i], result_tuple_desc_->slots()[i],
-        mem_pool_.get(), &ctx));
+        fn_pool_.get(), &ctx));
     fn_ctxs_.push_back(ctx);
     state->obj_pool()->Add(ctx);
   }
@@ -172,11 +173,10 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   DCHECK(client_ != NULL);
-  // TODO: Set delete_on_read to false if this node is inside a subplan.
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
       state->block_mgr(), client_,
       false /* initial_small_buffers */,
-      true /* delete_on_read */,
+      !IsInSubplan() /* delete_on_read */,
       true /* read_write */));
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
 
@@ -810,6 +810,7 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   if (curr_tuple_pool_.get() != NULL) curr_tuple_pool_->FreeAll();
   if (prev_tuple_pool_.get() != NULL) prev_tuple_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
+  if (fn_pool_.get() != NULL) fn_pool_->FreeAll();
   ExecNode::Close(state);
 }
 

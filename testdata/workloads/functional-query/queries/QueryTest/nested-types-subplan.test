@@ -200,6 +200,59 @@ where c_custkey < 4
 bigint,string,bigint,decimal,decimal,string,string
 ====
 ---- QUERY
+# Test analytic functions without partition by and order by inside a subplan.
+select c_custkey, v.* from customer c,
+  (select count(o_orderkey) over() c, sum(o_totalprice) over() s,
+          avg(o_totalprice) over() a, max(o_orderstatus) over() mx,
+          min(o_orderdate) over() mn
+   from c.c_orders) v
+where c_custkey < 4
+---- RESULTS
+1,6,587762.91,97960.48,'O','1992-04-19'
+1,6,587762.91,97960.48,'O','1992-04-19'
+1,6,587762.91,97960.48,'O','1992-04-19'
+1,6,587762.91,97960.48,'O','1992-04-19'
+1,6,587762.91,97960.48,'O','1992-04-19'
+1,6,587762.91,97960.48,'O','1992-04-19'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+2,7,1028273.43,146896.20,'P','1992-04-05'
+---- TYPES
+bigint,bigint,decimal,decimal,string,string
+====
+---- QUERY
+# Test analytic functions with partition by inside a subplan.
+select c_custkey, v.* from customer c,
+(select o_orderstatus,
+  count(o_orderkey) over(partition by o_orderstatus) c,
+  sum(o_totalprice) over(partition by o_orderstatus) s,
+  avg(o_totalprice) over(partition by o_orderstatus) a,
+  max(o_orderstatus) over(partition by o_orderstatus) mx,
+  min(o_orderdate) over(partition by o_orderstatus) mn
+from c.c_orders) v
+where c_custkey < 4
+---- RESULTS
+1,'F',2,197679.65,98839.82,'F','1992-04-19'
+1,'F',2,197679.65,98839.82,'F','1992-04-19'
+1,'O',4,390083.26,97520.81,'O','1996-06-29'
+1,'O',4,390083.26,97520.81,'O','1996-06-29'
+1,'O',4,390083.26,97520.81,'O','1996-06-29'
+1,'O',4,390083.26,97520.81,'O','1996-06-29'
+2,'F',4,319892.45,79973.11,'F','1992-04-05'
+2,'F',4,319892.45,79973.11,'F','1992-04-05'
+2,'F',4,319892.45,79973.11,'F','1992-04-05'
+2,'F',4,319892.45,79973.11,'F','1992-04-05'
+2,'O',2,486983.63,243491.81,'O','1996-08-05'
+2,'O',2,486983.63,243491.81,'O','1996-08-05'
+2,'P',1,221397.35,221397.35,'P','1995-03-10'
+---- TYPES
+bigint,string,bigint,decimal,decimal,string,string
+====
+---- QUERY
 # Test left outer join of a relative table ref.
 select c_custkey, c_mktsegment, o_orderkey, o_orderdate
 from customer c left outer join c.c_orders

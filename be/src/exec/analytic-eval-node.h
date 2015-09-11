@@ -230,6 +230,11 @@ class AnalyticEvalNode : public ExecNode {
   /// functions is allocated via these contexts.
   std::vector<impala_udf::FunctionContext*> fn_ctxs_;
 
+  /// Mem pool backing allocations from fn_ctxs_. This pool must not be Reset() because
+  /// the memory is managed by the FreePools of the function contexts which do their own
+  /// bookkeeping using a pointer-based structure stored in the memory blocks themselves.
+  boost::scoped_ptr<MemPool> fn_pool_;
+
   /// Pools used to allocate result tuples (added to result_tuples_ and later returned)
   /// and window tuples (added to window_tuples_ to buffer the current window). Resources
   /// are transferred from curr_tuple_pool_ to prev_tuple_pool_ once it is at least
