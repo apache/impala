@@ -43,7 +43,7 @@ parser.add_option("--output_mdl_path", dest="output_mdl_path",
                   help="The path of the output mdl file. Default: %default")
 # TODO: get default version value from bin/save-version.sh
 parser.add_option("--output_mdl_version", dest="output_mdl_version",
-                  metavar="IMPALA_VERSION", default="2.3.0-cdh5",
+                  metavar="IMPALA_VERSION", default="2.5.0-cdh5",
                   help="The Impala version that is written in the output mdl.")
 
 options, args = parser.parse_args()
