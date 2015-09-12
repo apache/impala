@@ -722,6 +722,8 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     }
   }
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
+  // Check if there was an error evaluating a row value.
+  RETURN_IF_ERROR(coord_->runtime_state()->CheckQueryState());
 
   // Update the result cache if necessary.
   if (result_cache_max_size_ > 0 && result_cache_.get() != NULL) {

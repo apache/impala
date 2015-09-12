@@ -2223,3 +2223,9 @@ select count(*) from tpch_parquet.lineitem where btrim(l_comment, l_comment) != 
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Test for IMPALA-1746: QueryExecState doesn't check for query cancellation or errors
+select dayofyear(trunc('2014-11-11', string_col)) from functional.alltypestiny limit 1;
+---- CATCH
+Invalid Truncate Unit: 0
+====
