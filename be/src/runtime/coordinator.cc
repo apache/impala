@@ -904,6 +904,7 @@ void Coordinator::ValidateCollectionSlots(RowBatch* batch) {
         const SlotDescriptor* slot_desc = tuple_desc->collection_slots()[k];
         int tuple_idx = row_desc.GetTupleIdx(slot_desc->parent()->id());
         const Tuple* tuple = row->GetTuple(tuple_idx);
+        if (tuple == NULL) continue;
         DCHECK(tuple->IsNull(slot_desc->null_indicator_offset()));
       }
     }
