@@ -151,7 +151,7 @@ RowBatch::~RowBatch() {
   }
   if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
     DCHECK(tuple_ptrs_ != NULL);
-    delete tuple_ptrs_;
+    free(tuple_ptrs_);
     tuple_ptrs_ = NULL;
   }
 }
