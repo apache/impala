@@ -157,7 +157,9 @@ public class KuduTable extends Table {
     for (FieldSchema field: schema) {
       com.cloudera.impala.catalog.Type type = parseColumnType(field);
       // TODO: Check for decimal types?
-      Column col = new Column(field.getName(), type, field.getComment(), pos);
+      boolean isKey = keyColumns.contains(field.getName());
+      KuduColumn col = new KuduColumn(field.getName(), isKey, !isKey, type,
+          field.getComment(), pos);
       columnNames.add(col.getName());
       addColumn(col);
       ++pos;
