@@ -35,6 +35,7 @@ public class SingularRowSrcNode extends PlanNode {
     super(id, "SINGULAR ROW SRC");
     tupleIds_ = Lists.newArrayList(containingSubplanNode.getChild(0).tupleIds_);
     tblRefIds_ = Lists.newArrayList(containingSubplanNode.getChild(0).tblRefIds_);
+    nullableTupleIds_.addAll(containingSubplanNode.getChild(0).getNullableTupleIds());
     containingSubplanNode_ = containingSubplanNode;
   }
 

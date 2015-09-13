@@ -273,3 +273,20 @@ inner join t2.int_array a
 ---- TYPES
 bigint,bigint,int
 ====
+---- QUERY
+# IMPALA-2326: Test that tuple nullability information is preserved through subplan nodes.
+# This test assumes that codegen optimizes the grouping aggregation node based on tuple
+# nullability. With codegen enabled, this test will cause a SEGV if the tuple nullability
+# information is incorrect at the aggregation node.
+select t2.id, count(a.item)
+from complextypestbl t1
+left outer join complextypestbl t2
+  on (t1.id = t2.id + 2)
+inner join t1.int_array a
+group by t2.id
+---- RESULTS
+NULL,6
+6,1
+---- TYPES
+bigint,bigint
+====
