@@ -163,6 +163,7 @@ class RowBatchSerializeTest : public testing::Test {
         Tuple* tuple_mem;
         int n = builder.GetFreeMemory(&tuple_mem);
         DCHECK_GE(n, array_len);
+        memset(tuple_mem, 0, item_desc->byte_size() * array_len);
         for (int i = 0; i < array_len; ++i) {
           for (int slot_idx = 0; slot_idx < item_desc->slots().size(); ++slot_idx) {
             SlotDescriptor* item_slot_desc = item_desc->slots()[slot_idx];
@@ -221,6 +222,7 @@ class RowBatchSerializeTest : public testing::Test {
       int num_tuples, int null_tuple_percent, int null_value_percent,
       vector<Tuple*>* result) {
     uint8_t* tuple_mem = pool->Allocate(tuple_desc.byte_size() * num_tuples);
+    memset(tuple_mem, 0, tuple_desc.byte_size() * num_tuples);
     for (int i = 0; i < num_tuples; ++i) {
       if (null_tuple_percent > 0 && rand() % 100 < null_tuple_percent) {
         result->push_back(NULL);
@@ -562,9 +564,11 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   MemPool* pool = batch->tuple_data_pool();
   for (int i = 0; i < num_distinct_array_tuples; ++i) {
     uint8_t* tuple_mem = pool->Allocate(array_tuple_desc->byte_size());
+    memset(tuple_mem, 0, array_tuple_desc->byte_size());
     Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
     ArrayValue av;
     av.ptr = pool->Allocate(array_item_desc->byte_size());
+    memset(av.ptr, 0, array_item_desc->byte_size());
     av.num_tuples = 1;
     StringValue huge_string_value((char*)huge_string.data(), huge_string_size);
     RawValue::Write(&huge_string_value, reinterpret_cast<Tuple*>(av.ptr),
