@@ -708,11 +708,12 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   VLOG_FILE << id() << " GetNext: " << DebugStateString();
 
   if (ReachedLimit()) {
-    // At this point all resources must have already been transferred. We can only
-    // get here after returning from GetNext() with *eos = true at least once.
-    DCHECK_EQ(prev_tuple_pool_->total_allocated_bytes(), 0);
-    DCHECK_EQ(curr_tuple_pool_->total_allocated_bytes(), 0);
-    DCHECK(row_batch->ContainsTupleStream(input_stream_.get()));
+    // TODO: This transfer is simple and correct, but not necessarily efficient. We
+    // should optimize the use/transfer of memory to better amortize allocations
+    // over multiple Reset()/Open()/GetNext()* cycles.
+    row_batch->tuple_data_pool()->AcquireData(prev_tuple_pool_.get(), false);
+    row_batch->tuple_data_pool()->AcquireData(curr_tuple_pool_.get(), false);
+    row_batch->AddTupleStream(input_stream_.get());
     *eos = true;
     return Status::OK();
   } else {
