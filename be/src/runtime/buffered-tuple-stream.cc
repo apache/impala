@@ -639,7 +639,7 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
   for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
     const TupleDescriptor* tuple_desc = desc_.tuple_descriptors()[i];
     Tuple* tuple = row->GetTuple(i);
-    DCHECK(nullable_tuple_ || tuple != NULL);
+    DCHECK(nullable_tuple_ || tuple_desc->byte_size() == 0 || tuple != NULL);
     if (tuple == NULL) continue;
     size += tuple->TotalByteSize(*tuple_desc);
   }

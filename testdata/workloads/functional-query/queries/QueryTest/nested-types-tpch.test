@@ -91,3 +91,17 @@ limit 10;
 ---- TYPES
 bigint,string,bigint,string
 ====
+---- QUERY
+# IMPALA-2335: non-nullable zero-width tuples can be NULL. This query hit a DCHECK.
+# In this query no slots of the supplier.s_partssupps array are materialized, so there
+# are NULL tuples once the array is unnested.
+SELECT t2.s_name
+FROM tpch_nested_parquet.customer t1
+INNER JOIN tpch_nested_parquet.supplier t2
+  ON t2.s_phone = t1.c_phone AND t2.s_acctbal = t1.c_acctbal,
+t2.s_partsupps t3
+WHERE t2.s_suppkey > t2.s_nationkey;
+---- RESULTS
+---- TYPES
+string
+====
