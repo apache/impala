@@ -372,6 +372,8 @@ class DiskIoMgr {
 
     /// Enqueues a buffer for this range. This does not block.
     /// Returns true if this scan range has hit the queue capacity, false otherwise.
+    /// The caller passes ownership of buffer to the scan range and it is not
+    /// valid to access buffer after this call.
     bool EnqueueBuffer(BufferDescriptor* buffer);
 
     /// Cleanup any queued buffers (i.e. due to cancellation). This cannot

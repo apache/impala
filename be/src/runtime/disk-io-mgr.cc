@@ -949,18 +949,20 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, RequestContext* reader
     --state.num_remaining_ranges();
   }
 
+  // After calling EnqueueBuffer(), it is no longer valid to read from buffer.
+  // Store the state we need before calling EnqueueBuffer().
+  bool eosr = buffer->eosr_;
+  ScanRange* scan_range = buffer->scan_range_;
   bool queue_full = buffer->scan_range_->EnqueueBuffer(buffer);
-  if (buffer->eosr_) {
+  if (eosr) {
     // For cached buffers, we can't close the range until the cached buffer is returned.
     // Close() is called from DiskIoMgr::ReturnBuffer().
-    if (buffer->scan_range_->cached_buffer_ == NULL) {
-      buffer->scan_range_->Close();
-    }
+    if (scan_range->cached_buffer_ == NULL) scan_range->Close();
   } else {
     if (queue_full) {
-      reader->blocked_ranges_.Enqueue(buffer->scan_range_);
+      reader->blocked_ranges_.Enqueue(scan_range);
     } else {
-      reader->ScheduleScanRange(buffer->scan_range_);
+      reader->ScheduleScanRange(scan_range);
     }
   }
   state.DecrementRequestThread();
