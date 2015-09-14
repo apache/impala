@@ -200,6 +200,97 @@ where c_custkey < 4
 bigint,string,bigint,decimal,decimal,string,string
 ====
 ---- QUERY
+# Test left outer join of a relative table ref.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c left outer join c.c_orders
+where c_custkey < 4
+---- RESULTS
+1,'BUILDING',454791,'1992-04-19'
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',3868359,'1992-08-22'
+1,'BUILDING',4273923,'1997-03-23'
+1,'BUILDING',4808192,'1996-06-29'
+1,'BUILDING',5133509,'1996-07-01'
+2,'AUTOMOBILE',430243,'1994-12-24'
+2,'AUTOMOBILE',1071617,'1995-03-10'
+2,'AUTOMOBILE',1374019,'1992-04-05'
+2,'AUTOMOBILE',1763205,'1994-08-28'
+2,'AUTOMOBILE',1842406,'1996-08-05'
+2,'AUTOMOBILE',2992930,'1994-05-21'
+2,'AUTOMOBILE',3986496,'1997-02-22'
+3,'AUTOMOBILE',NULL,'NULL'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Test left outer join of a relative table ref.
+# Use straight_join to enforce a left outer join inside the subplan.
+select straight_join c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c left outer join c.c_orders
+where c_custkey < 4
+---- RESULTS
+1,'BUILDING',454791,'1992-04-19'
+1,'BUILDING',579908,'1996-12-09'
+1,'BUILDING',3868359,'1992-08-22'
+1,'BUILDING',4273923,'1997-03-23'
+1,'BUILDING',4808192,'1996-06-29'
+1,'BUILDING',5133509,'1996-07-01'
+2,'AUTOMOBILE',430243,'1994-12-24'
+2,'AUTOMOBILE',1071617,'1995-03-10'
+2,'AUTOMOBILE',1374019,'1992-04-05'
+2,'AUTOMOBILE',1763205,'1994-08-28'
+2,'AUTOMOBILE',1842406,'1996-08-05'
+2,'AUTOMOBILE',2992930,'1994-05-21'
+2,'AUTOMOBILE',3986496,'1997-02-22'
+3,'AUTOMOBILE',NULL,'NULL'
+---- TYPES
+bigint,string,bigint,string
+====
+---- QUERY
+# Test left semi join of a relative table ref.
+select c_custkey, c_mktsegment
+from customer c left semi join c.c_orders
+where c_custkey < 4
+---- RESULTS
+1,'BUILDING'
+2,'AUTOMOBILE'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# Test left semi join of a relative table ref.
+# Use straight_join to enforce a left semi join inside the subplan.
+select straight_join c_custkey, c_mktsegment
+from customer c left semi join c.c_orders
+where c_custkey < 4
+---- RESULTS
+1,'BUILDING'
+2,'AUTOMOBILE'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# Test left anti join on a relative table ref.
+select c_custkey, c_mktsegment
+from customer c left anti join c.c_orders
+where c_custkey < 4
+---- RESULTS
+3,'AUTOMOBILE'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# Test left anti join on a relative table ref.
+# Use straight_join to enforce a left anti join inside the subplan.
+select straight_join c_custkey, c_mktsegment
+from customer c left anti join c.c_orders
+where c_custkey < 4
+---- RESULTS
+3,'AUTOMOBILE'
+---- TYPES
+bigint,string
+====
+---- QUERY
 # Test hash join inside a subplan.
 select c_custkey, c_mktsegment, o_orderkey, o_orderdate
 from customer c,
@@ -223,6 +314,127 @@ where c_custkey < 4
 2,'AUTOMOBILE',3986496,'1997-02-22'
 ---- TYPES
 bigint,string,bigint,string
+====
+---- QUERY
+# Test uncorrelated scalar subquery with a relative table ref.
+select c_custkey, c_mktsegment, c_acctbal
+from customer c
+where c_custkey < 10
+  and c_acctbal < (select avg(o_totalprice) from c.c_orders)
+---- RESULTS
+1,'BUILDING',711.56
+2,'AUTOMOBILE',121.65
+4,'MACHINERY',2866.83
+5,'HOUSEHOLD',794.47
+7,'AUTOMOBILE',9561.95
+8,'BUILDING',6819.74
+---- TYPES
+bigint,string,decimal
+====
+---- QUERY
+# Test correlated scalar subquery with a relative table ref.
+select c_custkey, c_mktsegment, c_acctbal
+from customer c
+where c_custkey < 10
+  and c_acctbal < (select avg(o_totalprice) from c.c_orders o
+                   where c.c_custkey != o.o_orderkey)
+---- RESULTS
+1,'BUILDING',711.56
+2,'AUTOMOBILE',121.65
+4,'MACHINERY',2866.83
+5,'HOUSEHOLD',794.47
+7,'AUTOMOBILE',9561.95
+8,'BUILDING',6819.74
+---- TYPES
+bigint,string,decimal
+====
+---- QUERY
+# Test uncorrelated EXISTS subquery with a relative table ref.
+select c_custkey, c_mktsegment, c_acctbal
+from customer c
+where c_custkey < 10
+  and exists (select o_orderkey from c.c_orders where o_orderkey % 2 = 0)
+---- RESULTS
+1,'BUILDING',711.56
+2,'AUTOMOBILE',121.65
+4,'MACHINERY',2866.83
+5,'HOUSEHOLD',794.47
+7,'AUTOMOBILE',9561.95
+8,'BUILDING',6819.74
+---- TYPES
+bigint,string,decimal
+====
+---- QUERY
+# Test uncorrelated NOT EXISTS subquery with a relative table ref.
+select c_custkey, c_mktsegment, c_acctbal
+from customer c
+where c_custkey < 10
+  and not exists (select o_orderkey from c.c_orders where o_orderkey % 2 = 0)
+---- RESULTS
+3,'AUTOMOBILE',7498.12
+6,'AUTOMOBILE',7638.57
+9,'FURNITURE',8324.07
+---- TYPES
+bigint,string,decimal
+====
+---- QUERY
+# Test correlated EXISTS subquery with a relative table ref.
+select c_custkey, c_mktsegment, c_acctbal
+from customer c
+where c_custkey < 10
+  and exists (select o_orderkey from c.c_orders o where c.c_acctbal * 10 > o.o_totalprice)
+---- RESULTS
+4,'MACHINERY',2866.83
+7,'AUTOMOBILE',9561.95
+8,'BUILDING',6819.74
+---- TYPES
+bigint,string,decimal
+====
+---- QUERY
+# Test correlated NOT EXISTS subquery with a relative table ref.
+select c_custkey, c_mktsegment, c_acctbal
+from customer c
+where c_custkey < 10
+  and not exists (select o_orderkey from c.c_orders o where c.c_acctbal * 10 > o.o_totalprice)
+---- RESULTS
+1,'BUILDING',711.56
+2,'AUTOMOBILE',121.65
+3,'AUTOMOBILE',7498.12
+5,'HOUSEHOLD',794.47
+6,'AUTOMOBILE',7638.57
+9,'FURNITURE',8324.07
+---- TYPES
+bigint,string,decimal
+====
+---- QUERY
+# Test uncorrelated IN subquery with a relative table ref.
+select c_custkey, c_mktsegment, o_orderkey, o_totalprice, o_orderdate
+from customer c, c.c_orders o
+where c_custkey < 10
+  and cast(o_orderdate as timestamp) + interval 13 days in
+    (select cast(l_shipdate as timestamp) from o.o_lineitems)
+---- RESULTS
+1,'BUILDING',454791,74602.81,'1992-04-19'
+4,'MACHINERY',164711,311722.87,'1992-04-26'
+7,'AUTOMOBILE',2014848,181378.37,'1997-01-19'
+8,'BUILDING',1859778,263567.37,'1998-02-04'
+---- TYPES
+bigint,string,bigint,decimal,string
+====
+---- QUERY
+# Test correlated IN subquery with a relative table ref.
+select c_custkey, c_mktsegment, o_orderkey, o_totalprice, o_orderdate
+from customer c, c.c_orders o
+where c_custkey < 10
+  and cast(o_orderdate as timestamp) + interval 13 days in
+    (select cast(l_shipdate as timestamp) from o.o_lineitems
+     where c_acctbal > l_extendedprice * l_tax)
+---- RESULTS
+1,'BUILDING',454791,74602.81,'1992-04-19'
+7,'AUTOMOBILE',2014848,181378.37,'1997-01-19'
+8,'BUILDING',1859778,263567.37,'1998-02-04'
+---- TYPES
+bigint,string,bigint,decimal,string
 ====
 ---- QUERY
 # Nested subplans with predicates on every table ref.
