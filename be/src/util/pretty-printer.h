@@ -91,11 +91,10 @@ class PrettyPrinter {
           PrintTimeMs(value, &ss);
         } else if (value >= MILLION) {
           /// if the time is over a ms, print it up to microsecond in the unit of ms.
-          value /= 1000;
-          ss << value / 1000 << "." << Mod(value, 1000) << "ms";
+          ss << value / MILLION << "ms";
         } else if (value > 1000) {
           /// if the time is over a microsecond, print it using unit microsecond
-          ss << value / 1000 << "." << Mod(value, 1000) << "us";
+          ss << value / 1000 << "us";
         } else {
           ss << value << "ns";
         }

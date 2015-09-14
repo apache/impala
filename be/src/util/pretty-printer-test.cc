@@ -98,6 +98,13 @@ TEST(PrettyPrinterTest, Seconds) {
 
 TEST(PrettyPrinterTest, NanoSeconds) {
   EXPECT_EQ(PrettyPrinter::Print(1, TUnit::TIME_NS), "1ns");
+  EXPECT_EQ(PrettyPrinter::Print(123.4, TUnit::TIME_NS), "123.400000ns");
+  EXPECT_EQ(PrettyPrinter::Print(1234.9, TUnit::TIME_NS), "1.234900us");
+  EXPECT_EQ(PrettyPrinter::Print(12345.6789, TUnit::TIME_NS), "12.345679us");
+  EXPECT_EQ(PrettyPrinter::Print(1234567.890, TUnit::TIME_NS), "1.234568ms");
+  EXPECT_EQ(PrettyPrinter::Print(123456789.0, TUnit::TIME_NS), "123.456789ms");
+  EXPECT_EQ(PrettyPrinter::Print(123823456789.9, TUnit::TIME_NS), "2m3s");
+  EXPECT_EQ(PrettyPrinter::Print(12123456789.9, TUnit::TIME_NS), "12s123ms");
   EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_NS), "1.500900ns");
   EXPECT_EQ(PrettyPrinter::Print(1000 * 1000 * 1000, TUnit::TIME_NS), "1s000ms");
 }
