@@ -124,6 +124,45 @@ TEST(Bitmap, SetGetModTest) {
   }
 }
 
+/// Regression test for IMPALA-2307.
+TEST(Bitmap, OverflowTest) {
+  Bitmap bm(64);
+  bm.SetAllBits(false);
+  int64_t bit_idx = 45;
+  int64_t ovr_idx = 13;
+
+  bm.Set<false>(bit_idx, true);
+  EXPECT_FALSE(bm.Get<false>(ovr_idx));
+  EXPECT_TRUE(bm.Get<false>(bit_idx));
+
+  bm.SetAllBits(false);
+  bm.Set<false>(ovr_idx, true);
+  EXPECT_FALSE(bm.Get<false>(bit_idx));
+  EXPECT_TRUE(bm.Get<false>(ovr_idx));
+
+  bm.SetAllBits(false);
+  bm.Set<false>(ovr_idx, true);
+  bm.Set<false>(bit_idx, false);
+  EXPECT_TRUE(bm.Get<false>(ovr_idx));
+  EXPECT_FALSE(bm.Get<false>(bit_idx));
+
+  bm.SetAllBits(false);
+  bm.Set<true>(bit_idx, true);
+  EXPECT_FALSE(bm.Get<true>(ovr_idx));
+  EXPECT_TRUE(bm.Get<true>(bit_idx));
+
+  bm.SetAllBits(false);
+  bm.Set<true>(ovr_idx, true);
+  EXPECT_FALSE(bm.Get<true>(bit_idx));
+  EXPECT_TRUE(bm.Get<true>(ovr_idx));
+
+  bm.SetAllBits(false);
+  bm.Set<true>(ovr_idx, true);
+  bm.Set<true>(bit_idx, false);
+  EXPECT_TRUE(bm.Get<true>(ovr_idx));
+  EXPECT_FALSE(bm.Get<true>(bit_idx));
+}
+
 }
 
 int main(int argc, char **argv) {

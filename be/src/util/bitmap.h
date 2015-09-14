@@ -42,9 +42,9 @@ class Bitmap {
     bit_index &= BIT_INDEX_MASK;
     DCHECK_LT(word_index, buffer_.size());
     if (v) {
-      buffer_[word_index] |= (1 << bit_index);
+      buffer_[word_index] |= (1LL << bit_index);
     } else {
-      buffer_[word_index] &= ~(1 << bit_index);
+      buffer_[word_index] &= ~(1LL << bit_index);
     }
   }
 
@@ -56,7 +56,7 @@ class Bitmap {
     int64_t word_index = bit_index >> NUM_OFFSET_BITS;
     bit_index &= BIT_INDEX_MASK;
     DCHECK_LT(word_index, buffer_.size());
-    return (buffer_[word_index] & (1 << bit_index)) != 0;
+    return (buffer_[word_index] & (1LL << bit_index)) != 0;
   }
 
   /// Bitwise ANDs the src bitmap into this one.
