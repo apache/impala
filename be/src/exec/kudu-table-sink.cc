@@ -207,11 +207,12 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
 
   // TODO right now we always flush an entire row batch, if these are small we'll
   // be inefficient. Consider decoupling impala's batch size from kudu's
-  if (sink_type_ != TTableSinkType::KUDU_DELETE) {
+  if (!kudu_table_sink_.ignore_not_found_or_duplicate) {
     KUDU_RETURN_IF_ERROR(session_->Flush(), "Error while flushing Kudu session.");
   } else {
-    // DELETE with a row value that doesn't exist is defined to be a no-op,
-    // so ignore kudu::Status::IsNotFound errors.
+    // If the sink has the option "ignore_not_found_or_duplicate" set,
+    // duplicate key or key already present errors from Kudu
+    // in INSERT, UPDATE, or DELETE operations will be ignored.
     kudu::Status s = session_->Flush();
     if (UNLIKELY(!s.ok())) {
       vector<KuduError*> errors;
@@ -229,13 +230,17 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
       for (int i = 0; i < errors.size(); ++i) {
         kudu::Status e = errors[i]->status();
         // Only set the final status once, but continue iterating to clean up the memory
-        if (result.ok() && !e.IsNotFound()) {
+        if (result.ok() && (
+                (sink_type_ == TTableSinkType::KUDU_DELETE && !e.IsNotFound()) ||
+                (sink_type_ == TTableSinkType::KUDU_UPDATE && !e.IsNotFound()) ||
+                (sink_type_ == TTableSinkType::KUDU_INSERT && !e.IsAlreadyPresent()))) {
           result = Status(strings::Substitute("$0: $1",
               "Error while flushing Kudu session", e.ToString()));
         }
         delete errors[i];
       }
       RETURN_IF_ERROR(result);
+      rows_added -= errors.size();
     }
   }
 

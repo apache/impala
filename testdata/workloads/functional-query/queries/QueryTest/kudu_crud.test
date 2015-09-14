@@ -177,3 +177,46 @@ select ID, nAmE, VALF, VALI from ignore_column_case;
 ---- TYPES
 INT,STRING,FLOAT,BIGINT
 ====
+---- QUERY
+insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
+---- RESULTS
+: 1
+====
+---- QUERY
+insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
+---- CATCH
+Error while flushing Kudu session.: IO error: Some errors occurred
+====
+---- QUERY
+insert ignore into tdata values (666, "The Devil", cast(1.2 as float), 43)
+---- RESULTS
+: 0
+====
+---- QUERY
+-- Updating the same record twice
+update a set a.name='Satan' from tdata a, tdata b where a.id = 666
+---- RESULTS
+====
+---- QUERY
+-- Does not exercise any error path in the sink because updating the same record twice
+-- is valid. Makes sure IGNORE works.
+update ignore a set a.name='Satan' from tdata a, tdata b where a.id = 666
+---- RESULTS
+====
+---- QUERY
+-- Using a cross join to generate the same delete twice. After the first delete succeeded,
+-- trying to execute the second delete will fail because the record does not exist.
+delete a from tdata a, tdata b where a.id = 666
+---- CATCH
+Error while flushing Kudu session.: IO error: Some errors occurred
+====
+---- QUERY
+-- Re-insert the data
+insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
+---- RESULTS
+: 1
+====
+---- QUERY
+delete ignore a from tdata a, tdata b where a.id = 666
+---- RESULTS
+====

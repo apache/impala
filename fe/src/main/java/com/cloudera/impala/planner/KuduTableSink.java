@@ -41,35 +41,43 @@ public class KuduTableSink extends TableSink {
   // expression i matches a column index into the Kudu schema at targetColdIdxs[i].
   private ArrayList<Integer> targetColdIdxs_;
 
+  private final boolean ignoreNotFoundOrDuplicate_;
+
   private KuduTableSink(Table targetTable, Type sinkType,
-      List<Integer> referencedColumns) {
+      List<Integer> referencedColumns, boolean ignoreNotFoundOrDuplicate) {
     super(targetTable);
     sinkType_ = sinkType;
     targetColdIdxs_ = referencedColumns != null
         ? Lists.newArrayList(referencedColumns) : null;
+    ignoreNotFoundOrDuplicate_ = ignoreNotFoundOrDuplicate;
   }
 
-  public static KuduTableSink createInsertSink(Table targetTable) {
-    return new KuduTableSink(targetTable, Type.INSERT, null);
+  public static KuduTableSink createInsertSink(Table targetTable,
+      boolean ignoreDuplicates) {
+    return new KuduTableSink(targetTable, Type.INSERT, null, ignoreDuplicates);
   }
 
   public static KuduTableSink createUpdateSink(Table targetTable,
-      List<Integer> referencedColIdxs) {
-    return new KuduTableSink(targetTable, Type.UPDATE, referencedColIdxs);
+      List<Integer> referencedColIdxs, boolean ignoreNotFound) {
+    return new KuduTableSink(targetTable, Type.UPDATE, referencedColIdxs,
+        ignoreNotFound);
   }
 
   public static KuduTableSink createDeleteSink(Table targetTable,
-      List<Integer> referencedColIdxs) {
-    return new KuduTableSink(targetTable, Type.DELETE, referencedColIdxs);
+      List<Integer> referencedColIdxs, boolean ignoreNotFound) {
+    return new KuduTableSink(targetTable, Type.DELETE, referencedColIdxs,
+        ignoreNotFound);
   }
 
   @Override
   public String getExplainString(String prefix, String detailPrefix,
       TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(
-        prefix + sinkType_.toExplainString() + " KUDU ["
-            + targetTable_.getFullName() + "]\n");
+    output.append(prefix + sinkType_.toExplainString());
+    output.append(" KUDU [" + targetTable_.getFullName() + "]\n");
+    output.append(detailPrefix).append("ignoreKeysNotFoundOrDuplicate: ").append(
+        ignoreNotFoundOrDuplicate_);
+    output.append("\n");
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(PrintUtils.printHosts(detailPrefix, fragment_.getNumNodes()));
       output.append(PrintUtils.printMemCost(" ", perHostMemCost_));
@@ -85,6 +93,7 @@ public class KuduTableSink extends TableSink {
         new TTableSink(targetTable_.getId().asInt(), sinkType_.toThrift());
     TKuduTableSink tKuduSink = new TKuduTableSink();
     tKuduSink.setReferenced_columns(targetColdIdxs_);
+    tKuduSink.setIgnore_not_found_or_duplicate(ignoreNotFoundOrDuplicate_);
     tTableSink.setKudu_table_sink(tKuduSink);
     result.table_sink = tTableSink;
     return result;

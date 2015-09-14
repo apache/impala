@@ -58,7 +58,7 @@ public abstract class DataSink {
    * Returns an output sink appropriate for writing to the given table.
    */
   public static DataSink createDataSink(Table table, List<Expr> partitionKeyExprs,
-      boolean overwrite) {
+      boolean overwrite, boolean ignoreDuplicates_) {
     if (table instanceof HdfsTable) {
       return new HdfsTableSink(table, partitionKeyExprs, overwrite);
     } else if (table instanceof HBaseTable) {
@@ -73,7 +73,7 @@ public abstract class DataSink {
       Preconditions.checkState(overwrite == false);
       // Partition clauses don't make sense for Kudu inserts.
       Preconditions.checkState(partitionKeyExprs.isEmpty());
-      return KuduTableSink.createInsertSink(table);
+      return KuduTableSink.createInsertSink(table, ignoreDuplicates_);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

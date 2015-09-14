@@ -58,6 +58,9 @@ struct TKuduTableSink {
   // The position in this vector is equal to the position in the output
   // expressions of the sink and holds the index into the Kudu schema
   1: optional list<i32> referenced_columns;
+
+  // Defines if duplicate or not found keys should be ignored
+  2: optional bool ignore_not_found_or_duplicate;
 }
 
 // Union type of all table sinks.

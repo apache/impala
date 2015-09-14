@@ -46,7 +46,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     Preconditions.checkNotNull(createStmt);
     this.createStmt_ = createStmt;
     this.insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
-        null, null, queryStmt, null);
+        null, null, queryStmt, null, false);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }

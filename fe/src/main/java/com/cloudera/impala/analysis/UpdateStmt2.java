@@ -30,8 +30,8 @@ public class UpdateStmt2 extends UpdateStmt {
   public UpdateStmt2(List<String> targetTablePath,
       FromClause tableRefs,
       List<Pair<SlotRef, Expr>> assignmentExprs,
-      Expr wherePredicate) {
-    super(targetTablePath, tableRefs, assignmentExprs, wherePredicate);
+      Expr wherePredicate, boolean ignoreNotFound) {
+    super(targetTablePath, tableRefs, assignmentExprs, wherePredicate, ignoreNotFound);
   }
 
   /**
@@ -40,13 +40,16 @@ public class UpdateStmt2 extends UpdateStmt {
   public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
-    return KuduTableSink.createUpdateSink(table_, referencedColumns_);
+    return KuduTableSink.createUpdateSink(table_, referencedColumns_,
+        ignoreNotFound_);
   }
 
   @Override
   public String toSql() {
     StringBuilder b = new StringBuilder();
     b.append("UPDATE ");
+
+    if (ignoreNotFound_) b.append("IGNORE ");
 
     if (fromClause_ == null) {
       b.append(targetTableRef_.toSql());

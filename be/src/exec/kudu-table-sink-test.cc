@@ -66,6 +66,12 @@ class KuduTableSinkTest : public testing::Test {
     table_sink.__set_target_table_id(0);
     table_sink.__set_type(sink_type);
 
+    // For tests ignore not found keys in delete test. Other paths are exercised via
+    // end-to-end tests.
+    TKuduTableSink kudu_table_sink;
+    kudu_table_sink.__set_ignore_not_found_or_duplicate(true);
+    table_sink.__set_kudu_table_sink(kudu_table_sink);
+
     data_sink_.__set_type(TDataSinkType::TABLE_SINK);
     data_sink_.__set_table_sink(table_sink);
 

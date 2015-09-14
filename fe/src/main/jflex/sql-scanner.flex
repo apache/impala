@@ -123,6 +123,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("hash", new Integer(SqlParserSymbols.KW_HASH));
     keywordMap.put("having", new Integer(SqlParserSymbols.KW_HAVING));
     keywordMap.put("if", new Integer(SqlParserSymbols.KW_IF));
+    keywordMap.put("ignore", new Integer(SqlParserSymbols.KW_IGNORE));
     keywordMap.put("in", new Integer(SqlParserSymbols.KW_IN));
     keywordMap.put("incremental", new Integer(SqlParserSymbols.KW_INCREMENTAL));
     keywordMap.put("init_fn", new Integer(SqlParserSymbols.KW_INIT_FN));

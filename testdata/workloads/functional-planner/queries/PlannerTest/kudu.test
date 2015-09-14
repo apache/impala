@@ -28,11 +28,13 @@ NODE 0:
 insert into functional_kudu.testtbl(id) values (10)
 ---- PLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|  ignoreKeysNotFoundOrDuplicate: false
 |
 00:UNION
    constant-operands=1
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|  ignoreKeysNotFoundOrDuplicate: false
 |
 00:UNION
    constant-operands=1
@@ -41,10 +43,12 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 insert into functional_kudu.testtbl(id) select int_col from functional_kudu.tinyinttable
 ---- PLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|  ignoreKeysNotFoundOrDuplicate: false
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|  ignoreKeysNotFoundOrDuplicate: false
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
 ====
@@ -54,6 +58,7 @@ select count(distinct id), name from functional_kudu.dimtbl
 group by name
 ---- PLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|  ignoreKeysNotFoundOrDuplicate: false
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(id)
@@ -65,6 +70,7 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 00:SCAN KUDU [functional_kudu.dimtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|  ignoreKeysNotFoundOrDuplicate: false
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(id)

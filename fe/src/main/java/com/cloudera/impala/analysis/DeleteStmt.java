@@ -35,21 +35,23 @@ import com.google.common.collect.Lists;
 public class DeleteStmt extends UpdateStmt {
 
   public DeleteStmt(List<String> targetTablePath, FromClause tableRefs,
-      Expr wherePredicate) {
+      Expr wherePredicate, boolean ignoreNotFound) {
     super(targetTablePath, tableRefs, Lists.<Pair<SlotRef, Expr>>newArrayList(),
-        wherePredicate);
+        wherePredicate, ignoreNotFound);
   }
 
   public KuduTableSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
-    return KuduTableSink.createDeleteSink(table_, referencedColumns_);
+    return KuduTableSink.createDeleteSink(table_, referencedColumns_,
+        ignoreNotFound_);
   }
 
   @Override
   public String toSql() {
     StringBuilder b = new StringBuilder();
     b.append("DELETE");
+    if (ignoreNotFound_) b.append(" IGNORE");
     if (fromClause_.size() > 1 || targetTableRef_.hasExplicitAlias()) {
       b.append(" ");
       if (targetTableRef_.hasExplicitAlias()) {

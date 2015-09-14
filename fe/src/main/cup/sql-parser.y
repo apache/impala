@@ -241,8 +241,8 @@ terminal
   KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
   KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP,KW_HASH,
-  KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
+  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HASH,
+  KW_IGNORE, KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
   KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
   KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS,
@@ -461,6 +461,7 @@ nonterminal CreateUdaStmt create_uda_stmt;
 nonterminal ShowFunctionsStmt show_functions_stmt;
 nonterminal DropFunctionStmt drop_function_stmt;
 nonterminal TFunctionCategory opt_function_category;
+nonterminal Boolean opt_modify_ignore;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -648,34 +649,40 @@ explain_stmt ::=
 // tbl(col1,...) etc) and the PARTITION clause. If the column permutation is present, the
 // query statement clause is optional as well.
 insert_stmt ::=
-  opt_with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table LPAREN
+  opt_with_clause:w KW_INSERT KW_OVERWRITE opt_modify_ignore:ignore
+  opt_kw_table table_name:table
+  LPAREN opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
+  opt_query_stmt:query
+  {: RESULT = new InsertStmt(w, table, true, list, hints, query, col_perm, ignore); :}
+  | opt_with_clause:w KW_INSERT KW_OVERWRITE
+  opt_modify_ignore:ignore opt_kw_table table_name:table
+  partition_clause:list opt_plan_hints:hints query_stmt:query
+  {: RESULT = new InsertStmt(w, table, true, list, hints, query, null, ignore); :}
+  | opt_with_clause:w KW_INSERT
+  opt_modify_ignore:ignore KW_INTO opt_kw_table table_name:table LPAREN
   opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
   opt_query_stmt:query
-  {: RESULT = new InsertStmt(w, table, true, list, hints, query, col_perm); :}
-  | opt_with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table
+  {: RESULT = new InsertStmt(w, table, false, list, hints, query, col_perm, ignore); :}
+  | opt_with_clause:w KW_INSERT
+  opt_modify_ignore:ignore KW_INTO opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
-  {: RESULT = new InsertStmt(w, table, true, list, hints, query, null); :}
-  | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table LPAREN
-  opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
-  opt_query_stmt:query
-  {: RESULT = new InsertStmt(w, table, false, list, hints, query, col_perm); :}
-  | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
-  partition_clause:list opt_plan_hints:hints query_stmt:query
-  {: RESULT = new InsertStmt(w, table, false, list, hints, query, null); :}
+  {: RESULT = new InsertStmt(w, table, false, list, hints, query, null, ignore); :}
   ;
 
 // Update statements have an optional WHERE and optional FROM clause.
 update_stmt ::=
-  KW_UPDATE dotted_path:target_table KW_SET update_set_expr_list:values
+  KW_UPDATE opt_modify_ignore:ignore dotted_path:target_table
+  KW_SET update_set_expr_list:values
   where_clause:where_predicate
   {:
     FromClause from_clause = new FromClause(
         Lists.newArrayList(new TableRef(target_table, null)));
-    RESULT = new UpdateStmt2(target_table, from_clause, values, where_predicate);
+    RESULT = new UpdateStmt2(target_table, from_clause, values, where_predicate, ignore);
   :}
-  | KW_UPDATE dotted_path:target_table KW_SET update_set_expr_list:values
+  | KW_UPDATE opt_modify_ignore:ignore dotted_path:target_table
+  KW_SET update_set_expr_list:values
     from_clause:tables where_clause:where_predicate
-  {: RESULT = new UpdateStmt2(target_table, tables, values, where_predicate); :}
+  {: RESULT = new UpdateStmt2(target_table, tables, values, where_predicate, ignore); :}
   ;
 
 update_set_expr_list ::=
@@ -697,14 +704,15 @@ update_set_expr_list ::=
 // keyword followed by a table alias or reference and a full FROM clause. In all cases
 // a WHERE clause may be present.
 delete_stmt ::=
-  KW_DELETE opt_delete_from:target_table  where_clause:where
+  KW_DELETE opt_modify_ignore:ignore opt_delete_from:target_table  where_clause:where
   {:
     FromClause from_clause = new FromClause(
         Lists.newArrayList(new TableRef(target_table, null)));
-    RESULT = new DeleteStmt(target_table, from_clause, where);
+    RESULT = new DeleteStmt(target_table, from_clause, where, ignore);
   :}
-  | KW_DELETE dotted_path:target_table from_clause:from where_clause:where
-  {: RESULT = new DeleteStmt(target_table, from, where); :}
+  | KW_DELETE opt_modify_ignore:ignore dotted_path:target_table from_clause:from
+  where_clause:where
+  {: RESULT = new DeleteStmt(target_table, from, where, ignore); :}
   ;
 
 opt_delete_from ::=
@@ -731,6 +739,13 @@ opt_ident_list ::=
 opt_kw_table ::=
   KW_TABLE
   | /* empty */
+  ;
+
+opt_modify_ignore ::=
+  KW_IGNORE
+  {: RESULT = true; :}
+  | /* empty */
+  {: RESULT = false; :}
   ;
 
 show_roles_stmt ::=
