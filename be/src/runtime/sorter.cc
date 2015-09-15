@@ -677,7 +677,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
         SlotDescriptor* slot_desc = var_slots[i];
         if (input_tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
-        DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
+        DCHECK(slot_desc->type().IsVarLenStringType());
         StringValue* value = reinterpret_cast<StringValue*>(
             input_tuple->GetSlot(slot_desc->tuple_offset()));
         int64_t data_offset = reinterpret_cast<int64_t>(value->ptr);
