@@ -105,3 +105,24 @@ WHERE t2.s_suppkey > t2.s_nationkey;
 ---- TYPES
 string
 ====
+---- QUERY
+# IMPALA-2229: deduping of zero-length tuples during exchange hits DCHECK. This query has
+# an exchange that uses full dedup (> 3 tuples, including an array) and includes a tuple
+# that is zero bytes in size.
+SELECT STRAIGHT_JOIN r_regionkey, p_retailprice
+FROM (SELECT p1.p_partkey, p2.p_retailprice, p2.p_mfgr
+      FROM part p1 INNER JOIN part p2 ON p1.p_partkey = p2.p_partkey
+      WHERE p1.p_partkey < 100 AND p2.p_partkey < 100) t2
+RIGHT JOIN (SELECT r_name, r_regionkey
+            FROM region r, r.r_nations
+            WHERE r_name = 'AFRICA') t1
+  ON t1.r_regionkey = t2.p_partkey
+---- RESULTS
+0,NULL
+0,NULL
+0,NULL
+0,NULL
+0,NULL
+---- TYPES
+SMALLINT,DECIMAL
+====

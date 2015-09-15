@@ -76,6 +76,7 @@ class RowBatchSerializeTest : public testing::Test {
   // 'tuple'.
   void TestTuplesEqual(const TupleDescriptor& tuple_desc, Tuple* tuple,
       Tuple* deserialized_tuple) {
+    if (tuple_desc.byte_size() == 0) return;
     if (tuple == NULL) {
       EXPECT_TRUE(deserialized_tuple == NULL);
       return;
@@ -196,6 +197,8 @@ class RowBatchSerializeTest : public testing::Test {
 
       for (int tuple_idx = 0; tuple_idx < row_desc.tuple_descriptors().size(); ++tuple_idx) {
         TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
+        // Allocating zero-length tuples in this way means that multiple tuples can have
+        // same address: an important corner case to test.
         Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
 
         for (int slot_idx = 0; slot_idx < tuple_desc->slots().size(); ++slot_idx) {
@@ -283,6 +286,8 @@ class RowBatchSerializeTest : public testing::Test {
   void TestDupRemoval(bool full_dedup);
 
   void TestConsecutiveNulls(bool full_dedup);
+
+  void TestZeroLengthTuple(bool full_dedup);
 };
 
 TEST_F(RowBatchSerializeTest, Basic) {
@@ -509,6 +514,32 @@ void RowBatchSerializeTest::TestConsecutiveNulls(bool full_dedup) {
   CreateTuples(*row_desc.tuple_descriptors()[0], batch->tuple_data_pool(),
       num_distinct_tuples, 50, 10, &tuples);
   AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
+  TestRowBatch(row_desc, batch, false, full_dedup);
+}
+
+TEST_F(RowBatchSerializeTest, ZeroLengthTuples) {
+  TestZeroLengthTuple(false);
+}
+
+TEST_F(RowBatchSerializeTest, ZeroLengthTuplesDedup) {
+  TestZeroLengthTuple(true);
+}
+
+void RowBatchSerializeTest::TestZeroLengthTuple(bool full_dedup) {
+  // tuples: (int), (string), ()
+  DescriptorTblBuilder builder(&pool_);
+  builder.DeclareTuple() << TYPE_INT;
+  builder.DeclareTuple() << TYPE_STRING;
+  builder.DeclareTuple();
+  DescriptorTbl* desc_tbl = builder.Build();
+  vector<bool> nullable_tuples(3, false);
+  vector<TTupleId> tuple_ids;
+  tuple_ids.push_back((TTupleId) 0);
+  tuple_ids.push_back((TTupleId) 1);
+  tuple_ids.push_back((TTupleId) 2);
+  RowDescriptor row_desc(*desc_tbl, tuple_ids, nullable_tuples);
+
+  RowBatch* batch = CreateRowBatch(row_desc);
   TestRowBatch(row_desc, batch, false, full_dedup);
 }
 

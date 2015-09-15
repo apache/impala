@@ -259,6 +259,11 @@ void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
             output_batch->tuple_offsets[prev_row_idx]);
         continue;
       } else if (UNLIKELY(distinct_tuples != NULL)) {
+        if ((*desc)->byte_size() == 0) {
+          // Zero-length tuples can be represented as NULL.
+          output_batch->tuple_offsets.push_back(-1);
+          continue;
+        }
         int* dedupd_offset = distinct_tuples->FindOrInsert(tuple, offset);
         if (*dedupd_offset != offset) {
           // Repeat of tuple
@@ -409,6 +414,7 @@ int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
         // Fast tuple deduplication for adjacent rows.
         continue;
       } else if (UNLIKELY(distinct_tuples != NULL)) {
+        if (row_desc_.tuple_descriptors()[j]->byte_size() == 0) continue;
         bool inserted = distinct_tuples->InsertIfNotPresent(tuple, -1);
         if (!inserted) continue;
       }
