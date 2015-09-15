@@ -213,10 +213,27 @@ Status KuduScanNode::TransformPushableConjunctsToRangePredicates() {
 
     DCHECK_EQ(function_call.node_type, TExprNodeType::FUNCTION_CALL);
 
+    const KuduSchema& kudu_schema = table_->schema();
+
     Slice col_name;
-    KuduValue* bound;
     GetSlotRefColumnName(predicate.nodes[1], &col_name);
-    GetExprLiteralBound(predicate.nodes[2], &bound);
+    KuduColumnSchema::DataType kudu_data_type;
+
+    bool found_col = false;
+    for (int i = 0; i < kudu_schema.num_columns(); ++i) {
+      if (kudu_schema.Column(i).name() == col_name) {
+        kudu_data_type = kudu_schema.Column(i).type();
+        found_col = true;
+        break;
+      }
+    }
+    if (!found_col) {
+      return Status(Substitute("Could not find col: $0 in the table schema.",
+          col_name.ToString()));
+    }
+
+    KuduValue* bound;
+    RETURN_IF_ERROR(GetExprLiteralBound(predicate.nodes[2], kudu_data_type, &bound));
     DCHECK(bound != NULL);
 
     const string& function_name = function_call.fn.name.function_name;
@@ -250,24 +267,82 @@ void KuduScanNode::GetSlotRefColumnName(const TExprNode& node, Slice* col_name) 
   DCHECK(false) << "Could not find a slot with slot id: " << slot_id;
 }
 
-void KuduScanNode::GetExprLiteralBound(const TExprNode& node, KuduValue** value) {
-  switch (node.node_type) {
-    case TExprNodeType::BOOL_LITERAL:
+namespace {
+
+typedef std::map<int, const char*> TypeNamesMap;
+
+// Gets the name of an Expr node type.
+string NodeTypeToString(TExprNodeType::type type) {
+  const TypeNamesMap& type_names_map =
+      impala::_TExprNodeType_VALUES_TO_NAMES;
+  TypeNamesMap::const_iterator iter = type_names_map.find(type);
+
+  if (iter == type_names_map.end()) {
+    return Substitute("Unknown type: $0", type);
+  }
+
+  return (*iter).second;
+}
+
+} // anonymous namespace
+
+Status KuduScanNode::GetExprLiteralBound(const TExprNode& node,
+    KuduColumnSchema::DataType type, KuduValue** value) {
+
+  // Build the Kudu values based on the type of the Kudu column.
+  // We're restrictive regarding which types we accept as the planner does all casting
+  // in the frontend and predicates only get pushed down if the types match.
+  switch (type) {
+    // For types BOOL and STRING we expect the expression literal to match perfectly.
+    case kudu::client::KuduColumnSchema::BOOL: {
+      if (node.node_type != TExprNodeType::BOOL_LITERAL) {
+        return Status(Substitute("Cannot create predicate over column of type BOOL with "
+            "value of type: $0", NodeTypeToString(node.node_type)));
+      }
       *value = KuduValue::FromBool(node.bool_literal.value);
-      return;
-    case TExprNodeType::FLOAT_LITERAL:
-      *value = KuduValue::FromFloat(node.float_literal.value);
-      return;
-    case TExprNodeType::INT_LITERAL:
-      *value = KuduValue::FromInt(node.int_literal.value);
-      return;
-    case TExprNodeType::STRING_LITERAL:
+      return Status::OK();
+    }
+    case kudu::client::KuduColumnSchema::STRING: {
+      if (node.node_type != TExprNodeType::STRING_LITERAL) {
+        return Status(Substitute("Cannot create predicate over column of type STRING"
+            " with value of type: $0", NodeTypeToString(node.node_type)));
+      }
       *value = KuduValue::CopyString(node.string_literal.value);
-      return;
+      return Status::OK();
+    }
+    case kudu::client::KuduColumnSchema::INT8:
+    case kudu::client::KuduColumnSchema::INT16:
+    case kudu::client::KuduColumnSchema::INT32:
+    case kudu::client::KuduColumnSchema::INT64: {
+      if (node.node_type != TExprNodeType::INT_LITERAL) {
+        return Status(Substitute("Cannot create predicate over column of type INT with "
+            "value of type: $0", NodeTypeToString(node.node_type)));
+      }
+      *value = KuduValue::FromInt(node.int_literal.value);
+      return Status::OK();
+    }
+    case kudu::client::KuduColumnSchema::FLOAT: {
+      if (node.node_type != TExprNodeType::FLOAT_LITERAL) {
+        return Status(Substitute("Cannot create predicate over column of type FLOAT with "
+            "value of type: $0", NodeTypeToString(node.node_type)));
+      }
+      *value = KuduValue::FromFloat(node.float_literal.value);
+      return Status::OK();
+    }
+    case kudu::client::KuduColumnSchema::DOUBLE: {
+      if (node.node_type != TExprNodeType::FLOAT_LITERAL) {
+        return Status(Substitute("Cannot create predicate over column of type DOUBLE with "
+            "value of type: $0", NodeTypeToString(node.node_type)));
+      }
+      *value = KuduValue::FromDouble(node.float_literal.value);
+      return Status::OK();
+    }
     default:
       // Should be unreachable.
       LOG(DFATAL) << "Unsupported node type: " << node.node_type;
   }
+  // Avoid compiler warning.
+  return Status("Unreachable");
 }
 
 void KuduScanNode::Close(RuntimeState* state) {

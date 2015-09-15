@@ -149,7 +149,8 @@ Status KuduScanner::OpenNextScanner(const TKuduKeyRange& key_range)  {
   vector<KuduPredicate*> predicates;
   scan_node_->ClonePredicates(&predicates);
   BOOST_FOREACH(KuduPredicate* predicate, predicates) {
-    scanner_->AddConjunctPredicate(predicate);
+    KUDU_RETURN_IF_ERROR(scanner_->AddConjunctPredicate(predicate),
+                         "Unable to add conjunct predicate.");
   }
 
   if (UNLIKELY(FLAGS_pick_only_leaders_for_tests)) {

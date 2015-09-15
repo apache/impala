@@ -164,7 +164,8 @@ class KuduScanNode : public ScanNode {
 
   // Returns a KuduValue with the value of the literal in 'node'.
   // Expects that 'node' is a literal value.
-  void GetExprLiteralBound(const TExprNode& node, kudu::client::KuduValue** value);
+  Status GetExprLiteralBound(const TExprNode& node,
+      kudu::client::KuduColumnSchema::DataType type, kudu::client::KuduValue** value);
 
   // Returns a Slice with the name of the column that 'node' refers to.
   void GetSlotRefColumnName(const TExprNode& node, kudu::Slice* col_name);
