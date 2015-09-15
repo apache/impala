@@ -225,7 +225,8 @@ public class KuduScanNode extends ScanNode {
       Expr e = i.next();
       if (!(e instanceof BinaryPredicate)) continue;
       BinaryPredicate comparisonPred = (BinaryPredicate) e;
-      comparisonPred = normalizeBinaryPredicate(comparisonPred, analyzer);
+      comparisonPred = BinaryPredicate.normalizeAndFoldConstants(comparisonPred,
+          analyzer);
 
       // Make sure the expression on the left is a bare SlotRef.
       // TODO KUDU-931 look into handling implicit/explicit casts on the SlotRef.
@@ -323,26 +324,5 @@ public class KuduScanNode extends ScanNode {
       return comparisonPred;
     }
     return comparisonPred;
-  }
-
-  /**
-   * Returns a version of 'predicate' that always has the SlotRef, if there is one, on the
-   * left and the other expression on the right. This also folds constant children of the
-   * predicate.
-   *
-   * TODO KUDU-930 move this to BinaryPredicate as a static helper
-   */
-  private static BinaryPredicate normalizeBinaryPredicate(BinaryPredicate predicate,
-      Analyzer analyzer)
-      throws AnalysisException {
-    SlotRef ref = predicate.getBoundSlot();
-    if (ref == predicate.getChild(0).unwrapSlotRef(true)) return predicate;
-    Preconditions.checkState(ref == predicate.getChild(1).unwrapSlotRef(true));
-    BinaryPredicate pred = new BinaryPredicate(predicate.getOp().converse(), ref,
-        predicate.getChild(0));
-    pred.analyzeNoThrow(analyzer);
-    pred.foldConstantChildren(analyzer);
-    pred.analyzeNoThrow(analyzer);
-    return pred;
   }
 }

@@ -96,6 +96,23 @@ NODE 0:
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30, zip >= 2, zip <= 49
 ====
+# Test constant folding.
+select * from functional_kudu.testtbl
+where id < 10 + 30  and cast(sin(id) as boolean) = true and 20 * 3 >= id and 10 * 10 + 3 > id
+---- PLAN
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE
+   kudu predicates: id <= 39, id <= 60, id <= 102
+---- SCANRANGELOCATIONS
+NODE 0:
+  KUDU KEYRANGE []:[]
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE
+   kudu predicates: id <= 39, id <= 60, id <= 102
+====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
 where cast(sin(id) as boolean) = true and name = 'a'
