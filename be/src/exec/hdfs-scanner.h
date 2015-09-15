@@ -252,6 +252,11 @@ class HdfsScanner {
   /// 'builder.' Same output params as GetMemory(). Returns the maximum number of tuples
   /// that can be output, or 0 if OOM. Sets parse_status_ if OOM (parse_status_ should not
   /// already be set when calling this function to avoid overwriting it).
+  ///
+  /// The returned TupleRow* should not be incremented (i.e. don't call next_row() on
+  /// it). Instead, incrementing *tuple_mem will update *tuple_row_mem to be pointing at
+  /// the next tuple. This also means its unnecessary to call
+  /// (*tuple_row_mem)->SetTuple().
   int GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool, Tuple** tuple_mem,
       TupleRow** tuple_row_mem);
 
