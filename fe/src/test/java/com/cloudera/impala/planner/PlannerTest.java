@@ -66,7 +66,6 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("hdfs");
   }
 
-
   @Test
   public void testNestedCollections() {
     runPlannerTestFile("nested-collections");

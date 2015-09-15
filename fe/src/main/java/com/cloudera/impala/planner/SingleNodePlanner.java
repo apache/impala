@@ -448,8 +448,11 @@ public class SingleNodePlanner {
             invertJoin = true;
           }
         }
-        // Always place singular row src nodes on the build side.
-        if (root instanceof SingularRowSrcNode) invertJoin = true;
+        // Always place singular row src nodes on the build side, unless we need a
+        // null-aware left anti join which cannot be inverted.
+        if (root instanceof SingularRowSrcNode && !joinOp.isNullAwareLeftAntiJoin()) {
+          invertJoin = true;
+        }
 
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
         PlanNode candidate = null;
@@ -1348,13 +1351,13 @@ public class SingleNodePlanner {
     }
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
-    // Use a nested-loop join if there are no equi-join conjuncts, or if one of the join
-    // children is a singular row src. A singular row src has a cardinality of 1, so a
-    // nested-loop join is certainly cheaper than a hash join.
+    // Use a nested-loop join if there are no equi-join conjuncts, or if the inner
+    // (build side) is a singular row src. A singular row src has a cardinality of 1, so
+    // a nested-loop join is certainly cheaper than a hash join.
     JoinNode result = null;
-    if (eqJoinConjuncts.isEmpty() ||
-        inner instanceof SingularRowSrcNode ||
-        outer instanceof SingularRowSrcNode) {
+    Preconditions.checkState(!tblRef.getJoinOp().isNullAwareLeftAntiJoin()
+        || !(inner instanceof SingularRowSrcNode));
+    if (eqJoinConjuncts.isEmpty() || inner instanceof SingularRowSrcNode) {
       otherJoinConjuncts.addAll(eqJoinConjuncts);
       result = new NestedLoopJoinNode(outer, inner, tblRef.getDistributionMode(),
           tblRef.getJoinOp(), otherJoinConjuncts);

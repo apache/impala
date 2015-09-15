@@ -490,6 +490,27 @@ where c_custkey < 10
 bigint,string,bigint,decimal,string
 ====
 ---- QUERY
+# Test uncorrelated NOT IN subquery with a relative table ref.
+select c_custkey, c_mktsegment, o_orderkey, o_totalprice, o_orderdate
+from tpch_nested_parquet.customer c, c.c_orders o
+where c_custkey < 10
+  and o_orderdate like "1992%"
+  and cast(o_orderdate as timestamp) + interval 13 days not in
+      (select cast(l_shipdate as timestamp)
+       from o.o_lineitems)
+---- RESULTS
+1,'BUILDING',3868359,123076.84,'1992-08-22'
+2,'AUTOMOBILE',1374019,167016.61,'1992-04-05'
+4,'MACHINERY',4320612,182956.01,'1992-09-20'
+7,'AUTOMOBILE',2096544,185203.14,'1992-04-17'
+7,'AUTOMOBILE',3318789,249621.82,'1992-04-30'
+7,'AUTOMOBILE',4328998,322431.85,'1992-03-25'
+8,'BUILDING',4659813,7459.52,'1992-07-26'
+8,'BUILDING',5987111,97765.58,'1992-09-03'
+---- TYPES
+bigint,string,bigint,decimal,string
+====
+---- QUERY
 # Nested subplans with predicates on every table ref.
 select c_custkey, c_mktsegment, o_orderkey, o_orderdate, l_linenumber, l_shipdate
 from customer c, c.c_orders o, o.o_lineitems i

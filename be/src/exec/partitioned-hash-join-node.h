@@ -61,7 +61,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
-  /// Open() implemented in BlockingJoinNode
+  virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);

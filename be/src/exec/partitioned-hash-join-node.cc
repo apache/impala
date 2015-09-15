@@ -133,16 +133,6 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       child(1)->row_desc().tuple_descriptors().size()));
 
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    // Since there is only one such NAAJ stream, we don't worry about the memory consumed
-    // and always use IO-sized buffers.
-    null_aware_partition_ = partition_pool_->Add(new Partition(state, this, 0, false));
-    RETURN_IF_ERROR(null_aware_partition_->build_rows()->Init(id(), runtime_profile(), false));
-    RETURN_IF_ERROR(null_aware_partition_->probe_rows()->Init(id(), runtime_profile(), false));
-
-    null_probe_rows_ = state->obj_pool()->Add(new BufferedTupleStream(
-        state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
-        false /* use small buffers */, false /* delete on read */ ));
-    RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
 
@@ -182,19 +172,41 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
+Status PartitionedHashJoinNode::Open(RuntimeState* state) {
+  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    // Since there is only one such NAAJ stream, we don't worry about the memory consumed
+    // and always use IO-sized buffers.
+    null_aware_partition_ = partition_pool_->Add(new Partition(state, this, 0, false));
+    RETURN_IF_ERROR(
+        null_aware_partition_->build_rows()->Init(id(), runtime_profile(), false));
+    RETURN_IF_ERROR(
+        null_aware_partition_->probe_rows()->Init(id(), runtime_profile(), false));
+
+    null_probe_rows_ = partition_pool_->Add(new BufferedTupleStream(
+        state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
+        false /* use small buffers */, false /* delete on read */ ));
+    RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
+  }
+  RETURN_IF_ERROR(BlockingJoinNode::Open(state));
+  return Status::OK();
+}
+
 Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
+  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    non_empty_build_ = false;
+    null_probe_output_idx_ = -1;
+    matched_null_probe_.clear();
+    // The null_probe_rows_ object is owned by the partition_pool_ which is cleared in
+    // ClosePartitions(), so Close() the stream here first.
+    if (null_probe_rows_ != NULL) null_probe_rows_->Close();
+    null_probe_rows_ = NULL;
+    nulls_build_batch_.reset();
+  }
   state_ = PARTITIONING_BUILD;
   using_small_buffers_ = true;
   ht_ctx_->set_level(0);
   ClosePartitions();
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
-  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    non_empty_build_ = false;
-    null_probe_output_idx_ = -1;
-    matched_null_probe_.clear();
-    if (null_probe_rows_ != NULL) null_probe_rows_->Close();
-    nulls_build_batch_.reset();
-  }
   return ExecNode::Reset(state);
 }
 
@@ -213,8 +225,14 @@ void PartitionedHashJoinNode::ClosePartitions() {
     (*it)->Close(NULL);
   }
   output_build_partitions_.clear();
-  if (input_partition_ != NULL) input_partition_->Close(NULL);
-  if (null_aware_partition_ != NULL) null_aware_partition_->Close(NULL);
+  if (input_partition_ != NULL) {
+    input_partition_->Close(NULL);
+    input_partition_ = NULL;
+  }
+  if (null_aware_partition_ != NULL) {
+    null_aware_partition_->Close(NULL);
+    null_aware_partition_ = NULL;
+  }
   partition_pool_->Clear();
 }
 
@@ -222,10 +240,10 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (ht_ctx_.get() != NULL) ht_ctx_->Close();
 
-  ClosePartitions();
-
   if (null_probe_rows_ != NULL) null_probe_rows_->Close();
   nulls_build_batch_.reset();
+
+  ClosePartitions();
 
   if (block_mgr_client_ != NULL) {
     state->block_mgr()->ClearReservations(block_mgr_client_);

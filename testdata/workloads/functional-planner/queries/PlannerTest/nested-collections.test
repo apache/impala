@@ -953,7 +953,7 @@ where not exists (select c.f2 from a.struct_array_col c where a.id < c.f1)
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
 ====
-# Test subplans: Parent scan and a correlated subquery.
+# Test subplans: Parent scan and a correlated IN subquery.
 # Note: The Nested Loop Join here is intentional because there is no
 # point in doing a hash join with a single build row.
 select a.id
@@ -968,6 +968,47 @@ where id in (select b.item from a.int_array_col b where a.year < b.item)
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and an uncorrelated NOT IN subquery.
+# Note: We must use a hash join because the nested-loop join does not support
+# the null-aware anti join mode. Also, we cannot invert the join because the
+# null-aware right anti join is not supported.
+select a.id
+from functional.allcomplextypes a
+where id not in (select b.item from a.int_array_col b)
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  |  hash predicates: id = b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and a correlated NOT IN subquery.
+# Note: We must use a hash join because the nested-loop join does not support
+# the null-aware anti join mode. Also, we cannot invert the join because the
+# null-aware right anti join is not supported.
+select a.id
+from functional.allcomplextypes a
+where id not in (select b.item from a.int_array_col b where a.year < b.item)
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  |  hash predicates: id = b.item
+|  |  other join predicates: a.year < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |
+|  02:SINGULAR ROW SRC
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
