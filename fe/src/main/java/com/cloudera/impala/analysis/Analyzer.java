@@ -1478,10 +1478,15 @@ public class Analyzer {
     // Invert analysis state for an outer join.
     List<ExprId> conjunctIds =
         globalState_.conjunctsByOjClause.remove(oldRhsTbl.getId());
-    Preconditions.checkNotNull(conjunctIds);
-    globalState_.conjunctsByOjClause.put(newRhsTbl.getId(), conjunctIds);
-    for (ExprId eid: conjunctIds) {
-      globalState_.ojClauseByConjunct.put(eid, newRhsTbl);
+    if (conjunctIds != null) {
+      globalState_.conjunctsByOjClause.put(newRhsTbl.getId(), conjunctIds);
+      for (ExprId eid: conjunctIds) {
+        globalState_.ojClauseByConjunct.put(eid, newRhsTbl);
+      }
+    } else {
+      // An outer join is allowed not to have an On-clause if the rhs table ref is
+      // correlated or relative.
+      Preconditions.checkState(oldRhsTbl.isCorrelated() || oldRhsTbl.isRelative());
     }
     for (Map.Entry<TupleId, TableRef> e: globalState_.outerJoinedTupleIds.entrySet()) {
       if (e.getValue() == oldRhsTbl) e.setValue(newRhsTbl);
