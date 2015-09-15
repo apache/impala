@@ -774,6 +774,8 @@ public class CatalogServiceCatalog extends Catalog {
     } catch (TException e) {
       LOG.error("Error executing tableExists() metastore call: " + tblName, e);
       tableExistsInMetaStore = null;
+    } finally {
+      msClient.release();
     }
 
     if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
