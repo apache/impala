@@ -83,9 +83,10 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 # All predicates can be pushed down.
 select * from functional_kudu.testtbl
 where id >= 10 and zip <= 5 and 20 >= id and 'foo' = name and zip >= 0 and 30 >= zip
+and zip > 1 and zip < 50
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30
+   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30, zip >= 2, zip <= 49
 ---- SCANRANGELOCATIONS
 NODE 0:
   KUDU KEYRANGE []:[]
@@ -93,7 +94,7 @@ NODE 0:
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30
+   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30, zip >= 2, zip <= 49
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl

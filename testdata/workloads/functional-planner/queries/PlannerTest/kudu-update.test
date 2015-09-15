@@ -3,12 +3,12 @@ update functional_kudu.testtbl set name = 'peter' where zip > 94549
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: zip > 94549
+   kudu predicates: zip >= 94550
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: zip > 94549
+   kudu predicates: zip >= 94550
 ====
 # Predicate on key
 update functional_kudu.testtbl set name = 'peter' where zip > 94549 and id = 5
@@ -16,14 +16,12 @@ update functional_kudu.testtbl set name = 'peter' where zip > 94549 and id = 5
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: zip > 94549
-   kudu predicates: id = 5
+   kudu predicates: zip >= 94550, id = 5
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: zip > 94549
-   kudu predicates: id = 5
+   kudu predicates: zip >= 94550, id = 5
 ====
 # Mixing predicate and value assignment
 update functional_kudu.testtbl set zip = 94546 where zip > 94549
@@ -31,12 +29,12 @@ update functional_kudu.testtbl set zip = 94546 where zip > 94549
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: zip > 94549
+   kudu predicates: zip >= 94550
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: zip > 94549
+   kudu predicates: zip >= 94550
 ====
 update a
 set a.name = b.name

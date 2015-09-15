@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.planner;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
@@ -21,6 +22,7 @@ import java.util.Set;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
@@ -233,6 +235,9 @@ public class KuduScanNode extends ScanNode {
       // Needs to have a literal on the right.
       if (!comparisonPred.getChild(1).isLiteral()) continue;
 
+      comparisonPred = transformExclusiveIntLiteralPredicatesToInclusive(comparisonPred,
+          analyzer);
+
       Operator op = comparisonPred.getOp();
       switch (comparisonPred.getOp()) {
         case NE: continue;
@@ -251,6 +256,73 @@ public class KuduScanNode extends ScanNode {
       }
     }
     return pushableConjunctsBuilder.build();
+  }
+
+  /**
+   * Hack to be able to push to Kudu Int GT/LT conjuncts by incrementing or decrementing
+   * the int literal and changing the operator to GE/LE.
+   * Expects the predicate to have been previously normalized.
+   * Returns the same BinaryPredicate if the transformation was not needed or possible or
+   * a new, analyzed predicate if it was.
+   * TODO Remove this when KUDU-1148 (inclusive predicate support in Kudu) gets done
+   */
+  private static BinaryPredicate transformExclusiveIntLiteralPredicatesToInclusive(
+      BinaryPredicate comparisonPred, Analyzer analyzer) {
+    Expr constantExpr = comparisonPred.getChild(1);
+    if (!(constantExpr instanceof NumericLiteral)) return comparisonPred;
+    NumericLiteral numLiteral = (NumericLiteral) constantExpr;
+    long intValue = numLiteral.getLongValue();
+    if (comparisonPred.getOp() == Operator.GT) {
+      // Make sure we don't overflow the type, in which case the type would change and
+      // the slot would get an implicit cast meaning we wouldn't push it anyway.
+      switch (constantExpr.getType().getPrimitiveType()) {
+        case TINYINT:
+          if (intValue >= Byte.MAX_VALUE) return comparisonPred;
+          break;
+        case SMALLINT:
+          if (intValue >= Short.MAX_VALUE) return comparisonPred;
+          break;
+        case INT:
+          if (intValue >= Integer.MAX_VALUE) return comparisonPred;
+          break;
+        case BIGINT:
+          if (intValue >= Long.MAX_VALUE) return comparisonPred;
+          break;
+        default: return comparisonPred;
+      }
+      BigDecimal newValue = BigDecimal.valueOf(intValue + 1);
+      NumericLiteral newLiteral = new NumericLiteral(newValue);
+      comparisonPred = new BinaryPredicate(Operator.GE, comparisonPred.getChild(0),
+          newLiteral);
+      comparisonPred.analyzeNoThrow(analyzer);
+      return comparisonPred;
+    }
+    if (comparisonPred.getOp() == Operator.LT) {
+      // Make sure we don't underflow the type, in which case the type would change and
+      // the slot would get an implicit cast meaning we wouldn't push it anyway.
+      switch (constantExpr.getType().getPrimitiveType()) {
+        case TINYINT:
+          if (intValue <= Byte.MIN_VALUE) return comparisonPred;
+          break;
+        case SMALLINT:
+          if (intValue <= Short.MIN_VALUE) return comparisonPred;
+          break;
+        case INT:
+          if (intValue <= Integer.MIN_VALUE) return comparisonPred;
+          break;
+        case BIGINT:
+          if (intValue <= Long.MIN_VALUE) return comparisonPred;
+          break;
+        default: return comparisonPred;
+      }
+      BigDecimal newValue = BigDecimal.valueOf(intValue - 1);
+      NumericLiteral newLiteral = new NumericLiteral(newValue);
+      comparisonPred = new BinaryPredicate(Operator.LE, comparisonPred.getChild(0),
+          newLiteral);
+      comparisonPred.analyzeNoThrow(analyzer);
+      return comparisonPred;
+    }
+    return comparisonPred;
   }
 
   /**
