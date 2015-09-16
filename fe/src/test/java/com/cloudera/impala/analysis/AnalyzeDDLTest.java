@@ -1299,21 +1299,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'kudu.table_name'='tab'," +
         "'kudu.master_addresses' = '127.0.0.1:8080', " +
         "'kudu.key_columns' = 'a,b,c')");
-    ;
-
-    // Cannot use split keys and RANGE in conjunction
-    AnalysisError("create table tab (a int, b int, c int, d int) " +
-            " distribute by hash(a,b,c) into 8 buckets," +
-            "range(a) split rows ((1),('abc'),(3)) " +
-            "tblproperties (" +
-            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-            "'kudu.table_name'='tab'," +
-            "'kudu.master_addresses' = '127.0.0.1:8080', " +
-            "'kudu.key_columns' = 'a,b,c'," +
-            "'kudu.split_keys' = '[[1]]'" +
-            ")",
-        "The kudu.split_keys table property cannot be used in conjunction with the " +
-        "RANGE partitioning clause.");
 
     // No float split keys
     AnalysisError("create table tab (a int, b int, c int, d int) " +

@@ -502,6 +502,12 @@ def generate_statements(output_name, test_vectors, sections,
       alter = section.get('ALTER')
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
+
+      if file_format == 'kudu':
+        create_kudu = section["CREATE_KUDU"]
+      else:
+        create_kudu = None
+
       table_properties = section['TABLE_PROPERTIES']
       insert = eval_section(section['DEPENDENT_LOAD'])
       load = eval_section(section['LOAD'])
@@ -565,6 +571,8 @@ def generate_statements(output_name, test_vectors, sections,
         if file_format == 'avro':
           print 'CREATE section not supported'
           continue
+      elif create_kudu:
+        table_template = create_kudu
       elif create:
         table_template = create
         if file_format in ['avro', 'hbase', 'kudu']:
@@ -654,7 +662,8 @@ def generate_statements(output_name, test_vectors, sections,
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
-                         'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'DEPENDENT_LOAD', 'LOAD',
+                         'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
+                         'DEPENDENT_LOAD', 'LOAD',
                          'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 

@@ -260,13 +260,6 @@ public class CreateTableStmt extends StatementBase {
           // If the columns are not set, default to all key columns
           if (d.getColumns() == null) d.setColumns(keyColumns);
           d.analyze(analyzer);
-          if (d.getType_() == DistributeComponent.Type.RANGE &&
-              getTblProperties().containsKey(KuduTable.KEY_SPLIT_KEYS)) {
-            throw new AnalysisException(String.format("The %s table property cannot " +
-                "be used in conjunction with the RANGE partitioning clause.",
-                KuduTable.KEY_SPLIT_KEYS));
-          }
-
         }
       }
 

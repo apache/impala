@@ -1,24 +1,11 @@
 ====
 ---- QUERY
--- Test error handling for JSON split rows
-create table tdata_no_port ( id int, name string, valf float, vali bigint)
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = 'tdata_no_port',
-'kudu.split_keys' = '[["string_for_int"]]',
-'kudu.master_addresses' = '127.0.0.1',
-'kudu.key_columns' = 'id'
- )
----- CATCH
-org.glassfish.json.JsonStringImpl cannot be cast to javax.json.JsonNumber
-====
----- QUERY
 -- Test KuduClient will automatically set the default port if no port is given
 create table tdata_no_port ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
 'kudu.table_name' = 'tdata_no_port',
-'kudu.split_keys' = '[[10], [30]]',
 'kudu.master_addresses' = '127.0.0.1',
 'kudu.key_columns' = 'id'
  )
@@ -27,10 +14,10 @@ TBLPROPERTIES(
 ---- QUERY
 -- Invalid hostname
 create table tdata_bogus_host ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
 'kudu.table_name' = 'tdata_no_port',
-'kudu.split_keys' = '[[10], [30]]',
 'kudu.master_addresses' = 'bogus host name',
 'kudu.key_columns' = 'id'
  )
@@ -40,10 +27,10 @@ Couldn't resolve this master's address bogus host name:7051
 ---- QUERY
 -- Non-existing host
 create table tdata_non_existing_host ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
 'kudu.table_name' = 'tdata_no_port',
-'kudu.split_keys' = '[[10], [30]]',
 'kudu.master_addresses' = 'bogus.host.name',
 'kudu.key_columns' = 'id'
  )
@@ -52,10 +39,10 @@ Couldn't resolve this master's address bogus.host.name:7051
 ====
 ---- QUERY
 create table tdata ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
 'kudu.table_name' = 'tdata',
-'kudu.split_keys' = '[[10], [30]]',
 'kudu.master_addresses' = '0.0.0.0:7051',
 'kudu.key_columns' = 'id'
  )
@@ -171,10 +158,10 @@ INT,STRING
 ---- QUERY
 -- Test that string case is ignored
 create table ignore_column_case ( Id int, NAME string, vAlf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10, 'b'), (30, 'a'))
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
 'kudu.table_name' = 'ignore_column_case',
-'kudu.split_keys' = '[[10,"b"], [30,"a"]]',
 'kudu.master_addresses' = '127.0.0.1',
 'kudu.key_columns' = 'Id,NAME'
  )

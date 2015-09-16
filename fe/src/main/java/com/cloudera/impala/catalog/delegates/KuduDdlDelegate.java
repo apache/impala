@@ -74,8 +74,6 @@ public class KuduDdlDelegate extends DdlDelegate {
     // Can be optional for un-managed tables
     String kuduKeyCols = msTbl_.getParameters().get(KuduTable.KEY_KEY_COLUMNS);
 
-    String splitsJson = msTbl_.getParameters().get(KuduTable.KEY_SPLIT_KEYS);
-
     String replication = msTbl_.getParameters().get(KuduTable.KEY_TABLET_REPLICAS);
 
     KuduClientBuilder builder = new KuduClientBuilder(kuduMasters);
@@ -124,11 +122,6 @@ public class KuduDdlDelegate extends DdlDelegate {
 
       Schema schema = new Schema(columns);
       CreateTableBuilder ctb = new CreateTableBuilder();
-
-      // Will add split rows if they are defined, otherwise empty list
-      for (PartialRow splitRow : parseSplits(schema, splitsJson)) {
-        ctb.addSplitRow(splitRow);
-      }
 
       // Handle auto-partitioning of the Kudu table
       if (distributeParams_ != null) {
