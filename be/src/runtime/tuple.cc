@@ -99,6 +99,7 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
     int array_byte_size = av->num_tuples * item_desc->byte_size();
     uint8_t* array_data = reinterpret_cast<uint8_t*>(pool->Allocate(array_byte_size));
     memcpy(array_data, av->ptr, array_byte_size);
+    av->ptr = array_data;
     if (!item_desc->HasVarlenSlots()) continue;
 
     for (int i = 0; i < av->num_tuples; ++i) {

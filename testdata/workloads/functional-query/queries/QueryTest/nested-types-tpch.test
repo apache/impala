@@ -126,3 +126,22 @@ RIGHT JOIN (SELECT r_name, r_regionkey
 ---- TYPES
 SMALLINT,DECIMAL
 ====
+---- QUERY
+# IMPALA-2338: serialization of arrays in exchange.
+SELECT COALESCE(t2.p_size, t4.pos, o_orderkey) AS int_col, COUNT(*)
+FROM customer t1
+LEFT JOIN part t2 ON t1.c_custkey = t2.p_partkey,
+t1.c_orders t3,
+t3.item.o_lineitems t4
+WHERE t1.c_custkey < 100 AND t2.p_partkey < 100
+GROUP BY 1
+HAVING int_col <= 5
+ORDER BY 1
+---- RESULTS
+1,177
+2,113
+3,119
+5,71
+---- TYPES
+BIGINT,BIGINT
+====

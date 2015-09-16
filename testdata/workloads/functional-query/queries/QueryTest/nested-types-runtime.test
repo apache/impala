@@ -16,6 +16,22 @@ where t1.id = t2.id
 bigint,string
 ====
 ---- QUERY
+# Test sending collections through a hash exchange as the build of a hash join.
+select straight_join t1.id, m.key
+from complextypestbl t1 join [shuffle] complextypestbl t2, t2.int_map m
+where t1.id = t2.id
+---- RESULTS
+1,'k1'
+1,'k2'
+2,'k1'
+2,'k2'
+7,'k1'
+7,'k3'
+8,'k1'
+---- TYPES
+bigint,string
+====
+---- QUERY
 # Test top-n after a subplan flattening an array.
 select id, item from complextypestbl t, t.int_array
 order by id limit 5
