@@ -96,6 +96,12 @@ Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
+Status KuduScanner::KeepKuduScannerAlive() {
+  KUDU_RETURN_IF_ERROR(scanner_->KeepAlive(), "Unable to keep the "
+      "Kudu scanner alive.");
+  return Status::OK();
+}
+
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
   int tuple_buffer_size = row_batch->capacity() * tuple_byte_size_;
   void* tuple_buffer = row_batch->tuple_data_pool()->TryAllocate(tuple_buffer_size);

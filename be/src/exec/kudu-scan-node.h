@@ -126,7 +126,7 @@ class KuduScanNode : public ScanNode {
 
   // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
   // threads and consumed by the main thread.
-  boost::scoped_ptr<RowBatchQueue> materialized_row_batches_;
+  boost::scoped_ptr<RowBatchQueue> row_batch_queue;
 
   boost::mutex lock_;
   Status status_;

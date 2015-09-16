@@ -46,6 +46,10 @@ class KuduScanner {
   /// does) for now there is no point since there is a single instance.
   Status GetNext(RowBatch* row_batch, bool* eos);
 
+  /// Sends a "Ping" to the current scanner to keep it alive.
+  /// Requires that there is a current scanner.
+  Status KeepKuduScannerAlive();
+
   /// Closes the Kudu scanner.
   void Close();
 

@@ -191,6 +191,13 @@ class ExecNode {
     /// Adds a batch to the queue. This is blocking if the queue is full.
     void AddBatch(RowBatch* batch);
 
+    /// Adds a batch to the queue. If the queue is full, this blocks until space becomes
+    /// available or 'timeout_micros' has elapsed.
+    /// Returns true if the element was added to the queue, false if it wasn't. If this
+    /// method returns false, the queue didn't take ownership of the batch and it must be
+    /// managed externally.
+    bool AddBatchWithTimeout(RowBatch* batch, int64_t timeout_micros);
+
     /// Gets a row batch from the queue. Returns NULL if there are no more.
     /// This function blocks.
     /// Returns NULL after Shutdown().

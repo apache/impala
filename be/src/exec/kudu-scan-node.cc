@@ -39,8 +39,11 @@
 
 #include "common/names.h"
 
-DEFINE_int32(kudu_max_row_batches, 0, "the maximum size of materialized_row_batches_"
-    " for the Kudu scanners.");
+DEFINE_int32(kudu_max_row_batches, 0, "The maximum size of the row batch queue, "
+    " for Kudu scanners.");
+DEFINE_int32(kudu_scanner_keep_alive_period_us, 15 * 1000L * 1000L,
+    "The period at which Kudu Scanners should send keep-alive requests to the tablet "
+    "server to ensure that scanners do not time out.");
 
 using kudu::client::KuduClient;
 using kudu::client::KuduColumnSchema;
@@ -120,7 +123,7 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
     max_materialized_row_batches_ =
         10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
   }
-  materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
+  row_batch_queue.reset(new RowBatchQueue(max_materialized_row_batches_));
   return Status::OK();
 }
 
@@ -176,7 +179,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   *eos = false;
-  RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
+  RowBatch* materialized_batch = row_batch_queue->GetBatch();
   if (materialized_batch != NULL) {
     row_batch->AcquireState(materialized_batch);
     num_rows_returned_ += row_batch->num_rows();
@@ -189,7 +192,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
       *eos = true;
       done_ = true;
-      materialized_row_batches_->Shutdown();
+      row_batch_queue->Shutdown();
     }
     delete materialized_batch;
   } else {
@@ -355,12 +358,12 @@ void KuduScanNode::Close(RuntimeState* state) {
   if (!done_) {
     unique_lock<mutex> l(lock_);
     done_ = true;
-    materialized_row_batches_->Shutdown();
+    row_batch_queue->Shutdown();
   }
 
   scanner_threads_.JoinAll();
   DCHECK_EQ(num_active_scanners_, 0);
-  materialized_row_batches_->Cleanup();
+  row_batch_queue->Cleanup();
   ExecNode::Close(state);
 }
 
@@ -432,16 +435,20 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_ra
     bool eos = false;
     while (!eos) {
       // Keep looping through all the rows.
-      std::auto_ptr<RowBatch> row_batch(
-          new RowBatch(row_desc(), state_->batch_size(), mem_tracker()));
+      gscoped_ptr<RowBatch> row_batch(new RowBatch(row_desc(), state_->batch_size(),
+          mem_tracker()));
       status = scanner.GetNext(row_batch.get(), &eos);
-      if (!status.ok()) goto done;
-      materialized_row_batches_->AddBatch(row_batch.release());
-      if (done_) goto done;
+      bool added_to_queue = false;
+      while(status.ok() && !done_ &&
+          !(added_to_queue = row_batch_queue->AddBatchWithTimeout(row_batch.get(),
+          FLAGS_kudu_scanner_keep_alive_period_us))) {
+        status = scanner.KeepKuduScannerAlive();
+      }
+      if (added_to_queue) row_batch.release();
+      if (!status.ok() || done_) goto done;
     }
 
     if (state_->resource_pool()->optional_exceeded()) goto done;
-
     key_range = GetNextKeyRange();
     if (key_range == NULL) goto done;
   }
@@ -462,7 +469,7 @@ done:
   if (num_active_scanners_ == 0) {
     // If we got here and we are the last thread, we're all done.
     done_ = true;
-    materialized_row_batches_->Shutdown();
+    row_batch_queue->Shutdown();
   }
 }
 

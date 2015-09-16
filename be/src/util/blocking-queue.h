@@ -22,6 +22,7 @@
 #include <unistd.h>
 
 #include "util/stopwatch.h"
+#include "util/time.h"
 
 namespace impala {
 
@@ -32,6 +33,7 @@ namespace impala {
 /// Or, implement a mostly lock-free blocking queue.
 template <typename T>
 class BlockingQueue {
+
  public:
   BlockingQueue(size_t max_elements)
     : shutdown_(false),
@@ -77,6 +79,40 @@ class BlockingQueue {
     }
     total_put_wait_time_ += timer.ElapsedTime();
     if (shutdown_) return false;
+
+    DCHECK_LT(list_.size(), max_elements_);
+    list_.push_back(val);
+    unique_lock.unlock();
+    get_cv_.notify_one();
+    return true;
+  }
+
+  /// Puts an element into the queue, waiting until 'timeout_micros' elapses, if there is
+  /// no space.
+  /// If the queue is shut down, or if the timeout elapsed without being able to put the
+  /// element, returns false.
+  bool BlockingPutWithTimeout(const T& val, int64_t timeout_micros) {
+    MonotonicStopWatch timer;
+    boost::unique_lock<boost::mutex> unique_lock(lock_);
+
+    boost::system_time wtime = boost::get_system_time() +
+        boost::posix_time::microseconds(timeout_micros);
+
+    bool notified = true;
+    while (list_.size() >= max_elements_ && !shutdown_ && notified) {
+      timer.Start();
+      // Wait until we're notified or until the timeout expires.
+      notified =  put_cv_.timed_wait(unique_lock, wtime);
+      timer.Stop();
+    }
+
+    total_put_wait_time_ += timer.ElapsedTime();
+
+    // If the list is still full or if the the queue has been shutdown, return false.
+    // NOTE: We don't check 'notified' here as it appears that pthread condition variables
+    // have a weird behavior in which they can return ETIMEDOUT from timed_wait even if
+    // another thread did in fact signal
+    if (list_.size() >= max_elements_ || shutdown_) return false;
 
     DCHECK_LT(list_.size(), max_elements_);
     list_.push_back(val);
