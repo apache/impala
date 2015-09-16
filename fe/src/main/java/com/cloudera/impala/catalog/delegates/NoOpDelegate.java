@@ -22,21 +22,17 @@ import com.cloudera.impala.thrift.TAlterTableParams;
 /**
  * Empty implementation for the DdlDelegate interface that does nothing.
  */
-public class NoOpDelegate implements DdlDelegate {
+public class NoOpDelegate extends DdlDelegate {
 
   @Override
-  public void createTable(Table msTbl) throws ImpalaRuntimeException { }
+  public void createTable() throws ImpalaRuntimeException { }
 
   @Override
-  public void dropTable(Table msTbl) throws ImpalaRuntimeException { }
+  public void dropTable() throws ImpalaRuntimeException { }
 
   @Override
-  public boolean alterTable(Table msTbl, TAlterTableParams params)
+  public boolean alterTable()
       throws ImpalaRuntimeException {
     return true;
   }
-
-  @Override
-  public boolean canHandle(Table table) { return false; }
-
 }

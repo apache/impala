@@ -15,13 +15,23 @@
 package com.cloudera.impala.util;
 
 import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonReader;
 
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.cloudera.impala.thrift.TDistributeByRangeParam;
+import com.cloudera.impala.thrift.TRangeLiteral;
+import com.cloudera.impala.thrift.TRangeLiteralList;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.kududb.ColumnSchema;
@@ -30,17 +40,7 @@ import org.kududb.Type;
 import org.kududb.client.KuduTable;
 import org.kududb.client.PartialRow;
 
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.google.common.base.Function;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.net.HostAndPort;
-
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonReader;
+import static java.lang.String.format;
 
 public class KuduUtil {
 
@@ -57,11 +57,11 @@ public class KuduUtil {
     if (hiveFields.size() != kuduFields.size()) return false;
 
     HashMap<String, ColumnSchema> kuduFieldMap = Maps.newHashMap();
-    for (ColumnSchema kuduField: kuduFields) {
+    for (ColumnSchema kuduField : kuduFields) {
       kuduFieldMap.put(kuduField.getName().toUpperCase(), kuduField);
     }
 
-    for (FieldSchema hiveField: hiveFields) {
+    for (FieldSchema hiveField : hiveFields) {
       ColumnSchema kuduField = kuduFieldMap.get(hiveField.getName().toUpperCase());
       if (kuduField == null || fromImpalaType(
           com.cloudera.impala.catalog.Type.parseColumnType(hiveField)) !=
@@ -118,9 +118,31 @@ public class KuduUtil {
     return splitRows.build();
   }
 
+  /**
+   * Given the TDistributeByRangeParam from the CREATE statement, creates the
+   * appropriate split rows.
+   */
+  public static List<PartialRow> parseSplits(Schema schema,
+      TDistributeByRangeParam param) throws ImpalaRuntimeException {
+    ImmutableList.Builder<PartialRow> splitRows = ImmutableList.builder();
+    for (TRangeLiteralList literals : param.getSplit_rows()) {
+      PartialRow splitRow = new PartialRow(schema);
+      List<TRangeLiteral> literalValues = literals.getValues();
+      for (int i = 0; i < literalValues.size(); ++i) {
+        String colName = param.getColumns().get(i);
+        ColumnSchema col = schema.getColumn(colName);
+        setKey(splitRow, col.getType(), literalValues.get(i),
+            schema.getColumnIndex(colName), colName);
+      }
+      splitRows.add(splitRow);
+    }
+    return splitRows.build();
+  }
+
   private static void setKey(PartialRow key, Type type, JsonArray array, int pos)
       throws ImpalaRuntimeException {
     switch (type) {
+      case BOOL: key.addBoolean(pos, array.getBoolean(pos)); break;
       case INT8: key.addByte(pos, (byte) array.getInt(pos)); break;
       case INT16: key.addShort(pos, (short) array.getInt(pos)); break;
       case INT32: key.addInt(pos, array.getInt(pos)); break;
@@ -132,12 +154,61 @@ public class KuduUtil {
     }
   }
 
+  private static void setKey(PartialRow key, Type type, TRangeLiteral literal, int pos,
+      String colName) throws ImpalaRuntimeException {
+    switch (type) {
+      case BOOL:
+        checkCorrectType(literal.isSetBool_literal(), type, colName, literal);
+        key.addBoolean(pos, literal.bool_literal);
+        break;
+      case INT8:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        key.addByte(pos, (byte) literal.getInt_literal());
+        break;
+      case INT16:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        key.addShort(pos, (short) literal.getInt_literal());
+        break;
+      case INT32:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        key.addInt(pos, (int) literal.getInt_literal());
+        break;
+      case INT64:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        key.addLong(pos, literal.getInt_literal());
+        break;
+      case STRING:
+        checkCorrectType(literal.isSetString_literal(), type, colName, literal);
+        key.addString(pos, literal.getString_literal());
+        break;
+      default:
+        throw new ImpalaRuntimeException("Key columns not supported for type: "
+            + type.toString());
+    }
+  }
+
+  /**
+   * If correctType is true, returns. Otherwise throws a formatted error message
+   * indicating problems with the type of the literal of the range literal.
+   */
+  private static void checkCorrectType(boolean correctType, Type t, String colName,
+      TRangeLiteral literal) throws ImpalaRuntimeException {
+    if (correctType) return;
+    throw new ImpalaRuntimeException(
+        format("Expected %s literal for column '%s' got '%s'", t.getName(), colName,
+            ToString(literal)));
+  }
+
   /**
    * Parses a string of the form "a, b, c" and returns a set of values split by ',' and
-   * stripped of the whitespace. Normalizes the strings to lower case.
+   * stripped of the whitespace.
    */
   public static HashSet<String> parseKeyColumns(String cols) {
     return Sets.newHashSet(Splitter.on(",").trimResults().split(cols));
+  }
+
+  public static List<String> parseKeyColumnsAsList(String cols) {
+    return Lists.newArrayList(Splitter.on(",").trimResults().split(cols));
   }
 
   /**
@@ -147,7 +218,7 @@ public class KuduUtil {
   public static Type fromImpalaType(com.cloudera.impala.catalog.Type t)
       throws ImpalaRuntimeException {
     if (!t.isScalarType()) {
-      throw new ImpalaRuntimeException(String.format(
+      throw new ImpalaRuntimeException(format(
           "Non-scalar type %s is not supported in Kudu", t.toSql()));
     }
     ScalarType s = (ScalarType) t;
@@ -171,8 +242,18 @@ public class KuduUtil {
       case DATETIME:
       case DECIMAL:
       default:
-        throw new ImpalaRuntimeException(String.format(
+        throw new ImpalaRuntimeException(format(
             "Type %s is not supported in Kudu", s.toSql()));
     }
+  }
+
+  /**
+   * Returns the string value of the RANGE literal.
+   */
+  static String ToString(TRangeLiteral l) throws ImpalaRuntimeException {
+    if (l.isSetBool_literal()) return String.valueOf(l.bool_literal);
+    if (l.isSetString_literal()) return String.valueOf(l.string_literal);
+    if (l.isSetInt_literal()) return String.valueOf(l.int_literal);
+    throw new ImpalaRuntimeException("Unsupported type for RANGE literal.");
   }
 }

@@ -1213,13 +1213,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "present and have valid values.");
 
     AnalysisError("create table tab (x int) tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.key_columns' = 'a,b,c'"
-        +")",
+            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+            "'kudu.table_name'='tab'," +
+            "'kudu.key_columns' = 'a,b,c'"
+            + ")",
         "Kudu table is missing parameters in table properties. Please verify " +
-        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present and have valid values.");
+            "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+            "present and have valid values.");
 
     AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
@@ -1232,24 +1232,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Check that properties are not empty
     AnalysisError("create table tab (x int) tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'=''," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")",
+            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+            "'kudu.table_name'=''," +
+            "'kudu.master_addresses' = '127.0.0.1:8080', " +
+            "'kudu.key_columns' = 'a,b,c'" +
+            ")",
         "Kudu table is missing parameters in table properties. Please verify " +
-        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present and have valid values.");
+            "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+            "present and have valid values.");
 
     AnalysisError("create table tab (x int) tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='asd'," +
-        "'kudu.master_addresses' = '', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")",
+            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+            "'kudu.table_name'='asd'," +
+            "'kudu.master_addresses' = '', " +
+            "'kudu.key_columns' = 'a,b,c'" +
+            ")",
         "Kudu table is missing parameters in table properties. Please verify " +
-        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present and have valid values.");
+            "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+            "present and have valid values.");
 
     // Don't allow caching
     AnalysisError("create table tab (x int) cached in 'testPool' tblproperties (" +
@@ -1258,6 +1258,74 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'kudu.master_addresses' = '127.0.0.1:8080', " +
         "'kudu.key_columns' = 'a,b,c'" +
         ")", "A Kudu table cannot be cached in HDFS.");
+
+    // Flexible Partitioning
+    AnalyzesOk("create table tab (a int, b int, c int, d int) " +
+        "distribute by hash(a,b) into 8 buckets, hash(c) into 2 buckets " +
+        "tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")");
+
+    AnalyzesOk("create table tab (a int, b int, c int, d int) " +
+        " distribute by hash into 8 buckets " +
+        "tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")");
+
+    // Number of buckets must be larger 1
+    AnalysisError("create table tab (a int, b int, c int, d int) " +
+        " distribute by hash(a,b) into 8 buckets, hash(c) into 1 buckets " +
+        "tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")",
+        "Number of buckets in DISTRIBUTE BY clause 'HASH(c) INTO 1 BUCKETS' must " +
+            "be larger than 1");
+
+    // Distribute range data types are picked up during analysis and forwarded to Kudu
+    AnalyzesOk("create table tab (a int, b int, c int, d int) " +
+        "distribute by hash(a,b,c) into 8 buckets, " +
+        "range(a) split rows ((1),('abc'),(3)) " +
+        "tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c')");
+    ;
+
+    // Cannot use split keys and RANGE in conjunction
+    AnalysisError("create table tab (a int, b int, c int, d int) " +
+            " distribute by hash(a,b,c) into 8 buckets," +
+            "range(a) split rows ((1),('abc'),(3)) " +
+            "tblproperties (" +
+            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+            "'kudu.table_name'='tab'," +
+            "'kudu.master_addresses' = '127.0.0.1:8080', " +
+            "'kudu.key_columns' = 'a,b,c'," +
+            "'kudu.split_keys' = '[[1]]'" +
+            ")",
+        "The kudu.split_keys table property cannot be used in conjunction with the " +
+        "RANGE partitioning clause.");
+
+    // No float split keys
+    AnalysisError("create table tab (a int, b int, c int, d int) " +
+            "distribute by hash(a,b,c) into 8 buckets, " +
+            "range(a) split rows ((1.2),('abc'),(3)) " +
+            "tblproperties (" +
+            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+            "'kudu.table_name'='tab'," +
+            "'kudu.master_addresses' = '127.0.0.1:8080', " +
+            "'kudu.key_columns' = 'a,b,c'" +
+            ")",
+        "Only integral and string values allowed for split rows.");
   }
 
   @Test

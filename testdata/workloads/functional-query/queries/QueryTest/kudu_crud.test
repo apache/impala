@@ -1,5 +1,18 @@
 ====
 ---- QUERY
+-- Test error handling for JSON split rows
+create table tdata_no_port ( id int, name string, valf float, vali bigint)
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'tdata_no_port',
+'kudu.split_keys' = '[["string_for_int"]]',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id'
+ )
+---- CATCH
+org.glassfish.json.JsonStringImpl cannot be cast to javax.json.JsonNumber
+====
+---- QUERY
 -- Test KuduClient will automatically set the default port if no port is given
 create table tdata_no_port ( id int, name string, valf float, vali bigint)
 TBLPROPERTIES(

@@ -232,15 +232,17 @@ parser code {:
 // List of keywords. Please keep them sorted alphabetically.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
-  KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY,
+  KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN,
+  KW_BUCKETS, KW_BY,
   KW_CACHED, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN,
   KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELETE, KW_DELIMITED,
-  KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END,
-  KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
+  KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTRIBUTE, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE,
+  KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
   KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
+  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP,KW_HASH,
+  KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
   KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
   KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS,
@@ -249,7 +251,7 @@ terminal
   KW_PREPARE_FN, KW_PRODUCED, KW_RANGE, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME,
   KW_REPLACE, KW_REPLICATION, KW_RETURNS, KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE,
   KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
-  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED,
+  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SPLIT, KW_STORED,
   KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
   KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP,
   KW_TINYINT, KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
@@ -381,6 +383,13 @@ nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
 nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
 nonterminal StructField struct_field_def;
+nonterminal DistributeComponent distribute_hash_component;
+nonterminal ArrayList<DistributeComponent> distribute_hash_component_list;
+nonterminal ArrayList<DistributeComponent> opt_distribute_component_list;
+nonterminal ArrayList<DistributeComponent> distribute_component_list;
+nonterminal DistributeComponent distribute_range_component;
+nonterminal ArrayList<ArrayList<LiteralExpr>> split_row_list;
+nonterminal ArrayList<LiteralExpr> literal_list;
 nonterminal ColumnDef column_def, view_column_def;
 nonterminal ArrayList<ColumnDef> column_def_list, view_column_def_list;
 nonterminal ArrayList<ColumnDef> partition_column_defs, view_column_defs;
@@ -466,6 +475,8 @@ precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left LPAREN, RPAREN;
 // Support chaining of timestamp arithmetic exprs.
 precedence left KW_INTERVAL;
+
+precedence left KW_TBLPROPERTIES;
 
 // These tokens need to be at the end for function_def_args_map to accept
 // no keys. Otherwise, the grammar has shift/reduce conflicts.
@@ -924,16 +935,33 @@ create_tbl_as_select_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
   table_name:table comment_val:comment row_format_val:row_format
   serde_properties:serde_props file_format_create_table_val:file_format
-  location_val:location cache_op_val:cache_op tbl_properties:tbl_props
+  location_val:location cache_op_val:cache_op
+  distribute_component_list:distribute tbl_properties:tbl_props
   KW_AS query_stmt:query
   {:
     // Initialize with empty List of columns and partition columns. The
     // columns will be added from the query statement during analysis
     CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
         new ArrayList<ColumnDef>(), external, comment, row_format,
-        file_format, location, cache_op, if_not_exists, tbl_props, serde_props);
+        file_format, location, cache_op, if_not_exists, tbl_props, serde_props,
+        distribute);
     RESULT = new CreateTableAsSelectStmt(create_stmt, query);
   :}
+  | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+    table_name:table comment_val:comment row_format_val:row_format
+    serde_properties:serde_props file_format_create_table_val:file_format
+    location_val:location cache_op_val:cache_op tbl_properties:tbl_props
+    KW_AS query_stmt:query
+  {:
+    // Initialize with empty List of columns and partition columns. The
+    // columns will be added from the query statement during analysis
+    CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
+      new ArrayList<ColumnDef>(), external, comment, row_format,
+      file_format, location, cache_op, if_not_exists, tbl_props, serde_props,
+      null);
+    RESULT = new CreateTableAsSelectStmt(create_stmt, query);
+  :}
+
   ;
 
 // Create unpartitioned tables with and without column definitions.
@@ -947,11 +975,12 @@ create_unpartitioned_tbl_stmt ::=
   table_name:table LPAREN column_def_list:col_defs RPAREN comment_val:comment
   row_format_val:row_format serde_properties:serde_props
   file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
+  opt_distribute_component_list:distribute
   tbl_properties:tbl_props
   {:
     RESULT = new CreateTableStmt(table, col_defs, new ArrayList<ColumnDef>(), external,
         comment, row_format, file_format, location, cache_op, if_not_exists, tbl_props,
-        serde_props);
+        serde_props, distribute);
   :}
   | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
     table_name:table comment_val:comment row_format_val:row_format
@@ -960,7 +989,7 @@ create_unpartitioned_tbl_stmt ::=
   {:
     RESULT = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
         new ArrayList<ColumnDef>(), external, comment, row_format, file_format,
-        location, cache_op, if_not_exists, tbl_props, serde_props);
+        location, cache_op, if_not_exists, tbl_props, serde_props, null);
   :}
   | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
     table_name:table LPAREN column_def_list:col_defs RPAREN
@@ -975,6 +1004,78 @@ create_unpartitioned_tbl_stmt ::=
   :}
   ;
 
+
+// The DISTRIBUTE clause contains any number of HASH() clauses followed by exactly zero
+// or one RANGE clause
+opt_distribute_component_list ::=
+  distribute_component_list:list
+  {: RESULT = list; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+distribute_component_list ::=
+  KW_DISTRIBUTE KW_BY distribute_hash_component_list:list
+  {: RESULT = list; :}
+  | KW_DISTRIBUTE KW_BY distribute_range_component:rng
+  {: RESULT = Lists.newArrayList(rng); :}
+  | KW_DISTRIBUTE KW_BY distribute_hash_component_list:list COMMA distribute_range_component:rng
+  {:
+    list.add(rng);
+    RESULT = list;
+  :}
+  ;
+
+// A list of HASH distribution clauses used for flexible partitioning
+distribute_hash_component_list ::=
+  distribute_hash_component:dc
+  {: RESULT = Lists.newArrayList(dc); :}
+  | distribute_hash_component_list:list COMMA distribute_hash_component:d
+  {:
+    list.add(d);
+    RESULT = list;
+  :}
+  ;
+
+// The column list for a HASH clause is optional.
+distribute_hash_component ::=
+  KW_HASH LPAREN ident_list:cols RPAREN KW_INTO
+    INTEGER_LITERAL:buckets KW_BUCKETS
+  {: RESULT = new DistributeComponent(DistributeComponent.Type.HASH, cols, buckets); :}
+  | KW_HASH KW_INTO INTEGER_LITERAL:buckets KW_BUCKETS
+  {: RESULT = new DistributeComponent(DistributeComponent.Type.HASH, null, buckets); :}
+  ;
+
+// The column list for a RANGE clause is optional.
+distribute_range_component ::=
+  KW_RANGE LPAREN ident_list:cols RPAREN KW_SPLIT KW_ROWS
+  LPAREN split_row_list:list RPAREN
+  {: RESULT = new DistributeComponent(DistributeComponent.Type.RANGE, cols, list); :}
+  | KW_RANGE KW_SPLIT KW_ROWS LPAREN split_row_list:list RPAREN
+  {: RESULT = new DistributeComponent(DistributeComponent.Type.RANGE, null, list); :}
+  ;
+
+split_row_list ::=
+  LPAREN literal_list:l RPAREN
+  {: RESULT = Lists.<ArrayList<LiteralExpr>>newArrayList(l); :}
+  | split_row_list:list COMMA LPAREN literal_list:l RPAREN
+  {:
+    list.add(l);
+    RESULT = list;
+  :}
+  ;
+
+literal_list ::=
+  literal:l
+  {: RESULT = Lists.newArrayList(l); :}
+  | literal_list:list COMMA literal:l
+  {:
+    list.add(l);
+    RESULT = list;
+  :}
+  ;
+
+
 // Create partitioned tables with and without column definitions.
 // TODO: Clean up by consolidating everything after the column defs and
 // partition clause into a CreateTableParams.
@@ -988,7 +1089,7 @@ create_partitioned_tbl_stmt ::=
   {:
     RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
         row_format, file_format, location, cache_op, if_not_exists, tbl_props,
-        serde_props);
+        serde_props, null);
   :}
   | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
     table_name:table KW_PARTITIONED KW_BY
@@ -999,7 +1100,7 @@ create_partitioned_tbl_stmt ::=
   {:
     RESULT = new CreateTableStmt(table, new ArrayList<ColumnDef>(), partition_col_defs,
         external, comment, row_format, file_format, location, cache_op, if_not_exists,
-        tbl_props, serde_props);
+        tbl_props, serde_props, null);
   :}
   ;
 

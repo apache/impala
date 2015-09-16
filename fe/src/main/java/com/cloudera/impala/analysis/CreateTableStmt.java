@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.cloudera.impala.util.KuduUtil;
 import org.apache.hadoop.fs.permission.FsAction;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -56,6 +57,7 @@ public class CreateTableStmt extends StatementBase {
   private final Map<String, String> serdeProperties_;
   private final HdfsCachingOp cachingOp_;
   private HdfsUri location_;
+  private final List<DistributeComponent> distributeComponents_;
 
   // Set during analysis
   private String dbName_;
@@ -82,7 +84,7 @@ public class CreateTableStmt extends StatementBase {
       List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
       RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsUri location,
       HdfsCachingOp cachingOp, boolean ifNotExists, Map<String, String> tblProperties,
-      Map<String, String> serdeProperties) {
+      Map<String, String> serdeProperties, List<DistributeComponent> distributeComponents) {
     Preconditions.checkNotNull(columnDefs);
     Preconditions.checkNotNull(partitionColumnDefs);
     Preconditions.checkNotNull(fileFormat);
@@ -103,6 +105,7 @@ public class CreateTableStmt extends StatementBase {
     this.serdeProperties_ = serdeProperties;
     unescapeProperties(tblProperties_);
     unescapeProperties(serdeProperties_);
+    this.distributeComponents_ = distributeComponents;
   }
 
   /**
@@ -121,6 +124,7 @@ public class CreateTableStmt extends StatementBase {
     tableName_ = other.tableName_;
     tblProperties_ = other.tblProperties_;
     serdeProperties_ = other.serdeProperties_;
+    distributeComponents_ = other.distributeComponents_;
   }
 
   @Override
@@ -182,6 +186,11 @@ public class CreateTableStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     if (tblProperties_ != null) params.setTable_properties(tblProperties_);
     if (serdeProperties_ != null) params.setSerde_properties(serdeProperties_);
+    if (distributeComponents_ != null) {
+      for(DistributeComponent d : distributeComponents_) {
+        params.addToDistribute_by(d.toThrift());
+      }
+    }
     return params;
   }
 
@@ -243,9 +252,30 @@ public class CreateTableStmt extends StatementBase {
       if (cachingOp_ != null) {
         throw new AnalysisException("A Kudu table cannot be cached in HDFS.");
       }
+
+      if (distributeComponents_ != null) {
+        List<String> keyColumns = KuduUtil.parseKeyColumnsAsList(
+            getTblProperties().get(KuduTable.KEY_KEY_COLUMNS));
+        for(DistributeComponent d : distributeComponents_) {
+          // If the columns are not set, default to all key columns
+          if (d.getColumns() == null) d.setColumns(keyColumns);
+          d.analyze(analyzer);
+          if (d.getType_() == DistributeComponent.Type.RANGE &&
+              getTblProperties().containsKey(KuduTable.KEY_SPLIT_KEYS)) {
+            throw new AnalysisException(String.format("The %s table property cannot " +
+                "be used in conjunction with the RANGE partitioning clause.",
+                KuduTable.KEY_SPLIT_KEYS));
+          }
+
+        }
+      }
+
+    } else if (distributeComponents_ != null) {
+      throw new AnalysisException("Only Kudu tables can use DISTRIBUTE BY clause.");
     }
 
     if (cachingOp_ != null) cachingOp_.analyze(analyzer);
+
   }
 
   /**

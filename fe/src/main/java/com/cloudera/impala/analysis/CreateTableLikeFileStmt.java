@@ -59,7 +59,8 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       Map<String, String> serdeProperties) {
     super(tableName, new ArrayList<ColumnDef>(), partitionColumnDescs,
         isExternal, comment, rowFormat,
-        fileFormat, location, cachingOp, ifNotExists, tblProperties, serdeProperties);
+        fileFormat, location, cachingOp, ifNotExists, tblProperties, serdeProperties,
+        null);
     schemaLocation_ = schemaLocation;
     schemaFileFormat_ = schemaFileFormat;
   }

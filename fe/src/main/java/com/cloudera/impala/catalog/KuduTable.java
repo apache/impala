@@ -191,7 +191,7 @@ public class KuduTable extends Table {
     Set<String> keyColumns = KuduUtil.parseKeyColumns(
         Preconditions.checkNotNull(
             msTbl.getParameters().get(KEY_KEY_COLUMNS).toLowerCase(),
-        "'kudu.key_columns' cannot be null."));
+            "'kudu.key_columns' cannot be null."));
 
     // Load the rest of the data from the table parameters directly
     loadColumns(msTbl.getSd().getCols(), client, keyColumns);
@@ -264,8 +264,10 @@ public class KuduTable extends Table {
       for(LocatedTablet tab : tablets) {
         TResultRowBuilder builder = new TResultRowBuilder();
         builder.add("-1");
-        builder.add(DatatypeConverter.printHexBinary(tab.getStartKey()));
-        builder.add(DatatypeConverter.printHexBinary(tab.getEndKey()));
+        builder.add(DatatypeConverter.printHexBinary(
+            tab.getPartition().getPartitionKeyStart()));
+        builder.add(DatatypeConverter.printHexBinary(
+            tab.getPartition().getPartitionKeyEnd()));
         LocatedTablet.Replica leader = tab.getLeaderReplica();
         if (leader == null) {
           // Leader might be null, if it is not yet available (e.g. during
@@ -281,6 +283,12 @@ public class KuduTable extends Table {
 
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Could not communicate with Kudu.", e);
+    } finally {
+      try {
+        client.shutdown();
+      } catch (Exception e) {
+        throw new ImpalaRuntimeException("Could not close Kudu client.", e);
+      }
     }
     return result;
   }

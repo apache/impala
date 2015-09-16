@@ -2120,7 +2120,7 @@ public class ParserTest {
         " WITH REPLICATION = 4");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool'");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) LOCATION '/a' " +
-          "CACHED IN 'myPool'");
+        "CACHED IN 'myPool'");
     ParserError("CREATE TABLE Foo (i int) CACHED IN myPool");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN");
     ParserError("CREATE TABLE Foo (i int) CACHED 'myPool'");
@@ -2165,6 +2165,40 @@ public class ParserTest {
         "ROW FORMAT DELIMITED");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY (j string) PRODUCED BY DATA " +
         "SOURCE Foo(\"\")");
+
+
+    // Flexible partitioning
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS");
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, " +
+        "HASH(a) INTO 2 BUCKETS");
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH INTO 4 BUCKETS");
+    ParsesOk("CREATE TABLE Foo (i int, k int) DISTRIBUTE BY HASH INTO 4 BUCKETS," +
+        " HASH(k) INTO 4 BUCKETS");
+    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i)");
+
+    // Range partitioning, the split rows are not validated in the parser
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
+        "SPLIT ROWS ((1, 2.0, 'asdas'))");
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE " +
+        "SPLIT ROWS ((1, 2.0, 'asdas'))");
+
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
+            "SPLIT ROWS (('asdas'))");
+
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
+        "SPLIT ROWS ((1, 2.0, 'asdas'), (2,3.0, 'adas'))");
+
+    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
+        "SPLIT ROWS ()");
+    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i)");
+
+    // Combine both
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, RANGE(i) " +
+        "SPLIT ROWS ((1, 2.0, 'asdas'))");
+
+    // Can only have one range clause
+    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, RANGE(i) " +
+        "SPLIT ROWS ((1, 2.0, 'asdas')), RANGE(i) SPLIT ROWS ((1, 2.0, 'asdas'))");
   }
 
   @Test
@@ -2316,6 +2350,11 @@ public class ParserTest {
     // Column and partition definitions not allowed
     ParserError("CREATE TABLE Foo(i int) AS SELECT 1");
     ParserError("CREATE TABLE Foo PARTITIONED BY(i int) AS SELECT 1");
+
+    // Flexible partitioning
+    ParsesOk("CREATE TABLE Foo DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo DISTRIBUTE BY HASH(a) INTO 4 BUCKETS " +
+        "TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
   }
 
   @Test
