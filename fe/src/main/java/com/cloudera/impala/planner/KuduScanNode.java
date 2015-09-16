@@ -134,8 +134,8 @@ public class KuduScanNode extends ScanNode {
 
         // Now set the scan range of this tablet
         TKuduKeyRange keyRange = new TKuduKeyRange();
-        keyRange.setStartKey(tablet.getStartKey());
-        keyRange.setStopKey(tablet.getEndKey());
+        keyRange.setPartitionStartKey(tablet.getPartition().getPartitionKeyStart());
+        keyRange.setPartitionStopKey(tablet.getPartition().getPartitionKeyEnd());
         TScanRange scanRange = new TScanRange();
         scanRange.setKudu_key_range(keyRange);
 

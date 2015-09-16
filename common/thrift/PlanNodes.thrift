@@ -103,8 +103,8 @@ struct THBaseKeyRange {
 
 // Key range to query a Kudu table
 struct TKuduKeyRange {
-  1: optional binary startKey
-  2: optional binary stopKey
+  1: optional binary partitionStartKey
+  2: optional binary partitionStopKey
 }
 
 // Specification of an individual data range which is held in its entirety

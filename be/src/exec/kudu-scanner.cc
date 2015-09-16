@@ -50,19 +50,21 @@ namespace impala {
 
 namespace {
 
-// Sets up the scan range predicate on the scanner, i.e. the start/stop keys
-// of the range the scanner is supposed to scan.
+// Sets up the scan range predicate on the scanner, i.e. the partition start/stop keys
+// of the partition the scanner is supposed to scan.
 Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
     kudu::client::KuduScanner* scanner) {
-  if (key_range.startKey.empty() && key_range.stopKey.empty()) return Status::OK();
-
-  if (!key_range.startKey.empty()) {
-    KUDU_RETURN_IF_ERROR(scanner->AddLowerBoundRaw(key_range.startKey),
-        "adding scan range lower bound");
+  if (key_range.partitionStartKey.empty() && key_range.partitionStopKey.empty()) {
+    return Status::OK();
   }
-  if (!key_range.stopKey.empty()) {
-    KUDU_RETURN_IF_ERROR(scanner->AddExclusiveUpperBoundRaw(key_range.stopKey),
-        "adding scan range upper bound");
+
+  if (!key_range.partitionStartKey.empty()) {
+    KUDU_RETURN_IF_ERROR(scanner->AddLowerBoundPartitionKeyRaw(
+            key_range.partitionStartKey), "adding scan range lower bound");
+  }
+  if (!key_range.partitionStopKey.empty()) {
+    KUDU_RETURN_IF_ERROR(scanner->AddExclusiveUpperBoundPartitionKeyRaw(
+            key_range.partitionStopKey), "adding scan range upper bound");
   }
 
   return Status::OK();

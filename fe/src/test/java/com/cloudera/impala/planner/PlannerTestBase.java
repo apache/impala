@@ -260,9 +260,9 @@ public class PlannerTestBase {
           //      non-local key-ranges
           //result.append("host=" + networkAddress.hostname + ":" +
           //    networkAddress.port + " ");
-          result.append(Arrays.toString(kr.getStartKey()));
+          result.append(Arrays.toString(kr.getPartitionStartKey()));
           result.append(":");
-          result.append(Arrays.toString(kr.getStopKey()));
+          result.append(Arrays.toString(kr.getPartitionStopKey()));
         }
 
         result.append("\n");

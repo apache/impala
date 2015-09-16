@@ -44,13 +44,12 @@ class Tuple;
 /// use the same schema, for the same scan.
 ///
 /// What is implemented:
-/// - Single threaded scans
+/// - Multi threaded scans
 /// - Scan node side conjunct eval
 /// - Key predicate pushdowns
-///
-/// What is missing:
-/// - Multi-threaded scans
 /// - Column predicate pushdowns
+///
+/// What is left:
 /// - Memory transport
 class KuduScanNode : public ScanNode {
  public:
@@ -180,8 +179,8 @@ class KuduScanNode : public ScanNode {
   // Thread that creates and runs a scanner.
   void ScannerThread(const string& name, const TKuduKeyRange* initial_range);
 
-  // Returns the next key range to read. Thread safe. Returns NULL if there are no more
-  // ranges.
+  // Returns the next partition key range to read. Thread safe. Returns NULL if there are
+  // no more ranges.
   TKuduKeyRange* GetNextKeyRange();
 };
 

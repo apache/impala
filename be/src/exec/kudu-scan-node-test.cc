@@ -240,8 +240,8 @@ class KuduScanNodeTest : public testing::Test {
     }
 
     TKuduKeyRange kudu_key_range;
-    kudu_key_range.__set_startKey(encoded_start_key);
-    kudu_key_range.__set_stopKey(encoded_stop_key);
+    kudu_key_range.__set_partitionStartKey(encoded_start_key);
+    kudu_key_range.__set_partitionStopKey(encoded_stop_key);
 
     TScanRange scan_range;
     scan_range.__set_kudu_key_range(kudu_key_range);
@@ -281,8 +281,9 @@ TEST_F(KuduScanNodeTest, TestScanNode) {
                                    NUM_ROWS);
 
 
-  // Test having multiple scan ranges.
-  int mid_key = FIRST_ROW + (NUM_ROWS / 2);
+  // Test having multiple scan ranges, the range is split by tablet boundaries. Default
+  // split is at '5'.
+  int mid_key = 5;
   vector<TScanRangeParams> params;
   AddScanRange(FIRST_ROW, mid_key, &params);
   AddScanRange(mid_key, NUM_ROWS, &params);
