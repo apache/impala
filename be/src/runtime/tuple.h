@@ -46,6 +46,12 @@ class TupleRow;
 /// 9) string slots
 //
 /// A tuple with 0 materialised slots is represented as NULL.
+///
+/// TODO: Our projection of collection-typed slots breaks/augments the conventional
+/// semantics of the null bits, because we rely on producers of array values to also
+/// set the slot value in addition to the null bit. We should address this issue with
+/// a proper projection that restores the intended (original) null bit semantics.
+/// See also UnnestNode for details on the projection.
 class Tuple {
  public:
   /// initialize individual tuple with data residing in mem pool
