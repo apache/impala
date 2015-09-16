@@ -191,7 +191,7 @@ class Sorter::Run {
   int var_len_blocks_index_;
 
   // If true, pin the next fixed and var-len blocks and delete the previous ones
-  // during in the next call to GetNext(). Set during the previous call to GetNext().
+  // in the next call to GetNext(). Set during the previous call to GetNext().
   // Not used if a run is already pinned.
   bool pin_next_fixed_len_block_;
   bool pin_next_var_len_block_;
@@ -582,8 +582,10 @@ Status Sorter::Run::PrepareRead() {
   // Attempt to pin the first fixed and var-length blocks. In either case, pinning may
   // fail if the number of reserved blocks is oversubscribed, see IMPALA-1590.
   if (fixed_len_blocks_.size() > 0) {
-    bool pinned = false;
+    bool pinned;
     RETURN_IF_ERROR(fixed_len_blocks_[0]->Pin(&pinned));
+    // Temporary work-around for IMPALA-1868. Fail the query with OOM rather than
+    // DCHECK in case block pin fails.
     if (!pinned) {
       Status status = Status::MEM_LIMIT_EXCEEDED;
       status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "fixed"));
@@ -592,8 +594,10 @@ Status Sorter::Run::PrepareRead() {
   }
 
   if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
-    bool pinned = false;
+    bool pinned;
     RETURN_IF_ERROR(var_len_blocks_[0]->Pin(&pinned));
+    // Temporary work-around for IMPALA-1590. Fail the query with OOM rather than
+    // DCHECK in case block pin fails.
     if (!pinned) {
       Status status = Status::MEM_LIMIT_EXCEEDED;
       status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "variable"));
@@ -658,7 +662,13 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       fixed_len_blocks_[fixed_len_blocks_index_ - 1] = NULL;
       bool pinned;
       RETURN_IF_ERROR(fixed_len_block->Pin(&pinned));
-      DCHECK(pinned);
+      // Temporary work-around for IMPALA-2344. Fail the query with OOM rather than
+      // DCHECK in case block pin fails.
+      if (!pinned) {
+        Status status = Status::MEM_LIMIT_EXCEEDED;
+        status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "fixed"));
+        return status;
+      }
       pin_next_fixed_len_block_ = false;
     }
     if (pin_next_var_len_block_) {
@@ -666,7 +676,13 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       var_len_blocks_[var_len_blocks_index_ - 1] = NULL;
       bool pinned;
       RETURN_IF_ERROR(var_len_blocks_[var_len_blocks_index_]->Pin(&pinned));
-      DCHECK(pinned);
+      // Temporary work-around for IMPALA-2344. Fail the query with OOM rather than
+      // DCHECK in case block pin fails.
+      if (!pinned) {
+        Status status = Status::MEM_LIMIT_EXCEEDED;
+        status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "variable"));
+        return status;
+      }
       pin_next_var_len_block_ = false;
     }
   }
@@ -723,12 +739,12 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
     ++num_tuples_returned_;
   }
 
+  // Reached the block boundary, need to move to the next block.
   if (fixed_len_block_offset_ >= fixed_len_block->valid_data_len()) {
     pin_next_fixed_len_block_ = true;
     ++fixed_len_blocks_index_;
     fixed_len_block_offset_ = 0;
   }
-
   return Status::OK();
 }
 

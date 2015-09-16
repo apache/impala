@@ -471,8 +471,8 @@ class BufferedBlockMgr {
       BufferDescriptor** buffer);
 
   /// Writes unpinned blocks via DiskIoMgr until one of the following is true:
-  /// 1) The number of outstanding writes >= (block_write_threshold_ - num free buffers)
-  /// 2) There are no more unpinned blocks
+  ///   1. The number of outstanding writes >= (block_write_threshold_ - num free buffers)
+  ///   2. There are no more unpinned blocks
   /// Must be called with the lock_ already taken. Is not blocking.
   Status WriteUnpinnedBlocks();
 
