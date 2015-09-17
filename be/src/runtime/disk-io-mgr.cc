@@ -821,7 +821,7 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
         ? (*request_context)->mem_tracker_->AnyLimitExceeded() : false;
 
     if (process_limit_exceeded || reader_limit_exceeded) {
-      (*request_context)->Cancel(Status::MEM_LIMIT_EXCEEDED);
+      (*request_context)->Cancel(Status::MemLimitExceeded());
     }
 
     unique_lock<mutex> request_lock((*request_context)->lock_);

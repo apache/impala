@@ -67,7 +67,7 @@ void TestCallOK(int batch_size, void* d) {
   BODY_1K( global = CallOK(); );
 }
 
-Status CallStaticError() { return Status::MEM_LIMIT_EXCEEDED; }
+Status CallStaticError() { return Status::CANCELLED; }
 
 void TestCallStaticError(int batch_size, void*) {
   BODY_1K( global = CallStaticError(); );

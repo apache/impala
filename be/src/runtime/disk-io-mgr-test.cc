@@ -664,7 +664,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     vector<DiskIoMgr::BufferDescriptor*> buffers;
 
     AtomicInt<int> num_ranges_processed;
-    ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::MEM_LIMIT_EXCEEDED,
+    ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::MemLimitExceeded(),
         1, &num_ranges_processed);
 
     char result[strlen(data) + 1];

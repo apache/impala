@@ -250,7 +250,7 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   {
     lock_guard<SpinLock> l(query_status_lock_);
     if (query_status_.ok()) {
-      query_status_ = Status::MEM_LIMIT_EXCEEDED;
+      query_status_ = Status::MemLimitExceeded();
     } else {
       return query_status_;
     }

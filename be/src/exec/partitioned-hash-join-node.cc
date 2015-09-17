@@ -547,7 +547,7 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level) {
   if (level >= MAX_PARTITION_DEPTH) {
-    Status status = Status::MEM_LIMIT_EXCEEDED;
+    Status status = Status::MemLimitExceeded();
     status.SetErrorMsg(ErrorMsg(
         TErrorCode::PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH,
         id_, MAX_PARTITION_DEPTH));
@@ -755,7 +755,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
     DCHECK_GE(num_input_rows, largest_partition) << "Cannot have a partition with "
         "more rows than the input";
     if (num_input_rows == largest_partition) {
-      Status status = Status::MEM_LIMIT_EXCEEDED;
+      Status status = Status::MemLimitExceeded();
       status.AddDetail(Substitute("Cannot perform hash join at node with id $0. "
           "Repartitioning did not reduce the size of a spilled partition. "
           "Repartitioning level $1. Number of rows $2.",
@@ -1282,7 +1282,7 @@ Status PartitionedHashJoinNode::ReserveTupleStreamBlocks() {
       RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->SwitchToIoBuffers(&got_buffer));
     }
     if (!got_buffer) {
-      Status status = Status::MEM_LIMIT_EXCEEDED;
+      Status status = Status::MemLimitExceeded();
       status.AddDetail("Not enough memory to get the minimum required buffers for "
           "join.");
       return status;

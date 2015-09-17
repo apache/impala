@@ -28,11 +28,12 @@ namespace impala {
 // TODO: is there a more controlled way to do this.
 const Status Status::CANCELLED(ErrorMsg::Init(TErrorCode::CANCELLED, "Cancelled"));
 
-const Status Status::MEM_LIMIT_EXCEEDED(
-    ErrorMsg::Init(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded"));
-
 const Status Status::DEPRECATED_RPC(ErrorMsg::Init(TErrorCode::NOT_IMPLEMENTED_ERROR,
     "Deprecated RPC; please update your client"));
+
+Status Status::MemLimitExceeded() {
+  return Status(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded");
+}
 
 Status::Status(TErrorCode::type code)
     : msg_(new ErrorMsg(code)) {

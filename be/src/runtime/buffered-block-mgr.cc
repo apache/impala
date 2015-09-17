@@ -391,15 +391,14 @@ bool BufferedBlockMgr::IsCancelled() {
 
 Status BufferedBlockMgr::MemLimitTooLowError(Client* client, int node_id) {
   // TODO: what to print here. We can't know the value of the entire query here.
-  Status status = Status::MEM_LIMIT_EXCEEDED;
+  Status status = Status::MemLimitExceeded();
   status.AddDetail(Substitute("The memory limit is set too low to initialize spilling"
       " operator (id=$0). The minimum required memory to spill this operator is $1.",
       node_id, PrettyPrinter::Print(client->num_reserved_buffers_ * max_block_size(),
       TUnit::BYTES)));
   VLOG_QUERY << "Query: " << query_id_ << ". Node=" << node_id
              << " ran out of memory: " << endl
-             << DebugInternal() << endl << client->DebugString() << endl
-             << GetStackTrace();
+             << DebugInternal() << endl << client->DebugString();
   return status;
 }
 
@@ -965,11 +964,10 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       if (VLOG_QUERY_IS_ON) {
         stringstream ss;
         ss << "Query id=" << query_id_ << " was unable to get minimum required buffers."
-           << endl << DebugInternal() << endl << client->DebugString()
-           << endl << GetStackTrace();
+           << endl << DebugInternal() << endl << client->DebugString();
         VLOG_QUERY << ss.str();
       }
-      Status status = Status::MEM_LIMIT_EXCEEDED;
+      Status status = Status::MemLimitExceeded();
       status.AddDetail("Query did not have enough memory to get the minimum required "
           "buffers in the block manager.");
       return status;

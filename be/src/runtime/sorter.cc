@@ -587,7 +587,7 @@ Status Sorter::Run::PrepareRead() {
     // Temporary work-around for IMPALA-1868. Fail the query with OOM rather than
     // DCHECK in case block pin fails.
     if (!pinned) {
-      Status status = Status::MEM_LIMIT_EXCEEDED;
+      Status status = Status::MemLimitExceeded();
       status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "fixed"));
       return status;
     }
@@ -599,7 +599,7 @@ Status Sorter::Run::PrepareRead() {
     // Temporary work-around for IMPALA-1590. Fail the query with OOM rather than
     // DCHECK in case block pin fails.
     if (!pinned) {
-      Status status = Status::MEM_LIMIT_EXCEEDED;
+      Status status = Status::MemLimitExceeded();
       status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "variable"));
       return status;
     }
@@ -665,7 +665,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       // Temporary work-around for IMPALA-2344. Fail the query with OOM rather than
       // DCHECK in case block pin fails.
       if (!pinned) {
-        Status status = Status::MEM_LIMIT_EXCEEDED;
+        Status status = Status::MemLimitExceeded();
         status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "fixed"));
         return status;
       }
@@ -679,7 +679,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       // Temporary work-around for IMPALA-2344. Fail the query with OOM rather than
       // DCHECK in case block pin fails.
       if (!pinned) {
-        Status status = Status::MEM_LIMIT_EXCEEDED;
+        Status status = Status::MemLimitExceeded();
         status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "variable"));
         return status;
       }
