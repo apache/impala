@@ -777,11 +777,10 @@ int64_t PartitionedAggregationNode::LargestSpilledPartition() const {
   int64_t max_rows = 0;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
-    if (partition->is_spilled()) {
-      int64_t rows = partition->aggregated_row_stream->num_rows() +
-          partition->unaggregated_row_stream->num_rows();
-      if (rows > max_rows) max_rows = rows;
-    }
+    if (partition->is_closed || !partition->is_spilled()) continue;
+    int64_t rows = partition->aggregated_row_stream->num_rows() +
+        partition->unaggregated_row_stream->num_rows();
+    if (rows > max_rows) max_rows = rows;
   }
   return max_rows;
 }

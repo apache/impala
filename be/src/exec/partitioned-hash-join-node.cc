@@ -786,11 +786,10 @@ int64_t PartitionedHashJoinNode::LargestSpilledPartition() const {
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
     DCHECK(partition != NULL) << i << " " << hash_partitions_.size();
-    if (partition->is_spilled()) {
-      int64_t rows = partition->build_rows()->num_rows();
-      rows += partition->probe_rows()->num_rows();
-      if (rows > max_rows) max_rows = rows;
-    }
+    if (partition->is_closed() || !partition->is_spilled()) continue;
+    int64_t rows = partition->build_rows()->num_rows();
+    rows += partition->probe_rows()->num_rows();
+    if (rows > max_rows) max_rows = rows;
   }
   return max_rows;
 }
