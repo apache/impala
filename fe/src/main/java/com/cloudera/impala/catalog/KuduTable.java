@@ -253,9 +253,8 @@ public class KuduTable extends Table {
     resultSchema.addToColumns(new TColumn("Leader Replica", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("# Replicas", Type.INT.toThrift()));
 
-    KuduClient client = new KuduClient.KuduClientBuilder(getKuduMasterAddresses()).build();
-
-    try {
+    try (KuduClient client = new KuduClient.KuduClientBuilder(
+        getKuduMasterAddresses()).build()) {
       org.kududb.client.KuduTable kuduTable = client.openTable(kuduTableName_);
       List<LocatedTablet> tablets =
           kuduTable.getTabletsLocations(KUDU_RPC_TIMEOUT_MS);
@@ -281,12 +280,6 @@ public class KuduTable extends Table {
 
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Could not communicate with Kudu.", e);
-    } finally {
-      try {
-        client.shutdown();
-      } catch (Exception e) {
-        throw new ImpalaRuntimeException("Could not close Kudu client.", e);
-      }
     }
     return result;
   }

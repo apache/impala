@@ -76,9 +76,7 @@ public class KuduDdlDelegate extends DdlDelegate {
 
     String replication = msTbl_.getParameters().get(KuduTable.KEY_TABLET_REPLICAS);
 
-    KuduClientBuilder builder = new KuduClientBuilder(kuduMasters);
-    KuduClient client = builder.build();
-    try {
+    try (KuduClient client = new KuduClient.KuduClientBuilder(kuduMasters).build()) {
       // TODO should we throw if the table does not exist when its an external table?
       if (client.tableExists(kuduTableName)) {
         if (msTbl_.getTableType().equals(TableType.MANAGED_TABLE.toString())) {
@@ -156,12 +154,6 @@ public class KuduDdlDelegate extends DdlDelegate {
       throw e;
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Error creating Kudu table", e);
-    } finally {
-      try {
-        client.shutdown();
-      } catch (Exception e) {
-        throw new ImpalaRuntimeException("Error closing Kudu client", e);
-      }
     }
   }
 
@@ -173,9 +165,7 @@ public class KuduDdlDelegate extends DdlDelegate {
     String kuduTableName = msTbl_.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String kuduMasters = msTbl_.getParameters().get(KuduTable.KEY_MASTER_ADDRESSES);
 
-    KuduClientBuilder builder = new KuduClientBuilder(kuduMasters);
-    KuduClient client = builder.build();
-    try {
+    try (KuduClient client = new KuduClient.KuduClientBuilder(kuduMasters).build()) {
       if (!client.tableExists(kuduTableName)) {
         LOG.warn("Table: %s is in inconsistent state. It does not exist in Kudu master(s)"
             + " %s, but it exists in Hive metastore. Deleting from metastore only.",
@@ -188,12 +178,6 @@ public class KuduDdlDelegate extends DdlDelegate {
       throw e;
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Error dropping Kudu table", e);
-    } finally {
-      try {
-        client.shutdown();
-      } catch (Exception e) {
-        throw new ImpalaRuntimeException("Could not close Kudu client.", e);
-      }
     }
   }
 

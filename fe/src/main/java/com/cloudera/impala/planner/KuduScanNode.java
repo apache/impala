@@ -50,7 +50,7 @@ import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
-import static org.kududb.client.KuduClient.KuduClientBuilder;
+import static org.kududb.client.KuduClient.*;
 
 /**
  * Scan of a single Kudu table.
@@ -106,12 +106,9 @@ public class KuduScanNode extends ScanNode {
    * we get the key-range and for each tablet we get the replicated hosts as well.
    */
   private void computeScanRangeLocations(Analyzer analyzer) {
-    KuduClientBuilder builder =
-        new KuduClientBuilder(kuduTable_.getKuduMasterAddresses());
-    KuduClient client = builder.build();
     scanRanges_ = Lists.newArrayList();
-    // TODO: The metadata that is queried from Kudu should be cached in the Catalog
-    try {
+    try (KuduClient client = new KuduClientBuilder(
+        kuduTable_.getKuduMasterAddresses()).build()) {
       org.kududb.client.KuduTable rpcTable =
           client.openTable(kuduTable_.getKuduTableName());
       List<LocatedTablet> tabletLocations =
@@ -145,17 +142,10 @@ public class KuduScanNode extends ScanNode {
         // Set the scan range for this set of locations
         locs.setScan_range(scanRange);
         locs.locations = locations;
-
         scanRanges_.add(locs);
       }
     } catch (Exception e) {
       throw new RuntimeException("Loading Kudu Table failed", e);
-    } finally {
-      try {
-        client.shutdown();
-      } catch (Exception e) {
-        LOG.error("Error during shutdown of Kudu client.", e);
-      }
     }
   }
 
