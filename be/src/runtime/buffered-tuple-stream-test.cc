@@ -41,7 +41,8 @@
 
 using base::FreeDeleter;
 
-const int BATCH_SIZE = 250;
+static const int BATCH_SIZE = 250;
+static const uint32_t PRIME = 479001599;
 
 namespace impala {
 
@@ -107,77 +108,63 @@ class SimpleTupleStreamTest : public testing::Test {
     EXPECT_TRUE(status.ok());
   }
 
-  virtual RowBatch* CreateIntBatch(int start_val, int num_rows, bool gen_null) {
+  /// Generate the ith element of a sequence of int values.
+  int GenIntValue(int i) {
+    // Multiply by large prime to get varied bit patterns.
+    return i * PRIME;
+  }
+
+  /// Generate the ith element of a sequence of bool values.
+  bool GenBoolValue(int i) {
+    // Use a middle bit of the int value.
+    return ((GenIntValue(i) >> 8) & 0x1) != 0;
+  }
+
+  virtual RowBatch* CreateIntBatch(int offset, int num_rows, bool gen_null) {
     RowBatch* batch = pool_.Add(new RowBatch(*int_desc_, num_rows, &tracker_));
-    int* tuple_mem = reinterpret_cast<int*>(
-        batch->tuple_data_pool()->Allocate(sizeof(int) * num_rows));
+    int tuple_size = int_desc_->tuple_descriptors()[0]->byte_size();
+    uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(
+        batch->tuple_data_pool()->Allocate(tuple_size * num_rows));
+    memset(tuple_mem, 0, tuple_size * num_rows);
+
     const int int_tuples = int_desc_->tuple_descriptors().size();
-    if (int_tuples > 1) {
-      for (int i = 0; i < num_rows; ++i) {
-        int idx = batch->AddRow();
-        TupleRow* row = batch->GetRow(idx);
-        tuple_mem[i] = i + start_val;
-        for (int j = 0; j < int_tuples; ++j) {
-          if (!gen_null || (j % 2) == 0) {
-            row->SetTuple(j, reinterpret_cast<Tuple*>(&tuple_mem[i]));
-          } else {
-            row->SetTuple(j, NULL);
-          }
-        }
-        batch->CommitLastRow();
-      }
-    } else {
-      for (int i = 0; i < num_rows; ++i) {
-        int idx = batch->AddRow();
-        TupleRow* row = batch->GetRow(idx);
-        tuple_mem[i] = i + start_val;
-        if (!gen_null || (i % 2) == 0) {
-            row->SetTuple(0, reinterpret_cast<Tuple*>(&tuple_mem[i]));
+    for (int i = 0; i < num_rows; ++i) {
+      int idx = batch->AddRow();
+      TupleRow* row = batch->GetRow(idx);
+      Tuple* int_tuple = reinterpret_cast<Tuple*>(tuple_mem + i * tuple_size);
+      *reinterpret_cast<int*>(int_tuple + 1) = GenIntValue(i + offset);
+      for (int j = 0; j < int_tuples; ++j) {
+        int idx = (i + offset) * int_tuples + j;
+        if (!gen_null || GenBoolValue(idx)) {
+          row->SetTuple(j, int_tuple);
         } else {
-            row->SetTuple(0, NULL);
+          row->SetTuple(j, NULL);
         }
-        batch->CommitLastRow();
       }
+      batch->CommitLastRow();
     }
     return batch;
   }
 
-  virtual RowBatch* CreateStringBatch(int string_idx, int num_rows, bool gen_null) {
+  virtual RowBatch* CreateStringBatch(int offset, int num_rows, bool gen_null) {
     int tuple_size = sizeof(StringValue) + 1;
     RowBatch* batch = pool_.Add(new RowBatch(*string_desc_, num_rows, &tracker_));
     uint8_t* tuple_mem = batch->tuple_data_pool()->Allocate(tuple_size * num_rows);
     memset(tuple_mem, 0, tuple_size * num_rows);
     const int string_tuples = string_desc_->tuple_descriptors().size();
-    if (string_tuples > 1) {
-      for (int i = 0; i < num_rows; ++i) {
-        TupleRow* row = batch->GetRow(batch->AddRow());
-        string_idx %= NUM_STRINGS;
-        *reinterpret_cast<StringValue*>(tuple_mem + 1) = STRINGS[string_idx];
-        ++string_idx;
-        for (int j = 0; j < string_tuples; ++j) {
-          if (!gen_null || (j % 2) == 0) {
-            row->SetTuple(j, reinterpret_cast<Tuple*>(tuple_mem));
-          } else {
-            row->SetTuple(j, NULL);
-          }
-        }
-        batch->CommitLastRow();
-        tuple_mem += tuple_size;
-      }
-    } else {
-      for (int i = 0; i < num_rows; ++i) {
-        TupleRow* row = batch->GetRow(batch->AddRow());
-        string_idx %= NUM_STRINGS;
-        *reinterpret_cast<StringValue*>(tuple_mem + 1) = STRINGS[string_idx];
-        ++string_idx;
-        if (!gen_null || (i % 2) == 0) {
-          row->SetTuple(0, reinterpret_cast<Tuple*>(tuple_mem));
+    for (int i = 0; i < num_rows; ++i) {
+      TupleRow* row = batch->GetRow(batch->AddRow());
+      *reinterpret_cast<StringValue*>(tuple_mem + 1) = STRINGS[(i + offset) % NUM_STRINGS];
+      for (int j = 0; j < string_tuples; ++j) {
+        int idx = (i + offset) * string_tuples + j;
+        if (!gen_null || GenBoolValue(idx)) {
+          row->SetTuple(j, reinterpret_cast<Tuple*>(tuple_mem));
         } else {
-          row->SetTuple(0, NULL);
+          row->SetTuple(j, NULL);
         }
-        batch->CommitLastRow();
-        tuple_mem += tuple_size;
       }
+      batch->CommitLastRow();
+      tuple_mem += tuple_size;
     }
     return batch;
   }
@@ -203,7 +190,7 @@ class SimpleTupleStreamTest : public testing::Test {
       // For the tests indicate null-ability using the max int value
       results->push_back(std::numeric_limits<int>::max());
     } else {
-      results->push_back(*reinterpret_cast<int*>(t));
+      results->push_back(*reinterpret_cast<int*>(reinterpret_cast<uint8_t*>(t) + 1));
     }
   }
 
@@ -240,30 +227,17 @@ class SimpleTupleStreamTest : public testing::Test {
   virtual void VerifyResults(const vector<int>& results, int exp_rows, bool gen_null) {
     const int int_tuples = int_desc_->tuple_descriptors().size();
     EXPECT_EQ(results.size(), exp_rows * int_tuples);
-    if (int_tuples > 1) {
-      for (int i = 0; i < results.size(); i += int_tuples) {
-        for (int j = 0; j < int_tuples; ++j) {
-          if (!gen_null || (j % 2) == 0) {
-            ASSERT_EQ(results[i+j], i / int_tuples)
-                << " results[" << (i + j) << "]: " << results[i + j]
-                << " != " << (i / int_tuples) << " gen_null=" << gen_null;
-          } else {
-            ASSERT_TRUE(results[i+j] == std::numeric_limits<int>::max())
-                << "i: " << i << " j: " << j << " results[" << (i + j) << "]: "
-                << results[i+j] << " != " << std::numeric_limits<int>::max();
-          }
-        }
-      }
-    } else {
-      for (int i = 0; i < results.size(); i += int_tuples) {
-        if (!gen_null || (i % 2) == 0) {
-          ASSERT_TRUE(results[i] == i)
-              << " results[" << (i) << "]: " << results[i]
-              << " != " << i << " gen_null=" << gen_null;
+    for (int i = 0; i < exp_rows; ++i) {
+      for (int j = 0; j < int_tuples; ++j) {
+        int idx = i * int_tuples + j;
+        if (!gen_null || GenBoolValue(idx)) {
+          ASSERT_EQ(results[idx], GenIntValue(i))
+              << " results[" << idx << "]: " << results[idx]
+              << " != " << GenIntValue(i) << " gen_null=" << gen_null;
         } else {
-          ASSERT_TRUE(results[i] == std::numeric_limits<int>::max())
-              << "i: " << i << " results[" << i << "]: "
-              << results[i] << " != " << std::numeric_limits<int>::max();
+          ASSERT_TRUE(results[idx] == std::numeric_limits<int>::max())
+              << "i: " << i << " j: " << j << " results[" << idx << "]: "
+              << results[idx] << " != " << std::numeric_limits<int>::max();
         }
       }
     }
@@ -273,32 +247,18 @@ class SimpleTupleStreamTest : public testing::Test {
       bool gen_null) {
     const int string_tuples = string_desc_->tuple_descriptors().size();
     EXPECT_EQ(results.size(), exp_rows * string_tuples);
-    int idx = 0;
-    if (string_tuples > 1) {
-      for (int i = 0; i < results.size(); i += string_tuples) {
-        for (int j = 0; j < string_tuples; ++j) {
-          if (!gen_null || (j % 2) == 0) {
-            ASSERT_TRUE(results[i+j] == STRINGS[idx])
-                << "results[" << i << "+" << j << "] " << results[i+j]
-                << " != " << STRINGS[idx] << " idx=" << idx << " gen_null=" << gen_null;
-          } else {
-            ASSERT_TRUE(results[i+j] == StringValue())
-                << "results[" << i << "+" << j << "] " << results[i+j] << " not NULL";
-          }
-        }
-        idx = (idx + 1) % NUM_STRINGS;
-      }
-    } else {
-      for (int i = 0; i < results.size(); i += string_tuples) {
-        if (!gen_null || (i % 2) == 0) {
-          ASSERT_TRUE(results[i] == STRINGS[idx])
-              << "results[" << i << "] " << results[i]
-              << " != " << STRINGS[idx] << " idx=" << idx << " gen_null=" << gen_null;
+    for (int i = 0; i < exp_rows; ++i) {
+      for (int j = 0; j < string_tuples; ++j) {
+        int idx = i * string_tuples + j;
+        if (!gen_null || GenBoolValue(idx)) {
+          ASSERT_TRUE(results[idx] == STRINGS[i % NUM_STRINGS])
+              << "results[" << idx << "] " << results[idx]
+              << " != " << STRINGS[i % NUM_STRINGS] << " i=" << i << " gen_null="
+              << gen_null;
         } else {
-          ASSERT_TRUE(results[i] == StringValue())
-              << "results[" << i << "] " << results[i] << " not NULL";
+          ASSERT_TRUE(results[idx] == StringValue())
+              << "results[" << idx << "] " << results[idx] << " not NULL";
         }
-        idx = (idx + 1) % NUM_STRINGS;
       }
     }
   }
@@ -385,12 +345,7 @@ class SimpleTupleStreamTest : public testing::Test {
       }
       ReadValues(&stream, int_desc_, &results);
 
-      // Verify result
-      const int int_tuples = int_desc_->tuple_descriptors().size();
-      EXPECT_EQ(results.size(), BATCH_SIZE * num_batches * int_tuples);
-      for (int i = 0; i < results.size(); ++i) {
-        ASSERT_EQ(results[i], i / int_tuples);
-      }
+      VerifyResults(results, BATCH_SIZE * num_batches, false);
 
       stream.Close();
     }
