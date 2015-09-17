@@ -760,7 +760,9 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(scanRanges_);
     MembershipSnapshot cluster = MembershipSnapshot.getCluster();
     HashSet<TNetworkAddress> localHostSet = Sets.newHashSet();
+    int totalNodes = 0;
     int numLocalRanges = 0;
+    int numRemoteRanges = 0;
     for (TScanRangeLocations range: scanRanges_) {
       boolean anyLocal = false;
       for (TScanRangeLocation loc: range.locations) {
@@ -777,25 +779,31 @@ public class HdfsScanNode extends ScanNode {
       }
       // This range has at least one replica with a colocated impalad, so assume it
       // will be scheduled on one of those nodes.
-      if (anyLocal) ++numLocalRanges;
+      if (anyLocal) {
+        ++numLocalRanges;
+      } else {
+        ++numRemoteRanges;
+      }
+      // Approximate the number of nodes that will execute locally assigned ranges to
+      // be the smaller of the number of locally assigned ranges and the number of
+      // hosts that hold block replica for those ranges.
+      int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
+      // The remote ranges are round-robined across all the impalads.
+      int numRemoteNodes = Math.min(numRemoteRanges, cluster.numNodes());
+      // The local and remote assignments may overlap, but we don't know by how much so
+      // conservatively assume no overlap.
+      totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numNodes());
+      // Exit early if all hosts have a scan range assignment, to avoid extraneous work
+      // in case the number of scan ranges dominates the number of nodes.
+      if (totalNodes == cluster.numNodes()) break;
     }
-    // Approximate the number of nodes that will execute locally assigned ranges to be
-    // the smaller of the number of locally assigned ranges and the number of hosts
-    // that hold block replica for those ranges.
-    int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
-    // The remote ranges are round-robined across all the impalads.
-    int numRemoteRanges = scanRanges_.size() - numLocalRanges;
-    int numRemoteNodes = Math.min(numRemoteRanges, cluster.numNodes());
-    // The local and remote assignments may overlap, but we don't know by how much so
-    // conservatively assume no overlap.
-    int totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numNodes());
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
-    LOG.debug("computeNumNodes localRanges=" + numLocalRanges +
-        " remoteRanges=" + numRemoteRanges + " localHostSet.size=" + localHostSet.size() +
+    LOG.debug("computeNumNodes totalRanges=" + scanRanges_.size() +
+        " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges +
+        " localHostSet.size=" + localHostSet.size() +
         " clusterNodes=" + cluster.numNodes());
-
   }
 
   @Override
