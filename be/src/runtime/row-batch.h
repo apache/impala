@@ -211,7 +211,9 @@ class RowBatch {
   void AcquireState(RowBatch* src);
 
   /// Deep copy all rows this row batch into dst, using memory allocated from
-  /// dst's tuple_data_pool_. Only valid when this row batch is empty.
+  /// dst's tuple_data_pool_. Only valid when dst is empty.
+  /// TODO: the current implementation of deep copy can produce an oversized
+  /// row batch if there are duplicate tuples in this row batch.
   void DeepCopyTo(RowBatch* dst);
 
   /// Create a serialized version of this row batch in output_batch, attaching all of the
