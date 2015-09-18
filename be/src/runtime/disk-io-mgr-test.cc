@@ -126,6 +126,7 @@ class DiskIoMgrTest : public testing::Test {
         if (buffer != NULL) buffer->Return();
         break;
       }
+      ASSERT_LE(buffer->len(), expected_len);
       memcpy(result + range->offset() + buffer->scan_range_offset(),
           buffer->buffer(), buffer->len());
       buffer->Return();
@@ -1013,6 +1014,46 @@ TEST_F(DiskIoMgrTest, Buffers) {
   // gc buffers
   io_mgr.GcIoBuffers();
   EXPECT_EQ(io_mgr.num_allocated_buffers_, 0);
+  EXPECT_EQ(mem_tracker.consumption(), 0);
+}
+
+// IMPALA-2366: handle partial read where range goes past end of file.
+TEST_F(DiskIoMgrTest, PartialRead) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  int len = strlen(data);
+  int read_len = len + 1000; // Read past end of file.
+  CreateTempFile(tmp_file, data);
+
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
+  pool_.reset(new ObjectPool);
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, read_len, read_len));
+
+  Status status = io_mgr->Init(&mem_tracker);
+  ASSERT_TRUE(status.ok());
+  MemTracker reader_mem_tracker;
+  DiskIoMgr::RequestContext* reader;
+  status = io_mgr->RegisterContext(&reader, &reader_mem_tracker);
+  ASSERT_TRUE(status.ok());
+
+  // We should not read past the end of file.
+  DiskIoMgr::ScanRange* range = InitRange(1, tmp_file, 0, read_len, 0, stat_val.st_mtime);
+  DiskIoMgr::BufferDescriptor* buffer;
+  status = io_mgr->Read(reader, range, &buffer);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(buffer->eosr());
+  ASSERT_EQ(len, buffer->len());
+  ASSERT_TRUE(memcmp(buffer->buffer(), data, len) == 0);
+  buffer->Return();
+
+  io_mgr->UnregisterContext(reader);
+  pool_.reset();
+  io_mgr.reset();
+  EXPECT_EQ(reader_mem_tracker.consumption(), 0);
   EXPECT_EQ(mem_tracker.consumption(), 0);
 }
 
