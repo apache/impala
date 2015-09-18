@@ -92,6 +92,20 @@ class KuduTableSink : public DataSink {
 
   // Captures parameters passed down from the frontend
   TKuduTableSink kudu_table_sink_;
+
+  // Counts the number of calls to KuduSession::flush().
+  RuntimeProfile::Counter* kudu_flush_counter_;
+
+  // Aggregates the times spent in KuduSession:flush().
+  RuntimeProfile::Counter* kudu_flush_timer_;
+
+  // Total number of errors returned from Kudu.
+  RuntimeProfile::Counter* kudu_error_counter_;
+
+  // Total number of rows written including errors.
+  RuntimeProfile::Counter* rows_written_;
+  RuntimeProfile::Counter* rows_written_rate_;
+
 };
 
 }  // namespace impala

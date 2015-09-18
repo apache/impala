@@ -47,7 +47,12 @@ KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
       row_desc_(row_desc),
       select_list_texprs_(select_list_texprs),
       sink_type_(tsink.table_sink.type),
-      kudu_table_sink_(tsink.table_sink.kudu_table_sink) {
+      kudu_table_sink_(tsink.table_sink.kudu_table_sink),
+      kudu_flush_counter_(NULL),
+      kudu_flush_timer_(NULL),
+      kudu_error_counter_(NULL),
+      rows_written_(NULL),
+      rows_written_rate_(NULL) {
 }
 
 Status KuduTableSink::PrepareExprs(RuntimeState* state) {
@@ -86,6 +91,20 @@ Status KuduTableSink::Prepare(RuntimeState* state) {
   root_status.__set_stats(TInsertStats());
   root_status.__set_id(-1L);
   state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
+
+  // Add counters
+  kudu_flush_counter_ =
+      ADD_COUNTER(runtime_profile_, "TotalKuduFlushOperations", TUnit::UNIT);
+  kudu_error_counter_ =
+      ADD_COUNTER(runtime_profile_, "TotalKuduFlushErrors", TUnit::UNIT);
+  kudu_flush_timer_ = ADD_TIMER(runtime_profile_, "KuduFlushTimer");
+
+  rows_written_ =
+      ADD_COUNTER(runtime_profile_, "RowsWritten", TUnit::UNIT);
+  rows_written_rate_ = runtime_profile_->AddDerivedCounter(
+      "RowsWrittenRate", TUnit::UNIT_PER_SECOND,
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_written_,
+        runtime_profile_->total_time_counter()));
 
   return Status::OK();
 }
@@ -205,15 +224,20 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
     ++rows_added;
   }
 
+  COUNTER_ADD(kudu_flush_counter_, 1);
   // TODO right now we always flush an entire row batch, if these are small we'll
   // be inefficient. Consider decoupling impala's batch size from kudu's
   if (!kudu_table_sink_.ignore_not_found_or_duplicate) {
+    SCOPED_TIMER(kudu_flush_timer_);
     KUDU_RETURN_IF_ERROR(session_->Flush(), "Error while flushing Kudu session.");
   } else {
-    // If the sink has the option "ignore_not_found_or_duplicate" set,
-    // duplicate key or key already present errors from Kudu
-    // in INSERT, UPDATE, or DELETE operations will be ignored.
-    kudu::Status s = session_->Flush();
+    // DELETE with a row value that doesn't exist is defined to be a no-op,
+    // so ignore kudu::Status::IsNotFound errors.
+    kudu::Status s;
+    {
+      SCOPED_TIMER(kudu_flush_timer_);
+      s = session_->Flush();
+    }
     if (UNLIKELY(!s.ok())) {
       vector<KuduError*> errors;
       bool overflowed = false;
@@ -239,11 +263,15 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
         }
         delete errors[i];
       }
+      COUNTER_ADD(kudu_error_counter_, errors.size());
+      (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=
+          rows_added - errors.size();
       RETURN_IF_ERROR(result);
       rows_added -= errors.size();
     }
   }
 
+  COUNTER_ADD(rows_written_, rows_added);
   (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows += rows_added;
   return Status::OK();
 }
