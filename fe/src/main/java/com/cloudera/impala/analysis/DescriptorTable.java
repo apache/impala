@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.IdGenerator;
@@ -154,6 +156,10 @@ public class DescriptorTable {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
       if (tupleDesc.isMaterialized()) {
+        // TODO: Ideally, we should call tupleDesc.checkIsExecutable() here, but there
+        // currently are several situations in which we send materialized tuples without
+        // a mem layout to the BE, e.g., when unnesting unions or when replacing plan
+        // trees with an EmptySetNode.
         result.addToTupleDescriptors(tupleDesc.toThrift());
         Table table = tupleDesc.getTable();
         if (table != null && !(table instanceof View)) referencedTbls.add(table);

@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Table;
@@ -123,6 +125,7 @@ public class TupleDescriptor {
   public float getAvgSerializedSize() { return avgSerializedSize_; }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
+  public boolean hasMemLayout() { return hasMemLayout_; }
   public void setAliases(String[] aliases, boolean hasExplicitAlias) {
     aliases_ = aliases;
     hasExplicitAlias_ = hasExplicitAlias;
@@ -152,6 +155,19 @@ public class TupleDescriptor {
         .add("is_materialized", isMaterialized_)
         .add("slots", "[" + Joiner.on(", ").join(slotStrings) + "]")
         .toString();
+  }
+
+  /**
+   * Checks that this tuple is materialized and has a mem layout. Throws if this tuple
+   * is not executable, i.e., if one of those conditions is not met.
+   */
+  public void checkIsExecutable() {
+    Preconditions.checkState(isMaterialized_, String.format(
+        "Illegal reference to non-materialized tuple: debugname=%s alias=%s tid=%s",
+        debugName_, StringUtils.defaultIfEmpty(getAlias(), "n/a"), id_));
+    Preconditions.checkState(hasMemLayout_, String.format(
+        "Missing memory layout for tuple: debugname=%s alias=%s tid=%s",
+        debugName_, StringUtils.defaultIfEmpty(getAlias(), "n/a"), id_));
   }
 
   /**

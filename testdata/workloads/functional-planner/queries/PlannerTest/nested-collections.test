@@ -1346,3 +1346,38 @@ where a.item between 10 and 20
    predicates on c: c.f11 >= 10, c.f11 <= 20, c.f11 % 2 = 0
    predicates on f12: f12.key = 'test2'
 ====
+# IMPALA-2358: Test join ordering of relative collection table refs inside
+# a subquery.
+select 1
+from tpch_nested_parquet.supplier s
+where s.s_suppkey not in
+(select ps1.ps_partkey
+ from s.s_partsupps ps1
+ left outer join s.s_partsupps ps2
+   on ps1.ps_supplycost = ps2.ps_supplycost
+# This join has an ordering dependency on ps2, and should be in the same subplan as ps2.
+ inner join s.s_partsupps ps3
+   on ps2.ps_comment = ps3.ps_comment)
+---- PLAN
+01:SUBPLAN
+|
+|--08:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  |  hash predicates: s.s_suppkey = ps1.ps_partkey
+|  |
+|  |--07:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ps2.ps_comment = ps3.ps_comment
+|  |  |
+|  |  |--05:UNNEST [s.s_partsupps ps3]
+|  |  |
+|  |  06:HASH JOIN [LEFT OUTER JOIN]
+|  |  |  hash predicates: ps1.ps_supplycost = ps2.ps_supplycost
+|  |  |
+|  |  |--04:UNNEST [s.s_partsupps ps2]
+|  |  |
+|  |  03:UNNEST [s.s_partsupps ps1]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+====

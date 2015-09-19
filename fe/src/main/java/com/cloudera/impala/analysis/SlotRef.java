@@ -144,17 +144,13 @@ public class SlotRef extends Expr {
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.SLOT_REF;
     msg.slot_ref = new TSlotRef(desc_.getId().asInt());
-    Preconditions.checkState(desc_.getParent().isMaterialized(),
-        String.format("Illegal reference to non-materialized tuple: tid=%s",
-            desc_.getParent().getId()));
     // we shouldn't be sending exprs over non-materialized slots
-    Preconditions.checkState(desc_.isMaterialized(),
-        String.format("Illegal reference to non-materialized slot: tid=%s sid=%s",
-            desc_.getParent().getId(), desc_.getId()));
-    // we also shouldn't have forgotten to compute the mem layout
-    Preconditions.checkState(desc_.getByteOffset() != -1,
-        String.format("Missing memory layout for tuple with tid=%s",
-            desc_.getParent().getId()));
+    Preconditions.checkState(desc_.isMaterialized(), String.format(
+        "Illegal reference to non-materialized slot: tid=%s sid=%s",
+        desc_.getParent().getId(), desc_.getId()));
+    // check that the tuples associated with this slot are executable
+    desc_.getParent().checkIsExecutable();
+    if (desc_.getItemTupleDesc() != null) desc_.getItemTupleDesc().checkIsExecutable();
   }
 
   @Override

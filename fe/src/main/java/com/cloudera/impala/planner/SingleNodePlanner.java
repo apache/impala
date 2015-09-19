@@ -669,12 +669,27 @@ public class SingleNodePlanner {
    */
   private void computeParentAndSubplanRefs(List<TableRef> tblRefs,
       boolean isStraightJoin, List<TableRef> parentRefs, List<SubplanRef> subplanRefs) {
-    // Check if we are in a Subplan context.
+    // List of table ref ids materialized so far during plan generation, including those
+    // from the subplan context, if any. We append the ids of table refs placed into
+    // parentRefs to this list to satisfy the ordering requirement of subsequent
+    // table refs that should also be put into parentRefs. Consider this example:
+    // FROM t, (SELECT ... FROM t.c1 LEFT JOIN t.c2 ON(...) JOIN t.c3 ON (...)) v
+    // Table ref t.c3 has an ordering dependency on t.c2 due to the outer join, but t.c3
+    // must be placed into the subplan that materializes t.c1 and t.c2.
+    List<TupleId> planTblRefIds = Lists.newArrayList();
+
+    // List of materialized tuple ids in the subplan context, if any. This list must
+    // remain constant in this function because the subplan context is fixed. Any
+    // relative or correlated table ref that requires a materialized tuple id produced
+    // by an element in tblRefs should be placed into subplanRefs because it requires
+    // a new subplan context.
     List<TupleId> subplanTids = Collections.emptyList();
-    List<TupleId> subplanTblRefIds = Collections.emptyList();
+
     if (ctx_.hasSubplan()) {
-      subplanTids = ctx_.getSubplan().getChild(0).getTupleIds();
-      subplanTblRefIds = ctx_.getSubplan().getChild(0).getTblRefIds();
+      // Add all table ref ids from the subplan context.
+      planTblRefIds.addAll(ctx_.getSubplan().getChild(0).getTblRefIds());
+      subplanTids =
+          Collections.unmodifiableList(ctx_.getSubplan().getChild(0).getTupleIds());
     }
 
     // List of table ref ids of all outer/semi joined table refs seen so far.
@@ -702,7 +717,7 @@ public class SingleNodePlanner {
           requiredTblRefIds.addAll(outerOrSemiJoinedTblRefIds);
         }
         if (!subplanTids.containsAll(requiredTids) ||
-            !subplanTblRefIds.containsAll(requiredTblRefIds)) {
+            !planTblRefIds.containsAll(requiredTblRefIds)) {
           isParentRef = false;
           ref.setLeftTblRef(null);
           // For outer and semi joins, we also need to ensure that the On-clause
@@ -723,6 +738,7 @@ public class SingleNodePlanner {
           ref.setLeftTblRef(parentRefs.get(parentRefs.size() - 1));
         }
         parentRefs.add(ref);
+        planTblRefIds.add(ref.getId());
       }
       if (ref.getJoinOp().isOuterJoin() || ref.getJoinOp().isSemiJoin()) {
         outerOrSemiJoinedTblRefIds.add(ref.getId());

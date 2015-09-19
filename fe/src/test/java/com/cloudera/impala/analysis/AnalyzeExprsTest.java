@@ -1667,24 +1667,33 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     SelectStmt stmt = (SelectStmt)AnalyzesOk(String.format(sqlTemplate, caseSql));
     CaseExpr caseExpr =
         (CaseExpr)stmt.getSelectList().getItems().get(0).getExpr();
-    List<SlotRef> slotRefs = Lists.newArrayList();
-    caseExpr.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
-    for (SlotRef slotRef: slotRefs) {
-      slotRef.getDesc().setIsMaterialized(true);
-      slotRef.getDesc().setByteOffset(0);
-    }
+    makeExprExecutable(caseExpr, stmt.getAnalyzer());
     TExpr caseThrift = caseExpr.treeToThrift();
     stmt = (SelectStmt)AnalyzesOk(String.format(sqlTemplate, decodeSql));
     CaseExpr decodeExpr =
         (CaseExpr)stmt.getSelectList().getItems().get(0).getExpr();
     Assert.assertEquals(caseSql, decodeExpr.toCaseSql());
-    slotRefs.clear();
-    decodeExpr.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
-    for (SlotRef slotRef: slotRefs) {
-      slotRef.getDesc().setIsMaterialized(true);
-      slotRef.getDesc().setByteOffset(0);
-    }
+    makeExprExecutable(caseExpr, stmt.getAnalyzer());
     Assert.assertEquals(caseThrift, decodeExpr.treeToThrift());
+  }
+
+  /**
+   * Marks all slots referenced by 'e' as materialized. Also marks all referenced tuples
+   * as materialized and computes their mem layout.
+   */
+  private void makeExprExecutable(Expr e, Analyzer analyzer) {
+    List<TupleId> tids = Lists.newArrayList();
+    List<SlotId> sids = Lists.newArrayList();
+    e.getIds(tids, sids);
+    for (SlotId sid: sids) {
+      SlotDescriptor slotDesc = analyzer.getDescTbl().getSlotDesc(sid);
+      slotDesc.setIsMaterialized(true);
+    }
+    for (TupleId tid: tids) {
+      TupleDescriptor tupleDesc = analyzer.getTupleDesc(tid);
+      tupleDesc.setIsMaterialized(true);
+      tupleDesc.computeMemLayout();
+    }
   }
 
   @Test
