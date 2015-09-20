@@ -378,9 +378,6 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Scan range for the metadata.
   const DiskIoMgr::ScanRange* metadata_range_;
 
-  /// Returned in ProcessSplit.
-  Status parse_status_;
-
   /// Pool to copy dictionary page buffer into. This pool is shared across all the
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;

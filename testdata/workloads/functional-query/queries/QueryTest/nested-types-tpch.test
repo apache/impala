@@ -158,3 +158,19 @@ ORDER BY o_orderkey LIMIT 1
 ---- TYPES
 BIGINT,BIGINT
 ====
+---- QUERY
+# IMPALA-2376
+set mem_limit=120m
+====
+---- QUERY
+select max(cnt) from customer c,
+(select count(l_returnflag) cnt from c.c_orders.o_lineitems) v;
+---- TYPES
+BIGINT
+---- CATCH
+Mem limit exceeded
+Failed to allocate buffer for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.
+====
+---- QUERY
+set mem_limit=0
+====
