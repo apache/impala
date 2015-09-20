@@ -66,6 +66,10 @@ class KuduTableSink : public DataSink {
   /// Create a new write operation according to the sink type.
   kudu::client::KuduWriteOperation* NewWriteOp();
 
+  /// Flushes the Kudu session and handles errors returned from Kudu. Passes the
+  /// number of errors during the flush operations as an out parameter.
+  Status Flush(int64_t* error_count);
+
   /// Used to get the KuduTableDescriptor from the RuntimeState
   TableId table_id_;
 

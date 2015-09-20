@@ -185,7 +185,7 @@ insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
 ---- QUERY
 insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
 ---- CATCH
-Error while flushing Kudu session.: IO error: Some errors occurred
+Error while flushing Kudu session:
 ====
 ---- QUERY
 insert ignore into tdata values (666, "The Devil", cast(1.2 as float), 43)
@@ -208,7 +208,7 @@ update ignore a set a.name='Satan' from tdata a, tdata b where a.id = 666
 -- trying to execute the second delete will fail because the record does not exist.
 delete a from tdata a, tdata b where a.id = 666
 ---- CATCH
-Error while flushing Kudu session.: IO error: Some errors occurred
+Error while flushing Kudu session:
 ====
 ---- QUERY
 -- Re-insert the data

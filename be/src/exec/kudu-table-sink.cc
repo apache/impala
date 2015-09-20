@@ -14,6 +14,7 @@
 
 #include "exec/kudu-table-sink.h"
 
+#include <sstream>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "exec/kudu-util.h"
@@ -23,6 +24,9 @@
 #include "gutil/gscoped_ptr.h"
 
 #include "common/names.h"
+
+DEFINE_int32(kudu_session_timeout_seconds, 60, "Kudu client session timeout flushing "
+    "data to the tablet servers.");
 
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduSchema;
@@ -123,12 +127,9 @@ Status KuduTableSink::Open(RuntimeState* state) {
       "Unable to open Kudu table");
 
   session_ = client_->NewSession();
+  session_->SetTimeoutMillis(FLAGS_kudu_session_timeout_seconds * 1000);
   KUDU_RETURN_IF_ERROR(session_->SetFlushMode(
       kudu::client::KuduSession::MANUAL_FLUSH), "Unable to set flush mode");
-
-  // TODO don't hardcode this timeout.
-  session_->SetTimeoutMillis(10000);
-
   return Status::OK();
 }
 
@@ -223,56 +224,61 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
         "Error while applying Kudu session.");
     ++rows_added;
   }
+  COUNTER_ADD(rows_written_, rows_added);
+  int64_t error_count = 0;
+  RETURN_IF_ERROR(Flush(&error_count));
+  (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=
+      rows_added - error_count;
+  return Status::OK();
+}
 
-  COUNTER_ADD(kudu_flush_counter_, 1);
+Status KuduTableSink::Flush(int64_t* error_count) {
   // TODO right now we always flush an entire row batch, if these are small we'll
   // be inefficient. Consider decoupling impala's batch size from kudu's
-  if (!kudu_table_sink_.ignore_not_found_or_duplicate) {
+  kudu::Status s;
+  {
     SCOPED_TIMER(kudu_flush_timer_);
-    KUDU_RETURN_IF_ERROR(session_->Flush(), "Error while flushing Kudu session.");
-  } else {
-    // DELETE with a row value that doesn't exist is defined to be a no-op,
-    // so ignore kudu::Status::IsNotFound errors.
-    kudu::Status s;
-    {
-      SCOPED_TIMER(kudu_flush_timer_);
-      s = session_->Flush();
-    }
-    if (UNLIKELY(!s.ok())) {
-      vector<KuduError*> errors;
-      bool overflowed = false;
-      session_->GetPendingErrors(&errors, &overflowed);
-      // The memory for the errors is manually manged. Iterate over all errors and delete
-      // them accordingly.
-      Status result = Status::OK();
-      // Overflowed is set to true if the KuduSession could not hold on to all errors.
-      // In this case we cannot guarantee that all errors are of type "NotFound".
-      if (UNLIKELY(overflowed)) {
-        result = Status("Error overflow in Kudu session, previous delete might be inconsistent.");
-      }
+    COUNTER_ADD(kudu_flush_counter_, 1);
+    s = session_->Flush();
+  }
+  if (LIKELY(s.ok())) return Status::OK();
 
-      for (int i = 0; i < errors.size(); ++i) {
-        kudu::Status e = errors[i]->status();
-        // Only set the final status once, but continue iterating to clean up the memory
-        if (result.ok() && (
-                (sink_type_ == TTableSinkType::KUDU_DELETE && !e.IsNotFound()) ||
-                (sink_type_ == TTableSinkType::KUDU_UPDATE && !e.IsNotFound()) ||
-                (sink_type_ == TTableSinkType::KUDU_INSERT && !e.IsAlreadyPresent()))) {
-          result = Status(strings::Substitute("$0: $1",
-              "Error while flushing Kudu session", e.ToString()));
-        }
-        delete errors[i];
-      }
-      COUNTER_ADD(kudu_error_counter_, errors.size());
-      (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=
-          rows_added - errors.size();
-      RETURN_IF_ERROR(result);
-      rows_added -= errors.size();
-    }
+  stringstream error_msg_buffer;
+  vector<KuduError*> errors;
+  bool failed = false;
+  session_->GetPendingErrors(&errors, &failed);
+  // Overflowed is set to true if the KuduSession could not hold on to all errors.
+  // In this case we cannot guarantee that all errors may be of a state that can be
+  // intentionally ignored.
+  if (UNLIKELY(failed)) {
+    error_msg_buffer << "Error overflow in Kudu session, "
+                     << "previous write operation might be inconsistent.\n";
   }
 
-  COUNTER_ADD(rows_written_, rows_added);
-  (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows += rows_added;
+  // The memory for the errors is manually managed. Iterate over all errors and delete
+  // them accordingly.
+  bool first_error = true;
+  for (int i = 0; i < errors.size(); ++i) {
+    kudu::Status e = errors[i]->status();
+    // If the sink has the option "ignore_not_found_or_duplicate" set, duplicate key or
+    // key already present errors from Kudu in INSERT, UPDATE, or DELETE operations will
+    // be ignored.
+    if (!kudu_table_sink_.ignore_not_found_or_duplicate ||
+        ((sink_type_ == TTableSinkType::KUDU_DELETE && !e.IsNotFound()) ||
+            (sink_type_ == TTableSinkType::KUDU_UPDATE && !e.IsNotFound()) ||
+            (sink_type_ == TTableSinkType::KUDU_INSERT && !e.IsAlreadyPresent()))) {
+      if (first_error) {
+        error_msg_buffer << "Error while flushing Kudu session: \n";
+        first_error = false;
+      }
+      error_msg_buffer << e.ToString() << "\n";
+      failed = true;
+    }
+    delete errors[i];
+  }
+  COUNTER_ADD(kudu_error_counter_, errors.size());
+  if (error_count != NULL) *error_count = errors.size();
+  if (failed) return Status(error_msg_buffer.str());
   return Status::OK();
 }
 
