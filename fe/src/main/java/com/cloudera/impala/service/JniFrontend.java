@@ -383,7 +383,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeTableParams);
 
     TDescribeTableResult result = frontend_.describeTable(
-        params.getDb(), params.getTable_name(), params.getOutput_style());
+        params.getDb(), params.getTable_name(), params.getOutput_style(),
+        params.getResult_struct());
 
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {

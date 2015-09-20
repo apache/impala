@@ -110,7 +110,8 @@ public class Path {
   public static enum PathType {
     SLOT_REF,
     TABLE_REF,
-    STAR
+    STAR,
+    ANY, // Reference to any field or table in schema.
   }
 
   // Implicit or explicit raw path to be resolved relative to rootDesc_ or rootTable_.

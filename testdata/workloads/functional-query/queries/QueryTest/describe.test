@@ -64,3 +64,68 @@ describe functional.allcomplextypes
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+describe functional_parquet.allcomplextypes.int_array_col
+---- RESULTS
+'item','int',''
+'pos','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe functional_parquet.allcomplextypes.map_array_col.item
+---- RESULTS
+'key','string',''
+'value','int',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe functional_parquet.allcomplextypes.complex_struct_col
+---- RESULTS
+'f1','int',''
+'f2','array<int>',''
+'f3','map<string,int>',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+describe functional_parquet.allcomplextypes.complex_struct_col.f2
+---- RESULTS
+'item','int',''
+'pos','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+use functional_parquet
+====
+---- QUERY
+describe functional_parquet.allcomplextypes.complex_struct_col.f2
+---- RESULTS
+'item','int',''
+'pos','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+use functional_parquet
+====
+---- QUERY
+# Check that paths relative to current database work ok.
+describe allcomplextypes.int_array_col
+---- RESULTS
+'item','int',''
+'pos','bigint',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Pretty-printing should work for fields too.
+describe allcomplextypes.nested_struct_col
+---- RESULTS
+'f1','int',''
+'f2','struct<\n  f11:bigint,\n  f12:struct<\n    f21:bigint\n  >\n>',''
+---- TYPES
+string,string,string
+====

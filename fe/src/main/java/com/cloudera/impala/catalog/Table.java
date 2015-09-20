@@ -386,6 +386,17 @@ public abstract class Table implements CatalogObject {
   }
 
   /**
+   * Returns a struct type with the columns in the same order as getColumnsInHiveOrder().
+   */
+  public StructType getHiveColumnsAsStruct() {
+    ArrayList<StructField> fields = Lists.newArrayListWithCapacity(colsByPos_.size());
+    for (Column col: getColumnsInHiveOrder()) {
+      fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
+    }
+    return new StructType(fields);
+  }
+
+  /**
    * Returns the list of all columns excluding any partition columns.
    */
   public List<Column> getNonClusteringColumns() {

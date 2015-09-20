@@ -29,11 +29,14 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.ArrayType;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.StructField;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
@@ -2190,9 +2193,49 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("describe formatted functional.alltypes");
     AnalyzesOk("describe functional.alltypes");
     AnalysisError("describe formatted nodb.alltypes",
-        "Database does not exist: nodb");
+        "Could not resolve path: 'nodb.alltypes'");
     AnalysisError("describe functional.notbl",
-        "Table does not exist: functional.notbl");
+        "Could not resolve path: 'functional.notbl'");
+
+    // Complex typed fields.
+    AnalyzesOk("describe functional_parquet.allcomplextypes.int_array_col");
+    AnalyzesOk("describe functional_parquet.allcomplextypes.map_array_col");
+    AnalyzesOk("describe functional_parquet.allcomplextypes.map_map_col");
+    AnalyzesOk("describe functional_parquet.allcomplextypes.map_map_col.value");
+    AnalyzesOk("describe functional_parquet.allcomplextypes.complex_struct_col");
+    AnalyzesOk("describe functional_parquet.allcomplextypes.complex_struct_col.f3");
+    AnalysisError("describe formatted functional_parquet.allcomplextypes.int_array_col",
+        "DESCRIBE FORMATTED must refer to a table");
+    AnalysisError("describe functional_parquet.allcomplextypes.id",
+        "Cannot describe path 'functional_parquet.allcomplextypes.id' targeting " +
+        "scalar type: INT");
+    AnalysisError("describe functional_parquet.allcomplextypes.nonexistent",
+        "Could not resolve path: 'functional_parquet.allcomplextypes.nonexistent'");
+
+    // Handling of ambiguous paths.
+    addTestDb("ambig");
+    addTestTable("create table ambig.ambig (ambig struct<ambig:array<int>>)");
+    // Single element path can only be resolved as <table>.
+    DescribeStmt describe = (DescribeStmt)AnalyzesOk("describe ambig",
+        createAnalyzer("ambig"));
+    Assert.assertEquals("ambig", describe.toThrift().db);
+    Assert.assertEquals("ambig", describe.toThrift().table_name, "ambig");
+    StructType colStructType = new StructType(Lists.newArrayList(
+        new StructField("ambig", new ArrayType(Type.INT))));
+    StructType tableStructType = new StructType(Lists.newArrayList(
+        new StructField("ambig", colStructType)));
+    Assert.assertEquals(tableStructType.toSql(),
+        Type.fromThrift(describe.toThrift().result_struct).toSql());
+
+    // Path could be resolved as either <db>.<table> or <table>.<complex field>
+    AnalysisError("describe ambig.ambig", createAnalyzer("ambig"),
+        "Path is ambiguous: 'ambig.ambig'");
+    // Path could be resolved as either <db>.<table>.<field> or <table>.<field>.<field>
+    AnalysisError("describe ambig.ambig.ambig", createAnalyzer("ambig"),
+        "Path is ambiguous: 'ambig.ambig.ambig'");
+    // 4 element path can only be resolved to nested array.
+    AnalyzesOk("describe ambig.ambig.ambig.ambig", createAnalyzer("ambig"));
+
   }
 
   @Test

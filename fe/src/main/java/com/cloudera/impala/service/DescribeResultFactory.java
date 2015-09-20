@@ -18,11 +18,14 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.StructField;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TResultRow;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /*
@@ -33,45 +36,13 @@ public class DescribeResultFactory {
   // Number of columns in each row of the DESCRIBE FORMATTED result set.
   private final static int NUM_DESC_FORMATTED_RESULT_COLS = 3;
 
-  public static TDescribeTableResult buildDescribeTableResult(Table table,
-      TDescribeTableOutputStyle outputFormat) {
-    switch (outputFormat) {
-      case MINIMAL: return describeTableMinimal(table);
-      case FORMATTED: return describeTableFormatted(table);
-      default: throw new UnsupportedOperationException(
-          "Unknown TDescribeTableOutputStyle value: " + outputFormat);
-    }
-  }
-
-  /*
-   * Builds results for a DESCRIBE <table> command. This consists of the column
-   * definition for each column in the table.
-   */
-  private static TDescribeTableResult describeTableMinimal(Table table) {
-    TDescribeTableResult descResult = new TDescribeTableResult();
-    descResult.results = Lists.newArrayList();
-
-    // Get description of all the table's columns (includes partition columns).
-    for (Column column: table.getColumnsInHiveOrder()) {
-      TColumnValue colNameCol = new TColumnValue();
-      colNameCol.setString_val(column.getName());
-      TColumnValue dataTypeCol = new TColumnValue();
-      dataTypeCol.setString_val(column.getType().prettyPrint().toLowerCase());
-      TColumnValue commentCol = new TColumnValue();
-      commentCol.setString_val(column.getComment() != null ? column.getComment() : "");
-      descResult.results.add(
-          new TResultRow(Lists.newArrayList(colNameCol, dataTypeCol, commentCol)));
-    }
-    return descResult;
-  }
-
   /*
    * Builds a TDescribeTableResult that contains the result of a DESCRIBE FORMATTED
    * <table> command. For the formatted describe output the goal is to be exactly the
    * same as what Hive (via HiveServer2) outputs, for compatibility reasons. To do this,
    * Hive's MetadataFormatUtils class is used to build the results.
    */
-  private static TDescribeTableResult describeTableFormatted(Table table) {
+  public static TDescribeTableResult buildDescribeFormattedResult(Table table) {
     TDescribeTableResult descResult = new TDescribeTableResult();
     descResult.results = Lists.newArrayList();
 
@@ -113,6 +84,27 @@ public class DescribeResultFactory {
         resultRow.addToColVals(colVal);
       }
       descResult.results.add(resultRow);
+    }
+    return descResult;
+  }
+
+  /*
+   * Builds a TDescribeTableResult that contains the result of a DESCRIBE <path> command:
+   * the names and types of fields of the table or complex type referred to by the path.
+   */
+  public static TDescribeTableResult buildDescribeMinimalResult(StructType type) {
+    TDescribeTableResult descResult = new TDescribeTableResult();
+    descResult.results = Lists.newArrayList();
+
+    for (StructField field: type.getFields()) {
+      TColumnValue colNameCol = new TColumnValue();
+      colNameCol.setString_val(field.getName());
+      TColumnValue dataTypeCol = new TColumnValue();
+      dataTypeCol.setString_val(field.getType().prettyPrint().toLowerCase());
+      TColumnValue commentCol = new TColumnValue();
+      commentCol.setString_val(field.getComment() != null ? field.getComment() : "");
+      descResult.results.add(
+          new TResultRow(Lists.newArrayList(colNameCol, dataTypeCol, commentCol)));
     }
     return descResult;
   }

@@ -80,6 +80,7 @@ import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableId;
 import com.cloudera.impala.catalog.Type;
@@ -96,6 +97,7 @@ import com.cloudera.impala.thrift.TCatalogOpRequest;
 import com.cloudera.impala.thrift.TCatalogOpType;
 import com.cloudera.impala.thrift.TCatalogServiceRequestHeader;
 import com.cloudera.impala.thrift.TColumn;
+import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TCreateDropRoleParams;
 import com.cloudera.impala.thrift.TDdlExecRequest;
@@ -714,9 +716,16 @@ public class Frontend {
    * loading the table metadata.
    */
   public TDescribeTableResult describeTable(String dbName, String tableName,
-      TDescribeTableOutputStyle outputStyle) throws ImpalaException {
-    Table table = impaladCatalog_.getTable(dbName, tableName);
-    return DescribeResultFactory.buildDescribeTableResult(table, outputStyle);
+      TDescribeTableOutputStyle outputStyle, TColumnType tResultStruct)
+          throws ImpalaException {
+    if (outputStyle == TDescribeTableOutputStyle.MINIMAL) {
+      StructType resultStruct = (StructType)Type.fromThrift(tResultStruct);
+      return DescribeResultFactory.buildDescribeMinimalResult(resultStruct);
+    } else {
+      Preconditions.checkArgument(outputStyle == TDescribeTableOutputStyle.FORMATTED);
+      Table table = impaladCatalog_.getTable(dbName, tableName);
+      return DescribeResultFactory.buildDescribeFormattedResult(table);
+    }
   }
 
   /**

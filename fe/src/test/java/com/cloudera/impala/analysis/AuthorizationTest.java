@@ -82,6 +82,7 @@ public class AuthorizationTest {
   //   SELECT permissions on columns ('id', 'int_struct_col', 'struct_array_col',
   //   'int_map_col') on 'functional.allcomplextypes' (no SELECT permissions on
   //   'functional.allcomplextypes')
+  //   ALL permissions on 'functional_parquet.allcomplextypes'
   //   SELECT permissions on all the columns of 'functional.alltypestiny' (no SELECT
   //   permissions on table 'functional.alltypestiny')
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
@@ -280,6 +281,15 @@ public class AuthorizationTest {
       priv.setColumn_name(columnName);
       privileges.add(priv);
     }
+    sentryService.grantRolePrivileges(USER, roleName, privileges);
+    privileges.clear();
+
+    // table privileges on functional_parquet.allcomplextypes
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_parquet");
+    privilege.setTable_name("allcomplextypes");
+    privileges.add(privilege);
     sentryService.grantRolePrivileges(USER, roleName, privileges);
     privileges.clear();
 
@@ -1286,9 +1296,18 @@ public class AuthorizationTest {
     AuthzOk("describe functional.alltypestiny");
     // User has column level privileges on a subset of table columns
     AuthzOk("describe functional.alltypessmall");
+    // User has column level privileges on described column.
+    AuthzOk("describe functional.allcomplextypes.int_struct_col");
+    // User has column level privileges on another column in table.
+    AuthzOk("describe functional.allcomplextypes.complex_struct_col");
+    // User has table level privileges without column level.
+    AuthzOk("describe functional_parquet.allcomplextypes.complex_struct_col");
     // Insufficient privileges on table.
     AuthzError("describe formatted functional.alltypestiny",
         "User '%s' does not have privileges to access: functional.alltypestiny");
+    // Insufficient privileges on table for nested column.
+    AuthzError("describe functional.complextypestbl.nested_struct",
+        "User '%s' does not have privileges to access: functional.complextypestbl");
     // Insufficient privileges on view.
     AuthzError("describe functional.alltypes_view",
         "User '%s' does not have privileges to access: functional.alltypes_view");

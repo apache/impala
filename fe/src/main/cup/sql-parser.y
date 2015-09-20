@@ -1702,8 +1702,8 @@ show_files_stmt ::=
   ;
 
 describe_stmt ::=
-  KW_DESCRIBE describe_output_style:style table_name:table
-  {: RESULT = new DescribeStmt(table, style); :}
+  KW_DESCRIBE describe_output_style:style dotted_path:path
+  {: RESULT = new DescribeStmt(path, style); :}
   ;
 
 describe_output_style ::=

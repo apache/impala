@@ -135,6 +135,9 @@ struct TDescribeTableParams {
 
   // Controls the output style for this describe command.
   3: required TDescribeTableOutputStyle output_style
+
+  // Struct type with fields to display for the MINIMAL output style.
+  4: optional Types.TColumnType result_struct
 }
 
 // Results of a call to describeTable()

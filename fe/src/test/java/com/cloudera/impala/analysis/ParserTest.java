@@ -1642,6 +1642,12 @@ public class ParserTest {
     // Fully-qualified table ok
     ParsesOk("DESCRIBE databasename.tablename");
     ParsesOk("DESCRIBE FORMATTED databasename.tablename");
+
+    // Paths within table ok.
+    ParsesOk("DESCRIBE databasename.tablename.field1");
+    ParsesOk("DESCRIBE databasename.tablename.field1.field2");
+    ParsesOk("DESCRIBE FORMATTED databasename.tablename.field1");
+    ParsesOk("DESCRIBE FORMATTED databasename.tablename.field1.field2");
   }
 
   @Test

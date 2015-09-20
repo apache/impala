@@ -642,7 +642,7 @@ public class Analyzer {
       throws AnalysisException, TableLoadingException {
     // We only allow correlated references in predicates of a subquery.
     boolean resolveInAncestors = false;
-    if (pathType == PathType.TABLE_REF) {
+    if (pathType == PathType.TABLE_REF || pathType == PathType.ANY) {
       resolveInAncestors = true;
     } else if (pathType == PathType.SLOT_REF) {
       resolveInAncestors = isSubquery_;
@@ -681,7 +681,8 @@ public class Analyzer {
       }
     } else {
       // Always prefer table ref paths rooted at a registered tuples descriptor.
-      Preconditions.checkState(pathType == PathType.TABLE_REF);
+      Preconditions.checkState(pathType == PathType.TABLE_REF ||
+          pathType == PathType.ANY);
       Path result = resolvePaths(rawPath, candidates, pathType, errors);
       if (result != null) return result;
       candidates.clear();
@@ -730,7 +731,10 @@ public class Analyzer {
       pathTypeStr = "Column/field reference";
     } else if (pathType == PathType.TABLE_REF) {
       pathTypeStr = "Table reference";
+    } else if (pathType == PathType.ANY) {
+      pathTypeStr = "Path";
     } else {
+      Preconditions.checkState(pathType == PathType.STAR);
       pathTypeStr = "Star expression";
       pathStr += ".*";
     }
@@ -793,6 +797,10 @@ public class Analyzer {
                 pathStr, Joiner.on(".").join(rawPath), p.destType().toSql()));
             continue;
           }
+          break;
+        }
+        case ANY: {
+          // Any path is valid.
           break;
         }
       }

@@ -278,6 +278,11 @@ public class AuditingTest extends AnalyzerTest {
     accessEvents = AnalyzeAccessEvents("describe functional.complex_view");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
         "functional.complex_view", TCatalogObjectType.VIEW, "ANY")));
+
+    accessEvents = AnalyzeAccessEvents(
+        "describe functional.allcomplextypes.int_array_col");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional.allcomplextypes", TCatalogObjectType.TABLE, "ANY")));
   }
 
   @Test
