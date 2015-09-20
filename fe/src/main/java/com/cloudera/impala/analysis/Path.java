@@ -273,6 +273,8 @@ public class Path {
 
   public Table getRootTable() { return rootTable_; }
   public TupleDescriptor getRootDesc() { return rootDesc_; }
+  public boolean isRootedAtTable() { return rootTable_ != null; }
+  public boolean isRootedAtTuple() { return rootDesc_ != null; }
   public List<String> getRawPath() { return rawPath_; }
   public boolean isResolved() { return isResolved_; }
 
@@ -357,6 +359,51 @@ public class Path {
     }
     result.addAll(rawPath_);
     return result;
+  }
+
+  /**
+   * Returns the absolute explicit path starting from the fully-qualified table name.
+   * The goal is produce a canonical non-ambiguous path that can be used as an
+   * identifier for table and slot references.
+   *
+   * Example:
+   * create table mydb.test (a array<struct<f1:int,f2:string>>);
+   * use mydb;
+   * select f1 from test t, t.a;
+   *
+   * This function should return the following for the path of the 'f1' SlotRef:
+   * mydb.test.a.item.f1
+   */
+  public List<String> getCanonicalPath() {
+    List<String> result = Lists.newArrayList();
+    getCanonicalPath(result);
+    return result;
+  }
+
+  /**
+   * Recursive helper for getCanonicalPath().
+   */
+  private void getCanonicalPath(List<String> result) {
+    Type currentType = null;
+    if (isRootedAtTuple()) {
+      rootDesc_.getPath().getCanonicalPath(result);
+      currentType = rootDesc_.getType();
+    } else {
+      Preconditions.checkNotNull(isRootedAtTable());
+      result.add(rootTable_.getTableName().getDb());
+      result.add(rootTable_.getTableName().getTbl());
+      currentType = rootTable_.getType().getItemType();
+    }
+    // Compute the explicit path from the matched positions. Note that rawPath_ is
+    // not sufficient because it could contain implicit matches.
+    for (int i = 0; i < matchedPositions_.size(); ++i) {
+      StructType structType = getTypeAsStruct(currentType);
+      int matchPos = matchedPositions_.get(i);
+      Preconditions.checkState(matchPos < structType.getFields().size());
+      StructField match = structType.getFields().get(matchPos);
+      result.add(match.getName());
+      currentType = match.getType();
+    }
   }
 
   /**

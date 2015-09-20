@@ -26,7 +26,7 @@ public class BaseTableRef extends TableRef {
   public BaseTableRef(TableRef tableRef) {
     super(tableRef);
     Preconditions.checkState(resolvedPath_.isResolved());
-    Preconditions.checkNotNull(resolvedPath_.getRootTable());
+    Preconditions.checkState(resolvedPath_.isRootedAtTable());
     // Set implicit aliases if no explicit one was given.
     if (hasExplicitAlias()) return;
     aliases_ = new String[] {

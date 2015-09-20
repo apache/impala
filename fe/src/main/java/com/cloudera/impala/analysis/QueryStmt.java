@@ -135,7 +135,7 @@ public abstract class QueryStmt extends StatementBase {
         // this query stmt. If so, the correlation is contained within this stmt
         // and the table ref does not conflict with absolute refs.
         CollectionTableRef t = (CollectionTableRef) tblRef;
-        Preconditions.checkNotNull(t.getResolvedPath().getRootDesc());
+        Preconditions.checkState(t.getResolvedPath().isRootedAtTuple());
         // This check relies on tblRefs being in depth-first order.
         if (!tblRefIds.contains(t.getResolvedPath().getRootDesc().getId())) {
           if (correlatedRef == null) correlatedRef = tblRef;

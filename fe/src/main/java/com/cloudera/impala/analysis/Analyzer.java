@@ -744,7 +744,7 @@ public class Analyzer {
       if (!p.resolve()) continue;
 
       // Check legality of the resolved path.
-      if (p.getRootDesc() != null && !isVisible(p.getRootDesc().getId())) {
+      if (p.isRootedAtTuple() && !isVisible(p.getRootDesc().getId())) {
         errors.addLast(String.format(
             "Illegal %s '%s' of semi-/anti-joined table '%s'",
             pathTypeStr.toLowerCase(), pathStr, p.getRootDesc().getAlias()));
@@ -827,7 +827,7 @@ public class Analyzer {
    * a new empty SlotDescriptor for paths with a collection-typed destination.
    */
   public SlotDescriptor registerSlotRef(Path slotPath) throws AnalysisException {
-    Preconditions.checkNotNull(slotPath.getRootDesc());
+    Preconditions.checkState(slotPath.isRootedAtTuple());
     // Always register a new slot descriptor for collection types. The BE currently
     // relies on this behavior for setting unnested collection slots to NULL.
     if (slotPath.destType().isCollectionType()) {

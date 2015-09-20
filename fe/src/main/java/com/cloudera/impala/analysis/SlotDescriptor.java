@@ -122,7 +122,7 @@ public class SlotDescriptor {
 
   public void setPath(Path path) {
     Preconditions.checkNotNull(path);
-    Preconditions.checkNotNull(path.getRootDesc());
+    Preconditions.checkState(path.isRootedAtTuple());
     Preconditions.checkState(path.getRootDesc() == parent_);
     path_ = path;
     type_ = path_.destType();
@@ -193,7 +193,7 @@ public class SlotDescriptor {
     // Truncate materializedPath after first collection element
     // 'offset' adjusts for the index returned by path_.getFirstCollectionIndex() being
     // relative to path_.getRootDesc()
-    int offset = path_.getRootDesc() == null ? 0 :
+    int offset = !path_.isRootedAtTuple() ? 0 :
         path_.getRootDesc().getPath().getAbsolutePath().size();
     materializedPath.subList(
         offset + path_.getFirstCollectionIndex() + 1, materializedPath.size()).clear();

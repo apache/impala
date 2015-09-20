@@ -180,7 +180,7 @@ public class TableRef implements ParseNode {
           "Failed to load metadata for table: '%s'", Joiner.on(".").join(rawPath_)), e);
     }
 
-    if (resolvedPath_.getRootTable() != null) {
+    if (resolvedPath_.isRootedAtTable()) {
       // Add access event for auditing.
       Table table = resolvedPath_.getRootTable();
       if (table instanceof View) {
