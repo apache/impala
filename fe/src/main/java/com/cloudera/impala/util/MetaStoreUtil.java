@@ -33,9 +33,18 @@ import com.google.common.collect.Lists;
 public class MetaStoreUtil {
   private static final Logger LOG = Logger.getLogger(MetaStoreUtil.class);
 
+  // Maximum comment length, e.g., for columns, that can be stored in the HMS.
+  // This number is a lower bound of the constraint set in the HMS DB schema,
+  // because the constraint varies among different backing databases, e.g.,
+  // for Postgres it is 4000, but for most other databases it is 256.
+  public static final int CREATE_MAX_COMMENT_LENGTH = 256;
+
+  // Maximum length of the string representation of a type that the HMS can store.
+  public static final int MAX_TYPE_NAME_LENGTH = 4000;
+
   // The default maximum number of partitions to fetch from the Hive metastore in one
   // RPC.
-  private final static short DEFAULT_MAX_PARTITIONS_PER_RPC = 1000;
+  private static final short DEFAULT_MAX_PARTITIONS_PER_RPC = 1000;
 
   // The maximum number of partitions to fetch from the metastore in one RPC.
   // Read from the 'hive.metastore.batch.retrieve.table.partition.max' Hive configuration

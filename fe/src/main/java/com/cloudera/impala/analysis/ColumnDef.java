@@ -22,6 +22,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumn;
+import com.cloudera.impala.util.MetaStoreUtil;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -84,6 +85,21 @@ public class ColumnDef {
     }
     Preconditions.checkNotNull(type_);
     Preconditions.checkState(type_.isValid());
+    // Check HMS constraints of type and comment.
+    String typeSql = type_.toSql();
+    if (typeSql.length() > MetaStoreUtil.MAX_TYPE_NAME_LENGTH) {
+      throw new AnalysisException(String.format(
+          "Type of column '%s' exceeds maximum type length of %d characters:\n" +
+          "%s has %d characters.", colName_, MetaStoreUtil.MAX_TYPE_NAME_LENGTH,
+          typeSql, typeSql.length()));
+    }
+    if (comment_ != null &&
+        comment_.length() > MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH) {
+      throw new AnalysisException(String.format(
+          "Comment of column '%s' exceeds maximum length of %d characters:\n" +
+          "%s has %d characters.", colName_, MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH,
+          comment_, comment_.length()));
+    }
   }
 
   @Override

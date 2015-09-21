@@ -334,7 +334,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       Preconditions.checkNotNull(type);
       String colName = field.getName();
       schema.add(new ColumnDef(colName, new TypeDef(type),
-          "inferred from: " + field.toString()));
+          "Inferred from Parquet file."));
     }
     return schema;
   }

@@ -11,16 +11,16 @@ create table ddl_test_db.temp_legacy_table like parquet
 ---- QUERY
 describe ddl_test_db.temp_legacy_table
 ---- RESULTS
-'t_long','bigint','inferred from: required int64 t_long'
-'t_struct','struct<\n  f_int:int,\n  t_struct:struct<\n    f_int:int,\n    f_int2:int\n  >,\n  int_arr:array<int>,\n  int_map:map<string,int>\n>','inferred from: required group t_struct {\n  required int32 f_int;\n  required group t_struct {\n    required int32 f_int;\n    optional int32 f_int2;\n  }\n  required group int_arr (LIST) {\n    repeated int32 array;\n  }\n  required group int_map (MAP) {\n    repeated group map (MAP_KEY_VALUE) {\n      required binary key (UTF8);\n      required int32 value;\n    }\n  }\n}'
-'t_array_basic','array<int>','inferred from: required group t_array_basic (LIST) {\n  repeated int32 array;\n}'
-'t_array_struct','array<struct<\n  f_int1:int,\n  f_int2:int,\n  f_int3:int\n>>','inferred from: required group t_array_struct (LIST) {\n  repeated group array {\n    required int32 f_int1;\n    required int32 f_int2;\n    optional int32 f_int3;\n  }\n}'
-'t_array_array','array<array<int>>','inferred from: required group t_array_array (LIST) {\n  repeated group array (LIST) {\n    repeated int32 array;\n  }\n}'
-'t_array_map','array<map<string,int>>','inferred from: required group t_array_map (LIST) {\n  repeated group array (MAP) {\n    repeated group map (MAP_KEY_VALUE) {\n      required binary key (UTF8);\n      required int32 value;\n    }\n  }\n}'
-'map_int','map<string,int>','inferred from: required group map_int (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required int32 value;\n  }\n}'
-'map_struct','map<string,struct<\n  f_int:int,\n  f_int2:int\n>>','inferred from: required group map_struct (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value {\n      required int32 f_int;\n      required int32 f_int2;\n    }\n  }\n}'
-'map_array','map<string,array<int>>','inferred from: required group map_array (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (LIST) {\n      repeated int32 array;\n    }\n  }\n}'
-'map_map','map<string,map<string,int>>','inferred from: required group map_map (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (MAP) {\n      repeated group map (MAP_KEY_VALUE) {\n        required binary key (UTF8);\n        optional int32 value;\n      }\n    }\n  }\n}'
+'t_long','bigint','Inferred from Parquet file.'
+'t_struct','struct<\n  f_int:int,\n  t_struct:struct<\n    f_int:int,\n    f_int2:int\n  >,\n  int_arr:array<int>,\n  int_map:map<string,int>\n>','Inferred from Parquet file.'
+'t_array_basic','array<int>','Inferred from Parquet file.'
+'t_array_struct','array<struct<\n  f_int1:int,\n  f_int2:int,\n  f_int3:int\n>>','Inferred from Parquet file.'
+'t_array_array','array<array<int>>','Inferred from Parquet file.'
+'t_array_map','array<map<string,int>>','Inferred from Parquet file.'
+'map_int','map<string,int>','Inferred from Parquet file.'
+'map_struct','map<string,struct<\n  f_int:int,\n  f_int2:int\n>>','Inferred from Parquet file.'
+'map_array','map<string,array<int>>','Inferred from Parquet file.'
+'map_map','map<string,map<string,int>>','Inferred from Parquet file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -40,16 +40,16 @@ create table ddl_test_db.temp_modern_table like parquet
 ---- QUERY
 describe ddl_test_db.temp_modern_table
 ---- RESULTS
-'t_long','bigint','inferred from: required int64 t_long'
-'t_struct','struct<\n  f_int:int,\n  t_struct:struct<\n    f_int:int,\n    f_int2:int\n  >,\n  int_arr:array<int>,\n  int_map:map<string,int>\n>','inferred from: required group t_struct {\n  required int32 f_int;\n  required group t_struct {\n    required int32 f_int;\n    optional int32 f_int2;\n  }\n  required group int_arr (LIST) {\n    repeated group list {\n      required int32 element;\n    }\n  }\n  required group int_map (MAP) {\n    repeated group map (MAP_KEY_VALUE) {\n      required binary key (UTF8);\n      required int32 value;\n    }\n  }\n}'
-'t_array_basic','array<int>','inferred from: required group t_array_basic (LIST) {\n  repeated group list {\n    required int32 element;\n  }\n}'
-'t_array_struct','array<struct<\n  f_int1:int,\n  f_int2:int,\n  f_int3:int\n>>','inferred from: required group t_array_struct (LIST) {\n  repeated group list {\n    required group element {\n      required int32 f_int1;\n      required int32 f_int2;\n      optional int32 f_int3;\n    }\n  }\n}'
-'t_array_array','array<array<int>>','inferred from: required group t_array_array (LIST) {\n  repeated group list {\n    required group element (LIST) {\n      repeated group list {\n        required int32 element;\n      }\n    }\n  }\n}'
-'t_array_map','array<map<string,int>>','inferred from: required group t_array_map (LIST) {\n  repeated group list {\n    required group element (MAP) {\n      repeated group map (MAP_KEY_VALUE) {\n        required binary key (UTF8);\n        required int32 value;\n      }\n    }\n  }\n}'
-'map_int','map<string,int>','inferred from: required group map_int (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required int32 value;\n  }\n}'
-'map_struct','map<string,struct<\n  f_int:int,\n  f_int2:int\n>>','inferred from: required group map_struct (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value {\n      required int32 f_int;\n      required int32 f_int2;\n    }\n  }\n}'
-'map_array','map<string,array<int>>','inferred from: required group map_array (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (LIST) {\n      repeated group list {\n        optional int32 element;\n      }\n    }\n  }\n}'
-'map_map','map<string,map<string,int>>','inferred from: required group map_map (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (MAP) {\n      repeated group map (MAP_KEY_VALUE) {\n        required binary key (UTF8);\n        optional int32 value;\n      }\n    }\n  }\n}'
+'t_long','bigint','Inferred from Parquet file.'
+'t_struct','struct<\n  f_int:int,\n  t_struct:struct<\n    f_int:int,\n    f_int2:int\n  >,\n  int_arr:array<int>,\n  int_map:map<string,int>\n>','Inferred from Parquet file.'
+'t_array_basic','array<int>','Inferred from Parquet file.'
+'t_array_struct','array<struct<\n  f_int1:int,\n  f_int2:int,\n  f_int3:int\n>>','Inferred from Parquet file.'
+'t_array_array','array<array<int>>','Inferred from Parquet file.'
+'t_array_map','array<map<string,int>>','Inferred from Parquet file.'
+'map_int','map<string,int>','Inferred from Parquet file.'
+'map_struct','map<string,struct<\n  f_int:int,\n  f_int2:int\n>>','Inferred from Parquet file.'
+'map_array','map<string,array<int>>','Inferred from Parquet file.'
+'map_map','map<string,map<string,int>>','Inferred from Parquet file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -69,9 +69,9 @@ create table ddl_test_db.temp_decimal_table like parquet
 ---- QUERY
 describe ddl_test_db.temp_decimal_table
 ---- RESULTS
-'d32','decimal(3,2)','inferred from: required fixed_len_byte_array(16) d32 (DECIMAL(3,2))'
-'d11','decimal(1,1)','inferred from: required fixed_len_byte_array(16) d11 (DECIMAL(1,1))'
-'d1015','decimal(15,10)','inferred from: required fixed_len_byte_array(16) d1015 (DECIMAL(15,10))'
+'d32','decimal(3,2)','Inferred from Parquet file.'
+'d11','decimal(1,1)','Inferred from Parquet file.'
+'d1015','decimal(15,10)','Inferred from Parquet file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -87,11 +87,11 @@ create table ddl_test_db.test_like_file_create like parquet
 ---- QUERY
 describe ddl_test_db.test_like_file_create
 ---- RESULTS
-'id','string','inferred from: optional binary id'
-'zip','string','inferred from: optional binary zip'
-'description1','string','inferred from: optional binary description1'
-'description2','string','inferred from: optional binary description2'
-'income','int','inferred from: optional int32 income'
+'id','string','Inferred from Parquet file.'
+'zip','string','Inferred from Parquet file.'
+'description1','string','Inferred from Parquet file.'
+'description2','string','Inferred from Parquet file.'
+'income','int','Inferred from Parquet file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -107,17 +107,17 @@ create table if not exists ddl_test_db.test_like_file_create like parquet
 ---- QUERY
 describe ddl_test_db.test_like_file_create
 ---- RESULTS
-'id','int','inferred from: optional int32 id'
-'bool_col','boolean','inferred from: optional boolean bool_col'
-'tinyint_col','int','inferred from: optional int32 tinyint_col'
-'smallint_col','int','inferred from: optional int32 smallint_col'
-'int_col','int','inferred from: optional int32 int_col'
-'bigint_col','bigint','inferred from: optional int64 bigint_col'
-'float_col','float','inferred from: optional float float_col'
-'double_col','double','inferred from: optional double double_col'
-'date_string_col','string','inferred from: optional binary date_string_col'
-'string_col','string','inferred from: optional binary string_col'
-'timestamp_col','timestamp','inferred from: optional int96 timestamp_col'
+'id','int','Inferred from Parquet file.'
+'bool_col','boolean','Inferred from Parquet file.'
+'tinyint_col','int','Inferred from Parquet file.'
+'smallint_col','int','Inferred from Parquet file.'
+'int_col','int','Inferred from Parquet file.'
+'bigint_col','bigint','Inferred from Parquet file.'
+'float_col','float','Inferred from Parquet file.'
+'double_col','double','Inferred from Parquet file.'
+'date_string_col','string','Inferred from Parquet file.'
+'string_col','string','Inferred from Parquet file.'
+'timestamp_col','timestamp','Inferred from Parquet file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -130,17 +130,17 @@ create table if not exists ddl_test_db.test_like_file_create like parquet
 # should not have changed since last statement was IF NOT EXISTS
 describe ddl_test_db.test_like_file_create
 ---- RESULTS
-'id','int','inferred from: optional int32 id'
-'bool_col','boolean','inferred from: optional boolean bool_col'
-'tinyint_col','int','inferred from: optional int32 tinyint_col'
-'smallint_col','int','inferred from: optional int32 smallint_col'
-'int_col','int','inferred from: optional int32 int_col'
-'bigint_col','bigint','inferred from: optional int64 bigint_col'
-'float_col','float','inferred from: optional float float_col'
-'double_col','double','inferred from: optional double double_col'
-'date_string_col','string','inferred from: optional binary date_string_col'
-'string_col','string','inferred from: optional binary string_col'
-'timestamp_col','timestamp','inferred from: optional int96 timestamp_col'
+'id','int','Inferred from Parquet file.'
+'bool_col','boolean','Inferred from Parquet file.'
+'tinyint_col','int','Inferred from Parquet file.'
+'smallint_col','int','Inferred from Parquet file.'
+'int_col','int','Inferred from Parquet file.'
+'bigint_col','bigint','Inferred from Parquet file.'
+'float_col','float','Inferred from Parquet file.'
+'double_col','double','Inferred from Parquet file.'
+'date_string_col','string','Inferred from Parquet file.'
+'string_col','string','Inferred from Parquet file.'
+'timestamp_col','timestamp','Inferred from Parquet file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
