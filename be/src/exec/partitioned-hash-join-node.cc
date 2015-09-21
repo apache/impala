@@ -574,12 +574,8 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level) {
   if (level >= MAX_PARTITION_DEPTH) {
-    Status status = Status::MemLimitExceeded();
-    status.SetErrorMsg(ErrorMsg(
-        TErrorCode::PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH,
-        id_, MAX_PARTITION_DEPTH));
-    state->SetMemLimitExceeded();
-    return status;
+    return state->SetMemLimitExceeded(ErrorMsg(
+        TErrorCode::PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH, id_, MAX_PARTITION_DEPTH));
   }
 
   DCHECK(hash_partitions_.empty());

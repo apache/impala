@@ -149,10 +149,9 @@ int HdfsScanner::GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool,
   *pool = builder->pool();
   int max_num_rows = builder->GetFreeMemory(tuple_mem);
   if (max_num_rows == 0) {
-    parse_status_ = Status::MemLimitExceeded();
-    parse_status_.SetErrorMsg(ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED,
+    parse_status_ = state_->SetMemLimitExceeded(ErrorMsg(
+        TErrorCode::COLLECTION_ALLOC_FAILED,
         PrintPath(*scan_node_->hdfs_table(), builder->tuple_desc().tuple_path())));
-    state_->SetMemLimitExceeded();
     return 0;
   }
   // Treat tuple as a single-tuple row

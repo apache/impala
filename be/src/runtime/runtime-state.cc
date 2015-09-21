@@ -246,12 +246,13 @@ void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
 }
 
 Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
-    int64_t failed_allocation_size) {
+    int64_t failed_allocation_size, const ErrorMsg* msg) {
   DCHECK_GE(failed_allocation_size, 0);
   {
     lock_guard<SpinLock> l(query_status_lock_);
     if (query_status_.ok()) {
       query_status_ = Status::MemLimitExceeded();
+      if (msg != NULL) query_status_.MergeStatus(*msg);
     } else {
       return query_status_;
     }

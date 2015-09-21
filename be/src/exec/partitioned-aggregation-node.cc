@@ -779,11 +779,8 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
 
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   if (level >= MAX_PARTITION_DEPTH) {
-    Status status = Status::MemLimitExceeded();
-    status.SetErrorMsg(ErrorMsg(TErrorCode::PARTITIONED_AGG_MAX_PARTITION_DEPTH,
-        id_, MAX_PARTITION_DEPTH));
-    state_->SetMemLimitExceeded();
-    return status;
+    return state_->SetMemLimitExceeded(ErrorMsg(
+        TErrorCode::PARTITIONED_AGG_MAX_PARTITION_DEPTH, id_, MAX_PARTITION_DEPTH));
   }
   ht_ctx_->set_level(level);
 

@@ -257,12 +257,18 @@ class RuntimeState {
   }
 
   /// Sets query_status_ to MEM_LIMIT_EXCEEDED and logs all the registered trackers.
-  /// Subsequent calls to this will be no-ops.
-  /// If failed_allocation_size is not 0, then it is the size of the allocation (in
+  /// Subsequent calls to this will be no-ops. Returns query_status_.
+  /// If 'failed_allocation_size' is not 0, then it is the size of the allocation (in
   /// bytes) that would have exceeded the limit allocated for 'tracker'.
   /// This value and tracker are only used for error reporting.
+  /// If 'msg' is non-NULL, it will be appended to query_status_ in addition to the
+  /// generic "Memory limit exceeded" error.
   Status SetMemLimitExceeded(MemTracker* tracker = NULL,
-      int64_t failed_allocation_size = 0);
+      int64_t failed_allocation_size = 0, const ErrorMsg* msg = NULL);
+
+  Status SetMemLimitExceeded(const ErrorMsg& msg) {
+    return SetMemLimitExceeded(NULL, 0, &msg);
+  }
 
   /// Returns a non-OK status if query execution should stop (e.g., the query was cancelled
   /// or a mem limit was exceeded). Exec nodes should check this periodically so execution
