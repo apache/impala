@@ -283,7 +283,7 @@ void AggregationNode::Close(RuntimeState* state) {
   // but we don't actually need the result, so allocate a single dummy tuple to avoid
   // accumulating memory.
   Tuple* dummy_dst = NULL;
-  if (needs_finalize_) {
+  if (needs_finalize_ && output_tuple_desc_ != NULL) {
     dummy_dst = Tuple::Create(output_tuple_desc_->byte_size(), tuple_pool_.get());
   }
   while (!output_iterator_.AtEnd()) {
@@ -373,6 +373,8 @@ void AggregationNode::UpdateTuple(Tuple* tuple, TupleRow* row) {
 
 Tuple* AggregationNode::FinalizeTuple(Tuple* tuple, MemPool* pool) {
   DCHECK(tuple != NULL || aggregate_evaluators_.empty());
+  DCHECK(output_tuple_desc_ != NULL);
+
   Tuple* dst = tuple;
   if (needs_finalize_ && intermediate_tuple_id_ != output_tuple_id_) {
     dst = Tuple::Create(output_tuple_desc_->byte_size(), pool);
