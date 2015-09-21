@@ -97,6 +97,7 @@ Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
 }
 
 Status KuduScanner::KeepKuduScannerAlive() {
+  if (!scanner_) return Status::OK();
   KUDU_RETURN_IF_ERROR(scanner_->KeepAlive(), "Unable to keep the "
       "Kudu scanner alive.");
   return Status::OK();
