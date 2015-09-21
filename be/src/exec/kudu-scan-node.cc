@@ -97,6 +97,8 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
   state_ = state;
 
+  scan_ranges_complete_counter_ =
+      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
   kudu_read_timer_ = ADD_CHILD_TIMER(runtime_profile(), KUDU_READ_TIMER,
       SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
@@ -447,7 +449,8 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_ra
       if (added_to_queue) row_batch.release();
       if (!status.ok() || done_) goto done;
     }
-
+    // Mark the current scan range as complete.
+    scan_ranges_complete_counter()->Add(1);
     if (state_->resource_pool()->optional_exceeded()) goto done;
     key_range = GetNextKeyRange();
     if (key_range == NULL) goto done;
