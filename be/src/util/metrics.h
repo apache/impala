@@ -157,6 +157,7 @@ class SimpleMetric : public Metric {
         << "Can't change value of PROPERTY metric: " << key();
     DCHECK(kind() != TMetricKind::COUNTER || delta >= 0)
         << "Can't decrement value of COUNTER metric: " << key();
+    if (delta == 0) return;
     boost::lock_guard<SpinLock> l(lock_);
     value_ += delta;
   }

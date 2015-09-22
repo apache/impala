@@ -119,8 +119,6 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
   bool eos = false;
   do {
     RowBatch* batch = build_batch_cache_->GetNextBatch();
-    RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
     SCOPED_TIMER(build_timer_);
     raw_build_batches_.AddRowBatch(batch);
@@ -139,6 +137,7 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
         copied_build_batches_.total_num_rows());
   } while (!eos);
 
+  SCOPED_TIMER(build_timer_);
   if (copied_build_batches_.total_num_rows() > 0) {
     // To simplify things, we only want to process one list, so we need to copy
     // the remaining raw batches.

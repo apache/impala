@@ -116,8 +116,8 @@ class MemTracker {
 
   /// Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
-    if (bytes < 0) {
-      Release(-bytes);
+    if (bytes <= 0) {
+      if (bytes < 0) Release(-bytes);
       return;
     }
 
@@ -126,7 +126,6 @@ class MemTracker {
       consumption_->Set(consumption_metric_->value());
       return;
     }
-    if (bytes == 0) return;
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
@@ -216,8 +215,8 @@ class MemTracker {
 
   /// Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
-    if (bytes < 0) {
-      Consume(-bytes);
+    if (bytes <= 0) {
+      if (bytes < 0) Consume(-bytes);
       return;
     }
 
@@ -230,7 +229,6 @@ class MemTracker {
       consumption_->Set(consumption_metric_->value());
       return;
     }
-    if (bytes == 0) return;
     if (UNLIKELY(enable_logging_)) LogUpdate(false, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {

@@ -72,21 +72,27 @@ TEST(MemTestTest, ConsumptionMetric) {
 
   metric.Increment(10);
   // consumption_ is only updated with consumption_metric_ after calls to
-  // Consume()/Release()
-  t.Consume(0);
+  // Consume()/Release() with a non-zero value
+  t.Consume(1);
   EXPECT_EQ(t.consumption(), 10);
   EXPECT_EQ(t.peak_consumption(), 10);
   metric.Increment(-5);
-  t.Consume(0);
+  t.Consume(-1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 10);
   EXPECT_FALSE(t.LimitExceeded());
   metric.Increment(150);
-  t.Consume(0);
+  t.Consume(1);
   EXPECT_EQ(t.consumption(), 155);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_TRUE(t.LimitExceeded());
   metric.Increment(-150);
+  t.Consume(-1);
+  EXPECT_EQ(t.consumption(), 5);
+  EXPECT_EQ(t.peak_consumption(), 155);
+  EXPECT_FALSE(t.LimitExceeded());
+  // consumption_ is not updated when Consume()/Release() is called with a zero value
+  metric.Increment(10);
   t.Consume(0);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);

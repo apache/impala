@@ -319,8 +319,8 @@ void RowBatch::Reset() {
   DCHECK(tuple_data_pool_.get() != NULL);
   num_rows_ = 0;
   has_in_flight_row_ = false;
+  // TODO: Change this to Clear() and investigate the repercussions.
   tuple_data_pool_->FreeAll();
-  tuple_data_pool_.reset(new MemPool(mem_tracker_));
   for (int i = 0; i < io_buffers_.size(); ++i) {
     io_buffers_[i]->Return();
   }

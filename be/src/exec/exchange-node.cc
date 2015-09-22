@@ -174,6 +174,8 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
 Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
     bool* eos) {
   DCHECK_EQ(output_batch->num_rows(), 0);
+  RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(stream_recvr_->GetNext(output_batch, eos));
 
   while ((num_rows_skipped_ < offset_)) {
