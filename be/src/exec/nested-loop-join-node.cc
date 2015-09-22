@@ -128,7 +128,7 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
       // This batch and earlier batches may refer to resources passed from the child
       // that aren't owned by the row batch itself. Deep copying ensures that the row
       // batches are backed by memory owned by this node that is safe to hold on to.
-      DeepCopyBuildBatches(state);
+      RETURN_IF_ERROR(DeepCopyBuildBatches(state));
     }
 
     VLOG_ROW << Substitute("raw_build_batches_: BuildList($0)",
@@ -156,7 +156,7 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
   return Status::OK();
 }
 
-void NestedLoopJoinNode::DeepCopyBuildBatches(RuntimeState* state) {
+Status NestedLoopJoinNode::DeepCopyBuildBatches(RuntimeState* state) {
   for (RowBatchList::BatchIterator it = raw_build_batches_.BatchesBegin();
     it != raw_build_batches_.BatchesEnd(); ++it) {
     RowBatch* raw_batch = *it;
@@ -167,8 +167,12 @@ void NestedLoopJoinNode::DeepCopyBuildBatches(RuntimeState* state) {
     copied_build_batches_.AddRowBatch(copied_batch);
     // Reset raw batches as we go to free up memory if possible.
     raw_batch->Reset();
+
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(QueryMaintenance(state));
   }
   raw_build_batches_.Reset();
+  return Status::OK();
 }
 
 Status NestedLoopJoinNode::InitGetNext(TupleRow* first_left_row) {

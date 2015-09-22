@@ -148,7 +148,10 @@ class NestedLoopJoinNode : public BlockingJoinNode {
 
   /// Deep copy all build batches in raw_build_batches_ to copied_build_batches_.
   /// Resets all the source batches and clears raw_build_batches_.
-  void DeepCopyBuildBatches(RuntimeState* state);
+  /// If the memory limit is exceeded while copying batches, returns a MEM_LIMIT_EXCEEDED
+  /// status, sets the query status to MEM_LIMIT_EXCEEDED and leave the row batches to
+  /// be cleaned up later when the node is closed.
+  Status DeepCopyBuildBatches(RuntimeState* state);
 };
 
 }
