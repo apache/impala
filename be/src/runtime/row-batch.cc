@@ -50,8 +50,12 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
   DCHECK(mem_tracker_ != NULL);
   DCHECK_GT(capacity, 0);
   tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
+  DCHECK_GT(tuple_ptrs_size_, 0);
+  // TODO: switch to Init() pattern so we can check memory limit and return Status.
   if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
+    mem_tracker_->Consume(tuple_ptrs_size_);
     tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
+    DCHECK(tuple_ptrs_ != NULL);
   } else {
     tuple_ptrs_ = reinterpret_cast<Tuple**>(
         tuple_data_pool_->Allocate(tuple_ptrs_size_));
@@ -76,8 +80,12 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     tuple_data_pool_(new MemPool(mem_tracker)) {
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
+  DCHECK_GT(tuple_ptrs_size_, 0);
+  // TODO: switch to Init() pattern so we can check memory limit and return Status.
   if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
+    mem_tracker_->Consume(tuple_ptrs_size_);
     tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
+    DCHECK(tuple_ptrs_ != NULL);
   } else {
     tuple_ptrs_ = reinterpret_cast<Tuple**>(
         tuple_data_pool_->Allocate(tuple_ptrs_size_));
@@ -147,11 +155,13 @@ RowBatch::~RowBatch() {
     tuple_streams_[i]->Close();
   }
   for (int i = 0; i < blocks_.size(); ++i) {
+    // TODO: Delete() returns a Status.
     blocks_[i]->Delete();
   }
   if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
     DCHECK(tuple_ptrs_ != NULL);
     free(tuple_ptrs_);
+    mem_tracker_->Release(tuple_ptrs_size_);
     tuple_ptrs_ = NULL;
   }
 }
@@ -319,6 +329,7 @@ void RowBatch::Reset() {
     tuple_streams_[i]->Close();
   }
   for (int i = 0; i < blocks_.size(); ++i) {
+    // TODO: Delete() returns a Status.
     blocks_[i]->Delete();
   }
   blocks_.clear();
