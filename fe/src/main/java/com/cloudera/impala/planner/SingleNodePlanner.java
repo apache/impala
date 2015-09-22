@@ -692,8 +692,8 @@ public class SingleNodePlanner {
           Collections.unmodifiableList(ctx_.getSubplan().getChild(0).getTupleIds());
     }
 
-    // List of table ref ids of all outer/semi joined table refs seen so far.
-    List<TupleId> outerOrSemiJoinedTblRefIds = Lists.newArrayList();
+    // Table ref representing the last outer or semi join we have seen. 
+    TableRef lastSemiOrOuterJoin = null;
     for (TableRef ref: tblRefs) {
       boolean isParentRef = true;
       if (ref.isRelative() || ref.isCorrelated()) {
@@ -714,7 +714,11 @@ public class SingleNodePlanner {
             CollectionTableRef collectionTableRef = (CollectionTableRef) ref;
             requiredTids.add(collectionTableRef.getResolvedPath().getRootDesc().getId());
           }
-          requiredTblRefIds.addAll(outerOrSemiJoinedTblRefIds);
+          if (lastSemiOrOuterJoin != null) {
+            // Prevent incorrect join re-ordering across outer/semi joins by requiring all
+            // table ref ids to the left and including the last outer/semi join.
+            requiredTblRefIds.addAll(lastSemiOrOuterJoin.getAllTupleIds());
+          }
         }
         if (!subplanTids.containsAll(requiredTids) ||
             !planTblRefIds.containsAll(requiredTblRefIds)) {
@@ -741,7 +745,7 @@ public class SingleNodePlanner {
         planTblRefIds.add(ref.getId());
       }
       if (ref.getJoinOp().isOuterJoin() || ref.getJoinOp().isSemiJoin()) {
-        outerOrSemiJoinedTblRefIds.add(ref.getId());
+        lastSemiOrOuterJoin = ref;
       }
     }
     Preconditions.checkState(tblRefs.size() == parentRefs.size() + subplanRefs.size());

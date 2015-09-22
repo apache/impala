@@ -1381,3 +1381,26 @@ where s.s_suppkey not in
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
    partitions=1/1 files=1 size=111.08MB
 ====
+# IMPALA-2383: Test join ordering of relative collection ref after an outer join.
+select 1 from functional.allcomplextypes t1
+left outer join functional.allcomplextypes t2 ON (t1.id = t2.id)
+# The subplan for this table ref must come after the outer join of t1 and t2.
+inner join t2.int_array_col
+---- PLAN
+06:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [t2.int_array_col]
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.allcomplextypes t2]
+|     partitions=0/0 files=0 size=0B
+|
+00:SCAN HDFS [functional.allcomplextypes t1]
+   partitions=0/0 files=0 size=0B
+====

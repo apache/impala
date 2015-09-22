@@ -271,10 +271,6 @@ left outer join complextypestbl t2
   on (t1.id = t2.id + 4)
 inner join t2.int_array a
 ---- RESULTS
-1,NULL,NULL
-2,NULL,NULL
-3,NULL,NULL
-4,NULL,NULL
 5,1,1
 5,1,2
 5,1,3
@@ -284,8 +280,6 @@ inner join t2.int_array a
 6,2,NULL
 6,2,NULL
 6,2,NULL
-7,NULL,NULL
-8,NULL,NULL
 ---- TYPES
 bigint,bigint,int
 ====
