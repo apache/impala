@@ -203,7 +203,7 @@ next_row:
       Partition* partition = hash_partitions_[partition_idx];
       if (UNLIKELY(partition->is_closed())) {
         // This partition is closed, meaning the build side for this partition was empty.
-        DCHECK_EQ(state_, PROCESSING_PROBE);
+        DCHECK(state_ == PROCESSING_PROBE || state_ == REPARTITIONING);
       } else {
         // This partition is not in memory, spill the probe row and move to the next row.
         DCHECK(partition->is_spilled());

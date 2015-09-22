@@ -34,7 +34,7 @@ order by
   -- avg_quarterly_sales,
   sum_sales,
   i_manufact_id
-limit 100;
+limit 100
 ---- RESULTS
 612,2.27
 315,2.79
