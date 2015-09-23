@@ -16,15 +16,15 @@ package com.cloudera.impala.catalog;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.ClusterStatus;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
@@ -32,12 +32,19 @@ import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.ServerLoad;
+import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.RegionLoad;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hive.hbase.HBaseSerDe;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -115,7 +122,6 @@ public class HBaseTable extends Table {
   // Keep the conf around
   private final static Configuration hbaseConf_ = HBaseConfiguration.create();
 
-  private HTable hTable_ = null;
   // Cached column families. Used primarily for speeding up row stats estimation
   // (see CDH-19292).
   private HColumnDescriptor[] columnFamilies_ = null;
@@ -125,15 +131,68 @@ public class HBaseTable extends Table {
     super(id, msTbl, db, name, owner);
   }
 
-  // Parse the column description string to the column families and column
-  // qualifies. This is a copy of HBaseSerDe.parseColumnMapping and
-  // parseColumnStorageTypes with parts we don't use removed. The hive functions
-  // are not public.
-  // tableDefaultStorageIsBinary - true if table is default to binary encoding
-  // columnsMappingSpec - input string format describing the table
-  // fieldSchemas - input field schema from metastore table
-  // columnFamilies/columnQualifiers/columnBinaryEncodings - out parameters that will be
-  // filled with the column family, column qualifier and encoding for each column.
+  /**
+   * Connection instances are expensive to create. The HBase documentation recommends
+   * one and then sharing it among threads. All operations on a connection are
+   * thread-safe.
+   */
+  private static class ConnectionHolder {
+    private static Connection connection_ = null;
+
+    public static synchronized Connection getConnection(Configuration conf)
+        throws IOException {
+      if (connection_ == null || connection_.isClosed()) {
+        connection_ = ConnectionFactory.createConnection(conf);
+      }
+      return connection_;
+    }
+  }
+
+  /**
+   * Table client objects are thread-unsafe and cheap to create. The HBase docs recommend
+   * creating a new one for each task and then closing when done.
+   */
+  public org.apache.hadoop.hbase.client.Table getHBaseTable() throws IOException {
+    return ConnectionHolder.getConnection(hbaseConf_)
+        .getTable(TableName.valueOf(hbaseTableName_));
+  }
+
+  private void closeHBaseTable(org.apache.hadoop.hbase.client.Table table) {
+    try {
+      table.close();
+    } catch (IOException e) {
+      LOG.error("Error closing HBase table: " + hbaseTableName_, e);
+    }
+  }
+
+  /**
+   * Get the cluster status, making sure we close the admin client afterwards.
+   */
+  public ClusterStatus getClusterStatus() throws IOException {
+    Admin admin = null;
+    ClusterStatus clusterStatus = null;
+    try {
+      Connection connection = ConnectionHolder.getConnection(hbaseConf_);
+      admin = connection.getAdmin();
+      clusterStatus = admin.getClusterStatus();
+    } finally {
+      admin.close();
+    }
+    return clusterStatus;
+  }
+
+  /**
+   * Parse the column description string to the column families and column
+   * qualifies. This is a copy of HBaseSerDe.parseColumnMapping and
+   * parseColumnStorageTypes with parts we don't use removed. The hive functions
+   * are not public.
+
+   * tableDefaultStorageIsBinary - true if table is default to binary encoding
+   * columnsMappingSpec - input string format describing the table
+   * fieldSchemas - input field schema from metastore table
+   * columnFamilies/columnQualifiers/columnBinaryEncodings - out parameters that will be
+   * filled with the column family, column qualifier and encoding for each column.
+   */
   private void parseColumnMapping(boolean tableDefaultStorageIsBinary,
       String columnsMappingSpec, List<FieldSchema> fieldSchemas,
       List<String> columnFamilies, List<String> columnQualifiers,
@@ -268,7 +327,8 @@ public class HBaseTable extends Table {
     Preconditions.checkNotNull(getMetaStoreTable());
     try {
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
-      hTable_ = new HTable(hbaseConf_, hbaseTableName_);
+      // Warm up the connection and verify the table exists.
+      getHBaseTable().close();
       columnFamilies_ = null;
       Map<String, String> serdeParams =
           getMetaStoreTable().getSd().getSerdeInfo().getParameters();
@@ -365,7 +425,8 @@ public class HBaseTable extends Table {
     super.loadFromThrift(table);
     try {
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
-      hTable_ = new HTable(hbaseConf_, hbaseTableName_);
+      // Warm up the connection and verify the table exists.
+      getHBaseTable().close();
       columnFamilies_ = null;
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table from " +
@@ -373,7 +434,9 @@ public class HBaseTable extends Table {
     }
   }
 
-  // This method is completely copied from Hive's HBaseStorageHandler.java.
+  /**
+   * This method is completely copied from Hive's HBaseStorageHandler.java.
+   */
   private String getHBaseTableName(org.apache.hadoop.hive.metastore.api.Table tbl) {
     // Give preference to TBLPROPERTIES over SERDEPROPERTIES
     // (really we should only use TBLPROPERTIES, so this is just
@@ -397,7 +460,7 @@ public class HBaseTable extends Table {
    * the estimated row count and the estimated size in bytes per row.
    */
   private Pair<Long, Long> getEstimatedRowStatsForRegion(HRegionLocation location,
-      boolean isCompressed) throws IOException {
+      boolean isCompressed, ClusterStatus clusterStatus) throws IOException {
     HRegionInfo info = location.getRegionInfo();
 
     Scan s = new Scan(info.getStartKey());
@@ -410,10 +473,13 @@ public class HBaseTable extends Table {
     s.setCacheBlocks(false);
     // Try and get deletes too so their size can be counted.
     s.setRaw(false);
-    ResultScanner rs = hTable_.getScanner(s);
+
+    org.apache.hadoop.hbase.client.Table table = getHBaseTable();
+    ResultScanner rs = table.getScanner(s);
 
     long currentRowSize = 0;
     long currentRowCount = 0;
+
     try {
       // Get the the ROW_COUNT_ESTIMATE_BATCH_SIZE fetched rows
       // for a representative sample
@@ -442,18 +508,23 @@ public class HBaseTable extends Table {
       }
     } finally {
       rs.close();
+      closeHBaseTable(table);
     }
 
     // If there are no rows then no need to estimate.
-    if (currentRowCount == 0)
-      return new Pair<Long, Long>(0L, 0L);
-    // Get the size on hdfs
-    long currentHdfsSize = getHdfsSize(info);
+    if (currentRowCount == 0) return new Pair<Long, Long>(0L, 0L);
+    // Get the size.
+    long currentSize = getRegionSize(location, clusterStatus);
     // estimate the number of rows.
     double bytesPerRow = currentRowSize / (double) currentRowCount;
+    if (currentSize == 0) {
+      return new Pair<Long, Long>(currentRowCount, (long) bytesPerRow);
+    }
+
     // Compression factor two is only a best effort guess
     long estimatedRowCount =
-        (long) ((isCompressed ? 2 : 1) * (currentHdfsSize / bytesPerRow));
+        (long) ((isCompressed ? 2 : 1) * (currentSize / bytesPerRow));
+
     return new Pair<Long, Long>(estimatedRowCount, (long) bytesPerRow);
   }
 
@@ -466,10 +537,14 @@ public class HBaseTable extends Table {
    * Depending on the skew of data in the regions this can either mean that we need
    * to check only a minimal number of regions or that we will scan all regions.
    *
+   * The HBase region servers periodically update the master with their metrics,
+   * including storefile size. We get the size of the storefiles for all regions in
+   * the cluster with a single call to getClusterStatus from the master.
+   *
    * The accuracy of this number is determined by the number of rows that are written
    * and kept in the memstore and have not been flushed until now. A large number
    * of key-value pairs in the memstore will lead to bad estimates as this number
-   * is not reflected in the file size on HDFS that is used to estimate this number.
+   * is not reflected in the storefile size that is used to estimate this number.
    *
    * Currently, the algorithm does not consider the case that the key range used as a
    * parameter might be generally of different size than the rest of the region.
@@ -494,11 +569,15 @@ public class HBaseTable extends Table {
     long rowCount = 0;
     long rowSize = 0;
 
+    org.apache.hadoop.hbase.client.Table table = null;
     try {
+      table = getHBaseTable();
+      ClusterStatus clusterStatus = getClusterStatus();
+
       // Check to see if things are compressed.
       // If they are we'll estimate a compression factor.
       if (columnFamilies_ == null) {
-        columnFamilies_ = hTable_.getTableDescriptor().getColumnFamilies();
+        columnFamilies_ = table.getTableDescriptor().getColumnFamilies();
       }
       Preconditions.checkNotNull(columnFamilies_);
       for (HColumnDescriptor desc : columnFamilies_) {
@@ -506,27 +585,36 @@ public class HBaseTable extends Table {
       }
 
       // Fetch all regions for the key range
-      List<HRegionLocation> locations =
-          getRegionsInRange(hTable_, startRowKey, endRowKey);
+      List<HRegionLocation> locations = getRegionsInRange(table, startRowKey, endRowKey);
       Collections.shuffle(locations);
       // The following variables track the number and size of 'rows' in
       // HBase and allow incremental calculation of the average and standard
       // deviation.
-      StatsHelper<Long> statsCount = new StatsHelper<Long>();
       StatsHelper<Long> statsSize = new StatsHelper<Long>();
+      long totalEstimatedRows = 0;
 
       // Collects stats samples from at least MIN_NUM_REGIONS_TO_CHECK
       // and at most all regions until the delta is small enough.
       while ((statsSize.count() < MIN_NUM_REGIONS_TO_CHECK ||
           statsSize.stddev() > statsSize.mean() * DELTA_FROM_AVERAGE) &&
           statsSize.count() < locations.size()) {
-        Pair<Long, Long> tmp = getEstimatedRowStatsForRegion(
-            locations.get((int) statsCount.count()), isCompressed);
-        statsCount.addSample(tmp.first);
+        HRegionLocation currentLocation = locations.get((int) statsSize.count());
+        Pair<Long, Long> tmp = getEstimatedRowStatsForRegion(currentLocation,
+            isCompressed, clusterStatus);
+        totalEstimatedRows += tmp.first;
         statsSize.addSample(tmp.second);
       }
 
-      rowCount = (long) (getHdfsSize(null) / statsSize.mean());
+      // Sum up the total size for all regions in range.
+      long totalSize = 0;
+      for (final HRegionLocation location : locations) {
+        totalSize += getRegionSize(location, clusterStatus);
+      }
+      if (totalSize == 0) {
+        rowCount = totalEstimatedRows;
+      } else {
+        rowCount = (long) (totalSize / statsSize.mean());
+      }
       rowSize = (long) statsSize.mean();
     } catch (IOException ioe) {
       // Print the stack trace, but we'll ignore it
@@ -534,35 +622,31 @@ public class HBaseTable extends Table {
       // TODO: Put this into the per query log.
       LOG.error("Error computing HBase row count estimate", ioe);
       return new Pair<Long, Long>(-1l, -1l);
+    } finally {
+      closeHBaseTable(table);
     }
     return new Pair<Long, Long>(rowCount, rowSize);
   }
 
   /**
-   * Returns the Hdfs size of the given region in bytes. NULL can be
-   * passed as a parameter to retrieve the size of the complete table.
+   * Returns the size of the given region in bytes. Simply returns the storefile size
+   * for this region from the ClusterStatus. Returns 0 in case of an error.
    */
-  public long getHdfsSize(HRegionInfo info) throws IOException {
-    Path tableDir = HTableDescriptor.getTableDir(
-        getRootDir(hbaseConf_), Bytes.toBytes(hbaseTableName_));
-    FileSystem fs = tableDir.getFileSystem(hbaseConf_);
-    if (info != null) {
-      Path regionDir = tableDir.suffix("/" + info.getEncodedName());
-      return fs.getContentSummary(regionDir).getLength();
-    } else {
-      return fs.getContentSummary(tableDir).getLength();
-    }
-  }
+  public long getRegionSize(HRegionLocation location, ClusterStatus clusterStatus) {
+    HRegionInfo info = location.getRegionInfo();
+    ServerLoad serverLoad = clusterStatus.getLoad(location.getServerName());
 
-  /**
-   * Returns hbase's root directory: i.e. <code>hbase.rootdir</code> from
-   * the given configuration as a qualified Path.
-   * Method copied from HBase FSUtils.java to avoid depending on HBase server.
-   */
-  public static Path getRootDir(final Configuration c) throws IOException {
-    Path p = new Path(c.get(HConstants.HBASE_DIR));
-    FileSystem fs = p.getFileSystem(c);
-    return p.makeQualified(fs);
+    // If the serverLoad is null, the master doesn't have information for this region's
+    // server. This shouldn't normally happen.
+    if (serverLoad == null) {
+      LOG.error("Unable to find load for server: " + location.getServerName() +
+          " for location " + info.getRegionName());
+      return 0;
+    }
+    RegionLoad regionLoad = serverLoad.getRegionsLoad().get(info.getRegionName());
+
+    final long megaByte = 1024L * 1024L;
+    return regionLoad.getStorefileSizeMB() * megaByte;
   }
 
   /**
@@ -584,10 +668,6 @@ public class HBaseTable extends Table {
 
   public String getHBaseTableName() {
     return hbaseTableName_;
-  }
-
-  public HTable getHTable() {
-    return hTable_;
   }
 
   public static Configuration getHBaseConf() {
@@ -645,7 +725,8 @@ public class HBaseTable extends Table {
    * @throws IOException
    *           if a remote or network exception occurs
    */
-  public static List<HRegionLocation> getRegionsInRange(HTable hbaseTbl,
+  public static List<HRegionLocation> getRegionsInRange(
+      org.apache.hadoop.hbase.client.Table hbaseTbl,
       final byte[] startKey, final byte[] endKey) throws IOException {
     final boolean endKeyIsEndOfTable = Bytes.equals(endKey, HConstants.EMPTY_END_ROW);
     if ((Bytes.compareTo(startKey, endKey) > 0) && !endKeyIsEndOfTable) {
@@ -654,11 +735,13 @@ public class HBaseTable extends Table {
     }
     final List<HRegionLocation> regionList = new ArrayList<HRegionLocation>();
     byte[] currentKey = startKey;
+    Connection connection = ConnectionHolder.getConnection(hbaseConf_);
     // Make sure only one thread is accessing the hbaseTbl.
     synchronized (hbaseTbl) {
+      RegionLocator locator = connection.getRegionLocator(hbaseTbl.getName());
       do {
         // always reload region location info.
-        HRegionLocation regionLocation = hbaseTbl.getRegionLocation(currentKey, true);
+        HRegionLocation regionLocation = locator.getRegionLocation(currentKey, true);
         regionList.add(regionLocation);
         currentKey = regionLocation.getRegionInfo().getEndKey();
       } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
@@ -691,39 +774,51 @@ public class HBaseTable extends Table {
     resultSchema.addToColumns(new TColumn("Est. #Rows", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
 
+    org.apache.hadoop.hbase.client.Table table;
+    try {
+      table = getHBaseTable();
+    } catch (IOException e) {
+      LOG.error("Error getting HBase table " + hbaseTableName_, e);
+      throw new RuntimeException(e);
+    }
+
     // TODO: Consider fancier stats maintenance techniques for speeding up this process.
     // Currently, we list all regions and perform a mini-scan of each of them to
     // estimate the number of rows, the data size, etc., which is rather expensive.
     try {
+      ClusterStatus clusterStatus = getClusterStatus();
       long totalNumRows = 0;
-      long totalHdfsSize = 0;
-      List<HRegionLocation> regions = HBaseTable.getRegionsInRange(hTable_,
+      long totalSize = 0;
+      List<HRegionLocation> regions = HBaseTable.getRegionsInRange(table,
           HConstants.EMPTY_END_ROW, HConstants.EMPTY_START_ROW);
       for (HRegionLocation region : regions) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();
         HRegionInfo regionInfo = region.getRegionInfo();
-        Pair<Long, Long> estRowStats = getEstimatedRowStatsForRegion(region, false);
+        Pair<Long, Long> estRowStats =
+            getEstimatedRowStatsForRegion(region, false, clusterStatus);
 
         long numRows = estRowStats.first.longValue();
-        long hdfsSize = getHdfsSize(regionInfo);
+        long regionSize = getRegionSize(region, clusterStatus);
         totalNumRows += numRows;
-        totalHdfsSize += hdfsSize;
+        totalSize += regionSize;
 
-        // Add the region location, start rowkey, number of rows and raw Hdfs size.
+        // Add the region location, start rowkey, number of rows and raw size.
         rowBuilder.add(String.valueOf(region.getHostname()))
             .add(Bytes.toString(regionInfo.getStartKey())).add(numRows)
-            .addBytes(hdfsSize);
+            .addBytes(regionSize);
         result.addToRows(rowBuilder.get());
       }
 
-      // Total num rows and raw Hdfs size.
+      // Total num rows and raw region size.
       if (regions.size() > 1) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();
-        rowBuilder.add("Total").add("").add(totalNumRows).addBytes(totalHdfsSize);
+        rowBuilder.add("Total").add("").add(totalNumRows).addBytes(totalSize);
         result.addToRows(rowBuilder.get());
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
+    } finally {
+      closeHBaseTable(table);
     }
     return result;
   }

@@ -293,15 +293,16 @@ public class HBaseScanNode extends ScanNode {
 
     // Retrieve relevant HBase regions and their region servers
     HBaseTable tbl = (HBaseTable) desc_.getTable();
-    HTable hbaseTbl = null;
+    org.apache.hadoop.hbase.client.Table hbaseTbl = null;
     List<HRegionLocation> regionsLoc;
     try {
-      hbaseTbl = new HTable(hbaseConf_, tbl.getHBaseTableName());
+      hbaseTbl = tbl.getHBaseTable();
       regionsLoc = HBaseTable.getRegionsInRange(hbaseTbl, startKey_, stopKey_);
+      hbaseTbl.close();
     } catch (IOException e) {
       throw new RuntimeException(
           "couldn't retrieve HBase table (" + tbl.getHBaseTableName() + ") info:\n"
-          + e.getMessage());
+          + e.getMessage(), e);
     }
 
     // Convert list of HRegionLocation to Map<hostport, List<HRegionLocation>>.

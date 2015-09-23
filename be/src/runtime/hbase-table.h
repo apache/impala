@@ -25,55 +25,56 @@ namespace impala {
 
 class RuntimeState;
 
-/// Class to wrap JNI calls into HTable.
+/// Class to wrap JNI calls into Table.
 class HBaseTable {
  public:
-  HBaseTable(const std::string& table_name, jobject& conf, jobject& executor);
+  HBaseTable(const std::string& table_name, jobject connection);
   ~HBaseTable();
 
-  /// Close and release the HTable wrapped by this class.
+  /// Close and release the Table wrapped by this class.
   void Close(RuntimeState* state);
 
   /// Create all needed java side objects.
-  /// This call can cause connections to HBase and Zookeeper to be created.
   Status Init();
 
   /// From a java Scan object get a result scanner that will iterate over
   /// KeyValues from HBase.
   Status GetResultScanner(const jobject& scan, jobject* result_scanner);
 
-  /// Send an list of puts to hbase through an HTable.
+  /// Send an list of puts to hbase through a Table.
   Status Put(const jobject& puts_list);
 
-  /// Call this to initialize the HBase HTable jni references
+  /// Call this to initialize the HBase Table jni references
   static Status InitJNI();
 
  private:
   std::string table_name_;
-  jobject conf_;
-  jobject executor_;
-  jobject htable_;
+  jobject connection_;
+  jobject table_;
 
-  /// org.apache.hadoop.hbase.client.HTable
-  static jclass htable_cl_;
+  /// org.apache.hadoop.hbase.client.Table
+  static jclass table_cl_;
 
-  /// new HTable(Configuration, ExecutorService)
-  static jmethodID htable_ctor_;
+  /// org.apache.hadoop.hbase.client.Connection
+  static jclass connection_cl_;
 
-  /// htable.close()
-  static jmethodID htable_close_id_;
+  /// connection.getTable(TableName)
+  static jmethodID connection_get_table_id_;
 
-  /// htable.getScannerId(Scan)
-  static jmethodID htable_get_scanner_id_;
+  /// table.close()
+  static jmethodID table_close_id_;
 
-  /// htable.put(List<Put> puts
-  static jmethodID htable_put_id_;
+  /// table.getScannerId(Scan)
+  static jmethodID table_get_scanner_id_;
 
-  /// Bytes class and static methods
-  static jclass bytes_cl_;
+  /// table.put(List<Put> puts
+  static jmethodID table_put_id_;
 
-  /// Bytes.toBytes(String)
-  static jmethodID bytes_to_bytes_id_;
+  /// TableName class and static methods
+  static jclass table_name_cl_;
+
+  /// TableName.valueOf(String)
+  static jmethodID table_name_value_of_id_;
 };
 
 }  // namespace impala

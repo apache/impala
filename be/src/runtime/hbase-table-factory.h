@@ -24,8 +24,8 @@
 
 namespace impala {
 
-/// A (process-wide) factory of HTable java objects.
-/// This object keeps java objects around to ease creation of HTables
+/// A (process-wide) factory of Table java objects.
+/// This object keeps a Connection object around to ease creation of Tables
 /// that share a pool of threads and connections.
 /// TODO: Consider writing factory in Java to save JNI logic (and to avoid
 /// having to mark objects as global refs)
@@ -35,25 +35,23 @@ class HBaseTableFactory {
  public:
   ~HBaseTableFactory();
 
-  /// JNI setup. Create global references to classes,
-  /// and find method ids.
+  /// JNI setup. Create global references to classes, and find method ids.
+  /// This call can cause connections to HBase and Zookeeper to be created.
   static Status Init();
 
   /// create an HTable java object for the given table name.
-  /// The new htable is returned in global_htable
   /// It is the caller's responsibility to close the HBaseTable using
   /// HBaseTable#Close().
   Status GetTable(const std::string& table_name,
                   boost::scoped_ptr<HBaseTable>* hbase_table);
 
  private:
-  /// ExecutorService class and methods.
-  static jclass executor_cl_;
-  static jmethodID executor_shutdown_id_;
+  /// Connection jobject. Initialized in Init().
+  static jobject connection_;
 
-  /// Configuration and executor jobject's. Initialized in Init().
-  static jobject conf_;
-  static jobject executor_;
+  /// Connection class and methods.
+  static jclass connection_cl_;
+  static jmethodID connection_close_id_;
 };
 
 }  // namespace impala
