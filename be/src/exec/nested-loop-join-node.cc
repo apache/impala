@@ -283,16 +283,16 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
     DCHECK(HasValidProbeRow());
     while (!build_row_iterator_.AtEnd()) {
       DCHECK(HasValidProbeRow());
-      // This loop can go on for a long time if the conjuncts are very selective.
-      // Do query maintenance every N iterations.
-      if ((current_build_row_idx_ & (N - 1)) == 0) {
-        RETURN_IF_CANCELLED(state);
-        RETURN_IF_ERROR(QueryMaintenance(state));
-      }
       CreateOutputRow(semi_join_staging_row_, current_probe_row_,
         build_row_iterator_.GetRow());
       build_row_iterator_.Next();
       ++current_build_row_idx_;
+      // This loop can go on for a long time if the conjuncts are very selective.
+      // Do query maintenance after every N iterations.
+      if ((current_build_row_idx_ & (N - 1)) == 0) {
+        RETURN_IF_CANCELLED(state);
+        RETURN_IF_ERROR(QueryMaintenance(state));
+      }
       if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
         continue;
       }
@@ -328,16 +328,16 @@ Status NestedLoopJoinNode::GetNextLeftAntiJoin(RuntimeState* state,
     DCHECK(HasValidProbeRow());
     while (!build_row_iterator_.AtEnd()) {
       DCHECK(current_probe_row_ != NULL);
-      // This loop can go on for a long time if the conjuncts are very selective.
-      // Do query maintenance every N iterations.
-      if ((current_build_row_idx_ & (N - 1)) == 0) {
-        RETURN_IF_CANCELLED(state);
-        RETURN_IF_ERROR(QueryMaintenance(state));
-      }
       CreateOutputRow(semi_join_staging_row_, current_probe_row_,
           build_row_iterator_.GetRow());
       build_row_iterator_.Next();
       ++current_build_row_idx_;
+      // This loop can go on for a long time if the conjuncts are very selective.
+      // Do query maintenance after every N iterations.
+      if ((current_build_row_idx_ & (N - 1)) == 0) {
+        RETURN_IF_CANCELLED(state);
+        RETURN_IF_ERROR(QueryMaintenance(state));
+      }
       if (EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
         // Found a match for the probe row. This row will not be in the result.
         matched_probe_ = true;
@@ -576,8 +576,13 @@ Status NestedLoopJoinNode::FindBuildMatches(
   const int N = BitUtil::NextPowerOfTwo(state->batch_size());
   while (!build_row_iterator_.AtEnd()) {
     DCHECK(current_probe_row_ != NULL);
+    TupleRow* output_row = output_batch->GetRow(output_batch->AddRow());
+    CreateOutputRow(output_row, current_probe_row_, build_row_iterator_.GetRow());
+    build_row_iterator_.Next();
+    ++current_build_row_idx_;
+
     // This loop can go on for a long time if the conjuncts are very selective. Do query
-    // maintenance every N iterations.
+    // maintenance after every N iterations.
     if ((current_build_row_idx_ & (N - 1)) == 0) {
       if (ReachedLimit()) {
         eos_ = true;
@@ -588,11 +593,6 @@ Status NestedLoopJoinNode::FindBuildMatches(
       RETURN_IF_CANCELLED(state);
       RETURN_IF_ERROR(QueryMaintenance(state));
     }
-
-    TupleRow* output_row = output_batch->GetRow(output_batch->AddRow());
-    CreateOutputRow(output_row, current_probe_row_, build_row_iterator_.GetRow());
-    build_row_iterator_.Next();
-    ++current_build_row_idx_;
     if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, output_row)) continue;
     matched_probe_ = true;
     if (use_matching_build_rows_bitmap_) {

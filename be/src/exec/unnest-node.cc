@@ -121,8 +121,11 @@ Status UnnestNode::Open(RuntimeState* state) {
 
 Status UnnestNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(QueryMaintenance(state));
+  // Avoid expensive query maintenance overhead for small arrays.
+  if (item_idx_ > 0) {
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(QueryMaintenance(state));
+  }
   *eos = false;
 
   // Populate the output row_batch with tuples from the array.
