@@ -20,7 +20,10 @@ public class ArrayType extends Type {
   public Type getItemType() { return itemType_; }
 
   @Override
-  public String toSql() { return String.format("ARRAY<%s>", itemType_.toSql()); }
+  public String toSql(int depth) {
+    if (depth >= MAX_NESTING_DEPTH) return "ARRAY<...>";
+    return String.format("ARRAY<%s>", itemType_.toSql(depth + 1));
+  }
 
   @Override
   public boolean equals(Object other) {

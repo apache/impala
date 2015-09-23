@@ -18,6 +18,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
@@ -30,6 +31,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.ArrayType;
+import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
@@ -2121,6 +2123,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   /**
+   * Wraps the given typeDef in a CREATE TABLE stmt and runs AnalyzesOk().
+   * Returns the analyzed type.
+   */
+  private Type TypeDefAnalyzeOk(String typeDef) {
+    ParseNode stmt = AnalyzesOk(String.format("CREATE TABLE t (i %s)", typeDef));
+    CreateTableStmt createTableStmt = (CreateTableStmt) stmt;
+    return createTableStmt.getColumnDefs().get(0).getType();
+  }
+
+  /**
    * Wraps the given typeDefs in a CREATE TABLE stmt and asserts that the type def
    * failed to analyze with the given error message.
    */
@@ -2175,6 +2187,34 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Invalid struct-field name.
     TypeDefAnalysisError("STRUCT<`???`: int>",
         "Invalid struct field name: ???");
+
+    // Test maximum nesting depth with all complex types.
+    for (String prefix: Arrays.asList("struct<f1:int,f2:", "array<", "map<string,")) {
+      String middle = "int";
+      String suffix = ">";
+      // Test type with exactly the max nesting depth.
+      String maxTypeDef = genTypeSql(Type.MAX_NESTING_DEPTH, prefix, middle, suffix);
+      Type maxType = TypeDefAnalyzeOk(maxTypeDef);
+      Assert.assertFalse(maxType.exceedsMaxNestingDepth());
+      // Test type with exactly one level above the max nesting depth.
+      String oneAboveMaxDef =
+          genTypeSql(Type.MAX_NESTING_DEPTH + 1, prefix, middle, suffix);
+      TypeDefAnalysisError(oneAboveMaxDef, "Type exceeds the maximum nesting depth");
+      // Test type with very deep nesting to test we do not hit a stack overflow.
+      String veryDeepDef =
+          genTypeSql(Type.MAX_NESTING_DEPTH * 100, prefix, middle, suffix);
+      TypeDefAnalysisError(veryDeepDef, "Type exceeds the maximum nesting depth");
+    }
+  }
+
+  /**
+   * Generates a string with the following pattern:
+   * <prefix>*<middle><suffix>*
+   * with exactly depth-1 repetitions of prefix and suffix
+   */
+  private String genTypeSql(int depth, String prefix, String middle, String suffix) {
+    return StringUtils.repeat(prefix, depth - 1) +
+        middle + StringUtils.repeat(suffix, depth - 1);
   }
 
   @Test

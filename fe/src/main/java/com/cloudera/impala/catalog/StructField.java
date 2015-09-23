@@ -46,9 +46,10 @@ public class StructField {
   public int getPosition() { return position_; }
   public void setPosition(int position) { position_ = position; }
 
-  public String toSql() {
+  public String toSql(int depth) {
+    String typeSql = (depth < Type.MAX_NESTING_DEPTH) ? type_.toSql(depth) : "...";
     StringBuilder sb = new StringBuilder(name_);
-    if (type_ != null) sb.append(":" + type_.toSql());
+    if (type_ != null) sb.append(":" + typeSql);
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
   }

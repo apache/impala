@@ -43,6 +43,13 @@ public class TypeDef implements ParseNode {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
+    // Check the max nesting depth before calling the recursive analyze() to avoid
+    // a stack overflow.
+    if (parsedType_.exceedsMaxNestingDepth()) {
+      throw new AnalysisException(String.format(
+          "Type exceeds the maximum nesting depth of %s:\n%s",
+          Type.MAX_NESTING_DEPTH, parsedType_.toSql()));
+    }
     analyze(parsedType_, analyzer);
     isAnalyzed_ = true;
   }

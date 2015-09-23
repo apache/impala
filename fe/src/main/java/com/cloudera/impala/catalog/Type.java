@@ -38,6 +38,12 @@ import com.google.common.collect.Lists;
  * as abstract methods that subclasses must implement.
  */
 public abstract class Type {
+  // Maximum nesting depth of a type. This limit was determined experimentally by
+  // generating and scanning deeply nested Parquet and Avro files. In those experiments,
+  // we exceeded the stack space in the scanner (which uses recursion for dealing with
+  // nested types) at a nesting depth between 200 and 300 (200 worked, 300 crashed).
+  public static int MAX_NESTING_DEPTH = 100;
+
   // Static constant types for scalar types that don't require additional information.
   public static final ScalarType INVALID = new ScalarType(PrimitiveType.INVALID_TYPE);
   public static final ScalarType NULL = new ScalarType(PrimitiveType.NULL_TYPE);
@@ -112,7 +118,13 @@ public abstract class Type {
    * The output of this is stored directly in the hive metastore as the column type.
    * The string must match exactly.
    */
-  public abstract String toSql();
+  public final String toSql() { return toSql(0); }
+
+  /**
+   * Recursive helper for toSql() to be implemented by subclasses. Keeps track of the
+   * nesting depth and terminates the recursion if MAX_NESTING_DEPTH is reached.
+   */
+  protected abstract String toSql(int depth);
 
   /**
    * Same as toSql() but adds newlines and spaces for better readability of nested types.
@@ -290,6 +302,44 @@ public abstract class Type {
           (ScalarType) t1, (ScalarType) t2, strict);
     }
     return ScalarType.INVALID;
+  }
+
+  /**
+   * Returns true if this type exceeds the MAX_NESTING_DEPTH, false otherwise.
+   */
+  public boolean exceedsMaxNestingDepth() { return exceedsMaxNestingDepth(0); }
+
+  /**
+   * Helper for exceedsMaxNestingDepth(). Recursively computes the max nesting depth,
+   * terminating early if MAX_NESTING_DEPTH is reached. Returns true if this type
+   * exceeds the MAX_NESTING_DEPTH, false otherwise.
+   *
+   * Examples of types and their nesting depth:
+   * INT --> 1
+   * STRUCT<f1:INT> --> 2
+   * STRUCT<f1:STRUCT<f2:INT>> --> 3
+   * ARRAY<INT> --> 2
+   * ARRAY<STRUCT<f1:INT>> --> 3
+   * MAP<STRING,INT> --> 2
+   * MAP<STRING,STRUCT<f1:INT>> --> 3
+   */
+  private boolean exceedsMaxNestingDepth(int d) {
+    if (d >= MAX_NESTING_DEPTH) return true;
+    if (isStructType()) {
+      StructType structType = (StructType) this;
+      for (StructField f: structType.getFields()) {
+        if (f.getType().exceedsMaxNestingDepth(d + 1)) return true;
+      }
+    } else if (isArrayType()) {
+      ArrayType arrayType = (ArrayType) this;
+      if (arrayType.getItemType().exceedsMaxNestingDepth(d + 1)) return true;
+    } else if (isMapType()) {
+      MapType mapType = (MapType) this;
+      if (mapType.getValueType().exceedsMaxNestingDepth(d + 1)) return true;
+    } else {
+      Preconditions.checkState(isScalarType());
+    }
+    return false;
   }
 
   public static List<TColumnType> toThrift(Type[] types) {

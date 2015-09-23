@@ -1,0 +1,199 @@
+====
+---- QUERY
+# Test maximally nested struct.
+create external table max_nesting_depth.struct_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct/file.parq'
+stored as parquet
+location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct/'
+====
+---- QUERY
+select f.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0
+from max_nesting_depth.struct_tbl
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test maximally nested array.
+create external table max_nesting_depth.int_array_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_array/file.parq'
+stored as parquet
+location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_array/'
+====
+---- QUERY
+# Test absolute table ref executed with a single scan.
+select * from max_nesting_depth.int_array_tbl.f.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item.item.item.
+  item.item.item.item.item.item.item.item
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test relative ref executed with deeply nested subplans.
+select * from max_nesting_depth.int_array_tbl.f t0,
+  t0.item t1, t1.item t2, t2.item t3, t3.item t4, t4.item t5,
+  t5.item t6, t6.item t7, t7.item t8, t8.item t9, t9.item t10,
+  t10.item t11, t11.item t12, t12.item t13, t13.item t14, t14.item t15,
+  t15.item t16, t16.item t17, t17.item t18, t18.item t19, t19.item t20,
+  t20.item t21, t21.item t22, t22.item t23, t23.item t24, t24.item t25,
+  t25.item t26, t26.item t27, t27.item t28, t28.item t29, t29.item t30,
+  t30.item t31, t31.item t32, t32.item t33, t33.item t34, t34.item t35,
+  t35.item t36, t36.item t37, t37.item t38, t38.item t39, t39.item t40,
+  t40.item t41, t41.item t42, t42.item t43, t43.item t44, t44.item t45,
+  t45.item t46, t46.item t47, t47.item t48, t48.item t49, t49.item t50,
+  t50.item t51, t51.item t52, t52.item t53, t53.item t54, t54.item t55,
+  t55.item t56, t56.item t57, t57.item t58, t58.item t59, t59.item t60,
+  t60.item t61, t61.item t62, t62.item t63, t63.item t64, t64.item t65,
+  t65.item t66, t66.item t67, t67.item t68, t68.item t69, t69.item t70,
+  t70.item t71, t71.item t72, t72.item t73, t73.item t74, t74.item t75,
+  t75.item t76, t76.item t77, t77.item t78, t78.item t79, t79.item t80,
+  t80.item t81, t81.item t82, t82.item t83, t83.item t84, t84.item t85,
+  t85.item t86, t86.item t87, t87.item t88, t88.item t89, t89.item t90,
+  t90.item t91, t91.item t92, t92.item t93, t93.item t94, t94.item t95,
+  t95.item t96, t96.item t97, t97.item t98
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test maximally nested array of struct.
+create external table max_nesting_depth.struct_array_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_array/file.parq'
+stored as parquet
+location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_array/'
+====
+---- QUERY
+# Test absolute table ref executed with a single scan.
+select * from max_nesting_depth.struct_array_tbl.f.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test relative ref executed with deeply nested subplans.
+select * from max_nesting_depth.struct_array_tbl.f t0,
+  t0.f0 t1, t1.f0 t2, t2.f0 t3, t3.f0 t4, t4.f0 t5,
+  t5.f0 t6, t6.f0 t7, t7.f0 t8, t8.f0 t9, t9.f0 t10,
+  t10.f0 t11, t11.f0 t12, t12.f0 t13, t13.f0 t14, t14.f0 t15,
+  t15.f0 t16, t16.f0 t17, t17.f0 t18, t18.f0 t19, t19.f0 t20,
+  t20.f0 t21, t21.f0 t22, t22.f0 t23, t23.f0 t24, t24.f0 t25,
+  t25.f0 t26, t26.f0 t27, t27.f0 t28, t28.f0 t29, t29.f0 t30,
+  t30.f0 t31, t31.f0 t32, t32.f0 t33, t33.f0 t34, t34.f0 t35,
+  t35.f0 t36, t36.f0 t37, t37.f0 t38, t38.f0 t39, t39.f0 t40,
+  t40.f0 t41, t41.f0 t42, t42.f0 t43, t43.f0 t44, t44.f0 t45,
+  t45.f0 t46, t46.f0 t47, t47.f0 t48, t48.f0 t49
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test maximally nested map.
+create external table max_nesting_depth.int_map_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_map/file.parq'
+stored as parquet
+location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_map/'
+====
+---- QUERY
+# Test absolute table ref executed with a single scan.
+select t.value from max_nesting_depth.int_map_tbl.f.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value.value.value.
+  value.value.value.value.value.value.value.value t
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test relative ref executed with deeply nested subplans.
+select t98.value from max_nesting_depth.int_map_tbl.f t0,
+  t0.value t1, t1.value t2, t2.value t3, t3.value t4, t4.value t5,
+  t5.value t6, t6.value t7, t7.value t8, t8.value t9, t9.value t10,
+  t10.value t11, t11.value t12, t12.value t13, t13.value t14, t14.value t15,
+  t15.value t16, t16.value t17, t17.value t18, t18.value t19, t19.value t20,
+  t20.value t21, t21.value t22, t22.value t23, t23.value t24, t24.value t25,
+  t25.value t26, t26.value t27, t27.value t28, t28.value t29, t29.value t30,
+  t30.value t31, t31.value t32, t32.value t33, t33.value t34, t34.value t35,
+  t35.value t36, t36.value t37, t37.value t38, t38.value t39, t39.value t40,
+  t40.value t41, t41.value t42, t42.value t43, t43.value t44, t44.value t45,
+  t45.value t46, t46.value t47, t47.value t48, t48.value t49, t49.value t50,
+  t50.value t51, t51.value t52, t52.value t53, t53.value t54, t54.value t55,
+  t55.value t56, t56.value t57, t57.value t58, t58.value t59, t59.value t60,
+  t60.value t61, t61.value t62, t62.value t63, t63.value t64, t64.value t65,
+  t65.value t66, t66.value t67, t67.value t68, t68.value t69, t69.value t70,
+  t70.value t71, t71.value t72, t72.value t73, t73.value t74, t74.value t75,
+  t75.value t76, t76.value t77, t77.value t78, t78.value t79, t79.value t80,
+  t80.value t81, t81.value t82, t82.value t83, t83.value t84, t84.value t85,
+  t85.value t86, t86.value t87, t87.value t88, t88.value t89, t89.value t90,
+  t90.value t91, t91.value t92, t92.value t93, t93.value t94, t94.value t95,
+  t95.value t96, t96.value t97, t97.value t98
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test maximally nested map of struct.
+create external table max_nesting_depth.struct_map_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_map/file.parq'
+stored as parquet
+location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_map/'
+====
+---- QUERY
+# Test absolute table ref executed with a single scan.
+select t.value from max_nesting_depth.struct_map_tbl.f.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
+  f0.f0.f0.f0.f0.f0.f0.f0.f0 t
+---- RESULTS
+42
+---- TYPES
+int
+====
+---- QUERY
+# Test relative ref executed with deeply nested subplans.
+select t49.value from max_nesting_depth.struct_map_tbl.f t0,
+  t0.f0 t1, t1.f0 t2, t2.f0 t3, t3.f0 t4, t4.f0 t5,
+  t5.f0 t6, t6.f0 t7, t7.f0 t8, t8.f0 t9, t9.f0 t10,
+  t10.f0 t11, t11.f0 t12, t12.f0 t13, t13.f0 t14, t14.f0 t15,
+  t15.f0 t16, t16.f0 t17, t17.f0 t18, t18.f0 t19, t19.f0 t20,
+  t20.f0 t21, t21.f0 t22, t22.f0 t23, t23.f0 t24, t24.f0 t25,
+  t25.f0 t26, t26.f0 t27, t27.f0 t28, t28.f0 t29, t29.f0 t30,
+  t30.f0 t31, t31.f0 t32, t32.f0 t33, t33.f0 t34, t34.f0 t35,
+  t35.f0 t36, t36.f0 t37, t37.f0 t38, t38.f0 t39, t39.f0 t40,
+  t40.f0 t41, t41.f0 t42, t42.f0 t43, t43.f0 t44, t44.f0 t45,
+  t45.f0 t46, t46.f0 t47, t47.f0 t48, t48.f0 t49
+---- RESULTS
+42
+---- TYPES
+int
+====

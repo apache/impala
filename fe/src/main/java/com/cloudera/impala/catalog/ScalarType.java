@@ -150,7 +150,8 @@ public class ScalarType extends Type {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(int depth) {
+    if (depth >= MAX_NESTING_DEPTH) return "...";
     switch(type_) {
       case BINARY: return type_.toString();
       case VARCHAR:

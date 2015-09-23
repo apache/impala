@@ -1,0 +1,22 @@
+This folder contains Parquet files for testing the maximum nesting depth
+of complex types. The maximum nesting depth Types.MAX_NESTING_DEPTH (100).
+All Parquet files contain the integer 42 as the only data value in a single
+Parquet column.
+
+The folders contain files for the following complex types with nesting
+depth of exactly 100.
+
+struct/
+- struct<f:struct<f:...struct<f:int>...>>
+
+int_array/
+- array<array<...array<int>...>>
+
+int_map/
+- map<string,<map<string,...map<string,int>...>>
+
+struct_array/
+- array<struct<f:array<struct<f...array<int>...>>>>
+
+struct_map/
+- map<string,struct<f:map<string,struct:f...map<string,int>...>>>>
