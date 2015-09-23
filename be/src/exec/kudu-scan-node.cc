@@ -14,6 +14,7 @@
 
 #include "exec/kudu-scan-node.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #include <kudu/client/row_result.h>
 #include <kudu/client/schema.h>
@@ -45,6 +46,7 @@ DEFINE_int32(kudu_scanner_keep_alive_period_us, 15 * 1000L * 1000L,
     "The period at which Kudu Scanners should send keep-alive requests to the tablet "
     "server to ensure that scanners do not time out.");
 
+using boost::algorithm::to_lower_copy;
 using kudu::client::KuduClient;
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduPredicate;
@@ -218,38 +220,35 @@ Status KuduScanNode::TransformPushableConjunctsToRangePredicates() {
 
     DCHECK_EQ(function_call.node_type, TExprNodeType::FUNCTION_CALL);
 
-    const KuduSchema& kudu_schema = table_->schema();
+    IdxByLowerCaseColName idx_by_lc_name;
+    RETURN_IF_ERROR(MapLowercaseKuduColumnNamesToIndexes(table_->schema(),
+        &idx_by_lc_name));
 
-    Slice col_name;
-    GetSlotRefColumnName(predicate.nodes[1], &col_name);
-    KuduColumnSchema::DataType kudu_data_type;
+    string impala_col_name;
+    GetSlotRefColumnName(predicate.nodes[1], &impala_col_name);
 
-    bool found_col = false;
-    for (int i = 0; i < kudu_schema.num_columns(); ++i) {
-      if (kudu_schema.Column(i).name() == col_name) {
-        kudu_data_type = kudu_schema.Column(i).type();
-        found_col = true;
-        break;
-      }
+    IdxByLowerCaseColName::const_iterator iter;
+    if ((iter = idx_by_lc_name.find(impala_col_name)) ==
+        idx_by_lc_name.end()) {
+      return Status(Substitute("Could not find col: '$0' in the table schema",
+                               impala_col_name));
     }
-    if (!found_col) {
-      return Status(Substitute("Could not find col: $0 in the table schema.",
-          col_name.ToString()));
-    }
+
+    KuduColumnSchema column = table_->schema().Column(iter->second);
 
     KuduValue* bound;
-    RETURN_IF_ERROR(GetExprLiteralBound(predicate.nodes[2], kudu_data_type, &bound));
+    RETURN_IF_ERROR(GetExprLiteralBound(predicate.nodes[2], column.type(), &bound));
     DCHECK(bound != NULL);
 
     const string& function_name = function_call.fn.name.function_name;
     if (function_name == GE_FN) {
-      kudu_predicates_.push_back(table_->NewComparisonPredicate(col_name,
+      kudu_predicates_.push_back(table_->NewComparisonPredicate(column.name(),
           KuduPredicate::GREATER_EQUAL, bound));
     } else if (function_name == LE_FN) {
-      kudu_predicates_.push_back(table_->NewComparisonPredicate(col_name,
+      kudu_predicates_.push_back(table_->NewComparisonPredicate(column.name(),
           KuduPredicate::LESS_EQUAL, bound));
     } else if (function_name == EQ_FN) {
-      kudu_predicates_.push_back(table_->NewComparisonPredicate(col_name,
+      kudu_predicates_.push_back(table_->NewComparisonPredicate(column.name(),
           KuduPredicate::EQUAL, bound));
     } else {
       DCHECK(false) << "Received unpushable operator to push down: " << function_name;
@@ -258,7 +257,7 @@ Status KuduScanNode::TransformPushableConjunctsToRangePredicates() {
   return Status::OK();
 }
 
-void KuduScanNode::GetSlotRefColumnName(const TExprNode& node, Slice* col_name) {
+void KuduScanNode::GetSlotRefColumnName(const TExprNode& node, string* col_name) {
   const KuduTableDescriptor* table_desc =
       static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
   TSlotId slot_id = node.slot_ref.slot_id;

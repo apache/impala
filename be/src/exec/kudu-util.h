@@ -17,6 +17,7 @@
 
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
+#include <boost/unordered_map.hpp>
 
 namespace impala {
 
@@ -35,6 +36,14 @@ Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_typ
 /// Builds a KuduSchema from an expression list.
 Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
     const KuduTableDescriptor& table_desc, kudu::client::KuduSchema* schema);
+
+typedef boost::unordered_map<std::string, int> IdxByLowerCaseColName;
+
+/// Returns a map of lower case column names to column indexes in 'map'.
+/// Returns an error Status if 'schema' had more than one column with the same lower
+/// case name.
+Status MapLowercaseKuduColumnNamesToIndexes(const kudu::client::KuduSchema& schema,
+       IdxByLowerCaseColName* map);
 
 /// Gets the projected columns from the TupleDescriptor.
 /// Translates Impalas lower case column names to the version used by Kudu.

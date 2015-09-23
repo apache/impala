@@ -166,8 +166,8 @@ class KuduScanNode : public ScanNode {
   Status GetExprLiteralBound(const TExprNode& node,
       kudu::client::KuduColumnSchema::DataType type, kudu::client::KuduValue** value);
 
-  // Returns a Slice with the name of the column that 'node' refers to.
-  void GetSlotRefColumnName(const TExprNode& node, kudu::Slice* col_name);
+  // Returns a string with the name of the column that 'node' refers to.
+  void GetSlotRefColumnName(const TExprNode& node, string* col_name);
 
   // Transforms the set of pushable conjuncts received from the frontend into a set of
   // KuduPredicates that will be set in all scanners.

@@ -17,16 +17,18 @@
 #include <algorithm>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
 
 #include "runtime/descriptors.h"
+#include "gutil/strings/substitute.h"
 
 #include "common/names.h"
 
 using boost::algorithm::to_lower_copy;
+using kudu::client::KuduSchema;
+using kudu::client::KuduColumnSchema;
 
 namespace impala {
 
@@ -99,17 +101,27 @@ Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_typ
   return Status::OK();
 }
 
+Status MapLowercaseKuduColumnNamesToIndexes(const kudu::client::KuduSchema& schema,
+    IdxByLowerCaseColName* map) {
+  DCHECK(map != NULL);
+  for(size_t i = 0; i < schema.num_columns(); ++i) {
+    string lower_case_col_name = to_lower_copy(schema.Column(i).name());
+    if (map->find(lower_case_col_name) != map->end()) {
+      return Status(strings::Substitute("There was already a column with name: '$0' "
+          "in the schema", lower_case_col_name));
+    }
+    (*map)[to_lower_copy(schema.Column(i).name())] = i;
+  }
+  return Status::OK();
+}
+
 Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-    vector<string>* projected_columns, const kudu::client::KuduSchema& schema) {
+    vector<string>* projected_columns, const KuduSchema& schema) {
   DCHECK(projected_columns != NULL);
   projected_columns->clear();
 
-  // Map lowercase Impala column names to correctly cased Kudu column names
-  unordered_map<string, string> impala_to_kudu_names;
-  for(size_t i = 0; i < schema.num_columns(); ++i) {
-    string name = schema.Column(i).name();
-    impala_to_kudu_names[to_lower_copy(name)] = name;
-  }
+  IdxByLowerCaseColName idx_by_lc_name;
+  RETURN_IF_ERROR(MapLowercaseKuduColumnNamesToIndexes(schema, &idx_by_lc_name));
 
   // In debug mode try a dynamic cast. If it fails it means that the
   // TableDescriptor is not an instance of KuduTableDescriptor.
@@ -124,8 +136,13 @@ Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
   for (int i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
     int col_idx = slots[i]->col_pos();
-    const string& col_name = impala_to_kudu_names[table_desc->col_names()[col_idx]];
-    projected_columns->push_back(col_name);
+    string impala_col_name = to_lower_copy(table_desc->col_names()[col_idx]);
+    IdxByLowerCaseColName::const_iterator iter;
+    if ((iter = idx_by_lc_name.find(impala_col_name)) == idx_by_lc_name.end()) {
+      return Status(strings::Substitute("Could not find column: $0 in the Kudu schema.",
+         impala_col_name));
+    }
+    projected_columns->push_back(schema.Column((*iter).second).name());
   }
 
   return Status::OK();
