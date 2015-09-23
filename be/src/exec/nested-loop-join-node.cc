@@ -86,6 +86,7 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state) {
   copied_build_batches_.Reset();
   build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
+    mem_tracker()->Release(matching_build_rows_->MemUsage());
     delete matching_build_rows_;
     matching_build_rows_ = NULL;
   }
@@ -104,6 +105,7 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
   build_batches_ = NULL;
   Expr::Close(join_conjunct_ctxs_, state);
   if (matching_build_rows_ != NULL) {
+    mem_tracker()->Release(matching_build_rows_->MemUsage());
     delete matching_build_rows_;
     matching_build_rows_ = NULL;
   }
@@ -149,8 +151,12 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
   }
 
   if (use_matching_build_rows_bitmap_) {
-    // TODO Account for the memory used by the bitmap.
-    matching_build_rows_ = new Bitmap(build_batches_->total_num_rows());
+    // Account for the memory used by the bitmap.
+    int64_t num_bits = build_batches_->total_num_rows();
+    if (!mem_tracker()->TryConsume(Bitmap::MemUsage(num_bits))) {
+      return Status::MemLimitExceeded();
+    }
+    matching_build_rows_ = new Bitmap(num_bits);
   }
   return Status::OK();
 }
@@ -286,8 +292,8 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
         build_row_iterator_.GetRow());
       build_row_iterator_.Next();
       ++current_build_row_idx_;
-      // This loop can go on for a long time if the conjuncts are very selective.
-      // Do query maintenance after every N iterations.
+      // This loop can go on for a long time if the conjuncts are very selective. Do
+      // expensive query maintenance after every N iterations.
       if ((current_build_row_idx_ & (N - 1)) == 0) {
         RETURN_IF_CANCELLED(state);
         RETURN_IF_ERROR(QueryMaintenance(state));
@@ -331,8 +337,8 @@ Status NestedLoopJoinNode::GetNextLeftAntiJoin(RuntimeState* state,
           build_row_iterator_.GetRow());
       build_row_iterator_.Next();
       ++current_build_row_idx_;
-      // This loop can go on for a long time if the conjuncts are very selective.
-      // Do query maintenance after every N iterations.
+      // This loop can go on for a long time if the conjuncts are very selective. Do
+      // expensive query maintenance after every N iterations.
       if ((current_build_row_idx_ & (N - 1)) == 0) {
         RETURN_IF_CANCELLED(state);
         RETURN_IF_ERROR(QueryMaintenance(state));
@@ -580,8 +586,8 @@ Status NestedLoopJoinNode::FindBuildMatches(
     build_row_iterator_.Next();
     ++current_build_row_idx_;
 
-    // This loop can go on for a long time if the conjuncts are very selective. Do query
-    // maintenance after every N iterations.
+    // This loop can go on for a long time if the conjuncts are very selective. Do
+    // expensive query maintenance after every N iterations.
     if ((current_build_row_idx_ & (N - 1)) == 0) {
       if (ReachedLimit()) {
         eos_ = true;

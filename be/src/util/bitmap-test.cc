@@ -27,14 +27,14 @@
 namespace impala {
 
 void CreateRandomBitmap(Bitmap* bitmap) {
-  for (int64_t i = 0; i < bitmap->size(); ++i) {
+  for (int64_t i = 0; i < bitmap->num_bits(); ++i) {
     bitmap->Set<false>(i, rand() % 2 == 0);
   }
 }
 
 // Returns true if all the bits in the bitmap are equal to 'value'.
 bool CheckAll(const Bitmap& bitmap, const bool value) {
-  for (int64_t i = 0; i < bitmap.size(); ++i) {
+  for (int64_t i = 0; i < bitmap.num_bits(); ++i) {
     if (bitmap.Get<false>(i) != value) return false;
   }
   return true;
@@ -42,18 +42,18 @@ bool CheckAll(const Bitmap& bitmap, const bool value) {
 
 TEST(Bitmap, SetupTest) {
   Bitmap bm1(0);
-  EXPECT_EQ(bm1.size(), 0);
+  EXPECT_EQ(bm1.num_bits(), 0);
   Bitmap bm2(1);
-  EXPECT_EQ(bm2.size(), 1);
+  EXPECT_EQ(bm2.num_bits(), 1);
   Bitmap bm3(63);
-  EXPECT_EQ(bm3.size(), 63);
+  EXPECT_EQ(bm3.num_bits(), 63);
   Bitmap bm4(64);
-  EXPECT_EQ(bm4.size(), 64);
+  EXPECT_EQ(bm4.num_bits(), 64);
 }
 
 TEST(Bitmap, SetAllTest) {
   Bitmap bm(1024);
-  EXPECT_EQ(bm.size(), 1024);
+  EXPECT_EQ(bm.num_bits(), 1024);
 
   CreateRandomBitmap(&bm);
   bm.SetAllBits(false);
@@ -161,6 +161,14 @@ TEST(Bitmap, OverflowTest) {
   bm.Set<true>(bit_idx, false);
   EXPECT_TRUE(bm.Get<true>(ovr_idx));
   EXPECT_FALSE(bm.Get<true>(bit_idx));
+}
+
+/// Test that bitmap memory usage calculation is correct.
+TEST(Bitmap, MemUsage) {
+  // 70 bits requires two int64s, for 16 bytes.
+  EXPECT_EQ(16, Bitmap::MemUsage(70));
+  Bitmap bm(70);
+  EXPECT_EQ(16, bm.MemUsage());
 }
 
 }
