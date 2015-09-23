@@ -150,6 +150,19 @@ public class KuduScanNode extends ScanNode {
   }
 
   @Override
+  protected double computeSelectivity() {
+    double baseSelectivity = super.computeSelectivity();
+    // The kuduConjuncts_ are not part of the selectivity calculation of the PlanNode
+    // superclass. Adjust the selectivity to account for predicates that are
+    // pushed down to Kudu.
+    for (Expr e : kuduConjuncts_) {
+      if (baseSelectivity < 0) continue;
+      baseSelectivity *= e.getSelectivity();
+    }
+    return baseSelectivity;
+  }
+
+  @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     // Update the number of nodes to reflect the hosts that have relevant data.

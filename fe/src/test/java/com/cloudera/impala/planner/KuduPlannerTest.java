@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.planner;
 
+import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.TQueryOptions;
 import org.junit.Test;
 
 /**
@@ -29,5 +31,13 @@ public class KuduPlannerTest extends PlannerTestBase {
 
   @Test
   public void testDelete() { runPlannerTestFile("kudu-delete"); }
+
+
+  @Test
+  public void testSelectivity() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.VERBOSE);
+    runPlannerTestFile("kudu-selectivity", options);
+  }
 
 }
