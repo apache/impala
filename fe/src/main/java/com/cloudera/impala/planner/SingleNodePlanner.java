@@ -713,7 +713,7 @@ public class SingleNodePlanner {
     // remain constant in this function because the subplan context is fixed. Any
     // relative or correlated table ref that requires a materialized tuple id produced
     // by an element in tblRefs should be placed into subplanRefs because it requires
-    // a new subplan context.
+    // a new subplan context. Otherwise, it should be placed into parentRefs.
     List<TupleId> subplanTids = Collections.emptyList();
 
     if (ctx_.hasSubplan()) {
@@ -730,39 +730,30 @@ public class SingleNodePlanner {
       if (ref.isRelative() || ref.isCorrelated()) {
         List<TupleId> requiredTids = Lists.newArrayList();
         List<TupleId> requiredTblRefIds = Lists.newArrayList();
-        if (isStraightJoin) {
-          // Place the SubplanNode at the table refs position in FROM-clause order
-          // with respect to the parent table refs.
-          TableRef lastParentRef = parentRefs.get(parentRefs.size() - 1);
-          requiredTids.addAll(lastParentRef.getAllMaterializedTupleIds());
-          requiredTblRefIds.add(lastParentRef.getId());
+        if (ref.isCorrelated()) {
+          requiredTids.addAll(ref.getCorrelatedTupleIds());
         } else {
+          CollectionTableRef collectionTableRef = (CollectionTableRef) ref;
+          requiredTids.add(collectionTableRef.getResolvedPath().getRootDesc().getId());
+        }
+        // Add all plan table ref ids as an ordering dependency for straight_join.
+        if (isStraightJoin) requiredTblRefIds.addAll(planTblRefIds);
+        if (lastSemiOrOuterJoin != null) {
+          // Prevent incorrect join re-ordering across outer/semi joins by requiring all
+          // table ref ids to the left and including the last outer/semi join.
           // TODO: Think about when we can allow re-ordering across semi/outer joins
           // in subplans.
-          if (ref.isCorrelated()) {
-            requiredTids.addAll(ref.getCorrelatedTupleIds());
-          } else {
-            CollectionTableRef collectionTableRef = (CollectionTableRef) ref;
-            requiredTids.add(collectionTableRef.getResolvedPath().getRootDesc().getId());
-          }
-          if (lastSemiOrOuterJoin != null) {
-            // Prevent incorrect join re-ordering across outer/semi joins by requiring all
-            // table ref ids to the left and including the last outer/semi join.
-            requiredTblRefIds.addAll(lastSemiOrOuterJoin.getAllTupleIds());
-          }
+          requiredTblRefIds.addAll(lastSemiOrOuterJoin.getAllTupleIds());
         }
-        if (!subplanTids.containsAll(requiredTids) ||
-            !planTblRefIds.containsAll(requiredTblRefIds)) {
+        if (!subplanTids.containsAll(requiredTids)) {
           isParentRef = false;
           ref.setLeftTblRef(null);
           // For outer and semi joins, we also need to ensure that the On-clause
           // conjuncts can be evaluated, so add those required table ref ids,
           // excluding the id of ref itself.
           if (ref.getJoinOp().isOuterJoin() || ref.getJoinOp().isSemiJoin()) {
-            List<TupleId> onClauseTblRefIds =
-                Lists.newArrayList(ref.getOnClauseTupleIds());
-            onClauseTblRefIds.remove(ref.getId());
-            requiredTblRefIds.addAll(onClauseTblRefIds);
+            requiredTblRefIds.addAll(ref.getOnClauseTupleIds());
+            requiredTblRefIds.remove(ref.getId());
           }
           subplanRefs.add(new SubplanRef(ref, requiredTids, requiredTblRefIds));
         }

@@ -1430,3 +1430,163 @@ select a from functional.allcomplextypes t,
 00:SCAN HDFS [functional.allcomplextypes t]
    partitions=0/0 files=0 size=0B
 ====
+# IMPALA-2349: Test planning of nested subplans with straight_join.
+select straight_join 1
+from functional.allcomplextypes t1
+left outer join functional.allcomplextypes t2 on (t1.id = t2.id)
+inner join t1.map_map_col m1
+inner join m1.value m2
+---- PLAN
+10:SUBPLAN
+|
+|--08:SUBPLAN
+|  |
+|  |--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:UNNEST [m1.value m2]
+|  |  |
+|  |  04:SINGULAR ROW SRC
+|  |
+|  07:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--03:UNNEST [t1.map_map_col m1]
+|  |
+|  02:SINGULAR ROW SRC
+|
+09:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.allcomplextypes t2]
+|     partitions=0/0 files=0 size=0B
+|
+00:SCAN HDFS [functional.allcomplextypes t1]
+   partitions=0/0 files=0 size=0B
+====
+# IMPALA-2412: Test join ordering in nested subplans.
+select 1
+from tpch_nested_parquet.customer c
+left outer join c.c_orders o1 on o1.pos = c.c_custkey
+where c.c_custkey in
+(select o2.pos
+ from c.c_orders o2
+ left outer join o2.o_lineitems l
+# This join has an ordering dependency on l because l is outer joined,
+# and this join must be in the same subplan as o1 and o2.
+ left outer join c.c_orders o3 on o3.pos = o2.pos
+ where c.c_custkey = o2.pos)
+---- PLAN
+01:SUBPLAN
+|
+|--12:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: o2.pos = c.c_custkey
+|  |
+|  |--11:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  join predicates: o1.pos = c.c_custkey
+|  |  |
+|  |  |--02:SINGULAR ROW SRC
+|  |  |
+|  |  03:UNNEST [c.c_orders o1]
+|  |
+|  10:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: o2.pos = o3.pos
+|  |
+|  |--09:UNNEST [c.c_orders o3]
+|  |
+|  05:SUBPLAN
+|  |
+|  |--08:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |
+|  |  |--06:SINGULAR ROW SRC
+|  |  |
+|  |  07:UNNEST [o2.o_lineitems l]
+|  |
+|  04:UNNEST [c.c_orders o2]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
+====
+# IMPALA-2412: Test join ordering in nested subplans. Same as above
+# but with a few inner joins.
+select 1
+from tpch_nested_parquet.customer c
+inner join c.c_orders o1 on o1.pos = c.c_custkey
+where c.c_custkey in
+(select o2.pos
+ from c.c_orders o2
+ left outer join o2.o_lineitems l
+# This join has an ordering dependency on l because l is outer joined,
+# and this join must be in the same subplan as o1 and o2.
+ inner join c.c_orders o3 on o3.pos = o2.pos
+ where c.c_custkey = o2.pos)
+---- PLAN
+01:SUBPLAN
+|
+|--12:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: o2.pos = c.c_custkey
+|  |
+|  |--11:NESTED LOOP JOIN [INNER JOIN]
+|  |  |  join predicates: o1.pos = c.c_custkey
+|  |  |
+|  |  |--02:SINGULAR ROW SRC
+|  |  |
+|  |  03:UNNEST [c.c_orders o1]
+|  |
+|  10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o2.pos = o3.pos
+|  |
+|  |--09:UNNEST [c.c_orders o3]
+|  |
+|  05:SUBPLAN
+|  |
+|  |--08:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |
+|  |  |--06:SINGULAR ROW SRC
+|  |  |
+|  |  07:UNNEST [o2.o_lineitems l]
+|  |
+|  04:UNNEST [c.c_orders o2]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
+====
+# IMPALA-2412: Test join ordering in nested subplans.
+select 1
+from tpch_nested_parquet.customer c
+left outer join c.c_orders o1 on o1.pos = c.c_custkey
+where c.c_custkey in
+(select o2.pos
+ from c.c_orders o2
+ left outer join c.c_orders o3 on o3.pos = o2.pos
+ left outer join o2.o_lineitems l
+ where c.c_custkey = o2.pos)
+---- PLAN
+01:SUBPLAN
+|
+|--12:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: o2.pos = c.c_custkey
+|  |
+|  |--11:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  join predicates: o1.pos = c.c_custkey
+|  |  |
+|  |  |--02:SINGULAR ROW SRC
+|  |  |
+|  |  03:UNNEST [c.c_orders o1]
+|  |
+|  10:SUBPLAN
+|  |
+|  |--08:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |
+|  |  |--06:SINGULAR ROW SRC
+|  |  |
+|  |  07:UNNEST [o2.o_lineitems l]
+|  |
+|  09:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: o2.pos = o3.pos
+|  |
+|  |--05:UNNEST [c.c_orders o3]
+|  |
+|  04:UNNEST [c.c_orders o2]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
+====
