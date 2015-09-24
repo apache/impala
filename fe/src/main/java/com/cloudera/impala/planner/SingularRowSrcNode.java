@@ -50,7 +50,9 @@ public class SingularRowSrcNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = 1;
-    numNodes_ = containingSubplanNode_.getNumNodes();
+    // The containing SubplanNode has not yet been initialized, so get the number
+    // of nodes from the SubplanNode's input.
+    numNodes_ = containingSubplanNode_.getChild(0).getNumNodes();
   }
 
   @Override

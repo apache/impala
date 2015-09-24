@@ -32,18 +32,19 @@ import com.google.common.collect.Lists;
  * An UnnestNode can only appear in the plan tree of a SubplanNode.
  */
 public class UnnestNode extends PlanNode {
-  private final SubplanNode parent_;
+  private final SubplanNode containingSubplanNode_;
   private final CollectionTableRef tblRef_;
   private final Expr collectionExpr_;
 
-  public UnnestNode(PlanNodeId id, SubplanNode parent, CollectionTableRef tblRef) {
+  public UnnestNode(PlanNodeId id, SubplanNode containingSubplanNode,
+      CollectionTableRef tblRef) {
     super(id, Lists.newArrayList(tblRef.getDesc().getId()), "UNNEST");
-    parent_ = parent;
+    containingSubplanNode_ = containingSubplanNode;
     tblRef_ = tblRef;
     collectionExpr_ = tblRef_.getCollectionExpr();
     // Assume the collection expr has been fully resolved in analysis.
     Preconditions.checkState(
-        collectionExpr_.isBoundByTupleIds(parent.getChild(0).tupleIds_));
+        collectionExpr_.isBoundByTupleIds(containingSubplanNode.getChild(0).tupleIds_));
   }
 
   @Override
@@ -62,7 +63,9 @@ public class UnnestNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = PlannerContext.AVG_COLLECTION_SIZE;
-    numNodes_ = parent_.getNumNodes();
+    // The containing SubplanNode has not yet been initialized, so get the number
+    // of nodes from the SubplanNode's input.
+    numNodes_ = containingSubplanNode_.getChild(0).getNumNodes();
   }
 
   @Override
@@ -72,8 +75,8 @@ public class UnnestNode extends PlanNode {
     output.append(String.format("%s%s [%s]\n", prefix, getDisplayLabel(),
         getDisplayLabelDetail()));
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-      output.append(
-          String.format("%sparent-subplan=%s\n", detailPrefix, parent_.getId()));
+      output.append(String.format(
+          "%sparent-subplan=%s\n", detailPrefix, containingSubplanNode_.getId()));
     }
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (!conjuncts_.isEmpty()) {

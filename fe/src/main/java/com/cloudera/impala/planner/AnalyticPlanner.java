@@ -186,6 +186,7 @@ public class AnalyticPlanner {
   private void computeInputPartitionExprs(List<PartitionGroup> partitionGroups,
       List<Expr> groupingExprs, int numNodes, List<Expr> inputPartitionExprs) {
     inputPartitionExprs.clear();
+    Preconditions.checkState(numNodes != -1);
     // find partition group with maximum intersection
     long maxNdv = 0;
     PartitionGroup maxPg = null;
