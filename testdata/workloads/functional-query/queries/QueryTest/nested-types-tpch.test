@@ -145,3 +145,16 @@ ORDER BY 1
 ---- TYPES
 BIGINT,BIGINT
 ====
+# IMPALA-2357: Test analytic function with order by on top of subplans that
+# generate many rows. This test stresses the order by and should not crash.
+SELECT o_orderkey, r FROM
+  (SELECT o2.o_orderkey, LAG(o1.pos, 100) OVER (ORDER BY o2.o_orderkey DESC) r
+   FROM tpch_nested_parquet.customer c
+   JOIN c.c_orders o1
+   JOIN c.c_orders o2 ON (o1.pos = o2.pos)) v
+ORDER BY o_orderkey LIMIT 1
+---- RESULTS
+1,15
+---- TYPES
+BIGINT,BIGINT
+====

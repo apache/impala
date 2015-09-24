@@ -132,6 +132,11 @@ class Sorter::Run {
   void CopyVarLenDataConvertOffset(char* dest, int64_t offset,
       const vector<StringValue*>& var_values);
 
+  /// Returns true if we have var-len slots and there are var-len blocks.
+  inline bool HasVarLenBlocks() const {
+    return has_var_len_slots_ && !var_len_blocks_.empty();
+  }
+
   // Parent sorter object.
   const Sorter* sorter_;
 
@@ -516,22 +521,23 @@ Status Sorter::Run::UnpinAllBlocks() {
   int total_var_len;
   string_values.reserve(sort_tuple_desc_->string_slots().size());
   BufferedBlockMgr::Block* cur_sorted_var_len_block = NULL;
-  if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
+  if (HasVarLenBlocks()) {
     DCHECK(var_len_copy_block_ != NULL);
     sorted_var_len_blocks.push_back(var_len_copy_block_);
-    cur_sorted_var_len_block = sorted_var_len_blocks.back();
+    cur_sorted_var_len_block = var_len_copy_block_;
   } else {
     DCHECK(var_len_copy_block_ == NULL);
   }
 
   for (int i = 0; i < fixed_len_blocks_.size(); ++i) {
     BufferedBlockMgr::Block* cur_fixed_block = fixed_len_blocks_[i];
-    if (has_var_len_slots_) {
+    if (HasVarLenBlocks()) {
       for (int block_offset = 0; block_offset < cur_fixed_block->valid_data_len();
           block_offset += sort_tuple_size_) {
         Tuple* cur_tuple =
             reinterpret_cast<Tuple*>(cur_fixed_block->buffer() + block_offset);
         CollectNonNullVarSlots(cur_tuple, &string_values, &total_var_len);
+        DCHECK(cur_sorted_var_len_block != NULL);
         if (cur_sorted_var_len_block->BytesRemaining() < total_var_len) {
           bool added;
           RETURN_IF_ERROR(TryAddBlock(&sorted_var_len_blocks, &added));
@@ -630,7 +636,7 @@ Status Sorter::Run::GetNextBatch(RowBatch** output_batch) {
       // The merge is complete. Delete the last blocks in the run.
       RETURN_IF_ERROR(fixed_len_blocks_.back()->Delete());
       fixed_len_blocks_[fixed_len_blocks_.size() - 1] = NULL;
-      if (has_var_len_slots_) {
+      if (HasVarLenBlocks()) {
         RETURN_IF_ERROR(var_len_blocks_.back()->Delete());
         var_len_blocks_[var_len_blocks_.size() - 1] = NULL;
       }
