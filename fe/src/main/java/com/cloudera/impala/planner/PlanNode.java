@@ -358,6 +358,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     msg.setLabel_detail(getDisplayLabelDetail());
     msg.setEstimated_stats(estimatedStats);
 
+    Preconditions.checkState(tupleIds_.size() > 0);
     msg.setRow_tuples(Lists.<Integer>newArrayListWithCapacity(tupleIds_.size()));
     msg.setNullable_tuples(Lists.<Boolean>newArrayListWithCapacity(tupleIds_.size()));
     for (TupleId tid: tupleIds_) {

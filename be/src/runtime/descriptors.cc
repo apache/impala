@@ -324,6 +324,7 @@ RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
                              const vector<bool>& nullable_tuples)
   : tuple_idx_nullable_map_(nullable_tuples) {
   DCHECK_EQ(nullable_tuples.size(), row_tuples.size());
+  DCHECK_GT(row_tuples.size(), 0);
   for (int i = 0; i < row_tuples.size(); ++i) {
     tuple_desc_map_.push_back(desc_tbl.GetTupleDescriptor(row_tuples[i]));
     DCHECK(tuple_desc_map_.back() != NULL);
@@ -353,6 +354,7 @@ RowDescriptor::RowDescriptor(const vector<TupleDescriptor*>& tuple_descs,
   : tuple_desc_map_(tuple_descs),
     tuple_idx_nullable_map_(nullable_tuples) {
   DCHECK_EQ(nullable_tuples.size(), tuple_descs.size());
+  DCHECK_GT(tuple_descs.size(), 0);
   InitTupleIdxMap();
   InitHasVarlenSlots();
 }

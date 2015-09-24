@@ -143,3 +143,12 @@ from functional.alltypes where false
 ---- TYPES
 FLOAT
 ====
+---- QUERY
+# IMPALA-2406: condition filters out all rows from subquery during planning.
+select *
+from (select 10 as i, 2 as j, '2013' as s) as t
+where t.i < 10;
+---- RESULTS
+---- TYPES
+TINYINT,TINYINT,STRING
+====

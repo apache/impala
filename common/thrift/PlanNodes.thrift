@@ -362,6 +362,7 @@ struct TPlanNode {
   2: required TPlanNodeType node_type
   3: required i32 num_children
   4: required i64 limit
+  // Tuples in row produced by node. Must be non-empty.
   5: required list<Types.TTupleId> row_tuples
 
   // nullable_tuples[i] is true if row_tuples[i] is nullable

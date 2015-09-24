@@ -176,6 +176,14 @@ public class SingleNodePlanner {
   private PlanNode createEmptyNode(QueryStmt stmt, Analyzer analyzer) {
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     stmt.getMaterializedTupleIds(tupleIds);
+    if (tupleIds.isEmpty()) {
+      // Constant selects do not have materialized tuples at this stage.
+      Preconditions.checkState(stmt instanceof SelectStmt,
+          "Only constant selects should have no materialized tuples");
+      SelectStmt selectStmt = (SelectStmt)stmt;
+      Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
+      tupleIds.add(createResultTupleDescriptor(selectStmt, "empty", analyzer).getId());
+    }
     EmptySetNode node = new EmptySetNode(ctx_.getNextNodeId(), tupleIds);
     node.init(analyzer);
     // Set the output smap to resolve exprs referencing inline views within stmt.
@@ -692,7 +700,7 @@ public class SingleNodePlanner {
           Collections.unmodifiableList(ctx_.getSubplan().getChild(0).getTupleIds());
     }
 
-    // Table ref representing the last outer or semi join we have seen. 
+    // Table ref representing the last outer or semi join we have seen.
     TableRef lastSemiOrOuterJoin = null;
     for (TableRef ref: tblRefs) {
       boolean isParentRef = true;
@@ -909,30 +917,46 @@ public class SingleNodePlanner {
       throws InternalException {
     Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
     ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
-    ArrayList<String> colLabels = selectStmt.getColLabels();
     // Create tuple descriptor for materialized tuple.
-    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor("union");
-    tupleDesc.setIsMaterialized(true);
+    TupleDescriptor tupleDesc = createResultTupleDescriptor(selectStmt, "union", analyzer);
     UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tupleDesc.getId());
-
     // Analysis guarantees that selects without a FROM clause only have constant exprs.
     unionNode.addConstExprList(Lists.newArrayList(resultExprs));
 
     // Replace the select stmt's resultExprs with SlotRefs into tupleDesc.
     for (int i = 0; i < resultExprs.size(); ++i) {
-      SlotDescriptor slotDesc = analyzer.addSlotDescriptor(tupleDesc);
-      slotDesc.setLabel(colLabels.get(i));
-      slotDesc.setSourceExpr(resultExprs.get(i));
-      slotDesc.setType(resultExprs.get(i).getType());
-      slotDesc.setStats(ColumnStats.fromExpr(resultExprs.get(i)));
-      slotDesc.setIsMaterialized(true);
-      SlotRef slotRef = new SlotRef(slotDesc);
+      SlotRef slotRef = new SlotRef(tupleDesc.getSlots().get(i));
       resultExprs.set(i, slotRef);
     }
-    tupleDesc.computeMemLayout();
     // UnionNode.init() needs tupleDesc to have been initialized
     unionNode.init(analyzer);
     return unionNode;
+  }
+
+  /**
+   * Create tuple descriptor that can hold the results of the given SelectStmt, with one
+   * slot per result expr.
+   */
+  private TupleDescriptor createResultTupleDescriptor(SelectStmt selectStmt,
+      String debugName, Analyzer analyzer) {
+    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor(
+        debugName);
+    tupleDesc.setIsMaterialized(true);
+
+    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
+    ArrayList<String> colLabels = selectStmt.getColLabels();
+    for (int i = 0; i < resultExprs.size(); ++i) {
+      Expr resultExpr = resultExprs.get(i);
+      String colLabel = colLabels.get(i);
+      SlotDescriptor slotDesc = analyzer.addSlotDescriptor(tupleDesc);
+      slotDesc.setLabel(colLabel);
+      slotDesc.setSourceExpr(resultExpr);
+      slotDesc.setType(resultExpr.getType());
+      slotDesc.setStats(ColumnStats.fromExpr(resultExpr));
+      slotDesc.setIsMaterialized(true);
+    }
+    tupleDesc.computeMemLayout();
+    return tupleDesc;
   }
 
   /**
