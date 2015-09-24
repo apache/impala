@@ -42,6 +42,7 @@ table_name:bad_dict_page_offset, constraint:restrict_to, table_format:parquet/no
 table_name:bad_compressed_size, constraint:restrict_to, table_format:parquet/none/none
 table_name:alltypesagg_hive_13_1, constraint:restrict_to, table_format:parquet/none/none
 table_name:kite_required_fields, constraint:restrict_to, table_format:parquet/none/none
+table_name:lineitem_multiblock, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types
 # cannot be converted to the corresponding Avro types yet.

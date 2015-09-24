@@ -1,0 +1,26 @@
+This file was created for:
+IMPALA-1881- Maximize data locality when scanning Parquet files with multiple row groups.
+
+The table lineitem_multiblock is a single parquet file with:
+ - A row group size of approximately 12 KB each.
+ - 200 row groups in total.
+
+Assuming a 1 MB HDFS block size, it has:
+ - 3 blocks of up to 1 MB each.
+ - Multiple row groups per block
+ - Some row groups that span across block boundaries and live on 2 blocks.
+
+----
+
+This table was created using hive and has the same table structure and some of the data of
+'tpch.lineitem'.
+
+The following commands were used:
+
+create table functional_parquet.lineitem_multiblock like tpch.lineitem
+stored as parquet;
+
+set parquet.block.size=4086; # This is to set the row group size
+
+insert into functional_parquet.lineitem_multiblock select * from
+tpch.lineitem limit 20000; # We limit to 20000 to keep the size of the table small

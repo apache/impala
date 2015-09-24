@@ -1716,3 +1716,33 @@ create external table {db_name}{db_suffix}.{table_name} like {db_name}.liketbl s
 ---- LOAD
 `hdfs dfs -mkdir -p /test-warehouse/avro_null_char && \
 hdfs dfs -put -f ${IMPALA_HOME}/testdata/avro_null_char/000000_0 /test-warehouse/avro_null_char/
+====
+---- DATASET
+-- IMPALA-1881: Maximize data locality when scanning Parquet files with multiple row groups.
+functional
+---- BASE_TABLE_NAME
+lineitem_multiblock
+---- COLUMNS
+L_ORDERKEY BIGINT
+L_PARTKEY BIGINT
+L_SUPPKEY BIGINT
+L_LINENUMBER INT
+L_QUANTITY DECIMAL(12,2)
+L_EXTENDEDPRICE DECIMAL(12,2)
+L_DISCOUNT DECIMAL(12,2)
+L_TAX DECIMAL(12,2)
+L_RETURNFLAG STRING
+L_LINESTATUS STRING
+L_SHIPDATE STRING
+L_COMMITDATE STRING
+L_RECEIPTDATE STRING
+L_SHIPINSTRUCT STRING
+L_SHIPMODE STRING
+L_COMMENT STRING
+---- ROW_FORMAT
+DELIMITED FIELDS TERMINATED BY '|'
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/lineitem_multiblock_parquet && \
+hadoop fs -Ddfs.block.size=1048576 -put -f \
+${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 /test-warehouse/lineitem_multiblock_parquet
+====

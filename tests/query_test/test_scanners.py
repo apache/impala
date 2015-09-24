@@ -200,6 +200,32 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
+  def test_verify_runtime_profile(self, vector):
+    # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
+    # we verify if each impalad reads one block by checking if each impalad reads at
+    # least one row group.
+    DB_NAME = 'functional_parquet'
+    TABLE_NAME = 'lineitem_multiblock'
+    query = 'select count(l_orderkey) from %s.%s' % (DB_NAME, TABLE_NAME)
+    result = self.client.execute(query)
+    assert len(result.data) == 1
+    assert result.data[0] == '20000'
+
+    runtime_profile = str(result.runtime_profile)
+    num_row_groups_list = re.findall('NumRowGroups: ([0-9]*)', runtime_profile)
+    scan_ranges_complete_list = re.findall('ScanRangesComplete: ([0-9]*)', runtime_profile)
+    # This will fail if the number of impalads != 3
+    # The fourth fragment is the "Averaged Fragment"
+    assert len(num_row_groups_list) == 4
+    assert len(scan_ranges_complete_list) == 4
+
+    # Skip the Averaged Fragment; it comes first in the runtime profile.
+    for num_row_groups in num_row_groups_list[1:]:
+      assert int(num_row_groups) > 0
+
+    for scan_ranges_complete in scan_ranges_complete_list[1:]:
+      assert int(scan_ranges_complete) == 1
+
 # Missing coverage: Impala can query a table with complex types created by Hive on a
 # non-hdfs filesystem.
 @SkipIfS3.hive

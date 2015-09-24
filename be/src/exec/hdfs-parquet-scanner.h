@@ -39,12 +39,16 @@ struct HdfsFileDesc;
 /// Parquet (and other columnar formats) use scan ranges differently than other formats.
 /// Each materialized column maps to a single ScanRange per row group.  For streaming
 /// reads, all the columns need to be read in parallel. This is done by issuing one
-/// ScanRange (in IssueInitialRanges()) for the file footer as the other scanners do. This
-/// footer range is processed in ProcessSplit().  ProcessSplit() then computes the column
-/// ranges for each row group and submits them to the IoMgr for immediate scheduling (so
-/// they don't surface in DiskIoMgr::GetNextRange()).  Scheduling them immediately also
-/// guarantees they are all read at once.
-//
+/// ScanRange (in IssueInitialRanges()) for the file footer per split.
+/// ProcessSplit() is called once for each original split and determines the row groups
+/// whose midpoints fall within that split. We use the mid-point to determine whether a
+/// row group should be processed because if the row group size is less than or equal to
+/// the split size, the mid point guarantees that we have at least 50% of the row group in
+/// the current split. ProcessSplit() then computes the column ranges for these row groups
+/// and submits them to the IoMgr for immediate scheduling (so they don't surface in
+/// DiskIoMgr::GetNextRange()). Scheduling them immediately also guarantees they are all
+/// read at once.
+///
 /// Like the other scanners, each parquet scanner object is one to one with a
 /// ScannerContext. Unlike the other scanners though, the context will have multiple
 /// streams, one for each column. Row groups are processed one at a time this way.
@@ -346,7 +350,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Size of the file footer.  This is a guess.  If this value is too little, we will
   /// need to issue another read.
-  static const int FOOTER_SIZE = 100 * 1024;
+  static const int64_t FOOTER_SIZE;
 
   /// Class that implements Parquet definition and repetition level decoding.
   class LevelDecoder;
@@ -391,6 +395,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of cols that need to be read.
   RuntimeProfile::Counter* num_cols_counter_;
 
+  /// Number of row groups that need to be read.
+  RuntimeProfile::Counter* num_row_groups_counter_;
+
   /// Reads data using 'column_readers' to materialize instances of 'tuple_desc'
   /// (including recursively reading collections).
   ///
@@ -430,6 +437,14 @@ class HdfsParquetScanner : public HdfsScanner {
   template <bool IN_COLLECTION>
   inline bool ReadRow(const std::vector<ColumnReader*>& column_readers, Tuple* tuple,
       MemPool* pool, bool* materialize_tuple);
+
+  /// Find and return the last split in the file if it is assigned to this scan node.
+  /// Returns NULL otherwise.
+  static DiskIoMgr::ScanRange* FindFooterSplit(HdfsFileDesc* file);
+
+  /// Validate column offsets by checking if the dictionary page comes before the data
+  /// pages and checking if the column offsets lie within the file.
+  Status ValidateColumnOffsets(const parquet::RowGroup& row_group);
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.

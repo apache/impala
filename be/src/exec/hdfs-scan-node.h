@@ -81,8 +81,13 @@ struct ScanRangeMetadata {
   /// The partition id that this range is part of.
   int64_t partition_id;
 
-  ScanRangeMetadata(int64_t partition_id)
-    : partition_id(partition_id) { }
+  /// For parquet scan ranges we initially create a request for the file footer for each
+  /// split; we store a pointer to the actual split so that we can recover its information
+  /// for the scanner to process.
+  const DiskIoMgr::ScanRange* original_split;
+
+  ScanRangeMetadata(int64_t partition_id, const DiskIoMgr::ScanRange* original_split)
+      : partition_id(partition_id), original_split(original_split) { }
 };
 
 /// A ScanNode implementation that is used for all tables read directly from
@@ -182,16 +187,19 @@ class HdfsScanNode : public ScanNode {
   /// This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
-  /// Allocate a new scan range object, stored in the runtime state's object pool.  For
+  /// Allocate a new scan range object, stored in the runtime state's object pool. For
   /// scan ranges that correspond to the original hdfs splits, the partition id must be
   /// set to the range's partition id. For other ranges (e.g. columns in parquet, read
   /// past buffers), the partition_id is unused. expected_local should be true if this
   /// scan range is not expected to require a remote read. The range must fall within
   /// the file bounds. That is, the offset must be >= 0, and offset + len <= file_length.
+  /// If not NULL, the 'original_split' pointer is stored for reference in the scan range
+  /// metadata of the scan range that is to be allocated.
   /// This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(
       hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
-      int disk_id, bool try_cache, bool expected_local, int64_t mtime);
+      int disk_id, bool try_cache, bool expected_local, int64_t mtime,
+      const DiskIoMgr::ScanRange* original_split = NULL);
 
   /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   /// 'num_files_queued' indicates how many file's scan ranges have been added

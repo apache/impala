@@ -52,3 +52,47 @@ SELECT * from bad_magic_number
 ---- CATCH
 File '$NAMENODE/test-warehouse/bad_magic_number_parquet/bad_magic_number.parquet' has an invalid version number: XXXX
 ====
+---- QUERY
+# count(*) query on parquet file with multiple blocks
+SELECT count(*) from lineitem_multiblock
+---- TYPES
+bigint
+---- RESULTS
+20000
+====
+---- QUERY
+# Select multiple columns from parquet file with multiple blocks
+SELECT count(l_comment), min(l_partkey), max(l_linenumber) from lineitem_multiblock;
+---- TYPES
+bigint, bigint, int
+---- RESULTS
+20000,2,7
+====
+---- QUERY
+# Test limit queries on parquet with multiple blocks
+select distinct l_orderkey from functional_parquet.lineitem_multiblock where
+l_orderkey < 5 or l_orderkey > 15000 order by l_orderkey limit 20;
+---- TYPES
+bigint
+---- RESULTS
+1
+2
+3
+4
+15008
+15009
+15010
+15011
+15012
+15013
+15014
+15015
+15040
+15041
+15042
+15043
+15044
+15045
+15046
+15047
+====

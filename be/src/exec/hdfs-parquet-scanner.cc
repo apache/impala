@@ -59,6 +59,8 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
     "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
     "be converted from UTC to local time. Writes are unaffected.");
 
+const int64_t HdfsParquetScanner::FOOTER_SIZE = 100 * 1024;
+
 // Max data page header size in bytes. This is an estimate and only needs to be an upper
 // bound. It is theoretically possible to have a page header of any size due to string
 // value statistics, but in practice we'll have trouble reading string values this large.
@@ -109,48 +111,66 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
   vector<DiskIoMgr::ScanRange*> footer_ranges;
   for (int i = 0; i < files.size(); ++i) {
+    // If the file size is less than 12 bytes, it is an invalid Parquet file.
+    if (files[i]->file_length < 12) {
+      return Status(Substitute("Parquet file $0 has an invalid file length: $1",
+          files[i]->filename, files[i]->file_length));
+    }
+    // Compute the offset of the file footer.
+    int64_t footer_size = min(FOOTER_SIZE, files[i]->file_length);
+    int64_t footer_start = files[i]->file_length - footer_size;
+
+    // Try to find the split with the footer.
+    DiskIoMgr::ScanRange* footer_split = FindFooterSplit(files[i]);
+
     for (int j = 0; j < files[i]->splits.size(); ++j) {
       DiskIoMgr::ScanRange* split = files[i]->splits[j];
 
-      // Since Parquet scanners always read entire files, only read a file if we're
-      // assigned the first split to avoid reading multi-block files with multiple
-      // scanners.
-      if (split->offset() != 0) {
-        // We are expecting each file to be one hdfs block (so all the scan range
-        // offsets should be 0).  Having multiple blocks is not incorrect but is
-        // nonoptimal so issue a warning.  However, if there is no impalad co-located
-        // with the datanode holding the block (i.e. split->expected_local() is false),
-        // then this may indicate a pseudo-HDFS system like Isilon where HDFS blocks
-        // aren't meaningful from a locality standpoint.  In that case, the warning is
-        // spurious so suppress it.
-        if (split->expected_local()) {
-          scan_node->runtime_state()->LogError(
-              ErrorMsg(TErrorCode::PARQUET_MULTIPLE_BLOCKS, files[i]->filename));
+      DCHECK_LE(split->offset() + split->len(), files[i]->file_length);
+      // If this is a count(*), we can get the result with the file metadata alone and
+      // don't need to read any row groups. We only want a single node to process the
+      // file footer in this case, which is the node with the footer split.
+      // If it's not a count(*), we create a footer range for the split always.
+      if (!scan_node->materialized_slots().empty() || footer_split == split) {
+        ScanRangeMetadata* split_metadata =
+            reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
+        // Each split is processed by first issuing a scan range for the file footer, which
+        // is done here, followed by scan ranges for the columns of each row group within
+        // the actual split (in InitColumns()). The original split is stored in the
+        // metadata associated with the footer range.
+        DiskIoMgr::ScanRange* footer_range;
+        if (footer_split != NULL) {
+          footer_range = scan_node->AllocateScanRange(files[i]->fs,
+              files[i]->filename.c_str(), footer_size, footer_start,
+              split_metadata->partition_id, footer_split->disk_id(),
+              footer_split->try_cache(), footer_split->expected_local(), files[i]->mtime,
+              split);
+        } else {
+          // If we did not find the last split, we know it is going to be a remote read.
+          footer_range = scan_node->AllocateScanRange(files[i]->fs,
+              files[i]->filename.c_str(), footer_size, footer_start,
+              split_metadata->partition_id, -1, false, false, files[i]->mtime, split);
         }
-        // We assign the entire file to one scan range, so mark all but one split
-        // (i.e. the first split) as complete
+
+        footer_ranges.push_back(footer_range);
+      } else {
         scan_node->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
-        continue;
       }
-
-      // Compute the offset of the file footer
-      DCHECK_GT(files[i]->file_length, 0);
-      int64_t footer_size = min(static_cast<int64_t>(FOOTER_SIZE), files[i]->file_length);
-      int64_t footer_start = files[i]->file_length - footer_size;
-
-      ScanRangeMetadata* metadata =
-          reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
-      DiskIoMgr::ScanRange* footer_range = scan_node->AllocateScanRange(
-          files[i]->fs, files[i]->filename.c_str(), footer_size, footer_start,
-          metadata->partition_id, split->disk_id(), split->try_cache(),
-          split->expected_local(), files[i]->mtime);
-      footer_ranges.push_back(footer_range);
     }
   }
-  // Issue the footer ranges for all files. The same thread that processes the footer
-  // will assemble the rows for this file, so mark these files added completely.
+  // The threads that process the footer will also do the scan, so we mark all the files
+  // as complete here.
   RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges, files.size()));
   return Status::OK();
+}
+
+DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
+  DCHECK(file != NULL);
+  for (int i = 0; i < file->splits.size(); ++i) {
+    DiskIoMgr::ScanRange* split = file->splits[i];
+    if (split->offset() + split->len() == file->file_length) return split;
+  }
+  return NULL;
 }
 
 namespace impala {
@@ -878,6 +898,8 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   num_cols_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
+  num_row_groups_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
 
   scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK();
@@ -1388,9 +1410,61 @@ void HdfsParquetScanner::CollectionColumnReader::UpdateDerivedState() {
   }
 }
 
+Status HdfsParquetScanner::ValidateColumnOffsets(const parquet::RowGroup& row_group) {
+  const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
+  for (int i = 0; i < row_group.columns.size(); ++i) {
+    const parquet::ColumnChunk& col_chunk = row_group.columns[i];
+    int64_t col_start = col_chunk.meta_data.data_page_offset;
+    // The file format requires that if a dictionary page exists, it be before data pages.
+    if (col_chunk.meta_data.__isset.dictionary_page_offset) {
+      if (col_chunk.meta_data.dictionary_page_offset >= col_start) {
+        stringstream ss;
+        ss << "File " << file_desc->filename << ": metadata is corrupt. "
+            << "Dictionary page (offset=" << col_chunk.meta_data.dictionary_page_offset
+            << ") must come before any data pages (offset=" << col_start << ").";
+        return Status(ss.str());
+      }
+      col_start = col_chunk.meta_data.dictionary_page_offset;
+    }
+    int64_t col_len = col_chunk.meta_data.total_compressed_size;
+    int64_t col_end = col_start + col_len;
+    if (col_end <= 0 || col_end > file_desc->file_length) {
+      stringstream ss;
+      ss << "File " << file_desc->filename << ": metadata is corrupt. "
+          << "Column " << i << " has invalid column offsets "
+          << "(offset=" << col_start << ", size=" << col_len << ", "
+          << "file_size=" << file_desc->file_length << ").";
+      return Status(ss.str());
+    }
+  }
+  return Status::OK();
+}
+
+// Get the start of the column.
+static int64_t GetColumnStartOffset(const parquet::ColumnMetaData& column) {
+  if (column.__isset.dictionary_page_offset) {
+    DCHECK_LT(column.dictionary_page_offset, column.data_page_offset);
+    return column.dictionary_page_offset;
+  }
+  return column.data_page_offset;
+}
+
+// Get the file offset of the middle of the row group.
+static int64_t GetRowGroupMidOffset(const parquet::RowGroup& row_group) {
+  int64_t start_offset = GetColumnStartOffset(row_group.columns[0].meta_data);
+
+  const parquet::ColumnMetaData& last_column =
+      row_group.columns[row_group.columns.size() - 1].meta_data;
+  int64_t end_offset =
+      GetColumnStartOffset(last_column) + last_column.total_compressed_size;
+
+  return start_offset + (end_offset - start_offset) / 2;
+}
+
 Status HdfsParquetScanner::ProcessSplit() {
   // First process the file metadata in the footer
   bool eosr;
+  metadata_range_ = stream_->scan_range();
   RETURN_IF_ERROR(ProcessFooter(&eosr));
   if (eosr) return Status::OK();
 
@@ -1401,12 +1475,20 @@ Status HdfsParquetScanner::ProcessSplit() {
   // its own stream.
   stream_ = NULL;
 
-  // Iterate through each row group in the file and read all the materialized columns
-  // per row group.  Row groups are independent, so this this could be parallelized.
-  // However, having multiple row groups per file should be seen as an edge case and
-  // we can do better parallelizing across files instead.
-  // TODO: not really an edge case since MR writes multiple row groups
+  // Iterate through each row group in the file and process any row groups that fall
+  // within this split.
   for (int i = 0; i < file_metadata_.row_groups.size(); ++i) {
+    const DiskIoMgr::ScanRange* split_range =
+        reinterpret_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
+    RETURN_IF_ERROR(ValidateColumnOffsets(file_metadata_.row_groups[i]));
+
+    int64_t row_group_mid_pos = GetRowGroupMidOffset(file_metadata_.row_groups[i]);
+    int64_t split_offset = split_range->offset();
+    int64_t split_length = split_range->len();
+    if (!(row_group_mid_pos >= split_offset &&
+        row_group_mid_pos < split_offset + split_length)) continue;
+    COUNTER_ADD(num_row_groups_counter_, 1);
+
     // Attach any resources and clear the streams before starting a new row group. These
     // streams could either be just the footer stream or streams for the previous row
     // group.
@@ -1646,8 +1728,8 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   // If the metadata was too big, we need to stitch it before deserializing it.
   // In that case, we stitch the data in this buffer.
   vector<uint8_t> metadata_buffer;
-  metadata_range_ = stream_->scan_range();
 
+  DCHECK(metadata_range_ != NULL);
   if (UNLIKELY(metadata_size > remaining_bytes_buffered)) {
     // In this case, the metadata is bigger than our guess meaning there are
     // not enough bytes in the footer range from IssueInitialRanges().
@@ -2139,28 +2221,16 @@ Status HdfsParquetScanner::InitColumns(
 
     RETURN_IF_ERROR(ValidateColumn(*scalar_reader, row_group_idx));
 
-    // If there is a dictionary page, the file format requires it to come before
-    // any data pages.  We need to start reading the column from the data page.
     if (col_chunk.meta_data.__isset.dictionary_page_offset) {
-      if (col_chunk.meta_data.dictionary_page_offset >= col_start) {
-        stringstream ss;
-        ss << "File " << file_desc->filename << ": metadata is corrupt. "
-           << "Dictionary page (offset=" << col_chunk.meta_data.dictionary_page_offset
-           << ") must come before any data pages (offset=" << col_start << ").";
-        return Status(ss.str());
-      }
+      // Already validated in ValidateColumnOffsets()
+      DCHECK_LT(col_chunk.meta_data.dictionary_page_offset, col_start);
       col_start = col_chunk.meta_data.dictionary_page_offset;
     }
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
     int64_t col_end = col_start + col_len;
-    if (col_end <= 0 || col_end > file_desc->file_length) {
-      stringstream ss;
-      ss << "File " << file_desc->filename << ": metadata is corrupt. "
-         << "Column " << scalar_reader->col_idx() << " has invalid column offsets "
-         << "(offset=" << col_start << ", size=" << col_len << ", "
-         << "file_size=" << file_desc->file_length << ").";
-      return Status(ss.str());
-    }
+
+    // Already validated in ValidateColumnOffsets()
+    DCHECK(col_end > 0 && col_end < file_desc->file_length);
     if (file_version_.application == "parquet-mr" && file_version_.VersionLt(1, 2, 9)) {
       // The Parquet MR writer had a bug in 1.2.8 and below where it didn't include the
       // dictionary page header size in total_compressed_size and total_uncompressed_size
@@ -2176,11 +2246,12 @@ Status HdfsParquetScanner::InitColumns(
       FILE_CHECK_EQ(col_chunk.file_path, string(metadata_range_->file()));
     }
 
+    const DiskIoMgr::ScanRange* split_range =
+        reinterpret_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
         metadata_range_->fs(), metadata_range_->file(), col_len, col_start,
-        scalar_reader->col_idx(), metadata_range_->disk_id(),
-        metadata_range_->try_cache(), metadata_range_->expected_local(),
-        file_desc->mtime);
+        scalar_reader->col_idx(), split_range->disk_id(), split_range->try_cache(),
+        split_range->expected_local(), file_desc->mtime);
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column
