@@ -141,7 +141,7 @@ public class AnalyzerTest {
   protected Db addTestDb(String dbName) {
     Db db = catalog_.getDb(dbName);
     Preconditions.checkState(db == null, "Test db must not already exist.");
-    db = new Db(dbName, catalog_);
+    db = new Db(dbName, catalog_, null);
     catalog_.addDb(db);
     testDbs_.add(db);
     return db;

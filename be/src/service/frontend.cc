@@ -65,6 +65,7 @@ Frontend::Frontend() {
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"updateMembership", "([B)V", &update_membership_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
+    {"describeDb", "([B)[B", &describe_db_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"showCreateTable", "([B)Ljava/lang/String;", &show_create_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
@@ -116,8 +117,13 @@ Status Frontend::UpdateMembership(const TUpdateMembershipRequest& req) {
   return JniUtil::CallJniMethod(fe_, update_membership_id_, req);
 }
 
+Status Frontend::DescribeDb(const TDescribeDbParams& params,
+    TDescribeResult* response) {
+  return JniUtil::CallJniMethod(fe_, describe_db_id_, params, response);
+}
+
 Status Frontend::DescribeTable(const TDescribeTableParams& params,
-    TDescribeTableResult* response) {
+    TDescribeResult* response) {
   return JniUtil::CallJniMethod(fe_, describe_table_id_, params, response);
 }
 

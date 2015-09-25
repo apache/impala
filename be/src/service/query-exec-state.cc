@@ -307,8 +307,16 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       result_metadata_ = response.schema;
       return Status::OK();
     }
-    case TCatalogOpType::DESCRIBE: {
-      TDescribeTableResult response;
+    case TCatalogOpType::DESCRIBE_DB: {
+      TDescribeResult response;
+      RETURN_IF_ERROR(frontend_->DescribeDb(catalog_op.describe_db_params,
+          &response));
+      // Set the result set
+      request_result_set_.reset(new vector<TResultRow>(response.results));
+      return Status::OK();
+    }
+    case TCatalogOpType::DESCRIBE_TABLE: {
+      TDescribeResult response;
       RETURN_IF_ERROR(frontend_->DescribeTable(catalog_op.describe_table_params,
           &response));
       // Set the result set

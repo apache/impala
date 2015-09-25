@@ -671,7 +671,7 @@ public class CatalogOpExecutor {
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().createDatabase(db);
-        newDb = catalog_.addDb(dbName);
+        newDb = catalog_.addDb(dbName, db);
       } catch (AlreadyExistsException e) {
         if (!params.if_not_exists) {
           throw new ImpalaRuntimeException(
@@ -680,7 +680,16 @@ public class CatalogOpExecutor {
         LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
             "IF NOT EXISTS was specified.", e, dbName));
         newDb = catalog_.getDb(dbName);
-        if (newDb == null) newDb = catalog_.addDb(dbName);
+        if (newDb == null) {
+          try {
+            org.apache.hadoop.hive.metastore.api.Database msDb =
+                msClient.getHiveClient().getDatabase(dbName);
+            newDb = catalog_.addDb(dbName, msDb);
+          } catch (TException e1) {
+            throw new ImpalaRuntimeException(
+                String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e1);
+          }
+        }
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
@@ -689,8 +698,8 @@ public class CatalogOpExecutor {
       }
 
       Preconditions.checkNotNull(newDb);
-      TCatalogObject thriftDb = new TCatalogObject(TCatalogObjectType.DATABASE,
-          Catalog.INITIAL_CATALOG_VERSION);
+      TCatalogObject thriftDb = new TCatalogObject(
+          TCatalogObjectType.DATABASE, Catalog.INITIAL_CATALOG_VERSION);
       thriftDb.setDb(newDb.toThrift());
       thriftDb.setCatalog_version(newDb.getCatalogVersion());
       resp.result.setUpdated_catalog_object(thriftDb);

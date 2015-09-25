@@ -1630,24 +1630,42 @@ public class ParserTest {
   }
 
   @Test
+  public void TestDescribeDb() {
+    // Missing argument
+    ParserError("DESCRIBE DATABASE");
+    ParserError("DESCRIBE DATABASE FORMATTED");
+    ParserError("DESCRIBE DATABASE EXTENDED");
+
+    // database ok
+    ParsesOk("DESCRIBE DATABASE databasename");
+    ParsesOk("DESCRIBE DATABASE FORMATTED databasename");
+    ParsesOk("DESCRIBE DATABASE EXTENDED databasename");
+  }
+
+  @Test
   public void TestDescribe() {
     // Missing argument
     ParserError("DESCRIBE");
     ParserError("DESCRIBE FORMATTED");
+    ParserError("DESCRIBE EXTENDED");
 
     // Unqualified table ok
     ParsesOk("DESCRIBE tablename");
     ParsesOk("DESCRIBE FORMATTED tablename");
+    ParsesOk("DESCRIBE EXTENDED tablename");
 
     // Fully-qualified table ok
     ParsesOk("DESCRIBE databasename.tablename");
     ParsesOk("DESCRIBE FORMATTED databasename.tablename");
+    ParsesOk("DESCRIBE EXTENDED databasename.tablename");
 
     // Paths within table ok.
     ParsesOk("DESCRIBE databasename.tablename.field1");
     ParsesOk("DESCRIBE databasename.tablename.field1.field2");
     ParsesOk("DESCRIBE FORMATTED databasename.tablename.field1");
     ParsesOk("DESCRIBE FORMATTED databasename.tablename.field1.field2");
+    ParsesOk("DESCRIBE EXTENDED databasename.tablename.field1");
+    ParsesOk("DESCRIBE EXTENDED databasename.tablename.field1.field2");
   }
 
   @Test

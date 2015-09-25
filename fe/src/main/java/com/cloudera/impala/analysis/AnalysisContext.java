@@ -15,8 +15,8 @@
 package com.cloudera.impala.analysis;
 
 import java.io.StringReader;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -26,21 +26,17 @@ import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.AuthorizeableColumn;
 import com.cloudera.impala.authorization.AuthorizeableTable;
-import com.cloudera.impala.authorization.AuthorizeableDb;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
+import com.cloudera.impala.thrift.TDescribeOutputStyle;
 import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.common.Pair;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -108,7 +104,8 @@ public class AnalysisContext {
       return stmt_ instanceof ShowCreateFunctionStmt;
     }
     public boolean isShowFilesStmt() { return stmt_ instanceof ShowFilesStmt; }
-    public boolean isDescribeStmt() { return stmt_ instanceof DescribeStmt; }
+    public boolean isDescribeDbStmt() { return stmt_ instanceof DescribeDbStmt; }
+    public boolean isDescribeTableStmt() { return stmt_ instanceof DescribeTableStmt; }
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
     public boolean isExplainStmt() { return stmt_.isExplain(); }
     public boolean isShowRolesStmt() { return stmt_ instanceof ShowRolesStmt; }
@@ -139,8 +136,8 @@ public class AnalysisContext {
     private boolean isViewMetadataStmt() {
       return isShowFilesStmt() || isShowTablesStmt() || isShowDbsStmt() ||
           isShowFunctionsStmt() || isShowRolesStmt() || isShowGrantRoleStmt() ||
-          isShowCreateTableStmt() || isShowCreateFunctionStmt() ||
-          isShowDataSrcsStmt() || isShowStatsStmt() || isDescribeStmt();
+          isShowCreateTableStmt() || isShowDataSrcsStmt() || isShowStatsStmt() ||
+          isDescribeTableStmt() || isDescribeDbStmt() || isShowCreateFunctionStmt();
     }
 
     private boolean isGrantRevokeStmt() {
@@ -284,9 +281,14 @@ public class AnalysisContext {
       return (ShowFilesStmt) stmt_;
     }
 
-    public DescribeStmt getDescribeStmt() {
-      Preconditions.checkState(isDescribeStmt());
-      return (DescribeStmt) stmt_;
+    public DescribeDbStmt getDescribeDbStmt() {
+      Preconditions.checkState(isDescribeDbStmt());
+      return (DescribeDbStmt) stmt_;
+    }
+
+    public DescribeTableStmt getDescribeTableStmt() {
+      Preconditions.checkState(isDescribeTableStmt());
+      return (DescribeTableStmt) stmt_;
     }
 
     public ShowCreateTableStmt getShowCreateTableStmt() {
@@ -426,7 +428,7 @@ public class AnalysisContext {
       for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
         Preconditions.checkState(
             !(privReq.getAuthorizeable() instanceof AuthorizeableColumn) ||
-            analysisResult_.isDescribeStmt());
+            analysisResult_.isDescribeTableStmt());
         authorizePrivilegeRequest(authzChecker, privReq);
       }
     }

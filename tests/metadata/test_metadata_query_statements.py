@@ -50,13 +50,47 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
       self.client.execute(self.CREATE_DATA_SRC_STMT % (name,))
 
   def setup_method(self, method):
+    self.cleanup_db('impala_test_desc_db1')
+    self.cleanup_db('impala_test_desc_db2')
+    self.cleanup_db('impala_test_desc_db3')
+    self.cleanup_db('impala_test_desc_db4')
+    self.cleanup_db('hive_test_desc_db')
     self.cleanup_db('hive_test_db')
 
+    call(["hive", "-e", "drop database if exists hive_test_desc_db cascade"])
+    call([
+        "hive", "-e", "create database hive_test_desc_db comment 'test comment' "
+        "with dbproperties('pi' = '3.14', 'e' = '2.82')"])
+    call(["hive", "-e", "alter database hive_test_desc_db set owner user test"])
+
+    self.client.execute("create database if not exists impala_test_desc_db1")
+    self.client.execute(
+        "create database if not exists impala_test_desc_db2 "
+        "comment \"test comment\"")
+    self.client.execute(
+        "create database if not exists impala_test_desc_db3 "
+        "location \"hdfs://localhost:20500/testdb\"")
+    self.client.execute(
+        "create database if not exists impala_test_desc_db4 "
+        "comment \"test comment\" location \"hdfs://localhost:20500/test2.db\"")
+    self.client.execute("invalidate metadata")
+
   def teardown_method(self, method):
+    self.cleanup_db('impala_test_desc_db1')
+    self.cleanup_db('impala_test_desc_db2')
+    self.cleanup_db('impala_test_desc_db3')
+    self.cleanup_db('impala_test_desc_db4')
+    self.cleanup_db('hive_test_desc_db')
     self.cleanup_db('hive_test_db')
 
   def test_show(self, vector):
     self.run_test_case('QueryTest/show', vector)
+
+  @pytest.mark.execute_serially
+  @SkipIfS3.hive
+  @SkipIfIsilon.hive
+  def test_describe_db(self, vector):
+    self.run_test_case('QueryTest/describedb', vector)
 
   @pytest.mark.execute_serially
   def test_show_data_sources(self, vector):

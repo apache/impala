@@ -265,6 +265,18 @@ public class AuditingTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestDescribeDb() throws AuthorizationException, AnalysisException {
+    Set<TAccessEvent> accessEvents =
+        AnalyzeAccessEvents("describe database default");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "default", TCatalogObjectType.DATABASE, "VIEW_METADATA")));
+
+    accessEvents = AnalyzeAccessEvents("describe database extended default");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "default", TCatalogObjectType.DATABASE, "VIEW_METADATA")));
+  }
+
+  @Test
   public void TestDescribe() throws AuthorizationException, AnalysisException {
     Set<TAccessEvent> accessEvents =
         AnalyzeAccessEvents("describe functional.alltypesagg");

@@ -23,14 +23,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-import org.junit.Assert;
-
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -1278,6 +1277,18 @@ public class AuthorizationTest {
     // User has column-level privileges on the target table
     AuthzError("drop stats functional.alltypestiny", "User '%s' does not have " +
         "privileges to execute 'ALTER' on: functional.alltypestiny");
+  }
+
+  @Test
+  public void TestDescribeDb() throws AuthorizationException, AnalysisException {
+    AuthzOk("describe database functional_seq_snap");
+
+    // Database doesn't exist.
+    AuthzError("describe database nodb",
+        "User '%s' does not have privileges to access: nodb");
+    // Insufficient privileges on db.
+    AuthzError("describe database functional_rc",
+        "User '%s' does not have privileges to access: functional_rc");
   }
 
   @Test

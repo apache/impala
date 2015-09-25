@@ -58,8 +58,9 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TDescribeDbParams;
+import com.cloudera.impala.thrift.TDescribeResult;
 import com.cloudera.impala.thrift.TDescribeTableParams;
-import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TGetAllHadoopConfigsResponse;
@@ -375,16 +376,37 @@ public class JniFrontend {
   }
 
   /**
+   * Returns a database's properties such as its location and comment.
+   * The argument is a serialized TDescribeDbParams object.
+   * The return type is a serialised TDescribeDbResult object.
+   * @see Frontend#describeDb
+   */
+  public byte[] describeDb(byte[] thriftDescribeDbParams) throws ImpalaException {
+    TDescribeDbParams params = new TDescribeDbParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeDbParams);
+
+    TDescribeResult result = frontend_.describeDb(
+        params.getDb(), params.getOutput_style());
+
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
    * Returns a list of the columns making up a table.
-   * The argument is a serialized TDescribeTableParams object.
-   * The return type is a serialised TDescribeTableResult object.
+   * The argument is a serialized TDescribeParams object.
+   * The return type is a serialised TDescribeResult object.
    * @see Frontend#describeTable
    */
   public byte[] describeTable(byte[] thriftDescribeTableParams) throws ImpalaException {
     TDescribeTableParams params = new TDescribeTableParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeTableParams);
 
-    TDescribeTableResult result = frontend_.describeTable(
+    TDescribeResult result = frontend_.describeTable(
         params.getDb(), params.getTable_name(), params.getOutput_style(),
         params.getResult_struct());
 
@@ -551,6 +573,7 @@ public class JniFrontend {
       }
     }
 
+    @Override
     public int compareTo(CdhVersion o) {
       return (this.major == o.major) ? (this.minor - o.minor) : (this.major - o.major);
     }

@@ -64,9 +64,11 @@ public class Db implements CatalogObject {
   // (e.g. can't drop it, can't add tables to it, etc).
   private boolean isSystemDb_ = false;
 
-  public Db(String name, Catalog catalog) {
+  public Db(String name, Catalog catalog,
+      org.apache.hadoop.hive.metastore.api.Database msDb) {
     thriftDb_ = new TDatabase(name.toLowerCase());
     parentCatalog_ = catalog;
+    thriftDb_.setMetastore_db(msDb);
     tableCache_ = new CatalogObjectCache<Table>();
     functions_ = new HashMap<String, List<Function>>();
   }
@@ -77,12 +79,14 @@ public class Db implements CatalogObject {
    * Creates a Db object with no tables based on the given TDatabase thrift struct.
    */
   public static Db fromTDatabase(TDatabase db, Catalog parentCatalog) {
-    return new Db(db.getDb_name(), parentCatalog);
+    return new Db(db.getDb_name(), parentCatalog, db.getMetastore_db());
   }
 
   public boolean isSystemDb() { return isSystemDb_; }
   public TDatabase toThrift() { return thriftDb_; }
+  @Override
   public String getName() { return thriftDb_.getDb_name(); }
+  @Override
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.DATABASE;
   }
@@ -158,6 +162,14 @@ public class Db implements CatalogObject {
 
   private static final FunctionResolutionOrder FUNCTION_RESOLUTION_ORDER =
       new FunctionResolutionOrder();
+
+  /**
+   * Returns the metastore.api.Database object this Database was created from.
+   * Returns null if it is not related to a hive database such as builtins_db.
+   */
+  public org.apache.hadoop.hive.metastore.api.Database getMetaStoreDb() {
+    return thriftDb_.getMetastore_db();
+  }
 
   /**
    * Returns the number of functions in this database.

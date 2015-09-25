@@ -102,8 +102,8 @@ import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TCreateDropRoleParams;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
-import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
-import com.cloudera.impala.thrift.TDescribeTableResult;
+import com.cloudera.impala.thrift.TDescribeOutputStyle;
+import com.cloudera.impala.thrift.TDescribeResult;
 import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -199,6 +199,7 @@ public class Frontend {
       config_ = config;
     }
 
+    @Override
     public void run() {
       try {
         LOG.info("Reloading authorization policy file from: " + config_.getPolicyFile());
@@ -297,9 +298,16 @@ public class Frontend {
       ddl.op_type = TCatalogOpType.SHOW_FILES;
       ddl.setShow_files_params(analysis.getShowFilesStmt().toThrift());
       metadata.setColumns(Collections.<TColumn>emptyList());
-    } else if (analysis.isDescribeStmt()) {
-      ddl.op_type = TCatalogOpType.DESCRIBE;
-      ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
+    } else if (analysis.isDescribeDbStmt()) {
+      ddl.op_type = TCatalogOpType.DESCRIBE_DB;
+      ddl.setDescribe_db_params(analysis.getDescribeDbStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("name", Type.STRING.toThrift()),
+          new TColumn("location", Type.STRING.toThrift()),
+          new TColumn("comment", Type.STRING.toThrift())));
+    } else if (analysis.isDescribeTableStmt()) {
+      ddl.op_type = TCatalogOpType.DESCRIBE_TABLE;
+      ddl.setDescribe_table_params(analysis.getDescribeTableStmt().toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("name", Type.STRING.toThrift()),
           new TColumn("type", Type.STRING.toThrift()),
@@ -716,6 +724,7 @@ public class Frontend {
     }
     Collections.sort(fns,
         new Comparator<Function>() {
+          @Override
           public int compare(Function f1, Function f2) {
             return f1.signatureString().compareTo(f2.signatureString());
           }
@@ -724,18 +733,29 @@ public class Frontend {
   }
 
   /**
-   * Returns table metadata, such as the column descriptors, in the specified table.
-   * Throws an exception if the table or db is not found or if there is an error
-   * loading the table metadata.
+   * Returns database metadata, in the specified database. Throws an exception if db is
+   * not found or if there is an error loading the db metadata.
    */
-  public TDescribeTableResult describeTable(String dbName, String tableName,
-      TDescribeTableOutputStyle outputStyle, TColumnType tResultStruct)
+  public TDescribeResult describeDb(String dbName, TDescribeOutputStyle outputStyle)
+      throws ImpalaException {
+    Db db = impaladCatalog_.getDb(dbName);
+    return DescribeResultFactory.buildDescribeDbResult(db, outputStyle);
+  }
+
+  /**
+   * Returns table metadata, such as the column descriptors, in the specified table.
+   * Throws an exception if the table or db is not found or if there is an error loading
+   * the table metadata.
+   */
+  public TDescribeResult describeTable(String dbName, String tableName,
+      TDescribeOutputStyle outputStyle, TColumnType tResultStruct)
           throws ImpalaException {
-    if (outputStyle == TDescribeTableOutputStyle.MINIMAL) {
+    if (outputStyle == TDescribeOutputStyle.MINIMAL) {
       StructType resultStruct = (StructType)Type.fromThrift(tResultStruct);
       return DescribeResultFactory.buildDescribeMinimalResult(resultStruct);
     } else {
-      Preconditions.checkArgument(outputStyle == TDescribeTableOutputStyle.FORMATTED);
+      Preconditions.checkArgument(outputStyle == TDescribeOutputStyle.FORMATTED ||
+          outputStyle == TDescribeOutputStyle.EXTENDED);
       Table table = impaladCatalog_.getTable(dbName, tableName);
       return DescribeResultFactory.buildDescribeFormattedResult(table);
     }

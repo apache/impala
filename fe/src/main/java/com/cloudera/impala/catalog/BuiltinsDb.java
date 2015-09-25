@@ -31,7 +31,7 @@ import com.google.common.collect.Lists;
 
 public class BuiltinsDb extends Db {
   public BuiltinsDb(String name, Catalog catalog) {
-    super(name, catalog);
+    super(name, catalog, null);
     setIsSystemDb(true);
     initBuiltins();
   }

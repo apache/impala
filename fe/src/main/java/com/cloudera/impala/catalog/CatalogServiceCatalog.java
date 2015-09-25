@@ -140,6 +140,7 @@ public class CatalogServiceCatalog extends Catalog {
    * Called periodically by the cachePoolReader_.
    */
   private class CachePoolReader implements Runnable {
+    @Override
     public void run() {
       LOG.trace("Reloading cache pool names from HDFS");
       // Map of cache pool name to CachePoolInfo. Stored in a map to allow Set operations
@@ -374,7 +375,7 @@ public class CatalogServiceCatalog extends Catalog {
       MetaStoreClient msClient = metaStoreClientPool_.getClient();
       try {
         for (String dbName: msClient.getHiveClient().getAllDatabases()) {
-          Db db = new Db(dbName, this);
+          Db db = new Db(dbName, this, msClient.getHiveClient().getDatabase(dbName));
           db.setCatalogVersion(incrementAndGetCatalogVersion());
           newDbCache.put(db.getName().toLowerCase(), db);
 
@@ -432,8 +433,9 @@ public class CatalogServiceCatalog extends Catalog {
    * Adds a database name to the metadata cache and returns the database's
    * new Db object. Used by CREATE DATABASE statements.
    */
-  public Db addDb(String dbName) throws ImpalaException {
-    Db newDb = new Db(dbName, this);
+  public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb)
+      throws ImpalaException {
+    Db newDb = new Db(dbName, this, msDb);
     newDb.setCatalogVersion(incrementAndGetCatalogVersion());
     addDb(newDb);
     return newDb;
@@ -765,6 +767,7 @@ public class CatalogServiceCatalog extends Catalog {
     // 3) unknown (null) - There was exception thrown by the metastore client.
     Boolean tableExistsInMetaStore;
     MetaStoreClient msClient = getMetaStoreClient();
+    org.apache.hadoop.hive.metastore.api.Database msDb = null;
     try {
       tableExistsInMetaStore = msClient.getHiveClient().tableExists(dbName, tblName);
     } catch (UnknownDBException e) {
@@ -774,42 +777,53 @@ public class CatalogServiceCatalog extends Catalog {
     } catch (TException e) {
       LOG.error("Error executing tableExists() metastore call: " + tblName, e);
       tableExistsInMetaStore = null;
-    } finally {
-      msClient.release();
     }
 
     if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
       updatedObjects.second = removeTable(dbName, tblName);
+      msClient.release();
       return true;
-    } else {
-      Db db = getDb(dbName);
-      if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
-        // The table does not exist in our cache AND it is unknown whether the table
-        // exists in the metastore. Do nothing.
-        return false;
-      } else if (db == null && tableExistsInMetaStore) {
-        // The table exists in the metastore, but our cache does not contain the parent
-        // database. A new db will be added to the cache along with the new table.
-        db = new Db(dbName, this);
+    }
+
+    Db db = getDb(dbName);
+    if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
+      // The table does not exist in our cache AND it is unknown whether the
+      // table exists in the metastore. Do nothing.
+      msClient.release();
+      return false;
+    } else if (db == null && tableExistsInMetaStore) {
+      // The table exists in the metastore, but our cache does not contain the parent
+      // database. A new db will be added to the cache along with the new table. msDb
+      // must be valid since tableExistsInMetaStore is true.
+      try {
+        msDb = msClient.getHiveClient().getDatabase(dbName);
+        Preconditions.checkNotNull(msDb);
+        db = new Db(dbName, this, msDb);
         db.setCatalogVersion(incrementAndGetCatalogVersion());
         addDb(db);
         updatedObjects.first = db;
+      } catch (TException e) {
+        // The metastore database cannot be get. Log the error and return.
+        LOG.error("Error executing getDatabase() metastore call: " + dbName, e);
+        return false;
+      } finally {
+        msClient.release();
       }
-
-      // Add a new uninitialized table to the table cache, effectively invalidating
-      // any existing entry. The metadata for the table will be loaded lazily, on the
-      // on the next access to the table.
-      Table newTable = IncompleteTable.createUninitializedTable(
-          getNextTableId(), db, tblName);
-      newTable.setCatalogVersion(incrementAndGetCatalogVersion());
-      db.addTable(newTable);
-      if (loadInBackground_) {
-        tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
-            tblName.toLowerCase()));
-      }
-      updatedObjects.second = newTable;
-      return false;
     }
+
+    // Add a new uninitialized table to the table cache, effectively invalidating
+    // any existing entry. The metadata for the table will be loaded lazily, on the
+    // on the next access to the table.
+    Table newTable = IncompleteTable.createUninitializedTable(
+        getNextTableId(), db, tblName);
+    newTable.setCatalogVersion(incrementAndGetCatalogVersion());
+    db.addTable(newTable);
+    if (loadInBackground_) {
+      tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
+          tblName.toLowerCase()));
+    }
+    updatedObjects.second = newTable;
+    return false;
   }
 
   /**

@@ -14,42 +14,177 @@
 
 package com.cloudera.impala.service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 
-import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.StructField;
 import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
-import com.cloudera.impala.thrift.TDescribeTableResult;
+import com.cloudera.impala.thrift.TDescribeOutputStyle;
+import com.cloudera.impala.thrift.TDescribeResult;
 import com.cloudera.impala.thrift.TResultRow;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /*
- * Builds results for DESCRIBE statements by constructing and populating a
- * TDescribeTableResult object.
+ * Builds results for DESCRIBE DATABASE statements by constructing and
+ * populating a TDescribeResult object.
  */
 public class DescribeResultFactory {
-  // Number of columns in each row of the DESCRIBE FORMATTED result set.
+  // Number of columns in each row of the DESCRIBE FORMATTED|EXTENDED result set.
   private final static int NUM_DESC_FORMATTED_RESULT_COLS = 3;
+  // Empty column used to format description output table.
+  private final static TColumnValue EMPTY = new TColumnValue().setString_val("");
+
+  public static TDescribeResult buildDescribeDbResult(Db db,
+    TDescribeOutputStyle outputFormat) {
+    switch (outputFormat) {
+      case MINIMAL: return describeDbMinimal(db);
+      case FORMATTED:
+      case EXTENDED:
+        return describeDbExtended(db);
+      default: throw new UnsupportedOperationException(
+          "Unknown TDescribeOutputStyle value for describe database: " + outputFormat);
+    }
+  }
 
   /*
-   * Builds a TDescribeTableResult that contains the result of a DESCRIBE FORMATTED
+   * Builds results for a DESCRIBE DATABASE <db> command. This consists of the database
+   * location and comment.
+   */
+  private static TDescribeResult describeDbMinimal(Db db) {
+    TDescribeResult descResult = new TDescribeResult();
+
+    org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
+    descResult.results = Lists.newArrayList();
+    String location = null;
+    String comment = null;
+    if(msDb != null) {
+      location = msDb.getLocationUri();
+      comment = msDb.getDescription();
+    }
+
+    TColumnValue dbNameCol = new TColumnValue();
+    dbNameCol.setString_val(db.getName());
+    TColumnValue dbLocationCol = new TColumnValue();
+    dbLocationCol.setString_val(Objects.toString(location, ""));
+    TColumnValue commentCol = new TColumnValue();
+    commentCol.setString_val(Objects.toString(comment, ""));
+    descResult.results.add(
+        new TResultRow(Lists.newArrayList(dbNameCol, dbLocationCol, commentCol)));
+    return descResult;
+  }
+
+  /*
+   * Helper function used to build privilege results.
+   */
+  private static void buildPrivilegeResult(
+      TDescribeResult descResult, Map<String, List<PrivilegeGrantInfo>> privilegeMap) {
+    if (privilegeMap == null) return;
+
+    for (Map.Entry<String, List<PrivilegeGrantInfo>> privilegeEntry:
+        privilegeMap.entrySet()) {
+      TColumnValue title = new TColumnValue();
+      title.setString_val("Privileges for " + privilegeEntry.getKey() + ": ");
+      descResult.results.add(
+          new TResultRow(Lists.newArrayList(title, EMPTY, EMPTY)));
+      for (PrivilegeGrantInfo privilegeInfo: privilegeEntry.getValue()) {
+        TColumnValue privilege = new TColumnValue();
+        privilege.setString_val(
+            privilegeInfo.getPrivilege() + " " + privilegeInfo.isGrantOption());
+        TColumnValue grantor = new TColumnValue();
+        grantor.setString_val(
+            privilegeInfo.getGrantor() + " " + privilegeInfo.getGrantorType());
+        TColumnValue grantTime = new TColumnValue();
+        grantTime.setString_val(privilegeInfo.getCreateTime() + "");
+        descResult.results.add(
+            new TResultRow(Lists.newArrayList(privilege, grantor, grantTime)));
+      }
+    }
+  }
+
+  /*
+   * Builds a TDescribeResult that contains the result of a DESCRIBE FORMATTED|EXTENDED
+   * DATABASE <db> command. Output all the database's properties.
+   */
+  private static TDescribeResult describeDbExtended(Db db) {
+    TDescribeResult descResult = describeDbMinimal(db);
+    org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
+    String ownerName = null;
+    PrincipalType ownerType = null;
+    Map<String, String> params = null;
+    PrincipalPrivilegeSet privileges = null;
+    if(msDb != null) {
+      ownerName = msDb.getOwnerName();
+      ownerType = msDb.getOwnerType();
+      params = msDb.getParameters();
+      privileges = msDb.getPrivileges();
+    }
+
+    if (ownerName != null && ownerType != null) {
+      TColumnValue owner = new TColumnValue();
+      owner.setString_val("Owner: ");
+      TResultRow ownerRow =
+          new TResultRow(Lists.newArrayList(owner, EMPTY, EMPTY));
+      descResult.results.add(ownerRow);
+
+      TColumnValue ownerNameCol = new TColumnValue();
+      ownerNameCol.setString_val(Objects.toString(ownerName, ""));
+      TColumnValue ownerTypeCol = new TColumnValue();
+      ownerTypeCol.setString_val(Objects.toString(ownerType, ""));
+      descResult.results.add(
+          new TResultRow(Lists.newArrayList(EMPTY, ownerNameCol, ownerTypeCol)));
+    }
+
+    if (params != null && params.size() > 0) {
+      TColumnValue parameter = new TColumnValue();
+      parameter.setString_val("Parameter: ");
+      TResultRow parameterRow =
+          new TResultRow(Lists.newArrayList(parameter, EMPTY, EMPTY));
+      descResult.results.add(parameterRow);
+      for (Map.Entry<String, String> param: params.entrySet()) {
+        TColumnValue key = new TColumnValue();
+        key.setString_val(Objects.toString(param.getKey(), ""));
+        TColumnValue val = new TColumnValue();
+        val.setString_val(Objects.toString(param.getValue(), ""));
+        descResult.results.add(
+            new TResultRow(Lists.newArrayList(EMPTY, key, val)));
+      }
+    }
+
+    // Currently we only retrieve privileges stored in hive metastore.
+    // TODO: Retrieve privileges from Catalog
+    if (privileges != null) {
+      buildPrivilegeResult(descResult, privileges.getUserPrivileges());
+      buildPrivilegeResult(descResult, privileges.getGroupPrivileges());
+      buildPrivilegeResult(descResult, privileges.getRolePrivileges());
+    }
+    return descResult;
+  }
+
+  /*
+   * Builds a TDescribeResult that contains the result of a DESCRIBE FORMATTED|EXTENDED
    * <table> command. For the formatted describe output the goal is to be exactly the
    * same as what Hive (via HiveServer2) outputs, for compatibility reasons. To do this,
    * Hive's MetadataFormatUtils class is used to build the results.
    */
-  public static TDescribeTableResult buildDescribeFormattedResult(Table table) {
-    TDescribeTableResult descResult = new TDescribeTableResult();
+  public static TDescribeResult buildDescribeFormattedResult(Table table) {
+    TDescribeResult descResult = new TDescribeResult();
     descResult.results = Lists.newArrayList();
 
     org.apache.hadoop.hive.metastore.api.Table msTable =
         table.getMetaStoreTable().deepCopy();
-    // Fixup the metastore table so the output of DESCRIBE FORMATTED matches Hive's.
-    // This is to distinguish between empty comments and no comments (value is null).
+    // Fixup the metastore table so the output of DESCRIBE FORMATTED|EXTENDED matches
+    // Hive's. This is to distinguish between empty comments and no comments
+    // (value is null).
     for (FieldSchema fs: msTable.getSd().getCols())
       fs.setComment(table.getColumn(fs.getName()).getComment());
     for (FieldSchema fs: msTable.getPartitionKeys()) {
@@ -89,11 +224,11 @@ public class DescribeResultFactory {
   }
 
   /*
-   * Builds a TDescribeTableResult that contains the result of a DESCRIBE <path> command:
+   * Builds a TDescribeResult that contains the result of a DESCRIBE <path> command:
    * the names and types of fields of the table or complex type referred to by the path.
    */
-  public static TDescribeTableResult buildDescribeMinimalResult(StructType type) {
-    TDescribeTableResult descResult = new TDescribeTableResult();
+  public static TDescribeResult buildDescribeMinimalResult(StructType type) {
+    TDescribeResult descResult = new TDescribeResult();
     descResult.results = Lists.newArrayList();
 
     for (StructField field: type.getFields()) {

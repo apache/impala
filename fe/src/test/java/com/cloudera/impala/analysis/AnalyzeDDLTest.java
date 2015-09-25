@@ -2335,6 +2335,21 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestDescribeDb() throws AnalysisException {
+    addTestDb("test_analyse_desc_db");
+    AnalyzesOk("describe database test_analyse_desc_db");
+    AnalyzesOk("describe database extended test_analyse_desc_db");
+    AnalyzesOk("describe database formatted test_analyse_desc_db");
+
+    AnalysisError("describe database db_does_not_exist",
+        "Database does not exist: db_does_not_exist");
+    AnalysisError("describe database extended db_does_not_exist",
+        "Database does not exist: db_does_not_exist");
+    AnalysisError("describe database formatted db_does_not_exist",
+        "Database does not exist: db_does_not_exist");
+  }
+
+  @Test
   public void TestDescribe() throws AnalysisException {
     AnalyzesOk("describe formatted functional.alltypes");
     AnalyzesOk("describe functional.alltypes");
@@ -2351,7 +2366,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("describe functional_parquet.allcomplextypes.complex_struct_col");
     AnalyzesOk("describe functional_parquet.allcomplextypes.complex_struct_col.f3");
     AnalysisError("describe formatted functional_parquet.allcomplextypes.int_array_col",
-        "DESCRIBE FORMATTED must refer to a table");
+        "DESCRIBE FORMATTED|EXTENDED must refer to a table");
     AnalysisError("describe functional_parquet.allcomplextypes.id",
         "Cannot describe path 'functional_parquet.allcomplextypes.id' targeting " +
         "scalar type: INT");
@@ -2362,7 +2377,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     addTestDb("ambig");
     addTestTable("create table ambig.ambig (ambig struct<ambig:array<int>>)");
     // Single element path can only be resolved as <table>.
-    DescribeStmt describe = (DescribeStmt)AnalyzesOk("describe ambig",
+    DescribeTableStmt describe = (DescribeTableStmt)AnalyzesOk("describe ambig",
         createAnalyzer("ambig"));
     Assert.assertEquals("ambig", describe.toThrift().db);
     Assert.assertEquals("ambig", describe.toThrift().table_name, "ambig");

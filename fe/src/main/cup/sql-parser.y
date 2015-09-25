@@ -27,7 +27,7 @@ import com.cloudera.impala.analysis.ColumnDef;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TFunctionCategory;
-import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
+import com.cloudera.impala.thrift.TDescribeOutputStyle;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPrivilegeLevel;
 import com.cloudera.impala.thrift.TTablePropertyType;
@@ -236,7 +236,7 @@ terminal
   KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC,
   KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
-  KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
+  KW_EXISTS, KW_EXPLAIN, KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
   KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
   KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
@@ -294,10 +294,11 @@ nonterminal ShowPartitionsStmt show_partitions_stmt;
 nonterminal ShowStatsStmt show_stats_stmt;
 nonterminal String show_pattern;
 nonterminal ShowFilesStmt show_files_stmt;
-nonterminal DescribeStmt describe_stmt;
+nonterminal DescribeDbStmt describe_db_stmt;
+nonterminal DescribeTableStmt describe_table_stmt;
 nonterminal ShowCreateTableStmt show_create_tbl_stmt;
 nonterminal ShowCreateFunctionStmt show_create_function_stmt;
-nonterminal TDescribeTableOutputStyle describe_output_style;
+nonterminal TDescribeOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
 nonterminal TruncateStmt truncate_stmt;
 nonterminal ResetMetadataStmt reset_metadata_stmt;
@@ -508,7 +509,9 @@ stmt ::=
   {: RESULT = show_create_function; :}
   | show_files_stmt:show_files
   {: RESULT = show_files; :}
-  | describe_stmt:describe
+  | describe_db_stmt:describe
+  {: RESULT = describe; :}
+  | describe_table_stmt:describe
   {: RESULT = describe; :}
   | alter_tbl_stmt:alter_tbl
   {: RESULT = alter_tbl; :}
@@ -1719,16 +1722,23 @@ show_files_stmt ::=
   {: RESULT = new ShowFilesStmt(table, partition); :}
   ;
 
-describe_stmt ::=
+describe_db_stmt ::=
+  KW_DESCRIBE db_or_schema_kw describe_output_style:style IDENT:db
+  {: RESULT = new DescribeDbStmt(db, style); :}
+  ;
+
+describe_table_stmt ::=
   KW_DESCRIBE describe_output_style:style dotted_path:path
-  {: RESULT = new DescribeStmt(path, style); :}
+  {: RESULT = new DescribeTableStmt(path, style); :}
   ;
 
 describe_output_style ::=
   KW_FORMATTED
-  {: RESULT = TDescribeTableOutputStyle.FORMATTED; :}
+  {: RESULT = TDescribeOutputStyle.FORMATTED; :}
+  | KW_EXTENDED
+  {: RESULT = TDescribeOutputStyle.EXTENDED; :}
   | /* empty */
-  {: RESULT = TDescribeTableOutputStyle.MINIMAL; :}
+  {: RESULT = TDescribeOutputStyle.MINIMAL; :}
   ;
 
 select_stmt ::=

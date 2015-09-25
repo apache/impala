@@ -1,0 +1,65 @@
+====
+---- QUERY
+# Test printing of default database.
+describe database default
+---- RESULTS
+'default','$NAMENODE/test-warehouse','Default Hive database'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test printing of hive_test_desc_db database.
+describe database hive_test_desc_db
+---- RESULTS
+'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test printing of hive_test_desc_db database with extended information.
+describe database extended hive_test_desc_db
+---- RESULTS
+'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
+'Parameter: ','',''
+'','test','USER'
+'Owner: ','',''
+'','e','2.82'
+'','pi','3.14'
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended impala_test_desc_db1
+---- RESULTS
+'impala_test_desc_db1','$NAMENODE/test-warehouse/impala_test_desc_db1.db',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended impala_test_desc_db2
+---- RESULTS
+'impala_test_desc_db2','$NAMENODE/test-warehouse/impala_test_desc_db2.db','test comment'
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended impala_test_desc_db3
+---- RESULTS
+'impala_test_desc_db3','$NAMENODE/testdb',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended impala_test_desc_db4
+---- RESULTS
+'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database formatted impala_test_desc_db4
+---- RESULTS
+'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
+---- TYPES
+string, string, string
+====

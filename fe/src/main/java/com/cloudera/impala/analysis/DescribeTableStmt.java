@@ -26,7 +26,7 @@ import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
+import com.cloudera.impala.thrift.TDescribeOutputStyle;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.google.common.base.Preconditions;
 
@@ -34,18 +34,18 @@ import com.google.common.base.Preconditions;
  * Representation of a DESCRIBE table statement which returns metadata on
  * a specified table:
  * Syntax: DESCRIBE <path>
- *         DESCRIBE FORMATTED <table>
+ *         DESCRIBE FORMATTED|EXTENDED <table>
  *
- * If FORMATTED is not specified and the path refers to a table, the statement only
- * returns info on the given table's column definition (column name, data type, and
+ * If FORMATTED|EXTENDED is not specified and the path refers to a table, the statement
+ * only returns info on the given table's column definition (column name, data type, and
  * comment). If the path refers to a complex typed field within a column, the statement
  * returns the field names, types, and comments.
- * If FORMATTED is specified, extended metadata on the table is returned
+ * If FORMATTED|EXTENDED is specified, extended metadata on the table is returned
  * (in addition to the column definitions). This metadata includes info about the table
  * properties, SerDe properties, StorageDescriptor properties, and more.
  */
-public class DescribeStmt extends StatementBase {
-  private final TDescribeTableOutputStyle outputStyle_;
+public class DescribeTableStmt extends StatementBase {
+  private final TDescribeOutputStyle outputStyle_;
 
   /// "."-separated path from the describe statement.
   private ArrayList<String> rawPath_;
@@ -59,7 +59,7 @@ public class DescribeStmt extends StatementBase {
   /// Struct type with the fields to display for the described path.
   private StructType resultStruct_;
 
-  public DescribeStmt(ArrayList<String> rawPath, TDescribeTableOutputStyle outputStyle) {
+  public DescribeTableStmt(ArrayList<String> rawPath, TDescribeOutputStyle outputStyle) {
     Preconditions.checkNotNull(rawPath);
     Preconditions.checkArgument(!rawPath.isEmpty());
     rawPath_ = rawPath;
@@ -72,23 +72,25 @@ public class DescribeStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DESCRIBE ");
-    if (outputStyle_ != TDescribeTableOutputStyle.MINIMAL) {
-      sb.append(outputStyle_.toString());
+    if (outputStyle_ != TDescribeOutputStyle.MINIMAL) {
+      sb.append(outputStyle_.toString() + " ");
     }
     return sb.toString() + StringUtils.join(rawPath_, ".");
   }
 
   public TableName getTableName() { return tableName_; }
-  public TDescribeTableOutputStyle getOutputStyle() { return outputStyle_; }
+  public TDescribeOutputStyle getOutputStyle() { return outputStyle_; }
 
 
   /**
    * Get the privilege requirement, which depends on the output style.
    */
-  public Privilege getPrivilegeRequirement() {
+  private Privilege getPrivilegeRequirement() {
     switch (outputStyle_) {
       case MINIMAL: return Privilege.ANY;
-      case FORMATTED: return Privilege.VIEW_METADATA;
+      case FORMATTED:
+      case EXTENDED:
+        return Privilege.VIEW_METADATA;
       default:
         Preconditions.checkArgument(false);
         return null;
@@ -123,10 +125,11 @@ public class DescribeStmt extends StatementBase {
     if (path_.destTable() != null) {
       resultStruct_ = path_.getRootTable().getHiveColumnsAsStruct();
     } else if (path_.destType().isComplexType()) {
-      if (outputStyle_ == TDescribeTableOutputStyle.FORMATTED) {
-        throw new AnalysisException("DESCRIBE FORMATTED must refer to a table");
+      if (outputStyle_ == TDescribeOutputStyle.FORMATTED ||
+          outputStyle_ == TDescribeOutputStyle.EXTENDED) {
+        throw new AnalysisException("DESCRIBE FORMATTED|EXTENDED must refer to a table");
       }
-      Preconditions.checkState(outputStyle_ == TDescribeTableOutputStyle.MINIMAL);
+      Preconditions.checkState(outputStyle_ == TDescribeOutputStyle.MINIMAL);
       resultStruct_ = Path.getTypeAsStruct(path_.destType());
     } else {
       throw new AnalysisException("Cannot describe path '" +

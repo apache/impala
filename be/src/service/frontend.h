@@ -109,15 +109,20 @@ class Frontend {
   /// Call FE to get the roles.
   Status ShowRoles(const TShowRolesParams& params, TShowRolesResult* result);
 
+  /// Returns (in the output parameter) the result of a DESCRIBE DATABASE db command.
+  /// This command retrieves db metadata, such as db location and comment.
+  /// The metadata that is returned is controlled by setting the 'output_style' field.
+  /// If set to FORMATTED|EXTENDED, all the database's properties are returned.
+  Status DescribeDb(const TDescribeDbParams& params, TDescribeResult* response);
+
   /// Returns (in the output parameter) the result of a DESCRIBE table command. This
   /// command retrieves table metadata, such as the column definitions. The metadata
   /// that is returned is controlled by setting the 'output_style' field. If this
   /// field is set to MINIMAL, only the column definitions are returned. If set to
-  /// FORMATTED, extended metadata is returned (in addition to the column defs).
+  /// FORMATTED|EXTENDED, extended metadata is returned (in addition to the column defs).
   /// This includes info about the table properties, SerDe properties, StorageDescriptor
   /// properties, and more.
-  Status DescribeTable(const TDescribeTableParams& params,
-      TDescribeTableResult* response);
+  Status DescribeTable(const TDescribeTableParams& params, TDescribeResult* response);
 
   /// Returns (in the output parameter) a string containing the CREATE TABLE command that
   /// creates the table specified in the params.
@@ -173,6 +178,7 @@ class Frontend {
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache()
   jmethodID update_membership_id_; // JniFrontend.updateMembership()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
+  jmethodID describe_db_id_; // JniFrontend.describeDb
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID show_create_table_id_; // JniFrontend.showCreateTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames

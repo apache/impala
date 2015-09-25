@@ -364,8 +364,9 @@ struct TDatabase {
   // Name of the database. Case insensitive, expected to be stored as lowercase.
   1: required string db_name
 
-  // The HDFS location new tables will default their base directory to
-  2: optional string location
+  // The Hive Metastore representation of this database. May not be set if there were
+  // errors loading the database metadata
+  2: optional hive_metastore.Database metastore_db
 }
 
 // Represents a role in an authorization policy.
