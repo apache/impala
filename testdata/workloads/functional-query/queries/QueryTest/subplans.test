@@ -215,3 +215,16 @@ GROUP BY opriority
 BIGINT, STRING
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 ====
+---- QUERY
+# IMPALA-2368: Test nested subplans with a non-trivial plan tree.
+SELECT count(*)
+FROM tpch_nested_parquet.customer c
+INNER JOIN c.c_orders o
+WHERE c_custkey < 10 AND o.pos IN
+  (SELECT LEAD(l.l_linenumber) OVER (ORDER BY l.pos)
+   FROM o.o_lineitems l)
+---- TYPES
+BIGINT
+---- RESULTS
+14
+====

@@ -133,7 +133,13 @@ Status SubplanNode::Reset(RuntimeState* state) {
   input_eos_ = false;
   input_row_idx_ = 0;
   subplan_eos_ = false;
-  return ExecNode::Reset(state);
+  num_rows_returned_ = 0;
+  RETURN_IF_ERROR(child(0)->Reset(state));
+  // If child(1) is not open it means that we have just Reset() it and returned from
+  // GetNext() without opening it again. It is not safe to call Reset() on the same
+  // exec node twice in a row.
+  if (subplan_is_open_) RETURN_IF_ERROR(child(1)->Reset(state));
+  return Status::OK();
 }
 
 void SubplanNode::Close(RuntimeState* state) {

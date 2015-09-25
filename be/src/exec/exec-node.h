@@ -93,9 +93,11 @@ class ExecNode {
   /// Clears all internal state, returning this node to the state it was in after calling
   /// Prepare() and before calling Open(). This function must not clear memory
   /// still owned by this node that is backing rows returned in GetNext().
-  /// Prepare() must have already been called before calling Reset(). Open()/GetNext()
-  /// may have optionally been called (not necessarily until eos). Close() must not have
-  /// been called.
+  /// Prepare() and Open() must have already been called before calling Reset().
+  /// GetNext() may have optionally been called (not necessarily until eos).
+  /// Close() must not have been called.
+  /// Reset() is not idempotent. Calling it multiple times in a row without a preceding
+  /// call to Open() is invalid.
   /// If overridden in a subclass, must call superclass's Reset() at the end. The default
   /// implementation calls Reset() on children.
   /// Note that this function may be called many times (proportional to the input data),
