@@ -469,7 +469,8 @@ Status Coordinator::GetStatus() {
   return query_status_;
 }
 
-Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance_id) {
+Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance_id,
+    const string& instance_hostname) {
   {
     lock_guard<mutex> l(lock_);
 
@@ -490,7 +491,7 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   // Log the id of the fragment that first failed so we can track it down easier.
   if (instance_id != NULL) {
     VLOG_QUERY << "Query id=" << query_id_ << " failed because fragment id="
-               << *instance_id << " failed.";
+               << *instance_id << " on host=" << instance_hostname << " failed.";
   }
 
   return query_status_;
@@ -855,7 +856,8 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   // if there was an error, we need to return the query's error status rather than
   // the status we just got back from the local executor (which may well be CANCELLED
   // in that case).  Coordinator fragment failed in this case so we log the query_id.
-  RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_instance_id()));
+  RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_instance_id(),
+      FLAGS_hostname));
 
   if (*batch == NULL) {
     returned_all_results_ = true;
@@ -1318,7 +1320,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   // and returned_all_results_ is true.
   // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
   if (!(returned_all_results_ && status.IsCancelled()) && !status.ok()) {
-    UpdateStatus(status, &exec_state->fragment_instance_id);
+    UpdateStatus(status, &exec_state->fragment_instance_id,
+        TNetworkAddressToString(exec_state->backend_address));
     return Status::OK();
   }
 
@@ -1326,7 +1329,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     exec_state->stopwatch.Stop();
     DCHECK_GT(num_remaining_backends_, 0);
-    VLOG_QUERY << "Backend " << params.backend_num << " completed, "
+    VLOG_QUERY << "Backend " << params.backend_num << " on host "
+               << exec_state->backend_address << " completed, "
                << num_remaining_backends_ - 1 << " remaining: query_id=" << query_id_;
     if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
       // print host/port info for the first backend that's still in progress as a

@@ -396,8 +396,9 @@ class Coordinator {
   /// an error status, and returns the current query_status_.
   /// Calls CancelInternal() when switching to an error status.
   /// If failed_fragment is non-null, it is the fragment_id that has failed, used
-  /// for error reporting.
-  Status UpdateStatus(const Status& status, const TUniqueId* failed_fragment);
+  /// for error reporting along with instance_hostname.
+  Status UpdateStatus(const Status& status, const TUniqueId* failed_fragment,
+      const std::string& instance_hostname = "");
 
   /// Returns only when either all backends have reported success or the query is in
   /// error. Returns the status of the query.
