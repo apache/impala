@@ -487,7 +487,7 @@ Status Coordinator::GetStatus() {
   return query_status_;
 }
 
-Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance_id,
+Status Coordinator::UpdateStatus(const Status& status, const TUniqueId& instance_id,
     const string& instance_hostname) {
   {
     lock_guard<mutex> l(lock_);
@@ -507,10 +507,8 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   }
 
   // Log the id of the fragment that first failed so we can track it down easier.
-  if (instance_id != NULL) {
-    VLOG_QUERY << "Query id=" << query_id_ << " failed because fragment id="
-               << *instance_id << " on host=" << instance_hostname << " failed.";
-  }
+  VLOG_QUERY << "Query id=" << query_id_ << " failed because fragment id="
+             << instance_id << " on host=" << instance_hostname << " failed.";
 
   return query_status_;
 }
@@ -809,7 +807,8 @@ Status Coordinator::Wait() {
   Status return_status = Status::OK();
   if (executor_.get() != NULL) {
     // Open() may block
-    return_status = UpdateStatus(executor_->Open(), NULL);
+    return_status = UpdateStatus(executor_->Open(),
+        runtime_state()->fragment_instance_id(), FLAGS_hostname);
 
     if (return_status.ok()) {
       // If the coordinator fragment has a sink, it will have finished executing at this
@@ -874,7 +873,7 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   // if there was an error, we need to return the query's error status rather than
   // the status we just got back from the local executor (which may well be CANCELLED
   // in that case).  Coordinator fragment failed in this case so we log the query_id.
-  RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_instance_id(),
+  RETURN_IF_ERROR(UpdateStatus(status, runtime_state()->fragment_instance_id(),
       FLAGS_hostname));
 
   if (*batch == NULL) {
@@ -1343,7 +1342,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   // and returned_all_results_ is true.
   // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
   if (!(returned_all_results_ && status.IsCancelled()) && !status.ok()) {
-    UpdateStatus(status, &exec_state->fragment_instance_id,
+    UpdateStatus(status, exec_state->fragment_instance_id,
         TNetworkAddressToString(exec_state->backend_address));
     return Status::OK();
   }
