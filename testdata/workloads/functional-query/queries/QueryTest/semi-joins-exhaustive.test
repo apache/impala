@@ -1,0 +1,14 @@
+====
+---- QUERY
+# Regression test for IMPALA-2256. Join whose right side has very high
+# cardinality (121M) and zero materialized slots.
+SELECT straight_join
+COUNT(*) FROM alltypesagg t1
+WHERE t1.int_col IN (
+ SELECT 1 FROM alltypesagg t1
+ CROSS JOIN alltypesagg t2)
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====

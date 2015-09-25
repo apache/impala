@@ -155,3 +155,8 @@ class TestSemiJoinQueries(ImpalaTestSuite):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/semi-joins', new_vector)
+
+  def test_semi_joins_exhaustive(self, vector):
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    new_vector = copy(vector)
+    self.run_test_case('QueryTest/semi-joins-exhaustive', new_vector)

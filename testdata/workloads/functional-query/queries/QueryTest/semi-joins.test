@@ -280,7 +280,7 @@ INT, INT, INT
 ---- QUERY
 # Regression test for IMPALA-1351: PHJ::GetNext() returns -1 in NAAJ w/o error.
 # NOTE: Commented out because it takes a few hours to run on a single node.
-# TODO: Casey will try to simplify.
+# TODO: Casey will try to simplify, also consider moving to semi-joins-exhaustive.
 #SELECT COUNT(t2.month) AS int_col_1
 #FROM alltypesagg t1 CROSS
 #JOIN alltypesagg t2 FULL
@@ -327,17 +327,4 @@ RIGHT ANTI JOIN functional.SemiJoinTblB b on v.b = b.b
 3,NULL,50
 ---- TYPES
 INT, INT, INT
-====
----- QUERY
-# Regression test for IMPALA-2256. Join whose right side has very high
-# cardinality (121M) and zero materialized slots.
-SELECT straight_join
-COUNT(*) FROM alltypesagg t1
-WHERE t1.int_col IN (
- SELECT 1 FROM alltypesagg t1
- CROSS JOIN alltypesagg t2)
----- RESULTS
-10
----- TYPES
-BIGINT
 ====
