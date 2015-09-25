@@ -29,8 +29,17 @@ namespace impala {
 class Bitmap {
  public:
   Bitmap(int64_t num_bits) {
+    DCHECK_GE(num_bits, 0);
     buffer_.resize(BitUtil::RoundUpNumi64(num_bits));
     num_bits_ = num_bits;
+  }
+
+  /// Resize bitmap and set all bits to zero.
+  void Reset(int64_t num_bits) {
+    DCHECK_GE(num_bits, 0);
+    buffer_.resize(BitUtil::RoundUpNumi64(num_bits));
+    num_bits_ = num_bits;
+    SetAllBits(false);
   }
 
   /// Compute memory usage of a bitmap, not including the Bitmap object itself.

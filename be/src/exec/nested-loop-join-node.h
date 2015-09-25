@@ -15,6 +15,7 @@
 #ifndef IMPALA_EXEC_NESTED_LOOP_JOIN_NODE_H
 #define IMPALA_EXEC_NESTED_LOOP_JOIN_NODE_H
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "exec/exec-node.h"
@@ -46,6 +47,7 @@ class NestedLoopJoinNode : public BlockingJoinNode {
  public:
   NestedLoopJoinNode(ObjectPool* pool, const TPlanNode& tnode,
       const DescriptorTbl& descs);
+  virtual ~NestedLoopJoinNode();
 
   virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
@@ -66,7 +68,7 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   /// this cache, but the tuple data is always transferred to the output batch in
   /// GetNext() when eos_ is set to true. The cache helps to avoid creating new
   /// RowBatches after a Reset().
-  RowBatchCache* build_batch_cache_;
+  boost::scoped_ptr<RowBatchCache> build_batch_cache_;
 
   /// List of build batches from child.
   RowBatchList raw_build_batches_;
@@ -85,7 +87,8 @@ class NestedLoopJoinNode : public BlockingJoinNode {
 
   /// Bitmap used to identify matching build tuples for the case of OUTER/SEMI/ANTI
   /// joins. Owned exclusively by the nested loop join node.
-  Bitmap* matching_build_rows_;
+  /// Non-NULL if a bitmap is used to record build rows that match a probe row.
+  boost::scoped_ptr<Bitmap> matching_build_rows_;
 
   /// If true, we've started processing the unmatched build rows. Only used in
   /// RIGHT OUTER JOIN, RIGHT ANTI JOIN and FULL OUTER JOIN modes.
@@ -93,9 +96,6 @@ class NestedLoopJoinNode : public BlockingJoinNode {
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
-
-  /// True if a bitmap is used to record build rows that match a probe row.
-  bool use_matching_build_rows_bitmap_;
 
   /// Join conjuncts
   std::vector<ExprContext*> join_conjunct_ctxs_;

@@ -35,12 +35,13 @@ NestedLoopJoinNode::NestedLoopJoinNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : BlockingJoinNode("NestedLoopJoinNode", tnode.nested_loop_join_node.join_op, pool,
         tnode, descs),
-    build_batch_cache_(NULL),
     build_batches_(NULL),
     current_build_row_idx_(0),
-    matching_build_rows_(NULL),
-    process_unmatched_build_rows_(false),
-    use_matching_build_rows_bitmap_(false) {
+    process_unmatched_build_rows_(false) {
+}
+
+NestedLoopJoinNode::~NestedLoopJoinNode() {
+  DCHECK(is_closed());
 }
 
 Status NestedLoopJoinNode::Init(const TPlanNode& tnode) {
@@ -53,11 +54,12 @@ Status NestedLoopJoinNode::Init(const TPlanNode& tnode) {
   DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN ||
       join_conjunct_ctxs_.size() == 0) << "Join conjuncts in a cross join";
 
-  // For some join modes we need to record the build rows with matches in a
-  // bitmap.
-  use_matching_build_rows_bitmap_ = (join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
-      join_op_ == TJoinOp::RIGHT_SEMI_JOIN || join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
-      join_op_ == TJoinOp::FULL_OUTER_JOIN);
+  // For some join modes we need to record the build rows with matches in a bitmap.
+  if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
+      join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+    // Allocate empty bitmap to be expanded later.
+    matching_build_rows_.reset(new Bitmap(0));
+  }
   return Status::OK();
 }
 
@@ -76,8 +78,8 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
   RETURN_IF_ERROR(Expr::Prepare(
       join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
-  build_batch_cache_ = new RowBatchCache(
-      child(1)->row_desc(), state->batch_size(), mem_tracker());
+  build_batch_cache_.reset(new RowBatchCache(
+      child(1)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK();
 }
 
@@ -85,11 +87,6 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state) {
   raw_build_batches_.Reset();
   copied_build_batches_.Reset();
   build_batches_ = NULL;
-  if (matching_build_rows_ != NULL) {
-    mem_tracker()->Release(matching_build_rows_->MemUsage());
-    delete matching_build_rows_;
-    matching_build_rows_ = NULL;
-  }
   matched_probe_ = false;
   current_probe_row_ = NULL;
   probe_batch_pos_ = 0;
@@ -106,13 +103,9 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
   Expr::Close(join_conjunct_ctxs_, state);
   if (matching_build_rows_ != NULL) {
     mem_tracker()->Release(matching_build_rows_->MemUsage());
-    delete matching_build_rows_;
-    matching_build_rows_ = NULL;
+    matching_build_rows_.reset();
   }
-  if (build_batch_cache_ != NULL) {
-    delete build_batch_cache_;
-    build_batch_cache_ = NULL;
-  }
+  build_batch_cache_.reset();
   BlockingJoinNode::Close(state);
 }
 
@@ -156,13 +149,19 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
     build_batches_ = &raw_build_batches_;
   }
 
-  if (use_matching_build_rows_bitmap_) {
-    // Account for the memory used by the bitmap.
+  if (matching_build_rows_ != NULL) {
     int64_t num_bits = build_batches_->total_num_rows();
-    if (!mem_tracker()->TryConsume(Bitmap::MemUsage(num_bits))) {
-      return Status::MemLimitExceeded();
+    // Reuse existing bitmap, expanding it if needed.
+    if (matching_build_rows_->num_bits() >= num_bits) {
+      matching_build_rows_->SetAllBits(false);
+    } else {
+      // Account for the additional memory used by the bitmap.
+      if (!mem_tracker()->TryConsume(Bitmap::MemUsage(num_bits) -
+          matching_build_rows_->MemUsage())) {
+        return Status::MemLimitExceeded();
+      }
+      matching_build_rows_->Reset(num_bits);
     }
-    matching_build_rows_ = new Bitmap(num_bits);
   }
   return Status::OK();
 }
@@ -606,8 +605,7 @@ Status NestedLoopJoinNode::FindBuildMatches(
     }
     if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, output_row)) continue;
     matched_probe_ = true;
-    if (use_matching_build_rows_bitmap_) {
-      DCHECK(matching_build_rows_ != NULL);
+    if (matching_build_rows_ != NULL) {
       matching_build_rows_->Set<false>(current_build_row_idx_ - 1, true);
     }
     if (!EvalConjuncts(conjunct_ctxs, num_ctxs, output_row)) continue;
