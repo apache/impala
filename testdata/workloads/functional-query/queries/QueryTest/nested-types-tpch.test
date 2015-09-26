@@ -145,22 +145,24 @@ ORDER BY 1
 ---- TYPES
 BIGINT,BIGINT
 ====
+---- QUERY
 # IMPALA-2357: Test analytic function with order by on top of subplans that
 # generate many rows. This test stresses the order by and should not crash.
 SELECT o_orderkey, r FROM
-  (SELECT o2.o_orderkey, LAG(o1.pos, 100) OVER (ORDER BY o2.o_orderkey DESC) r
+  (SELECT o2.o_orderkey, COUNT(o1.pos) OVER (ORDER BY o2.o_orderkey DESC) r
    FROM tpch_nested_parquet.customer c
    JOIN c.c_orders o1
    JOIN c.c_orders o2 ON (o1.pos = o2.pos)) v
 ORDER BY o_orderkey LIMIT 1
 ---- RESULTS
-1,15
+1,1500000
 ---- TYPES
 BIGINT,BIGINT
 ====
 ---- QUERY
 # IMPALA-2376
-set mem_limit=120m
+# Set memory limit low enough to get the below query to consistently fail.
+set mem_limit=20m
 ====
 ---- QUERY
 select max(cnt) from customer c,
@@ -168,8 +170,7 @@ select max(cnt) from customer c,
 ---- TYPES
 BIGINT
 ---- CATCH
-Mem limit exceeded
-Failed to allocate buffer for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.
+Memory limit exceeded
 ====
 ---- QUERY
 set mem_limit=0
