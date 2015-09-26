@@ -33,8 +33,12 @@ const int BLOCKS_REQUIRED_FOR_MERGE = 3;
 // Error message when pinning fixed or variable length blocks failed.
 // TODO: Add the node id that iniated the sort
 const string PIN_FAILED_ERROR_MSG = "Failed to pin block for $0-length data needed "
-    "for sorting. Reducing query concurrency or increasing the memory available to "
-    "Impala may help running this query.";
+    "for sorting. Reducing query concurrency or increasing the memory limit may help "
+    "this query to complete successfully.";
+
+const string MEM_ALLOC_FAILED_ERROR_MSG = "Failed to allocate block for $0-length "
+    "data needed for sorting. Reducing query concurrency or increasing the "
+    "memory limit may help this query to complete successfully.";
 
 // A run is a sequence of blocks containing tuples that are or will eventually be in
 // sorted order.
@@ -361,17 +365,29 @@ Status Sorter::Run::Init() {
   BufferedBlockMgr::Block* block = NULL;
   RETURN_IF_ERROR(
       sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
-  DCHECK(block != NULL);
+  if (block == NULL) {
+    Status status = Status::MemLimitExceeded();
+    status.AddDetail(Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "fixed"));
+    return status;
+  }
   fixed_len_blocks_.push_back(block);
   if (has_var_len_slots_) {
     RETURN_IF_ERROR(
         sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
-    DCHECK(block != NULL);
+    if (block == NULL) {
+      Status status = Status::MemLimitExceeded();
+      status.AddDetail(Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "variable"));
+      return status;
+    }
     var_len_blocks_.push_back(block);
     if (!is_sorted_) {
       RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(
           sorter_->block_mgr_client_, NULL, &var_len_copy_block_));
-      DCHECK(var_len_copy_block_ != NULL);
+      if (var_len_copy_block_ == NULL) {
+        Status status = Status::MemLimitExceeded();
+        status.AddDetail(Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "variable"));
+        return status;
+      }
     }
   }
   if (!is_sorted_) sorter_->initial_runs_counter_->Add(1);
@@ -1004,7 +1020,7 @@ Status Sorter::AddBatch(RowBatch* batch) {
       RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllBlocks());
       unsorted_run_ = obj_pool_.Add(
           new Run(this, output_row_desc_->tuple_descriptors()[0], true));
-      unsorted_run_->Init();
+      RETURN_IF_ERROR(unsorted_run_->Init());
     }
   }
   return Status::OK();
@@ -1076,7 +1092,7 @@ Status Sorter::Reset() {
   DCHECK(unsorted_run_ == NULL);
   unsorted_run_ = obj_pool_.Add(
       new Run(this, output_row_desc_->tuple_descriptors()[0], true));
-  unsorted_run_->Init();
+  RETURN_IF_ERROR(unsorted_run_->Init());
   return Status::OK();
 }
 
