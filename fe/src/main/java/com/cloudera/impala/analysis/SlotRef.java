@@ -62,7 +62,7 @@ public class SlotRef extends Expr {
    */
   public SlotRef(SlotDescriptor desc) {
     super();
-    if (desc.getPath() != null) {
+    if (desc.isScanSlot()) {
       rawPath_ = desc.getPath().getRawPath();
     } else {
       rawPath_ = null;

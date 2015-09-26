@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -68,13 +67,18 @@ public class CollectionTableRef extends TableRef {
    * Registers this collection table ref with the given analyzer and adds a slot
    * descriptor for the materialized collection to be populated by parent scan.
    * Also determines whether this collection table ref is correlated or not.
+   *
+   * If this function is called in the context of analyzing a WITH clause, then
+   * no slot is added to the parent descriptor so as to not pollute the analysis
+   * state of the parent block (the WITH-clause analyzer is discarded, and the
+   * parent analyzer could have an entirely different global state).
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     Preconditions.checkNotNull(getPrivilegeRequirement());
     desc_ = analyzer.registerTableRef(this);
-    if (isRelative()) {
+    if (isRelative() && !analyzer.isWithClause()) {
       SlotDescriptor parentSlotDesc = analyzer.registerSlotRef(resolvedPath_);
       parentSlotDesc.setItemTupleDesc(desc_);
       collectionExpr_ = new SlotRef(parentSlotDesc);
@@ -91,7 +95,8 @@ public class CollectionTableRef extends TableRef {
         Preconditions.checkState(!(parentRef instanceof InlineViewRef));
         correlatedTupleIds_.add(parentRef.getId());
       }
-    } else {
+    }
+    if (!isRelative()) {
       // Register a column-level privilege request for the collection-typed column.
       analyzer.registerPrivReq(new PrivilegeRequestBuilder().
           allOf(Privilege.SELECT).onColumn(desc_.getTableName().getDb(),

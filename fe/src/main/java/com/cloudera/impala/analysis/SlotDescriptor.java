@@ -31,7 +31,7 @@ public class SlotDescriptor {
   private final TupleDescriptor parent_;
 
   // Resolved path to the column/field corresponding to this slot descriptor, if any,
-  // Only set for slots that represent a column/field.
+  // Only set for slots that represent a column/field materialized in a scan.
   private Path path_;
   private Type type_;
 
@@ -131,10 +131,9 @@ public class SlotDescriptor {
 
   public Path getPath() { return path_; }
 
-  public Column getColumn() {
-    if (path_ == null) return null;
-    return path_.destColumn();
-  }
+  public boolean isScanSlot() { return path_ != null; }
+
+  public Column getColumn() { return !isScanSlot() ? null : path_.destColumn(); }
 
   public ColumnStats getStats() {
     if (stats_ == null) {
@@ -182,7 +181,7 @@ public class SlotDescriptor {
     // However, we sometimes materialize inline-view tuples when generating plan trees
     // with EmptySetNode portions. In that case, a slot descriptor could have a non-empty
     // path pointing into the inline-view tuple (which has no path).
-    if (path_ == null || parent_.getPath() == null) return Collections.emptyList();
+    if (!isScanSlot() || parent_.getPath() == null) return Collections.emptyList();
     Preconditions.checkState(path_.isResolved());
 
     List<Integer> materializedPath = Lists.newArrayList(path_.getAbsolutePath());
@@ -218,7 +217,16 @@ public class SlotDescriptor {
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
         materializedPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, isMaterialized_);
-    if (itemTupleDesc_ != null) result.setItemTupleId(itemTupleDesc_.getId().asInt());
+    if (itemTupleDesc_ != null) {
+      // Check for recursive or otherwise invalid item tuple descriptors. Since we assign
+      // tuple ids globally in increasing order, the id of an item tuple descriptor must
+      // always have been generated after the parent tuple id if the tuple/slot belong
+      // to a base table. For example, tuples/slots introduced during planning do not
+      // have such a guarantee.
+      Preconditions.checkState(!isScanSlot() ||
+          itemTupleDesc_.getId().asInt() > parent_.getId().asInt());
+      result.setItemTupleId(itemTupleDesc_.getId().asInt());
+    }
     return result;
   }
 

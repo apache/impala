@@ -465,3 +465,83 @@ select * from t1 where bigint_col = bigint_col2
    partitions=4/4 files=4 size=460B
    predicates: bigint_col = bigint_col
 ====
+# IMPALA-2414: Test basic correlated WITH clause view.
+select pos from functional.allcomplextypes t inner join
+  (with w as (select pos from t.int_array_col)
+   select pos from w) v
+on v.pos = t.id
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [INNER JOIN]
+|  |  join predicates: pos = t.id
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [t.int_array_col]
+|
+00:SCAN HDFS [functional.allcomplextypes t]
+   partitions=0/0 files=0 size=0B
+====
+# IMPALA-2414: Test correlated WITH clause view nested in another WITH clause.
+select pos from functional.allcomplextypes t inner join
+  (with w1 as (with w2 as (select pos from t.int_array_col) select * from w2)
+   select pos from w1) v
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [t.int_array_col]
+|
+00:SCAN HDFS [functional.allcomplextypes t]
+   partitions=0/0 files=0 size=0B
+====
+# IMPALA-2414: Test correlated WITH clause view nested in another WITH clause.
+with w1 as (select pos from functional.allcomplextypes t,
+  (with w2 as (select pos from t.int_array_col) select * from w2) v)
+select * from w1
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [t.int_array_col]
+|
+00:SCAN HDFS [functional.allcomplextypes t]
+   partitions=0/0 files=0 size=0B
+====
+# IMPALA-2414: Test multiple correlated WITH clause views that are joined.
+select pos from functional.allcomplextypes t inner join
+  (with w1 as (select pos, item from t.int_array_col),
+   w2 as (select key, value from t.map_map_col.value)
+   select a1.*, m2.* from w1 a1, w1 a2, w2 m1, w2 m2) v on v.value = t.id
+---- PLAN
+01:SUBPLAN
+|
+|--10:NESTED LOOP JOIN [INNER JOIN]
+|  |  join predicates: value = t.id
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--06:UNNEST [t.map_map_col.value]
+|  |
+|  08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--05:UNNEST [t.map_map_col.value]
+|  |
+|  07:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--04:UNNEST [t.int_array_col]
+|  |
+|  03:UNNEST [t.int_array_col]
+|
+00:SCAN HDFS [functional.allcomplextypes t]
+   partitions=0/0 files=0 size=0B
+====

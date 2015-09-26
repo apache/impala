@@ -126,6 +126,9 @@ public class Analyzer {
   // Flag indicating if this analyzer instance belongs to a subquery.
   private boolean isSubquery_ = false;
 
+  // Flag indicating whether this analyzer belongs to a WITH clause view.
+  private boolean isWithClause_ = false;
+
   // If set, when privilege requests are registered they will use this error
   // error message.
   private String authErrorMsg_;
@@ -148,6 +151,8 @@ public class Analyzer {
   public boolean isSubquery() { return isSubquery_; }
   public boolean setHasPlanHints() { return globalState_.hasPlanHints = true; }
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
+  public void setIsWithClause() { isWithClause_ = true; }
+  public boolean isWithClause() { return isWithClause_; }
 
   // state shared between all objects of an Analyzer tree
   // TODO: Many maps here contain properties about tuples, e.g., whether
@@ -351,6 +356,7 @@ public class Analyzer {
     user_ = parentAnalyzer.getUser();
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
+    isWithClause_ = parentAnalyzer.isWithClause_;
   }
 
   /**

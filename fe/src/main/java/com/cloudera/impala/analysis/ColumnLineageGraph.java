@@ -397,7 +397,7 @@ public class ColumnLineageGraph {
     for (SlotId slotId: slotIds) {
       SlotDescriptor slotDesc = descTbl_.getSlotDesc(slotId);
       List<Expr> sourceExprs = slotDesc.getSourceExprs();
-      if (sourceExprs.isEmpty() && slotDesc.getPath() != null &&
+      if (sourceExprs.isEmpty() && slotDesc.isScanSlot() &&
           slotDesc.getPath().isRootedAtTuple()) {
         // slot should correspond to a materialized tuple of a table
         Preconditions.checkState(slotDesc.getParent().isMaterialized());
