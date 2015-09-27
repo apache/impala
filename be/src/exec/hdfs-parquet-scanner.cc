@@ -1242,11 +1242,16 @@ Status HdfsParquetScanner::ProcessSplit() {
         AssembleRows(scan_node_->tuple_desc(), column_readers_, -1, i, NULL);
     assemble_rows_timer_.Stop();
 
+    if (parse_status_.IsMemLimitExceeded()) return parse_status_;
     if (!parse_status_.ok()) LOG_OR_RETURN_ON_ERROR(parse_status_.msg(), state_);
-    if (!continue_execution) return Status::OK();
+
+    if (scan_node_->ReachedLimit()) return Status::OK();
+    if (context_->cancelled()) return Status::OK();
+    RETURN_IF_ERROR(state_->CheckQueryState());
+
+    DCHECK(continue_execution);
     // We should be at the end of the the row group if we get this far
     DCHECK_EQ(column_readers_[0]->rep_level(), -1);
-
     // Reset parse_status_ for the next row group.
     parse_status_ = Status::OK();
   }
