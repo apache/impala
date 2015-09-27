@@ -17,6 +17,7 @@
 # annotate the class or test routine with the marker.
 #
 
+import re
 import os
 import pytest
 from functools import partial
@@ -61,3 +62,15 @@ class SkipIfIsilon:
   untriaged = pytest.mark.skipif(IS_ISILON,
       reason="This Isilon issue has yet to be triaged.")
   jira = partial(pytest.mark.skipif, IS_ISILON)
+
+# TODO: looking at TEST_START_CLUSTER_ARGS is a hack. It would be better to add an option
+# to pytest.
+test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS","")
+old_agg_regex = "enable_partitioned_aggregation=false"
+old_hash_join_regex = "enable_partitioned_hash_join=false"
+using_old_aggs_joins = re.search(old_agg_regex, test_start_cluster_args) is not None or \
+    re.search(old_hash_join_regex, test_start_cluster_args) is not None
+
+class SkipIfOldAggsJoins:
+  nested_types = pytest.mark.skipif(using_old_aggs_joins,
+      reason="Nested types not supported with old aggs and joins")

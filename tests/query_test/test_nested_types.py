@@ -4,7 +4,9 @@
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIfOldAggsJoins
 
+@SkipIfOldAggsJoins.nested_types
 class TestNestedTypes(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
