@@ -697,10 +697,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
       bool wait_for_all_subscribers);
 
-  /// To be run in a thread. Every FLAGS_idle_session_timeout / 2 seconds, wakes up and
-  /// checks all sessions for their last-idle time. Those that have been idle for longer
-  /// than FLAGS_idle_session_timeout are 'expired': they will no longer accept queries and
-  /// any running queries associated with those sessions are cancelled.
+  /// Register timeout value upon opening a new session. This will wake up
+  /// session_timeout_thread_ to update its poll period.
+  void RegisterSessionTimeout(int32_t timeout);
+
+  /// To be run in a thread which wakes up every x / 2 seconds in which x is the minimum
+  /// non-zero idle session timeout value of all sessions. This function checks all
+  /// sessions for their last-idle times. Those that have been idle for longer than
+  /// their configured timeout values are 'expired': they will no longer accept queries
+  /// and any running queries associated with those sessions are unregistered.
   void ExpireSessions();
 
   /// Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
@@ -756,8 +761,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// avoid blocking the statestore callback.
   boost::scoped_ptr<ThreadPool<CancellationWork> > cancellation_thread_pool_;
 
-  /// Thread that runs ExpireSessions if FLAGS_idle_session_timeout > 0
+  /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
+  /// which are idle for more their timeout values.
   boost::scoped_ptr<Thread> session_timeout_thread_;
+
+  /// Contains all the non-zero idle session timeout values.
+  std::multiset<int32_t> session_timeout_set_;
+
+  /// The lock for protecting the session_timeout_set_.
+  boost::mutex session_timeout_lock_;
+
+  /// session_timeout_thread_ relies on the following conditional variable to wake up
+  /// on every poll period expiration or when the poll period changes.
+  boost::condition_variable session_timeout_cv_;
 
   /// map from query id to exec state; QueryExecState is owned by us and referenced
   /// as a shared_ptr to allow asynchronous deletion
@@ -829,6 +845,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// at most one RPC will be issued against a session at a time, but clients may do
     /// something unexpected and, for example, poll in one thread and fetch in another.
     uint32_t ref_count;
+
+    /// Per-session idle timeout in seconds. Default value is FLAGS_idle_session_timeout.
+    /// It can be overridden with a smaller value via the option "idle_session_timeout"
+    /// when opening a HS2 session.
+    int32_t session_timeout;
 
     /// Builds a Thrift representation of this SessionState for serialisation to
     /// the frontend.

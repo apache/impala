@@ -16,6 +16,7 @@
 
 import pytest
 import json
+import time
 from socket import getfqdn
 from urllib2 import urlopen
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
@@ -76,6 +77,61 @@ class TestHS2(HS2TestSuite):
     # Double close should be an error
     TestHS2.check_response(self.hs2_client.CloseSession(close_session_req),
                            TCLIService.TStatusCode.ERROR_STATUS)
+
+  # This test verifies the number of open and expired sessions so avoid running
+  # concurrently with other sessions.
+  @pytest.mark.execute_serially
+  def test_idle_session_timeout(self):
+    """Test for idle sessions' expiration"""
+    timeout_periods = [0, 5, 10]
+    session_handles = []
+
+    for timeout in timeout_periods:
+      open_session_req = TCLIService.TOpenSessionReq()
+      open_session_req.configuration = {}
+      open_session_req.configuration['idle_session_timeout'] = str(timeout)
+      resp = self.hs2_client.OpenSession(open_session_req)
+      TestHS2.check_response(resp)
+      session_handles.append(resp.sessionHandle)
+
+    num_open_sessions = self.impalad_test_service.get_metric_value(
+      "impala-server.num-open-hiveserver2-sessions")
+    num_expired_sessions = self.impalad_test_service.get_metric_value(
+      "impala-server.num-sessions-expired")
+
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.statement = "SELECT 1+2"
+    for session_handle in session_handles:
+      execute_statement_req.sessionHandle = session_handle
+      resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+      TestHS2.check_response(resp)
+
+    assert num_open_sessions == self.impalad_test_service.get_metric_value(
+      "impala-server.num-open-hiveserver2-sessions")
+    assert num_expired_sessions == self.impalad_test_service.get_metric_value(
+      "impala-server.num-sessions-expired")
+
+    for timeout in timeout_periods:
+      sleep_period = timeout * 1.5
+      time.sleep(sleep_period)
+      for i, session_handle in enumerate(session_handles):
+        if session_handle is not None:
+          execute_statement_req.sessionHandle = session_handle
+          resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+          if timeout_periods[i] == 0 or sleep_period < timeout_periods[i]:
+            TestHS2.check_response(resp)
+          else:
+            TestHS2.check_response(resp, TCLIService.TStatusCode.ERROR_STATUS)
+            close_session_req = TCLIService.TCloseSessionReq()
+            close_session_req.sessionHandle = session_handles[i]
+            TestHS2.check_response(self.hs2_client.CloseSession(close_session_req))
+            session_handles[i] = None
+            num_open_sessions -= 1
+            num_expired_sessions += 1
+      assert num_open_sessions == self.impalad_test_service.get_metric_value(
+        "impala-server.num-open-hiveserver2-sessions")
+      assert num_expired_sessions == self.impalad_test_service.get_metric_value(
+        "impala-server.num-sessions-expired")
 
   @needs_session()
   def test_get_operation_status(self):

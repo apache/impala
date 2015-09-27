@@ -74,6 +74,7 @@ const TProtocolVersion::type MAX_SUPPORTED_HS2_VERSION =
 
 DECLARE_string(hostname);
 DECLARE_int32(webserver_port);
+DECLARE_int32(idle_session_timeout);
 
 namespace impala {
 
@@ -602,10 +603,25 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   }
 
   state->database = "default";
+  state->session_timeout = FLAGS_idle_session_timeout;
   typedef map<string, string> ConfigurationMap;
   BOOST_FOREACH(const ConfigurationMap::value_type& v, request.configuration) {
-    if (iequals(v.first, "use:database")) state->database = v.second;
+    if (iequals(v.first, "use:database")) {
+      state->database = v.second;
+    } else if (iequals(v.first, "idle_session_timeout")) {
+      int32_t requested_timeout = atoi(v.second.c_str());
+      if (requested_timeout > 0) {
+        if (FLAGS_idle_session_timeout > 0) {
+          state->session_timeout = min(FLAGS_idle_session_timeout, requested_timeout);
+        } else {
+          state->session_timeout = requested_timeout;
+        }
+      }
+      VLOG_QUERY << "OpenSession(): idle_session_timeout="
+                 << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
+    }
   }
+  RegisterSessionTimeout(state->session_timeout);
 
   // Convert request.configuration to session default query options.
   state->default_query_options = default_query_options_;

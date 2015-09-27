@@ -85,9 +85,12 @@ using boost::algorithm::istarts_with;
 using boost::algorithm::replace_all_copy;
 using boost::algorithm::split;
 using boost::algorithm::token_compress_on;
+using boost::get_system_time;
+using boost::system_time;
 using boost::uuids::random_generator;
 using boost::uuids::uuid;
 using namespace apache::thrift;
+using namespace boost::posix_time;
 using namespace beeswax;
 using namespace strings;
 
@@ -341,10 +344,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       FLAGS_cancellation_thread_pool_size, MAX_CANCELLATION_QUEUE_SIZE,
       bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
 
-  if (FLAGS_idle_session_timeout > 0) {
-    session_timeout_thread_.reset(new Thread("impala-server", "session-expirer",
-            bind<void>(&ImpalaServer::ExpireSessions, this)));
-  }
+  // Initialize a session expiry thread which blocks indefinitely until the first session
+  // with non-zero timeout value is opened. Note that a session which doesn't specify any
+  // idle session timeout value will use the default value FLAGS_idle_session_timeout.
+  session_timeout_thread_.reset(new Thread("impala-server", "session-expirer",
+      bind<void>(&ImpalaServer::ExpireSessions, this)));
 
   query_expiration_thread_.reset(new Thread("impala-server", "query-expirer",
       bind<void>(&ImpalaServer::ExpireQueries, this)));
@@ -993,6 +997,15 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
     UnregisterQuery(query_id, false, &status);
   }
+  // Reconfigure the poll period of session_timeout_thread_ if necessary.
+  int32_t session_timeout = session_state->session_timeout;
+  if (session_timeout > 0) {
+    lock_guard<mutex> l(session_timeout_lock_);
+    multiset<int32_t>::const_iterator itr = session_timeout_set_.find(session_timeout);
+    DCHECK(itr != session_timeout_set_.end());
+    session_timeout_set_.erase(itr);
+    session_timeout_cv_.notify_one();
+  }
   return Status::OK();
 }
 
@@ -1008,7 +1021,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
       lock_guard<mutex> session_lock(i->second->lock);
       if (i->second->expired) {
         stringstream ss;
-        ss << "Client session expired due to more than " << FLAGS_idle_session_timeout
+        ss << "Client session expired due to more than " << i->second->session_timeout
            << "s of inactivity (last activity was at: "
            << TimestampValue(i->second->last_accessed_ms / 1000).DebugString() << ").";
         return Status(ss.str());
@@ -1519,6 +1532,7 @@ void ImpalaServer::ConnectionStart(
     session_state->start_time = TimestampValue::LocalTime();
     session_state->last_accessed_ms = UnixMillis();
     session_state->database = "default";
+    session_state->session_timeout = FLAGS_idle_session_timeout;
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
     session_state->default_query_options = default_query_options_;
@@ -1526,6 +1540,7 @@ void ImpalaServer::ConnectionStart(
     if (!connection_context.username.empty()) {
       session_state->connected_user = connection_context.username;
     }
+    RegisterSessionTimeout(session_state->session_timeout);
 
     {
       lock_guard<mutex> l(session_state_map_lock_);
@@ -1564,12 +1579,29 @@ void ImpalaServer::ConnectionEnd(
   connection_to_sessions_map_.erase(it);
 }
 
+void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
+  if (session_timeout <= 0) return;
+  lock_guard<mutex> l(session_timeout_lock_);
+  session_timeout_set_.insert(session_timeout);
+  session_timeout_cv_.notify_one();
+}
+
 void ImpalaServer::ExpireSessions() {
   while (true) {
-    // Sleep for half the session timeout; the maximum delay between a session expiring
-    // and this method picking it up is equal to the size of this sleep.
-    SleepForMs(FLAGS_idle_session_timeout * 500);
-    lock_guard<mutex> l(session_state_map_lock_);
+    {
+      unique_lock<mutex> timeout_lock(session_timeout_lock_);
+      if (session_timeout_set_.empty()) {
+        session_timeout_cv_.wait(timeout_lock);
+      } else {
+        // Sleep for half the minimum session timeout; the maximum delay between a session
+        // expiring and this method picking it up is equal to the size of this sleep.
+        int64_t session_timeout_min_ms = *session_timeout_set_.begin() * 1000 / 2;
+        system_time deadline = get_system_time() + milliseconds(session_timeout_min_ms);
+        session_timeout_cv_.timed_wait(timeout_lock, deadline);
+      }
+    }
+
+    lock_guard<mutex> map_lock(session_state_map_lock_);
     int64_t now = UnixMillis();
     VLOG(3) << "Session expiration thread waking up";
     // TODO: If holding session_state_map_lock_ for the duration of this loop is too
@@ -1577,13 +1609,16 @@ void ImpalaServer::ExpireSessions() {
     BOOST_FOREACH(SessionStateMap::value_type& session_state, session_state_map_) {
       unordered_set<TUniqueId> inflight_queries;
       {
-        lock_guard<mutex> l(session_state.second->lock);
+        lock_guard<mutex> state_lock(session_state.second->lock);
         if (session_state.second->ref_count > 0) continue;
         // A session closed by other means is in the process of being removed, and it's
         // best not to interfere.
         if (session_state.second->closed || session_state.second->expired) continue;
+        if (session_state.second->session_timeout == 0) continue;
+
         int64_t last_accessed_ms = session_state.second->last_accessed_ms;
-        if (now - last_accessed_ms <= (FLAGS_idle_session_timeout * 1000)) continue;
+        int64_t session_timeout_ms = session_state.second->session_timeout * 1000;
+        if (now - last_accessed_ms <= session_timeout_ms) continue;
         LOG(INFO) << "Expiring session: " << session_state.first << ", user:"
                   << session_state.second->connected_user << ", last active: "
                   << TimestampValue(last_accessed_ms / 1000).DebugString();
