@@ -59,6 +59,8 @@ class ArrayValueBuilder {
                   << " bytes. Cannot allocate more than " << INT_MAX
                   << " bytes in a single allocation. Current buffer size: "
                   << buffer_size_ << ", num tuples: " << array_value_->num_tuples;
+        *tuple_mem = NULL;
+        return 0;
       }
       uint8_t* new_buf = pool_->TryAllocate(new_buffer_size);
       if (new_buf == NULL) {
