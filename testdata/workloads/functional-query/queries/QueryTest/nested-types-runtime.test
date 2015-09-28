@@ -34,20 +34,20 @@ bigint,string
 ---- QUERY
 # Test top-n after a subplan flattening an array.
 select id, item from complextypestbl t, t.int_array
-order by id limit 5
+order by id, item limit 5
 ---- RESULTS
 1,1
 1,2
 1,3
 2,1
-2,NULL
+2,2
 ---- TYPES
 bigint,int
 ====
 ---- QUERY
 # Test top-n after a subplan flattening a map.
 select id, key, value from complextypestbl t, t.int_map_array.item
-order by id limit 3
+order by id, key limit 3
 ---- RESULTS
 1,'k1',1
 2,'k1',1
@@ -58,7 +58,7 @@ bigint,string,int
 ---- QUERY
 # Test sort after a subplan that flattens a map.
 select id, key, value from complextypestbl t, t.int_map
-order by id
+order by id, key
 ---- RESULTS
 1,'k1',1
 1,'k2',100
