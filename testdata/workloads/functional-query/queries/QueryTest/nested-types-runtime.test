@@ -329,3 +329,18 @@ select straight_join c, id, item from complextypestbl t1, (values('A' c),('B')) 
 ---- TYPES
 string,bigint,int
 ====
+---- QUERY
+# IMPALA-2434: Test union all with a subplan operand. The tables and predicates below
+# are carefully chosen so that the subplan is executed as the second operand.
+select count(*) from (
+  select c_custkey from tpch_nested_parquet.customer c, c.c_orders
+  where c_custkey < 1000
+  union all
+  select a.id from functional.alltypes a, functional.alltypes b
+  where a.int_col < 0 and b.int_col < 0 and a.string_col = "" and b.string_col = ""
+) v
+---- RESULTS
+9869
+---- TYPES
+bigint
+====

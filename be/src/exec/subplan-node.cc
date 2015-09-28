@@ -72,6 +72,7 @@ Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  *eos = false;
 
   while (true) {
     if (subplan_is_open_) {
