@@ -595,6 +595,21 @@ where a.int_col is null or b.int_col is null
 bigint
 ====
 ---- QUERY
+# IMPALA-2440: Full outer join using non-partitioned HJ can incorrectly produce
+# extra row of nulls
+select a.id, b.id
+from
+(select id
+from functional.alltypestiny where id = -1) a
+full outer join
+(select id
+from functional.alltypestiny where id = -2) b
+on (a.id = b.id)
+---- RESULTS
+---- TYPES
+INT, INT
+====
+---- QUERY
 # Regression test for IMPALA-676, which exposed a bug in our codegen subexpresssion
 # elimination logic.
 select count(*) from alltypesagg a
