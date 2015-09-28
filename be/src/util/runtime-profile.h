@@ -51,6 +51,8 @@ namespace impala {
       (profile)->AddCounter(name, TUnit::TIME_NS, parent)
   #define SCOPED_TIMER(c) \
       ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
+  #define CANCEL_SAFE_SCOPED_TIMER(c, is_cancelled) \
+      ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c, is_cancelled)
   #define COUNTER_ADD(c, v) (c)->Add(v)
   #define COUNTER_SET(c, v) (c)->Set(v)
   #define ADD_THREAD_COUNTERS(profile, prefix) (profile)->AddThreadCounters(prefix)
@@ -63,6 +65,7 @@ namespace impala {
   #define ADD_TIMER(profile, name) NULL
   #define ADD_CHILD_TIMER(profile, name, parent) NULL
   #define SCOPED_TIMER(c)
+  #define CANCEL_SAFE_SCOPED_TIMER(c)
   #define COUNTER_ADD(c, v)
   #define COUNTER_SET(c, v)
   #define ADD_THREAD_COUNTERS(profile, prefix) NULL
@@ -707,12 +710,17 @@ class ScopedCounter {
 
 /// Utility class to update time elapsed when the object goes out of scope.
 /// 'T' must implement the StopWatch "interface" (Start,Stop,ElapsedTime) but
-/// we use templates not to pay for virtual function overhead.
+/// we use templates not to pay for virtual function overhead. In some cases
+/// the runtime profile may be deleted while the counter is still active. In this
+/// case the is_cancelled argument can be provided so that ScopedTimer will not
+/// update the counter when the query is cancelled. The destructor for ScopedTimer
+/// can access both is_cancelled and the counter, so the caller must ensure that it
+/// is safe to access both at the end of the scope in which the timer is used.
 template<class T>
 class ScopedTimer {
  public:
-  ScopedTimer(RuntimeProfile::Counter* counter) :
-    counter_(counter) {
+  ScopedTimer(RuntimeProfile::Counter* counter, const bool* is_cancelled = NULL) :
+    counter_(counter), is_cancelled_(is_cancelled){
     if (counter == NULL) return;
     DCHECK(counter->unit() == TUnit::TIME_NS);
     sw_.Start();
@@ -722,7 +730,7 @@ class ScopedTimer {
   void Start() { sw_.Start(); }
 
   void UpdateCounter() {
-    if (counter_ != NULL) {
+    if (counter_ != NULL && !IsCancelled()) {
       counter_->Add(sw_.ElapsedTime());
     }
   }
@@ -731,6 +739,10 @@ class ScopedTimer {
   void ReleaseCounter() {
     UpdateCounter();
     counter_ = NULL;
+  }
+
+  bool IsCancelled() {
+    return is_cancelled_ != NULL && *is_cancelled_;
   }
 
   /// Update counter when object is destroyed
@@ -746,6 +758,7 @@ class ScopedTimer {
 
   T sw_;
   RuntimeProfile::Counter* counter_;
+  const bool* is_cancelled_;
 };
 
 /// Utility class to update ThreadCounter when the object goes out of scope or when Stop is
