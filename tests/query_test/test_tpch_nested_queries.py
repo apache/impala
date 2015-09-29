@@ -5,7 +5,9 @@ import logging
 import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite,\
     create_single_exec_option_dimension
+from tests.common.skip import SkipIfOldAggsJoins
 
+@SkipIfOldAggsJoins.nested_types
 class TestTpchNestedQuery(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
