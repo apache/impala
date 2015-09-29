@@ -172,6 +172,9 @@ public class SingleNodePlanner {
 
   /**
    * Creates an EmptyNode that 'materializes' the tuples of the given stmt.
+   * Marks all collection-typed slots referenced in stmt as non-materialized because
+   * they are never unnested, and therefore the corresponding parent scan should not
+   * materialize them.
    */
   private PlanNode createEmptyNode(QueryStmt stmt, Analyzer analyzer) {
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
@@ -184,6 +187,7 @@ public class SingleNodePlanner {
       Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
       tupleIds.add(createResultTupleDescriptor(selectStmt, "empty", analyzer).getId());
     }
+    unmarkCollectionSlots(stmt);
     EmptySetNode node = new EmptySetNode(ctx_.getNextNodeId(), tupleIds);
     node.init(analyzer);
     // Set the output smap to resolve exprs referencing inline views within stmt.
@@ -192,6 +196,23 @@ public class SingleNodePlanner {
       node.setOutputSmap(((SelectStmt) stmt).getBaseTblSmap());
     }
     return node;
+  }
+
+  /**
+   * Mark all collection-typed slots in stmt as non-materialized.
+   */
+  private void unmarkCollectionSlots(QueryStmt stmt) {
+    List<TableRef> tblRefs = Lists.newArrayList();
+    stmt.collectTableRefs(tblRefs);
+    for (TableRef ref: tblRefs) {
+      if (!ref.isRelative()) continue;
+      Preconditions.checkState(ref instanceof CollectionTableRef);
+      CollectionTableRef collTblRef = (CollectionTableRef) ref;
+      Expr collExpr = collTblRef.getCollectionExpr();
+      Preconditions.checkState(collExpr instanceof SlotRef);
+      SlotRef collSlotRef = (SlotRef) collExpr;
+      collSlotRef.getDesc().setIsMaterialized(false);
+    }
   }
 
   /**
@@ -589,8 +610,10 @@ public class SingleNodePlanner {
     // If the selectStmt's select-project-join portion returns an empty result set
     // create a plan that feeds the aggregation of selectStmt with an empty set.
     // Make sure the slots of the aggregation exprs and the tuples that they reference
-    // are materialized (see IMPALA-1960).
+    // are materialized (see IMPALA-1960). Marks all collection-typed slots referenced
+    // in this select stmt as non-materialized because they are never unnested.
     if (analyzer.hasEmptySpjResultSet()) {
+      unmarkCollectionSlots(selectStmt);
       PlanNode emptySetNode = new EmptySetNode(ctx_.getNextNodeId(), rowTuples);
       emptySetNode.init(analyzer);
       emptySetNode.setOutputSmap(selectStmt.getBaseTblSmap());

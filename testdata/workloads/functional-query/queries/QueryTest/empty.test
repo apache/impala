@@ -152,3 +152,34 @@ where t.i < 10;
 ---- TYPES
 TINYINT,TINYINT,STRING
 ====
+---- QUERY
+# IMPALA-2430: Test empty blocks containing relative table refs.
+select c_custkey, v1.cnt, v2.o_orderkey, v3.l_linenumber, v4.cnt
+from tpch_nested_parquet.customer c
+left outer join
+  (select count(*) cnt from c.c_orders
+   where false) v1
+left outer join
+  (select o_orderkey from c.c_orders
+   where 20 < 10) v2
+left outer join
+  (select l_linenumber from c.c_orders.o_lineitems
+   where "a" in ("b", "c")) v3
+left outer join
+  (select count(*) cnt from c.c_orders o left outer join
+     (select l_linenumber from o.o_lineitems
+      where null) nv) v4
+where c_custkey < 10
+---- RESULTS
+1,0,NULL,NULL,6
+2,0,NULL,NULL,7
+3,0,NULL,NULL,0
+4,0,NULL,NULL,20
+5,0,NULL,NULL,4
+6,0,NULL,NULL,0
+7,0,NULL,NULL,16
+8,0,NULL,NULL,13
+9,0,NULL,NULL,0
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT,BIGINT
+====

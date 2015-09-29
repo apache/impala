@@ -382,3 +382,59 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2,2013)]
 |
 00:EMPTYSET
 ====
+# IMPALA-2430: Test empty blocks containing relative table refs.
+select c_custkey, v1.cnt, v2.o_orderkey, v3.l_linenumber, v4.cnt
+from tpch_nested_parquet.customer c
+left outer join
+  (select count(*) cnt from c.c_orders
+   where false) v1
+left outer join
+  (select o_orderkey from c.c_orders
+   where 20 < 10) v2
+left outer join
+  (select l_linenumber from c.c_orders.o_lineitems
+   where "a" in ("b", "c")) v3
+left outer join
+  (select count(*) cnt from c.c_orders o left outer join
+     (select l_linenumber from o.o_lineitems
+      where null) nv) v4
+where c_custkey < 10
+---- PLAN
+01:SUBPLAN
+|
+|--16:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |
+|  |--12:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |
+|  |  08:SUBPLAN
+|  |  |
+|  |  |--11:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  |
+|  |  |  |--09:SINGULAR ROW SRC
+|  |  |  |
+|  |  |  10:EMPTYSET
+|  |  |
+|  |  07:UNNEST [c.c_orders o]
+|  |
+|  15:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |
+|  |--06:EMPTYSET
+|  |
+|  14:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |
+|  |--05:EMPTYSET
+|  |
+|  13:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  03:EMPTYSET
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
+   predicates: c_custkey < 10
+====
