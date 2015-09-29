@@ -203,6 +203,7 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
   ht_ctx_->set_level(0);
   ClosePartitions();
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
+  CleanupProbeFilters();
   return ExecNode::Reset(state);
 }
 
@@ -247,6 +248,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(other_join_conjunct_ctxs_, state);
+  CleanupProbeFilters();
   BlockingJoinNode::Close(state);
 }
 
@@ -476,18 +478,22 @@ bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
       VLOG(2) << "Bitmap filter added on slot: " << probe_filters_[i].first;
       if (!acquired_ownership) {
         delete probe_filters_[i].second;
-        probe_filters_[i].second = NULL;
       }
+      probe_filters_[i].second = NULL;
     }
     return true;
   } else {
     // Make sure there are no memory leaks.
-    for (int i = 0; i < probe_filters_.size(); ++i) {
-      if (probe_filters_[i].second == NULL) continue;
-      delete probe_filters_[i].second;
-      probe_filters_[i].second = NULL;
-    }
+    CleanupProbeFilters();
     return false;
+  }
+}
+
+void PartitionedHashJoinNode::CleanupProbeFilters() {
+  for (int i = 0; i < probe_filters_.size(); ++i) {
+    if (probe_filters_[i].second == NULL) continue;
+    delete probe_filters_[i].second;
+    probe_filters_[i].second = NULL;
   }
 }
 

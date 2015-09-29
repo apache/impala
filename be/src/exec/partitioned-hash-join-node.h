@@ -254,6 +254,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Attach the probe filters to runtime state.
   bool AttachProbeFilters(RuntimeState* state);
 
+  /// Cleanup and free memory for probe filters.
+  void CleanupProbeFilters();
+
   /// Codegen function to create output row. Assumes that the probe row is non-NULL.
   llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
 
@@ -507,7 +510,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ProcessProbeBatchFn process_probe_batch_fn_level0_;
 
   /// Used for concentrating the existence bits from all the partitions, used by the
-  /// probe-side filter optimization.
+  /// probe-side filter optimization. The bitmaps are owned by this node.
   std::vector<std::pair<SlotId, Bitmap*> > probe_filters_;
 };
 
