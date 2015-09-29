@@ -358,8 +358,8 @@ class HdfsParquetScanner : public HdfsScanner {
   class BaseScalarColumnReader;
   friend class BaseScalarColumnReader;
 
-  template<typename T> class ScalarColumnReader;
-  template<typename T> friend class ScalarColumnReader;
+  template<typename T, bool MATERIALIZED> class ScalarColumnReader;
+  template<typename T, bool MATERIALIZED> friend class ScalarColumnReader;
   class BoolColumnReader;
   friend class BoolColumnReader;
 
@@ -405,6 +405,10 @@ class HdfsParquetScanner : public HdfsScanner {
   ///
   /// 'row_group_idx' is used for error checking when this is called on the table-level
   /// tuple. If reading into a collection, 'row_group_idx' doesn't matter.
+  /// IN_COLLECTION is true if the columns we are materializing are part of a Parquet
+  /// collection. MATERIALIZING_COLLECTION is true if we are materializing tuples inside
+  /// a nested collection.
+  template <bool IN_COLLECTION, bool MATERIALIZING_COLLECTION>
   bool AssembleRows(const TupleDescriptor* tuple_desc,
       const std::vector<ColumnReader*>& column_readers, int new_collection_rep_level,
       int row_group_idx, ArrayValueBuilder* array_value_builder);
@@ -414,6 +418,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// 'tuple_materialized' is an output parameter set by this function. If false is
   /// returned, there are no guarantees about 'tuple_materialized' or the state of
   /// column_readers, so execution should be halted immediately.
+  /// The template argument IN_COLLECTION allows an optimized version of this code to
+  /// be produced in the case when we are materializing the top-level tuple.
+  template <bool IN_COLLECTION>
   inline bool ReadRow(const std::vector<ColumnReader*>& column_readers, Tuple* tuple,
       MemPool* pool, bool* tuple_materialized);
 
