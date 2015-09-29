@@ -29,7 +29,8 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
   TEST_DBS = ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2',
-              'function_ddl_test', 'udf_test', 'data_src_test', 'truncate_table_test_db']
+              'function_ddl_test', 'udf_test', 'data_src_test', 'truncate_table_test_db',
+              'test_db']
 
   @classmethod
   def get_workload(self):
@@ -178,6 +179,39 @@ class TestDdlStatements(ImpalaTestSuite):
     self._create_db('ddl_test_db', sync=True)
     self.run_test_case('QueryTest/create', vector, use_db='ddl_test_db',
         multiple_impalad=self._use_multiple_impalad(vector))
+
+  @pytest.mark.execute_serially
+  def test_create_hive_integration(self, vector):
+    """Verifies that creating a catalog entity (database, table) in Impala using
+    'IF NOT EXISTS' while the entity exists in HMS, does not throw an error.
+    TODO: This test should be eventually subsumed by the Impala/Hive integration
+    tests."""
+    # Create a database in Hive
+    ret = call(["hive", "-e", "create database test_db"])
+    assert ret == 0
+    # Creating a database with the same name using 'IF NOT EXISTS' in Impala should
+    # not fail
+    self.client.execute("create database if not exists test_db")
+    # The database should appear in the catalog (IMPALA-2441)
+    assert 'test_db' in self.client.execute("show databases").data
+    # Ensure a table can be created in this database from Impala and that it is
+    # accessable in both Impala and Hive
+    self.client.execute("create table if not exists test_db.test_tbl_in_impala(a int)")
+    ret = call(["hive", "-e", "select * from test_db.test_tbl_in_impala"])
+    assert ret == 0
+    self.client.execute("select * from test_db.test_tbl_in_impala")
+
+    # Create a table in Hive
+    ret = call(["hive", "-e", "create table test_db.test_tbl (a int)"])
+    assert ret == 0
+    # Creating a table with the same name using 'IF NOT EXISTS' in Impala should
+    # not fail
+    self.client.execute("create table if not exists test_db.test_tbl (a int)")
+    # The table should not appear in the catalog unless invalidate metadata is
+    # executed
+    assert 'test_tbl' not in self.client.execute("show tables in test_db").data
+    self.client.execute("invalidate metadata test_db.test_tbl")
+    assert 'test_tbl' in self.client.execute("show tables in test_db").data
 
   @pytest.mark.execute_serially
   def test_sync_ddl_drop(self, vector):

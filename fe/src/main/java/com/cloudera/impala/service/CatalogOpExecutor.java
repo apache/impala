@@ -678,6 +678,7 @@ public class CatalogOpExecutor {
         LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
             "IF NOT EXISTS was specified.", e, dbName));
         newDb = catalog_.getDb(dbName);
+        if (newDb == null) newDb = catalog_.addDb(dbName);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
