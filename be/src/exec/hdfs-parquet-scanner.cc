@@ -168,6 +168,24 @@ HdfsParquetScanner::~HdfsParquetScanner() {
 
 // TODO for 2.3: move column readers to separate file
 
+/// Decoder for all supported Parquet level encodings.
+/// Overrides RleDecoder so it can use RLE decoding and internal bit reader.
+class HdfsParquetScanner::LevelDecoder : protected RleDecoder {
+ public:
+  LevelDecoder() {};
+
+  /// Initialize the LevelDecoder. Reads and advances the provided data buffer if the
+  /// encoding requires reading metadata from the page header.
+  Status Init(const string& filename, parquet::Encoding::type encoding, int max_level,
+      int num_buffered_values, uint8_t** data, int* data_size);
+
+  /// Reads the next level.
+  inline int16_t ReadLevel();
+
+ private:
+  parquet::Encoding::type encoding_;
+};
+
 /// Base class for reading a column. Reads a logical column, not necessarily a column
 /// materialized in the file (e.g. arrays). The two subclasses are BaseScalarColumnReader
 /// and CollectionColumnReader. Column readers read one def and rep level pair at a
@@ -183,8 +201,8 @@ class HdfsParquetScanner::ColumnReader {
 
   const SlotDescriptor* slot_desc() const { return slot_desc_; }
   const parquet::SchemaElement& schema_element() const { return *node_.element; }
-  int max_def_level() const { return node_.max_def_level; }
-  int max_rep_level() const { return node_.max_rep_level; }
+  int16_t max_def_level() const { return max_def_level_; }
+  int16_t max_rep_level() const { return max_rep_level_; }
   int def_level_of_immediate_repeated_ancestor() const {
     return node_.def_level_of_immediate_repeated_ancestor;
   }
@@ -269,8 +287,20 @@ class HdfsParquetScanner::ColumnReader {
   /// current rep and def level (i.e. before the first NextLevels() call or after the last
   /// value in the column has been read). If this is not inside a collection, rep_level_ is
   /// always 0.
-  int rep_level_;
-  int def_level_;
+  /// int16_t is large enough to hold the valid levels 0-255 and sentinel value -1.
+  /// The maximum values are cached here because they are accessed in inner loops.
+  int16_t rep_level_;
+  int16_t max_rep_level_;
+  int16_t def_level_;
+  int16_t max_def_level_;
+
+  // Cache frequently accessed members of slot_desc_ for perf.
+
+  /// slot_desc_->tuple_offset(). -1 if slot_desc_ is NULL.
+  int tuple_offset_;
+
+  /// slot_desc_->null_indicator_offset(). Invalid if slot_desc_ is NULL.
+  NullIndicatorOffset null_indicator_offset_;
 
   ColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
@@ -280,9 +310,16 @@ class HdfsParquetScanner::ColumnReader {
       pos_slot_desc_(NULL),
       pos_current_value_(-1),
       rep_level_(-1),
-      def_level_(-1) {
-    DCHECK_GE(node_.max_def_level, 0);
+      max_rep_level_(node_.max_rep_level),
+      def_level_(-1),
+      max_def_level_(node_.max_def_level),
+      tuple_offset_(slot_desc == NULL ? -1 : slot_desc->tuple_offset()),
+      null_indicator_offset_(slot_desc == NULL ? NullIndicatorOffset(-1, -1) :
+          slot_desc->null_indicator_offset()) {
     DCHECK_GE(node_.max_rep_level, 0);
+    DCHECK_LE(node_.max_rep_level, std::numeric_limits<int16_t>::max());
+    DCHECK_GE(node_.max_def_level, 0);
+    DCHECK_LE(node_.max_def_level, std::numeric_limits<int16_t>::max());
     // rep_level_ is always valid and equal to 0 if col not in collection.
     if (max_rep_level() == 0) rep_level_ = 0;
   }
@@ -361,14 +398,14 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   BaseScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
     : ColumnReader(parent, node, slot_desc),
+      bitmap_filter_(NULL),
+      num_buffered_values_(0),
+      bitmap_filter_rows_processed_(0),
+      bitmap_filter_rows_rejected_(0),
+      num_values_read_(0),
       metadata_(NULL),
       stream_(NULL),
-      decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
-      num_buffered_values_(0),
-      num_values_read_(0),
-      bitmap_filter_(NULL),
-      rows_returned_(0),
-      bitmap_filter_rows_rejected_(0) {
+      decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())) {
     DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
 
     RuntimeState* state = parent_->scan_node_->runtime_state();
@@ -391,7 +428,6 @@ class HdfsParquetScanner::BaseScalarColumnReader :
     data_ = NULL;
     stream_ = stream;
     metadata_ = metadata;
-    dict_decoder_base_ = NULL;
     num_values_read_ = 0;
     def_level_ = -1;
     // See ColumnReader constructor.
@@ -432,6 +468,44 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   // Friend parent scanner so it can perform validation (e.g. ValidateEndOfRowGroup())
   friend class HdfsParquetScanner;
 
+  // Class members that are accessed for every column should be included up here so they
+  // fit in as few cache lines as possible.
+
+  /// Cache of the bitmap_filter_ (if any) for this slot.
+  const Bitmap* bitmap_filter_;
+
+  /// Pointer to start of next value in data page
+  uint8_t* data_;
+
+  /// Decoder for definition levels.
+  LevelDecoder def_levels_;
+
+  /// Decoder for repetition levels.
+  LevelDecoder rep_levels_;
+
+  /// Page encoding for values. Cached here for perf.
+  parquet::Encoding::type page_encoding_;
+
+  /// Num values remaining in the current data page
+  int num_buffered_values_;
+
+  /// Cache of hash_seed_ to use with bitmap_filter_.
+  uint32_t hash_seed_;
+
+  /// Bitmap filters are optional (i.e. they can be ignored and the results will be
+  /// correct). Keep track of stats to determine if the filter is not effective. If the
+  /// number of rows filtered out is too low, this is not worth the cost.
+  /// TODO: this should be cost based taking into account how much we save when we
+  /// filter a row.
+  int64_t bitmap_filter_rows_processed_;
+  int64_t bitmap_filter_rows_rejected_;
+
+  // Less frequently used members that are not accessed in inner loop should go below
+  // here so they do not occupy precious cache line space.
+
+  /// The number of values seen so far. Updated per data page.
+  int64_t num_values_read_;
+
   const parquet::ColumnMetaData* metadata_;
   scoped_ptr<Codec> decompressor_;
   ScannerContext::Stream* stream_;
@@ -441,41 +515,6 @@ class HdfsParquetScanner::BaseScalarColumnReader :
 
   /// Header for current data page.
   parquet::PageHeader current_page_header_;
-
-  /// Num values remaining in the current data page
-  int num_buffered_values_;
-
-  /// Pointer to start of next value in data page
-  uint8_t* data_;
-
-  /// Decoder for definition levels. Only one of these is valid at a time, depending on
-  /// the data page metadata.
-  RleDecoder rle_def_levels_;
-  BitReader bit_packed_def_levels_;
-
-  /// Decoder for repetition levels. Only one of these is valid at a time, depending on
-  /// the data page metadata.
-  RleDecoder rle_rep_levels_;
-  BitReader bit_packed_rep_levels_;
-
-  /// Decoder for dictionary-encoded columns. Set by the subclass.
-  DictDecoderBase* dict_decoder_base_;
-
-  /// The number of values seen so far. Updated per data page.
-  int64_t num_values_read_;
-
-  /// Cache of the bitmap_filter_ (if any) for this slot.
-  const Bitmap* bitmap_filter_;
-  /// Cache of hash_seed_ to use with bitmap_filter_.
-  uint32_t hash_seed_;
-
-  /// Bitmap filters are optional (i.e. they can be ignored and the results will be
-  /// correct). Keep track of stats to determine if the filter is not effective. If the
-  /// number of rows filtered out is too low, this is not worth the cost.
-  /// TODO: this should be cost based taking into account how much we save when we
-  /// filter a row.
-  int64_t rows_returned_;
-  int64_t bitmap_filter_rows_rejected_;
 
   /// Read the next data page.  If a dictionary page is encountered, that will be read and
   /// this function will continue reading for the next data page.
@@ -491,29 +530,25 @@ class HdfsParquetScanner::BaseScalarColumnReader :
 
   /// Returns the definition level for the next value
   /// Returns -1 and sets parse_status_ if there was a error parsing it.
-  int ReadDefinitionLevel();
+  int16_t ReadDefinitionLevel();
 
   /// Returns the repetition level for the next value
   /// Returns -1 and sets parse_status_ if there was a error parsing it.
-  int ReadRepetitionLevel();
+  int16_t ReadRepetitionLevel();
 
-  /// Creates a dictionary decoder from values/size. Subclass must implement this
-  /// and set dict_decoder_base_.
-  virtual void CreateDictionaryDecoder(uint8_t* values, int size) = 0;
+  /// Creates a dictionary decoder from values/size and store in class. Subclass must
+  /// implement this.
+  virtual DictDecoderBase* CreateDictionaryDecoder(uint8_t* values, int size) = 0;
+
+  /// Return true if the column has an initialized dictionary decoder. Subclass must
+  /// implement this.
+  virtual bool HasDictionaryDecoder() = 0;
 
   /// Initializes the reader with the data contents. This is the content for the entire
   /// decompressed data page. Decoders can initialize state from here.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
  private:
-  /// Helper method for creating definition and repetition level decoders
-  Status InitLevelDecoders(parquet::Encoding::type encoding, int max_level,
-      uint8_t** data, int* data_size, RleDecoder* rle_decoder, BitReader* bit_reader);
-
-  /// Helper method for ReadDefinitionLevel() and ReadRepetitionLevel().
-  int ReadLevel(parquet::Encoding::type encoding, RleDecoder* rle_decoder,
-      BitReader* bit_reader);
-
   // Pull out slow-path Status construction code from ReadRepetitionLevel()/
   // ReadDefinitionLevel() for performance.
   void __attribute__((noinline)) SetLevelError(TErrorCode::type error_code) {
@@ -540,7 +575,8 @@ class HdfsParquetScanner::ScalarColumnReader :
  public:
   ScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
-    : BaseScalarColumnReader(parent, node, slot_desc) {
+    : BaseScalarColumnReader(parent, node, slot_desc),
+      dict_decoder_init_(false) {
     if (!MATERIALIZED) {
       // We're not materializing any values, just counting them. No need (or ability) to
       // initialize state used to materialize values.
@@ -580,47 +616,59 @@ class HdfsParquetScanner::ScalarColumnReader :
   inline bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
     // NextLevels() should have already been called and def and rep levels should be in
     // valid range.
-    // TODO(skye): these could be DCHECKs if we check upper bound in Read*Level(). Add
-    // check if not perf sensitive (here and other ReadSlot()/NextLevels() definitions)
     DCHECK_GE(rep_level_, 0);
-    FILE_CHECK_LE(rep_level_, max_rep_level());
+    DCHECK_LE(rep_level_, max_rep_level());
     DCHECK_GE(def_level_, 0);
-    FILE_CHECK_LE(def_level_, max_def_level());
+    DCHECK_LE(def_level_, max_def_level());
     DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
         "Caller should have called NextLevels() until we are ready to read a value";
 
     if (!MATERIALIZED) {
       return NextLevels<IN_COLLECTION>();
     } else if (def_level_ >= max_def_level()) {
-      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(slot_desc()->tuple_offset()),
-          pool, conjuncts_passed);
+      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool,
+          conjuncts_passed);
     } else {
       // Null value
-      tuple->SetNull(slot_desc()->null_indicator_offset());
+      tuple->SetNull(null_indicator_offset_);
       return NextLevels<IN_COLLECTION>();
     }
   }
 
-  virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
-    dict_decoder_.reset(new DictDecoder<T>(values, size, fixed_len_size_));
-    dict_decoder_base_ = dict_decoder_.get();
+  virtual DictDecoderBase* CreateDictionaryDecoder(uint8_t* values, int size) {
+    dict_decoder_.Reset(values, size, fixed_len_size_);
+    dict_decoder_init_ = true;
+    return &dict_decoder_;
+  }
+
+  virtual bool HasDictionaryDecoder() {
+    return dict_decoder_init_;
   }
 
   virtual Status InitDataPage(uint8_t* data, int size) {
+    page_encoding_ = current_page_header_.data_page_header.encoding;
+    if (page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY &&
+        page_encoding_ != parquet::Encoding::PLAIN) {
+      stringstream ss;
+      ss << "File '" << parent_->metadata_range_->file() << "' is corrupt: unexpected "
+         << "encoding: " << PrintEncoding(page_encoding_) << " for data page of column '"
+         << schema_element().name << "'.";
+      return Status(ss.str());
+    }
+
     // If slot_desc_ is NULL, dict_decoder_ is uninitialized
-    if (current_page_header_.data_page_header.encoding ==
-          parquet::Encoding::PLAIN_DICTIONARY && slot_desc_ != NULL) {
-      if (dict_decoder_.get() == NULL) {
+    if (page_encoding_ == parquet::Encoding::PLAIN_DICTIONARY && slot_desc_ != NULL) {
+      if (!dict_decoder_init_) {
         return Status("File corrupt. Missing dictionary page.");
       }
-      dict_decoder_->SetData(data, size);
+      dict_decoder_.SetData(data, size);
     }
 
     // Check if we should disable the bitmap filter. We'll do this if the filter
     // is not removing a lot of rows.
     // TODO: how to pick the selectivity?
-    if (bitmap_filter_ != NULL && rows_returned_ > 10000 &&
-        bitmap_filter_rows_rejected_ < rows_returned_ * .1) {
+    if (bitmap_filter_ != NULL && bitmap_filter_rows_processed_ > 10000 &&
+        bitmap_filter_rows_rejected_ < bitmap_filter_rows_processed_ * .1) {
       bitmap_filter_ = NULL;
     }
     return Status::OK();
@@ -635,24 +683,26 @@ class HdfsParquetScanner::ScalarColumnReader :
   /// true.
   template <bool IN_COLLECTION>
   inline bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_passed) {
-    parquet::Encoding::type page_encoding =
-        current_page_header_.data_page_header.encoding;
     T val;
     T* val_ptr = NeedsConversion() ? &val : reinterpret_cast<T*>(slot);
-    if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
-      if (UNLIKELY(!dict_decoder_->GetValue(val_ptr))) {
+    if (page_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
+      if (UNLIKELY(!dict_decoder_.GetValue(val_ptr))) {
         SetDictDecodeError();
         return false;
       }
     } else {
-      FILE_CHECK_EQ(page_encoding, parquet::Encoding::PLAIN);
+      DCHECK_EQ(page_encoding_, parquet::Encoding::PLAIN);
       data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
     }
     if (NeedsConversion()) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
-    ++rows_returned_;
-    if (*conjuncts_passed && bitmap_filter_ != NULL) {
+    // Avoid branch by using & instead of &&.
+    if (*conjuncts_passed & (bitmap_filter_ != NULL)) {
       uint32_t h = RawValue::GetHashValue(slot, slot_desc()->type(), hash_seed_);
       *conjuncts_passed = bitmap_filter_->Get<true>(h);
+      ++bitmap_filter_rows_processed_;
+      // TODO: always incrementing bitmap_filter_rows_rejected_ is a known bug. Before
+      // fixing it we need to investigate performance implications of disabling bitmap
+      // filters.
       ++bitmap_filter_rows_rejected_;
     }
     return NextLevels<IN_COLLECTION>();
@@ -682,7 +732,11 @@ class HdfsParquetScanner::ScalarColumnReader :
         Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, stream_->filename());
   }
 
-  scoped_ptr<DictDecoder<T> > dict_decoder_;
+  /// Dictionary decoder for decoding column values.
+  DictDecoder<T> dict_decoder_;
+
+  /// True if dict_decoder_ has been initialized with a dictionary page.
+  bool dict_decoder_init_;
 
   /// true if decoded values must be converted before being written to an output tuple.
   bool needs_conversion_;
@@ -761,9 +815,15 @@ class HdfsParquetScanner::BoolColumnReader :
   }
 
  protected:
-  virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
+  virtual DictDecoderBase* CreateDictionaryDecoder(uint8_t* values, int size) {
     DCHECK(false) << "Dictionary encoding is not supported for bools. Should never "
                   << "have gotten this far.";
+    return NULL;
+  }
+
+  virtual bool HasDictionaryDecoder() {
+    // Decoder should never be created for bools.
+    return false;
   }
 
   virtual Status InitDataPage(uint8_t* data, int size) {
@@ -778,18 +838,18 @@ class HdfsParquetScanner::BoolColumnReader :
     DCHECK(slot_desc_ != NULL);
     // Def and rep levels should be in valid range.
     DCHECK_GE(rep_level_, 0);
-    FILE_CHECK_LE(rep_level_, max_rep_level());
+    DCHECK_LE(rep_level_, max_rep_level());
     DCHECK_GE(def_level_, 0);
-    FILE_CHECK_LE(def_level_, max_def_level());
+    DCHECK_LE(def_level_, max_def_level());
     DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
         "Caller should have called NextLevels() until we are ready to read a value";
 
     if (def_level_ >= max_def_level()) {
-      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(slot_desc()->tuple_offset()),
-          pool, conjuncts_passed);
+      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool,
+          conjuncts_passed);
     } else {
       // Null value
-      tuple->SetNull(slot_desc()->null_indicator_offset());
+      tuple->SetNull(null_indicator_offset_);
       return NextLevels<IN_COLLECTION>();
     }
   }
@@ -1034,7 +1094,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
         continue;
       }
 
-      if (dict_decoder_base_ != NULL) {
+      if (HasDictionaryDecoder()) {
         return Status("Column chunk should not contain two dictionary pages.");
       }
       if (node_.element->type == parquet::Type::BOOLEAN) {
@@ -1073,12 +1133,12 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
         memcpy(dict_values, data_, data_size);
       }
 
-      CreateDictionaryDecoder(dict_values, data_size);
+      DictDecoderBase* dict_decoder = CreateDictionaryDecoder(dict_values, data_size);
       if (dict_header != NULL &&
-          dict_header->num_values != dict_decoder_base_->num_entries()) {
+          dict_header->num_values != dict_decoder->num_entries()) {
         return Status(Substitute(
             "Invalid dictionary. Expected $0 entries but data contained $1 entries",
-            dict_header->num_values, dict_decoder_base_->num_entries()));
+            dict_header->num_values, dict_decoder->num_entries()));
       }
       // Done with dictionary page, read next page
       continue;
@@ -1113,14 +1173,16 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
 
     if (max_rep_level() > 0) {
       // Initialize the repetition level data
-      InitLevelDecoders(current_page_header_.data_page_header.repetition_level_encoding,
-          max_rep_level(), &data_, &data_size, &rle_rep_levels_, &bit_packed_rep_levels_);
+      rep_levels_.Init(stream_->filename(),
+          current_page_header_.data_page_header.repetition_level_encoding,
+          max_rep_level(), num_buffered_values_, &data_, &data_size);
     }
 
     if (max_def_level() > 0) {
       // Initialize the definition level data
-      InitLevelDecoders(current_page_header_.data_page_header.definition_level_encoding,
-          max_def_level(), &data_, &data_size, &rle_def_levels_, &bit_packed_def_levels_);
+      def_levels_.Init(stream_->filename(),
+          current_page_header_.data_page_header.definition_level_encoding,
+          max_def_level(), num_buffered_values_, &data_, &data_size);
     }
 
     // Data can be empty if the column contains all NULLs
@@ -1131,9 +1193,10 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
   return Status::OK();
 }
 
-Status HdfsParquetScanner::BaseScalarColumnReader::InitLevelDecoders(
-    parquet::Encoding::type encoding, int max_level, uint8_t** data, int* data_size,
-    RleDecoder* rle_decoder, BitReader* bit_reader) {
+Status HdfsParquetScanner::LevelDecoder::Init(const string& filename,
+    parquet::Encoding::type encoding, int max_level,
+    int num_buffered_values, uint8_t** data, int* data_size) {
+  encoding_ = encoding;
   int32_t num_bytes = 0;
   switch (encoding) {
     case parquet::Encoding::RLE: {
@@ -1142,15 +1205,15 @@ Status HdfsParquetScanner::BaseScalarColumnReader::InitLevelDecoders(
         return status;
       }
       if (num_bytes < 0) {
-        return Status(TErrorCode::PARQUET_CORRUPT_VALUE, stream_->filename(), num_bytes);
+        return Status(TErrorCode::PARQUET_CORRUPT_VALUE, filename, num_bytes);
       }
       int bit_width = BitUtil::Log2(max_level + 1);
-      *rle_decoder = RleDecoder(*data, num_bytes, bit_width);
+      Reset(*data, num_bytes, bit_width);
       break;
     }
     case parquet::Encoding::BIT_PACKED:
-      num_bytes = BitUtil::Ceil(num_buffered_values_, 8);
-      *bit_reader = BitReader(*data, num_bytes);
+      num_bytes = BitUtil::Ceil(num_buffered_values, 8);
+      bit_reader_.Reset(*data, num_bytes);
       break;
     default: {
       stringstream ss;
@@ -1165,52 +1228,39 @@ Status HdfsParquetScanner::BaseScalarColumnReader::InitLevelDecoders(
 }
 
 // TODO More codegen here as well.
-inline int HdfsParquetScanner::BaseScalarColumnReader::ReadLevel(
-    parquet::Encoding::type encoding, RleDecoder* rle_decoder, BitReader* bit_reader) {
+inline int16_t HdfsParquetScanner::LevelDecoder::ReadLevel() {
+  bool valid;
   uint8_t level;
-  bool valid = false;
-  switch (encoding) {
-    case parquet::Encoding::RLE:
-      valid = rle_decoder->Get(&level);
-      break;
-    case parquet::Encoding::BIT_PACKED: {
-      valid = bit_reader->GetValue(1, &level);
-      break;
-    }
-    default:
-      FILE_CHECK(false);
+  if (encoding_ == parquet::Encoding::RLE) {
+    valid = Get(&level);
+  } else {
+    DCHECK_EQ(encoding_, parquet::Encoding::BIT_PACKED);
+    valid = bit_reader_.GetValue(1, &level);
   }
-  if (!valid) return -1;
-  return level;
+  return LIKELY(valid) ? level : -1;
 }
 
 // TODO(skye): try reading + caching many levels at once to avoid error checking etc on
 // each call (here and RLE decoder) for perf
-inline int HdfsParquetScanner::BaseScalarColumnReader::ReadDefinitionLevel() {
+inline int16_t HdfsParquetScanner::BaseScalarColumnReader::ReadDefinitionLevel() {
   DCHECK_GT(max_def_level(), 0);
-  int def_level = ReadLevel(
-      current_page_header_.data_page_header.definition_level_encoding,
-      &rle_def_levels_, &bit_packed_def_levels_);
+  int16_t def_level = def_levels_.ReadLevel();
 
-  if (UNLIKELY(def_level < 0)) {
+  if (UNLIKELY(def_level < 0 || def_level > max_def_level())) {
     SetLevelError(TErrorCode::PARQUET_DEF_LEVEL_ERROR);
     return -1;
   }
-  FILE_CHECK_LE(def_level_, max_def_level());
   return def_level;
 }
 
-inline int HdfsParquetScanner::BaseScalarColumnReader::ReadRepetitionLevel() {
+inline int16_t HdfsParquetScanner::BaseScalarColumnReader::ReadRepetitionLevel() {
   DCHECK_GT(max_rep_level(), 0);
-  int rep_level = ReadLevel(
-      current_page_header_.data_page_header.repetition_level_encoding,
-      &rle_rep_levels_, &bit_packed_rep_levels_);
+  int16_t rep_level = rep_levels_.ReadLevel();
 
-  if (UNLIKELY(rep_level < 0)) {
+  if (UNLIKELY(rep_level < 0 || rep_level > max_rep_level())) {
     SetLevelError(TErrorCode::PARQUET_REP_LEVEL_ERROR);
     return -1;
   }
-  FILE_CHECK_LE(rep_level, max_rep_level());
   return rep_level;
 }
 
@@ -1270,13 +1320,13 @@ bool HdfsParquetScanner::CollectionColumnReader::ReadValue(
   DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
       "Caller should have called NextLevels() until we are ready to read a value";
 
-  if (slot_desc_ == NULL) {
+  if (tuple_offset_ == -1) {
     return CollectionColumnReader::NextLevels();
   } else if (def_level_ >= max_def_level()) {
-    return ReadSlot(tuple->GetSlot(slot_desc()->tuple_offset()), pool, conjuncts_passed);
+    return ReadSlot(tuple->GetSlot(tuple_offset_), pool, conjuncts_passed);
   } else {
     // Null value
-    tuple->SetNull(slot_desc()->null_indicator_offset());
+    tuple->SetNull(null_indicator_offset_);
     return CollectionColumnReader::NextLevels();
   }
 }

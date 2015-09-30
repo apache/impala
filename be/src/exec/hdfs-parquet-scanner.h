@@ -348,6 +348,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// need to issue another read.
   static const int FOOTER_SIZE = 100 * 1024;
 
+  /// Class that implements Parquet definition and repetition level decoding.
+  class LevelDecoder;
+
   /// Per column reader.
   class ColumnReader;
   friend class ColumnReader;

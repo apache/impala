@@ -193,6 +193,12 @@ class DictDecoder : public DictDecoderBase {
   /// dictionary values (values stored using FIXED_LEN_BYTE_ARRAY).
   DictDecoder(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
 
+  /// Construct empty dictionary.
+  DictDecoder() {}
+
+  /// Reset decoder to fresh state.
+  void Reset(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
+
   virtual int num_entries() const { return dict_.size(); }
 
   /// Returns the next value.  Returns false if the data is invalid.
@@ -261,12 +267,14 @@ inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
 
 template<typename T>
 inline bool DictDecoder<T>::GetValue(T* value) {
-  int index;
+  int index = -1; // Initialize to avoid compiler warning.
   bool result = data_decoder_.Get(&index);
-  if (!result) return false;
-  if (index >= dict_.size()) return false;
-  *value = dict_[index];
-  return true;
+  // Use & to avoid branches.
+  if (LIKELY(result & (index >= 0) & (index < dict_.size()))) {
+    *value = dict_[index];
+    return true;
+  }
+  return false;
 }
 
 template<>
@@ -307,6 +315,13 @@ inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
 template<typename T>
 inline DictDecoder<T>::DictDecoder(uint8_t* dict_buffer, int dict_len,
     int fixed_len_size) {
+  Reset(dict_buffer, dict_len, fixed_len_size);
+}
+
+template<typename T>
+inline void DictDecoder<T>::Reset(uint8_t* dict_buffer, int dict_len,
+    int fixed_len_size) {
+  dict_.clear();
   uint8_t* end = dict_buffer + dict_len;
   while (dict_buffer < end) {
     T value;
