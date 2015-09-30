@@ -405,6 +405,7 @@ class HdfsParquetScanner : public HdfsScanner {
   ///
   /// 'row_group_idx' is used for error checking when this is called on the table-level
   /// tuple. If reading into a collection, 'row_group_idx' doesn't matter.
+  ///
   /// IN_COLLECTION is true if the columns we are materializing are part of a Parquet
   /// collection. MATERIALIZING_COLLECTION is true if we are materializing tuples inside
   /// a nested collection.
@@ -415,14 +416,17 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Function used by AssembleRows() to read a single row into 'tuple'. Returns false if
   /// execution should be aborted for some reason, otherwise returns true.
+  /// materialize_tuple is an in/out parameter. It is set to true by the caller to
+  /// materialize the tuple.  If any conjuncts fail, materialize_tuple is set to false
+  /// by ReadRow().
   /// 'tuple_materialized' is an output parameter set by this function. If false is
-  /// returned, there are no guarantees about 'tuple_materialized' or the state of
+  /// returned, there are no guarantees about 'materialize_tuple' or the state of
   /// column_readers, so execution should be halted immediately.
   /// The template argument IN_COLLECTION allows an optimized version of this code to
   /// be produced in the case when we are materializing the top-level tuple.
   template <bool IN_COLLECTION>
   inline bool ReadRow(const std::vector<ColumnReader*>& column_readers, Tuple* tuple,
-      MemPool* pool, bool* tuple_materialized);
+      MemPool* pool, bool* materialize_tuple);
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.
