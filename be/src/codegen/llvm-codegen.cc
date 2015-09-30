@@ -223,9 +223,10 @@ Status LlvmCodeGen::LoadImpalaIR(
       // TODO: reconsider this.  Substring match is probably not strict enough but
       // undoing the mangling is no fun either.
       if (fn_name.find(FN_MAPPINGS[j].fn_name) != string::npos) {
-        if (codegen->loaded_functions_[FN_MAPPINGS[j].fn] != NULL) {
-          return Status("Duplicate definition found for function: " + fn_name);
-        }
+        // TODO: make this a DCHECK when we resolve IMPALA-2439
+        CHECK(codegen->loaded_functions_[FN_MAPPINGS[j].fn] == NULL)
+            << "Duplicate definition found for function " << FN_MAPPINGS[j].fn << ": "
+            << fn_name;
         functions[i]->addFnAttr(Attribute::AlwaysInline);
         codegen->loaded_functions_[FN_MAPPINGS[j].fn] = functions[i];
         ++parsed_functions;
