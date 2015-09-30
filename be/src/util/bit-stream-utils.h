@@ -103,6 +103,13 @@ class BitReader {
 
   BitReader() : buffer_(NULL), max_bytes_(0) {}
 
+  void Reset(uint8_t* buffer, int buffer_len) {
+    buffer_ = buffer;
+    max_bytes_ = buffer_len;
+    byte_offset_ = 0;
+    bit_offset_ = 0;
+  }
+
   /// Gets the next value from the buffer.  Returns true if 'v' could be read or false if
   /// there are not enough bytes left. num_bits must be <= 32.
   template<typename T>

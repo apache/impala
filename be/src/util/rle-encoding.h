@@ -90,12 +90,23 @@ class RleDecoder {
 
   RleDecoder() {}
 
+  void Reset(uint8_t* buffer, int buffer_len, int bit_width) {
+    DCHECK_GE(bit_width, 0);
+    DCHECK_LE(bit_width, 64);
+    bit_reader_.Reset(buffer, buffer_len);
+    bit_width_ = bit_width;
+    current_value_ = 0;
+    repeat_count_ = 0;
+    literal_count_ = 0;
+  }
+
   /// Gets the next value.  Returns false if there are no more.
   template<typename T>
   bool Get(T* val);
 
  private:
   BitReader bit_reader_;
+  /// Number of bits needed to encode the value. Must be between 0 and 64.
   int bit_width_;
   uint64_t current_value_;
   uint32_t repeat_count_;
@@ -119,7 +130,7 @@ class RleEncoder {
   RleEncoder(uint8_t* buffer, int buffer_len, int bit_width)
     : bit_width_(bit_width),
       bit_writer_(buffer, buffer_len) {
-    DCHECK_GE(bit_width_, 1);
+    DCHECK_GE(bit_width_, 0);
     DCHECK_LE(bit_width_, 64);
     max_run_byte_size_ = MinBufferSize(bit_width);
     DCHECK_GE(buffer_len, max_run_byte_size_) << "Input buffer not big enough.";
@@ -187,7 +198,7 @@ class RleEncoder {
   /// (number of groups encodable by a 1-byte indicator * 8)
   static const int MAX_VALUES_PER_LITERAL_RUN = (1 << 6) * 8;
 
-  /// Number of bits needed to encode the value.
+  /// Number of bits needed to encode the value. Must be between 0 and 64.
   const int bit_width_;
 
   /// Underlying buffer.
