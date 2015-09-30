@@ -638,7 +638,7 @@ class HdfsParquetScanner::ScalarColumnReader :
     parquet::Encoding::type page_encoding =
         current_page_header_.data_page_header.encoding;
     T val;
-    T* val_ptr = needs_conversion_ ? &val : reinterpret_cast<T*>(slot);
+    T* val_ptr = NeedsConversion() ? &val : reinterpret_cast<T*>(slot);
     if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
       if (UNLIKELY(!dict_decoder_->GetValue(val_ptr))) {
         SetDictDecodeError();
@@ -648,7 +648,7 @@ class HdfsParquetScanner::ScalarColumnReader :
       FILE_CHECK_EQ(page_encoding, parquet::Encoding::PLAIN);
       data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
     }
-    if (needs_conversion_) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
+    if (NeedsConversion()) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
     ++rows_returned_;
     if (*conjuncts_passed && bitmap_filter_ != NULL) {
       uint32_t h = RawValue::GetHashValue(slot, slot_desc()->type(), hash_seed_);
@@ -656,6 +656,14 @@ class HdfsParquetScanner::ScalarColumnReader :
       ++bitmap_filter_rows_rejected_;
     }
     return NextLevels<IN_COLLECTION>();
+  }
+
+  /// Most column readers never require conversion, so we can avoid branches by
+  /// returning constant false. Column readers for types that require conversion
+  /// must specialize this function.
+  inline bool NeedsConversion() const {
+    DCHECK(!needs_conversion_);
+    return false;
   }
 
   void CopySlot(T* slot, MemPool* pool) {
@@ -667,8 +675,8 @@ class HdfsParquetScanner::ScalarColumnReader :
     DCHECK(false);
   }
 
-  // Pull out slow-path Status construction code from ReadRepetitionLevel()/
-  // ReadDefinitionLevel() for performance.
+  /// Pull out slow-path Status construction code from ReadRepetitionLevel()/
+  /// ReadDefinitionLevel() for performance.
   void __attribute__((noinline)) SetDictDecodeError() {
     parent_->parse_status_ =
         Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, stream_->filename());
@@ -676,13 +684,18 @@ class HdfsParquetScanner::ScalarColumnReader :
 
   scoped_ptr<DictDecoder<T> > dict_decoder_;
 
-  // true decoded values must be converted before being written to an output tuple
+  /// true if decoded values must be converted before being written to an output tuple.
   bool needs_conversion_;
 
-  // The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
-  // the max length for VARCHAR columns. Unused otherwise.
+  /// The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
+  /// the max length for VARCHAR columns. Unused otherwise.
   int fixed_len_size_;
 };
+
+template<>
+inline bool HdfsParquetScanner::ScalarColumnReader<StringValue, true>::NeedsConversion() const {
+  return needs_conversion_;
+}
 
 template<>
 void HdfsParquetScanner::ScalarColumnReader<StringValue, true>::CopySlot(
@@ -711,6 +724,11 @@ void HdfsParquetScanner::ScalarColumnReader<StringValue, true>::ConvertSlot(
   StringValue::PadWithSpaces(sv.ptr, len, unpadded_len);
 
   if (slot_desc()->type().IsVarLenStringType()) *dst = sv;
+}
+
+template<>
+inline bool HdfsParquetScanner::ScalarColumnReader<TimestampValue, true>::NeedsConversion() const {
+  return needs_conversion_;
 }
 
 template<>
