@@ -242,7 +242,7 @@ class MemPool {
   uint8_t* Allocate(int size) {
     if (size == 0) return NULL;
 
-    int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
+    int64_t num_bytes = BitUtil::RoundUp(size, 8);
     if (current_chunk_idx_ == -1
         || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
           > chunks_[current_chunk_idx_].size) {

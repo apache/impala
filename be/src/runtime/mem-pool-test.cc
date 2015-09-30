@@ -255,6 +255,56 @@ TEST(MemPoolTest, Limits) {
   delete p2;
 }
 
+TEST(MemPoolTest, MaxAllocation) {
+  int64_t int_max_rounded = BitUtil::RoundUp(INT_MAX, 8);
+
+  // Allocate a single INT_MAX chunk
+  MemTracker tracker;
+  MemPool p1(&tracker);
+  uint8_t* ptr = p1.Allocate(INT_MAX);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(p1.GetTotalChunkSizes(), int_max_rounded);
+  EXPECT_EQ(p1.total_allocated_bytes(), int_max_rounded);
+  p1.FreeAll();
+
+  // Allocate a small chunk (DEFAULT_INITIAL_CHUNK_SIZE) followed by an INT_MAX chunk
+  MemPool p2(&tracker);
+  p2.Allocate(8);
+  EXPECT_EQ(p2.GetTotalChunkSizes(), 4096);
+  EXPECT_EQ(p2.total_allocated_bytes(), 8);
+  ptr = p2.Allocate(INT_MAX);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(p2.GetTotalChunkSizes(), 4096LL + int_max_rounded);
+  EXPECT_EQ(p2.total_allocated_bytes(), 8LL + int_max_rounded);
+  p2.FreeAll();
+
+  // Allocate three INT_MAX chunks followed by a small chunk followed by another INT_MAX
+  // chunk
+  MemPool p3(&tracker);
+  p3.Allocate(INT_MAX);
+  // Allocates new int_max_rounded * 2 chunk
+  ptr = p3.Allocate(INT_MAX);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 3);
+  EXPECT_EQ(p3.total_allocated_bytes(), int_max_rounded * 2);
+  // Uses existing int_max_rounded * 2 chunk
+  ptr = p3.Allocate(INT_MAX);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 3);
+  EXPECT_EQ(p3.total_allocated_bytes(), int_max_rounded * 3);
+  // Allocates a new int_max_rounded * 4 chunk
+  ptr = p3.Allocate(8);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 7);
+  EXPECT_EQ(p3.total_allocated_bytes(), int_max_rounded * 3 + 8);
+  // Uses existing int_max_rounded * 4 chunk
+  ptr = p3.Allocate(INT_MAX);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 7);
+  EXPECT_EQ(p3.total_allocated_bytes(), int_max_rounded * 4 + 8);
+  p3.FreeAll();
+}
+
 }
 
 int main(int argc, char **argv) {
