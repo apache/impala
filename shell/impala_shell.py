@@ -665,6 +665,21 @@ class ImpalaShell(cmd.Cmd):
                                                  self.set_query_options)
     return self._execute_stmt(query)
 
+  def do_compute(self, args):
+    """Executes a COMPUTE STATS query.
+    Impala shell cannot get child query handle so it cannot
+    query live progress for COMPUTE STATS query. Disable live
+    progress/summary callback for COMPUTE STATS query."""
+    query = self.imp_client.create_beeswax_query("compute %s" % args,
+                                                 self.set_query_options)
+    (prev_print_progress, prev_print_summary) = self.print_progress, self.print_summary
+    (self.print_progress, self.print_summary) = False, False;
+    try:
+      ret = self._execute_stmt(query)
+    finally:
+      (self.print_progress, self.print_summary) = prev_print_progress, prev_print_summary
+    return ret
+
   def _format_outputstream(self):
     column_names = self.imp_client.get_column_names(self.last_query_handle)
     if self.write_delimited:
@@ -737,7 +752,7 @@ class ImpalaShell(cmd.Cmd):
       self.query_handle_closed = False
       self.last_summary = time.time()
       wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,
-         self._periodic_wait_callback)
+          self._periodic_wait_callback)
       # Reset the progress stream.
       self.progress_stream.clear()
 

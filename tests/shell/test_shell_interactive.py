@@ -79,6 +79,21 @@ class TestImpalaShellInteractive(object):
     self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
 
   @pytest.mark.execute_serially
+  def test_compute_stats_with_live_progress_options(self):
+    """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
+    impalad = ImpaladService(socket.getfqdn())
+    p = self._start_new_shell_process()
+    self._send_cmd_to_shell(p, "set live_progress=True")
+    self._send_cmd_to_shell(p, "set live_summary=True")
+    self._send_cmd_to_shell(p, 'create table test_live_progress_option(col int);')
+    try:
+      self._send_cmd_to_shell(p, 'compute stats test_live_progress_option;')
+    finally:
+      self._send_cmd_to_shell(p, 'drop table if exists test_live_progress_option;')
+    result = get_shell_cmd_result(p)
+    assert "Updated 1 partition(s) and 1 column(s)" in result.stdout
+
+  @pytest.mark.execute_serially
   def test_escaped_quotes(self):
     """Test escaping quotes"""
     # test escaped quotes outside of quotes
