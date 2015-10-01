@@ -1589,4 +1589,67 @@ where c.c_custkey in
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
+=======
+# IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
+# the ON clause and there are predicates in the WHERE clause that can be assigned to
+# the join node.
+select straight_join id from functional.allcomplextypes t1 left outer join t1.int_array_col t2
+where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: t1.id = t2.pos
+|  |  other predicates: t1.id = t2.pos, t2.item = 1
+|  |
+|  |--03:UNNEST [t1.int_array_col t2]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes t1]
+   partitions=0/0 files=0 size=0B
+   predicates: t1.int_struct_col.f1 = 10
+   predicates on t2: t2.item = 1
+====
+# IMPALA-2446: Test predicate assignment when right outer join has no conjuncts in
+# the ON clause and there are predicates in the WHERE clause that can be assigned to
+# the join node.
+select straight_join id from functional.allcomplextypes t1 right outer join t1.int_array_col t2
+where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: t1.id = t2.pos
+|  |  other predicates: t1.id = t2.pos, t1.int_struct_col.f1 = 10
+|  |
+|  |--03:UNNEST [t1.int_array_col t2]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes t1]
+   partitions=0/0 files=0 size=0B
+   predicates: t1.int_struct_col.f1 = 10
+   predicates on t2: t2.item = 1
+====
+# IMPALA-2446: Test predicate assignment when full outer join has no conjuncts in
+# the ON clause and there are predicates in the WHERE clause that can be assigned to
+# the join node.
+select id from functional.allcomplextypes t1 full outer join t1.int_array_col t2
+where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  |  join predicates: t2.pos = t1.id
+|  |  predicates: t1.id = t2.pos, t1.int_struct_col.f1 = 10, t2.item = 1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [t1.int_array_col t2]
+|
+00:SCAN HDFS [functional.allcomplextypes t1]
+   partitions=0/0 files=0 size=0B
+   predicates: t1.int_struct_col.f1 = 10
+   predicates on t2: t2.item = 1
 ====

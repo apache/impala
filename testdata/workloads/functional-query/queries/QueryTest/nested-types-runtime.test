@@ -397,3 +397,27 @@ where c_custkey < 2
 ---- TYPES
 bigint,bigint
 ====
+---- QUERY
+# IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
+# the ON clause and there are predicates in the WHERE clause that can be assigned to
+# the join node.
+select id, pos from complextypestbl t1 left outer join t1.int_array t2
+  where t1.id = t2.pos
+---- RESULTS
+1,1
+2,2
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# IMPALA-2446: Test predicate assignment when full outer join has no conjuncts in
+# the ON clause and there are predicates in the WHERE clause that can be assigned to
+# the join node.
+select id, pos from complextypestbl t1 full outer join t1.int_array t2
+  where t1.id = t2.pos
+---- RESULTS
+1,1
+2,2
+---- TYPES
+bigint,bigint
+====

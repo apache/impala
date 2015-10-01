@@ -216,7 +216,8 @@ public class Analyzer {
     public final Map<TupleId, TableRef> semiJoinedTupleIds = Maps.newHashMap();
 
     // Map from right-hand side table-ref id of an outer join to the list of
-    // conjuncts in its On clause.
+    // conjuncts in its On clause. There is always an entry for an outer join, but the
+    // corresponding value could be an empty list. There is no entry for non-outer joins.
     public final Map<TupleId, List<ExprId>> conjunctsByOjClause = Maps.newHashMap();
 
     // map from registered conjunct to its containing outer join On clause (represented
@@ -907,15 +908,16 @@ public class Analyzer {
   }
 
   /**
-   * Register all conjuncts that make up the On-clause 'e' of the given right-hand side
-   * of a join. Assigns each conjunct a unique id. If rhsRef is the right-hand side of
-   * an outer join, then the conjuncts conjuncts are registered such that they can only
-   * be evaluated by the node implementing that join.
+   * Register all conjuncts in 'conjuncts' that make up the On-clause of the given
+   * right-hand side of a join. Assigns each conjunct a unique id. If rhsRef is
+   * the right-hand side of an outer join, then the conjuncts conjuncts are
+   * registered such that they can only be evaluated by the node implementing that
+   * join.
    */
-  public void registerOnClauseConjuncts(Expr e, TableRef rhsRef)
+  public void registerOnClauseConjuncts(List<Expr> conjuncts, TableRef rhsRef)
       throws AnalysisException {
     Preconditions.checkNotNull(rhsRef);
-    Preconditions.checkNotNull(e);
+    Preconditions.checkNotNull(conjuncts);
     List<ExprId> ojConjuncts = null;
     if (rhsRef.getJoinOp().isOuterJoin()) {
       ojConjuncts = globalState_.conjunctsByOjClause.get(rhsRef.getId());
@@ -924,7 +926,7 @@ public class Analyzer {
         globalState_.conjunctsByOjClause.put(rhsRef.getId(), ojConjuncts);
       }
     }
-    for (Expr conjunct: e.getConjuncts()) {
+    for (Expr conjunct: conjuncts) {
       registerConjunct(conjunct);
       if (rhsRef.getJoinOp().isOuterJoin()) {
         globalState_.ojClauseByConjunct.put(conjunct.getId(), rhsRef);

@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -474,13 +475,14 @@ public class TableRef implements ParseNode {
             "analytic expression not allowed in ON clause: " + toSql());
       }
       Set<TupleId> onClauseTupleIds = Sets.newHashSet();
-      for (Expr e: onClause_.getConjuncts()) {
-        // Outer join clause conjuncts are registered for this particular table ref
-        // (ie, can only be evaluated by the plan node that implements this join).
-        // The exception are conjuncts that only pertain to the nullable side
-        // of the outer join; those can be evaluated directly when materializing tuples
-        // without violating outer join semantics.
-        analyzer.registerOnClauseConjuncts(e, this);
+      List<Expr> conjuncts = onClause_.getConjuncts();
+      // Outer join clause conjuncts are registered for this particular table ref
+      // (ie, can only be evaluated by the plan node that implements this join).
+      // The exception are conjuncts that only pertain to the nullable side
+      // of the outer join; those can be evaluated directly when materializing tuples
+      // without violating outer join semantics.
+      analyzer.registerOnClauseConjuncts(conjuncts, this);
+      for (Expr e: conjuncts) {
         List<TupleId> tupleIds = Lists.newArrayList();
         e.getIds(tupleIds, null);
         onClauseTupleIds.addAll(tupleIds);
@@ -490,6 +492,9 @@ public class TableRef implements ParseNode {
         && (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin())) {
       throw new AnalysisException(
           joinOp_.toString() + " requires an ON or USING clause.");
+    } else {
+      // Indicate that this table ref has an empty ON-clause.
+      analyzer.registerOnClauseConjuncts(Collections.<Expr>emptyList(), this);
     }
   }
 
