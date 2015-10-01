@@ -404,6 +404,11 @@ class HdfsScanner {
     return reinterpret_cast<TupleRow*>(mem + batch_->row_byte_size());
   }
 
+  // Convenience function for calling the PrintPath() function in
+  // debug-util. 'subpath_idx' can be specified in order to truncate the output to end on
+  // the i-th element of 'path' (inclusive).
+  string PrintPath(const SchemaPath& path, int subpath_idx = -1) const;
+
   /// Simple wrapper around scanner_conjunct_ctxs_. Used in the codegen'd version of
   /// WriteCompleteTuple() because it's easier than writing IR to access
   /// scanner_conjunct_ctxs_.

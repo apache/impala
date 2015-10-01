@@ -441,10 +441,16 @@ class HdfsParquetScanner : public HdfsScanner {
       std::vector<ColumnReader*>* column_readers);
 
   /// Creates a column reader for 'node'. slot_desc may be NULL, in which case the
-  /// returned column reader can only be used to read def/rep levels. The reader is added
-  /// to the runtime state's object pool. Does not create child readers for collection
-  /// readers; these must be added by the caller.
-  ColumnReader* CreateReader(const SchemaNode& node, const SlotDescriptor* slot_desc);
+  /// returned column reader can only be used to read def/rep levels.
+  /// 'is_collection_field' should be set to true if the returned reader is reading a
+  /// collection. This cannot be determined purely by 'node' because a repeated scalar
+  /// node represents both an array and the array's items (in this case
+  /// 'is_collection_field' should be true if the reader reads one value per array, and
+  /// false if it reads one value per item).  The reader is added to the runtime state's
+  /// object pool. Does not create child readers for collection readers; these must be
+  /// added by the caller.
+  ColumnReader* CreateReader(const SchemaNode& node, bool is_collection_field,
+      const SlotDescriptor* slot_desc);
 
   /// Creates a column reader that reads one value for each item in the table or
   /// collection element corresponding to 'parent_path'. 'parent_path' should point to
@@ -491,14 +497,48 @@ class HdfsParquetScanner : public HdfsScanner {
       int max_def_level, int max_rep_level, int ira_def_level, int* idx, int* col_idx,
       SchemaNode* node) const;
 
-  /// Traverses 'schema_' according to 'path', returning the result in 'node'.
-  /// 'missing_field' is set to true if 'path' does not exist in this file's schema,
-  /// otherwise it's set to false. If 'path' resolves to a collecton position field,
-  /// *pos_field is set to true. Otherwise 'pos_field' is set to false. Returns a non-OK
-  /// status if 'path' cannot be resolved against the file's schema (e.g., unrecognized
-  /// collection schema).
-  Status ResolvePath(const std::vector<int>& path, SchemaNode** node, bool* pos_field,
+  /// Traverses 'schema_' according to 'path', returning the result in 'node'. If 'path'
+  /// does not exist in this file's schema, 'missing_field' is set to true and
+  /// Status::OK() is returned, otherwise 'missing_field' is set to false. If 'path'
+  /// resolves to a collecton position field, *pos_field is set to true. Otherwise
+  /// 'pos_field' is set to false. Returns a non-OK status if 'path' cannot be resolved
+  /// against the file's schema (e.g., unrecognized collection schema).
+  ///
+  /// Tries to resolve assuming either two- or three-level array encoding in
+  /// 'schema_'. Returns a bad status if resolution fails in both cases.
+  Status ResolvePath(const SchemaPath& path, SchemaNode** node, bool* pos_field,
       bool* missing_field);
+
+  /// The 'array_encoding' parameter determines whether to assume one-, two-, or
+  /// three-level array encoding. The returned status is not logged (i.e. it's an expected
+  /// error).
+  enum ArrayEncoding {
+    ONE_LEVEL,
+    TWO_LEVEL,
+    THREE_LEVEL
+  };
+  Status ResolvePathHelper(ArrayEncoding array_encoding, const std::vector<int>& path,
+      SchemaNode** node, bool* pos_field, bool* missing_field);
+
+  /// Helper functions for ResolvePathHelper().
+
+  /// Advances 'node' to one of its children based on path[next_idx]. Returns the child
+  /// node or sets 'missing_field' to true.
+  SchemaNode* NextSchemaNode(const SchemaPath& path, int next_idx, SchemaNode* node,
+    bool* missing_field);
+
+  /// The ResolvePathHelper() logic for arrays.
+  Status ResolveArray(ArrayEncoding array_encoding, const SchemaPath& path, int idx,
+    SchemaNode** node, bool* pos_field, bool* missing_field);
+
+  /// The ResolvePathHelper() logic for maps.
+  Status ResolveMap(const SchemaPath& path, int idx, SchemaNode** node,
+      bool* missing_field);
+
+  /// The ResolvePathHelper() logic for scalars (just does validation since there's no
+  /// more actual work to be done).
+  Status ValidateScalarNode(const SchemaNode& node, const ColumnType& col_type,
+      const SchemaPath& path, int idx);
 };
 
 } // namespace impala

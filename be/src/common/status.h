@@ -140,6 +140,7 @@ class Status {
   Status(const std::string& error_msg);
 
   /// Create a status instance that represents an expected error and will not be logged
+  static Status Expected(const ErrorMsg& e);
   static Status Expected(const std::string& error_msg);
 
   ~Status() {
@@ -233,8 +234,8 @@ class Status {
 
  private:
 
-  /// Silent general error, this cannot be used with typed error messages as it would defy
-  /// the cause of a useful error message.
+  // Status constructors that can suppress logging via 'silent' parameter
+  Status(const ErrorMsg& error_msg, bool silent);
   Status(const std::string& error_msg, bool silent);
 
   /// Status uses a naked pointer to ensure the size of an instance on the stack is only

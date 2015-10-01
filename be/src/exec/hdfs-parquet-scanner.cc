@@ -194,7 +194,9 @@ class HdfsParquetScanner::ColumnReader {
     pos_slot_desc_ = pos_slot_desc;
   }
 
-  bool reading_collection() const { return node_.is_repeated(); }
+  /// Returns true if this reader materializes collections (i.e. ArrayValues).
+  virtual bool IsCollectionReader() const { return false; }
+
   virtual const char* filename() const = 0;
 
   /// Read the current value (or null) into 'tuple' for this column. This should only be
@@ -295,6 +297,8 @@ class HdfsParquetScanner::CollectionColumnReader :
 
   vector<ColumnReader*>* children() { return &children_; }
 
+  virtual bool IsCollectionReader() const { return true; }
+
   virtual const char* filename() const {
     // TODO: this won't be completely accurate if/when we support columns in separate
     // files
@@ -353,7 +357,7 @@ class HdfsParquetScanner::BaseScalarColumnReader :
       bitmap_filter_(NULL),
       rows_returned_(0),
       bitmap_filter_rows_rejected_(0) {
-    DCHECK_GE(node_.col_idx, 0);
+    DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
 
     RuntimeState* state = parent_->scan_node_->runtime_state();
     hash_seed_ = state->fragment_hash_seed();
@@ -771,7 +775,7 @@ void HdfsParquetScanner::Close() {
     ColumnReader* col_reader = readers.top();
     readers.pop();
 
-    if (col_reader->reading_collection()) {
+    if (col_reader->IsCollectionReader()) {
       CollectionColumnReader* collection_reader =
           static_cast<CollectionColumnReader*>(col_reader);
       BOOST_FOREACH(ColumnReader* r, *collection_reader->children()) readers.push(r);
@@ -801,9 +805,9 @@ void HdfsParquetScanner::Close() {
 }
 
 HdfsParquetScanner::ColumnReader* HdfsParquetScanner::CreateReader(
-    const SchemaNode& node, const SlotDescriptor* slot_desc) {
+    const SchemaNode& node, bool is_collection_field, const SlotDescriptor* slot_desc) {
   ColumnReader* reader = NULL;
-  if (node.is_repeated()) {
+  if (is_collection_field) {
     // Create collection reader (note this handles both NULL and non-NULL 'slot_desc')
     reader = new CollectionColumnReader(this, node, slot_desc);
   } else if (slot_desc != NULL) {
@@ -852,7 +856,7 @@ HdfsParquetScanner::ColumnReader* HdfsParquetScanner::CreateReader(
         }
         break;
       default:
-        DCHECK(false);
+        DCHECK(false) << slot_desc->type().DebugString();
     }
   } else {
     // Special case for counting scalar values (e.g. count(*), no materialized columns in
@@ -1598,6 +1602,44 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
 
 Status HdfsParquetScanner::ResolvePath(const SchemaPath& path, SchemaNode** node,
     bool* pos_field, bool* missing_field) {
+  *missing_field = false;
+  // First try two-level array encoding.
+  bool missing_field_two_level;
+  Status status_two_level =
+      ResolvePathHelper(TWO_LEVEL, path, node, pos_field, &missing_field_two_level);
+  if (missing_field_two_level) DCHECK(status_two_level.ok());
+  if (status_two_level.ok() && !missing_field_two_level) return Status::OK();
+  // The two-level resolution failed or reported a missing field, try three-level array
+  // encoding.
+  bool missing_field_three_level;
+  Status status_three_level =
+      ResolvePathHelper(THREE_LEVEL, path, node, pos_field, &missing_field_three_level);
+  if (missing_field_three_level) DCHECK(status_three_level.ok());
+  if (status_three_level.ok() && !missing_field_three_level) return Status::OK();
+  // The three-level resolution failed or reported a missing field, try one-level array
+  // encoding.
+  bool missing_field_one_level;
+  Status status_one_level =
+      ResolvePathHelper(ONE_LEVEL, path, node, pos_field, &missing_field_one_level);
+  if (missing_field_one_level) DCHECK(status_one_level.ok());
+  if (status_one_level.ok() && !missing_field_one_level) return Status::OK();
+  // None of resolutions yielded a node. Set *missing_field to true if any of the
+  // resolutions reported a missing a field.
+  if (missing_field_one_level || missing_field_two_level || missing_field_three_level) {
+    *node = NULL;
+    *missing_field = true;
+    return Status::OK();
+  }
+  // All resolutions failed. Log and return the status from the three-level resolution
+  // (which is technically the standard).
+  DCHECK(!status_one_level.ok() && !status_two_level.ok() && !status_three_level.ok());
+  *node = NULL;
+  VLOG_QUERY << status_three_level.msg().msg() << "\n" << GetStackTrace();
+  return status_three_level;
+}
+
+Status HdfsParquetScanner::ResolvePathHelper(ArrayEncoding array_encoding,
+    const SchemaPath& path, SchemaNode** node, bool* pos_field, bool* missing_field) {
   DCHECK(schema_.element != NULL)
       << "schema_ must be initialized before calling ResolvePath()";
 
@@ -1609,115 +1651,180 @@ Status HdfsParquetScanner::ResolvePath(const SchemaPath& path, SchemaNode** node
   // Traverse 'path' and resolve 'node' to the corresponding SchemaNode in 'schema_' (by
   // ordinal), or set 'node' to NULL if 'path' doesn't exist in this file's schema.
   for (int i = 0; i < path.size(); ++i) {
-    int table_idx = path[i];
-    // The first index in a path includes the table's partition keys
-    int file_idx = i == 0 ? path[i] - scan_node_->num_partition_keys() : path[i];
-    if ((*node)->children.size() <= file_idx) {
-      // The selected field is not in the file
-      VLOG_FILE << Substitute("File '$0' does not contain path '$1'",
-          stream_->filename(), PrintPath(*scan_node_->hdfs_table(), path));
-      *missing_field = true;
-      *node = NULL;
-      return Status::OK();
+    // Advance '*node' if necessary
+    if (i == 0 || col_type->type != TYPE_ARRAY || array_encoding == THREE_LEVEL) {
+      *node = NextSchemaNode(path, i, *node, missing_field);
+      if (*missing_field) return Status::OK();
+    } else {
+      // We just resolved an array, meaning *node is set to the repeated field of the
+      // array. Since we are trying to resolve using one- or two-level array encoding, the
+      // repeated field represents both the array and the array's item (i.e. there is no
+      // explict item field), so we don't advance *node in this case.
+      DCHECK(col_type != NULL);
+      DCHECK_EQ(col_type->type, TYPE_ARRAY);
+      DCHECK(array_encoding == ONE_LEVEL || array_encoding == TWO_LEVEL);
+      DCHECK((*node)->is_repeated());
     }
-    *node = &(*node)->children[file_idx];
 
+    // Advance 'col_type'
+    int table_idx = path[i];
     col_type = i == 0 ? &scan_node_->hdfs_table()->col_descs()[table_idx].type()
                : &col_type->children[table_idx];
 
+    // Resolve path[i]
     if (col_type->type == TYPE_ARRAY) {
       DCHECK_EQ(col_type->children.size(), 1);
-      // According to the parquet spec, array columns are represented like:
-      // <list-repetition> group <name> (LIST) {
-      //   repeated group list {
-      //     <element-repetition> <element-type> element;
-      //   }
-      // }
-      // See https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#lists
-      // for more details.
-      // TODO: implement support for all backwards-compat rules
-      if ((*node)->children.size() != 1) {
-        return Status(
-            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "array", (*node)->DebugString());
-      }
-      SchemaNode* list = &(*node)->children[0];
-      if (list->element->repetition_type != parquet::FieldRepetitionType::REPEATED ||
-          list->children.empty()) {
-        return Status(
-            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "array", (*node)->DebugString());
-      }
-      *node = list;
-
-      if (i + 1 < path.size()) {
-        if (path[i + 1] == 1) {
-          // The next index in 'path' is the artifical position field. Set 'pos_field' and
-          // return the parent list node.
-          DCHECK_EQ(path.size(), i + 2) << "position field cannot have children!";
-          *pos_field = true;
-          *node = NULL;
-          return Status::OK();
-        } else {
-          // The next value in 'path' should be the item index
-          DCHECK_EQ(path[i + 1], 0);
-        }
-      }
-
-      if (list->children.size() != 1) {
-        DCHECK_GT(list->children.size(), 1) << "Other collection representations NYI";
-        // Backwards compatibility: some data does not contain the inner 'element' node if
-        // the element is a struct. For example, the SQL schema
-        // array_col array<struct<a: int, b:string>> should be encoded as:
-        // <list-repetition> group array_col (LIST) {
-        //   repeated group list {
-        //     <element-repetition> group element {
-        //       <a-repetition> int a;
-        //       <b-repetition> binary b;
-        //     }
-        //   }
-        // }
-        //
-        // However, it may be encoded as:
-        // <list-repetition> group array_col (LIST) {
-        //   repeated group list {
-        //     <a-repetition> int a;
-        //     <b-repetition> binary b;
-        //   }
-        // }
-        //
-        // In this case, we skip the item index in 'path'.
-        col_type = &col_type->children[0];
-        ++i;
-      }
+      RETURN_IF_ERROR(
+          ResolveArray(array_encoding, path, i, node, pos_field, missing_field));
+      if (*missing_field || *pos_field) return Status::OK();
     } else if (col_type->type == TYPE_MAP) {
       DCHECK_EQ(col_type->children.size(), 2);
-      // According to the parquet spec, map columns are represented like:
-      // <map-repetition> group <name> (MAP) {
-      //   repeated group key_value {
-      //     required <key-type> key;
-      //     <value-repetition> <value-type> value;
-      //   }
-      // }
-      // See https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#maps for
-      // more details.
-      // TODO: implement support for all backwards-compat rules
-      if ((*node)->children.size() != 1) {
-        return Status(
-            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "map", (*node)->DebugString());
-      }
-      SchemaNode* key_value = &(*node)->children[0];
-      if (key_value->element->repetition_type != parquet::FieldRepetitionType::REPEATED ||
-          key_value->children.size() != 2) {
-        return Status(
-            TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, "map", (*node)->DebugString());
-      }
-      *node = key_value;
-
-      // The next index in 'path' should be the key or the value. Note that map elements
-      // do not have a synthetic position field.
-      if (i + 1 < path.size()) DCHECK(path[i + 1] == 0 || path[i + 1] == 1);
+      RETURN_IF_ERROR(ResolveMap(path, i, node, missing_field));
+      if (*missing_field) return Status::OK();
+    } else if (col_type->type == TYPE_STRUCT) {
+      DCHECK_GT(col_type->children.size(), 0);
+      // Nothing to do for structs
+    } else {
+      DCHECK(!col_type->IsComplexType());
+      DCHECK_EQ(i, path.size() - 1);
+      RETURN_IF_ERROR(ValidateScalarNode(**node, *col_type, path, i));
     }
   }
   DCHECK(*node != NULL);
+  return Status::OK();
+}
+
+HdfsParquetScanner::SchemaNode* HdfsParquetScanner::NextSchemaNode(const SchemaPath& path,
+    int next_idx, SchemaNode* node, bool* missing_field) {
+  DCHECK_LT(next_idx, path.size());
+  // The first index in a path includes the table's partition keys
+  int file_idx =
+      next_idx == 0 ? path[next_idx] - scan_node_->num_partition_keys() : path[next_idx];
+  if (node->children.size() <= file_idx) {
+    // The selected field is not in the file
+    VLOG_FILE << Substitute(
+        "File '$0' does not contain path '$1'", stream_->filename(), PrintPath(path));
+    *missing_field = true;
+    return NULL;
+  }
+  return &node->children[file_idx];
+}
+
+// There are three types of array encodings:
+//
+// 1. One-level encoding
+//      A bare repeated field. This is interpreted as a required array of required
+//      items.
+//    Example:
+//      repeated <item-type> item;
+//
+// 2. Two-level encoding
+//      A group containing a single repeated field. This is interpreted as a
+//      <list-repetition> array of required items (<list-repetition> is either
+//      optional or required).
+//    Example:
+//      <list-repetition> group <name> {
+//        repeated <item-type> item;
+//      }
+//
+// 3. Three-level encoding
+//      The "official" encoding according to the parquet spec. A group containing a
+//      single repeated group containing the item field. This is interpreted as a
+//      <list-repetition> array of <item-repetition> items (<list-repetition> and
+//      <item-repetition> are each either optional or required).
+//    Example:
+//      <list-repetition> group <name> {
+//        repeated group list {
+//          <item-repetition> <item-type> item;
+//        }
+//      }
+//
+// We ignore any field annotations or names, making us more permissive than the
+// Parquet spec dictates. Note that in any of the encodings, <item-type> may be a
+// group containing more fields, which corresponds to a complex item type. See
+// https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#lists for
+// more details and examples.
+//
+// This function resolves the array at '*node' assuming one-, two-, or three-level
+// encoding, determined by 'array_encoding'. '*node' is set to the repeated field for all
+// three encodings (unless '*pos_field' or '*missing_field' are set to true).
+Status HdfsParquetScanner::ResolveArray(ArrayEncoding array_encoding,
+    const SchemaPath& path, int idx, SchemaNode** node, bool* pos_field,
+    bool* missing_field) {
+  if (array_encoding == ONE_LEVEL) {
+    if (!(*node)->is_repeated()) {
+      ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, metadata_range_->file(),
+          PrintPath(path, idx), "array", (*node)->DebugString());
+      return Status::Expected(msg);
+    }
+  } else {
+    // In the multi-level case, we always expect the outer group to contain a single
+    // repeated field
+    if ((*node)->children.size() != 1 || !(*node)->children[0].is_repeated()) {
+      ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, metadata_range_->file(),
+          PrintPath(path, idx), "array", (*node)->DebugString());
+      return Status::Expected(msg);
+    }
+    // Set *node to the repeated field
+    *node = &(*node)->children[0];
+  }
+  DCHECK((*node)->is_repeated());
+
+  if (idx + 1 < path.size()) {
+    if (path[idx + 1] == 1) {
+      // The next index in 'path' is the artifical position field.
+      DCHECK_EQ(path.size(), idx + 2) << "position field cannot have children!";
+      *pos_field = true;
+      *node = NULL;
+      return Status::OK();
+    } else {
+      // The next value in 'path' should be the item index
+      DCHECK_EQ(path[idx + 1], 0);
+    }
+  }
+  return Status::OK();
+}
+
+// According to the parquet spec, map columns are represented like:
+// <map-repetition> group <name> (MAP) {
+//   repeated group key_value {
+//     required <key-type> key;
+//     <value-repetition> <value-type> value;
+//   }
+// }
+// We ignore any field annotations or names, making us more permissive than the
+// Parquet spec dictates. See
+// https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#maps for
+// more details.
+Status HdfsParquetScanner::ResolveMap(const SchemaPath& path, int idx, SchemaNode** node,
+    bool* missing_field) {
+  if ((*node)->children.size() != 1 || !(*node)->children[0].is_repeated() ||
+      (*node)->children[0].children.size() != 2) {
+    ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, metadata_range_->file(),
+        PrintPath(path, idx), "map", (*node)->DebugString());
+    return Status::Expected(msg);
+  }
+  *node = &(*node)->children[0];
+
+  // The next index in 'path' should be the key or the value. Note that map elements
+  // do not have a synthetic position field.
+  if (idx + 1 < path.size()) DCHECK(path[idx + 1] == 0 || path[idx + 1] == 1);
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::ValidateScalarNode(const SchemaNode& node,
+    const ColumnType& col_type, const SchemaPath& path, int idx) {
+  if (!node.children.empty()) {
+    ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, metadata_range_->file(),
+        PrintPath(path, idx), col_type.DebugString(), node.DebugString());
+    return Status::Expected(msg);
+  }
+  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[col_type.type];
+  if (type != node.element->type) {
+    ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, metadata_range_->file(),
+        PrintPath(path, idx), col_type.DebugString(), node.DebugString());
+    return Status::Expected(msg);
+  }
   return Status::OK();
 }
 
@@ -1758,10 +1865,11 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
       continue;
     }
 
-    ColumnReader* col_reader = CreateReader(*node, slot_desc);
+    ColumnReader* col_reader =
+        CreateReader(*node, slot_desc->type().IsCollectionType(), slot_desc);
     column_readers->push_back(col_reader);
 
-    if (col_reader->reading_collection()) {
+    if (col_reader->IsCollectionReader()) {
       // Recursively populate col_reader's children
       DCHECK(slot_desc->collection_item_descriptor() != NULL);
       const TupleDescriptor* item_tuple_desc = slot_desc->collection_item_descriptor();
@@ -1802,45 +1910,50 @@ Status HdfsParquetScanner::CreateCountingReader(
 
   if (missing_field) {
     // TODO: can we do anything else here?
-    return Status(Substitute("Could not find '$0' in file.",
-        PrintPath(*scan_node_->hdfs_table(), parent_path), stream_->filename()));
+    return Status(Substitute(
+        "Could not find '$0' in file.", PrintPath(parent_path), stream_->filename()));
   }
   DCHECK(!pos_field);
-  DCHECK(!parent_node->children.empty());
   DCHECK(parent_path.empty() || parent_node->is_repeated());
 
-  // Find a non-struct (i.e. array or scalar) child of 'parent_node', which we will use to
-  // create the item reader
-  const SchemaNode* target_node = &parent_node->children[0];
-  while (!target_node->children.empty() && !target_node->is_repeated()) {
-    target_node = &target_node->children[0];
-  }
-
-  *reader = CreateReader(*target_node, NULL);
-
-  if (target_node->is_repeated()) {
-    // Find the closest scalar descendent of 'target_node' via breadth-first search, and
-    // create scalar reader to drive 'reader'. We find the closest (i.e. least-nested)
-    // descendent as a heuristic for picking a descendent with fewer values, so it's
-    // faster to scan.
-    // TODO: use different heuristic than least-nested? Fewest values?
-    const SchemaNode* node = NULL;
-    queue<const SchemaNode*> nodes;
-    nodes.push(target_node);
-    while (!nodes.empty()) {
-      node = nodes.front();
-      nodes.pop();
-      if (node->children.size() > 0) {
-        BOOST_FOREACH(const SchemaNode& child, node->children) nodes.push(&child);
-      } else {
-        // node is the least-nested scalar descendent of 'target_node'
-        break;
-      }
+  if (!parent_node->children.empty()) {
+    // Find a non-struct (i.e. array or scalar) child of 'parent_node', which we will use to
+    // create the item reader
+    const SchemaNode* target_node = &parent_node->children[0];
+    while (!target_node->children.empty() && !target_node->is_repeated()) {
+      target_node = &target_node->children[0];
     }
-    DCHECK(node->children.empty()) << node->DebugString();
-    CollectionColumnReader* parent_reader = static_cast<CollectionColumnReader*>(*reader);
-    parent_reader->children()->push_back(CreateReader(*node, NULL));
+
+    *reader = CreateReader(*target_node, target_node->is_repeated(), NULL);
+    if (target_node->is_repeated()) {
+      // Find the closest scalar descendent of 'target_node' via breadth-first search, and
+      // create scalar reader to drive 'reader'. We find the closest (i.e. least-nested)
+      // descendent as a heuristic for picking a descendent with fewer values, so it's
+      // faster to scan.
+      // TODO: use different heuristic than least-nested? Fewest values?
+      const SchemaNode* node = NULL;
+      queue<const SchemaNode*> nodes;
+      nodes.push(target_node);
+      while (!nodes.empty()) {
+        node = nodes.front();
+        nodes.pop();
+        if (node->children.size() > 0) {
+          BOOST_FOREACH(const SchemaNode& child, node->children) nodes.push(&child);
+        } else {
+          // node is the least-nested scalar descendent of 'target_node'
+          break;
+        }
+      }
+      DCHECK(node->children.empty()) << node->DebugString();
+      CollectionColumnReader* parent_reader = static_cast<CollectionColumnReader*>(*reader);
+      parent_reader->children()->push_back(CreateReader(*node, false, NULL));
+    }
+  } else {
+    // Special case for a repeated scalar node. The repeated node represents both the
+    // parent collection and the child item.
+    *reader = CreateReader(*parent_node, false, NULL);
   }
+
   return Status::OK();
 }
 
@@ -1859,7 +1972,7 @@ Status HdfsParquetScanner::InitColumns(
   int num_scalar_readers = 0;
 
   BOOST_FOREACH(ColumnReader* col_reader, column_readers) {
-    if (col_reader->reading_collection()) {
+    if (col_reader->IsCollectionReader()) {
       // Recursively init child readers
       CollectionColumnReader* collection_reader =
           static_cast<CollectionColumnReader*>(col_reader);
@@ -2109,29 +2222,13 @@ Status HdfsParquetScanner::ValidateColumn(
     return Status(ss.str());
   }
 
-  // Check that this column is optional or required.
-  if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
-      schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
-    stringstream ss;
-    ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
-       << "' contains an unsupported column repetition type: "
-       << schema_element.repetition_type;
-    return Status(ss.str());
-  }
-
   // Validation after this point is only if col_reader is reading values.
   const SlotDescriptor* slot_desc = col_reader.slot_desc();
   if (slot_desc == NULL) return Status::OK();
 
-  // Check the type in the file is compatible with the catalog metadata.
   parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
-  if (type != file_data.meta_data.type) {
-    stringstream ss;
-    ss << "File '" << metadata_range_->file() << "' has an incompatible type with the"
-       << " table schema for column '" << schema_element.name << "'.  Expected type: "
-       << type << ".  Actual type: " << file_data.meta_data.type;
-    return Status(ss.str());
-  }
+  DCHECK_EQ(type, file_data.meta_data.type)
+      << "Should have been validated in ResolvePath()";
 
   // Check the decimal scale in the file matches the metastore scale and precision.
   // We fail the query if the metadata makes it impossible for us to safely read
@@ -2232,7 +2329,7 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
   // Validate scalar column readers' state
   int num_values_read = -1;
   for (int c = 0; c < column_readers.size(); ++c) {
-    if (column_readers[c]->reading_collection()) continue;
+    if (column_readers[c]->IsCollectionReader()) continue;
     BaseScalarColumnReader* reader =
         static_cast<BaseScalarColumnReader*>(column_readers[c]);
     // All readers should have exhausted the final data page. This could fail if one

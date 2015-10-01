@@ -151,7 +151,7 @@ int HdfsScanner::GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool,
   if (max_num_rows == 0) {
     parse_status_ = state_->SetMemLimitExceeded(ErrorMsg(
         TErrorCode::COLLECTION_ALLOC_FAILED,
-        PrintPath(*scan_node_->hdfs_table(), builder->tuple_desc().tuple_path())));
+        PrintPath(builder->tuple_desc().tuple_path())));
     return 0;
   }
   // Treat tuple as a single-tuple row
@@ -634,4 +634,11 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
 
     if (state_->abort_on_error() && parse_status_.ok()) parse_status_ = Status(ss.str());
   }
+}
+
+string HdfsScanner::PrintPath(const SchemaPath& path, int subpath_idx) const {
+  SchemaPath::const_iterator subpath_end =
+      subpath_idx == -1 ? path.end() : path.begin() + subpath_idx + 1;
+  SchemaPath subpath(path.begin(), subpath_end);
+  return impala::PrintPath(*scan_node_->hdfs_table(), subpath);
 }

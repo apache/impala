@@ -112,6 +112,13 @@ Status::Status(const string& error_msg)
   VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
+Status::Status(const ErrorMsg& error_msg, bool silent)
+  : msg_(new ErrorMsg(error_msg)) {
+  if (!silent) {
+    VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
+  }
+}
+
 Status::Status(const string& error_msg, bool silent)
   : msg_(new ErrorMsg(TErrorCode::GENERAL, error_msg)) {
   if (!silent) {
@@ -156,6 +163,10 @@ Status& Status::operator=(
         static_cast<TErrorCode::type>(hs2_status.statusCode), hs2_status.errorMessage);
   }
   return *this;
+}
+
+Status Status::Expected(const ErrorMsg& error_msg) {
+  return Status(error_msg, true);
 }
 
 Status Status::Expected(const std::string& error_msg) {

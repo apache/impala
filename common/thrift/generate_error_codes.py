@@ -171,7 +171,8 @@ error_codes = (
   ("PARQUET_REP_LEVEL_ERROR", 54, "Could not read repetition level, even though metadata"
    " states there are $0 values remaining in data page. file=$1"),
 
-  ("PARQUET_UNRECOGNIZED_SCHEMA", 55, "Unrecognized $0 schema:\\n$1"),
+  ("PARQUET_UNRECOGNIZED_SCHEMA", 55, "File '$0' has an incompatible Parquet schema for "
+   "column '$1'. Column type: $2, Parquet schema:\\n$3"),
 
   ("COLLECTION_ALLOC_FAILED", 56, "Failed to allocate buffer for collection '$0'."),
 

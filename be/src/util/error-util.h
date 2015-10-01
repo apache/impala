@@ -55,7 +55,7 @@ class ErrorMsg {
   /// that can be passed to Substitute. The reason is to try to avoid forcing the compiler
   /// putting all arguments for Substitute() on the stack whenver this is called and thus
   /// polute the instruction cache.
-  ErrorMsg(TErrorCode::type error);
+  explicit ErrorMsg(TErrorCode::type error);
   ErrorMsg(TErrorCode::type error, const ArgType& arg0);
   ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1);
   ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
