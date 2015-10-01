@@ -50,5 +50,5 @@ bigint,bigint,string,string,boolean,boolean,bigint,bigint,bigint,bigint
 # Parquet file with invalid magic number
 SELECT * from bad_magic_number
 ---- CATCH
-File $NAMENODE/test-warehouse/bad_magic_number_parquet/bad_magic_number.parquet is invalid.  Invalid file footer: XXXX
+File '$NAMENODE/test-warehouse/bad_magic_number_parquet/bad_magic_number.parquet' has an invalid version number: XXXX
 ====

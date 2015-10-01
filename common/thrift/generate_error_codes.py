@@ -184,7 +184,13 @@ error_codes = (
     "Temporary file $0 is blacklisted from a previous error and cannot be expanded."),
 
   ("RPC_CLIENT_CONNECT_FAILURE", 59,
-    "RPC client failed to connect: $0")
+    "RPC client failed to connect: $0"),
+
+  ("STALE_METADATA_FILE_TOO_SHORT", 60, "Metadata for file '$0' appears stale. "
+   "Try running \\\"refresh $1\\\" to reload the file metadata."),
+
+  ("PARQUET_BAD_VERSION_NUMBER", 61, "File '$0' has an invalid version number: $1\\n"
+   "This could be due to stale metadata. Try running \\\"refresh $2\\\"."),
 )
 
 import sys

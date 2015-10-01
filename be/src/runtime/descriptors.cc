@@ -124,6 +124,10 @@ TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
   }
 }
 
+string TableDescriptor::fully_qualified_name() const {
+  return Substitute("$0.$1", database_, name_);
+}
+
 string TableDescriptor::DebugString() const {
   vector<string> cols;
   BOOST_FOREACH(const ColumnDescriptor& col_desc, col_descs_) {

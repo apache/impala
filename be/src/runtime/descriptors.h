@@ -202,6 +202,9 @@ class TableDescriptor {
   int id() const { return id_; }
   const std::vector<ColumnDescriptor>& col_descs() const { return col_descs_; }
 
+  /// Returns "<database>.<name>"
+  std::string fully_qualified_name() const;
+
  protected:
   std::string name_;
   std::string database_;

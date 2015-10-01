@@ -1472,10 +1472,25 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
 
 Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   *eosr = false;
-  uint8_t* buffer;
-  int64_t len;
+  int64_t len = stream_->scan_range()->len();
 
-  RETURN_IF_ERROR(stream_->GetBuffer(false, &buffer, &len));
+  // We're processing the scan range issued in IssueInitialRanges(). The scan range should
+  // be the last FOOTER_BYTES of the file. !success means the file is shorter than we
+  // expect. Note we can't detect if the file is larger than we expect without attempting
+  // to read past the end of the scan range, but in this case we'll fail below trying to
+  // parse the footer.
+  DCHECK_LE(len, FOOTER_SIZE);
+  uint8_t* buffer;
+  bool success = stream_->ReadBytes(len, &buffer, &parse_status_);
+  if (!success) {
+    VLOG_QUERY << "Metadata for file '" << stream_->filename() << "' appears stale: "
+               << "metadata states file size to be "
+               << PrettyPrinter::Print(stream_->file_desc()->file_length, TUnit::BYTES)
+               << ", but could only read "
+               << PrettyPrinter::Print(stream_->total_bytes_returned(), TUnit::BYTES);
+    return Status(TErrorCode::STALE_METADATA_FILE_TOO_SHORT, stream_->filename(),
+        scan_node_->hdfs_table()->fully_qualified_name());
+  }
   DCHECK(stream_->eosr());
 
   // Number of bytes in buffer after the fixed size footer is accounted for.
@@ -1483,7 +1498,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
 
   // Make sure footer has enough bytes to contain the required information.
   if (remaining_bytes_buffered < 0) {
-    return Status(Substitute("File $0 is invalid.  Missing metadata.",
+    return Status(Substitute("File '$0' is invalid.  Missing metadata.",
         stream_->filename()));
   }
 
@@ -1491,9 +1506,9 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   uint8_t* magic_number_ptr = buffer + len - sizeof(PARQUET_VERSION_NUMBER);
   if (memcmp(magic_number_ptr, PARQUET_VERSION_NUMBER,
              sizeof(PARQUET_VERSION_NUMBER)) != 0) {
-    return Status(Substitute("File $0 is invalid.  Invalid file footer: $1",
-        stream_->filename(),
-        string((char*)magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER))));
+    return Status(TErrorCode::PARQUET_BAD_VERSION_NUMBER, stream_->filename(),
+        string(reinterpret_cast<char*>(magic_number_ptr), sizeof(PARQUET_VERSION_NUMBER)),
+        scan_node_->hdfs_table()->fully_qualified_name());
   }
 
   // The size of the metadata is encoded as a 4 byte little endian value before
