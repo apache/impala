@@ -375,3 +375,25 @@ where c_custkey < 10
 ---- TYPES
 BIGINT,BIGINT,BIGINT,INT,BIGINT
 ====
+---- QUERY
+# IMPALA-2456: Test subplan that contains a hash join with unnest nodes on both the build
+# and probe sides of the join. Tests projection of collection-typed slots on both sides
+# of the join.
+select c_custkey, o_orderkey
+from tpch_nested_parquet.customer c
+inner join c.c_orders o1
+left anti join
+  (select o2.o_orderkey x
+   from c.c_orders o2, c.c_orders o3) v
+on c.c_custkey = v.x
+where c_custkey < 2
+---- RESULTS
+1,454791
+1,579908
+1,3868359
+1,4273923
+1,4808192
+1,5133509
+---- TYPES
+bigint,bigint
+====

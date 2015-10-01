@@ -184,6 +184,15 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     // are fully constructed.
     RETURN_IF_ERROR(build_side_status.Get());
     RETURN_IF_ERROR(open_status);
+  } else if (IsInSubplan()) {
+    // When inside a subplan, open the first child before doing the build such that
+    // UnnestNodes on the probe side are opened and project their unnested collection
+    // slots. Otherwise, the build might unnecessarily deep-copy those collection slots,
+    // and this node would return them in GetNext().
+    // TODO: Remove this special-case behavior for subplans once we have proper
+    // projection. See UnnestNode for details on the current projection implementation.
+    RETURN_IF_ERROR(child(0)->Open(state));
+    RETURN_IF_ERROR(ConstructBuildSide(state));
   } else {
     RETURN_IF_ERROR(ConstructBuildSide(state));
     RETURN_IF_ERROR(child(0)->Open(state));
