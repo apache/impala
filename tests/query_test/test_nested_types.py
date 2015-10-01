@@ -9,6 +9,7 @@ import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIfOldAggsJoins
+from tests.util.filesystem_utils import get_fs_path
 
 @SkipIfOldAggsJoins.nested_types
 class TestNestedTypes(ImpalaTestSuite):
@@ -57,6 +58,7 @@ class TestNestedTypes(ImpalaTestSuite):
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
     self.run_test_case('QueryTest/nested-types-tpch', vector)
 
+@SkipIfOldAggsJoins.nested_types
 class TestParquetArrayEncodings(ImpalaTestSuite):
   # Create a unique database name so we can run multiple instances of this test class in
   # parallel
@@ -431,7 +433,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     assert result.data == ['2']
 
   def _create_test_table(self, tablename, filename, columns):
-    location = "/test-warehouse/%s_%s" % (self.DATABASE, tablename)
+    location = get_fs_path("/test-warehouse/%s_%s" % (self.DATABASE, tablename))
     self.client.execute("create table %s.%s (%s) stored as parquet location '%s'" %
                           (self.DATABASE, tablename, columns, location))
     local_path = self.TESTFILE_DIR + "/" + filename
