@@ -102,9 +102,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .single_element_group:
   # ..count = 2345
   def test_single_field_group_in_list(self, vector):
-    tablename = "SingleFieldGroupInList"
-    self._create_test_table(tablename, "SingleFieldGroupInList.parquet",
-                            "col1 array<struct<count: bigint>>")
+    tablename = self._create_test_table("SingleFieldGroupInList",
+        "SingleFieldGroupInList.parquet", "col1 array<struct<count: bigint>>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -134,8 +133,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .array = 35
   # .array = 36
   def test_avro_primitive_in_list(self, vector):
-    tablename = "AvroPrimitiveInList"
-    self._create_test_table(tablename, "AvroPrimitiveInList.parquet", "col1 array<int>")
+    tablename = self._create_test_table("AvroPrimitiveInList",
+        "AvroPrimitiveInList.parquet", "col1 array<int>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -168,10 +167,9 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .array:
   # ..count = 2345
   def test_avro_single_field_group_in_list(self, vector):
-    tablename = "AvroSingleFieldGroupInList"
-    # Note that the field name does not match the field name in the file schema.
-    self._create_test_table(tablename, "AvroSingleFieldGroupInList.parquet",
-                            "col1 array<struct<f1: bigint>>")
+# Note that the field name does not match the field name in the file schema.
+    tablename = self._create_test_table("AvroSingleFieldGroupInList",
+        "AvroSingleFieldGroupInList.parquet", "col1 array<struct<f1: bigint>>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -228,9 +226,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # 
   # [Same int_arrays_column repeated 8x more]
   def test_avro_array_of_arrays(self, vector):
-    tablename = "AvroArrayOfArrays"
-    # Note that the field name does not match the field name in the file schema.
-    self._create_test_table(tablename, "bad-avro.parquet", "col1 array<array<int>>")
+    tablename = self._create_test_table("AvroArrayOfArrays", "bad-avro.parquet",
+                                        "col1 array<array<int>>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -266,8 +263,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .list_of_ints_tuple = 35
   # .list_of_ints_tuple = 36
   def test_thrift_primitive_in_list(self, vector):
-    tablename = "ThriftPrimitiveInList"
-    self._create_test_table(tablename, "ThriftPrimitiveInList.parquet", "col1 array<int>")
+    tablename = self._create_test_table("ThriftPrimitiveInList",
+        "ThriftPrimitiveInList.parquet", "col1 array<int>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -300,9 +297,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .single_element_groups_tuple:
   # ..count = 2345
   def test_thrift_single_field_group_in_list(self, vector):
-    tablename = "ThriftSingleFieldGroupInList"
-    self._create_test_table(tablename, "ThriftSingleFieldGroupInList.parquet",
-                            "col1 array<struct<f1: bigint>>")
+    tablename = self._create_test_table("ThriftSingleFieldGroupInList",
+        "ThriftSingleFieldGroupInList.parquet", "col1 array<struct<f1: bigint>>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -343,9 +339,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # ..intListsColumn_tuple_tuple = 7
   # ..intListsColumn_tuple_tuple = 8
   def test_thrift_array_of_arrays(self, vector):
-    tablename = "ThriftArrayOfArrays"
-    # Note that the field name does not match the field name in the file schema.
-    self._create_test_table(tablename, "bad-thrift.parquet", "col1 array<array<int>>")
+    tablename = self._create_test_table("ThriftArrayOfArrays", "bad-thrift.parquet",
+                                        "col1 array<array<int>>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -378,9 +373,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # list_of_ints = 35
   # list_of_ints = 36
   def test_unannotated_list_of_primitives(self, vector):
-    tablename = "UnannotatedListOfPrimitives"
-    self._create_test_table(tablename, "UnannotatedListOfPrimitives.parquet",
-                            "col1 array<int>")
+    tablename = self._create_test_table("UnannotatedListOfPrimitives",
+        "UnannotatedListOfPrimitives.parquet", "col1 array<int>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -413,9 +407,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .x = 2.0
   # .y = 2.0
   def test_unannotated_list_of_groups(self, vector):
-    tablename = "UnannotatedListOfGroups"
-    self._create_test_table(tablename, "UnannotatedListOfGroups.parquet",
-                            "col1 array<struct<f1: float, f2: float>>")
+    tablename = self._create_test_table("UnannotatedListOfGroups",
+        "UnannotatedListOfGroups.parquet", "col1 array<struct<f1: float, f2: float>>")
 
     full_name = "%s.%s" % (self.DATABASE, tablename)
 
@@ -433,9 +426,13 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     assert result.data == ['2']
 
   def _create_test_table(self, tablename, filename, columns):
+    """Returns a unique tablename based on the input 'tablename'. This allows multiple
+    instances of the same test to be run in parallel (e.g. during an exhaustive run)."""
+    tablename = "%s_%s" % (tablename, random.randint(0, 10**5))
     location = get_fs_path("/test-warehouse/%s_%s" % (self.DATABASE, tablename))
     self.client.execute("create table %s.%s (%s) stored as parquet location '%s'" %
                           (self.DATABASE, tablename, columns, location))
     local_path = self.TESTFILE_DIR + "/" + filename
     check_call(["hadoop", "fs", "-put", local_path, location], shell=False)
     self.client.execute("invalidate metadata %s.%s" % (self.DATABASE, tablename))
+    return tablename
