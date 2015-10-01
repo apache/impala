@@ -204,6 +204,7 @@ void LikePredicate::RegexpLikePrepare(FunctionContext* context,
     if (match_parameter->is_null) {
       error << "NULL match parameter";
       context->SetError(error.str().c_str());
+      return;
     }
     RE2::Options opts;
     if (!SetRE2Options(context, match_parameter, &opts)) return;

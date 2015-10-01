@@ -629,7 +629,8 @@ StringVal StringFunctions::BTrimString(FunctionContext* ctx,
 
 // Similar to strstr() except that the strings are not null-terminated
 static char* locate_substring(char* haystack, int hay_len, char* needle, int needle_len) {
-  for (int i = 0; i < hay_len; ++i) {
+  DCHECK_GT(needle_len, 0);
+  for (int i = 0; i < hay_len - needle_len + 1; ++i) {
     char* possible_needle = haystack + i;
     if (strncmp(possible_needle, needle, needle_len) == 0) return possible_needle;
   }
