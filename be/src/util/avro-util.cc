@@ -69,11 +69,11 @@ Status AvroSchemaElement::ConvertSchema(
             << "Avro spec does not allow immediately nested unions";
         *element = child;
         element->null_union_position = null_position;
+        return Status::OK();
       }
     }
   }
 
-  // Check type after we process unions so we don't flag null unions.
   if (!IsSupportedAvroType(element->schema)) {
     stringstream ss;
     ss << "Avro enum, array, map, union, and fixed types are not supported. "
