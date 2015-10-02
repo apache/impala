@@ -1473,10 +1473,12 @@ static int64_t GetRowGroupMidOffset(const parquet::RowGroup& row_group) {
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
+  DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
   // First process the file metadata in the footer
   bool eosr;
   metadata_range_ = stream_->scan_range();
   RETURN_IF_ERROR(ProcessFooter(&eosr));
+
   if (eosr) return Status::OK();
 
   // We've processed the metadata and there are columns that need to be materialized.
@@ -1511,31 +1513,27 @@ Status HdfsParquetScanner::ProcessSplit() {
 
     assemble_rows_timer_.Start();
 
+    // If we are materializing non-repeated fields, i.e. not in a Parquet collection,
+    // we do not need to maintain repetition levels.
+    bool in_collection = false;
+
     // Prepare column readers for first read
     bool continue_execution = true;
     BOOST_FOREACH(ColumnReader* col_reader, column_readers_) {
-      continue_execution |= col_reader->NextLevels();
+      in_collection |= col_reader->max_rep_level() > 0;
+      continue_execution = col_reader->NextLevels();
       if (!continue_execution) break;
+      DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
     }
 
-    // If we are materializing non-repeated fields, i.e. not in a Parquet collection,
-    // we do not need to maintain repetition levels. The tuple slots materialized by the
-    // scanner are all be either at the top level of the Parquet file or in the same
-    // repetition group, so this should be uniform across the slots.
-    bool in_collection = false;
-    for (int c = 0; c < column_readers_.size(); ++c) {
-      if (column_readers_[c]->max_rep_level() > 0) {
-        in_collection = true;
-        break;
-      }
+    if (continue_execution) {
+      continue_execution = in_collection ?
+          AssembleRows<true, false>(scan_node_->tuple_desc(), column_readers_, -1, i,
+              NULL) :
+          AssembleRows<false, false>(scan_node_->tuple_desc(), column_readers_, -1, i,
+              NULL);
+      assemble_rows_timer_.Stop();
     }
-
-    continue_execution = in_collection ?
-        AssembleRows<true, false>(scan_node_->tuple_desc(), column_readers_, -1, i,
-            NULL) :
-        AssembleRows<false, false>(scan_node_->tuple_desc(), column_readers_, -1, i,
-            NULL);
-    assemble_rows_timer_.Stop();
 
     if (parse_status_.IsMemLimitExceeded()) return parse_status_;
     if (!parse_status_.ok()) LOG_OR_RETURN_ON_ERROR(parse_status_.msg(), state_);
@@ -1786,6 +1784,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     }
     DCHECK_EQ(metadata_bytes_to_read, 0);
   }
+
   // Deserialize file header
   // TODO: this takes ~7ms for a 1000-column table, figure out how to reduce this.
   Status status =
@@ -2536,7 +2535,8 @@ Status HdfsParquetScanner::ValidateColumn(
 Status HdfsParquetScanner::ValidateEndOfRowGroup(
     const vector<ColumnReader*>& column_readers, int row_group_idx, int64_t rows_read) {
   DCHECK(!column_readers.empty());
-  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_";
+  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_"
+      << parse_status_.GetDetail();
 
   if (column_readers[0]->max_rep_level() == 0) {
     // These column readers materialize table-level values (vs. collection values). Test

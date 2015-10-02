@@ -145,7 +145,8 @@ int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_r
 
 int HdfsScanner::GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool,
     Tuple** tuple_mem, TupleRow** tuple_row_mem) {
-  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_";
+  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_"
+      << parse_status_.GetDetail();
   *pool = builder->pool();
   int max_num_rows = builder->GetFreeMemory(tuple_mem);
   if (max_num_rows == 0) {
