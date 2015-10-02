@@ -157,12 +157,9 @@ class RowBatch {
   /// Add io buffer to this row batch.
   void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer);
 
-  /// Add tuple stream to this row batch. The row batch must call Close() on the stream
-  /// when freeing resources.
+  /// Add tuple stream to this row batch. The row batch takes ownership of the stream
+  /// and will call Close() on the stream and delete it when freeing resources.
   void AddTupleStream(BufferedTupleStream* stream);
-
-  /// Returns true if 'stream' has been added to with batch, false otherwise.
-  bool ContainsTupleStream(BufferedTupleStream* stream) const;
 
   /// Adds a block to this row batch. The block must be pinned. The blocks must be
   /// deleted when freeing resources.
@@ -264,6 +261,9 @@ class RowBatch {
 
   void SerializeInternal(int64_t size, DedupMap* distinct_tuples,
       TRowBatch* output_batch);
+
+  /// Close owned tuple streams and delete if needed.
+  void CloseTupleStreams();
 
   MemTracker* mem_tracker_;  // not owned
 

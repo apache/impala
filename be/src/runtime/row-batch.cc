@@ -151,9 +151,7 @@ RowBatch::~RowBatch() {
   for (int i = 0; i < io_buffers_.size(); ++i) {
     io_buffers_[i]->Return();
   }
-  for (int i = 0; i < tuple_streams_.size(); ++i) {
-    tuple_streams_[i]->Close();
-  }
+  CloseTupleStreams();
   for (int i = 0; i < blocks_.size(); ++i) {
     // TODO: Delete() returns a Status.
     blocks_[i]->Delete();
@@ -304,11 +302,6 @@ void RowBatch::AddTupleStream(BufferedTupleStream* stream) {
   auxiliary_mem_usage_ += stream->byte_size();
 }
 
-bool RowBatch::ContainsTupleStream(BufferedTupleStream* stream) const {
-  return std::find(tuple_streams_.begin(), tuple_streams_.end(), stream)
-      != tuple_streams_.end();
-}
-
 void RowBatch::AddBlock(BufferedBlockMgr::Block* block) {
   DCHECK(block != NULL);
   blocks_.push_back(block);
@@ -325,21 +318,26 @@ void RowBatch::Reset() {
     io_buffers_[i]->Return();
   }
   io_buffers_.clear();
-  for (int i = 0; i < tuple_streams_.size(); ++i) {
-    tuple_streams_[i]->Close();
-  }
+  CloseTupleStreams();
   for (int i = 0; i < blocks_.size(); ++i) {
     // TODO: Delete() returns a Status.
     blocks_[i]->Delete();
   }
   blocks_.clear();
-  tuple_streams_.clear();
   auxiliary_mem_usage_ = 0;
   if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
     tuple_ptrs_ = reinterpret_cast<Tuple**>(
         tuple_data_pool_->Allocate(tuple_ptrs_size_));
   }
   need_to_return_ = false;
+}
+
+void RowBatch::CloseTupleStreams() {
+  for (int i = 0; i < tuple_streams_.size(); ++i) {
+    tuple_streams_[i]->Close();
+    delete tuple_streams_[i];
+  }
+  tuple_streams_.clear();
 }
 
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {

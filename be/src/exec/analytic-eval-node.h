@@ -58,6 +58,7 @@ class AggFnEvaluator;
 class AnalyticEvalNode : public ExecNode {
  public:
   AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  virtual ~AnalyticEvalNode();
 
   virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
@@ -328,7 +329,7 @@ class AnalyticEvalNode : public ExecNode {
   /// The input stream owns tuple data backing rows returned in GetNext(), and is
   /// attached to an output row batch on eos or ReachedLimit().
   /// TODO: Consider re-pinning unpinned streams when possible.
-  boost::scoped_ptr<BufferedTupleStream> input_stream_;
+  BufferedTupleStream* input_stream_;
 
   /// Pool used for O(1) allocations that live until Close() or Reset().
   /// Does not own data backing tuples returned in GetNext(), so it does not

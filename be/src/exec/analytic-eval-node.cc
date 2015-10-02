@@ -51,6 +51,7 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     dummy_result_tuple_(NULL),
     curr_partition_idx_(-1),
     prev_input_row_(NULL),
+    input_stream_(NULL),
     input_eos_(false),
     evaluation_timer_(NULL) {
   if (tnode.analytic_node.__isset.buffered_tuple_id) {
@@ -91,6 +92,11 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     }
   }
   VLOG_FILE << id() << " Window=" << DebugWindowString();
+}
+
+AnalyticEvalNode::~AnalyticEvalNode() {
+  // Check that we didn't leak any memory.
+  DCHECK(input_stream_ == NULL);
 }
 
 Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
@@ -173,11 +179,12 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   DCHECK(client_ != NULL);
-  input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
+  DCHECK(input_stream_ == NULL);
+  input_stream_ = new BufferedTupleStream(state, child(0)->row_desc(),
       state->block_mgr(), client_,
       false /* initial_small_buffers */,
       !IsInSubplan() /* delete_on_read */,
-      true /* read_write */));
+      true /* read_write */);
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
@@ -706,6 +713,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   VLOG_FILE << id() << " GetNext: " << DebugStateString();
+  DCHECK(input_stream_ != NULL); // input_stream_ is NULL if we already hit eos.
 
   if (ReachedLimit()) {
     // TODO: This transfer is simple and correct, but not necessarily efficient. We
@@ -713,7 +721,9 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     // over multiple Reset()/Open()/GetNext()* cycles.
     row_batch->tuple_data_pool()->AcquireData(prev_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(curr_tuple_pool_.get(), false);
-    row_batch->AddTupleStream(input_stream_.get());
+    DCHECK(input_stream_ != NULL);
+    row_batch->AddTupleStream(input_stream_);
+    input_stream_ = NULL;
     *eos = true;
     return Status::OK();
   } else {
@@ -731,7 +741,8 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     // over multiple Reset()/Open()/GetNext()* cycles.
     row_batch->tuple_data_pool()->AcquireData(prev_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(curr_tuple_pool_.get(), false);
-    row_batch->AddTupleStream(input_stream_.get());
+    row_batch->AddTupleStream(input_stream_);
+    input_stream_ = NULL;
     *eos = true;
   }
 
@@ -775,7 +786,7 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
   }
   mem_pool_->Clear();
   // The following members will be re-created in Open().
-  input_stream_->Close();
+  DCHECK(input_stream_ == NULL); // input_stream_ should have been attached to last batch.
   curr_tuple_ = NULL;
   child_tuple_cmp_row_ = NULL;
   dummy_result_tuple_ = NULL;
@@ -788,7 +799,12 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
 void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (client_ != NULL) state->block_mgr()->ClearReservations(client_);
-  if (input_stream_.get() != NULL) input_stream_->Close();
+  if (input_stream_ != NULL) {
+    // We may need to clean up input_stream_ if an error occurred at some point.
+    input_stream_->Close();
+    delete input_stream_;
+    input_stream_ = NULL;
+  }
 
   // Close all evaluators and fn ctxs. If an error occurred in Init or Prepare there may
   // be fewer ctxs than evaluators. We also need to Finalize if curr_tuple_ was created

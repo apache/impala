@@ -63,6 +63,11 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
   can_add_probe_filters_ &= FLAGS_enable_phj_probe_side_filtering;
 }
 
+PartitionedHashJoinNode::~PartitionedHashJoinNode() {
+  // Check that we didn't leak any memory.
+  DCHECK(null_probe_rows_ == NULL);
+}
+
 Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(BlockingJoinNode::Init(tnode));
   DCHECK(tnode.__isset.hash_join_node);
@@ -179,9 +184,9 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(
         null_aware_partition_->probe_rows()->Init(id(), runtime_profile(), false));
 
-    null_probe_rows_ = state->obj_pool()->Add(new BufferedTupleStream(
+    null_probe_rows_ = new BufferedTupleStream(
         state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
-        true /* use small buffers */, false /* delete on read */ ));
+        true /* use small buffers */, false /* delete on read */ );
     RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
   }
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
@@ -193,10 +198,6 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
     non_empty_build_ = false;
     null_probe_output_idx_ = -1;
     matched_null_probe_.clear();
-    // The null_probe_rows_ object is owned by the partition_pool_ which is cleared in
-    // ClosePartitions(), so Close() the stream here first.
-    if (null_probe_rows_ != NULL) null_probe_rows_->Close();
-    null_probe_rows_ = NULL;
     nulls_build_batch_.reset();
   }
   state_ = PARTITIONING_BUILD;
@@ -229,6 +230,10 @@ void PartitionedHashJoinNode::ClosePartitions() {
   if (null_aware_partition_ != NULL) {
     null_aware_partition_->Close(NULL);
     null_aware_partition_ = NULL;
+    DCHECK(null_probe_rows_ != NULL);
+    null_probe_rows_->Close();
+    delete null_probe_rows_;
+    null_probe_rows_ = NULL;
   }
   partition_pool_->Clear();
 }
@@ -237,7 +242,6 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (ht_ctx_.get() != NULL) ht_ctx_->Close();
 
-  if (null_probe_rows_ != NULL) null_probe_rows_->Close();
   nulls_build_batch_.reset();
 
   ClosePartitions();
@@ -258,16 +262,12 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
     is_closed_(false),
     is_spilled_(false),
     level_(level) {
-  BufferedTupleStream* build = new BufferedTupleStream(
-      state, parent_->child(1)->row_desc(), state->block_mgr(),
-      parent_->block_mgr_client_);
-  DCHECK(build != NULL);
-  build_rows_ = state->obj_pool()->Add(build);
-  BufferedTupleStream* probe = new BufferedTupleStream(
-      state, parent_->child(0)->row_desc(),
+  build_rows_ = new BufferedTupleStream(state, parent_->child(1)->row_desc(),
       state->block_mgr(), parent_->block_mgr_client_);
-  DCHECK(probe != NULL);
-  probe_rows_ = state->obj_pool()->Add(probe);
+  DCHECK(build_rows_ != NULL);
+  probe_rows_ = new BufferedTupleStream(state, parent_->child(0)->row_desc(),
+      state->block_mgr(), parent_->block_mgr_client_);
+  DCHECK(probe_rows_ != NULL);
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {
@@ -293,6 +293,7 @@ void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
   if (build_rows_ != NULL) {
     if (batch == NULL) {
       build_rows_->Close();
+      delete build_rows_;
     } else {
       batch->AddTupleStream(build_rows_);
     }
@@ -301,6 +302,7 @@ void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
   if (probe_rows_ != NULL) {
     if (batch == NULL) {
       probe_rows_->Close();
+      delete probe_rows_;
     } else {
       batch->AddTupleStream(probe_rows_);
     }
@@ -1039,6 +1041,8 @@ Status PartitionedHashJoinNode::OutputNullAwareNullProbe(RuntimeState* state,
       // All done.
       null_aware_partition_->Close(out_batch);
       null_aware_partition_ = NULL;
+      out_batch->AddTupleStream(null_probe_rows_);
+      null_probe_rows_ = NULL;
       return Status::OK();
     }
   }
