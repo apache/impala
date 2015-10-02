@@ -435,9 +435,10 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
 
 Status PartitionedAggregationNode::Partition::InitStreams() {
   agg_fn_pool.reset(new MemPool(parent->expr_mem_tracker()));
+  DCHECK_EQ(agg_fn_ctxs.size(), 0);
   for (int i = 0; i < parent->agg_fn_ctxs_.size(); ++i) {
     agg_fn_ctxs.push_back(parent->agg_fn_ctxs_[i]->impl()->Clone(agg_fn_pool.get()));
-    parent->state_->obj_pool()->Add(agg_fn_ctxs[i]);
+    parent->partition_pool_->Add(agg_fn_ctxs[i]);
   }
 
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
