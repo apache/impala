@@ -174,5 +174,47 @@ Memory limit exceeded
 Failed to allocate buffer for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.
 ====
 ---- QUERY
+set num_scanner_threads=1
+====
+---- QUERY
+set mem_limit=1g
+====
+---- QUERY
+# IMPALA-2473: Scan query with large row size leading to oversized batches.
+# Should not OOM given single scanner thread and sufficient memory limit.
+select *
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+order by l_partkey desc, l_suppkey desc, l_linenumber desc, c_custkey
+limit 5
+---- RESULTS
+29888,'Customer#000029888','b8rX5B9YSZSnyro2o',6,'16-601-969-5769',8896.68,'FURNITURE','requests unwind carefully. slyly regular deposits across the fluffily final pac',3386277,'F',196816.57,'1993-11-29','2-HIGH','Clerk#000000176',0,'ular foxes cajole blithely slyly b',200000,7558,2,20.00,22000.00,0.03,0.07,'A','F','1994-01-13','1994-01-12','1994-02-02','COLLECT COD','REG AIR','ly express sauternes breach slyly'
+51016,'Customer#000051016','DkC0qs6omn',23,'33-214-457-4366',5249.55,'MACHINERY','ual deposits according to the permanently regular instructions d',1500291,'F',252068.24,'1993-08-05','2-HIGH','Clerk#000000569',0,' are along the furiously even asymptotes. carefully ironic foxes accordin',200000,7558,2,44.00,48400.00,0.04,0.04,'R','F','1993-11-21','1993-10-26','1993-11-25','DELIVER IN PERSON','AIR','xpress packages. slyly regular theodoli'
+90343,'Customer#000090343','KaC1qsGLktDWrWRuK4 Nrgbpvhs2rcg',4,'14-925-398-1742',4718.83,'MACHINERY',' even orbits. daringly pending accounts poach above the furiously even frays. final packages run. carefully stealthy',4315909,'O',221276.50,'1997-02-18','4-NOT SPECIFIED','Clerk#000000517',0,'lites: slyly final instructions integrate slyly pending, fina',200000,7558,1,32.00,35200.00,0.00,0.06,'N','O','1997-06-03','1997-04-11','1997-06-17','COLLECT COD','AIR','ns: special '
+111239,'Customer#000111239','xXeQMLtOCiS76XiMsRGzNdWCgZwsK S1l',6,'16-890-971-8054',3103.05,'FURNITURE','ites wake slyly according to the e',4186720,'F',277201.14,'1993-01-26','3-MEDIUM','Clerk#000000743',0,' regular ideas. stealthily bold accounts boost fu',200000,5039,3,47.00,51700.00,0.08,0.04,'A','F','1993-02-01','1993-03-26','1993-02-17','TAKE BACK RETURN','AIR','ias. slyly regular excuses are aft'
+116908,'Customer#000116908','kCt00BJVwUSKxuOySsLlLCS',21,'31-857-393-5714',8079.23,'FURNITURE','ending platelets. final dependencies haggle about the ironic, express courts. s',3911265,'O',166014.13,'1997-07-27','3-MEDIUM','Clerk#000000161',0,'ily along the blithely ironic foxes. ',200000,5039,3,36.00,39600.00,0.10,0.02,'N','O','1997-10-31','1997-10-12','1997-11-12','TAKE BACK RETURN','REG AIR','y slyly special deposits. bli'
+---- TYPES
+bigint,string,string,smallint,string,decimal,string,string,bigint,string,decimal,string,string,string,int,string,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,string,string,string,string,string
+====
+---- QUERY
+set num_scanner_threads=1
+====
+---- QUERY
+set mem_limit=500m
+====
+---- QUERY
+# IMPALA-2473: Highly selective scan query with large row size.
+# Should not OOM given single scanner thread and sufficient memory limit.
+select *
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+where c_phone='20-968-632-1388' and l_partkey = 127499
+---- RESULTS
+53722,'Customer#000053722','p2hQ7009dQSEuRdE31HtjVv9idN2rXBHdTx4JRk',10,'20-968-632-1388',4153.75,'HOUSEHOLD','l foxes are ideas. final deposits boost blithely. carefully bo',10277,'F',101242.81,'1994-04-08','3-MEDIUM','Clerk#000000655',0,'counts sleep around the special',127499,2524,1,12.00,18317.88,0.07,0.07,'A','F','1994-07-27','1994-05-22','1994-08-11','NONE','RAIL',' according to the furiously silent th'
+---- TYPES
+bigint,string,string,smallint,string,decimal,string,string,bigint,string,decimal,string,string,string,int,string,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,string,string,string,string,string
+====
+---- QUERY
 set mem_limit=0
+====
+---- QUERY
+set num_scanner_threads=0
 ====

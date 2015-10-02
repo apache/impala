@@ -158,9 +158,10 @@ class HdfsTableSink : public DataSink {
 
  private:
   /// Initialises the filenames of a given output partition, and opens the temporary file.
+  /// If the partition will not have any rows added to it, empty_partition must be true.
   Status InitOutputPartition(RuntimeState* state,
                              const HdfsPartitionDescriptor& partition_descriptor,
-                             OutputPartition* output_partition);
+                             OutputPartition* output_partition, bool empty_partition);
 
   /// Add a temporary file to an output partition.  Files are created in a
   /// temporary directory and then moved to the real partition directory by the
@@ -184,8 +185,9 @@ class HdfsTableSink : public DataSink {
 
   /// Given a hashed partition key, get the output partition structure from
   /// the partition_keys_to_output_partitions_.
+  /// no_more_rows indicates that no more rows will be added to the partition.
   Status GetOutputPartition(RuntimeState* state, const std::string& key,
-                            PartitionPair** partition_pair);
+                  PartitionPair** partition_pair, bool no_more_rows);
 
   /// Initialise and prepare select and partition key expressions
   Status PrepareExprs(RuntimeState* state);
@@ -281,10 +283,7 @@ class HdfsTableSink : public DataSink {
   RuntimeProfile::Counter* hdfs_write_timer_;
   /// Time spent compressing data
   RuntimeProfile::Counter* compress_timer_;
-
-  /// Flag to indicate the current input batch passed in Send() is empty. It implies that
-  /// we must not initialize the OutputPartition writer of a static partition insert.
-  bool has_empty_input_batch_;
 };
+
 }
 #endif

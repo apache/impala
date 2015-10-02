@@ -331,7 +331,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       }
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
-      if (ReachedLimit() || row_batch->AtCapacity() || input_batch_->eos) {
+      if (ReachedLimit() || row_batch->AtCapacity(tuple_pool) || input_batch_->eos) {
         *eos = ReachedLimit() || input_batch_->eos;
         return Status::OK();
       }
