@@ -247,7 +247,7 @@ public class AnalyticExpr extends Expr {
    * Rewrite percent_rank() to the following:
    *
    * percent_rank() over([partition by clause] order by clause)
-   *    = (Rank - 1)/(Count - 1)
+   *    = (Count == 1) ? 0:(Rank - 1)/(Count - 1)
    * where,
    *  Rank = rank() over([partition by clause] order by clause)
    *  Count = count() over([partition by clause])
@@ -255,16 +255,25 @@ public class AnalyticExpr extends Expr {
   private static Expr createPercentRank(AnalyticExpr analyticExpr) {
     Preconditions.checkState(
         AnalyticExpr.isPercentRankFn(analyticExpr.getFnCall().getFn()));
-    AnalyticExpr rankExpr =
-        create("rank", analyticExpr, true, false);
-    AnalyticExpr countExpr =
-        create("count", analyticExpr, false, false);
+
+    NumericLiteral zero = new NumericLiteral(BigInteger.valueOf(0), ScalarType.BIGINT);
     NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    AnalyticExpr countExpr = create("count", analyticExpr, false, false);
+    AnalyticExpr rankExpr = create("rank", analyticExpr, true, false);
+
     ArithmeticExpr arithmeticRewrite =
-        new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE,
-          new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, rankExpr, one),
-          new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, countExpr, one));
-    return arithmeticRewrite;
+      new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE,
+        new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, rankExpr, one),
+        new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, countExpr, one));
+
+    List<Expr> ifParams = Lists.newArrayList();
+    ifParams.add(
+      new BinaryPredicate(BinaryPredicate.Operator.EQ, one, countExpr));
+    ifParams.add(zero);
+    ifParams.add(arithmeticRewrite);
+    FunctionCallExpr resultantRewrite = new FunctionCallExpr("if", ifParams);
+
+    return resultantRewrite;
   }
 
   /**
@@ -279,10 +288,8 @@ public class AnalyticExpr extends Expr {
   private static Expr createCumeDist(AnalyticExpr analyticExpr) {
     Preconditions.checkState(
         AnalyticExpr.isCumeDistFn(analyticExpr.getFnCall().getFn()));
-    AnalyticExpr rankExpr =
-        create("rank", analyticExpr, true, true);
-    AnalyticExpr countExpr =
-        create("count", analyticExpr, false, false);
+    AnalyticExpr rankExpr = create("rank", analyticExpr, true, true);
+    AnalyticExpr countExpr = create("count", analyticExpr, false, false);
     NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
     ArithmeticExpr arithmeticRewrite =
         new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE,
@@ -306,10 +313,8 @@ public class AnalyticExpr extends Expr {
     Preconditions.checkState(
         AnalyticExpr.isNtileFn(analyticExpr.getFnCall().getFn()));
     Expr bucketExpr = analyticExpr.getChild(0);
-    AnalyticExpr rowNumExpr =
-        create("row_number", analyticExpr, true, false);
-    AnalyticExpr countExpr =
-        create("count", analyticExpr, false, false);
+    AnalyticExpr rowNumExpr = create("row_number", analyticExpr, true, false);
+    AnalyticExpr countExpr = create("count", analyticExpr, false, false);
 
     List<Expr> ifParams = Lists.newArrayList();
     ifParams.add(

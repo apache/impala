@@ -1545,3 +1545,20 @@ select id, rank() over(order by id) from functional.alltypesagg limit 10
 ---- TYPES
 INT, BIGINT
 ====
+---- QUERY
+# IMPALA-2457 - PERCENT_RANK() returns NaN for row group with 1 row.
+select id, rank() over (partition by id order by tinyint_col),
+count() over (partition by id), percent_rank() over (partition by id order by tinyint_col)
+from functional.alltypestiny
+---- RESULTS
+4,1,1,0
+6,1,1,0
+0,1,1,0
+1,1,1,0
+2,1,1,0
+5,1,1,0
+3,1,1,0
+7,1,1,0
+---- TYPES
+int, bigint, bigint, double
+====
