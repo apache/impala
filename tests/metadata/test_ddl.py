@@ -23,6 +23,7 @@ from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIfIsilon
 from tests.common.skip import SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 
@@ -180,6 +181,8 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/create', vector, use_db='ddl_test_db',
         multiple_impalad=self._use_multiple_impalad(vector))
 
+  @SkipIfS3.hive
+  @SkipIfIsilon.hive
   @pytest.mark.execute_serially
   def test_create_hive_integration(self, vector):
     """Verifies that creating a catalog entity (database, table) in Impala using
