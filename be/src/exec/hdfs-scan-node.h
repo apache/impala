@@ -261,6 +261,11 @@ class HdfsScanNode : public ScanNode {
   /// order set to conjuncts.size()
   void ComputeSlotMaterializationOrder(std::vector<int>* order) const;
 
+  /// Returns true if there are no materialized slots, such as a count(*) over the table.
+  inline bool IsZeroSlotTableScan() {
+    return materialized_slots().empty() && tuple_desc()->tuple_path().empty();
+  }
+
   /// map from volume id to <number of split, per volume split lengths>
   typedef boost::unordered_map<int32_t, std::pair<int, int64_t> > PerVolumnStats;
 

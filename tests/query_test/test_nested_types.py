@@ -54,8 +54,6 @@ class TestNestedTypes(ImpalaTestSuite):
 
   def test_tpch(self, vector):
     """Queries over the larger nested TPCH dataset."""
-    # This test takes a long time (minutes), only run in exhaustive
-    if self.exploration_strategy() != 'exhaustive': pytest.skip()
     self.run_test_case('QueryTest/nested-types-tpch', vector)
 
 @SkipIfOldAggsJoins.nested_types

@@ -127,11 +127,12 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       DiskIoMgr::ScanRange* split = files[i]->splits[j];
 
       DCHECK_LE(split->offset() + split->len(), files[i]->file_length);
-      // If this is a count(*), we can get the result with the file metadata alone and
-      // don't need to read any row groups. We only want a single node to process the
-      // file footer in this case, which is the node with the footer split.
-      // If it's not a count(*), we create a footer range for the split always.
-      if (!scan_node->materialized_slots().empty() || footer_split == split) {
+      // If there are no materialized slots (such as count(*) over the table), we can
+      // get the result with the file metadata alone and don't need to read any row
+      // groups. We only want a single node to process the file footer in this case,
+      // which is the node with the footer split.  If it's not a count(*), we create a
+      // footer range for the split always.
+      if (!scan_node->IsZeroSlotTableScan() || footer_split == split) {
         ScanRangeMetadata* split_metadata =
             reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
         // Each split is processed by first issuing a scan range for the file footer, which
@@ -1800,10 +1801,9 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   // Parse file schema
   RETURN_IF_ERROR(CreateSchemaTree(file_metadata_.schema, &schema_));
 
-  if (scan_node_->materialized_slots().empty() &&
-      scan_node_->tuple_desc()->tuple_path().empty()) {
-    // This is a count(*) over the table.  We can serve this query from just the file
-    // metadata.  We don't need to read the column data.
+  if (scan_node_->IsZeroSlotTableScan()) {
+    // There are no materialized slots, e.g. count(*) over the table.  We can serve
+    // this query from just the file metadata.  We don't need to read the column data.
     int64_t num_tuples = file_metadata_.num_rows;
     COUNTER_ADD(scan_node_->rows_read_counter(), num_tuples);
 
