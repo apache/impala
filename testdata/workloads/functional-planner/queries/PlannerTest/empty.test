@@ -435,6 +435,6 @@ where c_custkey < 10
 |  03:EMPTYSET
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=554.12MB
    predicates: c_custkey < 10
 ====
