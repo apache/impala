@@ -411,7 +411,8 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
       if (client->tracker_->TryConsume(len)) {
         // TODO: Have a cache of unused blocks of size 'len' (0, max_block_size_)
         uint8_t* buffer = new uint8_t[len];
-        new_block->buffer_desc_ = obj_pool_.Add(new BufferDescriptor(buffer, len));
+        // Descriptors for non-I/O sized buffers are deleted when the block is deleted.
+        new_block->buffer_desc_ = new BufferDescriptor(buffer, len);
         new_block->buffer_desc_->block = new_block;
         new_block->is_pinned_ = true;
         client->PinBuffer(new_block->buffer_desc_);
@@ -877,11 +878,12 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
       // Just delete the block for now.
       delete[] block->buffer_desc_->buffer;
       block->client_->tracker_->Release(block->buffer_desc_->len);
+      delete block->buffer_desc_;
     } else if (!free_io_buffers_.Contains(block->buffer_desc_)) {
       free_io_buffers_.Enqueue(block->buffer_desc_);
       buffer_available_cv_.notify_one();
+      block->buffer_desc_->block = NULL;
     }
-    block->buffer_desc_->block = NULL;
     block->buffer_desc_ = NULL;
   }
   ReturnUnusedBlock(block);
@@ -936,6 +938,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     //  1. In the unpinned list. The buffer will not be in the free list.
     //  2. in_write_ == true. The buffer will not be in the free list.
     //  3. The buffer is free, but hasn't yet been reassigned to a different block.
+    DCHECK_EQ(block->buffer_desc_->len, max_block_size()) << "Non-I/O blocks are always pinned";
     DCHECK(unpinned_blocks_.Contains(block) ||
            block->in_write_ ||
            free_io_buffers_.Contains(block->buffer_desc_));
@@ -970,6 +973,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     }
 
     DCHECK(buffer_desc != NULL);
+    DCHECK_EQ(buffer_desc->len, max_block_size()) << "Non-I/O buffer";
     if (buffer_desc->block != NULL) {
       // This buffer was assigned to a block but now we are reusing it. Reset the
       // previous block->buffer link.
