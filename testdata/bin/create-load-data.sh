@@ -304,6 +304,18 @@ function custom-post-load-steps {
   hadoop fs -Ddfs.block.size=1048576 -put -f \
     ${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 \
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
+
+  # IMPALA-2466: Add more tests to the HDFS Parquet scanner (Added after IMPALA-1881)
+  hadoop fs -mkdir -p /test-warehouse/lineitem_sixblocks_parquet && \
+  hadoop fs -Ddfs.block.size=1048576 -put -f \
+    ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_sixblocks.parquet \
+    /test-warehouse/lineitem_sixblocks_parquet
+
+  # IMPALA-2466: Add more tests to the HDFS Parquet scanner (this has only one row group)
+  hadoop fs -mkdir -p /test-warehouse/lineitem_multiblock_one_row_group_parquet && \
+  hadoop fs -Ddfs.block.size=1048576 -put -f \
+    ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_one_row_group.parquet \
+    /test-warehouse/lineitem_multiblock_one_row_group_parquet
 }
 
 function copy-and-load-ext-data-source {

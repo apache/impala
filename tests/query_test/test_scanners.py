@@ -215,32 +215,69 @@ class TestParquet(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
-    # we verify if each impalad reads one block by checking if each impalad reads at
-    # least one row group.
+    # each impalad should read 1 scan range.
     # It needs to execute serially because if there is at a time more, than one query
     # being scheduled, the simple scheduler round robins colocated impalads across
     # all running queries. See IMPALA-2479 for more details.
-    DB_NAME = 'functional_parquet'
-    TABLE_NAME = 'lineitem_multiblock'
-    query = 'select count(l_orderkey) from %s.%s' % (DB_NAME, TABLE_NAME)
+    table_name = 'functional_parquet.lineitem_multiblock'
+    self._multiple_blocks_helper(table_name, 20000, ranges_per_node=1)
+    table_name = 'functional_parquet.lineitem_sixblocks'
+    # 2 scan ranges per node should be created to read 'lineitem_sixblocks' because
+    # there are 6 blocks and 3 scan nodes.
+    self._multiple_blocks_helper(table_name, 40000, ranges_per_node=2)
+
+  @SkipIfS3.hdfs_block_size
+  @SkipIfIsilon.hdfs_block_size
+  @SkipIfLocal.multiple_impalad
+  @pytest.mark.execute_serially
+  def test_multiple_blocks_one_row_group(self, vector):
+    # For IMPALA-1881. The table functional_parquet.lineitem_multiblock_one_row_group has
+    # 3 blocks but only one row group across these blocks. We test to see that only one
+    # scan range reads everything from this row group.
+    table_name = 'functional_parquet.lineitem_multiblock_one_row_group'
+    self._multiple_blocks_helper(
+        table_name, 40000, one_row_group=True, ranges_per_node=1)
+
+  def _multiple_blocks_helper(
+      self, table_name, rows_in_table, one_row_group=False, ranges_per_node=1):
+    """ This function executes a simple SELECT query on a multiblock parquet table and
+    verifies the number of ranges issued per node and verifies that at least one row group
+    was read. If 'one_row_group' is True, then one scan range is expected to read the data
+    from the entire table regardless of the number of blocks. 'ranges_per_node' indicates
+    how many scan ranges we expect to be issued per node. """
+
+    query = 'select count(l_orderkey) from %s' % table_name
     result = self.client.execute(query)
     assert len(result.data) == 1
-    assert result.data[0] == '20000'
+    assert result.data[0] == str(rows_in_table)
 
     runtime_profile = str(result.runtime_profile)
     num_row_groups_list = re.findall('NumRowGroups: ([0-9]*)', runtime_profile)
-    scan_ranges_complete_list = re.findall('ScanRangesComplete: ([0-9]*)', runtime_profile)
+    scan_ranges_complete_list = re.findall(
+        'ScanRangesComplete: ([0-9]*)', runtime_profile)
+    num_rows_read_list = re.findall('RowsRead: [0-9.K]* \(([0-9]*)\)', runtime_profile)
+
     # This will fail if the number of impalads != 3
     # The fourth fragment is the "Averaged Fragment"
     assert len(num_row_groups_list) == 4
     assert len(scan_ranges_complete_list) == 4
+    assert len(num_rows_read_list) == 4
 
+    total_num_row_groups = 0
     # Skip the Averaged Fragment; it comes first in the runtime profile.
     for num_row_groups in num_row_groups_list[1:]:
-      assert int(num_row_groups) > 0
+      total_num_row_groups += int(num_row_groups)
+      if not one_row_group: assert int(num_row_groups) > 0
 
-    for scan_ranges_complete in scan_ranges_complete_list[1:]:
-      assert int(scan_ranges_complete) == 1
+    if one_row_group:
+      # If it's the one row group test, only one scan range should read all the data from
+      # that row group.
+      assert total_num_row_groups == 1
+      for rows_read in num_rows_read_list[1:]:
+        if rows_read != '0': assert rows_read == str(rows_in_table)
+
+    for scan_ranges_complete in scan_ranges_complete_list:
+      assert int(scan_ranges_complete) == ranges_per_node
 
   @SkipIfS3.insert
   def test_annotate_utf8_option(self, vector, unique_database):

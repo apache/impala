@@ -53,7 +53,7 @@ SELECT * from bad_magic_number
 File '$NAMENODE/test-warehouse/bad_magic_number_parquet/bad_magic_number.parquet' has an invalid version number: XXXX
 ====
 ---- QUERY
-# count(*) query on parquet file with multiple blocks
+# count(*) query on parquet file with multiple blocks (one block per node)
 SELECT count(*) from lineitem_multiblock
 ---- TYPES
 bigint
@@ -61,7 +61,15 @@ bigint
 20000
 ====
 ---- QUERY
-# Select multiple columns from parquet file with multiple blocks
+# count(*) query on parquet file with more than one block per node
+SELECT count(*) from lineitem_sixblocks
+---- TYPES
+bigint
+---- RESULTS
+40000
+====
+---- QUERY
+# Select multiple columns from parquet file with multiple blocks (one block per node)
 SELECT count(l_comment), min(l_partkey), max(l_linenumber) from lineitem_multiblock;
 ---- TYPES
 bigint, bigint, int
@@ -69,8 +77,44 @@ bigint, bigint, int
 20000,2,7
 ====
 ---- QUERY
-# Test limit queries on parquet with multiple blocks
-select distinct l_orderkey from functional_parquet.lineitem_multiblock where
+# Select multiple columns from parquet file with more than one block per node
+SELECT count(l_comment), min(l_partkey), max(l_linenumber) from lineitem_sixblocks;
+---- TYPES
+bigint, bigint, int
+---- RESULTS
+40000,2,7
+====
+---- QUERY
+# Test limit queries on parquet with multiple blocks (one block per node)
+select distinct l_orderkey from lineitem_multiblock where
+l_orderkey < 5 or l_orderkey > 15000 order by l_orderkey limit 20;
+---- TYPES
+bigint
+---- RESULTS
+1
+2
+3
+4
+15008
+15009
+15010
+15011
+15012
+15013
+15014
+15015
+15040
+15041
+15042
+15043
+15044
+15045
+15046
+15047
+====
+---- QUERY
+# Test limit queries on parquet with more than one block per node
+select distinct l_orderkey from lineitem_sixblocks where
 l_orderkey < 5 or l_orderkey > 15000 order by l_orderkey limit 20;
 ---- TYPES
 bigint
