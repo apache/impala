@@ -1653,3 +1653,22 @@ where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
    predicates: t1.int_struct_col.f1 = 10
    predicates on t2: t2.item = 1
 ====
+# IMPALA-2478: Test assignment of where-clause conjuncts with an outer-joined
+# # correlated inline view.
+select id from functional.allcomplextypes t1 left outer join
+  (select pos, item from t1.int_array_col t2) v
+ where t1.id > v.pos and v.item = 1
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  predicates: t1.id > pos, item = 1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [t1.int_array_col t2]
+|
+00:SCAN HDFS [functional.allcomplextypes t1]
+   partitions=0/0 files=0 size=0B
+   predicates on t2: t2.item = 1
+====

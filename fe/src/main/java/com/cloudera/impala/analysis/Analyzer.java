@@ -1432,6 +1432,9 @@ public class Analyzer {
           }
           try {
             p = srcConjunct.trySubstitute(smap, this, false);
+            // Unset the id because this bound predicate itself is not registered, and
+            // to prevent callers from inadvertently marking the srcConjunct as assigned.
+            p.setId(null);
           } catch (ImpalaException exc) {
             // not an executable predicate; ignore
             continue;
