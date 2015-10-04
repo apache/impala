@@ -84,7 +84,10 @@ void LikePredicate::LikePrepare(FunctionContext* context,
       string re_pattern;
       ConvertLikePattern(context,
           *reinterpret_cast<StringVal*>(context->GetConstantArg(1)), &re_pattern);
-      state->regex_.reset(new RE2(re_pattern));
+      RE2::Options opts;
+      opts.set_never_nl(false);
+      opts.set_dot_nl(true);
+      state->regex_.reset(new RE2(re_pattern, opts));
       if (!state->regex_->ok()) {
         context->SetError(
             strings::Substitute("Invalid regex: $0", pattern_val.ptr).c_str());
@@ -343,13 +346,16 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
     }
   } else {
     string re_pattern;
+    RE2::Options opts;
     if (is_like_pattern) {
       ConvertLikePattern(context, pattern_value, &re_pattern);
+      opts.set_never_nl(false);
+      opts.set_dot_nl(true);
     } else {
       re_pattern =
         string(reinterpret_cast<const char*>(pattern_value.ptr), pattern_value.len);
     }
-    re2::RE2 re(re_pattern);
+    re2::RE2 re(re_pattern, opts);
     if (re.ok()) {
       if (is_like_pattern) {
         return RE2::FullMatch(re2::StringPiece(

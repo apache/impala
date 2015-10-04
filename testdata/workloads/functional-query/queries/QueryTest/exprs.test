@@ -2033,6 +2033,20 @@ where NOT REGEXP_LIKE(str_col, match_regex_col)
 string, string
 ====
 ---- QUERY
+select translate(tmp.str, '\n', '@'), match_like_col
+from (values('one\ntwo' as str), ('\n')) as tmp, LikeTbl
+where tmp.str LIKE match_like_col
+---- RESULTS
+'one@two','%one%'
+'one@two','%two%'
+'one@two','%'
+'one@two','%'
+'@','%'
+'@','%'
+---- TYPES
+string, string
+====
+---- QUERY
 select str_col, no_match_regex_col from LikeTbl
 where NOT REGEXP_LIKE(str_col, no_match_regex_col)
 ---- RESULTS

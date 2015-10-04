@@ -1460,6 +1460,26 @@ TEST_F(ExprTest, LikePredicate) {
   TestIsNull("NULL REGEXP 'a'", TYPE_BOOLEAN);
   TestIsNull("'a' REGEXP NULL", TYPE_BOOLEAN);
   TestIsNull("NULL REGEXP NULL", TYPE_BOOLEAN);
+  // Test multi-line strings.
+  TestValue("'abc\n123' LIKE 'abc_123'", TYPE_BOOLEAN, true);
+  TestValue("'abc\n\n123' LIKE 'abc_123'", TYPE_BOOLEAN, false);
+  TestValue("'\n' LIKE 'a'", TYPE_BOOLEAN, false);
+  TestValue("'\n' LIKE '\n'", TYPE_BOOLEAN, true);
+  TestValue("'n\n' LIKE '\n'", TYPE_BOOLEAN, false);
+  TestValue("'\n\n' LIKE '_\n'", TYPE_BOOLEAN, true);
+  TestValue("'\n\n' LIKE '%\n'", TYPE_BOOLEAN, true);
+  TestValue("'\n\n' LIKE '\n_'", TYPE_BOOLEAN, true);
+  TestValue("'\n\n' LIKE '\n%'", TYPE_BOOLEAN, true);
+  TestValue("'\n\n' LIKE '__\n'", TYPE_BOOLEAN, false);
+  TestValue("'\n\n\n' LIKE '\n_\n'", TYPE_BOOLEAN, true);
+  TestValue("'abc\n123' LIKE 'abc%123'", TYPE_BOOLEAN, true);
+  TestValue("'abc\n\n123' LIKE 'abc%123'", TYPE_BOOLEAN, true);
+  TestValue("'\nabc\n123' LIKE '%abc_123'", TYPE_BOOLEAN, true);
+  TestValue("'abc\n123\nedf' LIKE 'abc%edf'", TYPE_BOOLEAN, true);
+  // Make sure that constant match handles '\n' properly.
+  TestValue("'abc\n123' LIKE 'abc%'", TYPE_BOOLEAN, true);
+  TestValue("'123\nabc' LIKE '%abc'", TYPE_BOOLEAN, true);
+  TestValue("'123\nabc\n123' LIKE '%abc%'", TYPE_BOOLEAN, true);
 }
 
 TEST_F(ExprTest, BetweenPredicate) {

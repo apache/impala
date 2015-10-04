@@ -48,29 +48,30 @@ class LikePredicate: public Predicate {
     char escape_char_;
 
     /// This is the function, set in the prepare function, that will be used to determine
-    /// the value of the predicate. It will be set depending on whether the expression is a
-    /// LIKE, RLIKE or REGEXP predicate, whether the pattern is a constant arguement
+    /// the value of the predicate. It will be set depending on whether the expression is
+    /// a LIKE, RLIKE or REGEXP predicate, whether the pattern is a constant argument
     /// and whether the pattern has any constant substrings. If the pattern is not a
-    /// constant arguement, none of the following fields can be set because we cannot know
+    /// constant argument, none of the following fields can be set because we cannot know
     /// the format of the pattern in the prepare function and must deal with each pattern
     /// seperately.
     LikePredicateFunction function_;
 
-    /// Holds the string the StringValue points to and is set any time StringValue is used.
+    /// Holds the string the StringValue points to and is set any time StringValue is
+    /// used.
     std::string search_string_;
 
-    /// Used for LIKE predicates if the pattern is a constant arguement, and is either a
+    /// Used for LIKE predicates if the pattern is a constant argument, and is either a
     /// constant string or has a constant string at the beginning or end of the pattern.
     /// This will be set in order to check for that pattern in the corresponding part of
     /// the string.
     StringValue search_string_sv_;
 
-    /// Used for LIKE predicates if the pattern is a constant arguement and has a constant
+    /// Used for LIKE predicates if the pattern is a constant argument and has a constant
     /// string in the middle of it. This will be use in order to check for the substring
     /// in the value.
     StringSearch substring_pattern_;
 
-    /// Used for RLIKE and REGEXP predicates if the pattern is a constant aruement.
+    /// Used for RLIKE and REGEXP predicates if the pattern is a constant argument.
     boost::scoped_ptr<re2::RE2> regex_;
 
     LikePredicateState() : escape_char_('\\') {
