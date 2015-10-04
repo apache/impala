@@ -30,7 +30,7 @@ order by
 |  group by: l_returnflag, l_linestatus
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: l_shipdate <= '1998-09-02'
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
@@ -50,7 +50,7 @@ order by
 |  group by: l_returnflag, l_linestatus
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: l_shipdate <= '1998-09-02'
 ====
 # TPCH-Q2
@@ -300,7 +300,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: c_mktsegment = 'BUILDING'
    predicates on o: o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -339,7 +339,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: c_mktsegment = 'BUILDING'
    predicates on o: o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -392,7 +392,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
 ---- DISTRIBUTEDPLAN
@@ -429,7 +429,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
 ====
@@ -502,7 +502,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -563,7 +563,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
 ====
 # TPCH-Q6
@@ -582,7 +582,7 @@ where
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [FINALIZE]
@@ -594,7 +594,7 @@ where
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24
 ====
 # TPCH-Q7
@@ -679,7 +679,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
 ---- DISTRIBUTEDPLAN
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -740,7 +740,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
 ====
 # TPCH-Q8
@@ -838,7 +838,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
 ---- DISTRIBUTEDPLAN
 29:MERGING-EXCHANGE [UNPARTITIONED]
@@ -916,7 +916,7 @@ order by
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
 ====
 # TPCH-Q9
@@ -994,7 +994,7 @@ order by
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ---- DISTRIBUTEDPLAN
 22:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: nation ASC, o_year DESC
@@ -1054,7 +1054,7 @@ order by
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # TPCH-Q10
 # Q10 - Returned Item Reporting Query
@@ -1120,7 +1120,7 @@ limit 20
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
    predicates on l: l_returnflag = 'R'
 ---- DISTRIBUTEDPLAN
@@ -1166,7 +1166,7 @@ limit 20
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
    predicates on l: l_returnflag = 'R'
 ====
@@ -1368,7 +1368,7 @@ order by
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1396,7 +1396,7 @@ order by
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
 ====
 # TPCH-Q13
@@ -1441,7 +1441,7 @@ order by
 |  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
 ---- DISTRIBUTEDPLAN
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1479,7 +1479,7 @@ order by
 |  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
 ====
 # TPCH-Q14
@@ -1505,7 +1505,7 @@ where
 |  hash predicates: p_partkey = l_partkey
 |
 |--00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
 |
 01:SCAN HDFS [tpch_nested_parquet.part p]
@@ -1525,7 +1525,7 @@ where
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
 |
 01:SCAN HDFS [tpch_nested_parquet.part p]
@@ -1578,7 +1578,7 @@ order by
 |  |  group by: l_suppkey
 |  |
 |  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
 |
 06:HASH JOIN [INNER JOIN]
@@ -1592,7 +1592,7 @@ order by
 |  group by: l_suppkey
 |
 01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
 ---- DISTRIBUTEDPLAN
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1625,7 +1625,7 @@ order by
 |  |  group by: l_suppkey
 |  |
 |  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1647,7 +1647,7 @@ order by
 |  group by: l_suppkey
 |
 01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
 ====
 # TPCH-Q16
@@ -1777,7 +1777,7 @@ where
 |  |  group by: l_partkey
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
@@ -1787,7 +1787,7 @@ where
 |     predicates: p_brand = 'Brand#23', p_container = 'MED BOX'
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ---- DISTRIBUTEDPLAN
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice)
@@ -1814,7 +1814,7 @@ where
 |  |  group by: l_partkey
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -1826,7 +1826,7 @@ where
 |     predicates: p_brand = 'Brand#23', p_container = 'MED BOX'
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # TPCH-Q18
 # Q18 - Large Value Customer Query
@@ -1886,7 +1886,7 @@ limit 100
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ---- DISTRIBUTEDPLAN
 16:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_totalprice DESC, o_orderdate ASC
@@ -1930,7 +1930,7 @@ limit 100
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # TPCH-Q19
 # Q19 - Discounted Revenue Query
@@ -1981,7 +1981,7 @@ where
 |     partitions=1/1 files=1 size=6.30MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * (1 - l_discount))
@@ -2001,7 +2001,7 @@ where
 |     partitions=1/1 files=1 size=6.30MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # TPCH-Q20
 # Note: Tricky rewrite from the original to avoid mixing
@@ -2053,7 +2053,7 @@ order by
 |  |  group by: l_partkey, l_suppkey
 |  |
 |  07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 |
 10:HASH JOIN [LEFT SEMI JOIN]
@@ -2112,7 +2112,7 @@ order by
 |  |  group by: l_partkey, l_suppkey
 |  |
 |  07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 |
 10:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -2232,7 +2232,7 @@ limit 100
 |  04:UNNEST [c.c_orders o]
 |
 01:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
@@ -2298,7 +2298,7 @@ limit 100
 |  04:UNNEST [c.c_orders o]
 |
 01:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates on o: o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
@@ -2352,7 +2352,7 @@ order by
 |  |  output: avg(c_acctbal)
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.customer c]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |
 01:SUBPLAN
@@ -2364,7 +2364,7 @@ order by
 |  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 ---- DISTRIBUTEDPLAN
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2397,7 +2397,7 @@ order by
 |  |  output: avg(c_acctbal)
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.customer c]
-|     partitions=1/1 files=4 size=554.12MB
+|     partitions=1/1 files=4 size=554.13MB
 |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |
 01:SUBPLAN
@@ -2409,6 +2409,6 @@ order by
 |  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.12MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 ====
