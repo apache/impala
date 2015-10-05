@@ -5,6 +5,7 @@ from subprocess import check_call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_test_suite import create_single_exec_option_dimension
+from tests.util.filesystem_utils import get_fs_path
 
 class TestRewrittenFile(ImpalaTestSuite):
   """Tests that we gracefully handle when a file in HDFS is rewritten outside of Impala
@@ -15,14 +16,15 @@ class TestRewrittenFile(ImpalaTestSuite):
   DATABASE = "test_written_file_" + str(random.randint(0, 10**10))
 
   TABLE_NAME = "alltypes_rewritten_file"
-  TABLE_LOCATION = "/test-warehouse/%s" % DATABASE
+  TABLE_LOCATION = get_fs_path("/test-warehouse/%s" % DATABASE)
   FILE_NAME = "alltypes.parq"
   # file size = 17.8 KB
-  SHORT_FILE = "/test-warehouse/alltypesagg_parquet/year=2010/month=1/" \
-      "day=__HIVE_DEFAULT_PARTITION__/*.parq"
+  SHORT_FILE = get_fs_path("/test-warehouse/alltypesagg_parquet/year=2010/month=1/" \
+      "day=__HIVE_DEFAULT_PARTITION__/*.parq")
   SHORT_FILE_NUM_ROWS = 1000
   # file size = 43.3 KB
-  LONG_FILE = "/test-warehouse/alltypesagg_parquet/year=2010/month=1/day=9/*.parq"
+  LONG_FILE = get_fs_path("/test-warehouse/alltypesagg_parquet/year=2010/month=1/" \
+      "day=9/*.parq")
   LONG_FILE_NUM_ROWS = 1000
 
   @classmethod
@@ -110,7 +112,7 @@ class TestRewrittenFile(ImpalaTestSuite):
       result = self.client.execute("select * from %s" % self.__full_table_name())
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert 'appears stale.' in str(e)
+      assert 'No such file or directory' in str(e)
 
     # Refresh the table and make sure we get results
     self.client.execute("refresh %s" % self.__full_table_name())

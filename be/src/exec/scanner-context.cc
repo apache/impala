@@ -296,16 +296,10 @@ bool ScannerContext::cancelled() const {
 }
 
 Status ScannerContext::Stream::ReportIncompleteRead(int64_t length, int64_t bytes_read) {
-  stringstream ss;
-  ss << "Tried to read " << length << " bytes but could only read "
-     << bytes_read << " bytes. This may indicate data file corruption. "
-     << "(file " << filename() << ", byte offset: " << file_offset() << ")";
-  return Status(ss.str());
+  return Status(TErrorCode::SCANNER_INCOMPLETE_READ, length, bytes_read,
+      filename(), file_offset());
 }
 
 Status ScannerContext::Stream::ReportInvalidRead(int64_t length) {
-  stringstream ss;
-  ss << "Invalid read of " << length << " bytes. This may indicate data file corruption. "
-     << "(file " << filename() << ", byte offset: " << file_offset() << ")";
-  return Status(ss.str());
+  return Status(TErrorCode::SCANNER_INVALID_READ, length, filename(), file_offset());
 }

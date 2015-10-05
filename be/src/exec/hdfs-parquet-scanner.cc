@@ -1702,13 +1702,17 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   uint8_t* buffer;
   bool success = stream_->ReadBytes(len, &buffer, &parse_status_);
   if (!success) {
-    VLOG_QUERY << "Metadata for file '" << stream_->filename() << "' appears stale: "
-               << "metadata states file size to be "
-               << PrettyPrinter::Print(stream_->file_desc()->file_length, TUnit::BYTES)
-               << ", but could only read "
-               << PrettyPrinter::Print(stream_->total_bytes_returned(), TUnit::BYTES);
-    return Status(TErrorCode::STALE_METADATA_FILE_TOO_SHORT, stream_->filename(),
-        scan_node_->hdfs_table()->fully_qualified_name());
+    DCHECK(!parse_status_.ok());
+    if (parse_status_.code() == TErrorCode::SCANNER_INCOMPLETE_READ) {
+      VLOG_QUERY << "Metadata for file '" << stream_->filename() << "' appears stale: "
+                 << "metadata states file size to be "
+                 << PrettyPrinter::Print(stream_->file_desc()->file_length, TUnit::BYTES)
+                 << ", but could only read "
+                 << PrettyPrinter::Print(stream_->total_bytes_returned(), TUnit::BYTES);
+      return Status(TErrorCode::STALE_METADATA_FILE_TOO_SHORT, stream_->filename(),
+          scan_node_->hdfs_table()->fully_qualified_name());
+    }
+    return parse_status_;
   }
   DCHECK(stream_->eosr());
 
