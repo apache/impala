@@ -333,6 +333,13 @@ build-and-copy-hive-udfs
 # Configure alltypes_seq as a read-only table. This is required for fe tests.
 hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
 hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+
+#IMPALA-1881: data file produced by hive with multiple blocks.
+hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
+hadoop fs -Ddfs.block.size=1048576 -put -f \
+  ${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 \
+  ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
+
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   # Caching tables in s3 returns an IllegalArgumentException, see IMPALA-1714
   cache-test-tables

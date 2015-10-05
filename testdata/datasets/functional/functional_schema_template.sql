@@ -1741,8 +1741,4 @@ L_SHIPMODE STRING
 L_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/lineitem_multiblock_parquet && \
-hadoop fs -Ddfs.block.size=1048576 -put -f \
-${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 /test-warehouse/lineitem_multiblock_parquet
 ====

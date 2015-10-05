@@ -31,6 +31,7 @@ class SkipIfS3:
   load_data = pytest.mark.skipif(IS_S3, reason="LOAD DATA not implemented for S3")
   caching = pytest.mark.skipif(IS_S3, reason="SET CACHED not implemented for S3")
   hive = pytest.mark.skipif(IS_S3, reason="Hive doesn't work with S3")
+  hdfs_block_size = pytest.mark.skipif(IS_S3, reason="S3 uses it's own block size")
   jira = partial(pytest.mark.skipif, IS_S3)
 
   # These ones need test infra work to re-enable.
