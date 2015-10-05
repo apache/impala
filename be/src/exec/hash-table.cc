@@ -32,7 +32,7 @@
 using namespace impala;
 using namespace llvm;
 
-DEFINE_bool(enable_quadratic_probing, false, "Enable quadratic probing hash table");
+DEFINE_bool(enable_quadratic_probing, true, "Enable quadratic probing hash table");
 
 const char* HashTableCtx::LLVM_CLASS_NAME = "class.impala::HashTableCtx";
 
