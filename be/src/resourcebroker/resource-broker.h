@@ -16,12 +16,14 @@
 #define RESOURCE_BROKER_H_
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/uuid/uuid.hpp>
 
 #include "runtime/client-cache.h"
 #include "util/collection-metrics.h"
 #include "util/promise.h"
+#include "util/stopwatch.h"
 #include "gen-cpp/LlamaAMService.h"
 #include "gen-cpp/LlamaNotificationService.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
@@ -33,6 +35,7 @@ class Status;
 class MetricGroup;
 class Scheduler;
 class ResourceBrokerNotificationServiceClient;
+class RuntimeProfile;
 
 /// Mediates resource-reservation requests between Impala and Yarn via the Llama service.
 /// The resource broker requests resources via the Llama's thrift interface and exposes
@@ -55,26 +58,33 @@ class ResourceBroker {
   void Close();
 
   /// Requests resources from Llama. Blocks until the request has been granted or denied.
+  /// TODO: Remove thrift interface
   Status Reserve(const TResourceBrokerReservationRequest& request,
       TResourceBrokerReservationResponse* response);
 
-  /// Requests more resources from Llama for an existing reservation. Blocks until the
-  /// request has been granted or denied.
-  Status Expand(const TResourceBrokerExpansionRequest& request,
-      TResourceBrokerExpansionResponse* response);
+  /// Requests more resources specified by 'resource' from Llama for an existing
+  /// reservation specified by the 'reservation_id'. Blocks until the request has been
+  /// granted or rejected, or no response is received within the timeout specified, in
+  /// which case a call to cancel the outstanding expansion is made and the call returns
+  /// with an error status. If timeout_ms <= 0, the call will not timeout. If the
+  /// expansion is successful, an OK status is returned and the 'expansion_id' and
+  /// 'allocated_resource' are set. An error status is returned if a timeout or an error
+  /// occurs.
+  Status Expand(const TUniqueId& reservation_id, const llama::TResource& resource,
+      int64_t timeout_ms, llama::TUniqueId* expansion_id,
+      llama::TAllocatedResource* allocated_resource);
 
-  /// Removes the record of all resource requests associated with this reservationID
-  /// (except the reservation request itself, if include_reservation is false) so that the
-  /// per-node accounting is correct when plan fragments finish. Does not communicate this
-  /// to Llama (i.e. only updates the local node's accounting), so the coordinator should
-  /// always call Release() to make sure that Llama knows the resources have gone.
-  void ClearRequests(const TUniqueId& reservation_id, bool include_reservation);
+  /// Removes the record of all resource requests associated with this
+  /// 'reservation_id', updating the per-node accounting of resources and cancels any
+  /// threads waiting on pending expansions. Does not communicate this to Llama, so the
+  /// coordinator should always call ReleaseReservation() to make sure that Llama knows
+  /// the resources should be released.
+  void ClearRequests(const TUniqueId& reservation_id);
 
   /// Releases resources acquired from Llama for this reservation and all associated
   /// expansion requests across _all_ nodes. Should therefore only be called once per
-  /// query.
-  Status Release(const TResourceBrokerReleaseRequest& request,
-      TResourceBrokerReleaseResponse* response);
+  /// query by the coordinator.
+  Status ReleaseReservation(const TUniqueId& reservation_id);
 
   /// Handles asynchronous Llama Application Master (AM) notifications including
   /// granted/denied/preempted reservations and resources.
@@ -98,9 +108,8 @@ class ResourceBroker {
   /// Retrieves or creates a new QueryResourceMgr for the given query ID. Returns true if
   /// this is the first 'checkout' of this QueryResourceMgr, false otherwise. The other
   /// parameters are passed to the QueryResourceMgr constructor.
-  bool GetQueryResourceMgr(const TUniqueId& query_id,
-      const TUniqueId& reservation_id, const TNetworkAddress& local_resource_address,
-      QueryResourceMgr** res_mgr);
+  bool GetQueryResourceMgr(const TUniqueId& query_id, const TUniqueId& reservation_id,
+      const TNetworkAddress& local_resource_address, QueryResourceMgr** res_mgr);
 
   /// Decrements the reference count for a particular QueryResourceMgr. If this is the last
   /// reference (i.e. the ref count goes to 0), the QueryResourceMgr is deleted. It's an
@@ -138,20 +147,20 @@ class ResourceBroker {
   /// Detects Llama restarts from the given return status of a Llama RPC.
   bool LlamaHasRestarted(const llama::TStatus& status) const;
 
+  /// Sends a Llama release RPC for the reservation or expansion with the specified
+  /// request_id.
+  Status ReleaseRequest(const llama::TUniqueId& request_id);
+
   /// Creates a Llama reservation request from a resource broker reservation request.
   void CreateLlamaReservationRequest(const TResourceBrokerReservationRequest& src,
       llama::TLlamaAMReservationRequest& dest);
 
-  /// Creates a Llama release request from a resource broker release request.
-  void CreateLlamaReleaseRequest(const TResourceBrokerReleaseRequest& src,
-      llama::TLlamaAMReleaseRequest& dest);
-
   class PendingRequest;
-  /// Wait for a reservation or expansion request to be fulfilled by the Llama via an async
-  /// call into LlamaNotificationThriftIf::AMNotification(), or for a timeout to occur (in
-  /// which case *timed_out is set to true). If the request is fulfilled, resources and
-  /// reservation_id are populated.
-  bool WaitForNotification(int64_t timeout, ResourceMap* resources, bool* timed_out,
+  /// Wait for a reservation or expansion request to be fulfilled by the Llama via an
+  /// async call into LlamaNotificationThriftIf::AMNotification(). If timeout_ms > 0, the
+  /// call will not wait longer than timeout_ms before returning false and *timed_out set
+  /// to true. If the request is fulfilled, resources and reservation_id are populated.
+  bool WaitForNotification(int64_t timeout_ms, ResourceMap* resources, bool* timed_out,
       PendingRequest* reservation);
 
   /// Llama availability group.
@@ -280,7 +289,7 @@ class ResourceBroker {
     PendingRequest(const llama::TUniqueId& reservation_id,
         const llama::TUniqueId& request_id, bool is_expansion)
         : reservation_id_(reservation_id), request_id_(request_id),
-          is_expansion_(is_expansion) {
+          is_expansion_(is_expansion), is_cancelled_(false) {
       DCHECK(is_expansion || reservation_id == request_id);
     }
 
@@ -302,6 +311,11 @@ class ResourceBroker {
     const llama::TUniqueId& reservation_id() const { return reservation_id_; }
 
     bool is_expansion() const { return is_expansion_; }
+    bool is_cancelled() const { return is_cancelled_; }
+
+    /// Sets the cancelled flag to true. Is only called before the promise is set and
+    /// while the pending_requests_lock_ is held to avoid races.
+    void SetCancelled() { is_cancelled_ = true; }
 
    private:
     /// Promise object that WaitForNotification() waits on and AMNotification() signals.
@@ -322,9 +336,12 @@ class ResourceBroker {
 
     /// True if this is an expansion request, false if it is a reservation request
     bool is_expansion_;
+
+    /// Set if the request was cancelled.
+    bool is_cancelled_;
   };
 
-  /// Protects pending_requests_
+  /// Protects pending_requests_ and pending_expansion_ids_
   boost::mutex pending_requests_lock_;
 
   /// Map from unique request ID provided to Llama (for both reservation and expansion
@@ -332,6 +349,12 @@ class ResourceBroker {
   /// from Llama.
   typedef boost::unordered_map<llama::TUniqueId, PendingRequest*> PendingRequestMap;
   PendingRequestMap pending_requests_;
+
+  /// Map from reservation IDs to pending expansion IDs. All pending request IDs have a
+  /// PendingRequest in pending_requests_.
+  typedef boost::unordered_map<llama::TUniqueId, boost::unordered_set<llama::TUniqueId> >
+      PendingExpansionIdsMap;
+  PendingExpansionIdsMap pending_expansion_ids_;
 
   /// An AllocatedRequest tracks resources allocated in response to one reservation or
   /// expansion request.

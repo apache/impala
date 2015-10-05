@@ -1209,12 +1209,9 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
   mem_limit_counter_->Set(mem_limit);
   block_size_counter_ = ADD_COUNTER(profile_.get(), "MaxBlockSize", TUnit::BYTES);
   block_size_counter_->Set(max_block_size_);
-  created_block_counter_ = ADD_COUNTER(
-      profile_.get(), "BlocksCreated", TUnit::UNIT);
-  recycled_blocks_counter_ = ADD_COUNTER(
-      profile_.get(), "BlocksRecycled", TUnit::UNIT);
-  bytes_written_counter_ = ADD_COUNTER(
-      profile_.get(), "BytesWritten", TUnit::BYTES);
+  created_block_counter_ = ADD_COUNTER(profile_.get(), "BlocksCreated", TUnit::UNIT);
+  recycled_blocks_counter_ = ADD_COUNTER(profile_.get(), "BlocksRecycled", TUnit::UNIT);
+  bytes_written_counter_ = ADD_COUNTER(profile_.get(), "BytesWritten", TUnit::BYTES);
   outstanding_writes_counter_ =
       ADD_COUNTER(profile_.get(), "BlockWritesOutstanding", TUnit::UNIT);
   buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TUnit::UNIT);

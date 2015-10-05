@@ -230,6 +230,9 @@ string MemTracker::LogUsage(const string& prefix) const {
   ss << prefix << label_ << ":";
   if (CheckLimitExceeded()) ss << " memory limit exceeded.";
   if (limit_ > 0) ss << " Limit=" << PrettyPrinter::Print(limit_, TUnit::BYTES);
+  if (rm_reserved_limit_ > 0) {
+    ss << " RM Limit=" << PrettyPrinter::Print(rm_reserved_limit_, TUnit::BYTES);
+  }
   ss << " Consumption=" << PrettyPrinter::Print(consumption(), TUnit::BYTES);
 
   stringstream prefix_ss;
@@ -301,11 +304,8 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
   // in flight.
   if (requested < rm_reserved_limit_) return true;
 
-  TResourceBrokerExpansionRequest exp;
-  query_resource_mgr_->CreateExpansionRequest(max(1L, bytes / (1024 * 1024)), 0L, &exp);
-
-  TResourceBrokerExpansionResponse response;
-  Status status = ExecEnv::GetInstance()->resource_broker()->Expand(exp, &response);
+  int64_t bytes_allocated;
+  Status status = query_resource_mgr_->RequestMemExpansion(bytes, &bytes_allocated);
   if (!status.ok()) {
     LOG(INFO) << "Failed to expand memory limit by "
               << PrettyPrinter::Print(bytes, TUnit::BYTES) << ": "
@@ -313,17 +313,14 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
     return false;
   }
 
-  DCHECK(response.allocated_resources.size() == 1) << "Got more resources than expected";
-  const llama::TAllocatedResource& resource =
-      response.allocated_resources.begin()->second;
-  DCHECK(resource.v_cpu_cores == 0L) << "Unexpected VCPUs returned by Llama";
-
-  // Finally, check whether the allocation that we got took us over the limits for any of
-  // our ancestors.
-  int64_t bytes_allocated = resource.memory_mb * 1024L * 1024L;
   BOOST_FOREACH(const MemTracker* tracker, limit_trackers_) {
     if (tracker == this) continue;
     if (tracker->consumption_->current_value() + bytes_allocated > tracker->limit_) {
+      // TODO: Allocation may be larger than needed and might exceed some parent
+      // tracker limit. IMPALA-2182.
+      VLOG_RPC << "Failed to use " << bytes_allocated << " bytes allocated over "
+               << tracker->label() << " tracker limit=" << tracker->limit_
+               << " consumption=" << tracker->consumption();
       // Don't adjust our limit; rely on query tear-down to release the resource.
       return false;
     }
@@ -332,6 +329,8 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
   rm_reserved_limit_ += bytes_allocated;
   // Resource broker might give us more than we ask for
   if (limit_ != -1) rm_reserved_limit_ = min(rm_reserved_limit_, limit_);
+  VLOG_RPC << "Reservation bytes_allocated=" << bytes_allocated << " rm_reserved_limit="
+           << rm_reserved_limit_ << " limit=" << limit_;
   return true;
 }
 

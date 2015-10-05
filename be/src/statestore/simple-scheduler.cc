@@ -899,16 +899,12 @@ Status SimpleScheduler::Release(QuerySchedule* schedule) {
   }
   if (FLAGS_enable_rm && schedule->NeedsRelease()) {
     DCHECK(resource_broker_ != NULL);
-    TResourceBrokerReleaseRequest request;
-    TResourceBrokerReleaseResponse response;
-    request.reservation_id = schedule->reservation()->reservation_id;
-    resource_broker_->Release(request, &response);
+    Status status = resource_broker_->ReleaseReservation(
+        schedule->reservation()->reservation_id);
     // Remove the reservation from the active-resource maps even if there was an error
     // releasing the reservation because the query running in the reservation is done.
     RemoveFromActiveResourceMaps(*schedule->reservation());
-    if (response.status.status_code != TErrorCode::OK) {
-      return Status(join(response.status.error_msgs, ", "));
-    }
+    RETURN_IF_ERROR(status);
   }
   return Status::OK();
 }
@@ -941,7 +937,9 @@ void SimpleScheduler::RemoveFromActiveResourceMaps(
   }
 }
 
+// TODO: Refactor the Handle*{Reservation,Resource} functions to avoid code duplication.
 void SimpleScheduler::HandlePreemptedReservation(const TUniqueId& reservation_id) {
+  VLOG_QUERY << "HandlePreemptedReservation client_id=" << reservation_id;
   Coordinator* coord = NULL;
   {
     lock_guard<mutex> l(active_resources_lock_);
@@ -960,6 +958,7 @@ void SimpleScheduler::HandlePreemptedReservation(const TUniqueId& reservation_id
 }
 
 void SimpleScheduler::HandlePreemptedResource(const TUniqueId& client_resource_id) {
+  VLOG_QUERY << "HandlePreemptedResource client_id=" << client_resource_id;
   Coordinator* coord = NULL;
   {
     lock_guard<mutex> l(active_resources_lock_);
@@ -974,11 +973,12 @@ void SimpleScheduler::HandlePreemptedResource(const TUniqueId& client_resource_i
     stringstream err_msg;
     err_msg << "Resource " << client_resource_id << " was preempted";
     Status status(err_msg.str());
-    coord->Cancel();
+    coord->Cancel(&status);
   }
 }
 
 void SimpleScheduler::HandleLostResource(const TUniqueId& client_resource_id) {
+  VLOG_QUERY << "HandleLostResource preempting client_id=" << client_resource_id;
   Coordinator* coord = NULL;
   {
     lock_guard<mutex> l(active_resources_lock_);
@@ -993,7 +993,7 @@ void SimpleScheduler::HandleLostResource(const TUniqueId& client_resource_id) {
     stringstream err_msg;
     err_msg << "Resource " << client_resource_id << " was lost";
     Status status(err_msg.str());
-    coord->Cancel();
+    coord->Cancel(&status);
   }
 }
 

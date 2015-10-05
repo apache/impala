@@ -22,6 +22,7 @@
 
 #include "runtime/exec-env.h"
 #include "resourcebroker/resource-broker.h"
+#include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/network-util.h"
 #include "util/promise.h"
@@ -34,8 +35,8 @@ using boost::uuids::uuid;
 using namespace impala;
 using namespace strings;
 
-const int64_t DEFAULT_EXPANSION_REQUEST_TIMEOUT_MS = 5000;
-
+DEFINE_int64(rm_mem_expansion_timeout_ms, 5000, "The amount of time to wait (ms) "
+    "for a memory expansion request.");
 DEFINE_double(max_vcore_oversubscription_ratio, 2.5, "(Advanced) The maximum ratio "
     "allowed between running threads and acquired VCore resources for a query's fragments"
     " on a single node");
@@ -104,9 +105,7 @@ void QueryResourceMgr::InitVcoreAcquisition(int32_t init_vcores) {
               thread_in_expand_, early_exit_)));
 }
 
-Status QueryResourceMgr::CreateExpansionRequest(int64_t memory_mb, int64_t vcores,
-    TResourceBrokerExpansionRequest* request) {
-  DCHECK(request != NULL);
+llama::TResource QueryResourceMgr::CreateResource(int64_t memory_mb, int64_t vcores) {
   DCHECK(memory_mb > 0 || vcores > 0);
   DCHECK(reservation_id_ != TUniqueId()) << "Expansion requires existing reservation";
 
@@ -125,12 +124,7 @@ Status QueryResourceMgr::CreateExpansionRequest(int64_t memory_mb, int64_t vcore
   res.client_resource_id.hi = *reinterpret_cast<uint64_t*>(&id.data[0]);
   res.client_resource_id.lo = *reinterpret_cast<uint64_t*>(&id.data[8]);
   res.enforcement = llama::TLocationEnforcement::MUST;
-
-  request->__set_resource(res);
-  request->__set_reservation_id(reservation_id_);
-  request->__set_request_timeout(DEFAULT_EXPANSION_REQUEST_TIMEOUT_MS);
-
-  return Status::OK();
+  return res;
 }
 
 bool QueryResourceMgr::AboveVcoreSubscriptionThreshold() {
@@ -159,6 +153,22 @@ void QueryResourceMgr::RemoveVcoreAvailableCb(int32_t callback_id) {
   callbacks_it_ = callbacks_.begin();
 }
 
+Status QueryResourceMgr::RequestMemExpansion(int64_t requested_bytes,
+    int64_t* allocated_bytes) {
+  DCHECK(allocated_bytes != NULL);
+  *allocated_bytes = 0;
+  int64_t requested_mb = BitUtil::Ceil(requested_bytes, 1024L * 1024L);
+  llama::TResource res = CreateResource(max(1L, requested_mb), 0);
+  llama::TUniqueId expansion_id;
+  llama::TAllocatedResource resource;
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->resource_broker()->Expand(reservation_id_,
+      res, FLAGS_rm_mem_expansion_timeout_ms, &expansion_id, &resource));
+
+  DCHECK_EQ(resource.v_cpu_cores, 0L) << "Unexpected VCPUs returned by Llama";
+  *allocated_bytes = resource.memory_mb * 1024L * 1024L;
+  return Status::OK();
+}
+
 void QueryResourceMgr::AcquireVcoreResources(
     shared_ptr<AtomicInt<int16_t> > thread_in_expand,
     shared_ptr<AtomicInt<int16_t> > early_exit) {
@@ -174,18 +184,21 @@ void QueryResourceMgr::AcquireVcoreResources(
     }
     if (ShouldExit()) break;
 
-    TResourceBrokerExpansionRequest request;
-    CreateExpansionRequest(0L, 1, &request);
-    TResourceBrokerExpansionResponse response;
+    llama::TResource res = CreateResource(0L, 1);
     VLOG_QUERY << "Expanding VCore allocation: " << reservation_id_;
 
     // First signal that we are about to enter a blocking Expand() call.
     thread_in_expand->FetchAndUpdate(1L);
+
     // TODO: Could cause problems if called during or after a system-wide shutdown
-    Status status = ExecEnv::GetInstance()->resource_broker()->Expand(request, &response);
+    llama::TAllocatedResource resource;
+    llama::TUniqueId expansion_id;
+    Status status = ExecEnv::GetInstance()->resource_broker()->Expand(reservation_id,
+        res, -1, &expansion_id, &resource);
     thread_in_expand->FetchAndUpdate(-1L);
     // If signalled to exit quickly by the destructor, exit the loop now. It's important
     // to do so without accessing any class variables since they may no longer be valid.
+    // Need to check after setting thread_in_expand to avoid a race.
     if (early_exit->FetchAndUpdate(0L) != 0) {
       VLOG_QUERY << "Fragment finished during Expand(): " << reservation_id;
       break;
@@ -201,8 +214,6 @@ void QueryResourceMgr::AcquireVcoreResources(
       continue;
     }
 
-    const llama::TAllocatedResource& resource =
-        response.allocated_resources.begin()->second;
     DCHECK(resource.v_cpu_cores == 1)
         << "Asked for 1 core, got: " << resource.v_cpu_cores;
     vcores_ += resource.v_cpu_cores;
@@ -242,11 +253,6 @@ void QueryResourceMgr::Shutdown() {
     callbacks_.clear();
   }
   threads_changed_cv_.notify_all();
-
-  // Delete all non-reservation requests associated with this reservation ID. If this the
-  // coordinator, the SimpleScheduler will actually release the resources by releasing the
-  // original reservation ID.
-  ExecEnv::GetInstance()->resource_broker()->ClearRequests(reservation_id_, false);
 }
 
 QueryResourceMgr::~QueryResourceMgr() {

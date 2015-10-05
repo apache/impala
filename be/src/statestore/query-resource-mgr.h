@@ -90,7 +90,7 @@ class ResourceResolver {
 //
 /// TODO: Handle reducing the number of VCores when threads finish.
 /// TODO: Consider combining more closely with ThreadResourceMgr.
-/// TODO: Add counters to RuntimeProfile to track VCores allocated etc.
+/// TODO: Add counters to RuntimeProfile to track resources.
 class QueryResourceMgr {
  public:
   QueryResourceMgr(const TUniqueId& reservation_id,
@@ -125,10 +125,10 @@ class QueryResourceMgr {
   /// Removes the callback with the given ID.
   void RemoveVcoreAvailableCb(int32_t callback_id);
 
-  /// Creates an expansion request for the reservation corresponding to this resource
-  /// context.
-  Status CreateExpansionRequest(int64_t memory_mb, int64_t vcores,
-      TResourceBrokerExpansionRequest* request);
+  /// Request an expansion of requested_bytes. If the expansion can be fulfilled within
+  /// the timeout period, the number of bytes allocated is returned in allocated_bytes
+  /// (which may be more than requested). Otherwise an error status is returned.
+  Status RequestMemExpansion(int64_t requested_bytes, int64_t* allocated_bytes);
 
   /// Sets the exit flag for the VCore acquisiton thread, but does not block. Also clears
   /// the set of callbacks, so that after Shutdown() has returned, no callback will be
@@ -137,6 +137,8 @@ class QueryResourceMgr {
 
   /// Waits for the VCore acquisition thread to stop.
   ~QueryResourceMgr();
+
+  const TUniqueId& reservation_id() const { return reservation_id_; }
 
  private:
   /// ID of the single reservation corresponding to this query
@@ -199,6 +201,10 @@ class QueryResourceMgr {
   /// Expand() RPC. If so, the destructor does not need to wait for the acquisition thread
   /// to exit.
   boost::shared_ptr<AtomicInt<int16_t> > thread_in_expand_;
+
+  /// Creates the llama resource for the memory and/or cores specified, associated with
+  /// the reservation context.
+  llama::TResource CreateResource(int64_t memory_mb, int64_t vcores);
 
   /// Run as a thread owned by acquire_cpu_thread_. Waits for notification from
   /// NotifyThreadUsageChange(), then checks the subscription level to decide if more
