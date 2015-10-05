@@ -10,7 +10,7 @@ select s.f1 from functional_parquet.complextypes_fileformat t, t.a
 |  03:UNNEST [t.a]
 |
 00:SCAN HDFS [functional_parquet.complextypes_fileformat t]
-   partitions=1/1 files=1 size=227B
+regex:\s+partitions=1/1\s+files=1\s+size=\d+B
 ====
 # Scanning an unpartitioned Avro table with complex types plans ok.
 select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
@@ -24,7 +24,7 @@ select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
 |  03:UNNEST [t.a]
 |
 00:SCAN HDFS [functional_avro_snap.complextypes_fileformat t]
-   partitions=1/1 files=1 size=649B
+regex:\s+partitions=1/1\s+files=1\s+size=\d+B
 ====
 # Complex types are not supported on text files.
 select s.f1 from functional.complextypes_fileformat t, t.a
@@ -113,7 +113,7 @@ select s.f1 from functional.complextypes_multifileformat t, t.a where p = 2
 |  03:UNNEST [t.a]
 |
 00:SCAN HDFS [functional.complextypes_multifileformat t]
-   partitions=1/3 files=1 size=128B
+regex:\s+partitions=1/3\s+files=1\s+size=\d+B
 ====
 # Scanning an Avro partition of a multi-format table with complex types plans ok.
 select s.f1 from functional.complextypes_multifileformat t, t.a where p = 3
@@ -127,5 +127,5 @@ select s.f1 from functional.complextypes_multifileformat t, t.a where p = 3
 |  03:UNNEST [t.a]
 |
 00:SCAN HDFS [functional.complextypes_multifileformat t]
-   partitions=1/3 files=1 size=128B
+regex:\s+partitions=1/3\s+files=1\s+size=\d+B
 ====

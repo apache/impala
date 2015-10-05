@@ -747,7 +747,6 @@ public class SingleNodePlanner {
         }
         if (!subplanTids.containsAll(requiredTids)) {
           isParentRef = false;
-          ref.setLeftTblRef(null);
           // For outer and semi joins, we also need to ensure that the On-clause
           // conjuncts can be evaluated, so add those required table ref ids,
           // excluding the id of ref itself.
@@ -759,10 +758,6 @@ public class SingleNodePlanner {
         }
       }
       if (isParentRef) {
-        // Fix the chain of parent table refs.
-        if (!parentRefs.isEmpty()) {
-          ref.setLeftTblRef(parentRefs.get(parentRefs.size() - 1));
-        }
         parentRefs.add(ref);
         planTblRefIds.add(ref.getId());
       }
@@ -771,6 +766,15 @@ public class SingleNodePlanner {
       }
     }
     Preconditions.checkState(tblRefs.size() == parentRefs.size() + subplanRefs.size());
+
+    // Fix the chain of parent table refs and set the left table of all subplanRefs to
+    // null. This step needs to be done outside of the loop above because the left links
+    // are required for getAllTupleIds() used for determining the requiredTblRefIds.
+    parentRefs.get(0).setLeftTblRef(null);
+    for (int i = 1; i < parentRefs.size(); ++i) {
+      parentRefs.get(i).setLeftTblRef(parentRefs.get(i - 1));
+    }
+    for (SubplanRef subplanRef: subplanRefs) subplanRef.tblRef.setLeftTblRef(null);
   }
 
   /**

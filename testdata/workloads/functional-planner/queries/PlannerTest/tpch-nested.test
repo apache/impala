@@ -2185,21 +2185,30 @@ order by
   s_name
 limit 100
 ---- PLAN
-18:TOP-N [LIMIT=100]
+20:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, s_name ASC
 |
-17:AGGREGATE [FINALIZE]
+19:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: s_name
 |
-16:HASH JOIN [INNER JOIN]
+18:SUBPLAN
+|
+|--16:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |  join predicates: l3.l_suppkey != l1.l_suppkey
+|  |
+|  |--14:SINGULAR ROW SRC
+|  |
+|  15:UNNEST [o.o_lineitems l3]
+|
+17:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |
-|--14:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|--12:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
 regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
-15:HASH JOIN [INNER JOIN]
+13:HASH JOIN [INNER JOIN]
 |  hash predicates: l1.l_suppkey = s_suppkey
 |
 |--00:SCAN HDFS [tpch_nested_parquet.supplier s]
@@ -2207,23 +2216,18 @@ regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 02:SUBPLAN
 |
-|--13:NESTED LOOP JOIN [CROSS JOIN]
+|--11:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--03:SINGULAR ROW SRC
 |  |
 |  05:SUBPLAN
 |  |
-|  |--12:NESTED LOOP JOIN [LEFT ANTI JOIN]
-|  |  |  join predicates: l3.l_suppkey != l1.l_suppkey
-|  |  |
-|  |  |--09:UNNEST [o.o_lineitems l3]
-|  |  |
-|  |  11:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
 |  |  |
 |  |  |--08:UNNEST [o.o_lineitems l2]
 |  |  |
-|  |  10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  09:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
 |  |  |--06:SINGULAR ROW SRC
 |  |  |
@@ -2237,59 +2241,63 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
 ---- DISTRIBUTEDPLAN
-23:MERGING-EXCHANGE [UNPARTITIONED]
+25:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) DESC, s_name ASC
 |  limit: 100
 |
-18:TOP-N [LIMIT=100]
+20:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, s_name ASC
 |
-22:AGGREGATE [FINALIZE]
+24:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: s_name
 |
-21:EXCHANGE [HASH(s_name)]
+23:EXCHANGE [HASH(s_name)]
 |
-17:AGGREGATE
+19:AGGREGATE
 |  output: count(*)
 |  group by: s_name
 |
-16:HASH JOIN [INNER JOIN, BROADCAST]
+18:SUBPLAN
+|
+|--16:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |  join predicates: l3.l_suppkey != l1.l_suppkey
+|  |
+|  |--14:SINGULAR ROW SRC
+|  |
+|  15:UNNEST [o.o_lineitems l3]
+|
+17:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
 |
-|--20:EXCHANGE [BROADCAST]
+|--22:EXCHANGE [BROADCAST]
 |  |
-|  14:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|  12:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
 regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
-15:HASH JOIN [INNER JOIN, BROADCAST]
+13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l1.l_suppkey = s_suppkey
 |
-|--19:EXCHANGE [BROADCAST]
+|--21:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=111.08MB
 |
 02:SUBPLAN
 |
-|--13:NESTED LOOP JOIN [CROSS JOIN]
+|--11:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--03:SINGULAR ROW SRC
 |  |
 |  05:SUBPLAN
 |  |
-|  |--12:NESTED LOOP JOIN [LEFT ANTI JOIN]
-|  |  |  join predicates: l3.l_suppkey != l1.l_suppkey
-|  |  |
-|  |  |--09:UNNEST [o.o_lineitems l3]
-|  |  |
-|  |  11:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
 |  |  |
 |  |  |--08:UNNEST [o.o_lineitems l2]
 |  |  |
-|  |  10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  09:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
 |  |  |--06:SINGULAR ROW SRC
 |  |  |
