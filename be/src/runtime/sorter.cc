@@ -40,99 +40,99 @@ const string MEM_ALLOC_FAILED_ERROR_MSG = "Failed to allocate block for $0-lengt
     "data needed for sorting. Reducing query concurrency or increasing the "
     "memory limit may help this query to complete successfully.";
 
-// A run is a sequence of blocks containing tuples that are or will eventually be in
-// sorted order.
-// A run may maintain two sequences of blocks - one containing the tuples themselves,
-// (i.e. fixed-len slots and ptrs to var-len data), and the other for the var-length
-// column data pointed to by those tuples.
-// Tuples in a run may be sorted in place (in-memory) and merged using a merger.
+/// A run is a sequence of blocks containing tuples that are or will eventually be in
+/// sorted order.
+/// A run may maintain two sequences of blocks - one containing the tuples themselves,
+/// (i.e. fixed-len slots and ptrs to var-len data), and the other for the var-length
+/// column data pointed to by those tuples.
+/// Tuples in a run may be sorted in place (in-memory) and merged using a merger.
 class Sorter::Run {
  public:
-  // materialize_slots is true for runs constructed from input rows. The input rows are
-  // materialized into single sort tuples using the expressions in
-  // sort_tuple_slot_expr_ctxs_. For intermediate merges, the tuples are already
-  // materialized so materialize_slots is false.
+  /// materialize_slots is true for runs constructed from input rows. The input rows are
+  /// materialized into single sort tuples using the expressions in
+  /// sort_tuple_slot_expr_ctxs_. For intermediate merges, the tuples are already
+  /// materialized so materialize_slots is false.
   Run(Sorter* parent, TupleDescriptor* sort_tuple_desc, bool materialize_slots);
 
   ~Run() { DeleteAllBlocks(); }
 
-  // Initialize the run for input rows by allocating the minimum number of required
-  // blocks - one block for fixed-len data added to fixed_len_blocks_, one for the
-  // initially unsorted var-len data added to var_len_blocks_, and one to copy sorted
-  // var-len data into (var_len_copy_block_).
+  /// Initialize the run for input rows by allocating the minimum number of required
+  /// blocks - one block for fixed-len data added to fixed_len_blocks_, one for the
+  /// initially unsorted var-len data added to var_len_blocks_, and one to copy sorted
+  /// var-len data into (var_len_copy_block_).
   Status Init();
 
-  // Add a batch of input rows to the current run. Returns the number
-  // of rows actually added in num_processed. If the run is full (no more blocks can
-  // be allocated), num_processed may be less than the number of rows in the batch.
-  // If materialize_slots_ is true, materializes the input rows using the expressions
-  // in sorter_->sort_tuple_slot_expr_ctxs_, else just copies the input rows.
+  /// Add a batch of input rows to the current run. Returns the number
+  /// of rows actually added in num_processed. If the run is full (no more blocks can
+  /// be allocated), num_processed may be less than the number of rows in the batch.
+  /// If materialize_slots_ is true, materializes the input rows using the expressions
+  /// in sorter_->sort_tuple_slot_expr_ctxs_, else just copies the input rows.
   template <bool has_var_len_data>
   Status AddBatch(RowBatch* batch, int start_index, int* num_processed);
 
   /// Attaches all fixed-len and var-len blocks to the given row batch.
   void TransferResources(RowBatch* row_batch);
 
-  // Unpins all the blocks in a sorted run. Var-length column data is copied into new
-  // blocks in sorted order. Pointers in the original tuples are converted to offsets
-  // from the beginning of the sequence of var-len data blocks.
+  /// Unpins all the blocks in a sorted run. Var-length column data is copied into new
+  /// blocks in sorted order. Pointers in the original tuples are converted to offsets
+  /// from the beginning of the sequence of var-len data blocks.
   Status UnpinAllBlocks();
 
-  // Deletes all blocks.
+  /// Deletes all blocks.
   void DeleteAllBlocks();
 
-  // Interface for merger - get the next batch of rows from this run. The callee (Run)
-  // still owns the returned batch. Calls GetNext(RowBatch*, bool*).
+  /// Interface for merger - get the next batch of rows from this run. The callee (Run)
+  /// still owns the returned batch. Calls GetNext(RowBatch*, bool*).
   Status GetNextBatch(RowBatch** sorted_batch);
 
  private:
   friend class Sorter;
   friend class TupleSorter;
 
-  // Fill output_batch with rows from this run. If convert_offset_to_ptr is true, offsets
-  // in var-length slots are converted back to pointers. Only row pointers are copied
-  // into output_batch.
-  // If this run was unpinned, one block (2 if there are var-len slots) is pinned while
-  // rows are filled into output_batch. The block is unpinned before the next block is
-  // pinned. Atmost 1 (2) block(s) will be pinned at any time.
-  // If the run was pinned, the blocks are not unpinned (Sorter holds on to the memory).
-  // In either case, all rows in output_batch will have their fixed and var-len data from
-  // the same block.
-  // TODO: If we leave the last run to be merged in memory, the fixed-len blocks can be
-  // unpinned as they are consumed.
+  /// Fill output_batch with rows from this run. If convert_offset_to_ptr is true, offsets
+  /// in var-length slots are converted back to pointers. Only row pointers are copied
+  /// into output_batch.
+  /// If this run was unpinned, one block (2 if there are var-len slots) is pinned while
+  /// rows are filled into output_batch. The block is unpinned before the next block is
+  /// pinned. Atmost 1 (2) block(s) will be pinned at any time.
+  /// If the run was pinned, the blocks are not unpinned (Sorter holds on to the memory).
+  /// In either case, all rows in output_batch will have their fixed and var-len data from
+  /// the same block.
+  /// TODO: If we leave the last run to be merged in memory, the fixed-len blocks can be
+  /// unpinned as they are consumed.
   template <bool convert_offset_to_ptr>
   Status GetNext(RowBatch* output_batch, bool* eos);
 
-  // Check if a run can be extended by allocating additional blocks from the block
-  // manager. Always true when building a sorted run in an intermediate merge, because
-  // the current block(s) can be unpinned before getting the next free block (so a block
-  // is always available)
+  /// Check if a run can be extended by allocating additional blocks from the block
+  /// manager. Always true when building a sorted run in an intermediate merge, because
+  /// the current block(s) can be unpinned before getting the next free block (so a block
+  /// is always available)
   bool CanExtendRun() const;
 
-  // Collect the non-null var-len (e.g. STRING) slots from 'src' in var_slots and return
-  // the total length of all var_len slots in total_var_len.
+  /// Collect the non-null var-len (e.g. STRING) slots from 'src' in var_slots and return
+  /// the total length of all var_len slots in total_var_len.
   void CollectNonNullVarSlots(Tuple* src, vector<StringValue*>* var_len_values,
       int* total_var_len);
 
-  // Check if the current run can be extended by a block. Add the newly allocated block
-  // to block_sequence, or set added to false if the run could not be extended.
-  // If the run is sorted (produced by an intermediate merge), unpin the last block in
-  // block_sequence before allocating and adding a new block - the run can always be
-  // extended in this case. If the run is unsorted, check max_blocks_in_unsorted_run_
-  // to see if a block can be added to the run. Also updates the sort bytes counter.
+  /// Check if the current run can be extended by a block. Add the newly allocated block
+  /// to block_sequence, or set added to false if the run could not be extended.
+  /// If the run is sorted (produced by an intermediate merge), unpin the last block in
+  /// block_sequence before allocating and adding a new block - the run can always be
+  /// extended in this case. If the run is unsorted, check max_blocks_in_unsorted_run_
+  /// to see if a block can be added to the run. Also updates the sort bytes counter.
   Status TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence, bool* added);
 
-  // Prepare to read a sorted run. Pins the first block(s) in the run if the run was
-  // previously unpinned.
+  /// Prepare to read a sorted run. Pins the first block(s) in the run if the run was
+  /// previously unpinned.
   Status PrepareRead();
 
-  // Copy the StringValue data in var_values to dest in order and update the StringValue
-  // ptrs to point to the copied data.
+  /// Copy the StringValue data in var_values to dest in order and update the StringValue
+  /// ptrs to point to the copied data.
   void CopyVarLenData(char* dest, const vector<StringValue*>& var_values);
 
-  // Copy the StringValue in var_values to dest in order. Update the StringValue ptrs to
-  // contain an offset to the copied data. Parameter 'offset' is the offset for the first
-  // StringValue.
+  /// Copy the StringValue in var_values to dest in order. Update the StringValue ptrs to
+  /// contain an offset to the copied data. Parameter 'offset' is the offset for the first
+  /// StringValue.
   void CopyVarLenDataConvertOffset(char* dest, int64_t offset,
       const vector<StringValue*>& var_values);
 
@@ -141,78 +141,80 @@ class Sorter::Run {
     return has_var_len_slots_ && !var_len_blocks_.empty();
   }
 
-  // Parent sorter object.
+  /// Parent sorter object.
   const Sorter* sorter_;
 
-  // Materialized sort tuple. Input rows are materialized into 1 tuple (with descriptor
-  // sort_tuple_desc_) before sorting.
+  /// Materialized sort tuple. Input rows are materialized into 1 tuple (with descriptor
+  /// sort_tuple_desc_) before sorting.
   const TupleDescriptor* sort_tuple_desc_;
 
-  // Sizes of sort tuple and block.
+  /// Sizes of sort tuple and block.
   const int sort_tuple_size_;
   const int block_size_;
 
   const bool has_var_len_slots_;
 
-  // True if the sort tuple must be materialized from the input batch in AddBatch().
-  // materialize_slots_ is true for runs being constructed from input batches, and
-  // is false for runs being constructed from intermediate merges.
+  /// True if the sort tuple must be materialized from the input batch in AddBatch().
+  /// materialize_slots_ is true for runs being constructed from input batches, and
+  /// is false for runs being constructed from intermediate merges.
   const bool materialize_slots_;
 
-  // True if the run is sorted. Set to true after an in-memory sort, and initialized to
-  // true for runs resulting from merges.
+  /// True if the run is sorted. Set to true after an in-memory sort, and initialized to
+  /// true for runs resulting from merges.
   bool is_sorted_;
 
-  // True if all blocks in the run are pinned.
+  /// True if all blocks in the run are pinned.
   bool is_pinned_;
 
-  // Sequence of blocks in this run containing the fixed-length portion of the sort tuples
-  // comprising this run. The data pointed to by the var-len slots are in var_len_blocks_.
-  // If is_sorted_ is true, the tuples in fixed_len_blocks_ will be in sorted order.
-  // fixed_len_blocks_[i] is NULL iff it has been deleted.
+  /// Sequence of blocks in this run containing the fixed-length portion of the sort
+  /// tuples comprising this run. The data pointed to by the var-len slots are in
+  /// var_len_blocks_.
+  /// If is_sorted_ is true, the tuples in fixed_len_blocks_ will be in sorted order.
+  /// fixed_len_blocks_[i] is NULL iff it has been deleted.
   vector<BufferedBlockMgr::Block*> fixed_len_blocks_;
 
-  // Sequence of blocks in this run containing the var-length data corresponding to the
-  // var-length columns from fixed_len_blocks_. These are reconstructed to be in sorted
-  // order in UnpinAllBlocks().
-  // var_len_blocks_[i] is NULL iff it has been deleted.
+  /// Sequence of blocks in this run containing the var-length data corresponding to the
+  /// var-length columns from fixed_len_blocks_. These are reconstructed to be in sorted
+  /// order in UnpinAllBlocks().
+  /// var_len_blocks_[i] is NULL iff it has been deleted.
   vector<BufferedBlockMgr::Block*> var_len_blocks_;
 
-  // If there are var-len slots, an extra pinned block is used to copy out var-len data
-  // into a new sequence of blocks in sorted order. var_len_copy_block_ stores this
-  // extra allocated block.
+  /// If there are var-len slots, an extra pinned block is used to copy out var-len data
+  /// into a new sequence of blocks in sorted order. var_len_copy_block_ stores this
+  /// extra allocated block.
   BufferedBlockMgr::Block* var_len_copy_block_;
 
-  // Number of tuples so far in this run.
+  /// Number of tuples so far in this run.
   int64_t num_tuples_;
 
-  // Number of tuples returned via GetNext(), maintained for debug purposes.
+  /// Number of tuples returned via GetNext(), maintained for debug purposes.
   int64_t num_tuples_returned_;
 
-  // buffered_batch_ is used to return TupleRows to the merger when this run is being
-  // merged. buffered_batch_ is returned in calls to GetNextBatch().
+  /// buffered_batch_ is used to return TupleRows to the merger when this run is being
+  /// merged. buffered_batch_ is returned in calls to GetNextBatch().
   scoped_ptr<RowBatch> buffered_batch_;
 
-  // Members used when a run is read in GetNext()
-  // The index into the fixed_ and var_len_blocks_ vectors of the current blocks being
-  // processed in GetNext().
+  /// Members used when a run is read in GetNext().
+  /// The index into the fixed_ and var_len_blocks_ vectors of the current blocks being
+  /// processed in GetNext().
   int fixed_len_blocks_index_;
   int var_len_blocks_index_;
 
-  // If true, pin the next fixed and var-len blocks and delete the previous ones
-  // in the next call to GetNext(). Set during the previous call to GetNext().
-  // Not used if a run is already pinned.
+  /// If true, pin the next fixed and var-len blocks and delete the previous ones
+  /// in the next call to GetNext(). Set during the previous call to GetNext().
+  /// Not used if a run is already pinned.
   bool pin_next_fixed_len_block_;
   bool pin_next_var_len_block_;
 
-  // Offset into the current fixed length data block being processed.
+  /// Offset into the current fixed length data block being processed.
   int fixed_len_block_offset_;
 }; // class Sorter::Run
 
-// Sorts a sequence of tuples from a run in place using a provided tuple comparator.
-// Quick sort is used for sequences of tuples larger that 16 elements, and insertion sort
-// is used for smaller sequences. The TupleSorter is initialized with a RuntimeState
-// instance to check for cancellation during an in-memory sort.
+
+/// Sorts a sequence of tuples from a run in place using a provided tuple comparator.
+/// Quick sort is used for sequences of tuples larger that 16 elements, and insertion sort
+/// is used for smaller sequences. The TupleSorter is initialized with a RuntimeState
+/// instance to check for cancellation during an in-memory sort.
 class Sorter::TupleSorter {
  public:
   TupleSorter(const TupleRowComparator& less_than_comp, int64_t block_size,
@@ -220,17 +222,17 @@ class Sorter::TupleSorter {
 
   ~TupleSorter();
 
-  // Performs a quicksort for tuples in 'run' followed by an insertion sort to
-  // finish smaller blocks.
-  // Returns early if stste_->is_cancelled() is true. No status
-  // is returned - the caller must check for cancellation.
+  /// Performs a quicksort for tuples in 'run' followed by an insertion sort to
+  /// finish smaller blocks.
+  /// Returns early if stste_->is_cancelled() is true. No status
+  /// is returned - the caller must check for cancellation.
   void Sort(Run* run);
 
  private:
   static const int INSERTION_THRESHOLD = 16;
 
-  // Helper class used to iterate over tuples in a run during quick sort and insertion
-  // sort.
+  /// Helper class used to iterate over tuples in a run during quick sort and insertion
+  /// sort.
   class TupleIterator {
    public:
     TupleIterator(TupleSorter* parent, int64_t index)
@@ -256,8 +258,8 @@ class Sorter::TupleSorter {
       current_tuple_ = buffer_start_ + block_offset + past_end_bytes;
     }
 
-    // Sets current_tuple_ to point to the next tuple in the run. Increments
-    // block_index and resets buffer if the next tuple is in the next block.
+    /// Sets current_tuple_ to point to the next tuple in the run. Increments
+    /// block_index and resets buffer if the next tuple is in the next block.
     void Next() {
       current_tuple_ += parent_->tuple_size_;
       ++index_;
@@ -271,78 +273,78 @@ class Sorter::TupleSorter {
       }
     }
 
-    // Sets current_tuple to point to the previous tuple in the run. Decrements
-    // block_index and resets buffer if the new tuple is in the previous block.
+    /// Sets current_tuple to point to the previous tuple in the run. Decrements
+    /// block_index and resets buffer if the new tuple is in the previous block.
     void Prev() {
       current_tuple_ -= parent_->tuple_size_;
       --index_;
       if (UNLIKELY(current_tuple_ < buffer_start_ && index_ >= 0)) {
-       --block_index_;
-       DCHECK_GE(block_index_, 0);
-       buffer_start_ = parent_->run_->fixed_len_blocks_[block_index_]->buffer();
-       current_tuple_ = buffer_start_ + parent_->last_tuple_block_offset_;
+        --block_index_;
+        DCHECK_GE(block_index_, 0);
+        buffer_start_ = parent_->run_->fixed_len_blocks_[block_index_]->buffer();
+        current_tuple_ = buffer_start_ + parent_->last_tuple_block_offset_;
       }
     }
 
    private:
     friend class TupleSorter;
 
-    // Pointer to the tuple sorter.
+    /// Pointer to the tuple sorter.
     TupleSorter* parent_;
 
-    // Index of the current tuple in the run.
+    /// Index of the current tuple in the run.
     int64_t index_;
 
-    // Pointer to the current tuple.
+    /// Pointer to the current tuple.
     uint8_t* current_tuple_;
 
-    // Start of the buffer containing current tuple.
+    /// Start of the buffer containing current tuple.
     uint8_t* buffer_start_;
 
-    // Index into run_.fixed_len_blocks_ of the block containing the current tuple.
+    /// Index into run_.fixed_len_blocks_ of the block containing the current tuple.
     int block_index_;
   };
 
-  // Size of the tuples in memory.
+  /// Size of the tuples in memory.
   const int tuple_size_;
 
-  // Number of tuples per block in a run.
+  /// Number of tuples per block in a run.
   const int block_capacity_;
 
-  // Offset in bytes of the last tuple in a block, calculated from block and tuple sizes.
+  /// Offset in bytes of the last tuple in a block, calculated from block and tuple sizes.
   const int last_tuple_block_offset_;
 
-  // Tuple comparator that returns true if lhs < rhs.
+  /// Tuple comparator that returns true if lhs < rhs.
   const TupleRowComparator less_than_comp_;
 
-  // Runtime state instance to check for cancellation. Not owned.
+  /// Runtime state instance to check for cancellation. Not owned.
   RuntimeState* const state_;
 
-  // The run to be sorted.
+  /// The run to be sorted.
   Run* run_;
 
-  // Temporarily allocated space to copy and swap tuples (Both are used in Partition()).
-  // temp_tuple_ points to temp_tuple_buffer_. Owned by this TupleSorter instance.
+  /// Temporarily allocated space to copy and swap tuples (Both are used in Partition()).
+  /// temp_tuple_ points to temp_tuple_buffer_. Owned by this TupleSorter instance.
   TupleRow* temp_tuple_row_;
   uint8_t* temp_tuple_buffer_;
   uint8_t* swap_buffer_;
 
-  // Perform an insertion sort for rows in the range [first, last) in a run.
+  /// Perform an insertion sort for rows in the range [first, last) in a run.
   void InsertionSort(const TupleIterator& first, const TupleIterator& last);
 
-  // Partitions the sequence of tuples in the range [first, last) in a run into two groups
-  // around the pivot tuple - i.e. tuples in first group are <= the pivot, and tuples in
-  // the second group are >= pivot. Tuples are swapped in place to create the groups and
-  // the index to the first element in the second group is returned.
-  // Checks state_->is_cancelled() and returns early with an invalid result if true.
+  /// Partitions the sequence of tuples in the range [first, last) in a run into two
+  /// groups around the pivot tuple - i.e. tuples in first group are <= the pivot, and
+  /// tuples in the second group are >= pivot. Tuples are swapped in place to create the
+  /// groups and the index to the first element in the second group is returned.
+  /// Checks state_->is_cancelled() and returns early with an invalid result if true.
   TupleIterator Partition(TupleIterator first, TupleIterator last, Tuple* pivot);
 
-  // Performs a quicksort of rows in the range [first, last) followed by insertion sort
-  // for smaller groups of elements.
-  // Checks state_->is_cancelled() and returns early if true.
+  /// Performs a quicksort of rows in the range [first, last) followed by insertion sort
+  /// for smaller groups of elements.
+  /// Checks state_->is_cancelled() and returns early if true.
   void SortHelper(TupleIterator first, TupleIterator last);
 
-  // Swaps tuples pointed to by left and right using the swap buffer.
+  /// Swaps tuples pointed to by left and right using the swap buffer.
   void Swap(uint8_t* left, uint8_t* right);
 }; // class TupleSorter
 
@@ -710,8 +712,10 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
   }
 
   // GetNext fills rows into the output batch until a block boundary is reached.
+  DCHECK(fixed_len_block != NULL);
   while (!output_batch->AtCapacity() &&
       fixed_len_block_offset_ < fixed_len_block->valid_data_len()) {
+    DCHECK(fixed_len_block != NULL);
     Tuple* input_tuple = reinterpret_cast<Tuple*>(
         fixed_len_block->buffer() + fixed_len_block_offset_);
 
@@ -1033,7 +1037,7 @@ Status Sorter::InputDone() {
   if (sorted_runs_.size() == 1) {
     // The entire input fit in one run. Read sorted rows in GetNext() directly
     // from the sorted run.
-    sorted_runs_.back()->PrepareRead();
+    RETURN_IF_ERROR(sorted_runs_.back()->PrepareRead());
   } else {
     // At least one merge is necessary.
     int blocks_per_run = has_var_len_slots_ ? 2 : 1;
@@ -1229,7 +1233,7 @@ Status Sorter::CreateMerger(int num_runs) {
   merge_runs.reserve(num_runs);
   for (int i = 0; i < num_runs; ++i) {
     Run* run = sorted_runs_.front();
-    run->PrepareRead();
+    RETURN_IF_ERROR(run->PrepareRead());
     // Run::GetNextBatch() is used by the merger to retrieve a batch of rows to merge
     // from this run.
     merge_runs.push_back(bind<Status>(mem_fn(&Run::GetNextBatch), run, _1));

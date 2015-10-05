@@ -429,6 +429,8 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
   bool in_mem;
   RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
   DCHECK(!in_mem) << "A new block cannot start in mem.";
+  DCHECK(!new_block->is_pinned() || new_block->buffer_desc_ != NULL)
+      << new_block->DebugString();
 
   if (!new_block->is_pinned()) {
     if (unpin_block == NULL) {
@@ -453,6 +455,9 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
 
 Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   Status status = Status::OK();
+  DCHECK(dst != NULL);
+  DCHECK(src != NULL);
+
   // First write out the src block.
   DCHECK(src->is_pinned_);
   DCHECK(!dst->is_pinned_);
@@ -960,6 +965,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       // There are no free buffers or blocks we can evict. We need to fail this request.
       // If this is an optional request, return OK. If it is required, return OOM.
       if (!is_reserved_request) return Status::OK();
+
       if (VLOG_QUERY_IS_ON) {
         stringstream ss;
         ss << "Query id=" << query_id_ << " was unable to get minimum required buffers."
