@@ -201,6 +201,7 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet', vector)
 
   def test_verify_runtime_profile(self, vector):
+    pytest.xfail("Disabled because unable to load table with the right number of blocks")
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # we verify if each impalad reads one block by checking if each impalad reads at
     # least one row group.
