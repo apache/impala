@@ -92,21 +92,23 @@ TEST(PrettyPrinterTest, Seconds) {
   EXPECT_EQ(PrettyPrinter::Print(1000, TUnit::TIME_S), "16m40s");
 
   // Only three decimal places of precision are supported for seconds.
-  // TODO: Fix buggy rounding behaviour. IMPALA-1648
   EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_S), "1s500ms");
 }
 
 TEST(PrettyPrinterTest, NanoSeconds) {
-  EXPECT_EQ(PrettyPrinter::Print(1, TUnit::TIME_NS), "1ns");
-  EXPECT_EQ(PrettyPrinter::Print(123.4, TUnit::TIME_NS), "123.400000ns");
-  EXPECT_EQ(PrettyPrinter::Print(1234.9, TUnit::TIME_NS), "1.234900us");
-  EXPECT_EQ(PrettyPrinter::Print(12345.6789, TUnit::TIME_NS), "12.345679us");
-  EXPECT_EQ(PrettyPrinter::Print(1234567.890, TUnit::TIME_NS), "1.234568ms");
-  EXPECT_EQ(PrettyPrinter::Print(123456789.0, TUnit::TIME_NS), "123.456789ms");
+  EXPECT_EQ(PrettyPrinter::Print(1, TUnit::TIME_NS), "1.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(123.4, TUnit::TIME_NS), "123.400ns");
+  EXPECT_EQ(PrettyPrinter::Print(1234.9, TUnit::TIME_NS), "1.234us");
+  EXPECT_EQ(PrettyPrinter::Print(12345.6789, TUnit::TIME_NS), "12.345us");
+  EXPECT_EQ(PrettyPrinter::Print(1234567.890, TUnit::TIME_NS), "1.234ms");
+  EXPECT_EQ(PrettyPrinter::Print(123456789.0, TUnit::TIME_NS), "123.456ms");
   EXPECT_EQ(PrettyPrinter::Print(123823456789.9, TUnit::TIME_NS), "2m3s");
   EXPECT_EQ(PrettyPrinter::Print(12123456789.9, TUnit::TIME_NS), "12s123ms");
-  EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_NS), "1.500900ns");
+  EXPECT_EQ(PrettyPrinter::Print(1.5009, TUnit::TIME_NS), "1.500ns");
   EXPECT_EQ(PrettyPrinter::Print(1000 * 1000 * 1000, TUnit::TIME_NS), "1s000ms");
+  EXPECT_EQ(PrettyPrinter::Print(123, TUnit::TIME_NS), "123.000ns");
+  EXPECT_EQ(PrettyPrinter::Print(123400, TUnit::TIME_NS), "123.400us");
+  EXPECT_EQ(PrettyPrinter::Print(123456789, TUnit::TIME_NS), "123.456ms");
 }
 
 TEST(PrettyPrinterTest, DoubleValue) {

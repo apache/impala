@@ -24,6 +24,9 @@
 #include "util/cpu-info.h"
 #include "util/template-util.h"
 
+/// Truncate a double to offset decimal places.
+#define DOUBLE_TRUNCATE(val, offset) floor(val * pow(10, offset)) / pow(10, offset)
+
 namespace impala {
 
 /// Methods for printing numeric values with optional units, or other types with an
@@ -85,18 +88,21 @@ class PrettyPrinter {
       }
 
       case TUnit::TIME_NS: {
+        ss << std::setprecision(TIME_NS_PRECISION);
         if (value >= BILLION) {
           /// If the time is over a second, print it up to ms.
           value /= MILLION;
           PrintTimeMs(value, &ss);
         } else if (value >= MILLION) {
           /// if the time is over a ms, print it up to microsecond in the unit of ms.
-          ss << value / MILLION << "ms";
+          ss << DOUBLE_TRUNCATE(static_cast<double>(value) / MILLION, TIME_NS_PRECISION)
+             << "ms";
         } else if (value > 1000) {
           /// if the time is over a microsecond, print it using unit microsecond
-          ss << value / 1000 << "us";
+          ss << DOUBLE_TRUNCATE(static_cast<double>(value) / 1000, TIME_NS_PRECISION)
+             << "us";
         } else {
-          ss << value << "ns";
+          ss << DOUBLE_TRUNCATE(value, TIME_NS_PRECISION) << "ns";
         }
         break;
       }
@@ -177,6 +183,7 @@ class PrettyPrinter {
 
  private:
   static const int PRECISION = 2;
+  static const int TIME_NS_PRECISION = 3;
   static const int64_t KILOBYTE = 1024;
   static const int64_t MEGABYTE = KILOBYTE * 1024;
   static const int64_t GIGABYTE = MEGABYTE * 1024;
