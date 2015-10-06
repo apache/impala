@@ -7,7 +7,7 @@ import pytest
 from copy import copy
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins
 
 class TestJoinQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]
@@ -34,6 +34,10 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins', new_vector)
+
+  @SkipIfOldAggsJoins.unsupported
+  def test_partitioned_joins(self, vector):
+    self.run_test_case('QueryTest/joins-partitioned', vector)
 
   @SkipIfS3.hbase
   @SkipIfIsilon.hbase

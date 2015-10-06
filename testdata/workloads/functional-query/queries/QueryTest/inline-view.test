@@ -499,23 +499,3 @@ true
 ---- TYPES
 boolean
 ====
----- QUERY
-# Regression test for IMPALA-1987. Equi-join predicates of outer joins contain
-# TupleIsNullPredicate exprs.
-select t1.int_col, t2.int_col, t3.id
-from alltypestiny t1 left outer join
-  (select coalesce(int_col, 384) as int_col from alltypestiny) t2
-  on t1.int_col = t2.int_col
-left outer join
-  (select 0 as id from alltypestiny) t3
-  on t1.int_col = t3.id
-order by 1 limit 5
----- RESULTS
-0,0,0
-0,0,0
-0,0,0
-0,0,0
-0,0,0
----- TYPES
-INT,INT,TINYINT
-====

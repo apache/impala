@@ -1,0 +1,81 @@
+====
+---- QUERY
+# IMPALA-2414: Test basic correlated WITH clause view.
+select pos from functional.allcomplextypes t inner join
+  (with w as (select pos from t.int_array_col)
+   select pos from w) v
+on v.pos = t.id
+---- RESULTS
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-2414: Test correlated WITH clause view nested in another WITH clause.
+select c_custkey, o_orderkey from tpch_nested_parquet.customer c join
+  (with w1 as (with w2 as (select o_orderkey from c.c_orders) select * from w2)
+   select o_orderkey from w1) v
+where c_custkey = 4
+---- RESULTS
+4,164711
+4,385825
+4,1192231
+4,1226497
+4,1590469
+4,1755398
+4,1944711
+4,1953441
+4,1978756
+4,2459619
+4,2765152
+4,2986913
+4,3251169
+4,3421092
+4,3683623
+4,3951331
+4,4320612
+4,4960614
+4,5453440
+4,5612065
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# IMPALA-2414: Test correlated WITH clause view nested in another WITH clause.
+with w1 as (select c_custkey, o_orderkey from tpch_nested_parquet.customer c join
+  (with w2 as (select o_orderkey from c.c_orders) select * from w2) v)
+select * from w1
+where c_custkey = 4
+---- RESULTS
+4,164711
+4,385825
+4,1192231
+4,1226497
+4,1590469
+4,1755398
+4,1944711
+4,1953441
+4,1978756
+4,2459619
+4,2765152
+4,2986913
+4,3251169
+4,3421092
+4,3683623
+4,3951331
+4,4320612
+4,4960614
+4,5453440
+4,5612065
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# IMPALA-2414: Test multiple correlated WITH clause views that are joined.
+select pos from functional.allcomplextypes t inner join
+  (with w1 as (select pos, item from t.int_array_col),
+   w2 as (select key, value from t.map_map_col.value)
+   select a1.*, m2.* from w1 a1, w1 a2, w2 m1, w2 m2) v on v.value = t.id
+---- RESULTS
+---- TYPES
+BIGINT
+====
