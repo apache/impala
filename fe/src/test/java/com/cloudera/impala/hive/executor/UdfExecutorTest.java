@@ -215,7 +215,7 @@ public class UdfExecutorTest {
     // Run the executor a few times to make sure nothing gets messed up
     // between runs.
     for (int i = 0; i < 10; ++i) {
-      long r = e.evaluate(inputArgs);
+      long r = e.evaluateForTesting(inputArgs);
       if (validate) {
         switch (expectedType.getPrimitiveType()) {
           case BOOLEAN: {
@@ -360,6 +360,28 @@ public class UdfExecutorTest {
     TestUdf(null, TestUdf.class, createDouble(3),
         createDouble(1), createDouble(2));
     TestUdf(null, TestUdf.class, "ABCXYZ", "ABC", "XYZ");
+    TestUdf(null, TestUdf.class, createInt(3), createInt(1), createInt(2));
+    TestUdf(null, TestUdf.class, createFloat(1.1f + 1.2f),
+        createFloat(1.1f), createFloat(1.2f));
+    TestUdf(null, TestUdf.class, createDouble(1.1 + 1.2 + 1.3),
+        createDouble(1.1), createDouble(1.2), createDouble(1.3));
+    TestUdf(null, TestUdf.class, createSmallInt(1 + 2), createSmallInt(1),
+        createSmallInt(2));
+    TestUdf(null, TestUdf.class, createBoolean(true && true),
+        createBoolean(true), createBoolean(true));
+    TestUdf(null, TestUdf.class, createInt(5 + 6 + 7), createInt(5),
+        createInt(6), createInt(7));
+    TestUdf(null, TestUdf.class, createBoolean(true && true && true),
+        createBoolean(true), createBoolean(true), createBoolean(true));
+    TestUdf(null, TestUdf.class, createFloat(1.1f + 1.2f + 1.3f),
+        createFloat(1.1f), createFloat(1.2f), createFloat(1.3f));
+    TestUdf(null, TestUdf.class, createDouble(1 + 1.2), createInt(1),
+        createDouble(1.2));
+    TestUdf(null, TestUdf.class, createInt(5 + 6 + 7 + 8), createInt(5),
+        createInt(6), createInt(7), createInt(8));
+    TestUdf(null, TestUdf.class, createBoolean(true && true && true && true),
+        createBoolean(true), createBoolean(true), createBoolean(true),
+        createBoolean(true));
     freeAllocations();
   }
 }

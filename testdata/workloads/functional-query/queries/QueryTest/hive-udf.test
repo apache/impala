@@ -121,3 +121,52 @@ NULL
 NULL
 NULL
 ====
+---- QUERY
+select udf_test.hive_add(cast(1 as int), cast(2 as int));
+---- TYPES
+int
+---- RESULTS
+3
+====
+---- QUERY
+select udf_test.hive_add(udf_test.hive_add(cast(1 as int), cast(2 as int)), cast(2 as int));
+---- TYPES
+int
+---- RESULTS
+5
+====
+---- QUERY
+select udf_test.hive_add(cast(udf_test.hive_add(cast(1 as int), cast(2 as int)) - udf_test.hive_add(cast(2 as int), cast(1 as int)) as int), cast(2 as int));
+---- TYPES
+int
+---- RESULTS
+2
+====
+---- QUERY
+select udf_test.hive_add(cast(1 as smallint), cast(2 as smallint));
+---- TYPES
+smallint
+---- RESULTS
+3
+====
+---- QUERY
+select udf_test.hive_add(cast(1.0 as float), cast(2.0 as float));
+---- TYPES
+float
+---- RESULTS
+3.0
+====
+---- QUERY
+select udf_test.hive_add(cast(1.0 as double), cast(2.0 as double));
+---- TYPES
+double
+---- RESULTS
+3.0
+====
+---- QUERY
+select udf_test.hive_add(cast(1 as boolean), cast(0 as boolean));
+---- TYPES
+boolean
+---- RESULTS
+false
+====

@@ -19,6 +19,12 @@ drop function if exists udf_test.identity(string, string);
 drop function if exists udf_test.identity(string, string, string);
 drop function if exists udf_test.identity(timestamp);
 
+drop function if exists udf_test.hive_add(int, int);
+drop function if exists udf_test.hive_add(float, float);
+drop function if exists udf_test.hive_add(double, double);
+drop function if exists udf_test.hive_add(smallint, smallint);
+drop function if exists udf_test.hive_add(boolean, boolean);
+
 drop function if exists udf_test.throws_exception();
 
 create database if not exists udf_test
@@ -85,6 +91,26 @@ location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(string, string, string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
+
+create function udf_test.hive_add(int, int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
+
+create function udf_test.hive_add(smallint, smallint) returns smallint
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
+
+create function udf_test.hive_add(float, float) returns float
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
+
+create function udf_test.hive_add(double, double) returns double
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
+
+create function udf_test.hive_add(boolean, boolean) returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
