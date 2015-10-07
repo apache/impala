@@ -442,6 +442,26 @@ class HiveSqlWriter(SqlWriter):
       sql = self._write_func(func)
     return sql
 
+  # Workaround for tinyint casting issues when run against RefDb
+  # that might only have larger integers.
+  # This does all the arithmetic operations in terms of bigints.
+  def _write_plus(self, func):
+    return self.arithmetic_cast(func, '+')
+
+  def _write_minus(self, func):
+    return self.arithmetic_cast(func, '-')
+
+  def _write_multiply(self, func):
+    return self.arithmetic_cast(func, '*')
+
+  def arithmetic_cast(self, func, symbol):
+    args = func.args
+    if args[0].type is Int and args[1].type is Int:
+      return 'CAST (%s AS BIGINT) %s CAST (%s AS BIGINT)' % \
+        (self._write(args[0]), symbol, self._write(args[1]))
+    else:
+      return self._write_func(func)
+
   # Hive partition by clause throws exception if sorted by more than one key, unless 'rows unbounded preceding' added.
   def _write_analytic_func(self, func):
     sql = self._to_sql_name(func.name()) \
