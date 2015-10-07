@@ -79,10 +79,8 @@ Status HdfsAvroScanner::ReadFileHeader() {
   RETURN_IF_FALSE(stream_->ReadBytes(
       sizeof(AVRO_VERSION_HEADER), &header, &parse_status_));
   if (memcmp(header, AVRO_VERSION_HEADER, sizeof(AVRO_VERSION_HEADER))) {
-    stringstream ss;
-    ss << "Invalid AVRO_VERSION_HEADER: '"
-       << ReadWriteUtil::HexDump(header, sizeof(AVRO_VERSION_HEADER)) << "'";
-    return Status(ss.str());
+    return Status(TErrorCode::AVRO_BAD_VERSION_HEADER,
+        stream_->filename(), ReadWriteUtil::HexDump(header, sizeof(AVRO_VERSION_HEADER)));
   }
 
   // Decode relevant metadata (encoded as Avro map)

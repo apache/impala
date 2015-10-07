@@ -197,6 +197,9 @@ error_codes = (
 
   ("SCANNER_INVALID_READ", 63, "Invalid read of $0 bytes. This may indicate data file "
    "corruption. (file $1, byte offset: $2)"),
+
+  ("AVRO_BAD_VERSION_HEADER", 64, "File '$0' has an invalid version header: $1\\n"
+   "Make sure the file is an Avro data file."),
 )
 
 import sys
