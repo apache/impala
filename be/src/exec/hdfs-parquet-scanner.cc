@@ -2262,10 +2262,16 @@ Status HdfsParquetScanner::InitColumns(
 
     const DiskIoMgr::ScanRange* split_range =
         reinterpret_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
+
+    // Determine if the column is completely contained within a local split.
+    bool column_range_local = split_range->expected_local() &&
+                              col_start >= split_range->offset() &&
+                              col_end <= split_range->offset() + split_range->len();
+
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
         metadata_range_->fs(), metadata_range_->file(), col_len, col_start,
         scalar_reader->col_idx(), split_range->disk_id(), split_range->try_cache(),
-        split_range->expected_local(), file_desc->mtime);
+        column_range_local, file_desc->mtime);
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column
