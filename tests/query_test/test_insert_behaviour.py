@@ -169,6 +169,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
   @SkipIfIsilon.hdfs_acls
+  @pytest.mark.execute_serially
   def test_insert_file_permissions(self):
     """Test that INSERT correctly respects file permission (minimum ACLs)"""
     TBL = "functional.insert_acl_permissions"
@@ -222,6 +223,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, INSERT_QUERY)
 
   @SkipIfIsilon.hdfs_acls
+  @pytest.mark.execute_serially
   def test_insert_acl_permissions(self):
     """Test that INSERT correctly respects ACLs"""
     TBL = "functional.insert_acl_permissions"
@@ -305,6 +307,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, INSERT_QUERY)
 
   @SkipIfIsilon.hdfs_acls
+  @pytest.mark.execute_serially
   def test_load_permissions(self):
     # We rely on test_insert_acl_permissions() to exhaustively check that ACL semantics
     # are correct. Here we just validate that LOADs can't be done when we cannot read from
@@ -427,6 +430,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_failure(self.client, insert_query)
 
   @SkipIfIsilon.hdfs_acls
+  @pytest.mark.execute_serially
   def test_multiple_group_acls(self):
     """Test that INSERT correctly respects multiple group ACLs"""
     TBL = "functional.insert_group_acl_permissions"
