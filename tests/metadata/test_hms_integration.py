@@ -30,8 +30,11 @@ import subprocess
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIfS3, SkipIfIsilon
 
 
+@SkipIfS3.hive
+@SkipIfIsilon.hive
 class TestHmsIntegration(ImpalaTestSuite):
 
   @classmethod
