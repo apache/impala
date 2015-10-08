@@ -161,11 +161,12 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
   return (*decompressor)->Init();
 }
 
-Codec::Codec(MemPool* mem_pool, bool reuse_buffer)
+Codec::Codec(MemPool* mem_pool, bool reuse_buffer, bool supports_streaming)
   : memory_pool_(mem_pool),
     reuse_buffer_(reuse_buffer),
     out_buffer_(NULL),
-    buffer_length_(0) {
+    buffer_length_(0),
+    supports_streaming_(supports_streaming) {
   if (memory_pool_ != NULL) {
     temp_memory_pool_.reset(new MemPool(memory_pool_->mem_tracker()));
   }

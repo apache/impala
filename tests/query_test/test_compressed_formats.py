@@ -111,7 +111,6 @@ class TestCompressedFormats(ImpalaTestSuite):
     finally:
       call(["hive", "-e", drop_cmd]);
 
-
 @SkipIfS3.insert
 class TestTableWriters(ImpalaTestSuite):
   @classmethod
@@ -218,3 +217,25 @@ class TestLargeCompressedFile(ImpalaTestSuite):
 
   def __drop_test_table(self):
     self.client.execute("DROP TABLE IF EXISTS %s" % self.TABLE_NAME)
+
+class TestBzip2Streaming(ImpalaTestSuite):
+  MAX_SCAN_RANGE_LENGTHS = [0, 5]
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestBzip2Streaming, cls).add_test_dimensions()
+
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("skipping if it's not exhaustive test.")
+    cls.TestMatrix.add_dimension(
+        TestDimension('max_scan_range_length', *cls.MAX_SCAN_RANGE_LENGTHS))
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'text' and\
+        v.get_value('table_format').compression_codec == 'bzip')
+
+  def test_bzip2_streaming(self, vector):
+    self.run_test_case('QueryTest/text-bzip-scan', vector)

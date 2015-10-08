@@ -191,5 +191,5 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 ---- QUERY
 select count(*) from functional_text_gzip.bad_text_gzip
 ---- CATCH
-Unexpected end of file decompressing gzip. File may be malformed.
+Unexpected end of compressed file. File may be truncated.
 ====

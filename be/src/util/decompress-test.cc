@@ -91,6 +91,8 @@ class DecompressorTest : public ::testing::Test {
         sizeof(input_streaming_), input_streaming_);
     CompressAndStreamingDecompress(compressor.get(), decompressor.get(),
         0, NULL);
+    CompressAndStreamingDecompress(compressor.get(), decompressor.get(),
+        0, input_);
 
     compressor->Close();
     decompressor->Close();
@@ -136,31 +138,47 @@ class DecompressorTest : public ::testing::Test {
     EXPECT_EQ(memcmp(input, output, input_len), 0);
   }
 
-  void CompressAndStreamingDecompress(Codec* compressor, Codec* decompressor,
-      int64_t input_len, uint8_t* input) {
-    uint8_t* compressed;
-    int64_t compressed_length;
-    EXPECT_OK(compressor->ProcessBlock(false, input_len,
-        input, &compressed_length, &compressed));
+  void Compress(Codec* compressor, int64_t input_len, uint8_t* input,
+      int64_t* output_len, uint8_t** output, bool output_preallocated) {
+    if (input == NULL && compressor->file_extension() == "bz2") {
+      // bzip does not allow NULL input
+      *output = NULL;
+      *output_len = 0;
+      return;
+    }
+    EXPECT_OK(compressor->ProcessBlock(output_preallocated, input_len,
+        input, output_len, output));
+  }
 
+  void StreamingDecompress(Codec* decompressor, int64_t input_len, uint8_t* input,
+      int64_t uncompressed_len, uint8_t* uncompressed_input) {
     // Should take multiple calls to ProcessBlockStreaming() to decompress the buffer.
     int64_t total_output_produced = 0;
-    int64_t compressed_bytes_remaining = compressed_length;
-    bool eos = false;
-    while (!eos) {
-      EXPECT_LE(total_output_produced, input_len);
+    int64_t compressed_bytes_remaining = input_len;
+    uint8_t* compressed_input = input;
+    do {
+      EXPECT_LE(total_output_produced, uncompressed_len);
       uint8_t* output = NULL;
       int64_t output_len = 0;
       int64_t compressed_bytes_read = 0;
+      bool stream_end = false;
       EXPECT_OK(decompressor->ProcessBlockStreaming(compressed_bytes_remaining,
-            compressed, &compressed_bytes_read, &output_len, &output, &eos));
-      EXPECT_EQ(memcmp(input + total_output_produced, output, output_len), 0);
+          compressed_input, &compressed_bytes_read, &output_len, &output, &stream_end));
+      EXPECT_EQ(memcmp(uncompressed_input + total_output_produced, output, output_len), 0);
       total_output_produced += output_len;
-      compressed = compressed + compressed_bytes_read;
+      compressed_input = compressed_input + compressed_bytes_read;
       compressed_bytes_remaining -= compressed_bytes_read;
-    }
+    } while (compressed_bytes_remaining > 0);
     EXPECT_EQ(0, compressed_bytes_remaining);
-    EXPECT_EQ(total_output_produced, input_len);
+    EXPECT_EQ(total_output_produced, uncompressed_len);
+  }
+
+  void CompressAndStreamingDecompress(Codec* compressor, Codec* decompressor,
+      int64_t input_len, uint8_t* input) {
+    uint8_t* compressed = NULL;
+    int64_t compressed_length = 0;
+    Compress(compressor, input_len, input, &compressed_length, &compressed, false);
+    StreamingDecompress(decompressor, compressed_length, compressed, input_len, input);
   }
 
   // Only tests compressors and decompressors with allocated output.
@@ -188,8 +206,8 @@ class DecompressorTest : public ::testing::Test {
 
   uint8_t input_[2 * 26 * 1024];
 
-  // Buffer for testing ProcessBlockStreaming() which allocates 16mb output buffers. This
-  // is 2x + 1 the size of the output buffers to ensure that the decompressed output
+  // Buffer for testing ProcessBlockStreaming() which allocates 8mb output buffers. This
+  // is 4x + 1 the size of the output buffers to ensure that the decompressed output
   // requires several calls and doesn't need to be nicely aligned (the last call gets a
   // small amount of data).
   uint8_t input_streaming_[32 * 1024 * 1024 + 1];
@@ -222,6 +240,7 @@ TEST_F(DecompressorTest, Deflate) {
 
 TEST_F(DecompressorTest, Bzip) {
   RunTest(THdfsCompression::BZIP2);
+  RunTestStreaming(THdfsCompression::BZIP2);
 }
 
 TEST_F(DecompressorTest, SnappyBlocked) {

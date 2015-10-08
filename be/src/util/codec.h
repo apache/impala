@@ -113,9 +113,23 @@ class Codec {
   /// Process data like ProcessBlock(), but can consume partial input and may only produce
   /// partial output. *input_bytes_read returns the number of bytes of input that have
   /// been consumed. Even if all input has been consumed, the caller must continue calling
-  /// to fetch output until *eos returns true.
+  /// to fetch output until *output_length==0.
+  ///
+  /// On the same codec object, we should call either ProcessBlock() or
+  /// ProcessBlockStreaming() but not both. Use ProcessBlockStreaming() when decompressing
+  /// file. Use ProcessBlock() when decompressing blocks.
+  ///
+  /// Inputs:
+  ///   input_length: length, in bytes of the data to decompress
+  ///   input: data to decompress
+  ///
+  /// Outputs:
+  ///   input_bytes_read: number of bytes of 'input' that were decompressed
+  ///   output_length: length of decompresed data
+  ///   output: decompressed data
+  ///   stream_end: end of output buffer corresponds to the end of a compressed stream.
   virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
-      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* eos) {
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* stream_end) {
     return Status("Not implemented.");
   }
 
@@ -134,6 +148,8 @@ class Codec {
 
   bool reuse_output_buffer() const { return reuse_buffer_; }
 
+  bool supports_streaming() const { return supports_streaming_; }
+
   /// Largest block we will compress/decompress: 2GB.
   /// We are dealing with compressed blocks that are never this big but we want to guard
   /// against a corrupt file that has the block length as some large number.
@@ -145,7 +161,7 @@ class Codec {
   ///   mem_pool: memory pool to allocate the output buffer. If mem_pool is NULL then the
   ///             caller must always preallocate *output in ProcessBlock().
   ///   reuse_buffer: if false always allocate a new buffer rather than reuse.
-  Codec(MemPool* mem_pool, bool reuse_buffer);
+  Codec(MemPool* mem_pool, bool reuse_buffer, bool supports_streaming = false);
 
   /// Initialize the codec. This should only be called once.
   virtual Status Init() = 0;
@@ -166,6 +182,10 @@ class Codec {
 
   /// Length of the output buffer.
   int64_t buffer_length_;
+
+  /// Can decompressor support streaming mode.
+  /// This is set to true for codecs that implement ProcessBlockStreaming().
+  bool supports_streaming_;
 };
 
 }

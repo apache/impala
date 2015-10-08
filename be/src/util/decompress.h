@@ -18,6 +18,7 @@
 
 // We need zlib.h here to declare stream_ below.
 #include <zlib.h>
+#include <bzlib.h>
 
 #include "util/codec.h"
 #include "exec/hdfs-scanner.h"
@@ -32,7 +33,8 @@ class GzipDecompressor : public Codec {
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
   virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
-      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* eos);
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output,
+      bool* stream_end);
   virtual std::string file_extension() const { return "gz"; }
 
  private:
@@ -54,17 +56,23 @@ class GzipDecompressor : public Codec {
 
 class BzipDecompressor : public Codec {
  public:
-  virtual ~BzipDecompressor() { }
+  virtual ~BzipDecompressor();
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
                               int64_t input_length, const uint8_t* input,
                               int64_t* output_length, uint8_t** output);
+  virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* stream_end);
   virtual std::string file_extension() const { return "bz2"; }
  private:
   friend class Codec;
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
 
-  virtual Status Init() { return Status::OK(); }
+  virtual Status Init();
+  std::string DebugStreamState() const;
+
+  /// Used for streaming decompression.
+  bz_stream stream_;
 };
 
 class SnappyDecompressor : public Codec {

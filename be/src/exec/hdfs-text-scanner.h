@@ -94,18 +94,26 @@ class HdfsTextScanner : public HdfsScanner {
   /// Fills the next byte buffer from the context.  This will block if there are no bytes
   /// ready.  Updates byte_buffer_ptr_, byte_buffer_end_ and byte_buffer_read_size_.
   /// If num_bytes is 0, the scanner will read whatever is the io mgr buffer size,
-  /// otherwise it will just read num_bytes.
+  /// otherwise it will just read num_bytes. If we are reading compressed text, num_bytes
+  /// must be 0.
   virtual Status FillByteBuffer(bool* eosr, int num_bytes = 0);
 
   /// Fills the next byte buffer from the compressed data in stream_ by reading the entire
   /// file, decompressing it, and setting the byte_buffer_ptr_ to the decompressed buffer.
   Status FillByteBufferCompressedFile(bool* eosr);
 
-  /// Fills the next byte buffer from the gzip compressed data in stream_. Unlike
+  /// Fills the next byte buffer from the compressed data in stream_. Unlike
   /// FillByteBufferCompressedFile(), the entire file does not need to be read at once.
   /// Buffers from stream_ are decompressed as they are read and byte_buffer_ptr_ is set
   /// to available decompressed data.
-  Status FillByteBufferGzip(bool* eosr);
+  Status FillByteBufferCompressedStream(bool* eosr);
+
+  /// Used by FillByteBufferCompressedStream() to decompress data from 'stream_'.
+  /// Returns COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS if it needs more input.
+  /// If bytes_to_read > 0, will read specified size.
+  /// If bytes_to_read = -1, will call GetBuffer().
+  Status DecompressBufferStream(int64_t bytes_to_read, uint8_t** decompressed_buffer,
+      int64_t* decompressed_len, bool *eosr);
 
   /// Prepends field data that was from the previous file buffer (This field straddled two
   /// file buffers).  'data' already contains the pointer/len from the current file buffer,

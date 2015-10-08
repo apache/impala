@@ -207,7 +207,23 @@ error_codes = (
 
   ("BTS_BLOCK_OVERFLOW", 66, "Cannot process row that is bigger than the IO size "
    "(row_size=$0, null_indicators_size=$1). To run this query, increase the IO size "
-   "(--read_size option).")
+   "(--read_size option)."),
+
+  ("COMPRESSED_FILE_MULTIPLE_BLOCKS", 67,
+   "For better performance, snappy-, gzip-, and bzip-compressed files "
+   "should not be split into multiple HDFS blocks. file=$0 offset $1"),
+
+  ("COMPRESSED_FILE_BLOCK_CORRUPTED", 68,
+   "$0 Data error, likely data corrupted in this block."),
+
+  ("COMPRESSED_FILE_DECOMPRESSOR_ERROR", 69, "$0 Decompressor error at $1, code=$2"),
+
+  ("COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS", 70,
+   "Decompression failed to make progress, but end of input is not reached. "
+   "File appears corrupted. file=$0"),
+
+  ("COMPRESSED_FILE_TRUNCATED", 71,
+   "Unexpected end of compressed file. File may be truncated. file=$0")
 )
 
 import sys

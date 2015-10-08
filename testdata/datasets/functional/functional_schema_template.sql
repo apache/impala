@@ -1726,3 +1726,43 @@ L_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+bzip2_tbl
+---- COLUMNS
+col string
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/bzip2_tbl_text_bzip/ && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/data-bzip2.bz2 /test-warehouse/bzip2_tbl_text_bzip/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+large_bzip2_tbl
+---- COLUMNS
+col string
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/large_bzip2_tbl_text_bzip/ && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/large_bzip2.bz2 /test-warehouse/large_bzip2_tbl_text_bzip/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+multistream_bzip2_tbl
+---- COLUMNS
+col string
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/multistream_bzip2_tbl_text_bzip/ && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/data-pbzip2.bz2 /test-warehouse/multistream_bzip2_tbl_text_bzip/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+large_multistream_bzip2_tbl
+---- COLUMNS
+col string
+---- DEPENDENT_LOAD
+`hdfs dfs -mkdir -p /test-warehouse/large_multistream_bzip2_tbl_text_bzip/ && \
+hdfs dfs -put -f ${IMPALA_HOME}/testdata/data/large_pbzip2.bz2 /test-warehouse/large_multistream_bzip2_tbl_text_bzip/
+====

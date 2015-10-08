@@ -1,0 +1,101 @@
+====
+---- QUERY
+select count(*) from functional_text_bzip.bzip2_tbl
+---- RESULTS
+1000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(col) from functional_text_bzip.bzip2_tbl
+---- RESULTS
+1000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from functional_text_bzip.bzip2_tbl order by col limit 5
+---- RESULTS
+'0'
+'1'
+'10'
+'100'
+'1000'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from functional_text_bzip.large_bzip2_tbl order by col limit 5
+---- RESULTS
+'0'
+'1'
+'10'
+'100'
+'1000'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(col) from functional_text_bzip.large_bzip2_tbl
+---- RESULTS
+10000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from functional_text_bzip.large_multistream_bzip2_tbl order by col limit 5
+---- RESULTS
+'0'
+'1'
+'10'
+'100'
+'1000'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(col) from functional_text_bzip.multistream_bzip2_tbl
+---- RESULTS
+1000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from functional_text_bzip.multistream_bzip2_tbl order by col limit 5
+---- RESULTS
+'0'
+'1'
+'10'
+'100'
+'1000'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from functional_text_bzip.large_multistream_bzip2_tbl
+---- RESULTS
+10000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(col) from functional_text_bzip.large_multistream_bzip2_tbl
+---- RESULTS
+10000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+select max(col) from (select * from functional_text_bzip.bzip2_tbl order by col limit 5) t
+---- RESULTS
+'1000'
+---- TYPES
+STRING
+====
+---- QUERY
+select max(col) from (select * from functional_text_bzip.multistream_bzip2_tbl order by col limit 5) t
+---- RESULTS
+'1000'
+---- TYPES
+STRING
+====

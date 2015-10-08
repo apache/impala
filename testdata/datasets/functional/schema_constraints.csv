@@ -150,3 +150,9 @@ table_name:alltimezones, constraint:restrict_to, table_format:text/none/none
 # Avro schema is inferred from the column definitions (IMPALA-1136)
 table_name:no_avro_schema, constraint:restrict_to, table_format:avro/snap/block
 table_name:avro_unicode_nulls, constraint:restrict_to, table_format:avro/snap/block
+
+# test single and multi stream bz2 files
+table_name:bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
+table_name:large_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
+table_name:multistream_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
+table_name:large_multistream_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block

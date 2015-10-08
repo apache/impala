@@ -38,3 +38,19 @@ Contains 3 row groups, each with ten rows and each array containing ten elements
 first rowgroup column metadata for 'int_array' incorrectly states there are 50 values
 (instead of 100), and the second rowgroup column metadata for 'id' incorrectly states
 there are 11 values (instead of 10). The third rowgroup has the correct metadata.
+
+data-bzip2.bz2
+Generated with bzip2, contains single bzip2 stream
+Contains 1 column, uncompressed data size < 8M
+
+large_bzip2.bz2
+Generated with bzip2, contains single bzip2 stream
+Contains 1 column, uncompressed data size > 8M
+
+data-pbzip2.bz2
+Generated with pbzip2, contains multiple bzip2 streams
+Contains 1 column, uncompressed data size < 8M
+
+large_pbzip2.bz2
+Generated with pbzip2, contains multiple bzip2 stream
+Contains 1 column, uncompressed data size > 8M
