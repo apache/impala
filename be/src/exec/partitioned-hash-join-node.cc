@@ -722,21 +722,19 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
     ResetForProbe();
   } else {
     // Done with this partition.
-    if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
-        join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+    if (!input_partition_->is_spilled() &&
+        (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+         join_op_ == TJoinOp::FULL_OUTER_JOIN)) {
       // In case of right-outer, right-anti and full-outer joins, we move this partition
       // to the list of partitions that we need to output their unmatched build rows.
       DCHECK(output_build_partitions_.empty());
-      BufferedTupleStream* build_rows = input_partition_->build_rows();
-      if (build_rows->num_rows() > 0) {
-        DCHECK(input_partition_->hash_tbl_.get() != NULL) << " id: " << id_
-            << " Build: " << build_rows->num_rows()
-            << " Probe: " << probe_rows->num_rows() << endl
-            << GetStackTrace();
-        hash_tbl_iterator_ =
-            input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
-        output_build_partitions_.push_back(input_partition_);
-      }
+      DCHECK(input_partition_->hash_tbl_.get() != NULL) << " id: " << id_
+           << " Build: " << input_partition_->build_rows()->num_rows()
+           << " Probe: " << probe_rows->num_rows() << endl
+           << GetStackTrace();
+      hash_tbl_iterator_ =
+          input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
+      output_build_partitions_.push_back(input_partition_);
     } else {
       // In any other case, just close the input partition.
       input_partition_->Close(out_batch);
@@ -1327,8 +1325,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
     } else {
       DCHECK_EQ(partition->probe_rows()->num_rows(), 0)
         << "No probe rows should have been spilled for this partition.";
-      if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
-          join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+      if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
           join_op_ == TJoinOp::FULL_OUTER_JOIN) {
         if (output_build_partitions_.empty()) {
           hash_tbl_iterator_ = partition->hash_tbl_->FirstUnmatched(ht_ctx_.get());

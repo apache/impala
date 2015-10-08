@@ -10,7 +10,7 @@ ON l1.l_orderkey = l2.l_orderkey
 BIGINT
 ====
 ---- QUERY
-# Regression test for IMPALA-1919. When spilled right joins and full outer joins
+# Regression test for IMPALA-1919. When spilling right joins or full outer joins
 # there is chance to call process batch while the out_batch is AtCapacity().
 SET mem_limit = 400m;
 SELECT COUNT(*) FROM lineitem l1 RIGHT OUTER JOIN lineitem l2
@@ -20,4 +20,18 @@ WHERE l2.l_linenumber % 2 = 0
 13291122
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-2168. When repartitioning spilled right joins or full
+# outer joins there is chance to try to access NULL streams.
+SET mem_limit = 1g;
+SELECT straight_join * FROM orders o
+RIGHT OUTER JOIN lineitem l ON o.o_orderkey =  if(l.l_orderkey % 2 = 0, 0, l.l_orderkey)
+ORDER BY l_receiptdate, l_orderkey, l_shipdate
+limit 10
+---- CATCH
+Memory limit exceeded
+====
+---- QUERY
+set mem_limit=0
 ====
