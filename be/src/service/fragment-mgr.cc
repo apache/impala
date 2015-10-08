@@ -42,6 +42,19 @@ Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params)
     return Status("missing sink in plan fragment");
   }
 
+  // Preparing and opening the fragment creates a thread and consumes a non-trivial
+  // amount of memory. If we are already starved for memory, cancel the fragment as
+  // early as possible to avoid digging the hole deeper.
+  if (ExecEnv::GetInstance()->process_mem_tracker()->LimitExceeded()) {
+    Status status = Status::MemLimitExceeded();
+    status.AddDetail(Substitute("Instance $0 of plan fragment $1 of query $2 could not "
+          "start because the backend Impala daemon is over its memory limit",
+          PrintId(exec_params.fragment_instance_ctx.fragment_instance_id),
+          exec_params.fragment.display_name,
+          PrintId(exec_params.fragment_instance_ctx.query_ctx.query_id)));
+    return status;
+  }
+
   shared_ptr<FragmentExecState> exec_state(
       new FragmentExecState(exec_params.fragment_instance_ctx, ExecEnv::GetInstance()));
   // Call Prepare() now, before registering the exec state, to avoid calling
