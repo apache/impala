@@ -35,10 +35,16 @@ PROJECT(ASSEMBLER)
 #  -Wno-deprecated: gutil contains deprecated headers
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
-SET(CXX_COMMON_FLAGS "-Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+
+# On Apple we build with clang and need libstdc++ instead of libc++
+if (APPLE)
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -stdlib=libstdc++")
+endif()
+
 SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
 # For any clang builds (currently only ASAN):
@@ -46,7 +52,7 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #        makes extra calls to clang which may have extra includes (-I) that are unused.
 #   -fcolor-diagnostics: ensure clang generates colorized output, which is necessary
 #        when using ccache as clang thinks it is not called from a terminal.
-SET(CXX_CLANG_FLAGS "-Qunused-arguments -fcolor-diagnostics")
+SET(CXX_CLANG_FLAGS "-Qunused-arguments -fcolor-diagnostics -Wno-unused-local-typedef")
 # For any gcc builds:
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
@@ -58,8 +64,10 @@ SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
 # For CMAKE_BUILD_TYPE=Release
 #   -O3: Enable all compiler optimizations
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
-SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb")
-SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG")
+#
+# Debug information is stored as dwarf2 to be as compatible as possible
+SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb -gdwarf-2")
+SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
@@ -80,8 +88,10 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_RELEASE")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_RELEASE} ${CXX_COVERAGE_FLAGS}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
-  SET(CMAKE_CXX_COMPILER ${LLVM_CLANG_EXECUTABLE})
-  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_ADDRESS_SANITIZER})
+  if (NOT IMPALA_TOOLCHAIN)
+    SET(CMAKE_CXX_COMPILER ${LLVM_CLANG_EXECUTABLE})
+  endif()
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_ADDRESS_SANITIZER}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif ()
@@ -119,8 +129,7 @@ add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 # modifying it at runtime, then re-compiling (and optimizing) the modified code. The final
 # optimizations will be less effective if the initial code is also optimized.
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-DIR_COMPILE" "-DNDEBUG"
-  "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG"
-  "-D__STDC_FORMAT_MACROS")
+  "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 
 # setup doc generation with Doxygen
 find_package(Doxygen)
@@ -162,7 +171,24 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # resolve includes of generated code
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 
+set(CLANG_INCLUDE_FLAGS)
+
+if (IMPALA_TOOLCHAIN)
+  # When the Toolchain is used we use LLVM 3.3 that was built in a different path that it
+  # is invoked from, and a GCC that resides in a different location. LVVM 3.3 relies on
+  # hard-coded path information about where to find the system headers and does not support
+  # specifying the -gcc-toolchain flag to dynamically provide this information. Because of
+  # these reasons we need to manually add the system c++ headers to the path when we
+  # compile the IR code with clang.
+  set(CLANG_BASE_FLAGS
+    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}"
+    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}/backward"
+    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}/x86_64-unknown-linux-gnu")
+  set(CLANG_INCLUDE_FLAGS ${CLANG_BASE_FLAGS})
+endif()
+
 set(CLANG_INCLUDE_FLAGS
+  ${CLANG_INCLUDE_FLAGS}
   "-I${CMAKE_CURRENT_SOURCE_DIR}/src"
   "-I${CMAKE_CURRENT_SOURCE_DIR}/generated-sources"
   "-I${THRIFT_INCLUDE_DIR}"
@@ -177,6 +203,10 @@ set(CLANG_INCLUDE_FLAGS
   "-I${JAVA_INCLUDE_PATH2}"
   "-I${RE2_INCLUDE_DIR}"
   "-I${SASL_INCLUDE_DIR}"
+  "-I${BZIP2_INCLUDE_DIR}"
+  "-I${ZLIB_INCLUDE_DIR}"
+  "-I${OPENSSL_INCLUDE_DIR}"
+  "-I${LDAP_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
@@ -198,8 +228,15 @@ endif()
 # the order in which impala libraries are listed below does not matter.
 # Note: The ld documentation discourages auto-resolving cyclic dependencies
 # for performance reasons.
+if (NOT APPLE)
+  # When compiling on Mac with clang using these linker flags are undefined and Clang on
+  # Mac will abort on unknown compiler or linker flags. In the long-term we should
+  # move away from using these flags to have a coherent build on OS X and Linux.
+  set(WL_START_GROUP "-Wl,--start-group")
+  set(WL_END_GROUP "-Wl,--end-group")
+endif()
 set (IMPALA_LINK_LIBS
-  -Wl,--start-group
+  ${WL_START_GROUP}
   Catalog
   CodeGen
   Common
@@ -218,13 +255,13 @@ set (IMPALA_LINK_LIBS
   Udf
   Util
   Webserver
-  -Wl,--end-group
+  ${WL_END_GROUP}
 )
 
 # If using dynamic linking, -Wl does not have any effect (it's only for .a files). So we
 # need to add these redundant dependencies to resolve the circular references in our
 # libraries when dynamic linking is enabled.
-if ("${BUILD_SHARED_LIBS}" STREQUAL "ON")
+if (BUILD_SHARED_LIBS)
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
     Runtime
     Exec
@@ -256,15 +293,15 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LDAP_LIBRARY}
   ${LBER_LIBRARY}
   ThriftSaslTransport
-  ${JAVA_JVM_LIBRARY}
-  ${HDFS_LIBS}
   gutil
   glogstatic
   gflagsstatic
   pprofstatic
+  ${HDFS_LIB}
   ${LIBZ}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}
+  ${JAVA_JVM_LIBRARY}
   kudu_client
   -lrt
 )
@@ -285,6 +322,21 @@ if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 endif()
 
+# When we link statically, we need to replace the static libhdfs.a with the dynamic
+# version otherwise the dynamic support libraries will pickup the static libhdfs.a
+# library. The result will not compile as libhdfs.a is not compiled with -fpic. The same
+# is true for other system dependencies that we don't have control over.
+set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
+list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS HDFS_STATIC)
+set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${HDFS_LIBRARIES})
+# Replace static libz bzib with dynamic
+if (NOT IMPALA_TOOLCHAIN AND NOT BUILD_SHARED_LIBS)
+  list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS BZIP2_STATIC)
+  list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS ZLIB_STATIC)
+  set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS
+    ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES})
+endif()
+
 # Replace Udf with ImpalaUdf for $UDF_TEST_LINK_LIBS
 set (UDF_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} ImpalaUdf)
 list(REMOVE_ITEM UDF_TEST_LINK_LIBS Udf)
@@ -294,11 +346,17 @@ list(REMOVE_ITEM UDF_TEST_LINK_LIBS Udf)
 set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
 set (UDF_TEST_LINK_LIBS ${UDF_TEST_LINK_LIBS} gtest)
 
-MESSAGE(STATUS, "Compiler Flags: ${CMAKE_CXX_FLAGS}")
-MESSAGE(STATUS, "Linker Libs: ${IMPALA_LINK_LIBS}")
+MESSAGE(STATUS "Compiler Flags: ${CMAKE_CXX_FLAGS}")
+
+if (CMAKE_DEBUG)
+  MESSAGE(STATUS "Linker Libs: ${IMPALA_LINK_LIBS}")
+endif()
 
 set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/llvm-ir")
 file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})
+
+# Add custom target to only build the backend tests
+add_custom_target(be-test)
 
 # Utility CMake function to make specifying tests and benchmarks less verbose
 FUNCTION(ADD_BE_TEST TEST_NAME)
@@ -308,6 +366,7 @@ FUNCTION(ADD_BE_TEST TEST_NAME)
   TARGET_LINK_LIBRARIES(${TEST_NAME} ${IMPALA_TEST_LINK_LIBS})
   set(CMAKE_EXE_LINKER_FLAGS "--start-group")
   ADD_TEST(${TEST_NAME} "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}")
+  ADD_DEPENDENCIES(be-test ${TEST_NAME})
 ENDFUNCTION()
 
 FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
@@ -329,6 +388,9 @@ function(COMPILE_TO_IR SRC_FILE)
     DEPENDS ${SRC_FILE})
   add_custom_target(${BASE_NAME}-ir ALL DEPENDS ${OUTPUT_FILE})
 endfunction(COMPILE_TO_IR)
+
+# Gutil is a little bit special
+add_subdirectory(src/gutil)
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/catalog)

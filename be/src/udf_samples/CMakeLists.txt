@@ -21,28 +21,31 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/udf_samples")
 # This should be called with the .cc src file and it will generate a
 # src-file-ir target that can be built.
 # e.g. COMPILE_TO_IR(test.cc) generates the "test-ir" make target.
-set(IR_COMPILE_FLAGS "-emit-llvm" "-O3" "-c" "-I../")
+set(IR_COMPILE_FLAGS "-emit-llvm" "-O3" "-c" "-I../" ${CLANG_BASE_FLAGS})
 function(COMPILE_TO_IR SRC_FILE)
   get_filename_component(BASE_NAME ${SRC_FILE} NAME_WE)
   set(OUTPUT_FILE "${LIBRARY_OUTPUT_PATH}/${BASE_NAME}.ll")
   add_custom_command(
     OUTPUT ${OUTPUT_FILE}
-    COMMAND ${LLVM_CLANG_EXECUTABLE} ${IR_COMPILE_FLAGS} ${SRC_FILE} -o ${OUTPUT_FILE}
+    COMMAND ${LLVM_CLANG_EXECUTABLE} ${IR_COMPILE_FLAGS} ${CLANG_INCLUDE_FLAGS} ${SRC_FILE} -o ${OUTPUT_FILE}
     DEPENDS ${SRC_FILE})
   add_custom_target(${BASE_NAME}-ir ALL DEPENDS ${OUTPUT_FILE})
 endfunction(COMPILE_TO_IR)
 
 # Build the UDA/UDFs into a shared library.
 add_library(udfsample SHARED udf-sample.cc)
+add_dependencies(udfsample thrift-deps)
 add_library(udasample SHARED uda-sample.cc hyperloglog-uda.cc)
+add_dependencies(udasample thrift-deps)
 
 # Custom targest to cross compile UDA/UDF to ir
 COMPILE_TO_IR(udf-sample.cc )
+add_dependencies(udf-sample-ir thrift-deps)
 COMPILE_TO_IR(uda-sample.cc )
+add_dependencies(uda-sample-ir thrift-deps)
 
 # This is an example of how to use the test harness to help develop UDF and UDAs.
 add_executable(udf-sample-test udf-sample-test.cc)
 target_link_libraries(udf-sample-test ImpalaUdf udfsample)
 add_executable(uda-sample-test uda-sample-test.cc)
 target_link_libraries(uda-sample-test ImpalaUdf udasample)
-

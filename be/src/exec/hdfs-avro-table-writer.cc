@@ -18,7 +18,6 @@
 #include <hdfs.h>
 #include <boost/scoped_ptr.hpp>
 #include <stdlib.h>
-#include <codec.h>
 #include <gutil/strings/substitute.h>
 
 #include "exec/exec-node.h"

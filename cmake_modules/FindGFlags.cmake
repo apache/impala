@@ -1,16 +1,20 @@
-# - Find GFLAGS (gflags.h, libgflags.a, libgflags.so, and libgflags.so.0)
+# - Find GFLAGS (gflags.h, libgflags.a, libgflags.so, and libgflags.so.0) with
+# GFLAGS_ROOT hinting a location
+#
 # This module defines
 #  GFLAGS_INCLUDE_DIR, directory containing headers
 #  GFLAGS_LIBS, directory containing gflag libraries
 #  GFLAGS_STATIC_LIB, path to libgflags.a
-#  GFLAGS_FOUND, whether gflags has been found
+#  gflagsstatic
 
-set(GFLAGS_SEARCH_HEADER_PATHS  
-  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/src
+set(GFLAGS_SEARCH_HEADER_PATHS
+  ${GFLAGS_ROOT}/include
+  $ENV{IMPALA_HOME}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/src
 )
 
 set(GFLAGS_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/.libs
+  ${GFLAGS_ROOT}/lib
+  $ENV{IMPALA_HOME}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/.libs
 )
 
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS
@@ -19,29 +23,25 @@ find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS
   NO_DEFAULT_PATH
 )
 
-find_library(GFLAGS_LIB_PATH NAMES gflags PATHS ${GFLAGS_SEARCH_LIB_PATH})
+find_library(GFLAGS_LIBS NAMES gflags PATHS ${GFLAGS_SEARCH_LIB_PATH})
+find_library(GFLAGS_STATIC_LIB NAMES libgflags.a PATHS ${GFLAGS_SEARCH_LIB_PATH})
 
-if (GFLAGS_LIB_PATH)
-  set(GFLAGS_FOUND TRUE)
-  set(GFLAGS_LIBS ${GFLAGS_SEARCH_LIB_PATH})
-  set(GFLAGS_STATIC_LIB ${GFLAGS_SEARCH_LIB_PATH}/libgflags.a)
-else ()
-  set(GFLAGS_FOUND FALSE)
-endif ()
-
-if (GFLAGS_FOUND)
-  if (NOT GFLAGS_FIND_QUIETLY)
-    message(STATUS "GFlags found in ${GFLAGS_SEARCH_LIB_PATH}")
-    message(STATUS "GFlags headers found in ${GFLAGS_SEARCH_HEADER_PATHS}")
-  endif ()
-else ()
-  message(STATUS "GFlags includes and libraries NOT found. "
+if (NOT GFLAGS_LIBS OR NOT GFLAGS_STATIC_LIB)
+  message(FATAL_ERROR "GFlags includes and libraries NOT found. "
     "Looked for headers in ${GFLAGS_SEARCH_HEADER_PATHS}, "
     "and for libs in ${GFLAGS_SEARCH_LIB_PATH}")
+  set(GFLAGS_FOUND FALSE)
+else()
+  set(GFLAGS_FOUND TRUE)
+  # for static linking with GFLAGS, GFLAGS_STATIC_LIB is set in GFLAGS' find module
+  add_library(gflagsstatic STATIC IMPORTED)
+  set_target_properties(gflagsstatic PROPERTIES IMPORTED_LOCATION ${GFLAGS_STATIC_LIB})
+
 endif ()
 
 mark_as_advanced(
   GFLAGS_INCLUDE_DIR
   GFLAGS_LIBS
   GFLAGS_STATIC_LIB
+  gflagsstatic
 )

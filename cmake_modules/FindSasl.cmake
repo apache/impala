@@ -1,4 +1,4 @@
-# Copyright 2013 Cloudera, Inc.
+# Copyright 2015 Cloudera, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,14 +52,14 @@ if (CYRUS_SASL_FOUND)
     message(STATUS "Found the CyrusSASL library: ${CYRUS_SASL_SHARED_LIB}")
   endif ()
 else ()
-  if (NOT CyrusSASL_FIND_QUIETLY)
+  if (NOT Sasl_FIND_QUIETLY)
     set(CYRUS_SASL_ERR_MSG "Could not find the CyrusSASL Library.")
     set(CYRUS_SASL_ERR_MSG "Install libsasl2-dev or cyrus-sasl-devel packages to build.")
-    if (CyrusSASL_FIND_REQUIRED)
+    if (Sasl_FIND_REQUIRED)
       message(FATAL_ERROR "${CYRUS_SASL_ERR_MSG}")
-    else (CyrusSASL_FIND_REQUIRED)
+    else (Sasl_FIND_REQUIRED)
       message(STATUS "${CYRUS_SASL_ERR_MSG}")
-    endif (CyrusSASL_FIND_REQUIRED)
+    endif (Sasl_FIND_REQUIRED)
   endif ()
 endif ()
 

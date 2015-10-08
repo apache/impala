@@ -15,11 +15,10 @@
 
 # Incrementally compiles the BE.
 
-# Exit on reference to uninitialized variable
-set -u
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
-# Exit on non-zero return value
-set -e
+: ${IMPALA_TOOLCHAIN=}
 
 BUILD_TESTS=1
 CLEAN=0
@@ -86,34 +85,36 @@ cd ${IMPALA_HOME}
 if [ "x${TARGET_BUILD_TYPE}" != "x" ] || [ "x${BUILD_SHARED_LIBS}" != "x" ]
 then
     rm -f ./CMakeCache.txt
-    CMAKE_ARGS=""
-    if [ "x${TARGET_BUILD_TYPE}" != "x" ]
-    then
-        CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=${TARGET_BUILD_TYPE}"
+    CMAKE_ARGS=()
+    if [ "x${TARGET_BUILD_TYPE}" != "x" ]; then
+      CMAKE_ARGS+=(-DCMAKE_BUILD_TYPE=${TARGET_BUILD_TYPE})
     fi
-    if [ "x${BUILD_SHARED_LIBS}" != "x" ]
-    then
-        CMAKE_ARGS="${CMAKE_ARGS} -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
+
+    if [ "x${BUILD_SHARED_LIBS}" != "x" ]; then
+      CMAKE_ARGS+=(-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS})
     fi
-    cmake . ${CMAKE_ARGS} -DCMAKE_EXPORT_COMPILE_COMMANDS=On
+
+    if [[ ! -z $IMPALA_TOOLCHAIN ]]; then
+
+      if [[ "$TARGET_BUILD_TYPE" == "ADDRESS_SANITIZER" ]]; then
+        CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/asan_toolchain.cmake)
+      else
+        CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/toolchain.cmake)
+      fi
+    fi
+
+    cmake . ${CMAKE_ARGS[@]}
 fi
 
 if [ $CLEAN -eq 1 ]
 then
   make clean
-  rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
-  rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
 fi
 
 $IMPALA_HOME/bin/gen_build_version.py --noclean
 
 cd $IMPALA_HOME/common/function-registry
 make
-cd $IMPALA_HOME/common/thrift
-make
-cd $IMPALA_BE_DIR
-# TODO: we need to figure out how to use CMake dependencies properly
-python src/codegen/gen_ir_descriptions.py --noclean
 
 cd $IMPALA_HOME
 if [ $BUILD_TESTS -eq 1 ]
@@ -123,13 +124,4 @@ else
   # TODO: is there a way to get CMake to do this?
   make -j${IMPALA_BUILD_THREADS:-4} impalad
   make -j${IMPALA_BUILD_THREADS:-4} statestored catalogd fesupport loggingsupport ImpalaUdf
-  # Don't execute these two commands in parallel because it might break the build as the
-  # dependency resolution of the targets does not happen independently but in parallel as
-  # well. If the targets are started sufficiently close together, the common dependencies
-  # might not be correctly built, as both targets will believe a target is built as soon
-  # as the target file exists. In the worst case, this will lead to corrupt built
-  # artifacts caused by missing or truncated object files.
-  # http://www.cmake.org/pipermail/cmake/2011-July/045256.html
-  make -j${IMPALA_BUILD_THREADS:-4} compile_to_ir_no_sse
-  make -j${IMPALA_BUILD_THREADS:-4} compile_to_ir_sse
 fi

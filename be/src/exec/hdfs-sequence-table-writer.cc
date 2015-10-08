@@ -28,7 +28,6 @@
 #include <hdfs.h>
 #include <boost/scoped_ptr.hpp>
 #include <stdlib.h>
-#include <codec.h>
 
 #include "common/names.h"
 

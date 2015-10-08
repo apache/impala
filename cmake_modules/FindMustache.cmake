@@ -4,8 +4,8 @@
 #  MUSTACHE_SRC_DIR, directory containing source
 #  MUSTACHE_FOUND, whether the Mustache library has been located
 
-find_path(MUSTACHE_INCLUDE_DIR mustache/mustache.h HINTS ${CMAKE_SOURCE_DIR}/thirdparty)
-find_path(MUSTACHE_SRC_DIR mustache.cc HINTS ${CMAKE_SOURCE_DIR}/thirdparty/mustache)
+find_path(MUSTACHE_INCLUDE_DIR mustache/mustache.h HINTS $ENV{IMPALA_HOME}/thirdparty)
+find_path(MUSTACHE_SRC_DIR mustache.cc HINTS $ENV{IMPALA_HOME}/thirdparty/mustache)
 
 if (MUSTACHE_INCLUDE_DIR)
   set(MUSTACHE_FOUND TRUE)

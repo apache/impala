@@ -2,10 +2,9 @@
 # This module defines
 #  SQUEASEL_INCLUDE_DIR, directory containing headers
 #  SQUEASEL_SRC_DIR, directory containing source
-#  SQUEASEL_FOUND, whether the Squeasel library has been located
 
-find_path(SQUEASEL_INCLUDE_DIR squeasel/squeasel.h HINTS ${CMAKE_SOURCE_DIR}/thirdparty)
-find_path(SQUEASEL_SRC_DIR squeasel.c HINTS ${CMAKE_SOURCE_DIR}/thirdparty/squeasel)
+find_path(SQUEASEL_INCLUDE_DIR squeasel/squeasel.h HINTS $ENV{IMPALA_HOME}/thirdparty)
+find_path(SQUEASEL_SRC_DIR squeasel.c HINTS $ENV{IMPALA_HOME}/thirdparty/squeasel)
 
 if (SQUEASEL_INCLUDE_DIR)
   set(SQUEASEL_FOUND TRUE)
@@ -18,7 +17,7 @@ if (SQUEASEL_FOUND)
     message(STATUS "Squeasel web server library found in ${SQUEASEL_INCLUDE_DIR}")
   endif ()
 else ()
-  message(STATUS "Squeasel web server library includes NOT found. ")
+  message(FATAL_ERROR "Squeasel web server library includes NOT found. ")
 endif ()
 
 mark_as_advanced(

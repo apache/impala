@@ -22,6 +22,8 @@
 #
 # Find the Google Test Framework
 #
+# GTEST_ROOT hints a location
+#
 # This module defines
 # GTEST_INCLUDE_DIR, where to find gtest include files, etc.
 # GTEST_LIBRARIES, the libraries to link against to use gtest.
@@ -29,23 +31,27 @@
 
 # also defined, but not for general use are
 # GTEST_LIBRARY, where to find the GTest library.
+# gtest
 
 set(GTEST_H gtest/gtest.h)
 
 find_path(GTEST_INCLUDE_DIR ${GTEST_H}
-  PATHS ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0/include
+  PATHS ${GTEST_ROOT}/include
+        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0/include
         NO_DEFAULT_PATH
   DOC   "Path to the ${GTEST_H} file"
 )
 
 find_library(GTEST_LIBRARY NAMES gtest
-  PATHS ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0
+  PATHS ${GTEST_ROOT}/lib
+        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest)"
 )
 
 find_library(GTEST_MAIN_LIBRARY NAMES gtest_main
-  PATHS ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0
+  PATHS ${GTEST_ROOT}/lib
+        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest_main)"
 )
@@ -61,15 +67,13 @@ if(GTEST_FOUND)
   if(NOT GTest_FIND_QUIETLY)
     message(STATUS "Found GTest: ${GTEST_LIBRARIES}")
   endif(NOT GTest_FIND_QUIETLY)
+  add_library(gtest STATIC IMPORTED)
+  set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
 else(GTEST_FOUND)
-  if(NOT GTest_FIND_QUIETLY)
-    if(GTest_FIND_REQUIRED)
-      message(FATAL_ERROR "Could not find the GTest Library")
-    else(GTest_FIND_REQUIRED)
-      message(STATUS "Could not find the GTest Library")
-    endif(GTest_FIND_REQUIRED)
-  endif(NOT GTest_FIND_QUIETLY)
+  message(FATAL_ERROR "Could not find the GTest Library")
 endif(GTEST_FOUND)
 
-mark_as_advanced(GTEST_INCLUDE_DIR GTEST_LIBRARIES)
-
+mark_as_advanced(
+  GTEST_INCLUDE_DIR
+  GTEST_LIBRARIES
+  gtest)

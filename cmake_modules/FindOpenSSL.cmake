@@ -1,0 +1,35 @@
+# OPENSSL_ROOT hints the location
+# Provides
+#  - OPENSSL_LIBRARIES,
+#  - OPENSSL_STATIC,
+#  - OPENSSL_INCLUDE_DIR,
+#  - OPENSSL_FOUND
+set(_OPENSSL_SEARCH_DIR)
+
+if (OPENSSL_ROOT)
+set(_OPENSSL_SEARCH_DIR PATHS ${OPENSSL_ROOT} NO_DEFAULT_PATH)
+endif()
+
+find_path(OPENSSL_INCLUDE_DIR openssl/opensslconf.h
+  ${_OPENSSL_SEARCH_DIR} PATH_SUFFIXES include)
+
+# Add dynamic and static libraries
+find_library(OPENSSL_SSL ssl  ${_OPENSSL_SEARCH_DIR} PATH_SUFFIXES lib lib64)
+find_library(OPENSSL_CRYPTO crypto  ${_OPENSSL_SEARCH_DIR} PATH_SUFFIXES lib lib64)
+
+if (NOT OPENSSL_SSL AND
+    NOT OPENSSL_CRYPTO)
+  message(FATAL_ERROR "OpenSSL not found in ${OPENSSL_ROOT}")
+  set(OPENSSL_FOUND FALSE)
+else()
+  set(OPENSSL_FOUND TRUE)
+  message(STATUS "OpenSSL: ${OPENSSL_INCLUDE_DIR}")
+  set(OPENSSL_LIBRARIES ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
+endif()
+
+mark_as_advanced(
+  OPENSSL_INCLUDE_DIR
+  OPENSSL_LIBRARIES
+  OPENSSL_CRYPTO
+  OPENSSL_SSL
+)

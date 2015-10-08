@@ -1,48 +1,54 @@
 # - Find SNAPPY (snappy.h, libsnappy.a, libsnappy.so, and libsnappy.so.1)
+# SNAPPY_ROOT hints the location
+#
 # This module defines
 #  SNAPPY_INCLUDE_DIR, directory containing headers
 #  SNAPPY_LIBS, directory containing gflag libraries
 #  SNAPPY_STATIC_LIB, path to libsnappy.a
 #  SNAPPY_FOUND, whether gflags has been found
+#  snappy - imported static library
 
-set(SNAPPY_SEARCH_HEADER_PATHS  
-  ${CMAKE_SOURCE_DIR}/thirdparty/snappy-1.0.5/build/include
+set(SNAPPY_SEARCH_HEADER_PATHS
+  ${SNAPPY_ROOT}/include
+  $ENV{IMPALA_HOME}/thirdparty/snappy-1.0.5/build/include
 )
 
 set(SNAPPY_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/snappy-1.0.5/build/lib
+  ${SNAPPY_ROOT}/lib
+  $ENV{IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
 )
 
-set(SNAPPY_INCLUDE_DIR 
-  ${CMAKE_SOURCE_DIR}/thirdparty/snappy-1.0.5/build/include
-)
+find_path(SNAPPY_INCLUDE_DIR
+  NAMES snappy.h
+  PATHS ${SNAPPY_SEARCH_HEADER_PATHS}
+  NO_DEFAULT_PATH)
 
-find_library(SNAPPY_LIB_PATH NAMES snappy
+find_library(SNAPPY_LIBS NAMES snappy
   PATHS ${SNAPPY_SEARCH_LIB_PATH}
         NO_DEFAULT_PATH
   DOC   "Google's snappy compression library"
 )
 
-if (SNAPPY_LIB_PATH)
-  set(SNAPPY_FOUND TRUE)
-  set(SNAPPY_LIBS ${SNAPPY_SEARCH_LIB_PATH})
-  set(SNAPPY_STATIC_LIB ${SNAPPY_SEARCH_LIB_PATH}/libsnappy.a)
-else ()
-  set(SNAPPY_FOUND FALSE)
-endif ()
+find_library(SNAPPY_STATIC_LIB NAMES libsnappy.a
+  PATHS ${SNAPPY_SEARCH_LIB_PATH}
+        NO_DEFAULT_PATH
+  DOC   "Google's snappy compression static library"
+)
 
-if (SNAPPY_FOUND)
-  if (NOT SNAPPY_FIND_QUIETLY)
-    message(STATUS "Snappy Found in ${SNAPPY_SEARCH_LIB_PATH}")
-  endif ()
-else ()
-  message(STATUS "Snappy includes and libraries NOT found. "
+if (NOT SNAPPY_LIBS OR NOT SNAPPY_STATIC_LIB)
+  message(FATAL_ERROR "Snappy includes and libraries NOT found. "
     "Looked for headers in ${SNAPPY_SEARCH_HEADER_PATH}, "
     "and for libs in ${SNAPPY_SEARCH_LIB_PATH}")
+  set(SNAPPY_FOUND FALSE)
+else()
+  set(SNAPPY_FOUND TRUE)
+  add_library(snappy STATIC IMPORTED)
+  set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_STATIC_LIB}")
 endif ()
 
 mark_as_advanced(
   SNAPPY_INCLUDE_DIR
   SNAPPY_LIBS
   SNAPPY_STATIC_LIB
+  snappy
 )

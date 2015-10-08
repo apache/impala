@@ -1,16 +1,20 @@
 # - Find pprof (libprofiler.a)
+# PPROF_ROOT hints the location
+#
 # This module defines
 #  PPROF_INCLUDE_DIR, directory containing headers
 #  PPROF_LIBS, directory containing pprof libraries
-#  PPROF_STATIC_LIB, path to libprofiler.a 
-#  PPROF_FOUND, whether pprof has been found
+#  PPROF_STATIC_LIB, path to libprofiler.a
+#  tcmallocstatic, pprofstatic
 
 set(PPROF_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/gperftools-2.0/src
+  ${GPERFTOOLS_ROOT}/include
+  $ENV{IMPALA_HOME}/thirdparty/gperftools-2.0/src
 )
 
 set(PPROF_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/gperftools-2.0/.libs
+  ${GPERFTOOLS_ROOT}/lib
+  $ENV{IMPALA_HOME}/thirdparty/gperftools-2.0/.libs
 )
 
 find_path(PPROF_INCLUDE_DIR google/profiler.h PATHS
@@ -19,28 +23,30 @@ find_path(PPROF_INCLUDE_DIR google/profiler.h PATHS
   NO_DEFAULT_PATH
 )
 
-find_library(PPROF_LIB_PATH NAMES profiler PATHS ${PPROF_SEARCH_LIB_PATH})
+find_library(PPROF_LIB_PATH profiler
+  PATHS ${PPROF_SEARCH_LIB_PATH} NO_DEFAULT_PATH)
+find_library(PPROF_STATIC_LIB libprofiler.a
+  PATHS ${PPROF_SEARCH_LIB_PATH} NO_DEFAULT_PATH)
+find_library(HEAPPROF_STATIC_LIB libtcmalloc.a
+  PATHS ${PPROF_SEARCH_LIB_PATH} NO_DEFAULT_PATH)
 
-if (PPROF_LIB_PATH)
-  set(PPROF_FOUND TRUE)
-  set(PPROF_LIBS ${PPROF_SEARCH_LIB_PATH})
-  set(PPROF_STATIC_LIB ${PPROF_SEARCH_LIB_PATH}/libprofiler.a)
-  set(HEAPPROF_STATIC_LIB ${PPROF_SEARCH_LIB_PATH}/libtcmalloc.a)
-else ()
-  set(PPROF_FOUND FALSE)
-endif ()
-
-if (PPROF_FOUND)
-  if (NOT PPROF_FIND_QUIETLY)
-    message(STATUS "PProf Found in ${PPROF_SEARCH_LIB_PATH}")
-  endif ()
-else ()
-  message(STATUS "PProf libraries NOT found. "
+if (NOT PPROF_LIB_PATH OR NOT PPROF_STATIC_LIB OR
+    NOT HEAPPROF_STATIC_LIB)
+  message(FATAL_ERROR "gperftools libraries NOT found. "
     "Looked for libs in ${PPROF_SEARCH_LIB_PATH}")
+  set(PPROF_FOUND FALSE)
+else()
+  set(PPROF_FOUND TRUE)
+  add_library(pprofstatic STATIC IMPORTED)
+  set_target_properties(pprofstatic PROPERTIES IMPORTED_LOCATION "${PPROF_STATIC_LIB}")
+  add_library(tcmallocstatic STATIC IMPORTED)
+  set_target_properties(tcmallocstatic PROPERTIES IMPORTED_LOCATION "${HEAPPROF_STATIC_LIB}")
 endif ()
 
 mark_as_advanced(
   PPROF_INCLUDE_DIR
   PPROF_LIBS
   PPROF_STATIC_LIB
+  pprofstatic
+  tcmallocstatic
 )
