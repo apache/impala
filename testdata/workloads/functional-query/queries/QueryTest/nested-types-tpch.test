@@ -162,7 +162,7 @@ BIGINT,BIGINT
 ---- QUERY
 # IMPALA-2376
 # Set memory limit low enough to get the below query to consistently fail.
-set mem_limit=20m
+set mem_limit=4m
 ====
 ---- QUERY
 select max(cnt) from customer c,
@@ -171,6 +171,7 @@ select max(cnt) from customer c,
 BIGINT
 ---- CATCH
 Memory limit exceeded
+Failed to allocate buffer for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.
 ====
 ---- QUERY
 set mem_limit=0
