@@ -44,7 +44,7 @@ class TestHashJoinTimer(ImpalaTestSuite):
               " where a.id>b.id and a.id=99",
               "NESTED LOOP JOIN"]
              ]
-  HASH_JOIN_UPPER_BOUND_MS = 1000
+  HASH_JOIN_UPPER_BOUND_MS = 1000 
   HASH_JOIN_LOWER_BOUND_MS = 1
 
   @classmethod
@@ -130,23 +130,19 @@ class TestHashJoinTimer(ImpalaTestSuite):
 
   def __parse_duration_ms(self, duration):
     """Parses a duration string of the form 1h2h3m4s5.6ms into milliseconds."""
-    matches = re.findall(r'([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+(\.[0-9]+)?ms)?'
-                         r'([0-9]+(\.[0-9]+)?us)?([0-9]+(\.[0-9]+)?ns)?',
-                         duration)
-    # Expect exactly two matches because all groups are optional in the regex.
-    if matches is None or len(matches) != 2:
-      assert False, 'Failed to parse duration string %s' % duration
+    matches = re.findall(r'(?P<value>[0-9]+(\.[0-9]+)?)(?P<units>\D+)', duration)
+    assert matches, 'Failed to parse duration string %s' % duration
     hours = 0
     minutes = 0
     seconds = 0
     milliseconds = 0
-    if matches[0][0]:
-      hours = int(matches[0][0][:-1])
-    if matches[0][1]:
-      minutes = int(matches[0][1][:-1])
-    if matches[0][2]:
-      seconds = int(matches[0][2][:-1])
-    if matches[0][3]:
-      # Truncate fractional milliseconds.
-      milliseconds = int(float(matches[0][3][:-2]))
+    for match in matches:
+      if (match[2] == 'h'):
+        hours = float(match[0])
+      elif (match[2] == 'm'):
+        minutes = float(match[0])
+      elif (match[2] == 's'):
+        seconds = float(match[0])
+      elif (match[2] == 'ms'):
+        milliseconds = float(match[0])
     return hours * 60 * 60 * 1000 + minutes * 60 * 1000 + seconds * 1000 + milliseconds
