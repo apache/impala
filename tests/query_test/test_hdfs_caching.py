@@ -165,6 +165,10 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     self.client.execute(("create table cachedb.no_replication_factor (id int) " \
                          "tblproperties(\"cache_directive_id\"=\"%s\")" % dirid))
     self.run_test_case('QueryTest/hdfs-caching-validation', vector)
+    # Temp fix for IMPALA-2510. Due to IMPALA-2518, when the test database is dropped,
+    # the cache directives are not removed for table 'cached_tbl_reload_part'.
+    drop_cache_directives_for_path(
+        "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2")
 
 def drop_cache_directives_for_path(path):
   """Drop the cache directive for a given path"""
