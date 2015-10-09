@@ -196,6 +196,9 @@ struct TAlterTableDropPartitionParams {
 
   // If true, no error is raised if no partition with the specified spec exists.
   2: required bool if_exists
+
+  // If true, underlying data is purged using -skipTrash
+  3: required bool purge
 }
 
 // Parameters for ALTER TABLE CHANGE COLUMN commands
@@ -503,6 +506,9 @@ struct TDropTableOrViewParams {
 
   // If true, no error is raised if the target table/view does not exist
   2: required bool if_exists
+
+  // If true, underlying data is purged using -skipTrash
+  3: required bool purge
 }
 
 // Parameters of TRUNCATE commands

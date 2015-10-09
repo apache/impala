@@ -56,7 +56,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     createStmt_ = createStmt;
     insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
         null, null, queryStmt, null);
-    cleanupStmt_ = new DropTableOrViewStmt(createStmt.getTblName(), true, true);
+    cleanupStmt_ = new DropTableOrViewStmt(createStmt.getTblName(), true, true, true);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }

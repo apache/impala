@@ -28,13 +28,18 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   private final boolean ifExists_;
   private final PartitionSpec partitionSpec_;
 
+  // Setting this value causes dropped partition(s) to be permanently
+  // deleted. For example, for HDFS tables it skips the trash mechanism
+  private final boolean purgePartition_;
+
   public AlterTableDropPartitionStmt(TableName tableName,
-      PartitionSpec partitionSpec, boolean ifExists) {
+      PartitionSpec partitionSpec, boolean ifExists, boolean purgePartition) {
     super(tableName);
     Preconditions.checkNotNull(partitionSpec);
     partitionSpec_ = partitionSpec;
     partitionSpec_.setTableName(tableName);
     ifExists_ = ifExists;
+    purgePartition_ = purgePartition;
   }
 
   public boolean getIfNotExists() { return ifExists_; }
@@ -45,6 +50,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     sb.append(" DROP ");
     if (ifExists_) sb.append("IF EXISTS ");
     sb.append(" DROP " + partitionSpec_.toSql());
+    if (purgePartition_) sb.append(" PURGE");
     return sb.toString();
   }
 
@@ -55,6 +61,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     TAlterTableDropPartitionParams addPartParams = new TAlterTableDropPartitionParams();
     addPartParams.setPartition_spec(partitionSpec_.toThrift());
     addPartParams.setIf_exists(ifExists_);
+    addPartParams.setPurge(purgePartition_);
     params.setDrop_partition_params(addPartParams);
     return params;
   }

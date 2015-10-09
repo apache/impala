@@ -245,8 +245,8 @@ terminal
   KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS,
   KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET,
   KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING,
-  KW_PREPARE_FN, KW_PRODUCED, KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFRESH, KW_REGEXP, KW_RENAME,
-  KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
+  KW_PREPARE_FN, KW_PRODUCED, KW_PURGE, KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFRESH,
+  KW_REGEXP, KW_RENAME, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
   KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE,
   KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
   KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED,
@@ -386,6 +386,7 @@ nonterminal HdfsCachingOp cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
 nonterminal String comment_val;
 nonterminal Boolean external_val;
+nonterminal Boolean purge_val;
 nonterminal String opt_init_string_val;
 nonterminal THdfsFileFormat file_format_val;
 nonterminal THdfsFileFormat file_format_create_table_val;
@@ -776,8 +777,8 @@ alter_tbl_stmt ::=
     column_def:col_def
   {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
-    partition_spec:partition
-  {: RESULT = new AlterTableDropPartitionStmt(table, partition, if_exists); :}
+    partition_spec:partition purge_val:purge
+  {: RESULT = new AlterTableDropPartitionStmt(table, partition, if_exists, purge); :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET KW_FILEFORMAT
     file_format_val:file_format
   {: RESULT = new AlterTableSetFileFormatStmt(table, partition, file_format); :}
@@ -1005,6 +1006,13 @@ opt_init_string_val ::=
 
 external_val ::=
   KW_EXTERNAL
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
+purge_val ::=
+  KW_PURGE
   {: RESULT = true; :}
   |
   {: RESULT = false; :}
@@ -1261,10 +1269,10 @@ drop_db_stmt ::=
   ;
 
 drop_tbl_or_view_stmt ::=
-  KW_DROP KW_TABLE if_exists_val:if_exists table_name:table
-  {: RESULT = new DropTableOrViewStmt(table, if_exists, true); :}
+  KW_DROP KW_TABLE if_exists_val:if_exists table_name:table purge_val:purge
+  {: RESULT = new DropTableOrViewStmt(table, if_exists, true, purge); :}
   | KW_DROP KW_VIEW if_exists_val:if_exists table_name:table
-  {: RESULT = new DropTableOrViewStmt(table, if_exists, false); :}
+  {: RESULT = new DropTableOrViewStmt(table, if_exists, false, false); :}
   ;
 
 drop_function_stmt ::=

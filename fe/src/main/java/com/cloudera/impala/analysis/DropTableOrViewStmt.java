@@ -32,16 +32,24 @@ public class DropTableOrViewStmt extends StatementBase {
   // True if we are dropping a table. False if we are dropping a view.
   protected final boolean dropTable_;
 
+  // Setting this value causes dropped tables to be permanently
+  // deleted. For example, for hdfs tables it skips the trash directory
+  protected final boolean purgeTable_;
+
   // Set during analysis
   protected String dbName_;
 
   /**
    * Constructor for building the DROP TABLE/VIEW statement
    */
-  public DropTableOrViewStmt(TableName tableName, boolean ifExists, boolean dropTable) {
-    this.tableName_ = tableName;
-    this.ifExists_ = ifExists;
-    this.dropTable_ = dropTable;
+  public DropTableOrViewStmt(TableName tableName, boolean ifExists,
+      boolean dropTable, boolean purgeTable) {
+    tableName_ = tableName;
+    ifExists_ = ifExists;
+    dropTable_ = dropTable;
+    purgeTable_ = purgeTable;
+    // PURGE with a view is not allowed.
+    Preconditions.checkState(!(!dropTable_ && purgeTable_));
   }
 
   @Override
@@ -50,13 +58,15 @@ public class DropTableOrViewStmt extends StatementBase {
     if (ifExists_) sb.append("IF EXISTS ");
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
     sb.append(tableName_.getTbl());
+    if (purgeTable_) sb.append(" PURGE");
     return sb.toString();
   }
 
   public TDropTableOrViewParams toThrift() {
     TDropTableOrViewParams params = new TDropTableOrViewParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
-    params.setIf_exists(getIfExists());
+    params.setIf_exists(ifExists_);
+    params.setPurge(purgeTable_);
     return params;
   }
 
@@ -97,6 +107,5 @@ public class DropTableOrViewStmt extends StatementBase {
   }
 
   public String getTbl() { return tableName_.getTbl(); }
-  public boolean getIfExists() { return this.ifExists_; }
   public boolean isDropTable() { return dropTable_; }
 }

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import getpass
 import logging
 import pytest
 from tests.common.test_vector import *
@@ -69,14 +70,32 @@ class TestHdfsEncryption(ImpalaTestSuite):
     self.client.execute('create database if not exists %s' % TEST_DB)
     self.client.execute('use %s' % TEST_DB)
     self.hdfs_client.make_dir(PYWEBHDFS_TMP_DIR)
+    # Few tests depend on the .Trash directory being present. In case it doesn't
+    # exist, we create a random text file and delete it so that hdfs recreates
+    # the hierarchy of trash
+    if not self.hdfs_client.exists("/user/{0}/.Trash/".format(getpass.getuser())):
+      self.hdfs_client.create_file("test-warehouse/random",file_data="random")
+      rc, stdout, stderr = exec_process("hadoop fs -rm /test-warehouse/random")
+      assert rc == 0, 'Error re-creating trash: %s %s' % (stdout, stderr)
 
   def teardown_method(self, method):
     self.__cleanup()
+    # Clean up trash directory so that further tests aren't affected
+    rc, stdout, stderr = exec_process(
+            "hadoop fs -rmr /user/{0}/.Trash/".format(getpass.getuser()))
+    assert rc == 0, 'Error deleting Trash: %s %s' % (stdout, stderr)
+
+  def create_encryption_zone(self, key, path):
+    """Creates an encryption zone using key 'key' on path 'path'"""
+    rc, stdout, stderr = exec_process(
+            "hdfs crypto -createZone -keyName %s -path %s" % (key, path))
+    assert rc == 0, 'Error creating encryption zone: %s %s' % (stdout, stderr)
 
   def __cleanup(self):
     self.client.execute('use default')
-    self.client.execute('drop table if exists %s.tbl' % TEST_DB)
-    self.client.execute('drop database if exists %s' % TEST_DB)
+    self.client.execute('drop table if exists %s.tbl purge' % TEST_DB)
+    self.client.execute('drop table if exists %s.t1 purge' % TEST_DB)
+    self.cleanup_db(TEST_DB)
     self.hdfs_client.delete_file_dir(PYWEBHDFS_TMP_DIR, recursive=True)
 
   def test_load_data(self, vector):
@@ -115,3 +134,72 @@ class TestHdfsEncryption(ImpalaTestSuite):
           'partition(year=2010, month=1)' % (TMP_DIR))
     else:
       self.client.execute('load data inpath \'%s\' into table tbl ' % (TMP_DIR))
+
+  @SkipIfS3.hdfs_client
+  @SkipIfIsilon.hdfs_encryption
+  @pytest.mark.execute_serially
+  def test_alter_table_drop_partition_encrypt(self):
+    """Verifies if alter <tbl> drop partition purge works in case
+    where the Trash dir and partition dir are in different encryption
+    zones. Check CDH-31350 for details"""
+    self.client.execute("create table {0}.t1(i int) partitioned\
+      by (j int)".format(TEST_DB))
+    # Add three partitions (j=1), (j=2), (j=3) to table t1
+    self.client.execute("alter table {0}.t1 add partition(j=1)".format(TEST_DB));
+    self.client.execute("alter table {0}.t1 add partition(j=2)".format(TEST_DB));
+    self.client.execute("alter table {0}.t1 add partition(j=3)".format(TEST_DB));
+    # Clean up the trash directory to create an encrypted zone
+    rc, stdout, stderr = exec_process(
+            "hadoop fs -rmr /user/{0}/.Trash/*".format(getpass.getuser()))
+    assert rc == 0, 'Error deleting Trash: %s %s' % (stdout, stderr)
+    # Create the necessary encryption zones
+    self.create_encryption_zone("testkey1", "/test-warehouse/{0}.db/t1/j=1"\
+            .format(TEST_DB))
+    self.create_encryption_zone("testkey2", "/test-warehouse/{0}.db/t1/j=2"\
+            .format(TEST_DB))
+    self.create_encryption_zone("testkey1", "/test-warehouse/{0}.db/t1/j=3"\
+            .format(TEST_DB))
+    self.create_encryption_zone("testkey2", "/user/{0}/.Trash/".format(\
+            getpass.getuser()))
+    # Load sample data into the partition directories
+    self.hdfs_client.create_file("test-warehouse/{0}.db/t1/j=1/j1.txt"\
+            .format(TEST_DB), file_data='j1')
+    self.hdfs_client.create_file("test-warehouse/{0}.db/t1/j=2/j2.txt"\
+            .format(TEST_DB), file_data='j2')
+    self.hdfs_client.create_file("test-warehouse/{0}.db/t1/j=3/j3.txt"\
+            .format(TEST_DB), file_data='j3')
+    # Drop the partition (j=1) without purge and make sure partition directory still
+    # exists. This behavior is expected due to the difference in encryption zones
+    self.execute_query_expect_failure(self.client, "alter table {0}.t1 drop \
+            partition(j=1)".format(TEST_DB));
+    assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".format(TEST_DB))
+    assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1".format(TEST_DB))
+    # Drop the partition j=2 (with purge) and make sure the partition directory is deleted
+    self.client.execute("alter table {0}.t1 drop partition(j=2) purge".format(TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2/j2.txt".format(TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2".format(TEST_DB))
+    # Drop the partition j=3 (with purge) and make sure the partition is deleted
+    # This is the case where the trash directory and partition data directory
+    # are in different encryption zones. Using purge should delete the partition
+    # data pemanently by skipping trash
+    self.client.execute("alter table {0}.t1 drop partition(j=3) purge".format(TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=3/j3.txt".format(TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=3".format(TEST_DB))
+
+  @SkipIfS3.hdfs_client
+  @SkipIfIsilon.hdfs_encryption
+  @pytest.mark.execute_serially
+  def test_drop_table_encrypt(self):
+    """Verifies if drop <table> purge works in a case where Trash directory and table
+    directory in different encryption zones"""
+    self.client.execute("create table {0}.t3(i int)".format(TEST_DB))
+
+    # Clean up the trash directory to create an encrypted zone
+    rc, stdout, stderr = exec_process(
+            "hadoop fs -rmr /user/{0}/.Trash/*".format(getpass.getuser()))
+    assert rc == 0, 'Error deleting Trash: %s %s' % (stdout, stderr)
+    # Create table directory and trash directory in different encryption zones
+    self.create_encryption_zone("testkey1", "/test-warehouse/{0}.db/t3".format(TEST_DB))
+    self.create_encryption_zone("testkey2", "/user/{0}/.Trash/".format(getpass.getuser()))
+    self.client.execute("drop table {0}.t3 purge".format(TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t3".format(TEST_DB))

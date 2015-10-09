@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+import org.apache.hadoop.hive.metastore.PartitionDropOptions;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
@@ -296,12 +297,13 @@ public class CatalogOpExecutor {
         break;
       case DROP_PARTITION:
         TAlterTableDropPartitionParams dropPartParams = params.getDrop_partition_params();
-        // Drop the partition from the corresponding HdfsTable. Get the table object
+        // Drop the partition from the corresponding table. Get the table object
         // with an updated catalog version. If the partition does not exist and
-        // "IfExists" is true, null is returned.
+        // "IfExists" is true, null is returned. If "purge" option is specified
+        // partition data is purged by skipping Trash, if configured.
         refreshedTable = alterTableDropPartition(TableName.fromThrift(
             params.getTable_name()), dropPartParams.getPartition_spec(),
-            dropPartParams.isIf_exists());
+            dropPartParams.isIf_exists(), dropPartParams.isPurge());
         response.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTable));
         response.result.setVersion(
             response.result.getUpdated_catalog_object().getCatalog_version());
@@ -943,7 +945,8 @@ public class CatalogOpExecutor {
   /**
    * Drops a table or view from the metastore and removes it from the catalog.
    * Also drops all associated caching requests on the table and/or table's partitions,
-   * uncaching all table data.
+   * uncaching all table data. If params.purge is true, table data is permanently
+   * deleted.
    */
   private void dropTableOrView(TDropTableOrViewParams params, TDdlExecResponse resp)
       throws ImpalaException {
@@ -956,7 +959,7 @@ public class CatalogOpExecutor {
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().dropTable(
-            tableName.getDb(), tableName.getTbl(), true, params.if_exists);
+            tableName.getDb(), tableName.getTbl(), true, params.if_exists, params.purge);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
@@ -1414,10 +1417,11 @@ public class CatalogOpExecutor {
    * the associated cache directive will also be removed.
    * Also drops the partition from its Hdfs table.
    * Returns the table object with an updated catalog version. If the partition does not
-   * exist and "IfExists" is true, null is returned.
+   * exist and "IfExists" is true, null is returned. If purge is true, partition data is
+   * permanently deleted.
    */
   private Table alterTableDropPartition(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, boolean ifExists)
+      List<TPartitionKeyValue> partitionSpec, boolean ifExists, boolean purge)
       throws ImpalaException {
     if (ifExists && !catalog_.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
         partitionSpec)) {
@@ -1440,9 +1444,11 @@ public class CatalogOpExecutor {
         }
       }
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
+      PartitionDropOptions dropOptions = PartitionDropOptions.instance();
+      dropOptions.purgeData(purge);
       try {
         msClient.getHiveClient().dropPartition(tableName.getDb(),
-            tableName.getTbl(), values);
+            tableName.getTbl(), values, dropOptions);
         updateLastDdlTime(msTbl, msClient);
         if (part.isMarkedCached()) {
           HdfsCachingUtil.uncachePartition(part);

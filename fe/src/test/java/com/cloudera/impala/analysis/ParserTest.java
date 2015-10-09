@@ -1882,25 +1882,33 @@ public class ParserTest {
 
   @Test
   public void TestAlterTableDropPartition() {
-    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=1)");
-    ParsesOk("ALTER TABLE TestDb.Foo DROP IF EXISTS PARTITION (i=1, s='Hello')");
-    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=NULL)");
-    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=NULL, j=2, k=NULL)");
-    ParsesOk("ALTER TABLE Foo DROP PARTITION (i=abc, j=(5*8+10), k=!true and false)");
+    // PURGE is optional
+    String[] purgeKw = {"PURGE", ""};
+    for (String kw: purgeKw) {
+      ParsesOk(String.format("ALTER TABLE Foo DROP PARTITION (i=1) %s", kw));
+      ParsesOk(String.format("ALTER TABLE TestDb.Foo DROP IF EXISTS "
+        + "PARTITION (i=1, s='Hello') %s", kw));
+      ParsesOk(String.format("ALTER TABLE Foo DROP PARTITION (i=NULL) %s", kw));
+      ParsesOk(String.format("ALTER TABLE Foo DROP PARTITION (i=NULL, "
+        + "j=2, k=NULL) %s", kw));
+      ParsesOk(String.format("ALTER TABLE Foo DROP PARTITION (i=abc, "
+        + "j=(5*8+10), k=!true and false) %s", kw));
 
-    // Cannot use dynamic partition syntax
-    ParserError("ALTER TABLE Foo DROP PARTITION (partcol)");
-    ParserError("ALTER TABLE Foo DROP PARTITION (i=1, j)");
+      // Cannot use dynamic partition syntax
+      ParserError(String.format("ALTER TABLE Foo DROP PARTITION (partcol) %s", kw));
+      ParserError(String.format("ALTER TABLE Foo DROP PARTITION (i=1, j) %s", kw));
 
-    ParserError("ALTER TABLE Foo DROP IF NOT EXISTS PARTITION (i=1, s='Hello')");
-    ParserError("ALTER TABLE TestDb.Foo DROP (i=1, s='Hello')");
-    ParserError("ALTER TABLE TestDb.Foo DROP (i=1)");
-    ParserError("ALTER TABLE Foo (i=1)");
-    ParserError("ALTER TABLE TestDb.Foo PARTITION (i=1)");
-    ParserError("ALTER TABLE Foo DROP PARTITION");
-    ParserError("ALTER TABLE TestDb.Foo DROP PARTITION ()");
-    ParserError("ALTER Foo DROP PARTITION (i=1)");
-    ParserError("ALTER TABLE DROP PARTITION (i=1)");
+      ParserError(String.format("ALTER TABLE Foo DROP IF NOT EXISTS "
+        + "PARTITION (i=1, s='Hello') %s", kw));
+      ParserError(String.format("ALTER TABLE TestDb.Foo DROP (i=1, s='Hello') %s", kw));
+      ParserError(String.format("ALTER TABLE TestDb.Foo DROP (i=1) %s", kw));
+      ParserError(String.format("ALTER TABLE Foo (i=1) %s", kw));
+      ParserError(String.format("ALTER TABLE TestDb.Foo PARTITION (i=1) %s", kw));
+      ParserError(String.format("ALTER TABLE Foo DROP PARTITION %s", kw));
+      ParserError(String.format("ALTER TABLE TestDb.Foo DROP PARTITION () %s", kw));
+      ParserError(String.format("ALTER Foo DROP PARTITION (i=1) %s", kw));
+      ParserError(String.format("ALTER TABLE DROP PARTITION (i=1) %s", kw));
+    }
   }
 
   @Test
@@ -2361,9 +2369,15 @@ public class ParserTest {
 
   @Test
   public void TestDrop() {
-    ParsesOk("DROP TABLE Foo");
-    ParsesOk("DROP TABLE Foo.Bar");
-    ParsesOk("DROP TABLE IF EXISTS Foo.Bar");
+    // PURGE is optional
+    String[] purgeKw = {"PURGE", ""};
+    for (String kw: purgeKw) {
+      ParsesOk(String.format("DROP TABLE Foo %s", kw));
+      ParsesOk(String.format("DROP TABLE Foo.Bar %s", kw));
+      ParsesOk(String.format("DROP TABLE IF EXISTS Foo %s", kw));
+      ParsesOk(String.format("DROP TABLE IF EXISTS Foo.Bar %s", kw));
+    }
+
     ParsesOk("DROP VIEW Foo");
     ParsesOk("DROP VIEW Foo.Bar");
     ParsesOk("DROP VIEW IF EXISTS Foo.Bar");
@@ -2386,7 +2400,9 @@ public class ParserTest {
     ParserError("DROP Foo");
     ParserError("DROP DATABASE Foo.Bar");
     ParserError("DROP SCHEMA Foo.Bar");
+    ParserError("DROP SCHEMA Foo PURGE");
     ParserError("DROP DATABASE Foo Bar");
+    ParserError("DROP DATABASE Foo PURGE");
     ParserError("DROP DATABASE CASCADE Foo");
     ParserError("DROP DATABASE CASCADE RESTRICT Foo");
     ParserError("DROP DATABASE RESTRICT CASCADE Foo");
@@ -2401,9 +2417,11 @@ public class ParserTest {
     ParserError("DROP VIEW EXISTS Foo");
     ParserError("DROP IF EXISTS VIEW Foo");
     ParserError("DROP VIW Foo");
+    ParserError("DROP VIEW Foo purge");
     ParserError("DROP FUNCTION Foo)");
     ParserError("DROP FUNCTION Foo(");
     ParserError("DROP FUNCTION Foo");
+    ParserError("DROP FUNCTION Foo PURGE");
     ParserError("DROP FUNCTION");
     ParserError("DROP BLAH FUNCTION");
     ParserError("DROP IF EXISTS FUNCTION Foo()");
