@@ -116,6 +116,9 @@ public class SlotRef extends Expr {
     isAnalyzed_ = true;
   }
 
+  @Override
+  public boolean isConstant() { return false; }
+
   public SlotDescriptor getDesc() {
     Preconditions.checkState(isAnalyzed_);
     Preconditions.checkNotNull(desc_);

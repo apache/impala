@@ -2229,3 +2229,14 @@ select dayofyear(trunc('2014-11-11', string_col)) from functional.alltypestiny l
 ---- CATCH
 Invalid Truncate Unit: 0
 ====
+---- QUERY
+# Regression test for IMPALA-2495: Crash: impala::InPredicate::SetLookupPrepare
+select count(id) from functional.alltypestiny t1
+left join (select coalesce(1, 10) as int_col
+from functional.alltypessmall) t2 on t1.id = t2.int_col
+where t2.int_col in (t2.int_col, 10);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====

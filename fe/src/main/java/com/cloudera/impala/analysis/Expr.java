@@ -912,12 +912,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * @return true if this expr can be evaluated with Expr::GetValue(NULL),
-   * ie, if it doesn't contain any references to runtime variables (which
-   * at the moment are only slotrefs and subqueries).
+   * i.e. if it doesn't contain any references to runtime variables (e.g. slot refs).
+   * Expr subclasses should override this if necessary (e.g. SlotRef, Subquery, etc.
+   * always return false).
    */
   public boolean isConstant() {
-    return !contains(Predicates.instanceOf(SlotRef.class)) &&
-           !contains(Predicates.instanceOf(Subquery.class));
+    for (Expr expr : children_) {
+      if (!expr.isConstant()) return false;
+    }
+    return true;
   }
 
   /**

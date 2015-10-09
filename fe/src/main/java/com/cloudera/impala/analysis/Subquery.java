@@ -99,6 +99,9 @@ public class Subquery extends Expr {
     isAnalyzed_ = true;
   }
 
+  @Override
+  public boolean isConstant() { return false; }
+
   /**
    * Check if the subquery's SelectStmt returns a single column of scalar type.
    */

@@ -1887,3 +1887,22 @@ where a.id < 10
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
 ====
+# Regression test for IMPALA-2495: Crash: impala::InPredicate::SetLookupPrepare
+select count(id) from functional.alltypestiny t1
+left join (select coalesce(1, 10) as int_col
+from functional.alltypessmall) t2 on t1.id = t2.int_col
+where t2.int_col in (t2.int_col, 10);
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(id)
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = if(TupleIsNull(), NULL, coalesce(1, 10))
+|  other predicates: if(TupleIsNull(), NULL, coalesce(1, 10)) IN (if(TupleIsNull(), NULL, coalesce(1, 10)), 10)
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 files=4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+====
