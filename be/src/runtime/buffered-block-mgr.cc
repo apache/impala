@@ -884,12 +884,15 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
       delete[] block->buffer_desc_->buffer;
       block->client_->tracker_->Release(block->buffer_desc_->len);
       delete block->buffer_desc_;
-    } else if (!free_io_buffers_.Contains(block->buffer_desc_)) {
-      free_io_buffers_.Enqueue(block->buffer_desc_);
-      buffer_available_cv_.notify_one();
+      block->buffer_desc_ = NULL;
+    } else {
+      if (!free_io_buffers_.Contains(block->buffer_desc_)) {
+        free_io_buffers_.Enqueue(block->buffer_desc_);
+        buffer_available_cv_.notify_one();
+      }
       block->buffer_desc_->block = NULL;
+      block->buffer_desc_ = NULL;
     }
-    block->buffer_desc_ = NULL;
   }
   ReturnUnusedBlock(block);
   DCHECK(block->Validate()) << endl << block->DebugString();
@@ -1097,6 +1100,12 @@ bool BufferedBlockMgr::Validate() const {
     }
 
     if (buffer->block != NULL) {
+      if (buffer->block->buffer_desc_ != buffer) {
+        LOG(ERROR) << "buffer<->block pointers inconsistent. Buffer: " << buffer
+          << endl << buffer->block->DebugString();
+        return false;
+      }
+
       if (!buffer->block->Validate()) {
         LOG(ERROR) << "buffer->block inconsistent."
           << endl << buffer->block->DebugString();

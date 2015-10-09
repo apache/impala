@@ -73,6 +73,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     exec_env_->InitForFeTests();
     io_mgr_tracker_.reset(new MemTracker(-1));
     block_mgr_parent_tracker_.reset(new MemTracker(-1));
+    client_tracker_.reset(new MemTracker(-1));
     exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
     runtime_state_.reset(
         new RuntimeState(TExecPlanFragmentParams(), "", exec_env_.get()));
@@ -83,6 +84,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   virtual void TearDown() {
     block_mgr_parent_tracker_.reset();
+    client_tracker_.reset();
     tmp_file_mgr_.reset();
     runtime_state_.reset();
     exec_env_.reset();
@@ -451,6 +453,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   scoped_ptr<ExecEnv> exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
   scoped_ptr<MemTracker> block_mgr_parent_tracker_;
+  scoped_ptr<MemTracker> client_tracker_;
   scoped_ptr<MemTracker> io_mgr_tracker_;
   scoped_ptr<MetricGroup> metrics_;
   scoped_ptr<TmpFileMgr> tmp_file_mgr_;
@@ -686,6 +689,60 @@ TEST_F(BufferedBlockMgrTest, Deletion) {
 
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+}
+
+// Delete blocks of various sizes and statuses to exercise the different code paths.
+// This relies on internal validation in block manager to detect many errors.
+TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
+  int max_num_buffers = 16;
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
+  BufferedBlockMgr::Client* client;
+  EXPECT_TRUE(block_mgr->RegisterClient(0, client_tracker_.get(), runtime_state_.get(),
+      &client).ok());
+  EXPECT_TRUE(client != NULL);
+
+  // Pinned I/O block.
+  BufferedBlockMgr::Block* new_block;
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_TRUE(new_block->is_max_size());
+  new_block->Delete();
+  EXPECT_TRUE(client_tracker_->consumption() == 0);
+
+  // Pinned non-I/O block.
+  int small_block_size = 128;
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block, small_block_size).ok());
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_EQ(small_block_size, client_tracker_->consumption());
+  new_block->Delete();
+  EXPECT_EQ(0, client_tracker_->consumption());
+
+  // Unpinned I/O block - delete after written to disk.
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_TRUE(new_block->is_max_size());
+  new_block->Unpin();
+  EXPECT_FALSE(new_block->is_pinned());
+  WaitForWrites(block_mgr);
+  new_block->Delete();
+  EXPECT_TRUE(client_tracker_->consumption() == 0);
+
+  // Unpinned I/O block - delete before written to disk.
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_TRUE(new_block->is_max_size());
+  new_block->Unpin();
+  EXPECT_FALSE(new_block->is_pinned());
+  new_block->Delete();
+  WaitForWrites(block_mgr);
+  EXPECT_TRUE(client_tracker_->consumption() == 0);
+
+  block_mgr.reset();
+  EXPECT_EQ(0, block_mgr_parent_tracker_->consumption());
 }
 
 // Test that all APIs return cancelled after close.
