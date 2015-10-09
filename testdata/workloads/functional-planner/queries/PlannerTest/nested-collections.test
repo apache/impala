@@ -74,7 +74,7 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |  |  03:UNNEST [r.r_nations n]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
 regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB

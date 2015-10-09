@@ -118,7 +118,7 @@ limit 100
 |  |  |  19:UNNEST [r.r_nations n]
 |  |  |
 |  |  16:SCAN HDFS [tpch_nested_parquet.region r]
-|  |     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |  |     predicates: r_name = 'EUROPE'
 |  |
 |  12:SUBPLAN
@@ -144,7 +144,7 @@ limit 100
 |  |  09:UNNEST [r.r_nations n]
 |  |
 |  06:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: r_name = 'EUROPE'
 |
 23:HASH JOIN [INNER JOIN]
@@ -201,7 +201,7 @@ limit 100
 |  |  |  19:UNNEST [r.r_nations n]
 |  |  |
 |  |  16:SCAN HDFS [tpch_nested_parquet.region r]
-|  |     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |  |     predicates: r_name = 'EUROPE'
 |  |
 |  12:SUBPLAN
@@ -229,7 +229,7 @@ limit 100
 |  |  09:UNNEST [r.r_nations n]
 |  |
 |  06:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: r_name = 'EUROPE'
 |
 23:HASH JOIN [INNER JOIN, BROADCAST]
@@ -482,7 +482,7 @@ order by
 |  |  13:UNNEST [r.r_nations n]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: r_name = 'ASIA'
 |
 01:SUBPLAN
@@ -543,7 +543,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |  |  13:UNNEST [r.r_nations n]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: r_name = 'ASIA'
 |
 01:SUBPLAN
@@ -648,7 +648,7 @@ order by
 |  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
@@ -660,7 +660,7 @@ order by
 |  hash predicates: c_nationkey = n2.n_nationkey
 |
 |--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 01:SUBPLAN
 |
@@ -705,7 +705,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
@@ -721,7 +721,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--17:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 01:SUBPLAN
 |
@@ -791,7 +791,7 @@ order by
 |  hash predicates: s_nationkey = n2.n_nationkey
 |
 |--16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 19:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
@@ -811,7 +811,7 @@ order by
 |  |  14:UNNEST [r.r_nations n1]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: r_name = 'AMERICA'
 |
 17:HASH JOIN [INNER JOIN]
@@ -863,7 +863,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--26:EXCHANGE [BROADCAST]
 |  |
 |  16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 19:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
@@ -887,7 +887,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |  |  14:UNNEST [r.r_nations n1]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: r_name = 'AMERICA'
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -962,7 +962,7 @@ order by
 |  hash predicates: s_nationkey = n_nationkey
 |
 |--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
@@ -1018,7 +1018,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
@@ -1101,7 +1101,7 @@ limit 20
 |  hash predicates: c_nationkey = n_nationkey
 |
 |--09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 01:SUBPLAN
 |
@@ -1147,7 +1147,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |
 01:SUBPLAN
 |
@@ -1217,7 +1217,7 @@ order by
 |  |  hash predicates: s_nationkey = n_nationkey
 |  |
 |  |--13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |  |     predicates: n_name = 'GERMANY'
 |  |
 |  09:SUBPLAN
@@ -1239,7 +1239,7 @@ order by
 |  hash predicates: s_nationkey = n_nationkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'GERMANY'
 |
 01:SUBPLAN
@@ -1278,7 +1278,7 @@ order by
 |  |--21:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |  |     predicates: n_name = 'GERMANY'
 |  |
 |  09:SUBPLAN
@@ -1308,7 +1308,7 @@ order by
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'GERMANY'
 |
 01:SUBPLAN
@@ -2067,7 +2067,7 @@ regex:\|\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |  hash predicates: s_nationkey = n_nationkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'CANADA'
 |
 01:SUBPLAN
@@ -2130,7 +2130,7 @@ regex:\|\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--14:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'CANADA'
 |
 01:SUBPLAN
@@ -2196,7 +2196,7 @@ limit 100
 |  hash predicates: s_nationkey = n_nationkey
 |
 |--14:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
 15:HASH JOIN [INNER JOIN]
@@ -2260,7 +2260,7 @@ regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
 |--20:EXCHANGE [BROADCAST]
 |  |
 |  14:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
+regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
 15:HASH JOIN [INNER JOIN, BROADCAST]
