@@ -316,10 +316,10 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
   DCHECK(parent_->state_ != PROCESSING_PROBE &&
          parent_->state_ != PROBING_SPILLED_PARTITION) << parent_->state_;
   DCHECK((is_spilled_ && parent_->state_ == REPARTITIONING) ||
-         probe_rows()->num_rows() == 0);
+         probe_rows_->num_rows() == 0);
   // Close the hash table as soon as possible to release memory.
   if (hash_tbl() != NULL) {
-    hash_tbl()->Close();
+    hash_tbl_->Close();
     hash_tbl_.reset();
   }
 
@@ -327,20 +327,20 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
   if (build_rows_->using_small_buffers()) {
     RETURN_IF_ERROR(build_rows_->SwitchToIoBuffers(&got_buffer));
   }
-  // Unpin the stream as soon as possible to increase the changes that the
+  // Unpin the stream as soon as possible to increase the chances that the
   // SwitchToIoBuffers() call below will succeed.
-  RETURN_IF_ERROR(build_rows()->UnpinStream(unpin_all_build));
+  RETURN_IF_ERROR(build_rows_->UnpinStream(unpin_all_build));
 
   if (got_buffer && probe_rows_->using_small_buffers()) {
     RETURN_IF_ERROR(probe_rows_->SwitchToIoBuffers(&got_buffer));
   }
   if (!got_buffer) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute("Not enough memory to switch to IO-sized buffers for a "
-                                "partition of join $0.", parent_->id_));
-    LOG(ERROR) << "Not enough memory to switch to IO-sized buffer for partition "
-               << this << " of join=" << parent_->id_;
-    return status;
+    // We'll try again to get the buffers when the stream fills up the small buffers.
+    VLOG_QUERY << "Not enough memory to switch to IO-sized buffer for partition "
+               << this << " of join=" << parent_->id_ << " build small buffers="
+               << build_rows_->using_small_buffers() << " probe small buffers="
+               << probe_rows_->using_small_buffers();
+    VLOG_FILE << GetStackTrace();
   }
 
   if (!is_spilled_) {
