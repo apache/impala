@@ -3257,8 +3257,11 @@ TEST_F(ExprTest, TimestampFunctions) {
   for (MaxIntervals::iterator it = max_intervals.begin(); it != max_intervals.end();
       ++it) {
     const string& unit = it->first;
-    const int64_t max_interval = it->second;
-    for (int64_t interval = 1; interval <= max_interval && interval > 0; interval *= 10) {
+
+    // The static max interval definitions aren't exact so (max interval - 1) may still
+    // produce a NULL. The static max interval definitions are within an order of
+    // magnitude of the real max values so testing can start at max / 10.
+    for (int64_t interval = it->second / 10; interval > 0; interval /= 10) {
       const string& sql_interval = lexical_cast<string>(interval);
       TestIsNotNull(unit + "_add(cast('1400-01-01 00:00:00' as timestamp), "
           + sql_interval + ")", TYPE_TIMESTAMP);
