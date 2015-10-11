@@ -230,7 +230,8 @@ void PartitionedHashJoinNode::ClosePartitions() {
   if (null_aware_partition_ != NULL) {
     null_aware_partition_->Close(NULL);
     null_aware_partition_ = NULL;
-    DCHECK(null_probe_rows_ != NULL);
+  }
+  if (null_probe_rows_ != NULL) {
     null_probe_rows_->Close();
     delete null_probe_rows_;
     null_probe_rows_ = NULL;
