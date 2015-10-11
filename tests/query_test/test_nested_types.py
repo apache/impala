@@ -9,7 +9,7 @@ import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfOldAggsJoins
+from tests.common.skip import SkipIfOldAggsJoins, SkipIfIsilon, SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 from subprocess import call, check_call
 
@@ -490,6 +490,8 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     self.run_test_case('QueryTest/max-nesting-depth', vector)
 
   @pytest.mark.execute_serially
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
   def test_load_hive_table(self, vector):
     """Tests that Impala rejects Hive-created tables with complex types that exceed
     the maximum nesting depth."""
