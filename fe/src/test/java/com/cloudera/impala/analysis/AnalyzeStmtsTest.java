@@ -899,7 +899,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestOrdinals() throws AnalysisException {
     AnalysisError("select * from functional.alltypes group by 1",
-        "cannot combine '*' in select list with GROUP BY");
+        "cannot combine '*' in select list with grouping or aggregation");
     AnalysisError("select * from functional.alltypes order by 14",
         "ORDER BY: ordinal exceeds number of items in select list: 14");
     AnalyzesOk("select t.* from functional.alltypes t order by 1");
@@ -1005,7 +1005,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "GROUP BY: ordinal exceeds number of items in select list");
     AnalysisError("select * from " +
         "(select * from functional.alltypes group by 1) x",
-        "cannot combine '*' in select list with GROUP BY");
+        "cannot combine '*' in select list with grouping or aggregation");
     AnalysisError("select * from " +
         "(select zip, count(*) from functional.testtbl group by count(*)) x",
         "GROUP BY expression must not contain aggregate functions");
@@ -1774,6 +1774,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select int_col from functional.alltypes order by count(*)",
         "select list expression not produced by aggregation output (missing from "
           + "GROUP BY clause?): int_col");
+    AnalysisError("select functional.alltypes.*, max(string_col) from " +
+        "functional.alltypes", "cannot combine '*' in select list with grouping or " +
+        "aggregation");
 
     // only count() allows '*'
     AnalysisError("select avg(*) from functional.testtbl",
@@ -2038,7 +2041,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select zip, count(*) from functional.testtbl group by 3",
         "GROUP BY: ordinal exceeds number of items in select list: 3");
     AnalysisError("select * from functional.alltypes group by 1",
-        "cannot combine '*' in select list with GROUP BY");
+        "cannot combine '*' in select list with grouping or aggregation");
     // picks up select item alias
     AnalyzesOk("select zip z, id iD1, id ID2, count(*) " +
         "from functional.testtbl group by z, ID1, id2");

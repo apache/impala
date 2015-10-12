@@ -513,14 +513,15 @@ public class SelectStmt extends QueryStmt {
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     }
 
-    // disallow '*' and explicit GROUP BY (we can't group by '*', and if you need to
-    // name all star-expanded cols in the group by clause you might as well do it
-    // in the select list)
-    if (groupingExprs_ != null) {
+    // Disallow '*' with explicit GROUP BY or aggregation function (we can't group by
+    // '*', and if you need to name all star-expanded cols in the group by clause you
+    // might as well do it in the select list).
+    if (groupingExprs_ != null ||
+        TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())) {
       for (SelectListItem item : selectList_.getItems()) {
         if (item.isStar()) {
           throw new AnalysisException(
-              "cannot combine '*' in select list with GROUP BY: " + item.toSql());
+              "cannot combine '*' in select list with grouping or aggregation");
         }
       }
     }
@@ -668,10 +669,12 @@ public class SelectStmt extends QueryStmt {
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       if (!resultExprs_.get(i).isBound(finalAggInfo.getOutputTupleId())) {
+        SelectListItem selectListItem = selectList_.getItems().get(i);
+        Preconditions.checkState(!selectListItem.isStar());
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
-            + selectList_.getItems().get(i).getExpr().toSql());
+            + selectListItem.getExpr().toSql());
       }
     }
     if (orderByElements_ != null) {
