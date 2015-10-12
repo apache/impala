@@ -63,8 +63,8 @@ DecimalVal DecimalFunctions::Round(FunctionContext* context, const DecimalVal& v
 inline DecimalVal DecimalFunctions::RoundTo(
     FunctionContext* context, const DecimalVal& val, int scale,
     DecimalOperators::DecimalRoundOp op) {
-  ColumnType val_type = AnyValUtil::TypeDescToColumnType(*context->GetArgType(0));
-  ColumnType return_type = AnyValUtil::TypeDescToColumnType(context->GetReturnType());
+  const FunctionContext::TypeDesc& val_type = *context->GetArgType(0);
+  const FunctionContext::TypeDesc& return_type = context->GetReturnType();
   if (scale < 0) {
     return DecimalOperators::RoundDecimalNegativeScale(
         context, val, val_type, return_type, op, -scale);

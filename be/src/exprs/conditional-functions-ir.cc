@@ -46,7 +46,8 @@ IS_NULL_COMPUTE_FUNCTION(DecimalVal);
     if (lhs_val.is_null) return AnyValType::null(); \
     /* Get rhs and return NULL if lhs == rhs, lhs otherwise */ \
     AnyValType rhs_val = children_[1]->Get##AnyValType(ctx, row); \
-    if (!rhs_val.is_null && AnyValUtil::Equals(children_[0]->type(), lhs_val, rhs_val)) {\
+    if (!rhs_val.is_null && \
+        AnyValUtil::Equals(children_[0]->type(), lhs_val, rhs_val)) { \
        return AnyValType::null(); \
     } \
     return lhs_val; \

@@ -119,7 +119,7 @@ BooleanVal InPredicate::Iterate(
   for (int i = 0; i < num_args; ++i) {
     if (args[i].is_null) {
       found_null = true;
-    } else if (AnyValUtil::Equals(type, val, args[i])) {
+    } else if (AnyValUtil::Equals(*type, val, args[i])) {
       return BooleanVal(true);
     }
   }

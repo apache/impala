@@ -53,8 +53,8 @@ BigIntVal UtilityFunctions::FnvHash(FunctionContext* ctx, const T& input_val) {
 BigIntVal UtilityFunctions::FnvHashDecimal(FunctionContext* ctx,
                                            const DecimalVal& input_val) {
   if (input_val.is_null) return BigIntVal::null();
-  ColumnType input_type = AnyValUtil::TypeDescToColumnType(*ctx->GetArgType(0));
-  int byte_size = input_type.GetByteSize();
+  const FunctionContext::TypeDesc& input_type = *ctx->GetArgType(0);
+  int byte_size = ColumnType::GetDecimalByteSize(input_type.precision);
   return BigIntVal(HashUtil::FnvHash64(&input_val.val16, byte_size, HashUtil::FNV_SEED));
 }
 

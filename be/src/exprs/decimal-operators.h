@@ -97,9 +97,9 @@ class DecimalOperators {
 
   /// Evaluates a round from 'val' and returns the result, using the rounding rule of
   /// 'type'.
-  static DecimalVal RoundDecimal(
-      FunctionContext* context, const DecimalVal& val, const ColumnType& val_type,
-      const ColumnType& output_type, const DecimalRoundOp& op);
+  static DecimalVal RoundDecimal(FunctionContext* context, const DecimalVal& val,
+      const FunctionContext::TypeDesc& val_type,
+      const FunctionContext::TypeDesc& output_type, const DecimalRoundOp& op);
 
   /// Same as above but infers 'val_type' from the first argument type and 'output_type'
   /// from the return type according to 'context'.
@@ -118,27 +118,28 @@ class DecimalOperators {
   ///   Decimal8Value Round(const Decimal4Value&);
   ///   Decimal4Value Round(const Decimal8Value&);
   ///   etc.
-  static DecimalVal RoundDecimalNegativeScale(
-      FunctionContext* context, const DecimalVal& val, const ColumnType& val_type,
-      const ColumnType& output_type, const DecimalRoundOp& op, int64_t rounding_scale);
+  static DecimalVal RoundDecimalNegativeScale(FunctionContext* context,
+      const DecimalVal& val, const FunctionContext::TypeDesc& val_type,
+      const FunctionContext::TypeDesc& output_type, const DecimalRoundOp& op,
+      int64_t rounding_scale);
 
  private:
   /// Converts 'val' to a DecimalVal according to 'type'. 'type' must be a decimal type.
   static DecimalVal IntToDecimalVal(
-      FunctionContext* context, const ColumnType& type, int64_t val);
+      FunctionContext* context, const FunctionContext::TypeDesc& type, int64_t val);
   static DecimalVal FloatToDecimalVal(
-      FunctionContext* context, const ColumnType& type, double val);
+      FunctionContext* context, const FunctionContext::TypeDesc& type, double val);
 
   /// Returns the value of 'val' scaled to 'output_type'.
-  static DecimalVal ScaleDecimalValue(
-      FunctionContext* context, const Decimal4Value& val, const ColumnType& val_type,
-      const ColumnType& output_type);
-  static DecimalVal ScaleDecimalValue(
-      FunctionContext* context, const Decimal8Value& val, const ColumnType& val_type,
-      const ColumnType& output_type);
-  static DecimalVal ScaleDecimalValue(
-      FunctionContext* context, const Decimal16Value& val, const ColumnType& val_type,
-      const ColumnType& output_type);
+  static DecimalVal ScaleDecimalValue(FunctionContext* context, const Decimal4Value& val,
+      const FunctionContext::TypeDesc& val_type,
+      const FunctionContext::TypeDesc& output_type);
+  static DecimalVal ScaleDecimalValue(FunctionContext* context, const Decimal8Value& val,
+      const FunctionContext::TypeDesc& val_type,
+      const FunctionContext::TypeDesc& output_type);
+  static DecimalVal ScaleDecimalValue(FunctionContext* context, const Decimal16Value& val,
+      const FunctionContext::TypeDesc& val_type,
+      const FunctionContext::TypeDesc& output_type);
 
   /// Returns the delta that needs to be added when the source decimal is rounded to
   /// target scale. Returns 0, if no rounding is necessary, or -1/1 if rounding

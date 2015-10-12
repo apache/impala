@@ -777,9 +777,9 @@ TEST(DecimalArithmetic, RandTesting) {
     }
 #endif
 
-    EXPECT_EQ(dec1.Compare(t1, dec2, t2), DoubleCompare(t1_d, t2_d));
-    EXPECT_TRUE(dec1.Compare(t1, dec1, t1) == 0);
-    EXPECT_TRUE(dec2.Compare(t2, dec2, t2) == 0);
+    EXPECT_EQ(dec1.Compare(t1.scale, dec2, t2.scale), DoubleCompare(t1_d, t2_d));
+    EXPECT_TRUE(dec1.Compare(t1.scale, dec1, t1.scale) == 0);
+    EXPECT_TRUE(dec2.Compare(t2.scale, dec2, t2.scale) == 0);
   }
 }
 

@@ -105,6 +105,12 @@ class StringParser {
   template <typename T>
   static inline DecimalValue<T> StringToDecimal(const char* s, int len,
       const ColumnType& type, StringParser::ParseResult* result) {
+    return StringToDecimal<T>(s, len, type.precision, type.scale, result);
+  }
+
+  template <typename T>
+  static inline DecimalValue<T> StringToDecimal(const char* s, int len,
+      int type_precision, int type_scale, StringParser::ParseResult* result) {
     // Special cases:
     //   1) '' == Fail, an empty string fails to parse.
     //   2) '   #   ' == #, leading and trailing white space is ignored.
@@ -168,7 +174,7 @@ class StringParser {
         // overflowing the underlying storage while handling a string like
         // 10000000000e-10 into a DECIMAL(1, 0). Adjustments for ignored digits and
         // an exponent will be made later.
-        if (LIKELY(type.precision > precision)) {
+        if (LIKELY(type_precision > precision)) {
           value = (value * 10) + (c - '0');  // Benchmarks are faster with parenthesis...
         }
         DCHECK(value >= 0);  // For some reason DCHECK_GE doesn't work with int128_t.
@@ -188,7 +194,7 @@ class StringParser {
     }
 
     // Find the number of truncated digits before adjusting the precision for an exponent.
-    int truncated_digit_count = precision - type.precision;
+    int truncated_digit_count = precision - type_precision;
     if (exponent > scale) {
       // Ex: 0.1e3 (which at this point would have precision == 1 and scale == 1), the
       //     scale must be set to 0 and the value set to 100 which means a precision of 3.
@@ -208,11 +214,11 @@ class StringParser {
     // Microbenchmarks show that beyond this point, returning on parse failure is slower
     // than just letting the function run out.
     *result = StringParser::PARSE_SUCCESS;
-    if (UNLIKELY(precision - scale > type.precision - type.scale)) {
+    if (UNLIKELY(precision - scale > type_precision - type_scale)) {
       *result = StringParser::PARSE_OVERFLOW;
-    } else if (UNLIKELY(scale > type.scale)) {
+    } else if (UNLIKELY(scale > type_scale)) {
       *result = StringParser::PARSE_UNDERFLOW;
-      int shift = scale - type.scale;
+      int shift = scale - type_scale;
       if (truncated_digit_count > 0) shift -= truncated_digit_count;
       if (shift > 0) value /= DecimalUtil::GetScaleMultiplier<T>(shift);
       DCHECK(value >= 0);
@@ -220,8 +226,8 @@ class StringParser {
       *result = StringParser::PARSE_FAILURE;
     }
 
-    if (type.scale > scale) {
-      value *= DecimalUtil::GetScaleMultiplier<T>(type.scale - scale);
+    if (type_scale > scale) {
+      value *= DecimalUtil::GetScaleMultiplier<T>(type_scale - scale);
     }
 
     return DecimalValue<T>(is_negative ? -value : value);

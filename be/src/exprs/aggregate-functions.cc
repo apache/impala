@@ -327,12 +327,11 @@ void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext* ctx,
   DecimalAvgState* avg = reinterpret_cast<DecimalAvgState*>(dst->ptr);
   const FunctionContext::TypeDesc* arg_desc = ctx->GetArgType(0);
   DCHECK(arg_desc != NULL);
-  const ColumnType& arg_type = AnyValUtil::TypeDescToColumnType(*arg_desc);
 
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
   int m = remove ? -1 : 1;
-  switch (arg_type.GetByteSize()) {
+  switch (ColumnType::GetDecimalByteSize(arg_desc->precision)) {
     case 4:
       avg->sum.val16 += m * src.val4;
       break;
@@ -343,7 +342,7 @@ void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext* ctx,
       avg->sum.val16 += m * src.val16;
       break;
     default:
-      DCHECK(false) << "Invalid byte size for type " << arg_type.DebugString();
+      DCHECK(false) << "Invalid byte size";
   }
   if (remove) {
     --avg->count;

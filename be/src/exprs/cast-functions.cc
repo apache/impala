@@ -108,9 +108,8 @@ CAST_FROM_STRING(DoubleVal, double, StringToFloat)
 #define CAST_TO_STRING(num_type) \
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const num_type& val) { \
     if (val.is_null) return StringVal::null(); \
-    ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType()); \
     StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
-    AnyValUtil::TruncateIfNecessary(rtype, &sv); \
+    AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv); \
     return sv; \
   }
 
@@ -129,8 +128,7 @@ CAST_TO_STRING(BigIntVal);
     sv.len = snprintf(reinterpret_cast<char*>(sv.ptr), sv.len, format, val.val); \
     DCHECK_GT(sv.len, 0); \
     DCHECK_LE(sv.len, MAX_FLOAT_CHARS); \
-    ColumnType return_type = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType()); \
-    AnyValUtil::TruncateIfNecessary(return_type, &sv); \
+    AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv); \
     return sv; \
   }
 
@@ -145,36 +143,33 @@ CAST_FLOAT_TO_STRING(DoubleVal, "%.17g");
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TinyIntVal& val) {
   if (val.is_null) return StringVal::null();
   int64_t tmp_val = val.val;
-  ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
   StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(tmp_val));
-  AnyValUtil::TruncateIfNecessary(rtype, &sv);
+  AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
 }
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVal& val) {
   if (val.is_null) return StringVal::null();
   TimestampValue tv = TimestampValue::FromTimestampVal(val);
-  ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
   StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(tv));
-  AnyValUtil::TruncateIfNecessary(rtype, &sv);
+  AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
 }
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& val) {
   if (val.is_null) return StringVal::null();
   StringVal sv;
-  ColumnType type = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
   sv.ptr = val.ptr;
   sv.len = val.len;
-  AnyValUtil::TruncateIfNecessary(type, &sv);
+  AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
 }
 
 StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) {
   if (val.is_null) return StringVal::null();
 
-  ColumnType type = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
-  DCHECK(type.type == TYPE_CHAR);
+  const FunctionContext::TypeDesc& type = ctx->GetReturnType();
+  DCHECK(type.type == FunctionContext::TYPE_FIXED_BUFFER);
   DCHECK_GE(type.len, 1);
   char* cptr;
   if (type.len > val.len) {
