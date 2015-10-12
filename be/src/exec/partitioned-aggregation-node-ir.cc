@@ -143,16 +143,17 @@ allocate_tuple:
     }
 
     // This partition is already spilled, just append the row.
+    DCHECK(dst_partition->is_spilled());
     BufferedTupleStream* dst_stream = AGGREGATED_ROWS ?
         dst_partition->aggregated_row_stream.get() :
         dst_partition->unaggregated_row_stream.get();
     DCHECK(dst_stream != NULL);
     DCHECK(!dst_stream->is_pinned()) << AGGREGATED_ROWS;
     DCHECK(dst_stream->has_write_block()) << AGGREGATED_ROWS;
-    DCHECK(!dst_stream->using_small_buffers()) << AGGREGATED_ROWS;
-    if (dst_stream->AddRow(row, &process_batch_status_)) continue;
-    DCHECK(!process_batch_status_.ok()) << AGGREGATED_ROWS;
-    return process_batch_status_;
+    if (LIKELY(dst_stream->AddRow(row, &process_batch_status_))) continue;
+    // Adding fails iff either we hit an error or haven't switched to I/O buffers.
+    RETURN_IF_ERROR(process_batch_status_);
+    RETURN_IF_ERROR(AppendRowRetryIOBuffers(dst_stream, row));
   }
 
   return Status::OK();

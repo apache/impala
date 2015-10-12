@@ -572,7 +572,8 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
   hash_tbl->Close();
   hash_tbl.reset();
 
-  // Need to switch both streams to IO-sized buffers in order to spill the partition.
+  // Try to switch both streams to IO-sized buffers to avoid allocating small buffers
+  // for spilled partition.
   bool got_buffer = true;
   if (aggregated_row_stream->using_small_buffers()) {
     RETURN_IF_ERROR(aggregated_row_stream->SwitchToIoBuffers(&got_buffer));
@@ -587,23 +588,19 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     RETURN_IF_ERROR(unaggregated_row_stream->SwitchToIoBuffers(&got_buffer));
   }
   if (!got_buffer) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute("Not enough memory to get the minimum required buffers "
-        "for aggregation with id=$0.", parent->id_));
-    return status;
+    // We'll try again to get the buffers when the stream fills up the small buffers.
+    VLOG_QUERY << "Not enough memory to switch to IO-sized buffer for partition "
+               << this << " of agg=" << parent->id_ << " agg small buffers="
+               << aggregated_row_stream->using_small_buffers()
+               << " unagg small buffers="
+               << unaggregated_row_stream->using_small_buffers();
+    VLOG_FILE << GetStackTrace();
   }
 
   COUNTER_ADD(parent->num_spilled_partitions_, 1);
   if (parent->num_spilled_partitions_->value() == 1) {
     parent->AddRuntimeExecOption("Spilled");
   }
-  // Need to make sure that we are not going to lose any information from the small
-  // buffers. Therefore, we are checking if we using small buffers and we actually have
-  // added some rows there.
-  DCHECK(!(aggregated_row_stream->using_small_buffers() &&
-           aggregated_row_stream->num_rows() > 0));
-  DCHECK(!(unaggregated_row_stream->using_small_buffers() &&
-           unaggregated_row_stream->num_rows() > 0));
   return Status::OK();
 }
 
@@ -763,6 +760,25 @@ Tuple* PartitionedAggregationNode::GetOutputTuple(
     }
   }
   return dst;
+}
+
+Status PartitionedAggregationNode::AppendRowRetryIOBuffers(BufferedTupleStream* stream,
+    TupleRow* row) {
+  DCHECK(stream->using_small_buffers());
+  DCHECK(!stream->is_pinned());
+  while (true) {
+    bool got_buffer;
+    RETURN_IF_ERROR(stream->SwitchToIoBuffers(&got_buffer));
+    if (got_buffer) break;
+    RETURN_IF_ERROR(SpillPartition());
+  }
+
+  // Adding the row should succeed after the I/O buffer switch.
+  if (!stream->AddRow(row, &process_batch_status_)) {
+    DCHECK(!process_batch_status_.ok());
+    return process_batch_status_;
+  }
+  return Status::OK();
 }
 
 void PartitionedAggregationNode::DebugString(int indentation_level,

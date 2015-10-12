@@ -382,6 +382,11 @@ class PartitionedAggregationNode : public ExecNode {
   template<bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx);
 
+  /// Used if appending row to a stream of a spilled partition failed because the stream
+  /// has not yet switched to I/O buffers and the small buffers are full. Switches the
+  /// stream to I/O buffers and spills partitions if necessary in order to append the row.
+  Status AppendRowRetryIOBuffers(BufferedTupleStream* stream, TupleRow* row);
+
   /// Reads all the rows from input_stream and process them by calling ProcessBatch().
   template<bool AGGREGATED_ROWS>
   Status ProcessStream(BufferedTupleStream* input_stream);
