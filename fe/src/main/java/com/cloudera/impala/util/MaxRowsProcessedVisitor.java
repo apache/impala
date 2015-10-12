@@ -34,8 +34,10 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
     if (caller instanceof ScanNode) {
       long tmp = caller.getInputCardinality();
       ScanNode scan = (ScanNode) caller;
-      if ((scan.isTableMissingTableStats() ||
-          scan.hasCorruptTableStats()) && !scan.hasLimit()) {
+      boolean missingStats = scan.isTableMissingStats() || scan.hasCorruptTableStats();
+      // In the absence of collection stats, treat scans on collections as if they
+      // have no limit.
+      if (scan.isAccessingCollectionType() || (missingStats && !scan.hasLimit())) {
         abort_ = true;
         return;
       }

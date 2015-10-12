@@ -249,3 +249,13 @@ where year=2009 and month=2
 05:SCAN HDFS [functional.alltypestiny c]
    partitions=1/4 files=1 size=115B
 ====
+# IMPALA-2527: Tests that the small query optimization is disabled for colleciton types
+select key from functional.allcomplextypes.map_map_col.value limit 5;
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 5
+|
+00:SCAN HDFS [functional.allcomplextypes.map_map_col.value]
+   partitions=0/0 files=0 size=0B
+   limit: 5
+====

@@ -19,6 +19,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.HdfsFileFormat;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TNetworkAddress;
@@ -142,6 +143,16 @@ abstract public class ScanNode extends PlanNode {
   public boolean isTableMissingTableStats() {
     if (desc_.getTable().getNumRows() == -1) return true;
     return numPartitionsMissingStats_ > 0;
+  }
+
+  /**
+   * Returns true if the tuple descriptor references a path with a collection type.
+   */
+  public boolean isAccessingCollectionType() {
+    for (Type t: desc_.getPath().getMatchedTypes()) {
+      if (t.isCollectionType()) return true;
+    }
+    return false;
   }
 
   public boolean isTableMissingColumnStats() {
