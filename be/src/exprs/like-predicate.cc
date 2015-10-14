@@ -21,7 +21,7 @@
 
 #include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
-
+#include "string-functions.h"
 #include "common/names.h"
 
 using namespace impala_udf;
@@ -160,35 +160,6 @@ BooleanVal LikePredicate::Regex(FunctionContext* context, const StringVal& val,
   return (state->function_)(context, val, pattern);
 }
 
-bool LikePredicate::SetRE2Options(FunctionContext* context,
-    const StringVal* match_parameter, RE2::Options* opts) {
-  stringstream error;
-  for (int i = 0; i < match_parameter->len; ++i) {
-    char match = match_parameter->ptr[i];
-    switch (match) {
-      case 'i':
-        opts->set_case_sensitive(false);
-        break;
-      case 'c':
-        opts->set_case_sensitive(true);
-        break;
-      case 'm':
-        opts->set_posix_syntax(true);
-        opts->set_one_line(false);
-        break;
-      case 'n':
-        opts->set_never_nl(false);
-        opts->set_dot_nl(true);
-        break;
-      default:
-        error << "Illegal match parameter " << match;
-        context->SetError(error.str().c_str());
-        return false;
-    }
-  }
-  return true;
-}
-
 // This prepare function is used only when 3 parameters are passed to the regexp_like()
 // function. For the 2 parameter version, the RegexPrepare() function is used to prepare.
 void LikePredicate::RegexpLikePrepare(FunctionContext* context,
@@ -210,7 +181,11 @@ void LikePredicate::RegexpLikePrepare(FunctionContext* context,
       return;
     }
     RE2::Options opts;
-    if (!SetRE2Options(context, match_parameter, &opts)) return;
+    string error_str;
+    if (!StringFunctions::SetRE2Options(*match_parameter, &error_str, &opts)) {
+      context->SetError(error_str.c_str());
+      return;
+    }
     string pattern_str(reinterpret_cast<const char*>(pattern->ptr), pattern->len);
     state->regex_.reset(new RE2(pattern_str, opts));
     if (!state->regex_->ok()) {
@@ -230,7 +205,11 @@ BooleanVal LikePredicate::RegexpLike(FunctionContext* context, const StringVal& 
   if (!context->IsArgConstant(2) || !context->IsArgConstant(1)) {
     if (match_parameter.is_null) return BooleanVal::null();
     RE2::Options opts;
-    SetRE2Options(context, &match_parameter, &opts);
+    string error_str;
+    if (!StringFunctions::SetRE2Options(match_parameter, &error_str, &opts)) {
+      context->SetError(error_str.c_str());
+      return BooleanVal(false);
+    }
     string re_pattern(reinterpret_cast<const char*>(pattern.ptr), pattern.len);
     re2::RE2 re(re_pattern, opts);
     if (re.ok()) {

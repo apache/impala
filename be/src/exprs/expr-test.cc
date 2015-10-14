@@ -2061,6 +2061,56 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestIsNull("regexp_like(NULL, NULL, NULL)", TYPE_BOOLEAN);
   TestIsNull("regexp_like(NULL, NULL)", TYPE_BOOLEAN);
 
+  TestValue("regexp_match_count('aaa', 'a')", TYPE_INT, 3);
+  TestValue("regexp_match_count('aaa', 'aa')", TYPE_INT, 1);
+  TestValue("regexp_match_count('aaaa', 'aa')", TYPE_INT, 2);
+  TestValue("regexp_match_count('', '')", TYPE_INT, 1);
+  TestValue("regexp_match_count('', '.*')", TYPE_INT, 1);
+  TestValue("regexp_match_count('abxcy1234a', 'a.x')", TYPE_INT, 1);
+  TestValue("regexp_match_count('abxcy1234a', 'a.x.*a')", TYPE_INT, 1);
+  TestValue("regexp_match_count('abxcy1234a', 'a.x.*k')", TYPE_INT, 0);
+  TestValue("regexp_match_count('aaa123a', 'a*')", TYPE_INT, 6);
+  TestValue("regexp_match_count('aaa123a', 'a?')", TYPE_INT, 8);
+  TestValue("regexp_match_count('a.x.y.*a', 'a\\\\.x\\\\.y\\\\.\\\\*a')", TYPE_INT, 1);
+  TestValue("regexp_match_count('0123456789', '.*')", TYPE_INT, 2);
+  TestValue("regexp_match_count('0123456789', '.+')", TYPE_INT, 1);
+  TestValue("regexp_match_count('0123456789', '.?')", TYPE_INT, 11);
+  TestValue("regexp_match_count('abcab', '(a|bc|abc)')", TYPE_INT, 2);
+  TestValue("regexp_match_count('abcab', '(a)b')", TYPE_INT, 2);
+  TestValue("regexp_match_count('abc123efg', '[\\\\d]')", TYPE_INT, 3);
+  TestValue("regexp_match_count('abc123efg', '[\\\\d]+')", TYPE_INT, 1);
+  TestValue("regexp_match_count('abc123efg', '[\\^\\\\d]')", TYPE_INT, 6);
+  TestValue("regexp_match_count('a1b2c3d4e5!!!', '[\\\\w\\\\d]')", TYPE_INT, 10);
+  TestValue("regexp_match_count('a1b2c3d4e5!!!', '\\\\w\\\\d')", TYPE_INT, 5);
+  TestValue("regexp_match_count('Steven and Stephen', 'Ste(v|ph)en')", TYPE_INT, 2);
+  TestValue("regexp_match_count('aaa', 'A', 1, 'i')", TYPE_INT, 3);
+  TestValue("regexp_match_count('aaa', 'A', 1, 'c')", TYPE_INT, 0);
+  TestValue("regexp_match_count('this\nis\nnewline', '.*', 1, '')", TYPE_INT, 6);
+  TestValue("regexp_match_count('this\nis\nnewline', '.*', 1, 'n')", TYPE_INT, 2);
+  TestValue("regexp_match_count('IPhone\nIPad\nIPod', '^I.*$', 1, '')", TYPE_INT, 0);
+  TestValue("regexp_match_count('IPhone\nIPad\nIPod', '^I.*$', 1, 'n')", TYPE_INT, 1);
+  TestValue("regexp_match_count('IPhone\nIPad\nIPod', '^I.*$', 1, 'm')", TYPE_INT, 3);
+  TestValue("regexp_match_count('iPhone\niPad\niPod', '^I.*$', 1, 'in')", TYPE_INT, 1);
+  TestValue("regexp_match_count('iPhone\niPad\niPod', '^I.*$', 1, 'cin')", TYPE_INT, 1);
+  TestValue("regexp_match_count('iPhone\niPad\niPod', '^I.*$', 1, 'im')", TYPE_INT, 3);
+  TestValue("regexp_match_count('iPhone\niPad\niPod', '^I.*$', 1, 'imn')", TYPE_INT, 1);
+  TestValue("regexp_match_count('aaa', 'a', 3, '')", TYPE_INT, 1);
+  TestValue("regexp_match_count('aaa', 'a', 4, '')", TYPE_INT, 0);
+  TestValue("regexp_match_count('aaa', 'a*', 4, '')", TYPE_INT, 1);
+  TestValue("regexp_match_count('aaa', 'a+', NULL, NULL)", TYPE_INT, 1);
+  TestValue("regexp_match_count('abc123', '(.)(.)')", TYPE_INT, 3);
+  TestValue("regexp_match_count('.)(.', '.\\\\)\\\\(.')",  TYPE_INT, 1);
+  TestError("regexp_match_count('.)(.', '.)(.')");
+  TestError("regexp_match_count('a', 'a', 0, '')");
+  TestError("regexp_match_count('a', 'a', -1, '')");
+  TestError("regexp_match_count('a', 'a', 1, 'a123efgyz')");
+  TestError("regexp_match_count('a', 'a', 1, 'cimnhk')");
+  TestError("regexp_match_count('a', 'a', -1, '')");
+  TestError("regexp_match_count(1, 1");
+  TestError("regexp_match_count(1, 1, 1, '')");
+  TestIsNull("regexp_match_count(NULL, '.*')", TYPE_INT);
+  TestIsNull("regexp_match_count('a123', NULL)", TYPE_INT);
+  TestIsNull("regexp_match_count(NULL, NULL)", TYPE_INT);
 }
 
 TEST_F(ExprTest, StringParseUrlFunction) {

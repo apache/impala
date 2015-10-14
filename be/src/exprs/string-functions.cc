@@ -315,13 +315,18 @@ IntVal StringFunctions::LocatePos(FunctionContext* context, const StringVal& sub
 }
 
 // The caller owns the returned regex. Returns NULL if the pattern could not be compiled.
-re2::RE2* CompileRegex(const StringVal& pattern, string* error_str) {
+re2::RE2* CompileRegex(const StringVal& pattern, string* error_str,
+    const StringVal& match_parameter) {
   re2::StringPiece pattern_sp(reinterpret_cast<char*>(pattern.ptr), pattern.len);
   re2::RE2::Options options;
   // Disable error logging in case e.g. every row causes an error
   options.set_log_errors(false);
   // Return the leftmost longest match (rather than the first match).
   options.set_longest_match(true);
+  if (!match_parameter.is_null &&
+      !StringFunctions::SetRE2Options(match_parameter, error_str, &options)) {
+    return NULL;
+  }
   re2::RE2* re = new re2::RE2(pattern_sp, options);
   if (!re->ok()) {
     stringstream ss;
@@ -334,6 +339,36 @@ re2::RE2* CompileRegex(const StringVal& pattern, string* error_str) {
   return re;
 }
 
+// This function sets options in the RE2 library before pattern matching.
+bool StringFunctions::SetRE2Options(const StringVal& match_parameter,
+    string* error_str, re2::RE2::Options* opts) {
+  for (int i = 0; i < match_parameter.len; i++) {
+    char match = match_parameter.ptr[i];
+    switch (match) {
+      case 'i':
+        opts->set_case_sensitive(false);
+        break;
+      case 'c':
+        opts->set_case_sensitive(true);
+        break;
+      case 'm':
+        opts->set_posix_syntax(true);
+        opts->set_one_line(false);
+        break;
+      case 'n':
+        opts->set_never_nl(false);
+        opts->set_dot_nl(true);
+        break;
+      default:
+        stringstream error;
+        error << "Illegal match parameter " << match;
+        *error_str = error.str();
+        return false;
+    }
+  }
+  return true;
+}
+
 void StringFunctions::RegexpPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope != FunctionContext::FRAGMENT_LOCAL) return;
@@ -343,7 +378,7 @@ void StringFunctions::RegexpPrepare(
   if (pattern->is_null) return;
 
   string error_str;
-  re2::RE2* re = CompileRegex(*pattern, &error_str);
+  re2::RE2* re = CompileRegex(*pattern, &error_str, StringVal::null());
   if (re == NULL) {
     context->SetError(error_str.c_str());
     return;
@@ -369,7 +404,7 @@ StringVal StringFunctions::RegexpExtract(FunctionContext* context, const StringV
   if (re == NULL) {
     DCHECK(!context->IsArgConstant(1));
     string error_str;
-    re = CompileRegex(pattern, &error_str);
+    re = CompileRegex(pattern, &error_str, StringVal::null());
     if (re == NULL) {
       context->AddWarning(error_str.c_str());
       return StringVal::null();
@@ -401,7 +436,7 @@ StringVal StringFunctions::RegexpReplace(FunctionContext* context, const StringV
   if (re == NULL) {
     DCHECK(!context->IsArgConstant(1));
     string error_str;
-    re = CompileRegex(pattern, &error_str);
+    re = CompileRegex(pattern, &error_str, StringVal::null());
     if (re == NULL) {
       context->AddWarning(error_str.c_str());
       return StringVal::null();
@@ -414,6 +449,93 @@ StringVal StringFunctions::RegexpReplace(FunctionContext* context, const StringV
   string result_str = AnyValUtil::ToString(str);
   re2::RE2::GlobalReplace(&result_str, *re, replace_str);
   return AnyValUtil::FromString(context, result_str);
+}
+
+void StringFunctions::RegexpMatchCountPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  int num_args = context->GetNumArgs();
+  DCHECK(num_args == 2 || num_args == 4);
+  if (!context->IsArgConstant(1) || (num_args == 4 && !context->IsArgConstant(3))) return;
+
+  DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
+  StringVal* pattern = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+  if (pattern->is_null) return;
+
+  StringVal* match_parameter = NULL;
+  if (num_args == 4) {
+    DCHECK_EQ(context->GetArgType(3)->type, FunctionContext::TYPE_STRING);
+    match_parameter = reinterpret_cast<StringVal*>(context->GetConstantArg(3));
+  }
+  string error_str;
+  re2::RE2* re = CompileRegex(*pattern, &error_str, match_parameter == NULL ?
+      StringVal::null() : *match_parameter);
+  if (re == NULL) {
+    context->SetError(error_str.c_str());
+    return;
+  }
+  context->SetFunctionState(scope, re);
+}
+
+IntVal StringFunctions::RegexpMatchCount2Args(FunctionContext* context,
+    const StringVal& str, const StringVal& pattern) {
+  return RegexpMatchCount4Args(context, str, pattern, IntVal::null(), StringVal::null());
+}
+
+IntVal StringFunctions::RegexpMatchCount4Args(FunctionContext* context,
+    const StringVal& str, const StringVal& pattern, const IntVal& start_pos,
+    const StringVal& match_parameter) {
+  if (str.is_null || pattern.is_null) return IntVal::null();
+
+  int offset = 0;
+  DCHECK_GE(str.len, 0);
+  // The parameter "start_pos" starts counting at 1 instead of 0. If "start_pos" is
+  // beyond the end of the string, "str" will be considered an empty string.
+  if (!start_pos.is_null) offset = min(start_pos.val - 1, str.len);
+  if (offset < 0) {
+    stringstream error;
+    error << "Illegal starting position " << start_pos.val << endl;
+    context->SetError(error.str().c_str());
+    return IntVal::null();
+  }
+
+  re2::RE2* re = reinterpret_cast<re2::RE2*>(
+      context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  // Destroys re if we have to locally compile it.
+  scoped_ptr<re2::RE2> scoped_re;
+  if (re == NULL) {
+    DCHECK(!context->IsArgConstant(1) || (context->GetNumArgs() == 4 &&
+        !context->IsArgConstant(3)));
+    string error_str;
+    re = CompileRegex(pattern, &error_str, match_parameter);
+    if (re == NULL) {
+      context->SetError(error_str.c_str());
+      return IntVal::null();
+    }
+    scoped_re.reset(re);
+  }
+
+  DCHECK_GE(str.len, offset);
+  re2::StringPiece str_sp(reinterpret_cast<char*>(str.ptr), str.len);
+  int count = 0;
+  re2::StringPiece match;
+  while (offset <= str.len &&
+      re->Match(str_sp, offset, str.len, re2::RE2::UNANCHORED, &match, 1)) {
+    // Empty string is a valid match for pattern with '*'. Start matching at the next
+    // character until we reach the end of the string.
+    count++;
+    if (match.size() == 0) {
+      if (offset == str.len) {
+        break;
+      }
+      offset++;
+    } else {
+      // Make sure forward progress is being made or we will be in an infinite loop.
+      DCHECK_GT(match.data() - str_sp.data() + match.size(), offset);
+      offset = match.data() - str_sp.data() + match.size();
+    }
+  }
+  return IntVal(count);
 }
 
 StringVal StringFunctions::Concat(FunctionContext* context, int num_children,

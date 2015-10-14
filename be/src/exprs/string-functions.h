@@ -16,6 +16,8 @@
 #ifndef IMPALA_EXPRS_STRING_FUNCTIONS_H
 #define IMPALA_EXPRS_STRING_FUNCTIONS_H
 
+#include <re2/re2.h>
+
 #include "runtime/string-value.h"
 #include "runtime/string-search.h"
 
@@ -30,18 +32,19 @@ class TupleRow;
 class StringFunctions {
  public:
   static StringVal Substring(FunctionContext*, const StringVal& str, const BigIntVal& pos,
-                             const BigIntVal& len);
-  static StringVal Substring(FunctionContext*, const StringVal& str, const BigIntVal& pos);
+      const BigIntVal& len);
+  static StringVal Substring(FunctionContext*, const StringVal& str,
+      const BigIntVal& pos);
   static StringVal SplitPart(FunctionContext* context, const StringVal& str,
-                             const StringVal& delim, const BigIntVal& field);
+      const StringVal& delim, const BigIntVal& field);
   static StringVal Left(FunctionContext*, const StringVal& str, const BigIntVal& len);
   static StringVal Right(FunctionContext*, const StringVal& str, const BigIntVal& len);
   static StringVal Space(FunctionContext*, const BigIntVal& len);
   static StringVal Repeat(FunctionContext*, const StringVal& str, const BigIntVal& n);
   static StringVal Lpad(FunctionContext*, const StringVal& str, const BigIntVal& len,
-                        const StringVal& pad);
+      const StringVal& pad);
   static StringVal Rpad(FunctionContext*, const StringVal& str, const BigIntVal&,
-                        const StringVal& pad);
+      const StringVal& pad);
   static IntVal Length(FunctionContext*, const StringVal& str);
   static IntVal CharLength(FunctionContext*, const StringVal& str);
   static StringVal Lower(FunctionContext*, const StringVal& str);
@@ -49,7 +52,7 @@ class StringFunctions {
   static StringVal InitCap(FunctionContext*, const StringVal& str);
   static StringVal Reverse(FunctionContext*, const StringVal& str);
   static StringVal Translate(FunctionContext*, const StringVal& str, const StringVal& src,
-                             const StringVal& dst);
+      const StringVal& dst);
   static StringVal Trim(FunctionContext*, const StringVal& str);
   static StringVal Ltrim(FunctionContext*, const StringVal& str);
   static StringVal Rtrim(FunctionContext*, const StringVal& str);
@@ -57,25 +60,34 @@ class StringFunctions {
   static IntVal Instr(FunctionContext*, const StringVal& str, const StringVal& substr);
   static IntVal Locate(FunctionContext*, const StringVal& substr, const StringVal& str);
   static IntVal LocatePos(FunctionContext*, const StringVal& substr, const StringVal& str,
-                          const BigIntVal& start_pos);
+      const BigIntVal& start_pos);
 
+  static bool SetRE2Options(const StringVal& match_parameter, std::string* error_str,
+      re2::RE2::Options* opts);
   static void RegexpPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
   static void RegexpClose(FunctionContext*, FunctionContext::FunctionStateScope);
   static StringVal RegexpExtract(FunctionContext*, const StringVal& str,
-                                 const StringVal& pattern, const BigIntVal& index);
+      const StringVal& pattern, const BigIntVal& index);
   static StringVal RegexpReplace(FunctionContext*, const StringVal& str,
-                                 const StringVal& pattern, const StringVal& replace);
-
+      const StringVal& pattern, const StringVal& replace);
+  static void RegexpMatchCountPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  static IntVal RegexpMatchCount2Args(FunctionContext* context, const StringVal& str,
+      const StringVal& pattern);
+  static IntVal RegexpMatchCount4Args(FunctionContext* context, const StringVal& str,
+      const StringVal& pattern, const IntVal& start_pos,
+      const StringVal& match_parameter);
   static StringVal Concat(FunctionContext*, int num_children, const StringVal* strs);
   static StringVal ConcatWs(FunctionContext*, const StringVal& sep, int num_children,
-                            const StringVal* strs);
+      const StringVal* strs);
   static IntVal FindInSet(FunctionContext*, const StringVal& str,
-                          const StringVal& str_set);
+      const StringVal& str_set);
 
   static void ParseUrlPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
-  static StringVal ParseUrl(FunctionContext*, const StringVal& url, const StringVal& part);
+  static StringVal ParseUrl(FunctionContext*, const StringVal& url,
+      const StringVal& part);
   static StringVal ParseUrlKey(FunctionContext*, const StringVal& url,
-                               const StringVal& key, const StringVal& part);
+      const StringVal& key, const StringVal& part);
   static void ParseUrlClose(FunctionContext*, FunctionContext::FunctionStateScope);
 
   /// Converts ASCII 'val' to corresponding character.

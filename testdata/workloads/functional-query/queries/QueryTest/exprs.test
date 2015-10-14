@@ -2243,3 +2243,98 @@ select dayofyear(trunc('2014-11-11', string_col)) from functional.alltypestiny l
 ---- CATCH
 Invalid Truncate Unit: 0
 ====
+---- QUERY
+select regexp_match_count(tmp.str, tmp.pattern) from (values
+('aaa' as str, 'a' as pattern),
+('aaa', 'aa'),
+('aaaa', 'aa'),
+('', ''),
+('', '.*'),
+('abxcy1234a', 'a.x'),
+('abxcy1234a', 'a.x.*a'),
+('abxcy1234a', 'a.x.*k'),
+('aaa123a', 'a*'),
+('aaa123a', 'a?'),
+('a.x.y.*a', 'a\.x\.y\.\*a'),
+('0123456789', '.*'),
+('0123456789', '.+'),
+('0123456789', '.?'),
+('abcab', '(a|ab|abc)'),
+('abc123efg', '[\\d]'),
+('abc123efg', '[\\d]+'),
+('abc123efg', '[\^\\d]'),
+('a1b2c3d4e5!!!', '[\\w\\d]'),
+('a1b2c3d4e5!!!', '\\w\\d')) as tmp
+---- RESULTS
+3
+1
+2
+1
+1
+1
+1
+0
+6
+8
+1
+2
+1
+11
+2
+3
+1
+6
+10
+5
+---- TYPES
+int
+====
+---- QUERY
+select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from (values
+('aaa' as str, 'A' as pattern, 1 as start_pos, 'i' as params),
+('aaa', 'A', 1, 'c'),
+('this\nis\nnewline', '.*', 1, ''),
+('this\nis\nnewline', '.*', 1, 'n'),
+('IPhone\nIPad\nIPod', '^I.*$', 1, ''),
+('IPhone\nIPad\nIPod', '^I.*$', 1, 'n'),
+('IPhone\nIPad\nIPod', '^I.*$', 1, 'm'),
+('iPhone\niPad\niPod', '^I.*$', 1, 'in'),
+('iPhone\niPad\niPod', '^I.*$', 1, 'cin'),
+('iPhone\niPad\niPod', '^I.*$', 1, 'im'),
+('iPhone\niPad\niPod', '^I.*$', 1, 'imn'),
+('aaa', 'a', 3, ''),
+('aaa', 'a', 4, ''),
+('aaa', 'a*', 4, '')) as tmp
+---- RESULTS
+3
+0
+6
+2
+0
+1
+3
+1
+1
+3
+1
+1
+0
+1
+---- TYPES
+int
+====
+---- QUERY
+select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from (values
+('a' as str, 'a' as pattern, -1 as start_pos, '' as params),
+('foobar', 'foobar', 1, 'i'),
+('iPhone\niPad\niPod', '^I.*$', 1, 'imn')) as tmp
+---- CATCH
+Illegal starting position -1
+====
+---- QUERY
+select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from (values
+('a' as str, 'a' as pattern, 1 as start_pos, 'xyz' as params),
+('foobar', 'foobar', 1, 'i'),
+('iPhone\niPad\niPod', '^I.*$', 1, 'imn')) as tmp
+---- CATCH
+Illegal match parameter x
