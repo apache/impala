@@ -506,9 +506,29 @@ public class SelectStmt extends QueryStmt {
           "aggregation without a FROM clause is not allowed");
     }
 
-    if ((groupingExprs_ != null ||
-        TreeNode.contains(resultExprs_, Expr.isAggregatePredicate()))
-        && selectList_.isDistinct()) {
+    // analyze having clause
+    if (havingClause_ != null) {
+      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
+        throw new AnalysisException(
+            "Subqueries are not supported in the HAVING clause.");
+      }
+      // substitute aliases in place (ordinals not allowed in having clause)
+      havingPred_ = havingClause_.substitute(aliasSmap_, analyzer, false);
+      havingPred_.checkReturnsBool("HAVING clause", true);
+      // can't contain analytic exprs
+      Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
+      if (analyticExpr != null) {
+        throw new AnalysisException(
+            "HAVING clause must not contain analytic expressions: "
+               + analyticExpr.toSql());
+      }
+    }
+
+    if (selectList_.isDistinct()
+        && (groupingExprs_ != null
+            || TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())
+            || (havingPred_ != null
+                && havingPred_.contains(Expr.isAggregatePredicate())))) {
       throw new AnalysisException(
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     }
@@ -559,23 +579,6 @@ public class SelectStmt extends QueryStmt {
               "GROUP BY expression must not contain analytic expressions: "
                   + groupingExprsCopy.get(i).toSql());
         }
-      }
-    }
-
-    // analyze having clause
-    if (havingClause_ != null) {
-      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
-        throw new AnalysisException("Subqueries are not supported in the HAVING clause.");
-      }
-      // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred_ = havingClause_.substitute(aliasSmap_, analyzer, false);
-      havingPred_.checkReturnsBool("HAVING clause", true);
-      // can't contain analytic exprs
-      Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
-      if (analyticExpr != null) {
-        throw new AnalysisException(
-            "HAVING clause must not contain analytic expressions: "
-               + analyticExpr.toSql());
       }
     }
 

@@ -1858,6 +1858,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select distinct id, zip, count(*) from " +
         "functional.testtbl group by 1, 2",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalyzesOk("select distinct id from functional.testtbl having id > 0");
+    AnalysisError("select distinct id from functional.testtbl having max(id) > 0",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalyzesOk("select count(distinct id, zip) from functional.testtbl");
     AnalysisError("select count(distinct id, zip), count(distinct zip) " +
         "from functional.testtbl",
