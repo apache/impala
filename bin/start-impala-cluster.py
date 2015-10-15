@@ -30,6 +30,7 @@ import sys
 from time import sleep, time
 from optparse import OptionParser
 from testdata.common import cgroups
+from multiprocessing.pool import ThreadPool
 
 # Options
 parser = OptionParser()
@@ -123,10 +124,11 @@ def exec_impala_process(cmd, args, stderr_log_file_path):
   os.system(cmd)
 
 def kill_cluster_processes(force=False):
-  kill_matching_processes('catalogd')
-  kill_matching_processes('impalad')
-  kill_matching_processes('statestored')
-  kill_matching_processes('mini-impala-cluster')
+  binaries = ['catalogd', 'impalad', 'statestored', 'mini-impala-cluster']
+  arglists = [(binary, force) for binary in binaries]
+  pool = ThreadPool(len(arglists))
+  pool.map(lambda arglist: kill_matching_processes(*arglist), arglists, 1)
+  pool.close()
 
 def kill_matching_processes(binary_name, force=False):
   """Kills all processes with the given binary name"""
@@ -204,7 +206,7 @@ def build_rm_args(instance_num):
 
 def start_impalad_instances(cluster_size):
   # Start each impalad instance and optionally redirect the output to a log file.
-  for i in range(options.cluster_size):
+  for i in range(cluster_size):
     if i == 0:
       # The first impalad always logs to impalad.INFO
       service_name = "impalad"
@@ -212,7 +214,11 @@ def start_impalad_instances(cluster_size):
       service_name = "impalad_node%s" % i
       # Sleep between instance startup: simultaneous starts hurt the minikdc
       # Yes, this is a hack, but it's easier than modifying the minikdc...
-      sleep(2)
+      # TODO: is this really necessary?
+      sleep(1)
+
+    print "Starting Impala Daemon logging to %s/%s.INFO" % (options.log_dir,
+        service_name)
 
     # impalad args from the --impalad_args flag. Also replacing '#ID' with the instance.
     param_args = (" ".join(options.impalad_args)).replace("#ID", str(i))
@@ -223,7 +229,7 @@ def start_impalad_instances(cluster_size):
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 
-def wait_for_impala_process_count(impala_cluster, retries=3):
+def wait_for_impala_process_count(impala_cluster, retries=10):
   """Checks that the desired number of impalad/statestored processes are running.
 
   Refresh until the number running impalad/statestored processes reaches the expected
@@ -233,7 +239,7 @@ def wait_for_impala_process_count(impala_cluster, retries=3):
   for i in range(retries):
     if len(impala_cluster.impalads) < options.cluster_size or \
         not impala_cluster.statestored or not impala_cluster.catalogd:
-          sleep(2)
+          sleep(1)
           impala_cluster.refresh()
   msg = str()
   if len(impala_cluster.impalads) < options.cluster_size:
@@ -268,16 +274,19 @@ def wait_for_catalog(impalad, timeout_in_seconds):
   """Waits for the impalad catalog to become ready"""
   start_time = time()
   catalog_ready = False
+  attempt = 0
   while (time() - start_time < timeout_in_seconds and not catalog_ready):
     try:
       num_dbs = impalad.service.get_metric_value('catalog.num-databases')
       num_tbls = impalad.service.get_metric_value('catalog.num-tables')
       catalog_ready = impalad.service.get_metric_value('catalog.ready')
-      print 'Waiting for Catalog... Status: %s DBs / %s tables (ready=%s)' %\
-          (num_dbs, num_tbls, catalog_ready)
+      if catalog_ready or attempt % 4 == 0:
+          print 'Waiting for Catalog... Status: %s DBs / %s tables (ready=%s)' %\
+              (num_dbs, num_tbls, catalog_ready)
+      attempt += 1
     except Exception, e:
       print e
-    sleep(1)
+    sleep(0.5)
   if not catalog_ready:
     raise RuntimeError('Catalog was not initialized in expected time period.')
 
@@ -347,6 +356,8 @@ if __name__ == "__main__":
         start_statestore()
         start_catalogd()
       start_impalad_instances(options.cluster_size)
+      # Sleep briefly to reduce log spam: the cluster takes some time to start up.
+      sleep(3)
       wait_for_cluster()
     except Exception, e:
       print 'Error starting cluster: %s' % e
