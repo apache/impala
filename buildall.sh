@@ -237,8 +237,12 @@ then
 fi
 
 # option to clean everything first
-if [ $CLEAN_ACTION -eq 1 ]
-then
+if [ $CLEAN_ACTION -eq 1 ]; then
+
+  # If the project was never build, no Makefile will exist and thus make clean will fail.
+  # Combine the make command with the bash noop to always return true.
+  make clean || :
+
   # Stop the minikdc if needed.
   if ${CLUSTER_DIR}/admin is_kerberized; then
     ${IMPALA_HOME}/testdata/bin/minikdc.sh stop
@@ -280,6 +284,9 @@ then
   # clean llvm
   rm -f $IMPALA_HOME/llvm-ir/impala*.ll
   rm -f $IMPALA_HOME/be/generated-sources/impala-ir/*
+
+  # When switching to and from toolchain, make sure to remove all CMake generated files
+  find -iname '*cmake*' -not -name CMakeLists.txt | grep -v -e cmake_module | grep -v -e thirdparty | xargs rm -Rf
 fi
 
 # Generate the Hadoop configs needed by Impala
