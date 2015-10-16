@@ -1601,8 +1601,8 @@ id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP)
 partitioned by (year INT, month INT)
 row format delimited fields terminated by ','
 LOCATION '/test-warehouse/{table_name}';
-ALTER TABLE {db_name}{db_suffix}.{table_name} ADD PARTITION (year=2015, month=3);
-ALTER TABLE {db_name}{db_suffix}.{table_name} ADD PARTITION (year=2010, month=3);
+ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2015, month=3);
+ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2010, month=3);
 ---- LOAD
 `hadoop fs -mkdir -p /test-warehouse/table_no_newline_part && \
 hadoop fs -mkdir -p /test-warehouse/table_no_newline_part/year=2010/month=3 && \
