@@ -11,16 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#ifndef IMPALA_REDACTOR_TEST_UTILS_H
+#define IMPALA_REDACTOR_TEST_UTILS_H
 
 #include <cstdlib>  // rand
 #include <cstdio>  // file stuff
+#include <errno.h>
 #include <pthread.h>
 #include <time.h>
+#include <string>
 
 #include <gtest/gtest.h>
 
-#ifndef IMPALA_REDACTOR_TEST_UTILS_H
-#define IMPALA_REDACTOR_TEST_UTILS_H
+#include "gutil/strings/substitute.h"
+#include "util/redactor.h"
 
 namespace impala {
 
@@ -76,7 +80,7 @@ class TempRulesFile {
   const char* name() const { return name_.c_str(); }
 
  private:
-  string name_;
+  std::string name_;
   bool deleted_;
 };
 
@@ -108,8 +112,8 @@ void AssertRedactedEquals(const char* message, const char* expected) {
   ASSERT_EQ(expected, temp);
 
   /// Test the signature with the 'changed' argument.
-  temp = string(message);
-  bool changed;
+  temp = std::string(message);
+  bool changed = false;
   Redact(&temp, &changed);
   ASSERT_EQ(expected, temp);
   ASSERT_EQ(temp == message, !changed);

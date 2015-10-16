@@ -31,6 +31,7 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 
+#include "util/asan.h"
 #include "common/logging.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
@@ -114,6 +115,7 @@ const char* GetDefaultDocumentRoot() {
 
   // Deliberate memory leak, but this should be called exactly once.
   string* str = new string(ss.str());
+  IGNORE_LEAKING_OBJECT(str);
   return str->c_str();
 }
 

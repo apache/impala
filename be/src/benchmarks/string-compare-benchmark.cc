@@ -31,8 +31,8 @@ int StringCompare1(const char* s1, int n1, const char* s2, int n2, int len) {
     while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
-      int chars_match = SSE4_cmpestri(xmm0, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-          xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCMP_MODE);
+      int chars_match = SSE4_cmpestri<SSEUtil::STRCMP_MODE>(xmm0,
+          SSEUtil::CHARS_PER_128_BIT_REGISTER, xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }
@@ -46,8 +46,8 @@ int StringCompare1(const char* s1, int n1, const char* s2, int n2, int len) {
       __m128i xmm1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(s2));
       // The upper bits always match (always 0), hence the comparison to
       // CHAR_PER_128_REGISTER
-      int chars_match = SSE4_cmpestri(xmm0, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-          xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCMP_MODE);
+      int chars_match = SSE4_cmpestri<SSEUtil::STRCMP_MODE>(xmm0,
+          SSEUtil::CHARS_PER_128_BIT_REGISTER, xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }
@@ -70,7 +70,7 @@ int StringCompare2(const char* s1, int n1, const char* s2, int n2, int len) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
       int n = std::min(len, 16);
-      int chars_match = SSE4_cmpestri(xmm0, n, xmm1, n, SSEUtil::STRCMP_MODE);
+      int chars_match = SSE4_cmpestri<SSEUtil::STRCMP_MODE>(xmm0, n, xmm1, n);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }
@@ -93,8 +93,8 @@ int StringCompare3(const char* s1, int n1, const char* s2, int n2, int len) {
     while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
-      int chars_match = SSE4_cmpestri(xmm0, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-          xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCMP_MODE);
+      int chars_match = SSE4_cmpestri<SSEUtil::STRCMP_MODE>(xmm0,
+          SSEUtil::CHARS_PER_128_BIT_REGISTER, xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }

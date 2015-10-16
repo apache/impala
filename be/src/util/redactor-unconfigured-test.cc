@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "redactor.cc"
+#include "redactor.h"
+#include "redactor.detail.h"
 
 #include <gtest/gtest.h>
 
 #include "redactor-test-utils.h"
 
 namespace impala {
+
+extern std::vector<Rule>* g_rules;
 
 // If the rules were never set, nothing should be redacted.
 TEST(RedactorTest, Unconfigured) {

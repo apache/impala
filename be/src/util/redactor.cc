@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "redactor.h"
+#include "redactor.detail.h"
 
 #include <cerrno>
 #include <cstring>  // strcmp, strcasestr
@@ -45,52 +46,9 @@ using strings::Substitute;
 
 typedef re2::RE2 Regex;
 
-struct Rule {
-  // Factory constructor. The factory pattern is used because constructing a
-  // case-insensitive Regex requires multiple lines and a Rule should be immutable so
-  // the Regex should be const. Const members must be initialized in the initialization
-  // list but multi-line statements cannot be used there. Keeping the Rule class
-  // immutable was preferred over having a direct constructor, though either should be
-  // fine.
-  static Rule Create(const string& trigger, const string& search_regex,
-      const string& replacement, bool case_sensitive) {
-    Regex::Options options;
-    options.set_case_sensitive(case_sensitive);
-    Regex re(search_regex, options);
-    return Rule(trigger, re, replacement);
-  }
-
-  // For use with vector.
-  Rule(const Rule& other)
-      : trigger(other.trigger),
-        search_pattern(other.search_pattern.pattern(), other.search_pattern.options()),
-        replacement(other.replacement) {}
-
-  const string trigger;
-  const Regex search_pattern;
-  const string replacement;
-
-  bool case_sensitive() const { return search_pattern.options().case_sensitive(); }
-
-  // For use with vector.
-  const Rule& operator=(const Rule& other) {
-    *this = Rule(other);
-    return *this;
-  }
-
- private:
-  // For use with the factory constructor. The case-sensitivity option in
-  // 'regex_options' also applies to 'trigger'.
-  Rule(const string& trigger, const Regex& search_pattern, const string& replacement)
-      : trigger(trigger),
-        search_pattern(search_pattern.pattern(), search_pattern.options()),
-        replacement(replacement) {}
-};
-
-typedef vector<Rule> Rules;
 
 // The actual rules in effect, if any.
-static Rules* g_rules;
+Rules* g_rules = NULL;
 
 string NameOfTypeOfJsonValue(const Value& value) {
   switch (value.GetType()) {

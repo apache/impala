@@ -86,21 +86,21 @@ namespace SSEUtil {
 /// mode constant into the inline asm.
 #define SSE_ALWAYS_INLINE inline __attribute__ ((__always_inline__))
 
-static SSE_ALWAYS_INLINE __m128i SSE4_cmpestrm(
-    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+template<int MODE>
+static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int len2) {
   /// Use asm reg rather than Yz output constraint to workaround LLVM bug 13199 -
   /// clang doesn't support Y-prefixed asm constraints.
-  register __m128i result asm("xmm0");
-  __asm__("pcmpestrm %5, %2, %1"
-      : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(mode) : "cc");
+  register volatile __m128i result asm("xmm0");
+  __asm__ volatile ("pcmpestrm %5, %2, %1"
+      : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
   return result;
 }
 
-static SSE_ALWAYS_INLINE int SSE4_cmpestri(
-    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+template<int MODE>
+static inline int SSE4_cmpestri(__m128i str1, int len1, __m128i str2, int len2) {
   int result;
   __asm__("pcmpestri %5, %2, %1"
-      : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(mode) : "cc");
+      : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
   return result;
 }
 
@@ -130,8 +130,18 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
 
 #include <smmintrin.h>
 
-#define SSE4_cmpestrm _mm_cmpestrm
-#define SSE4_cmpestri _mm_cmpestri
+template<int MODE>
+static inline __m128i SSE4_cmpestrm(
+    __m128i str1, int len1, __m128i str2, int len2) {
+  return _mm_cmpestrm(str1, len1, str2, len2, MODE);
+}
+
+template<int MODE>
+static inline int SSE4_cmpestri(
+    __m128i str1, int len1, __m128i str2, int len2) {
+  return _mm_cmpestri(str1, len1, str2, len2, MODE);
+}
+
 #define SSE4_crc32_u8 _mm_crc32_u8
 #define SSE4_crc32_u32 _mm_crc32_u32
 #define POPCNT_popcnt_u64 _mm_popcnt_u64
@@ -142,14 +152,14 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
 /// support SSE 4.2.  However, because the caller isn't allowed to call these routines
 /// on CPUs that lack SSE 4.2 anyway, we can implement stubs for this case.
 
-static inline __m128i SSE4_cmpestrm(
-    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+template<int MODE>
+static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int len2) {
   DCHECK(false) << "CPU doesn't support SSE 4.2";
   return (__m128i) { 0 };
 }
 
-static inline int SSE4_cmpestri(
-    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+template<int MODE>
+static inline int SSE4_cmpestri(__m128i str1, int len1, __m128i str2, int len2) {
   DCHECK(false) << "CPU doesn't support SSE 4.2";
   return 0;
 }

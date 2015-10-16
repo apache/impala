@@ -212,8 +212,8 @@ restart:
       // Load the next 16 bytes into the xmm register and do strchr for the
       // tuple delimiter.
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
-      xmm_tuple_mask = SSE4_cmpestrm(xmm_tuple_search_, 1, xmm_buffer,
-          SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
+      xmm_tuple_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_tuple_search_, 1,
+          xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       if (tuple_mask != 0) {
         found = true;

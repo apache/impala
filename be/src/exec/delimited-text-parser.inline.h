@@ -132,16 +132,16 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
     // can contain non-zero values.
     // _mm_extract_epi16 will extract 16 bits out of the xmm register.  The second
     // parameter specifies which 16 bits to extract (0 for the lowest 16 bits).
-    xmm_delim_mask = SSE4_cmpestrm(xmm_delim_search_, num_delims_, xmm_buffer,
-        SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
+    xmm_delim_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_delim_search_,
+        num_delims_, xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
     uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
     uint16_t escape_mask = 0;
     // If the table does not use escape characters, skip processing for it.
     if (process_escapes) {
       DCHECK(escape_char_ != '\0');
-      xmm_escape_mask = SSE4_cmpestrm(xmm_escape_search_, 1,
-          xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
+      xmm_escape_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_escape_search_, 1,
+          xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
       ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
     }
@@ -230,16 +230,16 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
       // Load the next 16 bytes into the xmm register
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
 
-      xmm_delim_mask = SSE4_cmpestrm(xmm_delim_search_, num_delims_, xmm_buffer,
-          SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
+      xmm_delim_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_delim_search_,
+          num_delims_, xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
       uint16_t escape_mask = 0;
       // If the table does not use escape characters, skip processing for it.
       if (process_escapes) {
         DCHECK(escape_char_ != '\0');
-        xmm_escape_mask = SSE4_cmpestrm(xmm_escape_search_, 1, xmm_buffer,
-            SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
+        xmm_escape_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_escape_search_, 1,
+            xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
         escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
         ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
       }

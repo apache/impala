@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "redactor.cc"
+#include "redactor.h"
+#include "redactor.detail.h"
 
 #include <gtest/gtest.h>
 
@@ -21,6 +22,9 @@
 namespace impala {
 
 using std::string;
+using strings::Substitute;
+
+extern std::vector<Rule>* g_rules;
 
 TEST(ParserTest, FileNotFound) {
   TempRulesFile rules_file("");
@@ -178,9 +182,6 @@ TEST(ParserTest, RuleNumberInErrorMessage) {
 }
 
 int main(int argc, char **argv) {
-  // Disabled under ASAN, see IMPALA-1918
-#ifndef ADDRESS_SANITIZER
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
-#endif
 }

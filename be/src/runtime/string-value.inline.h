@@ -40,8 +40,9 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
     while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
-      int chars_match = SSE4_cmpestri(xmm0, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-          xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCMP_MODE);
+      int chars_match = SSE4_cmpestri<SSEUtil::STRCMP_MODE>(xmm0,
+          SSEUtil::CHARS_PER_128_BIT_REGISTER, xmm1,
+          SSEUtil::CHARS_PER_128_BIT_REGISTER);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }

@@ -293,11 +293,8 @@ TEST(MemPoolTest, MaxAllocation) {
   EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 3);
   EXPECT_EQ(p3.total_allocated_bytes(), int_max_rounded * 3);
 
-  // ASAN can't allocate a 4GB chunk for some reason (IMPALA-2461), disable this part of
-  // the test.
-#ifndef ADDRESS_SANITIZER
-
   // Allocates a new int_max_rounded * 4 chunk
+#if !defined (ADDRESS_SANITIZER) || (__clang_major__ >= 3 && __clang_minor__ >= 7)
   ptr = p3.Allocate(8);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 7);
@@ -307,10 +304,9 @@ TEST(MemPoolTest, MaxAllocation) {
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(p3.GetTotalChunkSizes(), int_max_rounded * 7);
   EXPECT_EQ(p3.total_allocated_bytes(), int_max_rounded * 4 + 8);
-
 #endif
-
   p3.FreeAll();
+
 }
 
 }
