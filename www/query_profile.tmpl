@@ -21,6 +21,12 @@ limitations under the License.
 
 {{> www/query_detail_tabs.tmpl }}
 
+<h4>
+  <a href="/query_profile_encoded?query_id={{query_id}}" download="profile_{{query_id}}">
+    Download Thrift Profile
+  </a>
+</h4>
+
 <pre>{{profile}}</pre>
 
 <script>
