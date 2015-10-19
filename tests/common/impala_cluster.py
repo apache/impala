@@ -193,15 +193,19 @@ class BaseImpalaProcess(Process):
 class ImpaladProcess(BaseImpalaProcess):
   def __init__(self, cmd):
     super(ImpaladProcess, self).__init__(cmd, socket.gethostname())
-    self.service = ImpaladService(self.hostname,
-        self._get_webserver_port(default=25000), self.__get_beeswax_port(default=21000),
-        self.__get_be_port(default=22000))
+    self.service = ImpaladService(self.hostname, self._get_webserver_port(default=25000),
+                                  self.__get_beeswax_port(default=21000),
+                                  self.__get_be_port(default=22000),
+                                  self.__get_hs2_port(default=21050))
 
   def __get_beeswax_port(self, default=None):
     return int(self._get_arg_value('beeswax_port', default))
 
   def __get_be_port(self, default=None):
     return int(self._get_arg_value('be_port', default))
+
+  def __get_hs2_port(self, default=None):
+    return int(self._get_arg_value('hs2_port', default))
 
   def start(self, wait_until_ready=True):
     """Starts the impalad and waits until the service is ready to accept connections."""

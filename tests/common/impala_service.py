@@ -84,10 +84,12 @@ class BaseImpalaService(object):
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000):
+  def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000,
+               hs2_port=21050):
     super(ImpaladService, self).__init__(hostname, webserver_port)
     self.beeswax_port = beeswax_port
     self.be_port = be_port
+    self.hs2_port = hs2_port
 
   def get_num_known_live_backends(self, timeout=30, interval=1):
     LOG.info("Getting num_known_live_backends from %s:%s" %

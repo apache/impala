@@ -26,7 +26,6 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 from tests.util.filesystem_utils import WAREHOUSE
 
@@ -36,7 +35,8 @@ class TestAuthorization(CustomClusterTestSuite):
   AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv('LOG_DIR'))
 
   def setup(self):
-    host, port = IMPALAD_HS2_HOST_PORT.split(":")
+    host, port = (self.cluster.impalads[0].service.hostname,
+                  self.cluster.impalads[0].service.hs2_port)
     self.socket = TSocket(host, port)
     self.transport = TBufferedTransport(self.socket)
     self.transport.open()
@@ -83,6 +83,7 @@ class TestAuthorization(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--server_name=server1\
       --authorization_policy_file=%s\
       --authorized_proxy_user_config=hue=%s\
+      --abort_on_failed_audit_event=false\
       --audit_event_log_dir=%s" % (AUTH_POLICY_FILE, getuser(), AUDIT_LOG_DIR))
   def test_impersonation(self):
     """End-to-end impersonation + authorization test. Expects authorization to be
@@ -151,6 +152,7 @@ class TestAuthorization(CustomClusterTestSuite):
     # no do_as_user the Delegated User field should be empty.
     query_id = operation_id_to_query_id(
         execute_statement_resp.operationHandle.operationId)
+
     profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
     self.__verify_profile_user_fields(profile_page, effective_user='hue',
         delegated_user='', connected_user='hue')
