@@ -287,6 +287,11 @@ public class Frontend {
       ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("result", Type.STRING.toThrift())));
+    } else if (analysis.isShowCreateFunctionStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_CREATE_FUNCTION;
+      ddl.setShow_create_function_params(analysis.getShowCreateFunctionStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("result", Type.STRING.toThrift())));
     } else if (analysis.isShowFilesStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_FILES;
       ddl.setShow_files_params(analysis.getShowFilesStmt().toThrift());
@@ -708,17 +713,24 @@ public class Frontend {
 
   /**
    * Returns all function signatures that match the pattern. If pattern is null,
-   * matches all functions.
+   * matches all functions. If exactMatch is true, treats fnPattern as a function
+   * name instead of pattern and returns exact match only.
    */
   public List<Function> getFunctions(TFunctionCategory category,
-      String dbName, String fnPattern)
+      String dbName, String fnPattern, boolean exactMatch)
       throws DatabaseNotFoundException {
     Db db = impaladCatalog_.getDb(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    List<Function> fns = db.getFunctions(
+    List<Function> fns;
+    if (exactMatch) {
+      Preconditions.checkNotNull(fnPattern, "Invalid function name");
+      fns = db.getFunctions(category, fnPattern);
+    } else {
+      fns = db.getFunctions(
         category, PatternMatcher.createHivePatternMatcher(fnPattern));
+    }
     Collections.sort(fns,
         new Comparator<Function>() {
           public int compare(Function f1, Function f2) {

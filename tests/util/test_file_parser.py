@@ -169,7 +169,13 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
         parsed_sections['QUERY_NAME'] = subsection_comment
 
       if subsection_name == 'RESULTS' and subsection_comment:
-        parsed_sections['VERIFIER'] = subsection_comment
+        for comment in subsection_comment.split(','):
+          if subsection_comment == 'MULTI_LINE':
+            parsed_sections['MULTI_LINE'] = comment
+          elif subsection_comment.startswith('VERIFY'):
+            parsed_sections['VERIFIER'] = comment
+          else:
+            raise RuntimeError, 'Unknown subsection comment: %s' % comment
 
       parsed_sections[subsection_name] = '\n'.join([line for line in lines[1:-1]])
 

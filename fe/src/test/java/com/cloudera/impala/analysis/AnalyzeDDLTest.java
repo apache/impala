@@ -2367,6 +2367,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "SHOW PARTITIONS must target an HDFS table: functional_hbase.alltypes");
   }
 
+  @Test
+  public void TestShowCreateFunction() throws AnalysisException {
+    addTestFunction("TestFn", Lists.newArrayList(Type.INT, Type.INT), false);
+    AnalyzesOk("show create function TestFn");
+    addTestUda("AggFn", Type.INT, Type.INT);
+    AnalyzesOk("show create aggregate function AggFn");
+
+    // Verify there is differentiation between UDF and UDA.
+    AnalysisError("show create aggregate function default.TestFn",
+        "Function testfn() does not exist in database default");
+    AnalysisError("show create function default.AggFn",
+        "Function aggfn() does not exist in database default");
+    AnalysisError("show create function default.foobar",
+        "Function foobar() does not exist in database default");
+    AnalysisError("show create function foobar.fn",
+        "Database does not exist: foobar");
+  }
+
   /**
    * Validate if location path analysis issues proper warnings when directory
    * permissions/existence checks fail.

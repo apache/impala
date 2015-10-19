@@ -155,12 +155,8 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
       }
     }
 
-    if (analyzer.getDb(fn_.dbName(), Privilege.CREATE) == null) {
-      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + fn_.dbName());
-    }
-
-    Function existingFn = analyzer.getCatalog().getFunction(
-        fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
+    Db db = analyzer.getDb(fn_.dbName(), Privilege.CREATE);
+    Function existingFn = db.getFunction(fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
     if (existingFn != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.FN_ALREADY_EXISTS_ERROR_MSG +
           existingFn.signatureString());

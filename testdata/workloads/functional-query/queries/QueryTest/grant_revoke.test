@@ -130,6 +130,28 @@ show tables in grant_rev_db
 STRING
 ====
 ---- QUERY
+create function grant_rev_db.fn() RETURNS int
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+====
+---- QUERY
+show functions in grant_rev_db
+---- RESULTS
+'INT','fn()'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+show create function grant_rev_db.fn
+---- RESULTS: MULTI_LINE
+['CREATE FUNCTION grant_rev_db.fn()
+ RETURNS INT
+ LOCATION '$NAMENODE/test-warehouse/libTestUdfs.so'
+ SYMBOL='_Z2FnPN10impala_udf15FunctionContextE'
+']
+---- TYPES
+STRING
+====
+---- QUERY
 revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
 ====
 ---- QUERY
@@ -141,6 +163,27 @@ does not have privileges to execute 'CREATE' on: grant_rev_db
 show tables in grant_rev_db
 ---- CATCH
 does not have privileges to access: grant_rev_db.*
+====
+---- QUERY
+show functions in grant_rev_db
+---- CATCH
+does not have privileges to access: grant_rev_db
+====
+---- QUERY
+show create function grant_rev_db.fn
+---- CATCH
+does not have privileges to access: grant_rev_db
+====
+---- QUERY
+show create function _impala_builtins.sin
+---- RESULTS: MULTI_LINE
+['CREATE FUNCTION _impala_builtins.sin(DOUBLE)
+ RETURNS DOUBLE
+ LOCATION 'null'
+ SYMBOL='_ZN6impala13MathFunctions3SinEPN10impala_udf15FunctionContextERKNS1_9DoubleValE'
+']
+---- TYPES
+STRING
 ====
 ---- QUERY
 grant role grant_revoke_test_ALL_TEST_DB to group $GROUP_NAME

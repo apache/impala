@@ -103,6 +103,102 @@ show analytic functions in function_ddl_test
 STRING, STRING
 ====
 ---- QUERY
+show create function default.fn
+---- RESULTS: MULTI_LINE
+['CREATE FUNCTION default.fn()
+ RETURNS INT
+ LOCATION '$NAMENODE/test-warehouse/libTestUdfs.so'
+ SYMBOL='_Z2FnPN10impala_udf15FunctionContextE'
+']
+---- TYPES
+STRING
+====
+---- QUERY
+show create function function_ddl_test.fn_var_arg
+---- RESULTS: MULTI_LINE
+['CREATE FUNCTION function_ddl_test.fn_var_arg(INT...)
+ RETURNS INT
+ LOCATION '$NAMENODE/test-warehouse/libTestUdfs.so'
+ SYMBOL='_Z6VarSumPN10impala_udf15FunctionContextEiPKNS_6IntValE'
+']
+---- TYPES
+STRING
+====
+---- QUERY
+show create aggregate function function_ddl_test.agg_fn
+---- RESULTS: MULTI_LINE
+['CREATE AGGREGATE FUNCTION function_ddl_test.agg_fn(INT)
+ RETURNS BIGINT
+ LOCATION '$NAMENODE/test-warehouse/libudasample.so'
+ UPDATE_FN='_Z11CountUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPNS_9BigIntValE'
+ INIT_FN='_Z9CountInitPN10impala_udf15FunctionContextEPNS_9BigIntValE'
+ MERGE_FN='_Z10CountMergePN10impala_udf15FunctionContextERKNS_9BigIntValEPS2_'
+ FINALIZE_FN='_Z13CountFinalizePN10impala_udf15FunctionContextERKNS_9BigIntValE'
+CREATE AGGREGATE FUNCTION function_ddl_test.agg_fn(INT, STRING)
+ RETURNS INT
+ LOCATION '$NAMENODE/test-warehouse/libTestUdas.so'
+ UPDATE_FN='_Z12TwoArgUpdatePN10impala_udf15FunctionContextERKNS_6IntValERKNS_9StringValEPS2_'
+ INIT_FN='_Z10TwoArgInitPN10impala_udf15FunctionContextEPNS_6IntValE'
+ MERGE_FN='_Z11TwoArgMergePN10impala_udf15FunctionContextERKNS_6IntValEPS2_'
+']
+---- TYPES
+STRING
+====
+---- QUERY
+show create function _impala_builtins.sin
+---- RESULTS: MULTI_LINE
+['CREATE FUNCTION _impala_builtins.sin(DOUBLE)
+ RETURNS DOUBLE
+ LOCATION 'null'
+ SYMBOL='_ZN6impala13MathFunctions3SinEPN10impala_udf15FunctionContextERKNS1_9DoubleValE'
+']
+---- TYPES
+STRING
+====
+---- QUERY
+show create aggregate function _impala_builtins.avg
+---- RESULTS: MULTI_LINE
+['CREATE AGGREGATE FUNCTION _impala_builtins.avg(BIGINT)
+ RETURNS DOUBLE
+ INTERMEDIATE STRING
+ LOCATION 'null'
+ UPDATE_FN='_ZN6impala18AggregateFunctions9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE'
+ INIT_FN='_ZN6impala18AggregateFunctions7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE'
+ MERGE_FN='_ZN6impala18AggregateFunctions8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_'
+ SERIALIZE_FN='_ZN6impala18AggregateFunctions28StringValSerializeOrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+ FINALIZE_FN='_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+CREATE AGGREGATE FUNCTION _impala_builtins.avg(DECIMAL(*,*))
+ RETURNS DECIMAL(*,*)
+ INTERMEDIATE STRING
+ LOCATION 'null'
+ UPDATE_FN='_ZN6impala18AggregateFunctions16DecimalAvgUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE'
+ INIT_FN='_ZN6impala18AggregateFunctions14DecimalAvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE'
+ MERGE_FN='_ZN6impala18AggregateFunctions15DecimalAvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_'
+ SERIALIZE_FN='_ZN6impala18AggregateFunctions28StringValSerializeOrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+ FINALIZE_FN='_ZN6impala18AggregateFunctions18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+CREATE AGGREGATE FUNCTION _impala_builtins.avg(DOUBLE)
+ RETURNS DOUBLE
+ INTERMEDIATE STRING
+ LOCATION 'null'
+ UPDATE_FN='_ZN6impala18AggregateFunctions9AvgUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE'
+ INIT_FN='_ZN6impala18AggregateFunctions7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE'
+ MERGE_FN='_ZN6impala18AggregateFunctions8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_'
+ SERIALIZE_FN='_ZN6impala18AggregateFunctions28StringValSerializeOrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+ FINALIZE_FN='_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+CREATE AGGREGATE FUNCTION _impala_builtins.avg(TIMESTAMP)
+ RETURNS TIMESTAMP
+ INTERMEDIATE STRING
+ LOCATION 'null'
+ UPDATE_FN='_ZN6impala18AggregateFunctions18TimestampAvgUpdateEPN10impala_udf15FunctionContextERKNS1_12TimestampValEPNS1_9StringValE'
+ INIT_FN='_ZN6impala18AggregateFunctions7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE'
+ MERGE_FN='_ZN6impala18AggregateFunctions8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_'
+ SERIALIZE_FN='_ZN6impala18AggregateFunctions28StringValSerializeOrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+ FINALIZE_FN='_ZN6impala18AggregateFunctions20TimestampAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
+']
+---- TYPES
+STRING
+====
+---- QUERY
 drop function function_ddl_test.fn2(int, string)
 ====
 ---- QUERY

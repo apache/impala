@@ -386,6 +386,7 @@ enum TCatalogOpType {
   SHOW_ROLES,
   SHOW_GRANT_ROLE,
   SHOW_FILES,
+  SHOW_CREATE_FUNCTION
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field
@@ -437,6 +438,9 @@ struct TCatalogOpRequest {
 
   // Column lineage graph serialized into JSON
   15: optional string lineage_graph
+
+  // Parameters for SHOW_CREATE_FUNCTION
+  16: optional TGetFunctionsParams show_create_function_params
 }
 
 // Parameters for the SET query option command

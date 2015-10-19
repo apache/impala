@@ -123,6 +123,10 @@ class Frontend {
   /// creates the table specified in the params.
   Status ShowCreateTable(const TTableName& table_name, std::string* response);
 
+  /// Returns (in the output parameter) a string containing the CREATE FUNCTION command that
+  /// creates the function specified in the params.
+  Status ShowCreateFunction(const TGetFunctionsParams& params, std::string* response);
+
   /// Validate Hadoop config; requires FE
   Status ValidateSettings();
 
@@ -182,6 +186,7 @@ class Frontend {
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID set_catalog_initialized_id_; // JniFrontend.setCatalogInitialized
   jmethodID get_table_files_id_; // JniFrontend.getTableFiles
+  jmethodID show_create_function_id_; // JniFrontend.showCreateFunction
   jmethodID fe_ctor_;
 };
 

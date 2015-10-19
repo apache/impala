@@ -77,7 +77,9 @@ Frontend::Frontend() {
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"setCatalogInitialized", "()V", &set_catalog_initialized_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_},
-    {"getTableFiles", "([B)[B", &get_table_files_id_}};
+    {"getTableFiles", "([B)[B", &get_table_files_id_},
+    {"showCreateFunction", "([B)Ljava/lang/String;", &show_create_function_id_},
+};
 
   JNIEnv* jni_env = getJNIEnv();
   // create instance of java class JniFrontend
@@ -121,6 +123,10 @@ Status Frontend::DescribeTable(const TDescribeTableParams& params,
 
 Status Frontend::ShowCreateTable(const TTableName& table_name, string* response) {
   return JniUtil::CallJniMethod(fe_, show_create_table_id_, table_name, response);
+}
+
+Status Frontend::ShowCreateFunction(const TGetFunctionsParams& params, string* response) {
+  return JniUtil::CallJniMethod(fe_, show_create_function_id_, params, response);
 }
 
 Status Frontend::GetTableNames(const string& db, const string* pattern,

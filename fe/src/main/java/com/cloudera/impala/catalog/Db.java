@@ -23,7 +23,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunctionCategory;
@@ -301,7 +301,7 @@ public class Db implements CatalogObject {
   public void addBuiltin(Function fn) {
     Preconditions.checkState(isSystemDb());
     Preconditions.checkState(fn != null);
-    Preconditions.checkState(getFunction(fn, CompareMode.IS_IDENTICAL) == null);
+    Preconditions.checkState(getFunction(fn, Function.CompareMode.IS_IDENTICAL) == null);
     addFunction(fn);
   }
 
@@ -319,27 +319,37 @@ public class Db implements CatalogObject {
    */
   public List<Function> getFunctions(TFunctionCategory category,
       PatternMatcher fnPattern) {
-    List<Function> functions = Lists.newArrayList();
+    List<Function> functionsList = Lists.newArrayList();
     synchronized (functions_) {
       for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
-        if (fnPattern.matches(fns.getKey())) {
-          for (Function fn: fns.getValue()) {
-            if (!fn.userVisible()) continue;
-            if (category == null
-                || (category == TFunctionCategory.SCALAR && fn instanceof ScalarFunction)
-                || (category == TFunctionCategory.AGGREGATE
-                    && fn instanceof AggregateFunction
-                    && ((AggregateFunction)fn).isAggregateFn())
-                || (category == TFunctionCategory.ANALYTIC
-                    && fn instanceof AggregateFunction
-                    && ((AggregateFunction)fn).isAnalyticFn())) {
-              functions.add(fn);
-            }
+        if (!fnPattern.matches(fns.getKey())) continue;
+        for (Function fn: fns.getValue()) {
+          if (fn.userVisible() &&
+              (category == null || Function.categoryMatch(fn, category))) {
+            functionsList.add(fn);
           }
         }
       }
     }
-    return functions;
+    return functionsList;
+  }
+
+  /**
+   * Returns all functions with the given name and category.
+   */
+  public List<Function> getFunctions(TFunctionCategory category, String name) {
+    List<Function> functionsList = Lists.newArrayList();
+    Preconditions.checkNotNull(category);
+    Preconditions.checkNotNull(name);
+    synchronized(functions_) {
+      if (!functions_.containsKey(name)) return functionsList;
+      for (Function fn: functions_.get(name)) {
+        if (fn.userVisible() && Function.categoryMatch(fn, category)) {
+          functionsList.add(fn);
+        }
+      }
+    }
+    return functionsList;
   }
 
   @Override

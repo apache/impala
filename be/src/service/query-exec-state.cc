@@ -322,6 +322,13 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       SetResultSet(vector<string>(1, response));
       return Status::OK();
     }
+    case TCatalogOpType::SHOW_CREATE_FUNCTION: {
+      string response;
+      RETURN_IF_ERROR(frontend_->ShowCreateFunction(catalog_op.show_create_function_params,
+          &response));
+      SetResultSet(vector<string>(1, response));
+      return Status::OK();
+    }
     case TCatalogOpType::SHOW_FILES: {
       TResultSet response;
       RETURN_IF_ERROR(frontend_->GetTableFiles(catalog_op.show_files_params, &response));

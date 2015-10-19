@@ -194,24 +194,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
       throw new AnalysisException("Finalize() is required for this UDA.");
     }
 
-    StringBuilder sb = new StringBuilder("CREATE ");
-    sb.append("AGGREGATE FUNCTION ");
-    if (ifNotExists_) sb.append("IF NOT EXISTS ");
-    sb.append(uda.signatureString())
-      .append(" RETURNS ").append(uda.getReturnType())
-      .append(" INTERMEDIATE ").append(uda.getIntermediateType())
-      .append(" LOCATION ").append(uda.getLocation())
-      .append(" UPDATE_FN=").append(uda.getUpdateFnSymbol())
-      .append(" INIT_FN=").append(uda.getInitFnSymbol())
-      .append(" MERGE_FN=").append(uda.getMergeFnSymbol());
-    if (uda.getSerializeFnSymbol() != null) {
-      sb.append(" SERIALIZE_FN=").append(uda.getSerializeFnSymbol());
-    }
-    if (uda.getFinalizeFnSymbol() != null) {
-      sb.append(" FINALIZE_FN=").append(uda.getFinalizeFnSymbol());
-    }
-    if (getComment() != null) sb.append(" COMMENT = '" + getComment() + "'");
-    sqlString_ = sb.toString();
+    sqlString_ = uda.toSql(ifNotExists_);
   }
 
   @Override

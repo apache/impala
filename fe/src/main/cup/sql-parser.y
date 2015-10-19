@@ -296,6 +296,7 @@ nonterminal String show_pattern;
 nonterminal ShowFilesStmt show_files_stmt;
 nonterminal DescribeStmt describe_stmt;
 nonterminal ShowCreateTableStmt show_create_tbl_stmt;
+nonterminal ShowCreateFunctionStmt show_create_function_stmt;
 nonterminal TDescribeTableOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
 nonterminal TruncateStmt truncate_stmt;
@@ -503,6 +504,8 @@ stmt ::=
   {: RESULT = show_data_srcs; :}
   | show_create_tbl_stmt:show_create_tbl
   {: RESULT = show_create_tbl; :}
+  | show_create_function_stmt:show_create_function
+  {: RESULT = show_create_function; :}
   | show_files_stmt:show_files
   {: RESULT = show_files; :}
   | describe_stmt:describe
@@ -1702,6 +1705,13 @@ show_pattern ::=
 show_create_tbl_stmt ::=
   KW_SHOW KW_CREATE KW_TABLE table_name:table
   {: RESULT = new ShowCreateTableStmt(table); :}
+  ;
+
+show_create_function_stmt ::=
+  KW_SHOW KW_CREATE KW_FUNCTION function_name:fn_name
+  {: RESULT = new ShowCreateFunctionStmt(fn_name, TFunctionCategory.SCALAR); :}
+  | KW_SHOW KW_CREATE KW_AGGREGATE KW_FUNCTION function_name:fn_name
+  {: RESULT = new ShowCreateFunctionStmt(fn_name, TFunctionCategory.AGGREGATE); :}
   ;
 
 show_files_stmt ::=

@@ -61,6 +61,7 @@ import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TGetAllHadoopConfigsResponse;
 import com.cloudera.impala.thrift.TGetDataSrcsParams;
 import com.cloudera.impala.thrift.TGetDataSrcsResult;
@@ -345,7 +346,8 @@ public class JniFrontend {
     TGetFunctionsResult result = new TGetFunctionsResult();
     List<String> signatures = Lists.newArrayList();
     List<String> retTypes = Lists.newArrayList();
-    List<Function> fns = frontend_.getFunctions(params.category, params.db, params.pattern);
+    List<Function> fns = frontend_.getFunctions(params.category, params.db,
+        params.pattern, false);
     for (Function fn: fns) {
       signatures.add(fn.signatureString());
       retTypes.add(fn.getReturnType().toString());
@@ -403,6 +405,19 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftTableName);
     return ToSqlUtils.getCreateTableSql(frontend_.getCatalog().getTable(
         params.getDb_name(), params.getTable_name()));
+  }
+
+  /**
+   * Returns a SQL DDL string for creating the specified function.
+   */
+  public String showCreateFunction(byte[] thriftShowCreateFunctionParams)
+      throws ImpalaException {
+    TGetFunctionsParams params = new TGetFunctionsParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftShowCreateFunctionParams);
+    Preconditions.checkArgument(params.category == TFunctionCategory.SCALAR ||
+        params.category == TFunctionCategory.AGGREGATE);
+    return ToSqlUtils.getCreateFunctionSql(frontend_.getFunctions(
+        params.category, params.db, params.pattern, true));
   }
 
   /**

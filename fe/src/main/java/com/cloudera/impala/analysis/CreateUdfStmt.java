@@ -120,15 +120,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     checkOptArgNotSet(OptArg.MERGE_FN);
     checkOptArgNotSet(OptArg.FINALIZE_FN);
 
-    StringBuilder sb = new StringBuilder("CREATE ");
-    sb.append("FUNCTION ");
-    if (ifNotExists_) sb.append("IF NOT EXISTS ");
-    sb.append(udf.signatureString())
-      .append(" RETURNS ").append(udf.getReturnType())
-      .append(" LOCATION ").append(udf.getLocation())
-      .append(" SYMBOL=").append(udf.getSymbolName());
-    if (getComment() != null) sb.append(" COMMENT = '" + getComment() + "'");
-    sqlString_ = sb.toString();
+    sqlString_ = udf.toSql(ifNotExists_);
   }
 
   @Override

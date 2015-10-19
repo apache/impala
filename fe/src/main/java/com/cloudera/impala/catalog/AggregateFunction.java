@@ -178,6 +178,28 @@ public class AggregateFunction extends Function {
   public void setIntermediateType(Type t) { intermediateType_ = t; }
 
   @Override
+  public String toSql(boolean ifNotExists) {
+    StringBuilder sb = new StringBuilder("CREATE AGGREGATE FUNCTION ");
+    if (ifNotExists) sb.append("IF NOT EXISTS ");
+    sb.append(dbName() + "." + signatureString() + "\n")
+      .append(" RETURNS " + getReturnType() + "\n");
+    if (getIntermediateType() != null) {
+      sb.append(" INTERMEDIATE " + getIntermediateType() + "\n");
+    }
+    sb.append(" LOCATION '" + getLocation() + "'\n")
+      .append(" UPDATE_FN='" + getUpdateFnSymbol() + "'\n")
+      .append(" INIT_FN='" + getInitFnSymbol() + "'\n")
+      .append(" MERGE_FN='" + getMergeFnSymbol() + "'\n");
+    if (getSerializeFnSymbol() != null) {
+      sb.append(" SERIALIZE_FN='" + getSerializeFnSymbol() + "'\n");
+    }
+    if (getFinalizeFnSymbol() != null) {
+      sb.append(" FINALIZE_FN='" + getFinalizeFnSymbol() + "'\n");
+    }
+    return sb.toString();
+  }
+
+  @Override
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
     TAggregateFunction agg_fn = new TAggregateFunction();

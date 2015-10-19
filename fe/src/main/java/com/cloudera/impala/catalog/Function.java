@@ -26,6 +26,7 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TScalarFunction;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
 import com.cloudera.impala.thrift.TSymbolLookupResult;
@@ -295,6 +296,9 @@ public class Function implements CatalogObject {
   @Override
   public String getName() { return getFunctionName().toString(); }
 
+  // Child classes must override this function.
+  public String toSql(boolean ifNotExists) { return ""; }
+
   public TFunction toThrift() {
     TFunction fn = new TFunction();
     fn.setSignature(signatureString());
@@ -430,5 +434,19 @@ public class Function implements CatalogObject {
       Preconditions.checkState(false, t.toString());
       return "";
     }
+  }
+
+  /**
+   * Returns true if the given function matches the specified category.
+   */
+  public static boolean categoryMatch(Function fn, TFunctionCategory category) {
+    Preconditions.checkNotNull(category);
+    return (category == TFunctionCategory.SCALAR && fn instanceof ScalarFunction)
+        || (category == TFunctionCategory.AGGREGATE
+            && fn instanceof AggregateFunction
+            && ((AggregateFunction)fn).isAggregateFn())
+        || (category == TFunctionCategory.ANALYTIC
+            && fn instanceof AggregateFunction
+            && ((AggregateFunction)fn).isAnalyticFn());
   }
 }

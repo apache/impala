@@ -336,7 +336,13 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
   # then sort the actual and expected results before verification.
   if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
     order_matters = False
-  expected = QueryTestResult(expected_results.split('\n'), expected_types,
+  expected_results_list = []
+  if 'MULTI_LINE' in test_section:
+    expected_results_list = map(lambda s: s.replace('\n', '\\n'),
+        re.findall(r'\[(.*?)\]', expected_results, flags=re.DOTALL))
+  else:
+    expected_results_list = expected_results.split('\n')
+  expected = QueryTestResult(expected_results_list, expected_types,
       actual_labels, order_matters)
   actual = QueryTestResult(parse_result_rows(exec_result), actual_types,
       actual_labels, order_matters)

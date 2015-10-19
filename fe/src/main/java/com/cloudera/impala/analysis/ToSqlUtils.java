@@ -27,11 +27,13 @@ import org.apache.hadoop.hive.ql.parse.HiveLexer;
 
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsCompression;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -244,6 +246,15 @@ public class ToSqlUtils {
     }
     if (tblProperties != null && !tblProperties.isEmpty()) {
       sb.append("TBLPROPERTIES " + propertyMapToSql(tblProperties));
+    }
+    return sb.toString();
+  }
+
+  public static String getCreateFunctionSql(List<Function> functions) {
+    Preconditions.checkNotNull(functions);
+    StringBuilder sb = new StringBuilder();
+    for (Function fn: functions) {
+      sb.append(fn.toSql(false));
     }
     return sb.toString();
   }

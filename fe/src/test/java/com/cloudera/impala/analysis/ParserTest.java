@@ -3002,6 +3002,19 @@ public class ParserTest {
   }
 
   @Test
+  public void TestShowCreateFunction() {
+    ParsesOk("SHOW CREATE FUNCTION foo");
+    ParsesOk("SHOW CREATE FUNCTION foo.bar");
+    ParsesOk("SHOW CREATE AGGREGATE FUNCTION foo");
+    ParsesOk("SHOW CREATE AGGREGATE FUNCTION foo.bar");
+
+    ParserError("SHOW CREATE FUNCTION");
+    ParserError("SHOW CREATE AGGREGATE FUNCTION");
+    ParserError("SHOW CREATE ANALYTIC FUNCTION foo");
+    ParserError("SHOW CREATE AGGREGATE ANALYTIC FUNCTION foo");
+  }
+
+  @Test
   public void TestComputeStats() {
     ParsesOk("COMPUTE STATS functional.alltypes");
     ParserError("COMPUTE functional.alltypes");

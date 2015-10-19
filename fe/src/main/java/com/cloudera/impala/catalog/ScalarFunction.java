@@ -199,6 +199,17 @@ public class ScalarFunction extends Function {
   public String getCloseFnSymbol() { return closeFnSymbol_; }
 
   @Override
+  public String toSql(boolean ifNotExists) {
+    StringBuilder sb = new StringBuilder("CREATE FUNCTION ");
+    if (ifNotExists) sb.append("IF NOT EXISTS ");
+    sb.append(dbName() + "." + signatureString() + "\n")
+      .append(" RETURNS " + getReturnType() + "\n")
+      .append(" LOCATION '" + getLocation() + "'\n")
+      .append(" SYMBOL='" + getSymbolName() + "'\n");
+    return sb.toString();
+  }
+
+  @Override
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
     fn.setScalar_fn(new TScalarFunction());
