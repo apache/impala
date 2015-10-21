@@ -533,9 +533,6 @@ struct TExecRequest {
 
   // Timeline of planner's operation, for profiling
   11: optional RuntimeProfile.TEventSequence timeline
-
-  // Cleanup the catalog object if the insert query of a CTAS fails.
-  12: optional TCatalogOpRequest catalog_cleanup_request
 }
 
 // Parameters to FeSupport.cacheJar().

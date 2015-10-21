@@ -502,7 +502,6 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     // wait for another catalog update if any partitions were altered as a result
     // of the operation.
     DCHECK(exec_request_.__isset.query_exec_request);
-    DCHECK(exec_request_.__isset.catalog_cleanup_request);
     RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
   }
   return Status::OK();
@@ -531,13 +530,6 @@ void ImpalaServer::QueryExecState::Done() {
 
   // Update result set cache metrics, and update mem limit accounting.
   ClearResultCache();
-
-  if (!query_status_.ok() && catalog_op_type() == TCatalogOpType::DDL &&
-      ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
-    LOG(INFO) << "Delete newly created table due to error in CTAS query: "
-              << query_status_.GetDetail();
-    CtasCleanup();
-  }
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
@@ -1052,29 +1044,6 @@ void ImpalaServer::QueryExecState::ClearResultCache() {
     coord_->query_mem_tracker()->Release(total_bytes);
   }
   result_cache_.reset(NULL);
-}
-
-void ImpalaServer::QueryExecState::CtasCleanup() {
-  DCHECK(catalog_op_type() == TCatalogOpType::DDL &&
-      ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT);
-  // Cleanup newly created table, don't update original query status.
-  const TDdlExecResponse* ddl_resp = catalog_op_executor_->ddl_exec_response();
-  // ddl_resp is NULL means the DDL execution fails.
-  // table will not be created and there is nothing to cleanup.
-  if (ddl_resp != NULL && ddl_resp->new_table_created) {
-    CatalogOpExecutor droptable_op_executor(exec_env_, frontend_,
-        &server_profile_);
-    Status status = droptable_op_executor.Exec(exec_request_.catalog_cleanup_request);
-    if (status.ok()) {
-      // Cleanup catalog cache.
-      parent_server_->ProcessCatalogUpdateResult(
-          *droptable_op_executor.update_catalog_result(),
-          exec_request_.query_options.sync_ddl);
-    } else {
-      LOG(ERROR) << "Cannot drop table created by CTAS query: "
-                 << status.GetDetail();
-    }
-  }
 }
 
 }

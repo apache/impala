@@ -243,11 +243,6 @@ public class AnalysisContext {
       }
     }
 
-    public DropTableOrViewStmt getCleanupStmt() {
-      Preconditions.checkState(isCreateTableAsSelectStmt());
-      return getCreateTableAsSelectStmt().getCleanupStmt();
-    }
-
     public UseStmt getUseStmt() {
       Preconditions.checkState(isUseStmt());
       return (UseStmt) stmt_;
