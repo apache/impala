@@ -19,13 +19,13 @@
 // be included directly.  Clients should instead include
 // "base/atomicops.h".
 
-#ifndef SUPERSONIC_OPENSOURCE_AUXILIARY_ATOMICOPS_INTERNALS_X86_H_
-#define SUPERSONIC_OPENSOURCE_AUXILIARY_ATOMICOPS_INTERNALS_X86_H_
+#ifndef GUTIL_ATOMICOPS_INTERNALS_X86_H_
+#define GUTIL_ATOMICOPS_INTERNALS_X86_H_
 
-#include <glog/logging.h>
 #include <stdint.h>
 
-typedef int32_t Atomic32;
+#include <glog/logging.h>
+
 #define BASE_HAS_ATOMIC64 1  // Use only in tests and base/atomic*
 
 
@@ -51,9 +51,14 @@ extern struct AtomicOps_x86CPUFeatureStruct AtomicOps_Internalx86CPUFeatures;
 // AtomicOps initialisation for open source use.
 void AtomicOps_x86CPUFeaturesInit();
 
+typedef int32_t Atomic32;
+typedef int64_t Atomic64;
 
 namespace base {
 namespace subtle {
+
+typedef int32_t Atomic32;
+typedef int64_t Atomic64;
 
 // These atomic primitives don't work atomically, and can cause really nasty
 // hard-to-track-down bugs, if the pointer isn't naturally aligned. Check alignment
@@ -63,8 +68,6 @@ inline void CheckNaturalAlignment(const T *ptr) {
   DCHECK_EQ(0, reinterpret_cast<const uintptr_t>(ptr) & (sizeof(T) - 1))
     << "unaligned pointer not allowed for atomics";
 }
-
-typedef int64_t Atomic64;
 
 // 32-bit low-level operations on any platform.
 
@@ -149,6 +152,13 @@ inline Atomic32 Release_CompareAndSwap(volatile Atomic32* ptr,
 inline void NoBarrier_Store(volatile Atomic32* ptr, Atomic32 value) {
   CheckNaturalAlignment(ptr);
   *ptr = value;
+}
+
+// Issue the x86 "pause" instruction, which tells the CPU that we
+// are in a spinlock wait loop and should allow other hyperthreads
+// to run, not speculate memory access, etc.
+inline void PauseCPU() {
+  __asm__ __volatile__("pause" : : : "memory");
 }
 
 #if defined(__x86_64__)
@@ -495,4 +505,4 @@ inline Atomic64 Release_CompareAndSwap(volatile Atomic64* ptr,
 
 #undef ATOMICOPS_COMPILER_BARRIER
 
-#endif  // SUPERSONIC_OPENSOURCE_AUXILIARY_ATOMICOPS_INTERNALS_X86_H_
+#endif  // GUTIL_ATOMICOPS_INTERNALS_X86_H_

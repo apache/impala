@@ -67,8 +67,11 @@ ADD_LIBRARY(gutil
 ./utf/rune.c
 )
 
+
+
 # Disable warnings which trigger a lot in the Google code:
 SET_TARGET_PROPERTIES(gutil PROPERTIES
   COMPILE_FLAGS "${CXX_COMMON_FLAGS} -funsigned-char -Wno-deprecated -Wno-char-subscripts -fPIC")
 
+TARGET_LINK_LIBRARIES(gutil glogstatic gflagsstatic)
 SET(GUTIL_LIBS gutil)
