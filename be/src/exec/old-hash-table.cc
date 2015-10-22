@@ -35,7 +35,7 @@ using namespace llvm;
 const char* OldHashTable::LLVM_CLASS_NAME = "class.impala::OldHashTable";
 
 const float OldHashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
-static const int PAGE_SIZE = 8 * 1024 * 1024;
+static const int HT_PAGE_SIZE = 8 * 1024 * 1024;
 
 // Put a non-zero constant in the result location for NULL.
 // We don't want(NULL, 1) to hash to the same as (0, 1).
@@ -98,7 +98,7 @@ void OldHashTable::Close() {
   expr_value_null_bits_ = NULL;
   mem_pool_->FreeAll();
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-num_data_pages_ * PAGE_SIZE);
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-num_data_pages_ * HT_PAGE_SIZE);
   }
   mem_tracker_->Release(buckets_.capacity() * sizeof(Bucket));
   buckets_.clear();
@@ -730,13 +730,13 @@ void OldHashTable::ResizeBuckets(int64_t num_buckets) {
 }
 
 void OldHashTable::GrowNodeArray() {
-  node_remaining_current_page_ = PAGE_SIZE / sizeof(Node);
-  next_node_ = reinterpret_cast<Node*>(mem_pool_->Allocate(PAGE_SIZE));
+  node_remaining_current_page_ = HT_PAGE_SIZE / sizeof(Node);
+  next_node_ = reinterpret_cast<Node*>(mem_pool_->Allocate(HT_PAGE_SIZE));
   ++num_data_pages_;
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(PAGE_SIZE);
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(HT_PAGE_SIZE);
   }
-  if (mem_tracker_->LimitExceeded()) MemLimitExceeded(PAGE_SIZE);
+  if (mem_tracker_->LimitExceeded()) MemLimitExceeded(HT_PAGE_SIZE);
 }
 
 void OldHashTable::MemLimitExceeded(int64_t allocation_size) {
