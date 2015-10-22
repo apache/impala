@@ -18,40 +18,38 @@
 #include <stdint.h>
 #include <time.h>
 
+#include "gutil/walltime.h"
+
 /// Utilities for collecting timings.
 namespace impala {
 
-/// Returns a value representing a point in time with microsecond accuracy that is
-/// unaffected by daylight savings or manual adjustments to the system clock. This should
-/// not be assumed to be a Unix time. Typically the value corresponds to elapsed time
-/// since the system booted. See UnixMillis() below if you need to send a time to a
-/// different host.
+/// Returns a value representing a point in time that is unaffected by daylight savings or
+/// manual adjustments to the system clock. This should not be assumed to be a Unix
+/// time. Typically the value corresponds to elapsed time since the system booted. See
+/// UnixMillis() below if you need to send a time to a different host.
+inline int64_t MonotonicNanos() {
+  return GetMonoTimeNanos();
+}
+
 inline int64_t MonotonicMicros() {  // 63 bits ~= 5K years uptime
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return now.tv_sec * 1000000 + now.tv_nsec / 1000;
+  return GetMonoTimeMicros();
 }
 
 inline int64_t MonotonicMillis() {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return now.tv_sec * 1000 + now.tv_nsec / 1000000;
+  return GetMonoTimeMicros() / 1e3;
 }
 
 inline int64_t MonotonicSeconds() {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return now.tv_sec;
+  return GetMonoTimeMicros() / 1e6;
 }
+
 
 /// Returns the number of milliseconds that have passed since the Unix epoch. This is
 /// affected by manual changes to the system clock but is more suitable for use across
 /// a cluster. For more accurate timings on the local host use the monotonic functions
 /// above.
 inline int64_t UnixMillis() {
-  struct timespec now;
-  clock_gettime(CLOCK_REALTIME, &now);
-  return now.tv_sec * 1000 + now.tv_nsec / 1000000;
+  return GetCurrentTimeMicros() / 1e3;
 }
 
 /// Sleeps the current thread for at least duration_ms milliseconds.
