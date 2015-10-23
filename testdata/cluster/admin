@@ -190,11 +190,15 @@ function create_cluster {
   #
   # It is possible this hostname must also mactch the impala hostname, which will
   # never be "localhost".
-  if getent hosts 127.0.0.1 1>/dev/null; then
-    HADOOP_HOSTNAME=$(getent hosts 127.0.0.1 | awk '{print $2}')
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    HADOOP_HOSTNAME=$(dscacheutil -q host -a ip_address 127.0.0.1 | head -n 1 | awk '{print $2}')
   else
-    # This may be an error case...
-    HADOOP_HOSTNAME=127.0.0.1
+    if getent hosts 127.0.0.1 1>/dev/null; then
+      HADOOP_HOSTNAME=$(getent hosts 127.0.0.1 | awk '{print $2}')
+    else
+      # This may be an error case...
+      HADOOP_HOSTNAME=127.0.0.1
+    fi
   fi
 
   # For consistency, the first node will host all the master roles, including llama. Llama
@@ -290,8 +294,8 @@ function start_cluster {
   fi
 
   for SERVICE in ${SUPPORTED_SERVICES[@]}; do
-    WEBUI_PORT_VAR="${SERVICE^^}_WEBUI_PORT"
-    echo "Starting ${SERVICE^^} (Web UI - http://localhost:${!WEBUI_PORT_VAR})"
+    WEBUI_PORT_VAR="$(echo "$SERVICE" | awk '{print toupper($0)}')_WEBUI_PORT"
+    echo "Starting ${SERVICE} (Web UI - http://localhost:${!WEBUI_PORT_VAR})"
     exec_init_script "$SERVICE*" start
     if [ "${SERVICE}" = "hdfs" ]; then
         chmod_hdfs_root
@@ -333,7 +337,7 @@ function exec_init_script {
   shift
 
   for SCRIPT in \
-      $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" -executable); do
+      $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" -perm +0111 -type f); do
     if "$SCRIPT" status &>/dev/null; then
       RUNNING=true
     else
@@ -357,7 +361,7 @@ function check_cluster_status {
   ROLE_COUNT=0
   NOT_RUNNING=()
   for NODE_DIR in "$NODES_DIR/$NODE_PREFIX"*; do
-    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/*" -executable); do
+    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/*" -perm +0111 -type f); do
       ROLE_COUNT=$((ROLE_COUNT + 1))
       if ! "$SCRIPT" status &>/dev/null; then
         NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
@@ -377,7 +381,7 @@ function stop_cluster {
     # Stop services in reverse order to give them a chance to shutdown cleanly
     for ((SERVICE_IDX=${#SUPPORTED_SERVICES[@]} - 1; SERVICE_IDX >= 0; SERVICE_IDX--)); do
       SERVICE="${SUPPORTED_SERVICES[$SERVICE_IDX]}"
-      echo "Stopping ${SERVICE^^}"
+      echo "Stopping ${SERVICE}"
       exec_init_script "$SERVICE*" stop
     done
   fi
@@ -395,7 +399,11 @@ function delete_cluster {
 }
 
 function get_node_dir {
-  readlink -f "$NODES_DIR/$1"
+  if [[ ! "$OSTYPE" == "darwin"* ]]; then
+    readlink -f "$NODES_DIR/$1"
+  else
+    greadlink -f "$NODES_DIR/$1"
+  fi
 }
 
 function get_hadoop_client_conf_dir {
