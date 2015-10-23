@@ -16,6 +16,7 @@
 
 #include "common/logging.h"
 #include "rpc/authentication.h"
+#include "rpc/thrift-server.h"
 #include "util/network-util.h"
 #include "util/thread.h"
 
@@ -23,6 +24,8 @@ DECLARE_bool(enable_ldap_auth);
 DECLARE_string(ldap_uri);
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
+DECLARE_string(ssl_client_ca_certificate);
+DECLARE_string(ssl_server_certificate);
 
 // These are here so that we can grab them early in main() - the kerberos
 // init can clobber KRB5_KTNAME in PrincipalSubstitution.
@@ -104,6 +107,22 @@ TEST(Auth, LdapKerbAuth) {
   sa = dynamic_cast<SaslAuthProvider*>(ap);
   ASSERT_FALSE(sa->has_ldap());
   ASSERT_EQ(FLAGS_principal, sa->principal());
+}
+
+// Test for workaround for IMPALA-2598: SSL and Kerberos do not mix on server<->server
+// connections. Tests that Impala will fail to start if so configured.
+TEST(Auth, KerbAndSslDisabled) {
+  string hostname;
+  ASSERT_TRUE(GetHostname(&hostname).ok());
+  FLAGS_ssl_client_ca_certificate = "some_path";
+  FLAGS_ssl_server_certificate = "some_path";
+  ASSERT_TRUE(EnableInternalSslConnections());
+  SaslAuthProvider sa_internal(true);
+  ASSERT_FALSE(
+      sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
+  SaslAuthProvider sa_external(false);
+  ASSERT_TRUE(
+      sa_external.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
 }
 
 }

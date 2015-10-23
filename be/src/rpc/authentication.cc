@@ -33,6 +33,7 @@
 #include <ldap.h>
 
 #include "rpc/auth-provider.h"
+#include "rpc/thrift-server.h"
 #include "transport/TSaslClientTransport.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -616,6 +617,14 @@ Status CheckReplayCacheDirPermissions() {
 
 Status SaslAuthProvider::InitKerberos(const string& principal,
     const string& keytab_file) {
+
+  // Disallow starting Impala with Kerberos and server<->server SSL both enabled at the
+  // same time, which is known to cause hangs (IMPALA-2598).
+  // TODO: Remove when IMPALA-2598 is fixed.
+  if (is_internal_ && EnableInternalSslConnections()) {
+    return Status(TErrorCode::IMPALA_2598_KERBEROS_SSL_DISALLOWED);
+  }
+
   principal_ = principal;
   keytab_file_ = keytab_file;
   // The logic here is that needs_kinit_ is false unless we are the internal

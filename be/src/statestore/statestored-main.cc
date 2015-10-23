@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
 
   ThriftServer* server = new ThriftServer("StatestoreService", processor,
       FLAGS_state_store_port, NULL, metrics.get(), 5);
-  if (!FLAGS_ssl_server_certificate.empty()) {
+  if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
     EXIT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
         FLAGS_ssl_private_key_password_cmd));

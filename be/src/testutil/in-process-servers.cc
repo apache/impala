@@ -100,7 +100,7 @@ Status InProcessStatestore::Start() {
 
   statestore_server_.reset(new ThriftServer("StatestoreService", processor,
       statestore_port_, NULL, metrics_.get(), 5));
-  if (!FLAGS_ssl_server_certificate.empty()) {
+  if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
     EXIT_IF_ERROR(statestore_server_->EnableSsl(
         FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));

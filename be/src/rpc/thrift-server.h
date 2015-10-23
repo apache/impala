@@ -209,6 +209,10 @@ class ThriftServer {
   friend class ThriftServerEventProcessor;
 };
 
+// Returns true if, per the process configuration flags, server<->server communications
+// should use SSL.
+bool EnableInternalSslConnections();
+
 }
 
 #endif

@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
   ThriftServer* server = new ThriftServer("CatalogService", processor,
       FLAGS_catalog_service_port, NULL, metrics.get(), 5);
-  if (!FLAGS_ssl_server_certificate.empty()) {
+  if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for CatalogService";
     EXIT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
         FLAGS_ssl_private_key_password_cmd));
