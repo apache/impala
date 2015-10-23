@@ -26,6 +26,7 @@ def get_import(name):
   global __ALREADY_IMPORTED
   if not __ALREADY_IMPORTED:
     from tests.comparison.types import (
+        BigInt,
         Boolean,
         Char,
         DataType,
@@ -157,6 +158,80 @@ class ValExpr(object):
     return col_ref_counts
 
 
+class StructColumn(object):
+  '''The methods in this class are similar to TableExpr.
+
+     In Impala it's not possible to select from a struct column. To mirror this behavior
+     here, StructColumn does not inherit from TableExpr.
+
+     TODO: Maybe make a parent class that both StructColumn and TableExpr will inhert
+           from.
+  '''
+
+  def __init__(self, owner, name):
+    self.owner = owner
+    self.name = name
+    self._cols = []
+    self.alias = None
+
+  @property
+  def identifier(self):
+    return self.alias or self.name
+
+  @property
+  def cols(self):
+    '''Returns a ValExprList containing all scalar cols in this StructColumn. '''
+    # TODO: Since Impala now supports nested types, this method can be renamed to
+    # scalar_cols
+    result = ValExprList()
+    for col in self._cols:
+      if not isinstance(col, CollectionColumn):
+        result.extend(col.cols)
+    return result
+
+  @property
+  def collections(self):
+    result = []
+    for col in self._cols:
+      if isinstance(col, CollectionColumn):
+        result.append(col)
+        result.extend(col.collections)
+      elif isinstance(col, StructColumn):
+        result.extend(col.collections)
+    return result
+
+  def get_col_by_name(self, col_name):
+    for col in self._cols:
+      if col.name == col_name:
+        return col
+    return None
+
+  def add_col(self, col):
+    col.owner = self
+    self._cols.append(col)
+
+  def __eq__(self, other):
+    if not isinstance(other, StructColumn):
+      return False
+    if self is other:
+      return True
+    return self.name == other.name and self.owner.identifier == other.owner.identifier
+
+  def __hash__(self):
+    return hash(self.name)
+
+  def __repr__(self):
+    cols_str = ', '.join(str(f) for f in self._cols)
+    return '%s<name: %s, cols: [%s]>' % (type(self).__name__, self.name, cols_str)
+
+  def __deepcopy__(self, memo):
+    other = StructColumn(self.owner, self.name)
+    other.alias = self.alias
+    for col in self._cols:
+      other.add_col(deepcopy(col, memo))
+    return other
+
+
 class Column(ValExpr):
   '''A representation of a column. All TableExprs will have Columns. So a Column
      may belong to an InlineView as well as a standard Table.
@@ -170,6 +245,8 @@ class Column(ValExpr):
           a JOIN condition. In this usage the col is more like a val, which is why
           it implements/extends ValExpr.
 
+     This class can also be used to represent Map keys, Map values, Array pos,
+     scalar struct field, and scalar array item.
   '''
 
   def __init__(self, owner, name, exact_type):
@@ -195,6 +272,10 @@ class Column(ValExpr):
       return True
     return self.name == other.name and self.owner.identifier == other.owner.identifier
 
+  @property
+  def cols(self):
+    return ValExprList([self])
+
   def __repr__(self):
     return '%s<name: %s, type: %s>' % (
         type(self).__name__, self.name, self.type.__name__)
@@ -205,21 +286,22 @@ class Column(ValExpr):
 
 
 class ValExprList(list):
-  '''A list of ValExprs'''
+  '''A list of ValExprs.'''
 
   @property
   def by_type(self):
     return get_import('DataType').group_by_type(self)
 
+  def __repr__(self):
+    return 'ValExprList: ' + ', '.join(str(x) for x in self)
+
 
 class TableExpr(object):
   '''This class represents something that a query may use to SELECT from or JOIN on.'''
 
+  @property
   def identifier(self):
     '''Returns either a table name or alias if one has been declared.'''
-    pass
-
-  def cols(self):
     pass
 
   @property
@@ -245,6 +327,22 @@ class TableExpr(object):
   def col_types(self):
     '''Returns a Set containing the various column types that this TableExpr contains.'''
     return set(self.cols_by_type)
+
+  @property
+  def collections(self):
+    '''Returns all nested collections that can be accessed from this TableExpr.'''
+    result = []
+    for col in self._cols:
+      if isinstance(col, CollectionColumn):
+        result.append(col)
+        result.extend(col.collections)
+      elif isinstance(col, StructColumn):
+        result.extend(col.collections)
+    return result
+
+  def add_col(self, col):
+    col.owner = self
+    self._cols.append(col)
 
   def is_visible(self):
     '''If False is returned, columns from this TableExpr may only be used in JOIN
@@ -280,15 +378,16 @@ class TableExpr(object):
     return self.identifier == other.identifier
 
 
-class Table(TableExpr):
-  '''Represents a standard database table.'''
+class CollectionColumn(TableExpr):
+  '''Used for representing Map or Array columns.'''
 
-  def __init__(self, name):
+  def __init__(self, owner, name):
     self.name = name
-    self._cols = ValExprList()
-    self._unique_cols = ValExprList()
+    # Owner can be one of: Table, ArrayColumn or StructColumn.
+    self.owner = owner
+    self.is_visible = True
     self.alias = None
-    self.is_visible = True   # tables used in SEMI or ANTI JOINs are invisible
+    self._cols = []
 
   @property
   def identifier(self):
@@ -296,7 +395,107 @@ class Table(TableExpr):
 
   @property
   def cols(self):
-    return self._cols
+    result = ValExprList()
+    for col in self._cols:
+      if not isinstance(col, CollectionColumn):
+        result.extend(col.cols)
+    return result
+
+  def get_col_by_name(self, col_name):
+    for col in self._cols:
+      if col.name == col_name:
+        return col
+    return None
+
+  def __hash__(self):
+    return hash(self.name)
+
+  def __repr__(self):
+    cols_str = ', '.join(str(f) for f in self._cols)
+    return '%s<name: %s, cols: [%s]>' % (type(self).__name__, self.name, cols_str)
+
+
+class ArrayColumn(CollectionColumn):
+
+  def __init__(self, owner, name, item):
+    '''Item represents the type of array. For example if array type is Int, item should be
+       Column of type Int.
+    '''
+    super(ArrayColumn, self).__init__(owner, name)
+    item.owner = self
+    item.name = 'item'
+    self._cols.append(item)
+    # Arrays have 2 fields: pos and item. Pos is automatically set to BigInt.
+    self._cols.append(Column(
+        owner=self, name='pos', exact_type=get_import('BigInt')))
+
+  def __eq__(self, other):
+    if not isinstance(other, ArrayColumn):
+      return False
+    if self is other:
+      return True
+    return self.name == other.name and self.owner.identifier == other.owner.identifier
+
+  def __deepcopy__(self, memo):
+    other = ArrayColumn(
+        owner=self.owner,
+        name=self.name,
+        item=deepcopy(self.get_col_by_name('item')))
+    other.alias = self.alias
+    return other
+
+
+class MapColumn(CollectionColumn):
+
+  def __init__(self, owner, name, key, value):
+    super(MapColumn, self).__init__(owner, name)
+    # Set key
+    key.owner = self
+    key.name = 'key'
+    self._cols.append(key)
+    # Set value
+    value.owner = self
+    value.name = 'value'
+    self._cols.append(value)
+
+  def __eq__(self, other):
+    if not isinstance(other, MapColumn):
+      return False
+    if self is other:
+      return True
+    return self.name == other.name and self.owner.identifier == other.owner.identifier
+
+  def __deepcopy__(self, memo):
+    other = MapColumn(
+        owner=self.owner,
+        name=self.name,
+        key=deepcopy(self.get_col_by_name('key')),
+        value=deepcopy(self.get_col_by_name('value')))
+    other.alias = self.alias
+    return other
+
+
+class Table(TableExpr):
+  '''Represents a standard database table.'''
+
+  def __init__(self, name):
+    self.name = name
+    self._cols = [] # can include CollectionColumns and StructColumns
+    self._unique_cols = []
+    self.alias = None
+    self.is_visible = True # tables used in SEMI or ANTI JOINs are invisible
+
+  @property
+  def identifier(self):
+    return self.alias or self.name
+
+  @property
+  def cols(self):
+    result = ValExprList()
+    for col in self._cols:
+      if not isinstance(col, CollectionColumn):
+        result.extend(col.cols)
+    return result
 
   @cols.setter
   def cols(self, cols):
@@ -312,29 +511,23 @@ class Table(TableExpr):
 
   def __repr__(self):
     return 'Table<name: %s, cols: %s>' \
-        % (self.name, ', '.join([str(col) for col in self.cols]))
+        % (self.name, ', '.join([str(col) for col in self._cols]))
 
   def __deepcopy__(self, memo):
     other = Table(self.name)
     other.alias = self.alias
     other.is_visible = self.is_visible
     cols_by_name = dict()
-    # Copy the cols and set their owner to the copy of the TableExpr
     for col in self._cols:
-      col = deepcopy(col, memo)
-      col.owner = other
-      cols_by_name[col.name] = col
-    other._cols = ValExprList(cols_by_name[col.name] for col in self._cols)
-    other._unique_cols = ValExprList()
+      result_col = deepcopy(col, memo)
+      other.add_col(result_col)
+      cols_by_name[result_col.name] = result_col
+
+    other._unique_cols = []
     for col_combo in self._unique_cols:
       other_col_combo = set()
       for col in col_combo:
-        if col.name in cols_by_name:
-          col = cols_by_name[col.name]
-        else:
-          col = deepcopy(col, memo)
-          col.owner = other
-        other_col_combo.add(col)
+        other_col_combo.add(cols_by_name[col.name])
       other.unique_cols.append(other_col_combo)
     return other
 
@@ -366,6 +559,13 @@ class TableExprList(list):
   @property
   def col_types(self):
     return tuple(self.cols_by_type)
+
+  @property
+  def collections(self):
+    result = []
+    for table_expr in self:
+      result.extend(table_expr.collections)
+    return result
 
   @property
   def by_col_type(self):

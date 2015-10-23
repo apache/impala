@@ -18,6 +18,7 @@
    results.
 
 '''
+from copy import deepcopy
 from decimal import Decimal
 from itertools import izip
 from logging import getLogger
@@ -27,11 +28,10 @@ from os.path import join as join_path
 from random import choice
 from string import ascii_lowercase, digits
 from subprocess import call
-from threading import current_thread, Thread
 from tempfile import gettempdir
+from threading import current_thread, Thread
 from time import time
 
-from tests.comparison.types import BigInt
 from tests.comparison.db_connector import (
     DbConnection,
     DbConnector,
@@ -40,8 +40,10 @@ from tests.comparison.db_connector import (
     MYSQL,
     ORACLE,
     POSTGRESQL)
-from tests.comparison.query_generator import QueryGenerator
 from tests.comparison.model_translator import SqlWriter
+from tests.comparison.query_flattener import QueryFlattener
+from tests.comparison.query_generator import QueryGenerator
+from tests.comparison.types import BigInt
 
 LOG = getLogger(__name__)
 
@@ -54,7 +56,8 @@ class QueryResultComparator(object):
   # The DECIMAL values will be rounded before comparison
   DECIMAL_PLACES = 2
 
-  def __init__(self, query_profile, ref_connection, test_connection, query_timeout_seconds):
+  def __init__(self, query_profile, ref_connection,
+      test_connection, query_timeout_seconds):
     '''test/ref_connection arguments should be an instance of DbConnection'''
     ref_cursor = ref_connection.create_cursor()
     test_cursor = test_connection.create_cursor()
@@ -222,7 +225,7 @@ class QueryExecutor(object):
   # ram.
   TOO_MUCH_DATA = 1000 * 1000
 
-  def __init__(self, cursors, sql_writers, query_timeout_seconds):
+  def __init__(self, cursors, sql_writers, query_timeout_seconds, flatten_dialect=None):
     '''cursors should be a list of db_connector.Cursors.
 
        sql_writers should be a list of model_translator.SqlWriters, with translators in
@@ -232,7 +235,8 @@ class QueryExecutor(object):
     self.cursors = cursors
     self.sql_writers = sql_writers
     self.query_logs = list()
-
+    # SQL dialect for which the queries should be flattened
+    self.flatten_dialect = flatten_dialect
 
     for cursor in cursors:
       # A list of all queries attempted
@@ -316,6 +320,11 @@ class QueryExecutor(object):
     '''
     try:
       log_file.write('/***** Start Query *****/\n')
+      if sql_writer.DIALECT == self.flatten_dialect:
+        # Converts the query model for the flattened version of the data. This is for
+        # testing of Impala nested types support.
+        query = deepcopy(query)
+        QueryFlattener().flatten(query)
       if query.execution == 'CREATE_TABLE_AS':
         setup_sql = sql_writer.write_create_table_as(query, self._table_or_view_name)
         query_sql = 'SELECT * FROM ' + self._table_or_view_name

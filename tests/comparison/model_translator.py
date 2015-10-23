@@ -27,6 +27,9 @@ from tests.comparison.types import (
     Timestamp,
     VarChar)
 from tests.comparison.query import Query
+from tests.comparison.common import StructColumn, CollectionColumn
+from tests.comparison.query_flattener import QueryFlattener
+
 
 LOG = getLogger(__name__)
 
@@ -123,6 +126,10 @@ class SqlWriter(object):
                                 for view in with_clause.with_clause_inline_views)
 
   def _write_select_clause(self, select_clause):
+    if hasattr(select_clause, 'star_prefix'):
+      # This is a little hack to get query flattening to work (look at query_flattener.py
+      # TODO: Add proper support for SELECT *, and SELECT table_name.*
+      return 'SELECT %s.*' % select_clause.star_prefix
     sql = 'SELECT'
     if select_clause.distinct:
       sql += ' DISTINCT'
@@ -135,10 +142,36 @@ class SqlWriter(object):
     else:
       return self._write(select_item.val_expr)
 
+  def _write_struct_column(self, struct_col):
+    if isinstance(struct_col.owner, StructColumn) or \
+        (isinstance(struct_col.owner, CollectionColumn) and not struct_col.owner.alias):
+      return '%s.%s' % (self._write(struct_col.owner), struct_col.name)
+    else:
+      return '%s.%s' % (struct_col.owner.identifier, struct_col.name)
+
+  def _write_collection_column(self, collection_col):
+    if isinstance(collection_col.owner,
+        (StructColumn, CollectionColumn)) and not collection_col.owner.alias:
+      if collection_col.alias:
+        return '%s.%s %s' % (
+            self._write(collection_col.owner),
+            collection_col.name,
+            collection_col.alias)
+      else:
+        return '%s.%s' % (self._write(collection_col.owner), collection_col.name)
+    else:
+      if collection_col.alias:
+        return '%s.%s %s' % (
+            collection_col.owner.identifier,
+            collection_col.name,
+            collection_col.alias)
+      else:
+        return '%s.%s' % (collection_col.owner.identifier, collection_col.name)
+
   def _write_column(self, col):
-    if col.owner.alias:
-      return '%s.%s' % (col.owner.alias, col.name)
-    return col.name
+    if isinstance(col.owner, StructColumn):
+      return '%s.%s' % (self._write(col.owner), col.name)
+    return '%s.%s' % (col.owner.identifier, col.name)
 
   def _write_from_clause(self, from_clause):
     sql = 'FROM %s' % self._write(from_clause.table_expr)
@@ -148,7 +181,7 @@ class SqlWriter(object):
 
   def _write_table(self, table):
     if table.alias:
-        return '%s %s' % (table.name, table.identifier)
+      return '%s %s' % (table.name, table.identifier)
     return table.name
 
   def _write_inline_view(self, inline_view):
@@ -501,6 +534,15 @@ class PostgresqlSqlWriter(SqlWriter):
     return "%s + (%s) * INTERVAL '1' HOUR" \
         % (self._write(func.args[0]), self._write(func.args[1]))
 
+  def _write_join_clause(self, join_clause):
+    sql = '%s JOIN %s %s' % (
+        join_clause.join_type,
+        'LATERAL' if join_clause.is_lateral_join else '',
+        self._write(join_clause.table_expr))
+    if join_clause.boolean_expr:
+      sql += ' ON ' + self._write(join_clause.boolean_expr)
+    return sql
+
   def _write_date_add_minute(self, func):
     return "%s + (%s) * INTERVAL '1' MINUTE" \
         % (self._write(func.args[0]), self._write(func.args[1]))
@@ -508,6 +550,19 @@ class PostgresqlSqlWriter(SqlWriter):
   def _write_date_add_second(self, func):
     return "%s + (%s) * INTERVAL '1' SECOND" \
         % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_column(self, col):
+    def first_non_struct_ancestor(col):
+      col = col.owner
+      while isinstance(col, StructColumn):
+        col = col.owner
+      return col
+    return '%s.%s' % (first_non_struct_ancestor(col).identifier,
+        QueryFlattener.flat_column_name(col))
+
+  def _write_collection_column(self, collection_col):
+    return '%s %s' % (QueryFlattener.flat_collection_name(collection_col),
+        collection_col.identifier)
 
   def _write_extract_second(self, func):
     # For some reason Postgresql decided that extracting second should return a FLOAT...

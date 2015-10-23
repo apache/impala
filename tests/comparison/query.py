@@ -13,20 +13,29 @@
 # limitations under the License.
 
 from logging import getLogger
+from copy import deepcopy
 
-from tests.comparison.common import Column, TableExpr, TableExprList, ValExpr, ValExprList
+from tests.comparison.common import (
+    CollectionColumn,
+    Column,
+    StructColumn,
+    Table,
+    TableExpr,
+    TableExprList,
+    ValExpr,
+    ValExprList)
+from tests.comparison.funcs import And, Equals
+from tests.comparison.types import Boolean, BigInt
 
 LOG = getLogger(__name__)
 
 class Query(object):
   '''A representation of the structure of a SQL query. Only the select_clause and
      from_clause are required for a valid query.
-
   '''
 
   def __init__(self):
     self.parent = None
-
     self.with_clause = None
     self.select_clause = None
     self.from_clause = None
@@ -36,6 +45,21 @@ class Query(object):
     self.union_clause = None
     self.order_by_clause = None
     self.limit_clause = None
+
+  def __deepcopy__(self, memo):
+    other = Query()
+    memo[self] = other
+    other.parent = memo[self.parent] if self.parent in memo else None
+    other.with_clause = deepcopy(self.with_clause, memo)
+    other.from_clause = deepcopy(self.from_clause, memo)
+    other.select_clause = deepcopy(self.select_clause, memo)
+    other.where_clause = deepcopy(self.where_clause, memo)
+    other.group_by_clause = deepcopy(self.group_by_clause, memo)
+    other.having_clause = deepcopy(self.having_clause, memo)
+    other.union_clause = deepcopy(self.union_clause, memo)
+    other.order_by_clause = deepcopy(self.order_by_clause, memo)
+    other.limit_clause = deepcopy(self.limit_clause, memo)
+    return other
 
   @property
   def table_exprs(self):
@@ -70,7 +94,7 @@ class Query(object):
     if self.union_clause:
       queries.append(self.union_clause.query)
     if self.where_clause:
-      queries.extend(
+      queries.extend(subquery.query for subquery in \
           self.where_clause.boolean_expr.iter_exprs(lambda expr: expr.is_subquery))
     for query in list(queries):
       queries.extend(query.nested_queries)
@@ -81,7 +105,6 @@ class SelectClause(object):
   '''This encapsulates the SELECT part of a query. It is convenient to separate
      non-agg items from agg items so that it is simple to know if the query
      is an agg query or not.
-
   '''
 
   def __init__(self, select_items):
@@ -108,6 +131,11 @@ class SelectClause(object):
        this list will be propagated but additions will not be.
     '''
     return SelectItemSubList(self.items, lambda item: item.is_analytic)
+
+  def __deepcopy__(self, memo):
+    other = SelectClause([deepcopy(item, memo) for item in self.items])
+    other.distinct = self.distinct
+    return other
 
 
 # This is used in the query simplifier (not yet checked in) to simplify reduction
@@ -296,6 +324,11 @@ class SelectItem(object):
     '''Evaluates to True if this item contains an analytic expression.'''
     return self.val_expr.contains_analytic
 
+  def __deepcopy__(self, memo):
+    other = SelectItem(deepcopy(self.val_expr, memo))
+    other.alias = self.alias
+    return other
+
 
 class Subquery(ValExpr):
   '''Represents both a scalar subquery and a subquery that returns a multi-row/column
@@ -312,11 +345,12 @@ class Subquery(ValExpr):
   def type(self):
     return self.query.select_clause.items[0].type
 
+  def __deepcopy__(self, memo):
+    return Subquery(deepcopy(self.query, memo))
 
 class FromClause(object):
   '''A representation of a FROM clause. The member variable join_clauses may optionally
      contain JoinClause items.
-
   '''
 
   def __init__(self, table_expr, join_clauses=None):
@@ -332,6 +366,18 @@ class FromClause(object):
         TableExprList(join_clause.table_expr for join_clause in self.join_clauses)
     table_exprs.append(self.table_expr)
     return table_exprs
+
+  def __deepcopy__(self, memo):
+    other = FromClause(deepcopy(self.table_expr, memo))
+    other.join_clauses = [deepcopy(join_clause, memo) for join_clause in self.join_clauses]
+    return other
+
+  @property
+  def collections(self):
+    result = self.table_expr.collections
+    for join_clause in self.join_clauses:
+      result.extend(join_clause.table_expr.collections)
+    return result
 
   @property
   def visible_table_exprs(self):
@@ -349,7 +395,6 @@ class FromClause(object):
     for join_clause in self.join_clauses:
       if 'ANTI' in join_clause.join_type or 'SEMI' in join_clause.join_type:
         return True
-
 
 class InlineView(TableExpr):
   '''Represents an inline view.
@@ -373,8 +418,18 @@ class InlineView(TableExpr):
     return ValExprList(Column(self, item.name, item.type) for item in
                        self.query.select_clause.items)
 
+  @property
+  def collections(self):
+    return []
+
   def __repr__(self):
     return '%s<%s>' % (type(self).__name__, ', '.join(repr(col) for col in self.cols))
+
+  def __deepcopy__(self, memo):
+    other = InlineView(deepcopy(self.query, memo))
+    other.alias = self.alias
+    other.is_visible = self.is_visible
+    return other
 
 
 class WithClause(object):
@@ -391,6 +446,9 @@ class WithClause(object):
   @property
   def table_exprs(self):
     return self.with_clause_inline_views
+
+  def __deepcopy__(self, memo):
+    return WithClause(deepcopy(self.with_clause_inline_views, memo))
 
 
 class WithClauseInlineView(InlineView):
@@ -415,6 +473,11 @@ class WithClauseInlineView(InlineView):
   @property
   def identifier(self):
     return self.alias or self.with_clause_alias
+
+  def __deepcopy__(self, memo):
+    other = WithClauseInlineView(deepcopy(self.query, memo), self.with_clause_alias)
+    other.alias = self.alias
+    return other
 
 
 class JoinClause(object):
@@ -442,6 +505,21 @@ class JoinClause(object):
     self.join_type = join_type
     self.table_expr = table_expr
     self.boolean_expr = boolean_expr
+    # This is used for nested types. It means that we are joining with an earlier aliased
+    # element in the from clause. For example, "From customer t1 INNER JOIN t1.orders t2"
+    # or "FROM customer t1 INNER JOIN t1.orders.lineitems t2 ON t1.comment = t2.comment"
+    # are both lateral joins. However, "FROM customer t1 INNER JOIN customer.orders t2 ON
+    # (t1.comment = t2.comment)" is not a lateral join.
+    # TODO: consider renaming to is_nested_join
+    self.is_lateral_join = False
+
+  def __deepcopy__(self, memo):
+    other = JoinClause(
+        self.join_type,
+        deepcopy(self.table_expr, memo),
+        deepcopy(self.boolean_expr, memo))
+    other.is_lateral_join = self.is_lateral_join
+    return other
 
 
 class WhereClause(object):
@@ -453,11 +531,17 @@ class WhereClause(object):
   def __init__(self, boolean_expr):
     self.boolean_expr = boolean_expr
 
+  def __deepcopy__(self, memo):
+    return WhereClause(deepcopy(self.boolean_expr, memo))
+
 
 class GroupByClause(object):
 
-  def __init__(self, select_items):
-    self.group_by_items = select_items
+  def __init__(self, group_by_items):
+    self.group_by_items = group_by_items
+
+  def __deepcopy__(self, memo):
+    return GroupByClause([deepcopy(item, memo) for item in self.group_by_items])
 
 
 class HavingClause(object):
@@ -468,6 +552,9 @@ class HavingClause(object):
 
   def __init__(self, boolean_expr):
     self.boolean_expr = boolean_expr
+
+  def __deepcopy__(self, memo):
+    return HavingClause(deepcopy(self.boolean_expr, memo))
 
 
 class UnionClause(object):
@@ -492,6 +579,11 @@ class UnionClause(object):
       query = query.union_clause.query
     return queries
 
+  def __deepcopy__(self, memo):
+    other = UnionClause(deepcopy(self.query, memo))
+    other.all = self.all
+    return other
+
 
 class OrderByClause(object):
 
@@ -508,8 +600,17 @@ class OrderByClause(object):
         order = 'ASC'
       self.exprs_to_order.append((item, order))
 
+  def __deepcopy__(self, memo):
+    other = OrderByClause(val_exprs = list())
+    for (item, order) in self.exprs_to_order:
+      other.exprs_to_order.append((deepcopy(item, memo), order))
+    return other
+
 
 class LimitClause(object):
 
   def __init__(self, limit):
     self.limit = limit
+
+  def __deepcopy__(self, memo):
+    return LimitClause(deepcopy(limit, memo))

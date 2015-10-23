@@ -459,6 +459,33 @@ class DefaultProfile(object):
         return False
     return True
 
+class ImpalaNestedTypesProfile(DefaultProfile):
+
+  def __init__(self):
+    super(ImpalaNestedTypesProfile, self).__init__()
+    self._probabilities['OPTIONAL_QUERY_CLAUSES']['WITH'] = 0.3
+    self._probabilities['MISC']['INLINE_VIEW'] = 0.3
+
+  def use_lateral_join(self):
+    return random() < 0.5
+
+  def use_boolean_expr_for_lateral_join(self):
+    return random() < 0.2
+
+  def get_num_boolean_exprs_for_lateral_join(self):
+    if random() < 0.8:
+      return 0
+    result = 1
+    while random() < 0.6:
+      result += 1
+    return result
+
+  def get_table_count(self):
+    num = 1
+    while random() < (0.85 ** num):
+      num += 1
+    return num
+
 
 class HiveProfile(DefaultProfile):
   def __init__(self):

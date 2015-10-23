@@ -36,6 +36,15 @@ from logging import getLogger
 from os import chmod, symlink, unlink
 from os.path import basename, dirname
 from psycopg2 import connect as postgresql_connect
+from pyparsing import (
+    alphanums,
+    delimitedList,
+    Forward,
+    Group,
+    Literal,
+    nums,
+    Suppress,
+    Word)
 from random import randint
 from re import compile
 import shelve
@@ -45,7 +54,13 @@ from tempfile import NamedTemporaryFile, gettempdir
 from threading import Lock
 from time import time
 
-from tests.comparison.common import Column, Table, TableExprList
+from tests.comparison.common import (
+    ArrayColumn,
+    Column,
+    MapColumn,
+    StructColumn,
+    Table,
+    TableExprList)
 from tests.comparison.types import (
     Char,
     Decimal,
@@ -380,24 +395,148 @@ class DbConnection(object):
   def make_list_table_names_sql(self):
     return 'SHOW TABLES'
 
+  def parse_col_desc(self, data_type):
+
+    ''' Returns a prased output based on type describe output.
+
+    data_type is string that should look like this:
+    "bigint"
+    or like this:
+    "array<struct<
+      field_51:int,
+      field_52:bigint,
+      field_53:int,
+      field_54:boolean
+    >>"
+
+    In the first case, this method would return: 'bigint'
+
+    In the second case, it would return
+
+    ['array',
+      ['struct',
+        ['field_51', 'int'],
+        ['field_52', 'bigint'],
+        ['field_53', 'int'],
+        ['field_54', 'boolean']]]
+
+    This output is used to create the appropriate columns by self.create_column().
+    '''
+
+    COMMA, LPAR, RPAR, COLON, LBRA, RBRA = map(Suppress, ",<>:()")
+
+    t_bigint = Literal('bigint')
+    t_int = Literal('int')
+    t_smallint = Literal('smallint')
+    t_tinyint = Literal('tinyint')
+    t_boolean = Literal('boolean')
+    t_string = Literal('string')
+    t_timestamp = Literal('timestamp')
+    t_float = Literal('float')
+    t_double = Literal('double')
+
+    t_decimal = Group(Literal('decimal') + LBRA + Word(nums) + COMMA + Word(nums) + RBRA)
+    t_char = Group(Literal('char') + LBRA + Word(nums) + RBRA)
+    t_varchar = (Group(Literal('varchar') + LBRA + Word(nums) + RBRA) |
+        Literal('varchar'))
+
+    t_struct = Forward()
+    t_array = Forward()
+    t_map = Forward()
+
+    complex_type = (t_struct | t_array | t_map)
+
+    any_type = (
+        complex_type |
+        t_bigint |
+        t_int |
+        t_smallint |
+        t_tinyint |
+        t_boolean |
+        t_string |
+        t_timestamp |
+        t_float |
+        t_double |
+        t_decimal |
+        t_char |
+        t_varchar)
+
+    struct_field_name = Word(alphanums + '_')
+    struct_field_pair = Group(struct_field_name + COLON + any_type)
+
+    t_struct << Group(Literal('struct') + LPAR + delimitedList(struct_field_pair) + RPAR)
+    t_array << Group(Literal('array') + LPAR + any_type + RPAR)
+    t_map << Group(Literal('map') + LPAR + any_type + COMMA + any_type + RPAR)
+
+    return any_type.parseString(data_type)[0]
+
+  def create_column(self, col_name, col_type):
+    ''' Takes the output from parse_col_desc and creates the right column type. This
+    method returns one of Column, ArrayColumn, MapColumn, StructColumn.'''
+    if isinstance(col_type, str):
+      if col_type.upper() == 'VARCHAR':
+        col_type = 'STRING'
+      type_name = self.TYPE_NAME_ALIASES.get(col_type.upper())
+      return Column(owner=None,
+          name=col_name.lower(),
+          exact_type=self.TYPES_BY_NAME[type_name])
+
+    general_class = col_type[0]
+
+    if general_class.upper() in ('DECIMAL', 'NUMERIC'):
+      return Column(owner=None,
+          name=col_name.lower(),
+          exact_type=get_decimal_class(int(col_type[1]), int(col_type[2])))
+
+    if general_class.upper() == 'CHAR':
+      return Column(owner=None,
+          name=col_name.lower(),
+          exact_type=get_char_class(int(col_type[1])))
+
+    if general_class.upper() == 'VARCHAR':
+      type_size = int(col_type[1])
+      if type_size <= VarChar.MAX:
+        cur_type = get_varchar_class(type_size)
+      else:
+        cur_type = self.TYPES_BY_NAME['STRING']
+      return Column(owner=None,
+          name=col_name.lower(),
+          exact_type=cur_type)
+
+    if general_class.upper() == 'ARRAY':
+      return ArrayColumn(
+          owner=None,
+          name=col_name.lower(),
+          item=self.create_column(col_name='item', col_type=col_type[1]))
+
+    if general_class.upper() == 'MAP':
+      return MapColumn(
+          owner=None,
+          name=col_name.lower(),
+          key=self.create_column(col_name='key', col_type=col_type[1]),
+          value=self.create_column(col_name='value', col_type=col_type[2]))
+
+    if general_class.upper() == 'STRUCT':
+      struct_col = StructColumn(owner=None, name=col_name.lower())
+      for field_name, field_type in col_type[1:]:
+        struct_col.add_col(self.create_column(field_name, field_type))
+      return struct_col
+
+    raise Exception('unable to parse: {0}, type: {1}'.format(col_name, col_type))
+
+  def create_table_from_describe(self, table_name, describe_rows):
+    table = Table(table_name.lower())
+    for row in describe_rows:
+      col_name, data_type = row[:2]
+      col_type = self.parse_col_desc(data_type)
+      col = self.create_column(col_name, col_type)
+      table.add_col(col)
+    return table
+
   def describe_table(self, table_name):
     '''Return a Table with table and col names always in lowercase.'''
-    rows = self.execute_and_fetchall(self.make_describe_table_sql(table_name))
-    table = Table(table_name.lower())
-    for row in rows:
-      col_name, data_type = row[:2]
-      match = self.SQL_TYPE_PATTERN.match(data_type)
-      if not match:
-        raise Exception('Unexpected data type format: %s' % data_type)
-      type_name = self.TYPE_NAME_ALIASES.get(match.group(1).upper())
-      if not type_name:
-        raise Exception('Unknown data type: ' + match.group(1))
-      if len(match.groups()) > 1 and match.group(2) is not None:
-        type_size = [int(size) for size in match.group(2)[1:-1].split(',')]
-      else:
-        type_size = None
-      table.cols.append(
-          Column(table, col_name.lower(), self.parse_data_type(type_name, type_size)))
+    describe_rows = self.execute_and_fetchall(self.make_describe_table_sql(table_name))
+    table = self.create_table_from_describe(table_name, describe_rows)
     self.load_unique_col_metadata(table)
     return table
 
@@ -452,7 +591,7 @@ class DbConnection(object):
         index_name = '%s_%s' % (table_name, col.name)
         if self.db_name:
           index_name = '%s_%s' % (self.db_name, index_name)
-        cursor.execute('CREATE INDEX %s ON %s(%s)' % (index_name, table_name, col.name))
+        cursor.execute('CREATE INDEX ON %s(%s)' % (table_name, col.name))
 
   #########################################
   # Data loading                          #

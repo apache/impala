@@ -16,10 +16,17 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import ifilter
 from logging import getLogger
-from random import shuffle, choice, randint, randrange
+from random import shuffle, choice, randint, randrange, random
 
-from tests.comparison.common import TableExprList, ValExpr, ValExprList, Table, Column
 from tests.comparison.query_profile import DefaultProfile, HiveProfile
+from tests.comparison.common import (
+    ArrayColumn,
+    Column,
+    StructColumn,
+    Table,
+    TableExprList,
+    ValExpr,
+    ValExprList)
 from tests.comparison.funcs import (
     AGG_FUNCS,
     AggFunc,
@@ -74,6 +81,11 @@ class QueryGenerator(object):
     self.profile = query_profile
     self.queries_under_construction = list()
     self.max_nested_query_count = None
+    self.cur_id = 0
+
+  def get_next_id(self):
+    self.cur_id += 1
+    return 'a' + str(self.cur_id)
 
   @property
   def current_query(self):
@@ -84,6 +96,12 @@ class QueryGenerator(object):
   def root_query(self):
     if self.queries_under_construction:
       return self.queries_under_construction[0]
+
+  def clear_state(self):
+    # This function clears the state from the previous query.
+    self.cur_id = 0
+    self.profile.query = None
+    self.max_nested_query_count = None
 
   def create_query(self,
       table_exprs,
@@ -214,8 +232,7 @@ class QueryGenerator(object):
     if self.queries_under_construction:
       self.profile.query = self.queries_under_construction[-1]
     else:
-      self.profile.query = None
-      self.max_nested_query_count = None
+      self.clear_state()
 
     return query
 
@@ -493,10 +510,9 @@ class QueryGenerator(object):
           if use_correlated_subquery:
             outer_table_expr = choice(
                 self.current_query.from_clause.table_exprs.by_col_type[join_expr_type])
-            inner_table_expr = choice(
-                query.from_clause.table_exprs.by_col_type[join_expr_type])
             correlation_condition = self._create_relational_join_condition(
-                outer_table_expr, inner_table_expr)
+                outer_table_expr,
+                query.from_clause.table_exprs.by_col_type[join_expr_type])
             if query.where_clause:
               query.where_clause.boolean_expr = And.create_from_args(
                   query.where_clause.boolean_expr, correlation_condition)
@@ -1026,65 +1042,42 @@ class QueryGenerator(object):
           func.order_by_clause.exprs_to_order.append(
               (order_by_expr, choice([None, 'ASC', 'DESC', 'DESC'])))
 
-  def _create_analytic_partition_by_or_order_by_exprs(self,
-      table_exprs,
-      select_items,
-      required_exprs=None):
-    # TODO: Make more complicated exprs by combining the ones below. Ex: instead of
-    #       returning [a, b, c] return [(a + b) * c, etc].
-    # TODO: The current implementation is more restrictive than it needs to be. I think
-    #       we only need to know if a GROUP BY query is being generated, and in that case
-    #       limit column exprs to those of the set of GROUP BY columns.
-    if select_items:
-      val_exprs = [choice(select_items).val_expr
-                   for _ in xrange(self.profile.get_col_count_to_use_in_val_expr())]
-    else:
-      val_exprs = [self._create_val_expr(table_exprs)
-                   for _ in xrange(self.profile.get_col_count_to_use_in_val_expr())]
-    if required_exprs:
-      used_cols = set()
-      for expr in val_exprs:
-        used_cols.update(expr.count_col_refs().keys())
-      remaining_cols = required_exprs - used_cols
-      if remaining_cols:
-        val_exprs.extend(remaining_cols)
-    return val_exprs
-
   def _create_from_clause(self,
       table_exprs,
       table_alias_prefix,
       required_table_expr_col_type):
     from_clause = None
     table_count = self.profile.get_table_count()
-    for idx in xrange(table_count):
-      if idx == 0:
-        candidate_table_exprs = TableExprList(table_exprs)
-        if required_table_expr_col_type:
-          candidate_table_exprs = \
-              candidate_table_exprs.by_col_type[required_table_expr_col_type]
-          if not candidate_table_exprs:
-            raise Exception('No tables have the required column type')
-        if table_count > 0 \
-            and required_table_expr_col_type not in JOINABLE_TYPES:
-          candidate_table_exprs = TableExprList(
-              table_expr for table_expr in candidate_table_exprs
-              if table_expr.joinable_cols_by_type)
-          if not candidate_table_exprs:
-            raise Exception('No tables have any joinable types')
-        table_expr = self._create_table_expr(candidate_table_exprs)
-        table_expr.alias = table_alias_prefix + str(idx + 1)
-        from_clause = FromClause(table_expr)
-        if not table_expr.joinable_cols:
-          # A CROSS JOIN is still possible but let's assume that isn't wanted.
-          break
-      else:
-        join_clause = self._create_join_clause(from_clause, table_exprs)
-        join_clause.table_expr.alias = table_alias_prefix + str(idx + 1)
-        from_clause.join_clauses.append(join_clause)
-    # Note: the HAVING clause creation assumes the only case when a table will not have
-    #       an alias is the case below.
-    if len(from_clause.table_exprs) == 1 and not from_clause.table_expr.is_inline_view:
-      from_clause.table_expr.alias = None
+
+    candidate_table_exprs = TableExprList(table_exprs)
+    candidate_table_exprs.extend(candidate_table_exprs.collections)
+    # If filter out table expressions with no scalar columns.
+    candidate_table_exprs = TableExprList(
+        table_expr for table_expr in candidate_table_exprs if table_expr.cols)
+
+    if required_table_expr_col_type:
+      candidate_table_exprs = \
+          candidate_table_exprs.by_col_type[required_table_expr_col_type]
+      if not candidate_table_exprs:
+        raise Exception('No tables have the required column type')
+
+    if table_count > 1:
+      # If there are multiple multiple tables, the first chosen table must have joinable
+      # columns.
+      candidate_table_exprs = TableExprList(
+          table_expr for table_expr in candidate_table_exprs
+          if table_expr.joinable_cols_by_type)
+      if not candidate_table_exprs:
+        raise Exception('No tables have any joinable types')
+    table_expr = self._create_table_expr(candidate_table_exprs)
+    table_expr.alias = self.get_next_id()
+    from_clause = FromClause(table_expr)
+
+    for idx in xrange(1, table_count):
+      join_clause = self._create_join_clause(from_clause, table_exprs)
+      join_clause.table_expr.alias = self.get_next_id()
+      from_clause.join_clauses.append(join_clause)
+
     return from_clause
 
   def _create_table_expr(self, table_exprs, required_type=None):
@@ -1110,52 +1103,97 @@ class QueryGenerator(object):
 
   def _create_join_clause(self, from_clause, table_exprs):
     join_type = self.profile.choose_join_type(JoinClause.JOINS_TYPES)
-
-    if join_type == 'CROSS':
-      table_expr = self._create_table_expr(table_exprs)
+    use_lateral = self.profile.use_lateral_join()
+    correlated_collections = from_clause.collections
+    if use_lateral and correlated_collections:
+      # TODO: Add correlated collections from ancestor queries
+      if self.allow_more_nested_queries and self.profile.use_inline_view():
+        collection = self._create_inline_view(correlated_collections)
+      else:
+        collection = deepcopy(choice(correlated_collections))
+      join_clause = JoinClause(join_type, table_expr=collection)
+      join_clause.is_lateral_join = True
+      for _ in range(self.profile.get_num_boolean_exprs_for_lateral_join()):
+        predicate = self._create_single_join_condition(collection, from_clause.table_exprs)
+        if not predicate:
+          break
+        join_clause.boolean_expr = And.create_from_args(join_clause.boolean_expr,
+            predicate) if join_clause.boolean_expr else predicate
+      return join_clause
     else:
-      available_join_expr_types = set(from_clause.table_exprs.joinable_cols_by_type) \
-          & set(table_exprs.col_types)
-      if not available_join_expr_types:
-        raise Exception('No tables have any colums eligible for joining')
-      join_expr_type = self.profile.choose_type(tuple(available_join_expr_types))
-      table_expr = self._create_table_expr(table_exprs, required_type=join_expr_type)
-    if join_type in ('LEFT ANTI', 'LEFT SEMI'):
-      table_expr.is_visible = False
-    join_clause = JoinClause(join_type, table_expr)
+      candidate_table_exprs = TableExprList(table_exprs)
+      candidate_table_exprs.extend(candidate_table_exprs.collections)
+      if join_type == 'CROSS':
+        table_expr = self._create_table_expr(candidate_table_exprs)
+      else:
+        available_join_expr_types = set(from_clause.table_exprs.joinable_cols_by_type) \
+            & set(candidate_table_exprs.col_types)
+        if not available_join_expr_types:
+          raise Exception('No tables have any columns eligible for joining')
+        join_expr_type = self.profile.choose_type(tuple(available_join_expr_types))
+        table_expr = self._create_table_expr(
+            candidate_table_exprs, required_type=join_expr_type)
 
-    if join_type != 'CROSS':
+      if join_type in ('LEFT ANTI', 'LEFT SEMI'):
+        table_expr.is_visible = False
+
+      join_clause = JoinClause(join_type, table_expr)
+
+      if join_type == 'CROSS':
+        return join_clause
+
       join_table_expr_candidates = from_clause.table_exprs.by_col_type[join_expr_type]
       if not join_table_expr_candidates:
         raise Exception('table_expr has no common joinable columns')
-      related_table_expr = choice(join_table_expr_candidates)
       join_clause.boolean_expr = self._create_relational_join_condition(
-          table_expr, related_table_expr)
-    return join_clause
+          table_expr, join_table_expr_candidates)
+      return join_clause
 
-  def _create_relational_join_condition(self, left_table_expr, right_table_expr):
-    if not left_table_expr.joinable_cols_by_type:
-      raise Exception('All columns in table disallowed: %s' % left_table_expr)
-    if not right_table_expr.joinable_cols_by_type:
-      raise Exception('All columns in table disallowed: %s' % right_table_expr)
+  def _have_joinable_cols_in_common(self, table_expr, other_table_expr):
+    common_col_types = set(table_expr.joinable_cols_by_type) \
+        & set(other_table_expr.joinable_cols_by_type)
+    return len(common_col_types) > 0
+
+  def _create_single_join_condition(self, cur_table_expr, available_table_exprs):
+    candidates = []
+    for possible_table_expr in available_table_exprs:
+      if self._have_joinable_cols_in_common(cur_table_expr, possible_table_expr):
+        candidates.append(possible_table_expr)
+
+    if not candidates:
+      return None
+
+    target_table_expr = choice(candidates)
+    common_col_types = set(cur_table_expr.joinable_cols_by_type) \
+        & set(target_table_expr.joinable_cols_by_type)
+
+    col_type = choice(list(common_col_types))
+    left_col = choice(cur_table_expr.joinable_cols_by_type[col_type])
+    right_col = choice(target_table_expr.joinable_cols_by_type[col_type])
+    if issubclass(right_col.type, (String, VarChar)) and left_col.type == Char:
+      left_col = Trim.create_from_args(left_col)
+    elif left_col.type == Char and issubclass(right_col.type, (String, VarChar)):
+      right_col = Trim.create_from_args(right_col)
+    return Equals.create_from_args(left_col, right_col)
+
+  def _create_relational_join_condition(self,
+      left_table_expr, possible_right_table_exprs):
+    candidates = []
+    for right_table_expr in possible_right_table_exprs:
+      if self._have_joinable_cols_in_common(left_table_expr, right_table_expr):
+        candidates.append(right_table_expr)
+    if not candidates:
+      raise Exception('Tables have no joinable columns in common')
+    right_table_expr = choice(candidates)
     common_col_types = set(left_table_expr.joinable_cols_by_type) \
         & set(right_table_expr.joinable_cols_by_type)
-    if not common_col_types:
-      raise Exception('Tables have no joinable columns in common')
 
     predicates = list()
     for _ in xrange(1 + self.profile.choose_nested_expr_count()):
-      col_type = choice(list(common_col_types))
-      left_col = choice(left_table_expr.joinable_cols_by_type[col_type])
-      right_col = choice(right_table_expr.joinable_cols_by_type[col_type])
-      # As of this writing Impala doesn't trim CHARs when comparing against VARCHAR. It's
-      # expected that the user will explicitly do this. Eventually an implicit trim should
-      # be done.
-      if issubclass(right_col.type, (String, VarChar)) and left_col.type == Char:
-        left_col = Trim.create_from_args(left_col)
-      elif left_col.type == Char and issubclass(right_col.type, (String, VarChar)):
-        right_col = Trim.create_from_args(right_col)
-      predicates.append(Equals.create_from_args(left_col, right_col))
+      predicate = self._create_single_join_condition(left_table_expr, [right_table_expr])
+      if not predicate:
+        raise Exception('Tables have no joinable columns in common')
+      predicates.append(predicate)
     while len(predicates) > 1:
       predicates.append(And.create_from_args(predicates.pop(), predicates.pop()))
     return predicates[0]
@@ -1171,7 +1209,7 @@ class QueryGenerator(object):
         table_alias_prefix=table_alias_prefix)
     if predicate.contains_subquery and not from_clause_table_exprs[0].alias:
       # TODO: Figure out if an alias is really needed.
-      from_clause_table_exprs[0].alias = 't1'
+      from_clause_table_exprs[0].alias = self.get_next_id()
     return WhereClause(predicate)
 
   def _create_having_clause(self, table_exprs, basic_select_item_exprs):
@@ -1185,7 +1223,7 @@ class QueryGenerator(object):
     for arg in predicate.iter_exprs():
       if isinstance(arg, ValExpr) and arg.is_col and not arg.owner.alias:
         # TODO: Figure out if an alias is really needed.
-        arg.owner.alias = 't1'
+        arg.owner.alias = self.get_next_id()
     return HavingClause(predicate)
 
   def _enable_distinct_on_random_agg_items(self, agg_items):

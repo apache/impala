@@ -12,6 +12,7 @@ pg8000 == 1.10.2
 prettytable == 0.7.2
 psutil == 0.7.1
 pyhive == 0.1.5
+pyparsing == 2.0.3
 pytest == 2.7.2
 pytest-xdist == 1.12
 pywebhdfs == 0.3.2

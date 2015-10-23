@@ -263,7 +263,7 @@ class DatabasePopulator(object):
         try:
           source_cursor.execute('SELECT * FROM ' + table_name)
           while True:
-            rows = source_cursor.fetchmany(size=100)
+            rows = source_cursor.fetchmany(size=10000)
             if not rows:
               break
             for destination_cursor in cursors:
