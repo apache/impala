@@ -135,12 +135,13 @@ export IMPALA_ZLIB_VERSION=1.2.8
 
 # Some of the variables need to be overwritten to explicitely mark the patch level
 if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
-  IMPALA_AVRO_VERSION+=-p2
+  IMPALA_AVRO_VERSION+=-p3
   IMPALA_BZIP2_VERSION+=-p1
   IMPALA_GLOG_VERSION+=-p1
   IMPALA_GPERFTOOLS_VERSION+=-p1
   IMPALA_THRIFT_VERSION+=-p2
   IMPALA_RE2_VERSION+=-p1
+  IMPALA_LLVM_VERSION+=-p1
 fi
 
 if [[ ! -z "${IMPALA_CYRUS_SASL_INSTALL_DIR:-}" ]]
