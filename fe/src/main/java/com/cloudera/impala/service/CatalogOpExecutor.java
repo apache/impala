@@ -1840,7 +1840,7 @@ public class CatalogOpExecutor {
           }
         }
 
-        // Once the cache directives are sbumitted, observe the status of the caching
+        // Once the cache directives are submitted, observe the status of the caching
         // until no more progress is made -- either fully cached or out of cache memory
         if (!cacheDirs.isEmpty()) {
           catalog_.watchCacheDirs(cacheDirs, tableName.toThrift());

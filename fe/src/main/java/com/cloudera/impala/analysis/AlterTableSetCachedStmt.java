@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
@@ -59,6 +60,30 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
     if (!(table instanceof HdfsTable)) {
       throw new AnalysisException("ALTER TABLE SET [CACHED|UNCACHED] must target an " +
           "HDFS table: " + table.getFullName());
+    }
+
+    if (cacheOp_.shouldCache()) {
+      boolean isCacheable;
+      PartitionSpec partSpec = getPartitionSpec();
+      HdfsTable hdfsTable = (HdfsTable)table;
+      StringBuilder nameSb = new StringBuilder();
+      if (partSpec != null) {
+        HdfsPartition part = hdfsTable.getPartition(partSpec.getPartitionSpecKeyValues());
+        if (part == null) {
+          throw new AnalysisException("Partition spec does not exist: " +
+              partSpec.toSql());
+        }
+        isCacheable = part.isCacheable();
+        nameSb.append("Partition (" + part.getPartitionName() + ")");
+      } else {
+        isCacheable = hdfsTable.isCacheable();
+        nameSb.append("Table ").append(table.getFullName());
+      }
+      if (!isCacheable) {
+        throw new AnalysisException(nameSb.toString() + " cannot be cached. Please " +
+            "check if the table or partitions are on a filesystem which supports " +
+            "caching.");
+      }
     }
   }
 }

@@ -166,6 +166,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes add " +
         "partition(year=2050, month=10) cached in 'badPool'",
         "The specified cache pool does not exist: badPool");
+    AnalysisError("alter table functional.alltypes add " +
+        "partition(year=2050, month=10) location " +
+        "'file:///test-warehouse/alltypes/year=2010/month=10' cached in 'testPool'",
+        "Location 'file:/test-warehouse/alltypes/year=2010/month=10' cannot be cached. " +
+        "Please retry without caching: ALTER TABLE functional.alltypes ADD PARTITION " +
+        "... UNCACHED");
 
     // Valid URIs.
     AnalyzesOk("alter table functional.alltypes add " +
@@ -1362,6 +1368,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "location '/test-warehouse/' cached in 'testPool'");
     AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) " +
         "location '/test-warehouse/' uncached");
+    AnalysisError("create table cached_tbl(i int) location " +
+        "'file:///test-warehouse/cache_tbl' cached in 'testPool'",
+        "Location 'file:/test-warehouse/cache_tbl' cannot be cached. " +
+        "Please retry without caching: CREATE TABLE default.cached_tbl ... UNCACHED");
 
     // Invalid database name.
     AnalysisError("create table `???`.new_table (x int) PARTITIONED BY (y int)",

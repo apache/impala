@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +30,7 @@ import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.analysis.ToSqlUtils;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -273,6 +275,13 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
   public boolean isDefaultPartition() {
     return id_ == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
+  }
+
+  /**
+   * Returns true if the partition resides at a location which can be cached (e.g. HDFS).
+   */
+  public boolean isCacheable() {
+    return FileSystemUtil.isPathCacheable(new Path(location_));
   }
 
   /**

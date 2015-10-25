@@ -271,6 +271,32 @@ public class HdfsTable extends Table {
   public boolean spansMultipleFileSystems() { return multipleFileSystems_; }
 
   /**
+   * Returns true if the table resides at a location which supports caching (e.g. HDFS).
+   */
+  public boolean isLocationCacheable() {
+    return FileSystemUtil.isPathCacheable(new Path(getLocation()));
+  }
+
+  /**
+   * Returns true if the table and all its partitions reside at locations which
+   * support caching (e.g. HDFS).
+   */
+  public boolean isCacheable() {
+    if (!isLocationCacheable()) return false;
+    if (!isMarkedCached() && numClusteringCols_ > 0) {
+      for (HdfsPartition partition: getPartitions()) {
+        if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+          continue;
+        }
+        if (!partition.isCacheable()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
    * Queries the filesystem to load the file block metadata (e.g. DFS blocks) for the
    * given file.  Adds the newly created block metadata and block location to the
    * perFsFileBlocks, so that the disk IDs for each block can be retrieved with one

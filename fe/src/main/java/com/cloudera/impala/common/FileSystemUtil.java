@@ -295,7 +295,7 @@ public class FileSystemUtil {
   /**
    * Return true iff the path is on the given filesystem.
    */
-  public static Boolean isPathOnFileSystem(Path path, FileSystem fs) {
+  public static boolean isPathOnFileSystem(Path path, FileSystem fs) {
     try {
       // Call makeQualified() for the side-effect of FileSystem.checkPath() which will
       // throw an exception if path is not on fs.
@@ -311,7 +311,7 @@ public class FileSystemUtil {
    * Return true if the path can be reached, false for all other cases
    * File doesn't exist, cannot access the FileSystem, etc.
    */
-  public static Boolean isPathReachable(Path path, FileSystem fs, StringBuilder error_msg) {
+  public static boolean isPathReachable(Path path, FileSystem fs, StringBuilder error_msg) {
     try {
       if (fs.exists(path)) {
         return true;
@@ -322,6 +322,17 @@ public class FileSystemUtil {
       error_msg.append(e.getMessage());
     }
     return false;
+  }
+
+  /**
+   * Returns true if the given path is a location which supports caching (e.g. HDFS).
+   */
+  public static boolean isPathCacheable(Path path) {
+    try {
+      return isDistributedFileSystem(path);
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   /**

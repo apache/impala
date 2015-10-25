@@ -15,7 +15,10 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableType;
@@ -84,6 +87,28 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     if (location_ != null) {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
-    if (cacheOp_ != null) cacheOp_.analyze(analyzer);
+
+    boolean shouldCache = false;
+    Table table = getTargetTable();
+    if (cacheOp_ != null) {
+      cacheOp_.analyze(analyzer);
+      shouldCache = cacheOp_.shouldCache();
+    } else if (table instanceof HdfsTable) {
+      shouldCache = ((HdfsTable)table).isMarkedCached();
+    }
+    if (shouldCache) {
+      if (!(table instanceof HdfsTable)) {
+        throw new AnalysisException("Caching must target a HDFS table: " +
+            table.getFullName());
+      }
+      HdfsTable hdfsTable = (HdfsTable)table;
+      if ((location_ != null && !FileSystemUtil.isPathCacheable(location_.getPath())) ||
+          (location_ == null && !hdfsTable.isLocationCacheable())) {
+        throw new AnalysisException(String.format("Location '%s' cannot be cached. " +
+            "Please retry without caching: ALTER TABLE %s ADD PARTITION ... UNCACHED",
+            (location_ != null) ? location_.toString() : hdfsTable.getLocation(),
+            table.getFullName()));
+      }
+    }
   }
 }

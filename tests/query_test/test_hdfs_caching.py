@@ -116,12 +116,14 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     num_entries_pre = get_num_cache_requests()
     self.run_test_case('QueryTest/hdfs-caching', vector)
 
-    # After running this test case we should be left with 8 cache requests.
-    # In this case, 1 for each table + 7 more for each cached partition.
-    assert num_entries_pre == get_num_cache_requests() - 8
+    # After running this test case we should be left with 9 cache requests.
+    # In this case, 1 for each table + 7 more for each cached partition + 1
+    # for the table with partitions on both HDFS and local file system.
+    assert num_entries_pre == get_num_cache_requests() - 9
 
     self.client.execute("drop table cachedb.cached_tbl_part")
     self.client.execute("drop table cachedb.cached_tbl_nopart")
+    self.client.execute("drop table cachedb.cached_tbl_local")
 
     # Dropping the tables should cleanup cache entries leaving us with the same
     # total number of entries

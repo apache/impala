@@ -28,6 +28,7 @@ import com.cloudera.impala.catalog.HdfsStorageDescriptor;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableParams;
@@ -228,7 +229,15 @@ public class CreateTableStmt extends StatementBase {
       analyzeColumnDefs(analyzer);
     }
 
-    if (cachingOp_ != null) cachingOp_.analyze(analyzer);
+    if (cachingOp_ != null) {
+      cachingOp_.analyze(analyzer);
+      if (cachingOp_.shouldCache() && location_ != null &&
+          !FileSystemUtil.isPathCacheable(location_.getPath())) {
+        throw new AnalysisException(String.format("Location '%s' cannot be cached. " +
+            "Please retry without caching: CREATE TABLE %s ... UNCACHED",
+            location_.toString(), tableName_));
+      }
+    }
   }
 
   private void analyzeRowFormat(Analyzer analyzer) throws AnalysisException {

@@ -214,7 +214,8 @@ class ImpalaTestSuite(BaseTestSuite):
           # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.
           expected_str = test_section['CATCH'].strip() \
               .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
-              .replace('$NAMENODE', NAMENODE)
+              .replace('$NAMENODE', NAMENODE) \
+              .replace('$IMPALA_HOME', IMPALA_HOME)
           assert expected_str in str(e)
           continue
         raise
@@ -229,14 +230,17 @@ class ImpalaTestSuite(BaseTestSuite):
       if encoding: result.data = [row.decode(encoding) for row in result.data]
       # Replace $NAMENODE in the expected results with the actual namenode URI.
       if 'RESULTS' in test_section:
-        test_section['RESULTS'] = test_section['RESULTS'].replace('$NAMENODE', NAMENODE);
-      verify_raw_results(test_section, result,
+        test_section['RESULTS'] = test_section['RESULTS'] \
+            .replace('$NAMENODE', NAMENODE) \
+            .replace('$IMPALA_HOME', IMPALA_HOME)
+        verify_raw_results(test_section, result,
                          vector.get_value('table_format').file_format,
                          pytest.config.option.update_results)
       # If --update_results, then replace references to the namenode URI with $NAMENODE.
       if pytest.config.option.update_results and 'RESULTS' in test_section:
-        test_section['RESULTS'] = test_section['RESULTS'].replace(NAMENODE, '$NAMENODE')
-
+        test_section['RESULTS'] = test_section['RESULTS'] \
+            .replace(NAMENODE, '$NAMENODE') \
+            .replace('$IMPALA_HOME', IMPALA_HOME)
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)
