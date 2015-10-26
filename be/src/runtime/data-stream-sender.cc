@@ -422,7 +422,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
     Channel* current_channel = channels_[current_channel_idx_];
     current_channel->WaitForRpc();
     RETURN_IF_ERROR(SerializeBatch(batch, current_channel->thrift_batch()));
-    current_channel->SendBatch(current_channel->thrift_batch());
+    RETURN_IF_ERROR(current_channel->SendBatch(current_channel->thrift_batch()));
     current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
   } else {
     // hash-partition batch's rows across channels
