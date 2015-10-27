@@ -86,7 +86,8 @@ class MonotonicStopWatch {
   MonotonicStopWatch() {
     total_time_ = 0;
     running_ = false;
-    time_ceiling_ = NULL;
+    // Used to signal that time_ceiling_ is not set.
+    has_time_ceiling_ = false;
   }
 
   void Start() {
@@ -104,7 +105,10 @@ class MonotonicStopWatch {
   }
 
   /// Set the time ceiling of the stop watch. The stop watch won't run past the ceiling.
-  void SetTimeCeiling(const timespec& ceiling) { time_ceiling_ = &ceiling; }
+  void SetTimeCeiling(const timespec& ceiling) {
+    time_ceiling_ = ceiling;
+    has_time_ceiling_ = true;
+  }
 
   /// Restarts the timer. Returns the elapsed time until this point.
   uint64_t Reset() {
@@ -126,7 +130,8 @@ class MonotonicStopWatch {
   }
 
  private:
-  const timespec* time_ceiling_;
+  timespec time_ceiling_;
+  bool has_time_ceiling_;
   timespec start_;
   uint64_t total_time_; // in nanosec
   bool running_;
@@ -144,11 +149,11 @@ class MonotonicStopWatch {
     clock_gettime(CLOCK_MONOTONIC, &end);
     const timespec* actual_end = &end;
 
-    if (time_ceiling_ != NULL) {
+    if (has_time_ceiling_) {
       // If time_ceiling_ is less than start time, return 0.
-      if (TimeLessThan(*time_ceiling_, start_)) return 0;
+      if (TimeLessThan(time_ceiling_, start_)) return 0;
       // If time_ceiling_ is less than end, use it as end time.
-      if (TimeLessThan(*time_ceiling_, end)) actual_end = time_ceiling_;
+      if (TimeLessThan(time_ceiling_, end)) actual_end = &time_ceiling_;
     }
     return (actual_end->tv_sec - start_.tv_sec) * 1000L * 1000L * 1000L +
         (actual_end->tv_nsec - start_.tv_nsec);

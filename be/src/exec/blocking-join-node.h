@@ -101,13 +101,6 @@ class BlockingJoinNode : public ExecNode {
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
   RuntimeProfile::Counter* probe_row_counter_;   // num probe (left child) rows
 
-  /// The time (i.e. clock reads) when the right child stops overlapping with the left
-  /// child.
-  /// For the single threaded case, the left and right child never overlaps.
-  /// For the build side in a different thread, the overlap stops when the left child
-  /// Open() returns.
-  timespec overlap_stops_time_;
-
   /// Stopwatch that measures the build child's Open/GetNext time that overlaps
   /// with the probe child Open().
   MonotonicStopWatch built_probe_overlap_stop_watch_;

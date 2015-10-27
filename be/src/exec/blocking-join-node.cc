@@ -169,6 +169,12 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   // Inside a subplan we expect Open() to be called a number of times proportional to the
   // input data of the SubplanNode, so we prefer doing the join build in the main thread,
   // assuming that thread creation is expensive relative to a single subplan iteration.
+  //
+  // In this block, we also compute the 'overlap' time for the left and right child.  This
+  // is the time (i.e. clock reads) when the right child stops overlapping with the left
+  // child. For the single threaded case, the left and right child never overlap. For the
+  // build side in a different thread, the overlap stops when the left child Open()
+  // returns.
   if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
     Promise<Status> build_side_status;
     AddRuntimeExecOption("Join Build-Side Prepared Asynchronously");
@@ -187,8 +193,9 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     Status open_status = child(0)->Open(state);
 
     // The left/right child overlap stops here.
-    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time_);
-    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time_);
+    timespec overlap_stops_time;
+    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time);
+    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time);
 
     // Blocks until ConstructBuildSide has returned, after which the build side structures
     // are fully constructed.
@@ -204,9 +211,10 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(child(0)->Open(state));
     RETURN_IF_ERROR(ConstructBuildSide(state));
   } else {
-    // The left/right child never overlaps. The overlap stops here.
-    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time_);
-    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time_);
+    // The left/right child never overlap. The overlap stops here.
+    timespec overlap_stops_time;
+    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time);
+    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time);
 
     RETURN_IF_ERROR(ConstructBuildSide(state));
     RETURN_IF_ERROR(child(0)->Open(state));
