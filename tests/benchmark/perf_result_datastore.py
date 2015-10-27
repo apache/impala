@@ -33,7 +33,7 @@ class PerfResultDataStore(object):
   order of 1 parquet file per run.'''
 
   def __init__(self, host, port, database_name):
-    self._connection = impala_connect(host, port)
+    self._connection = impala_connect(host, port, use_ssl=True, auth_mechanism='GSSAPI')
     self._database_name = database_name
     self._staging_exec_result_table = None
     self._staging_profile_table = None
