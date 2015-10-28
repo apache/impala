@@ -6,12 +6,13 @@ import pytest
 from subprocess import call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfIsilon, SkipIfS3
+from tests.common.skip import SkipIfIsilon, SkipIfS3, SkipIfLocal
 from tests.common.test_vector import *
 from tests.util.filesystem_utils import get_fs_path
 
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
+
 class TestMetadataQueryStatements(ImpalaTestSuite):
 
   CREATE_DATA_SRC_STMT = ("CREATE DATA SOURCE %s LOCATION '" +
@@ -69,10 +70,10 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         "comment \"test comment\"")
     self.client.execute(
         "create database if not exists impala_test_desc_db3 "
-        "location \"hdfs://localhost:20500/testdb\"")
+        "location \"" + get_fs_path("/testdb") + "\"")
     self.client.execute(
         "create database if not exists impala_test_desc_db4 "
-        "comment \"test comment\" location \"hdfs://localhost:20500/test2.db\"")
+        "comment \"test comment\" location \"" + get_fs_path("/test2.db") + "\"")
     self.client.execute("invalidate metadata")
 
   def teardown_method(self, method):
@@ -89,6 +90,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @pytest.mark.execute_serially
   @SkipIfS3.hive
   @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_describe_db(self, vector):
     self.run_test_case('QueryTest/describedb', vector)
 
@@ -111,6 +113,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   # data doesn't reside in hdfs.
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfLocal.hive
   def test_describe_formatted(self, vector):
     # Describe a partitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
@@ -151,6 +154,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   # Missing Coverage: ddl by hive being visible to Impala for data not residing in hdfs.
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfLocal.hive
   def test_impala_sees_hive_created_tables_and_databases(self, vector):
     self.client.set_configuration(vector.get_value('exec_option'))
     db_name = 'hive_test_db'

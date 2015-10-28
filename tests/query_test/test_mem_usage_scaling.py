@@ -19,6 +19,7 @@ from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIfLocal
 
 class TestQueryMemLimitScaling(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits. """
@@ -150,6 +151,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
   def test_low_mem_limit_q9(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH['Q9']);
 
+  @SkipIfLocal.mem_usage_different
   def test_low_mem_limit_q10(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q10', self.MIN_MEM_FOR_TPCH['Q10']);
 
@@ -183,6 +185,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
   def test_low_mem_limit_q20(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q20', self.MIN_MEM_FOR_TPCH['Q20']);
 
+  @SkipIfLocal.mem_usage_different
   def test_low_mem_limit_q21(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q21', self.MIN_MEM_FOR_TPCH['Q21']);
 

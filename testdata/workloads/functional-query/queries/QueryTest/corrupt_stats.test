@@ -16,8 +16,8 @@ show table stats corrupted;
 ---- LABELS
 ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
-'1',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
-'2',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'1',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=2'
 'Total',-1,2,'48B','0B','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
@@ -30,8 +30,8 @@ show table stats corrupted;
 ---- LABELS
 ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
-'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=2'
 'Total',6,2,'48B','0B','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
@@ -47,8 +47,8 @@ show table stats corrupted;
 ---- LABELS
 ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
-'1',0,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'1',0,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=2'
 'Total',6,2,'48B','0B','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
@@ -82,8 +82,8 @@ show table stats corrupted;
 ---- LABELS
 ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
-'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=2'
 'Total',0,2,'48B','0B','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
@@ -107,8 +107,8 @@ show table stats corrupted;
 ---- LABELS
 ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
-'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
-'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted/org=2'
 'Total',6,2,'48B','0B','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
@@ -134,7 +134,7 @@ show table stats corrupted_no_part;
 ---- LABELS
 #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
-3,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted_no_part'
+3,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted_no_part'
 ---- TYPES
 BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
@@ -158,7 +158,7 @@ show table stats corrupted_no_part;
 ---- LABELS
 #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
--1,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted_no_part'
+-1,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/compute_stats_db.db/corrupted_no_part'
 ---- TYPES
 BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====

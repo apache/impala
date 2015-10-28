@@ -20,10 +20,11 @@ import pwd
 import pytest
 import time
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS, get_fs_path
 
 @SkipIfS3.insert
+@SkipIfLocal.hdfs_client
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
 

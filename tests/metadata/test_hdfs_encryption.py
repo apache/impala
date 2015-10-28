@@ -17,7 +17,7 @@ import logging
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.shell_util import exec_process
 
@@ -30,6 +30,7 @@ TMP_DIR = '/%s' % (PYWEBHDFS_TMP_DIR)
 
 @SkipIfS3.load_data
 @SkipIfIsilon.hdfs_encryption
+@SkipIfLocal.hdfs_encryption
 @pytest.mark.execute_serially
 class TestHdfsEncryption(ImpalaTestSuite):
   ''' Tests LOAD DATA commands work between HDFS encryption zones.

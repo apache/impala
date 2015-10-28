@@ -24,9 +24,8 @@ from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfIsilon
-from tests.common.skip import SkipIfS3
-from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
@@ -70,6 +69,7 @@ class TestDdlStatements(ImpalaTestSuite):
       self.hdfs_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
 
   @SkipIfS3.hdfs_client # S3: missing coverage: drop table/partition with PURGE
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_table_with_purge(self):
     """This test checks if the table data is permamently deleted in
@@ -117,6 +117,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir("test-warehouse/data_t3", recursive=True)
 
   @SkipIfS3.hdfs_client # S3: missing coverage: drop table/database
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_cleans_hdfs_dirs(self):
     DDL_TEST_DB = "ddl_test_db"
@@ -158,6 +159,7 @@ class TestDdlStatements(ImpalaTestSuite):
     assert not self.hdfs_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
 
   @SkipIfS3.insert # S3: missing coverage: truncate table
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_truncate_cleans_hdfs_files(self):
     TRUNCATE_DB = "truncate_table_test_db"
@@ -218,6 +220,7 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   @pytest.mark.execute_serially
   def test_create_hive_integration(self, vector):
     """Verifies that creating a catalog entity (database, table) in Impala using
@@ -264,6 +267,7 @@ class TestDdlStatements(ImpalaTestSuite):
 
   # TODO: don't use hdfs_client
   @SkipIfS3.insert # S3: missing coverage: alter table
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -279,6 +283,7 @@ class TestDdlStatements(ImpalaTestSuite):
         multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIfS3.hdfs_client # S3: missing coverage: alter table drop partition
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_alter_table_drop_partition_with_purge(self, vector):
     """Verfies whether alter <tbl> drop partition purge actually skips trash"""

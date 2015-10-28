@@ -17,7 +17,7 @@ from subprocess import check_call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIf
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIf, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
@@ -54,6 +54,7 @@ class TestComputeStats(ImpalaTestSuite):
     self.cleanup_db(self.TEST_DB_NAME)
     self.cleanup_db(self.TEST_ALIASING_DB_NAME)
 
+  @SkipIfLocal.hdfs_blocks
   @pytest.mark.execute_serially
   def test_compute_stats(self, vector):
     self.run_test_case('QueryTest/compute-stats', vector)
@@ -72,6 +73,7 @@ class TestComputeStats(ImpalaTestSuite):
   @SkipIfS3.hive
   @SkipIfS3.insert
   @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_compute_stats_impala_2201(self, vector):
     """IMPALA-2201: Tests that the results of compute incremental stats are properly
     persisted when the data was loaded from Hive with hive.stats.autogather=true.

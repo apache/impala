@@ -6,7 +6,7 @@ import pytest
 import re
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the different explain levels [0-3] on a few queries.
@@ -98,6 +98,7 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
     self.cleanup_db(self.TEST_DB_NAME)
 
   @SkipIfS3.hdfs_client
+  @SkipIfLocal.hdfs_client
   def test_non_empty_partition_0_rows(self):
     """Regression test for IMPALA-1708: if a partition has 0 rows but > 0 files after
     COMPUTE STATS, don't warn the user about missing stats. The files are probably

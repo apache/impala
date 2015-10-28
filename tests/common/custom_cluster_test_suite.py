@@ -21,6 +21,7 @@ import re
 from subprocess import call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.skip import SkipIfLocal
 from time import sleep
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
@@ -32,6 +33,7 @@ IMPALAD_ARGS = 'impalad_args'
 STATESTORED_ARGS = 'state_store_args'
 CATALOGD_ARGS = 'catalogd_args'
 
+@SkipIfLocal.multiple_impalad
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Every test in a test suite deriving from this class gets its own Impala cluster.
   Custom arguments may be passed to the cluster by using the @with_args decorator."""

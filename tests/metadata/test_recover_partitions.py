@@ -16,10 +16,11 @@
 import pytest
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 
 # Validates ALTER TABLE RECOVER PARTITIONS statement
+
 class TestRecoverPartitions(ImpalaTestSuite):
   TEST_DB = "recover_parts_db"
   TEST_TBL = "alter_recover_partitions"
@@ -59,6 +60,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     self.cleanup_db(self.TEST_DB)
 
   @SkipIfS3.insert
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_recover_partitions(self, vector):
     """Test that RECOVER PARTITIONS correctly discovers new partitions added externally
@@ -128,6 +130,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     assert self.has_value(null_inserted_value, result.data) == True
 
   @SkipIfS3.insert
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_nondefault_location_partitions(self, vector):
     """If the location of data files in one partition is changed, test that data files
@@ -164,6 +167,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     assert self.has_value(inserted_value, result.data) == True
 
   @SkipIfS3.insert
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_duplicate_partitions(self, vector):
     """Test that RECOVER PARTITIONS does not recover equivalent partitions. Two partitions
@@ -213,6 +217,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         % (self.TEST_TBL))
 
   @SkipIfS3.insert
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_post_invalidate(self, vector):
     """Test that RECOVER PARTITIONS works correctly after invalidate."""
@@ -248,6 +253,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     assert self.has_value('4', result.data) == True
 
   @SkipIfS3.insert
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_support_all_types(self, vector):
     """Test that RECOVER PARTITIONS works correctly on all supported data types."""
@@ -288,6 +294,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     # Test overflow partition values.
     self.check_invalid_partition_values(normal_values, overflow_values)
 
+  @SkipIfLocal.hdfs_client
   def check_invalid_partition_values(self, normal_values, invalid_values):
     """"Check that RECOVER PARTITIONS ignores partitions with invalid partition values."""
     result = self.execute_query_expect_success(self.client,

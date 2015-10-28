@@ -18,7 +18,7 @@ import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 TEST_TBL = 'read_only_tbl'
@@ -26,6 +26,7 @@ TBL_LOC = '%s/%s' % (WAREHOUSE, TEST_TBL)
 
 
 @SkipIfS3.insert
+@SkipIfLocal.hdfs_client
 class TestHdfsPermissions(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

@@ -14,8 +14,8 @@
 #
 import os
 import pytest
-from tests.common.skip import SkipIfS3, SkipIfIsilon
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
@@ -71,6 +71,8 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
     cls._drop_test_tbl()
     super(TestInsertBehaviourCustomCluster, cls).teardown_method(method)
 
+  @SkipIfLocal.hdfs_client
+  @SkipIfLocal.root_path
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--insert_inherit_permissions=true")
   def test_insert_inherit_permission(self):
@@ -99,6 +101,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
     finally:
       client.close()
 
+  @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--insert_inherit_permissions=false")
   def test_insert_inherit_permission_disabled(self):

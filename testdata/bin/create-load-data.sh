@@ -302,7 +302,14 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 # Start Impala
-${IMPALA_HOME}/bin/start-impala-cluster.py -s 3 --log_dir=${DATA_LOADING_LOG_DIR}
+START_CLUSTER_ARGS=""
+if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
+  START_CLUSTER_ARGS="--impalad_args=--abort_on_config_error=false -s 1"
+else
+  START_CLUSTER_ARGS="-s 3"
+fi
+${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${DATA_LOADING_LOG_DIR} \
+    ${START_CLUSTER_ARGS}
 # The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
 # On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
 # needed.
@@ -331,8 +338,11 @@ fi
 
 build-and-copy-hive-udfs
 # Configure alltypes_seq as a read-only table. This is required for fe tests.
-hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
-hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+# Set both read and execute permissions because accessing the contents of a directory on
+# the local filesystem requires the x permission (while on HDFS it requires the r
+# permission).
+hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
+hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
 
 #IMPALA-1881: data file produced by hive with multiple blocks.
 hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet

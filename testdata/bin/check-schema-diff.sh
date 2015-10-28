@@ -23,7 +23,7 @@
 set -ex
 
 DATASET=${1-}
-hdfs dfs -test -e  /test-warehouse/githash.txt || { exit 0; }
-GIT_HASH=$(echo $(hdfs dfs -cat /test-warehouse/githash.txt))
+hdfs dfs -test -e  ${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/githash.txt || { exit 0; }
+GIT_HASH=$(echo $(hdfs dfs -cat ${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/githash.txt))
 # Check whether a non-empty diff exists.
 git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets/$DATASET

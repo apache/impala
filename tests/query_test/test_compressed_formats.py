@@ -8,7 +8,8 @@ from os.path import join
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.util.filesystem_utils import get_fs_path
 
 # (file extension, table suffix) pairs
 compression_formats = [
@@ -23,6 +24,7 @@ compression_formats = [
 # filesystem.
 @SkipIfS3.hive
 @SkipIfIsilon.hive
+@SkipIfLocal.hive
 class TestCompressedFormats(ImpalaTestSuite):
   """
   Tests that we support compressed RC, sequence and text files and that unsupported
@@ -152,7 +154,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
   TODO: Once IMPALA-1619 is fixed, modify the test to test > 2GB file."""
 
   TABLE_NAME = "large_compressed_file"
-  TABLE_LOCATION = "/test-warehouse/large_compressed_file"
+  TABLE_LOCATION = get_fs_path("/test-warehouse/large_compressed_file")
   """ Name the file with ".snappy" extension to let scanner treat it
   as a snappy compressed file."""
   FILE_NAME = "largefile.snappy"

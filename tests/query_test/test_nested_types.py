@@ -9,7 +9,7 @@ import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfOldAggsJoins, SkipIfIsilon, SkipIfS3
+from tests.common.skip import SkipIfOldAggsJoins, SkipIfIsilon, SkipIfS3, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 from subprocess import call, check_call
 
@@ -58,6 +58,7 @@ class TestNestedTypes(ImpalaTestSuite):
     """Queries using nested types and with WITH clause."""
     self.run_test_case('QueryTest/nested-types-with-clause', vector)
 
+  @SkipIfLocal.mem_usage_different
   def test_tpch(self, vector):
     """Queries over the larger nested TPCH dataset."""
     self.run_test_case('QueryTest/nested-types-tpch', vector)
@@ -492,6 +493,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   @pytest.mark.execute_serially
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfLocal.hive
   def test_load_hive_table(self, vector):
     """Tests that Impala rejects Hive-created tables with complex types that exceed
     the maximum nesting depth."""

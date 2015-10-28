@@ -17,7 +17,7 @@ from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins, SkipIfLocal
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
@@ -207,6 +207,7 @@ class TestParquet(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
+  @SkipIfLocal.multiple_impalad
   def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # we verify if each impalad reads one block by checking if each impalad reads at
@@ -237,6 +238,7 @@ class TestParquet(ImpalaTestSuite):
 # non-hdfs filesystem.
 @SkipIfS3.hive
 @SkipIfIsilon.hive
+@SkipIfLocal.hive
 class TestParquetComplexTypes(ImpalaTestSuite):
   COMPLEX_COLUMN_TABLE = "functional_parquet.nested_column_types"
 
@@ -418,6 +420,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive
 @SkipIfIsilon.hive
+@SkipIfLocal.hive
 @pytest.mark.execute_serially
 class TestScanTruncatedFiles(ImpalaTestSuite):
   TEST_DB = 'test_truncated_file'

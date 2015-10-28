@@ -21,7 +21,7 @@ import re
 import os
 import pytest
 from functools import partial
-from tests.util.filesystem_utils import IS_DEFAULT_FS, IS_S3, IS_ISILON
+from tests.util.filesystem_utils import IS_DEFAULT_FS, IS_S3, IS_ISILON, IS_LOCAL
 
 
 class SkipIfS3:
@@ -77,3 +77,30 @@ class SkipIfOldAggsJoins:
       reason="Nested types not supported with old aggs and joins")
   unsupported = pytest.mark.skipif(using_old_aggs_joins,
       reason="Query unsupported with old aggs and joins")
+
+class SkipIfLocal:
+  # These ones are skipped due to product limitations.
+  caching = pytest.mark.skipif(IS_LOCAL,
+      reason="HDFS caching not supported on local file system")
+  hdfs_blocks = pytest.mark.skipif(IS_LOCAL,
+      reason="Files on local filesystem are not split into blocks")
+  hdfs_encryption = pytest.mark.skipif(IS_LOCAL,
+      reason="HDFS encryption is not supported on local filesystem")
+  hive = pytest.mark.skipif(IS_LOCAL,
+      reason="Hive not started when using local file system")
+  multiple_impalad = pytest.mark.skipif(IS_LOCAL,
+      reason="Multiple impalads are not supported when using local file system")
+  parquet_file_size = pytest.mark.skipif(IS_LOCAL,
+      reason="Parquet block size incorrectly determined")
+
+  # These ones need test infra work to re-enable.
+  hbase = pytest.mark.skipif(IS_LOCAL,
+      reason="HBase not started when using local file system")
+  hdfs_client = pytest.mark.skipif(IS_LOCAL,
+      reason="HDFS not started when using local file system")
+  mem_usage_different = pytest.mark.skipif(IS_LOCAL,
+      reason="Memory limit too low when running single node")
+  qualified_path = pytest.mark.skipif(IS_LOCAL,
+      reason="Tests rely on HDFS qualified paths")
+  root_path = pytest.mark.skipif(IS_LOCAL,
+      reason="Tests rely on the root directory")

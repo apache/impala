@@ -92,7 +92,7 @@
 <property>
   <!--  this should eventually be deprecated since the metastore should supply this -->
   <name>hive.metastore.warehouse.dir</name>
-  <value>/test-warehouse</value>
+  <value>${WAREHOUSE_LOCATION_PREFIX}/test-warehouse</value>
   <description></description>
 </property>
 

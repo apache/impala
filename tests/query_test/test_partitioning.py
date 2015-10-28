@@ -21,7 +21,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 
 # Tests to validate HDFS partitioning.
 class TestPartitioning(ImpalaTestSuite):
@@ -53,6 +53,7 @@ class TestPartitioning(ImpalaTestSuite):
     map(cls.cleanup_db, cls.TEST_DBS)
     super(TestPartitioning, cls).teardown_class()
 
+  @SkipIfLocal.root_path
   @pytest.mark.execute_serially
   def test_partition_col_types(self, vector):
     self.execute_query("create database hdfs_partitioning");
@@ -63,6 +64,7 @@ class TestPartitioning(ImpalaTestSuite):
   # filesystem.
   @SkipIfS3.hive
   @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   @pytest.mark.execute_serially
   def test_boolean_partitions(self, vector):
     # This test takes about a minute to complete due to the Hive commands that are

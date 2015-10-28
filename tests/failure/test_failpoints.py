@@ -11,7 +11,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, ALL_NODES_ONLY, LOG
 from tests.common.test_vector import TestDimension
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.util.test_file_parser import QueryTestSectionReader
 from time import sleep
 
@@ -40,6 +40,7 @@ QUERY_TYPE = ["SELECT"]
 @SkipIf.skip_hbase # -skip_hbase argument specified
 @SkipIfS3.hbase # S3: missing coverage: failures
 @SkipIfIsilon.hbase # ISILON: missing coverage: failures.
+@SkipIfLocal.hbase
 class TestFailpoints(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -65,7 +66,7 @@ class TestFailpoints(ImpalaTestSuite):
     # Executing an explain on the the test query will fail in an enviornment where hbase
     # tables don't exist (s3). Since this happens before the tests are run, the skipif
     # marker won't catch it. If 's3' is detected as a file system, return immedietely.
-    if os.getenv("TARGET_FILESYSTEM") in ["s3", "isilon"]: return
+    if os.getenv("TARGET_FILESYSTEM") in ["s3", "isilon", "local"]: return
     node_id_map = TestFailpoints.parse_plan_nodes_from_explain_output(QUERY, "functional")
     assert node_id_map
     cls.TestMatrix.add_dimension(TestDimension('location', *FAILPOINT_LOCATION))

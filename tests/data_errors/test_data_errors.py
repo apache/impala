@@ -15,7 +15,7 @@
 # Tests Impala properly handles errors when reading and writing data.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfLocal
 import pytest
 
 class TestDataErrors(ImpalaTestSuite):
@@ -47,6 +47,7 @@ class TestHdfsScanNodeErrors(TestDataErrors):
 
 
 @SkipIfS3.qualified_path
+@SkipIfLocal.qualified_path
 class TestHdfsSeqScanNodeErrors(TestHdfsScanNodeErrors):
   @classmethod
   def add_test_dimensions(cls):

@@ -7,7 +7,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 TEST_TBL_PART = "test_load"
@@ -19,6 +19,7 @@ HIDDEN_FILES = ["{0}/3/.100101.txt".format(STAGING_PATH),
                 "{0}/3/_100101.txt".format(STAGING_PATH)]
 
 @SkipIfS3.load_data
+@SkipIfLocal.hdfs_client
 class TestLoadData(ImpalaTestSuite):
 
   @classmethod

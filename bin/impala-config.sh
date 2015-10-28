@@ -57,6 +57,8 @@ export S3_BUCKET=${S3_BUCKET-""}
 export HDFS_REPLICATION=${HDFS_REPLICATION-3}
 export ISILON_NAMENODE=${ISILON_NAMENODE-""}
 export DEFAULT_FS=${DEFAULT_FS-"hdfs://localhost:20500"}
+export WAREHOUSE_LOCATION_PREFIX=${WAREHOUSE_LOCATION_PREFIX-""}
+export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # Basic error checking
@@ -91,9 +93,21 @@ elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   export DEFAULT_FS
   # isilon manages its own replication.
   export HDFS_REPLICATION=1
+elif [ "${TARGET_FILESYSTEM}" = "local" ]; then
+  if [ ! -d "${WAREHOUSE_LOCATION_PREFIX}" ]; then
+    echo "'$WAREHOUSE_LOCATION_PREFIX' is not a directory on the local filesystem."
+    return 1
+  elif [ ! -r "${WAREHOUSE_LOCATION_PREFIX}" ] || \
+      [ ! -w "${WAREHOUSE_LOCATION_PREFIX}" ]; then
+    echo "Current user does not have read/write permissions on local filesystem path "
+        "'$WAREHOUSE_LOCATION_PREFIX'"
+    return 1
+  fi
+  export DEFAULT_FS=${LOCAL_FS}
+  export FILESYSTEM_PREFIX=${LOCAL_FS}
 elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
-  echo "Valid values are: hdfs, isilon, s3"
+  echo "Valid values are: hdfs, isilon, s3, local"
   return 1
 fi
 

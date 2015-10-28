@@ -9,7 +9,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfLocal
+from tests.util.filesystem_utils import IS_LOCAL
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']
@@ -92,6 +93,7 @@ class TestInsertWideTable(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v: False);
 
+  @SkipIfLocal.parquet_file_size
   def test_insert_wide_table(self, vector):
     table_format = vector.get_value('table_format')
 

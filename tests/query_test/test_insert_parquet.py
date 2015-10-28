@@ -7,7 +7,8 @@ import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.util.filesystem_utils import get_fs_path
 from tests.util.filesystem_utils import WAREHOUSE
 
 # TODO: Add Gzip back.  IMPALA-424
@@ -48,6 +49,7 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     super(TestInsertParquetQueries, cls).setup_class()
 
   @pytest.mark.execute_serially
+  @SkipIfLocal.multiple_impalad
   def test_insert_parquet(self, vector):
     vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = \
         vector.get_value('file_size')
@@ -78,6 +80,7 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
   def setup_class(cls):
     super(TestInsertParquetInvalidCodec, cls).setup_class()
 
+  @SkipIfLocal.multiple_impalad
   def test_insert_parquet_invalid_codec(self, vector):
     vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
@@ -110,6 +113,7 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfIsilon.hdfs_block_size
+  @SkipIfLocal.hdfs_client
   def test_insert_parquet_verify_size(self, vector):
     # Test to verify that the result file size is close to what we expect.i
     TBL = "parquet_insert_size"
@@ -117,7 +121,7 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     CREATE = ("create table parquet_insert_size like tpch_parquet.orders"
               " stored as parquet location '{0}/{1}'".format(WAREHOUSE, TBL))
     QUERY = "insert overwrite {0} select * from tpch.orders".format(TBL)
-    DIR = "test-warehouse/{0}/".format(TBL)
+    DIR = get_fs_path("test-warehouse/{0}/".format(TBL))
     BLOCK_SIZE = 40 * 1024 * 1024
 
     self.execute_query(DROP)

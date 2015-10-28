@@ -52,14 +52,21 @@ public class HdfsCachingUtil {
   // become cached before assuming no more progress is being made.
   private final static int MAX_UNCHANGED_CACHING_REFRESH_INTERVALS = 5;
 
-  private final static DistributedFileSystem dfs;
-  static {
-    try {
-      dfs = FileSystemUtil.getDistributedFileSystem();
-    } catch (IOException e) {
-      throw new RuntimeException("HdfsCachingUtil failed to initialize the " +
-          "DistributedFileSystem: ", e);
+  private static DistributedFileSystem dfs = null;
+
+  /**
+   * Returns the dfs singleton object.
+   */
+  private static DistributedFileSystem getDfs() throws ImpalaRuntimeException {
+    if (dfs == null) {
+      try {
+        dfs = FileSystemUtil.getDistributedFileSystem();
+      } catch (IOException e) {
+        throw new ImpalaRuntimeException("HdfsCachingUtil failed to initialize the " +
+            "DistributedFileSystem: ", e);
+      }
     }
+    return dfs;
   }
 
   /**
@@ -233,7 +240,7 @@ public class HdfsCachingUtil {
 
     // The refresh interval is how often HDFS will update cache directive stats. We use
     // this value to determine how frequently we should poll for changes.
-    long hdfsRefreshIntervalMs = dfs.getConf().getLong(
+    long hdfsRefreshIntervalMs = getDfs().getConf().getLong(
         DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS,
         DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS_DEFAULT);
     Preconditions.checkState(hdfsRefreshIntervalMs > 0);
@@ -287,7 +294,7 @@ public class HdfsCachingUtil {
         .setPath(path).build();
     LOG.debug("Submitting cache directive: " + info.toString());
     try {
-      return dfs.addCacheDirective(info);
+      return getDfs().addCacheDirective(info);
     } catch (IOException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
@@ -339,7 +346,7 @@ public class HdfsCachingUtil {
         .setPath(path).build();
     LOG.debug("Modifying cache directive: " + info.toString());
     try {
-      dfs.modifyCacheDirective(info);
+      getDfs().modifyCacheDirective(info);
     } catch (IOException e) {
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
@@ -354,7 +361,7 @@ public class HdfsCachingUtil {
   private static void removeDirective(long directiveId) throws ImpalaRuntimeException {
     LOG.debug("Removing cache directive id: " + directiveId);
     try {
-      dfs.removeCacheDirective(directiveId);
+      getDfs().removeCacheDirective(directiveId);
     } catch (IOException e) {
       // There is no special exception type for the case where a directive ID does not
       // exist so we must inspect the error message.
@@ -374,7 +381,7 @@ public class HdfsCachingUtil {
         .setId(directiveId)
         .build();
     try {
-      RemoteIterator<CacheDirectiveEntry> itr = dfs.listCacheDirectives(filter);
+      RemoteIterator<CacheDirectiveEntry> itr = getDfs().listCacheDirectives(filter);
       if (itr.hasNext()) return itr.next();
     } catch (IOException e) {
       // Handle connection issues with e.g. HDFS and possible not found errors

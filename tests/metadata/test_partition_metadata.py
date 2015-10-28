@@ -22,7 +22,7 @@ from tests.util.shell_util import exec_process
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 
@@ -57,6 +57,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.cleanup_db(self.TEST_DB)
 
   @SkipIfS3.insert # S3: missing coverage: partition DDL
+  @SkipIfLocal.hdfs_client
   def test_multiple_partitions_same_location(self, vector):
     """Regression test for IMPALA-597. Verifies Impala is able to properly read
     tables that have multiple partitions pointing to the same location.
@@ -94,6 +95,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_partition_metadata_compatibility(self, vector):
     """Regression test for IMPALA-2048. For partitioned tables, test that when Impala
     updates the partition metadata (e.g. by doing a compute stats), the tables are

@@ -16,6 +16,7 @@ import logging
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (TestDimension,
     create_single_exec_option_dimension,
     create_parquet_dimension)

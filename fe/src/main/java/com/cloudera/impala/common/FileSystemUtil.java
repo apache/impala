@@ -255,6 +255,20 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true iff the filesystem is an instance of LocalFileSystem.
+   */
+  public static boolean isLocalFileSystem(FileSystem fs) {
+    return fs instanceof LocalFileSystem;
+  }
+
+  /**
+   * Return true iff path is on a local filesystem.
+   */
+  public static boolean isLocalFileSystem(Path path) throws IOException {
+    return isLocalFileSystem(path.getFileSystem(CONF));
+  }
+
+  /**
    * Returns true iff the filesystem is a DistributedFileSystem.
    */
   public static boolean isDistributedFileSystem(FileSystem fs) {
@@ -340,5 +354,15 @@ public class FileSystemUtil {
    */
   public static Configuration getConfiguration() {
     return CONF;
+  }
+
+  /**
+   * Returns true iff the given location is on a filesystem that Impala can write to.
+   */
+  public static boolean isImpalaWritableFilesystem(String location)
+      throws IOException {
+    Path path = new Path(location);
+    return (FileSystemUtil.isDistributedFileSystem(path) ||
+        FileSystemUtil.isLocalFileSystem(path));
   }
 }
