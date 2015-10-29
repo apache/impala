@@ -262,6 +262,10 @@ class Coordinator {
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
 
+  // Sets the TDescriptorTable(s) for the current fragment.
+  void SetExecPlanDescriptorTable(const TPlanFragment& fragment,
+      TExecPlanFragmentParams* rpc_params);
+
   /// True if execution has completed, false otherwise.
   bool execution_completed_;
 

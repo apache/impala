@@ -272,6 +272,7 @@ struct TExecPlanFragmentParams {
   2: optional Planner.TPlanFragment fragment
 
   // required in V1
+  // Contains only those descriptors referenced by fragment's scan nodes and data sink
   3: optional Descriptors.TDescriptorTable desc_tbl
 
   // required in V1
