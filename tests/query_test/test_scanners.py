@@ -200,9 +200,13 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
+  def test_continue_on_error(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/parquet-continue-on-error', vector)
+
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
-  def test_verify_runtime_profile(self, vector):
+  def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # we verify if each impalad reads one block by checking if each impalad reads at
     # least one row group.

@@ -22,3 +22,19 @@ hive> INSERT INTO TABLE tbl
 alltypesagg_hive_13_1.parquet:
 Generated with parquet-mr version 1.5.0-cdh5.4.0-SNAPSHOT
 hive> create table alltypesagg_hive_13_1 stored as parquet as select * from alltypesagg;
+
+bad_column_metadata.parquet:
+Generated with hacked version of parquet-mr 1.8.2-SNAPSHOT
+Schema:
+ {"type": "record",
+  "namespace": "com.cloudera.impala",
+  "name": "bad_column_metadata",
+  "fields": [
+      {"name": "id", "type": ["null", "long"]},
+      {"name": "int_array", "type": ["null", {"type": "array", "items": ["null", "int"]}]}
+  ]
+ }
+Contains 3 row groups, each with ten rows and each array containing ten elements. The
+first rowgroup column metadata for 'int_array' incorrectly states there are 50 values
+(instead of 100), and the second rowgroup column metadata for 'id' incorrectly states
+there are 11 values (instead of 10). The third rowgroup has the correct metadata.

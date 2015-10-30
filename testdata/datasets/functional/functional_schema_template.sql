@@ -1418,6 +1418,19 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/kite_required_fields.parquet \
 /test-warehouse/kite_required_fields_parquet/
 ====
 ---- DATASET
+-- Parquet file with incorrect column metadata in multiple row groups
+functional
+---- BASE_TABLE_NAME
+bad_column_metadata
+---- COLUMNS
+id bigint
+int_array array<int>
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/bad_column_metadata_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/bad_column_metadata.parquet \
+/test-warehouse/bad_column_metadata_parquet
+====
+---- DATASET
 functional
 ---- BASE_TABLE_NAME
 bad_serde

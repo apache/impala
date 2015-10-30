@@ -398,6 +398,8 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of row groups that need to be read.
   RuntimeProfile::Counter* num_row_groups_counter_;
 
+  const char* filename() const { return metadata_range_->file(); }
+
   /// Reads data using 'column_readers' to materialize instances of 'tuple_desc'
   /// (including recursively reading collections).
   ///
