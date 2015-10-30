@@ -303,7 +303,11 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
 // The "auxprop" plugin interface was intended to be a database service for the "glue"
 // layer between the mechanisms and applications.  We, however, hijack this interface
 // simply in order to provide an audit message prior to that start of authentication.
+#if SASL_VERSION_FULL >= ((2 << 16) | (1 << 8) | 25)
+static int ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
+#else
 static void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
+#endif
     unsigned int flags, const char* user, unsigned ulen) {
   // This callback is called twice, once with this flag clear, and once with
   // this flag set.  We only want to log this message once, so only log it when
@@ -312,6 +316,9 @@ static void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparam
     string ustr(user, ulen);
     VLOG(2) << "Attempting to authenticate user \"" << ustr << "\"";
   }
+#if SASL_VERSION_FULL >= ((2 << 16) | (1 << 8) | 25)
+  return SASL_OK;
+#endif
 }
 
 // Singleton structure used to register our auxprop plugin with Sasl

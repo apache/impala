@@ -112,9 +112,9 @@ set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
 # find Sasl
 find_package(Sasl REQUIRED)
 include_directories(${SASL_INCLUDE_DIR})
-add_library(saslstatic STATIC IMPORTED)
-set_target_properties(saslstatic PROPERTIES IMPORTED_LOCATION ${SASL_STATIC_LIBRARY})
-set(SASL_LIBRARY saslstatic)
+add_library(sasllib SHARED IMPORTED)
+set_target_properties(sasllib PROPERTIES IMPORTED_LOCATION ${SASL_SHARED_LIB})
+set(SASL_LIBRARY sasllib)
 message(STATUS "Sasl include dir: " ${SASL_INCLUDE_DIR})
 message(STATUS "Sasl library: " ${SASL_LIBRARY})
 
