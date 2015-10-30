@@ -1563,24 +1563,13 @@ from functional.alltypestiny order by id
 int, bigint, bigint, double
 ====
 ---- QUERY
-# Regression test for IMPALA-2265. The mem_limit is tuned to reproduce the issue
-# when running this query against functional_parquet.
+# Regression test for IMPALA-2265, IMPALA-2559. The mem_limit is tuned to reproduce the
+# issue when running this query against functional_parquet.
 SET mem_limit=150m;
 SELECT lag(-180, 13) over (ORDER BY t1.int_col ASC, t2.int_col ASC) AS int_col
-FROM functional_parquet.alltypes t1 CROSS JOIN alltypes t2 LIMIT 10
----- RESULTS
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
-NULL
----- TYPES
-SMALLINT
+FROM functional_parquet.alltypes t1 CROSS JOIN functional_parquet.alltypes t2 LIMIT 10
+---- CATCH
+Memory limit exceeded
 ====
 ---- QUERY
 set mem_limit=0

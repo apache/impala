@@ -1069,7 +1069,7 @@ Status Sorter::InputDone() {
     }
 
     // Create the final merger.
-    CreateMerger(sorted_runs_.size());
+    RETURN_IF_ERROR(CreateMerger(sorted_runs_.size()));
   }
   return Status::OK();
 }
@@ -1167,7 +1167,7 @@ Status Sorter::MergeIntermediateRuns() {
     // that the final merge can be performed.
     int num_runs_to_merge = min<int>(max_runs_per_intermediate_merge,
         sorted_runs_.size() - max_runs_per_intermediate_merge);
-    CreateMerger(num_runs_to_merge);
+    RETURN_IF_ERROR(CreateMerger(num_runs_to_merge));
     RowBatch intermediate_merge_batch(*output_row_desc_, state_->batch_size(),
         mem_tracker_);
     // merged_run is the new sorted run that is produced by the intermediate merge.
