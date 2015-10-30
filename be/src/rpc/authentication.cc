@@ -66,8 +66,7 @@ DECLARE_string(krb5_debug_file);
 
 DEFINE_int32(kerberos_reinit_interval, 60,
     "Interval, in minutes, between kerberos ticket renewals.");
-DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2:"
-    "/usr/lib/x86_64-linux-gnu/sasl2", "Colon separated list of paths to look for SASL "
+DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
     "security library plugins.");
 DEFINE_bool(enable_ldap_auth, false,
     "If true, use LDAP authentication for client connections");
@@ -302,7 +301,11 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
 // The "auxprop" plugin interface was intended to be a database service for the "glue"
 // layer between the mechanisms and applications.  We, however, hijack this interface
 // simply in order to provide an audit message prior to that start of authentication.
+#if SASL_VERSION_FULL >= ((2 << 16) | (1 << 8) | 25)
+static int ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
+#else
 static void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
+#endif
     unsigned int flags, const char* user, unsigned ulen) {
   // This callback is called twice, once with this flag clear, and once with
   // this flag set.  We only want to log this message once, so only log it when
@@ -311,6 +314,9 @@ static void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparam
     string ustr(user, ulen);
     VLOG(2) << "Attempting to authenticate user \"" << ustr << "\"";
   }
+#if SASL_VERSION_FULL >= ((2 << 16) | (1 << 8) | 25)
+  return SASL_OK;
+#endif
 }
 
 // Singleton structure used to register our auxprop plugin with Sasl
@@ -412,14 +418,12 @@ static int SaslAuthorizeExternal(sasl_conn_t* conn, void* context,
   return SASL_OK;
 }
 
-// Sasl callback - where to look for plugins.  We return the list of possible
-// places the plugins might be; this comes from the sasl_path flag.
-//
-// Places we know they might be:
-// UBUNTU:          /usr/lib/sasl2
-// CENTOS:          /usr/lib64/sasl2
-// custom install:  /usr/local/lib/sasl2
-// UBUNTU:          /usr/lib/x86_64-linux-gnu/sasl2
+// Sasl callback - where to look for plugins.  When SASL is dynamically linked, the plugin
+// path is embedded in the library. However, for backwards compatibility in Impala, we
+// provided the possibility to define a custom SASL plugin path that may override the
+// system default. This function is only used, when the user actively chooses to manually
+// define a custom SASL path, otherwise the automatic path resolution from the SASL
+// library is used.
 //
 // context: Ignored, always NULL
 // path: We return the plugin paths here.
@@ -482,22 +486,26 @@ Status InitAuth(const string& appname) {
     GENERAL_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
     GENERAL_CALLBACKS[0].context = ((void *)"General");
 
-    // Need this here so we can find available mechanisms
-    GENERAL_CALLBACKS[1].id = SASL_CB_GETPATH;
-    GENERAL_CALLBACKS[1].proc = (int (*)())&SaslGetPath;
-    GENERAL_CALLBACKS[1].context = NULL;
+    int arr_offset = 0;
+    if (!FLAGS_sasl_path.empty()) {
+      // Need this here so we can find available mechanisms
+      GENERAL_CALLBACKS[1].id = SASL_CB_GETPATH;
+      GENERAL_CALLBACKS[1].proc = (int (*)())&SaslGetPath;
+      GENERAL_CALLBACKS[1].context = NULL;
+      arr_offset = 1;
+    }
 
     // Allows us to view and set some options
-    GENERAL_CALLBACKS[2].id = SASL_CB_GETOPT;
-    GENERAL_CALLBACKS[2].proc = (int (*)())&SaslGetOption;
-    GENERAL_CALLBACKS[2].context = NULL;
+    GENERAL_CALLBACKS[1 + arr_offset].id = SASL_CB_GETOPT;
+    GENERAL_CALLBACKS[1 + arr_offset].proc = (int (*)())&SaslGetOption;
+    GENERAL_CALLBACKS[1 + arr_offset].context = NULL;
 
     // For curiosity, let's see what files are being touched.
-    GENERAL_CALLBACKS[3].id = SASL_CB_VERIFYFILE;
-    GENERAL_CALLBACKS[3].proc = (int (*)())&SaslVerifyFile;
-    GENERAL_CALLBACKS[3].context = NULL;
+    GENERAL_CALLBACKS[2 + arr_offset].id = SASL_CB_VERIFYFILE;
+    GENERAL_CALLBACKS[2 + arr_offset].proc = (int (*)())&SaslVerifyFile;
+    GENERAL_CALLBACKS[2 + arr_offset].context = NULL;
 
-    GENERAL_CALLBACKS[4].id = SASL_CB_LIST_END;
+    GENERAL_CALLBACKS[3 + arr_offset].id = SASL_CB_LIST_END;
 
     if (!FLAGS_principal.empty()) {
       // Callbacks for when we're a Kerberos Sasl internal connection.  Just do logging.
