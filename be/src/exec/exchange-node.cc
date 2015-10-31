@@ -83,7 +83,7 @@ Status ExchangeNode::Open(RuntimeState* state) {
         sort_exec_exprs_.rhs_ordering_expr_ctxs(), is_asc_order_, nulls_first_);
     // CreateMerger() will populate its merging heap with batches from the stream_recvr_,
     // so it is not necessary to call FillInputRowBatch().
-    stream_recvr_->CreateMerger(less_than);
+    RETURN_IF_ERROR(stream_recvr_->CreateMerger(less_than));
   } else {
     RETURN_IF_ERROR(FillInputRowBatch(state));
   }
