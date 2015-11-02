@@ -84,8 +84,7 @@ struct TGetTablesResult {
   1: list<string> tables
 }
 
-// Arguments to getDbNames, which returns a list of dbs that match an optional
-// pattern
+// Arguments to getDbs, which returns a list of dbs that match an optional pattern
 struct TGetDbsParams {
   // If not set, match every database
   1: optional string pattern
@@ -96,9 +95,9 @@ struct TGetDbsParams {
   2: optional ImpalaInternalService.TSessionState session
 }
 
-// getDbNames returns a list of database names
+// getDbs returns a list of databases
 struct TGetDbsResult {
-  1: list<string> dbs
+  1: list<CatalogObjects.TDatabase> dbs
 }
 
 // Arguments to getDataSrcsNames, which returns a list of data sources that match an

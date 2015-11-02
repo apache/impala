@@ -65,7 +65,7 @@ class ImpalaServer::QueryExecState {
   Status Exec(TExecRequest* exec_request);
 
   /// Execute a HiveServer2 metadata operation
-  /// TODO: This is likely a superset of GetTableNames/GetDbNames. Coalesce these different
+  /// TODO: This is likely a superset of GetTableNames/GetDbs. Coalesce these different
   /// code paths.
   Status Exec(const TMetadataOpRequest& exec_request);
 

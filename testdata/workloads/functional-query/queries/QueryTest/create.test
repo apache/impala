@@ -152,9 +152,9 @@ drop table ddl_test_db.test_like_file_create
 # It should show up now
 show databases like 'ddl_test_db'
 ---- RESULTS
-'ddl_test_db'
+'ddl_test_db',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 # Make sure creating a database with the same name doesn't throw an error when
@@ -817,7 +817,7 @@ drop database ddl_test_db
 show databases like 'ddl_test_db'
 ---- RESULTS
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 # Test DROP DATABASE ... [CASCADE | RESTRICT]
@@ -826,9 +826,9 @@ create database if not exists test_drop_cascade_db
 ---- QUERY
 show databases like 'test_drop_cascade_db'
 ---- RESULTS
-'test_drop_cascade_db'
+'test_drop_cascade_db',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 create table if not exists test_drop_cascade_db.t1 (i int);
@@ -884,9 +884,9 @@ create database if not exists test_drop_restrict_db
 ---- QUERY
 show databases like 'test_drop_restrict_db'
 ---- RESULTS
-'test_drop_restrict_db'
+'test_drop_restrict_db',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 drop database test_drop_restrict_db restrict
@@ -903,9 +903,9 @@ create database if not exists test_property_length_db
 ---- QUERY
 show databases like 'test_property_length_db'
 ---- RESULTS
-'test_property_length_db'
+'test_property_length_db',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 drop table if exists test_property_length_db.short_properties

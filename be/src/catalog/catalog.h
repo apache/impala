@@ -70,10 +70,10 @@ class Catalog {
   /// If pattern is NULL, match all databases otherwise match only those databases that
   /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   /// and each pN may contain wildcards denoted by '*' which match all strings.
-  /// TODO: GetDbNames() and GetTableNames() can probably be scraped in favor of
+  /// TODO: GetDbs() and GetTableNames() can probably be scrapped in favor of
   /// GetAllCatalogObjects(). Consider removing them and moving everything to use
   /// that.
-  Status GetDbNames(const std::string* pattern, TGetDbsResult* table_names);
+  Status GetDbs(const std::string* pattern, TGetDbsResult* dbs);
 
   /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
   /// table name returned is unqualified.
@@ -108,7 +108,7 @@ class Catalog {
   jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
   jmethodID get_catalog_objects_id_;  // JniCatalog.getCatalogObjects()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
-  jmethodID get_db_names_id_; // JniCatalog.getDbNames()
+  jmethodID get_dbs_id_; // JniCatalog.getDbs()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()

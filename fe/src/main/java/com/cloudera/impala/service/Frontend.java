@@ -263,7 +263,8 @@ public class Frontend {
       ddl.op_type = TCatalogOpType.SHOW_DBS;
       ddl.setShow_dbs_params(analysis.getShowDbsStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", Type.STRING.toThrift())));
+          new TColumn("name", Type.STRING.toThrift()),
+          new TColumn("comment", Type.STRING.toThrift())));
     } else if (analysis.isShowDataSrcsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_DATA_SRCS;
       ddl.setShow_data_srcs_params(analysis.getShowDataSrcsStmt().toThrift());
@@ -626,27 +627,34 @@ public class Frontend {
   }
 
   /**
-   * Returns all database names that match the pattern and
+   * Returns all databases that match the pattern and
    * are accessible to the given user. If pattern is null, matches all dbs.
    */
-  public List<String> getDbNames(String dbPattern, User user) {
-    List<String> dbNames = impaladCatalog_.getDbNames(dbPattern);
+  public List<Db> getDbs(String dbPattern, User user) {
+    List<Db> dbs = impaladCatalog_.getDbs(dbPattern);
     // If authorization is enabled, filter out the databases the user does not
     // have permissions on.
     if (authzConfig_.isEnabled()) {
-      Iterator<String> iter = dbNames.iterator();
+      Iterator<Db> iter = dbs.iterator();
       while (iter.hasNext()) {
-        String dbName = iter.next();
-        // Default DB should always be shown.
-        if (dbName.toLowerCase().equals(Catalog.DEFAULT_DB.toLowerCase())) continue;
-        PrivilegeRequest request = new PrivilegeRequestBuilder()
-            .any().onAnyTable(dbName).toRequest();
-        if (!authzChecker_.get().hasAccess(user, request)) {
-          iter.remove();
-        }
+        Db db = iter.next();
+        if (!isAccessibleToUser(db, user)) iter.remove();
       }
     }
-    return dbNames;
+    return dbs;
+  }
+
+  /**
+   * Check whether database is accessible to given user.
+   */
+  private boolean isAccessibleToUser(Db db, User user) {
+    if (db.getName().toLowerCase().equals(Catalog.DEFAULT_DB.toLowerCase())) {
+      // Default DB should always be shown.
+      return true;
+    }
+    PrivilegeRequest request = new PrivilegeRequestBuilder()
+        .any().onAnyTable(db.getName()).toRequest();
+    return authzChecker_.get().hasAccess(user, request);
   }
 
   /**

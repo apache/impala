@@ -32,7 +32,7 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 class TestDdlStatements(ImpalaTestSuite):
   TEST_DBS = ['ddl_test_db', 'ddl_purge_db', 'alter_table_test_db', 'alter_table_test_db2',
               'function_ddl_test', 'udf_test', 'data_src_test', 'truncate_table_test_db',
-              'test_db', 'alter_purge_db']
+              'test_db', 'alter_purge_db', 'db_with_comment']
 
   @classmethod
   def get_workload(self):
@@ -231,7 +231,7 @@ class TestDdlStatements(ImpalaTestSuite):
     # not fail
     self.client.execute("create database if not exists test_db")
     # The database should appear in the catalog (IMPALA-2441)
-    assert 'test_db' in self.client.execute("show databases").data
+    assert 'test_db' in self.all_db_names()
     # Ensure a table can be created in this database from Impala and that it is
     # accessable in both Impala and Hive
     self.client.execute("create table if not exists test_db.test_tbl_in_impala(a int)")
@@ -260,7 +260,7 @@ class TestDdlStatements(ImpalaTestSuite):
     # Drop the database immediately after creation (within a statestore heartbeat) and
     # verify the catalog gets updated properly.
     self.client.execute('drop database ddl_test_db')
-    assert 'ddl_test_db' not in self.client.execute("show databases").data
+    assert 'ddl_test_db' not in self.all_db_names()
 
   # TODO: don't use hdfs_client
   @SkipIfS3.insert # S3: missing coverage: alter table
@@ -509,17 +509,33 @@ class TestDdlStatements(ImpalaTestSuite):
     assert properties['p2'] == 'val3'
     assert properties[''] == ''
 
+  @pytest.mark.execute_serially
+  def test_create_db_comment(self, vector):
+    DB_NAME = 'db_with_comment'
+    COMMENT = 'A test comment'
+    self._create_db(DB_NAME, sync=True, comment=COMMENT)
+    result = self.client.execute("show databases like '{0}'".format(DB_NAME))
+    assert len(result.data) == 1
+    cols = result.data[0].split('\t')
+    assert len(cols) == 2
+    assert cols[0] == DB_NAME
+    assert cols[1] == COMMENT
+
   @classmethod
   def _use_multiple_impalad(cls, vector):
     return vector.get_value('exec_option')['sync_ddl'] == 1
 
-  def _create_db(self, db_name, sync=False):
+  def _create_db(self, db_name, sync=False, comment=None):
     """Creates a database using synchronized DDL to ensure all nodes have the test
     database available for use before executing the .test file(s).
     """
     impala_client = self.create_impala_client()
     sync and impala_client.set_configuration({'sync_ddl': 1})
-    ddl = "create database {0} location '{1}/{0}.db'".format(db_name, WAREHOUSE)
+    if comment is None:
+      ddl = "create database {0} location '{1}/{0}.db'".format(db_name, WAREHOUSE)
+    else:
+      ddl = "create database {0} comment '{1}' location '{2}/{0}.db'".format(
+        db_name, comment, WAREHOUSE)
     impala_client.execute(ddl)
     impala_client.close()
 

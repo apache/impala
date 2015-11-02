@@ -28,11 +28,13 @@ import com.cloudera.impala.authorization.SentryConfig;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
@@ -51,6 +53,7 @@ import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 
 /**
  * JNI-callable interface for the CatalogService. The main point is to serialize
@@ -143,16 +146,19 @@ public class JniCatalog {
   }
 
   /**
-   * Returns a list of table names matching an optional pattern.
-   * The argument is a serialized TGetTablesParams object.
-   * The return type is a serialized TGetTablesResult object.
+   * Returns a list of databases matching an optional pattern.
+   * The argument is a serialized TGetDbParams object.
+   * The return type is a serialized TGetDbResult object.
    */
-  public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException,
+  public byte[] getDbs(byte[] thriftGetTablesParams) throws ImpalaException,
       TException {
     TGetDbsParams params = new TGetDbsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
+    List<Db> dbs = catalog_.getDbs(null);
     TGetDbsResult result = new TGetDbsResult();
-    result.setDbs(catalog_.getDbNames(null));
+    List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
+    for (Db db: dbs) tDbs.add(db.toThrift());
+    result.setDbs(tDbs);
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(result);
   }

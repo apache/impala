@@ -68,7 +68,7 @@ Frontend::Frontend() {
     {"describeDb", "([B)[B", &describe_db_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"showCreateTable", "([B)Ljava/lang/String;", &show_create_table_id_},
-    {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getDbs", "([B)[B", &get_dbs_id_},
     {"getDataSrcMetadata", "([B)[B", &get_data_src_metadata_id_},
     {"getStats", "([B)[B", &get_stats_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
@@ -144,12 +144,12 @@ Status Frontend::GetTableNames(const string& db, const string* pattern,
   return JniUtil::CallJniMethod(fe_, get_table_names_id_, params, table_names);
 }
 
-Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
-    TGetDbsResult* db_names) {
+Status Frontend::GetDbs(const string* pattern, const TSessionState* session,
+    TGetDbsResult* dbs) {
   TGetDbsParams params;
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
-  return JniUtil::CallJniMethod(fe_, get_db_names_id_, params, db_names);
+  return JniUtil::CallJniMethod(fe_, get_dbs_id_, params, dbs);
 }
 
 Status Frontend::GetDataSrcMetadata(const string* pattern,

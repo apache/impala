@@ -51,6 +51,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.DataSource;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Role;
 import com.cloudera.impala.common.FileSystemUtil;
@@ -58,6 +59,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDescribeDbParams;
 import com.cloudera.impala.thrift.TDescribeResult;
 import com.cloudera.impala.thrift.TDescribeTableParams;
@@ -258,23 +260,23 @@ public class JniFrontend {
   }
 
   /**
-   * Returns a list of table names matching an optional pattern.
-   * The argument is a serialized TGetTablesParams object.
-   * The return type is a serialised TGetTablesResult object.
-   * @see Frontend#getTableNames
+   * Returns a list of databases matching an optional pattern.
+   * The argument is a serialized TGetDbParams object.
+   * The return type is a serialised TGetDbResult object.
+   * @see Frontend#getDbParams
    */
-  public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException {
+  public byte[] getDbs(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetDbsParams params = new TGetDbsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
         new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
         ImpalaInternalAdminUser.getInstance();
-    List<String> dbs = frontend_.getDbNames(params.pattern, user);
-
+    List<Db> dbs = frontend_.getDbs(params.pattern, user);
     TGetDbsResult result = new TGetDbsResult();
-    result.setDbs(dbs);
-
+    List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
+    for (Db db: dbs) tDbs.add(db.toThrift());
+    result.setDbs(tDbs);
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

@@ -43,7 +43,7 @@ Catalog::Catalog() {
     {"execDdl", "([B)[B", &exec_ddl_id_},
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
-    {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getDbs", "([B)[B", &get_dbs_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"checkUserSentryAdmin", "([B)V", &sentry_admin_check_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
@@ -113,10 +113,10 @@ Status Catalog::UpdateCatalog(const TUpdateCatalogRequest& req,
   return JniUtil::CallJniMethod(catalog_, update_metastore_id_, req, resp);
 }
 
-Status Catalog::GetDbNames(const string* pattern, TGetDbsResult* db_names) {
+Status Catalog::GetDbs(const string* pattern, TGetDbsResult* dbs) {
   TGetDbsParams params;
   if (pattern != NULL) params.__set_pattern(*pattern);
-  return JniUtil::CallJniMethod(catalog_, get_db_names_id_, params, db_names);
+  return JniUtil::CallJniMethod(catalog_, get_dbs_id_, params, dbs);
 }
 
 Status Catalog::GetTableNames(const string& db, const string* pattern,

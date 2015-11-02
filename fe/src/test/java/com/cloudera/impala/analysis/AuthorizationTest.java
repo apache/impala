@@ -42,6 +42,7 @@ import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Type;
@@ -1441,11 +1442,17 @@ public class AuthorizationTest {
     List<String> expectedDbs = Lists.newArrayList("default", "functional",
         "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
 
-    List<String> dbs = fe_.getDbNames("*", USER);
-    Assert.assertEquals(expectedDbs, dbs);
+    List<Db> dbs = fe_.getDbs("*", USER);
+    assertEquals(expectedDbs, extractDbNames(dbs));
 
-    dbs = fe_.getDbNames(null, USER);
-    Assert.assertEquals(expectedDbs, dbs);
+    dbs = fe_.getDbs(null, USER);
+    assertEquals(expectedDbs, extractDbNames(dbs));
+  }
+
+  private List<String> extractDbNames(List<Db> dbs) {
+    List<String> names = Lists.newArrayListWithCapacity(dbs.size());
+    for (Db db: dbs) names.add(db.getName());
+    return names;
   }
 
   @Test

@@ -19,13 +19,13 @@ import static org.junit.Assert.fail;
 
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Assert;
-
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,10 +138,11 @@ public class AnalyzerTest {
    * Returns the new dummy database.
    * The database is registered in testDbs_ and removed in the @After method.
    */
-  protected Db addTestDb(String dbName) {
+  protected Db addTestDb(String dbName, String comment) {
     Db db = catalog_.getDb(dbName);
     Preconditions.checkState(db == null, "Test db must not already exist.");
-    db = new Db(dbName, catalog_, null);
+    db = new Db(dbName, catalog_, new org.apache.hadoop.hive.metastore.api.Database(
+        dbName, comment, "", Collections.<String, String>emptyMap()));
     catalog_.addDb(db);
     testDbs_.add(db);
     return db;

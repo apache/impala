@@ -158,8 +158,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     call(["hive", "-e", "DROP DATABASE IF EXISTS %s CASCADE" % db_name])
     self.client.execute("invalidate metadata")
 
-    result = self.client.execute("show databases")
-    assert db_name not in result.data
+    assert db_name not in self.all_db_names()
 
     call(["hive", "-e", "CREATE DATABASE %s" % db_name])
 
@@ -171,21 +170,18 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
       assert "TableNotFoundException: Table not found: %s.%s"\
           % (db_name, tbl_name) in str(e)
 
-    result = self.client.execute("show databases")
-    assert db_name not in result.data
+    assert db_name not in self.all_db_names()
 
     # Create a table external to Impala.
     call(["hive", "-e", "CREATE TABLE %s.%s (i int)" % (db_name, tbl_name)])
 
     # Impala does not know about this database or table.
-    result = self.client.execute("show databases")
-    assert db_name not in result.data
+    assert db_name not in self.all_db_names()
 
     # Run 'invalidate metadata <table name>'. It should add the database and table
     # in to Impala's catalog.
     self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
-    result = self.client.execute("show databases")
-    assert db_name in result.data
+    assert db_name in self.all_db_names()
 
     result = self.client.execute("show tables in %s" % db_name)
     assert tbl_name in result.data
@@ -272,9 +268,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     assert len(result.data) == 0
 
     # Requires a refresh to see the dropped database
-    result = self.client.execute("show databases");
-    assert db_name in result.data
+    assert db_name in self.all_db_names()
 
     self.client.execute("invalidate metadata")
-    result = self.client.execute("show databases");
-    assert db_name not in result.data
+    assert db_name not in self.all_db_names()

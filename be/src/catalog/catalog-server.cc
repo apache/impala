@@ -338,20 +338,20 @@ void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_obje
 void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
   TGetDbsResult get_dbs_result;
-  Status status = catalog_->GetDbNames(NULL, &get_dbs_result);
+  Status status = catalog_->GetDbs(NULL, &get_dbs_result);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
       document->AddMember("error", error, document->GetAllocator());
     return;
   }
   Value databases(kArrayType);
-  BOOST_FOREACH(const string& db, get_dbs_result.dbs) {
+  BOOST_FOREACH(const TDatabase& db, get_dbs_result.dbs) {
     Value database(kObjectType);
-    Value str(db.c_str(), document->GetAllocator());
+    Value str(db.db_name.c_str(), document->GetAllocator());
     database.AddMember("name", str, document->GetAllocator());
 
     TGetTablesResult get_table_results;
-    Status status = catalog_->GetTableNames(db, NULL, &get_table_results);
+    Status status = catalog_->GetTableNames(db.db_name, NULL, &get_table_results);
     if (!status.ok()) {
       Value error(status.GetDetail().c_str(), document->GetAllocator());
       database.AddMember("error", error, document->GetAllocator());
@@ -361,7 +361,8 @@ void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     Value table_array(kArrayType);
     BOOST_FOREACH(const string& table, get_table_results.tables) {
       Value table_obj(kObjectType);
-      Value fq_name(Substitute("$0.$1", db, table).c_str(), document->GetAllocator());
+      Value fq_name(Substitute("$0.$1", db.db_name, table).c_str(),
+          document->GetAllocator());
       table_obj.AddMember("fqtn", fq_name, document->GetAllocator());
       Value table_name(table.c_str(), document->GetAllocator());
       table_obj.AddMember("name", table_name, document->GetAllocator());

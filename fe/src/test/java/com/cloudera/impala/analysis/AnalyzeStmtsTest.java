@@ -403,7 +403,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           String.format("Could not resolve column/field reference: '%s'", field));
     }
 
-    addTestDb("d");
+    addTestDb("d", null);
 
     // Test array of scalars. Only explicit paths make sense.
     addTestTable("create table d.t1 (c array<int>)");
@@ -634,7 +634,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestSlotRefPathAmbiguity() {
-    addTestDb("a");
+    addTestDb("a", null);
     addTestTable("create table a.a (a struct<a:struct<a:int>>)");
 
     // Slot path is not ambiguous.
@@ -678,7 +678,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestStarPathAmbiguity() {
-    addTestDb("a");
+    addTestDb("a", null);
     addTestTable("create table a.a (a struct<a:struct<a:int>>)");
 
     // Star path is not ambiguous.
@@ -721,7 +721,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestTableRefPathAmbiguity() {
-    addTestDb("a");
+    addTestDb("a", null);
     addTestTable("create table a.a (a array<struct<a:array<int>>>)");
 
     // Table paths are not ambiguous.

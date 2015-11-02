@@ -259,12 +259,8 @@ public class MetadataOp {
     PatternMatcher fnPattern = PatternMatcher.createJdbcPatternMatcher(functionName);
 
     ImpaladCatalog catalog = fe.getCatalog();
-    for (String dbName: fe.getDbNames(null, user)) {
-      if (!schemaPattern.matches(dbName)) continue;
-
-      Db db = catalog.getDb(dbName);
-      if (db == null) continue;
-
+    for (Db db: fe.getDbs(null, user)) {
+      if (!schemaPattern.matches(db.getName())) continue;
       if (functionName != null) {
         // Get function metadata
         List<Function> fns = db.getFunctions(null, fnPattern);
@@ -278,7 +274,7 @@ public class MetadataOp {
           tableList.add(tabName);
           Table table = null;
           try {
-            table = catalog.getTable(dbName, tabName);
+            table = catalog.getTable(db.getName(), tabName);
           } catch (TableLoadingException e) {
             // Ignore exception (this table will be skipped).
           }
@@ -288,13 +284,13 @@ public class MetadataOp {
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
           if (!table.isLoaded()) {
-            result.missingTbls.add(new TableName(dbName, tabName));
+            result.missingTbls.add(new TableName(db.getName(), tabName));
           } else {
             columns.addAll(fe.getColumns(table, columnPattern, user));
           }
           tablesColumnsList.add(columns);
         }
-        result.dbs.add(dbName);
+        result.dbs.add(db.getName());
         result.tableNames.add(tableList);
         result.columns.add(tablesColumnsList);
       }

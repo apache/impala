@@ -44,8 +44,7 @@ public class BlockIdGenerator {
 
       // Load all tables in the catalog
       Catalog catalog = CatalogServiceTestCatalog.create();
-      for (String dbName: catalog.getDbNames(null)) {
-        Db database = catalog.getDb(dbName);
+      for (Db database: catalog.getDbs(null)) {
         for (String tableName: database.getAllTableNames()) {
           Table table = database.getTable(tableName);
           // Only do this for hdfs tables

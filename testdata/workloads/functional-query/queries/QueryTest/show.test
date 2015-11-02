@@ -189,23 +189,30 @@ STRING
 # Show databases
 show databases like 'tpcds'
 ---- RESULTS
-'tpcds'
+'tpcds',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 show databases like 'functional'
 ---- RESULTS
-'functional'
+'functional',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 show databases like 'functional'
 ---- RESULTS
-'functional'
+'functional',''
 ---- TYPES
-STRING
+STRING,STRING
+====
+---- QUERY
+show databases like 'def*'
+---- RESULTS
+'default','Default Hive database'
+---- TYPES
+STRING,STRING
 ====
 ---- QUERY
 show files in insert_string_partitioned

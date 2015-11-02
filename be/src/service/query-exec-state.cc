@@ -227,12 +227,19 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
     }
     case TCatalogOpType::SHOW_DBS: {
       const TShowDbsParams* params = &catalog_op.show_dbs_params;
-      TGetDbsResult db_names;
+      TGetDbsResult dbs;
       const string* db_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(
-          frontend_->GetDbNames(db_pattern, &query_ctx_.session, &db_names));
-      SetResultSet(db_names.dbs);
+          frontend_->GetDbs(db_pattern, &query_ctx_.session, &dbs));
+      vector<string> names, comments;
+      names.reserve(dbs.dbs.size());
+      comments.reserve(dbs.dbs.size());
+      BOOST_FOREACH(const TDatabase& db, dbs.dbs) {
+        names.push_back(db.db_name);
+        comments.push_back(db.metastore_db.description);
+      }
+      SetResultSet(names, comments);
       return Status::OK();
     }
     case TCatalogOpType::SHOW_DATA_SRCS: {

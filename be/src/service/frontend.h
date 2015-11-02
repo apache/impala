@@ -73,8 +73,8 @@ class Frontend {
   /// be set to the user's current session. If this is an Impala internal request,
   /// the session should be set to NULL which will skip privilege checks returning all
   /// results.
-  Status GetDbNames(const std::string* pattern, const TSessionState* session,
-      TGetDbsResult* table_names);
+  Status GetDbs(const std::string* pattern, const TSessionState* session,
+      TGetDbsResult* dbs);
 
   /// Return all data sources matching the optional argument 'pattern'.
   /// If pattern is NULL, match all data source names otherwise match only those that
@@ -181,7 +181,7 @@ class Frontend {
   jmethodID describe_db_id_; // JniFrontend.describeDb
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID show_create_table_id_; // JniFrontend.showCreateTable
-  jmethodID get_db_names_id_; // JniFrontend.getDbNames
+  jmethodID get_dbs_id_; // JniFrontend.getDbs
   jmethodID get_data_src_metadata_id_; // JniFrontend.getDataSrcMetadata
   jmethodID get_stats_id_; // JniFrontend.getTableStats
   jmethodID get_functions_id_; // JniFrontend.getFunctions

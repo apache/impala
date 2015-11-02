@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -128,13 +129,13 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns a list of databases that match dbPattern. See filterStringsByPattern
-   * for details of the pattern match semantics.
+   * Returns databases that match dbPattern. See filterStringsByPattern for details of
+   * the pattern match semantics.
    *
    * dbPattern may be null (and thus matches everything).
    */
-  public List<String> getDbNames(String dbPattern) {
-    return filterStringsByPattern(dbCache_.get().keySet(), dbPattern);
+  public List<Db> getDbs(String dbPattern) {
+    return filterCatalogObjectsByPattern(dbCache_.get().values(), dbPattern);
   }
 
   /**
@@ -239,12 +240,7 @@ public abstract class Catalog {
    * pattern may be null (and thus matches everything).
    */
   public List<DataSource> getDataSources(String pattern) {
-    List<String> names = filterStringsByPattern(dataSources_.keySet(), pattern);
-    List<DataSource> dataSources = Lists.newArrayListWithCapacity(names.size());
-    for (String name: names) {
-      dataSources.add(dataSources_.get(name));
-    }
-    return dataSources;
+    return filterCatalogObjectsByPattern(dataSources_.getValues(), pattern);
   }
 
   /**
@@ -341,16 +337,52 @@ public abstract class Catalog {
    */
   private List<String> filterStringsByPattern(Iterable<String> candidates,
       String matchPattern) {
-    List<String> filtered = Lists.newArrayList();
+    List<String> filtered;
     if (matchPattern == null) {
       filtered = Lists.newArrayList(candidates);
     } else {
       PatternMatcher matcher = PatternMatcher.createHivePatternMatcher(matchPattern);
+      filtered = Lists.newArrayList();
       for (String candidate: candidates) {
         if (matcher.matches(candidate)) filtered.add(candidate);
       }
     }
     Collections.sort(filtered, String.CASE_INSENSITIVE_ORDER);
+    return filtered;
+  }
+
+  private static class CatalogObjectOrder implements Comparator<CatalogObject> {
+    @Override
+    public int compare(CatalogObject o1, CatalogObject o2) {
+      return String.CASE_INSENSITIVE_ORDER.compare(o1.getName(), o2.getName());
+    }
+  }
+
+  private static final CatalogObjectOrder CATALOG_OBJECT_ORDER = new CatalogObjectOrder();
+
+  /**
+   * Implement Hive's pattern-matching semantics for SHOW statements. The only
+   * metacharacters are '*' which matches any string of characters, and '|'
+   * which denotes choice.  Doing the work here saves loading tables or
+   * databases from the metastore (which Hive would do if we passed the call
+   * through to the metastore client).
+   *
+   * If matchPattern is null, all strings are considered to match. If it is the
+   * empty string, no strings match.
+   */
+  private <T extends CatalogObject> List<T> filterCatalogObjectsByPattern(
+      Iterable<? extends T> candidates, String matchPattern) {
+    List<T> filtered;
+    if (matchPattern == null) {
+      filtered = Lists.newArrayList(candidates);
+    } else {
+      PatternMatcher matcher = PatternMatcher.createHivePatternMatcher(matchPattern);
+      filtered = Lists.newArrayList();
+      for (T candidate: candidates) {
+        if (matcher.matches(candidate.getName())) filtered.add(candidate);
+      }
+    }
+    Collections.sort(filtered, CATALOG_OBJECT_ORDER);
     return filtered;
   }
 

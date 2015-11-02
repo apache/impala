@@ -15,7 +15,10 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
+
+import org.apache.hadoop.hive.metastore.api.Database;
 
 import com.cloudera.impala.analysis.ArithmeticExpr;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -31,7 +34,7 @@ import com.google.common.collect.Lists;
 
 public class BuiltinsDb extends Db {
   public BuiltinsDb(String name, Catalog catalog) {
-    super(name, catalog, null);
+    super(name, catalog, createMetastoreDb(name));
     setIsSystemDb(true);
     initBuiltins();
   }
@@ -53,6 +56,13 @@ public class BuiltinsDb extends Db {
     IsNullPredicate.initBuiltins(this);
     LikePredicate.initBuiltins(this);
     ScalarBuiltins.initBuiltins(this);
+  }
+
+  private static final String BUILTINS_DB_COMMENT = "System database for Impala builtin functions";
+
+  private static Database createMetastoreDb(String name) {
+    return new org.apache.hadoop.hive.metastore.api.Database(name,
+        BUILTINS_DB_COMMENT, "", Collections.<String,String>emptyMap());
   }
 
   private static final Map<Type, String> SAMPLE_INIT_SYMBOL =

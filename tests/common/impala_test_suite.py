@@ -136,6 +136,12 @@ class ImpalaTestSuite(BaseTestSuite):
     return hdfs_client
 
   @classmethod
+  def all_db_names(self):
+    results = self.client.execute("show databases").data
+    # Extract first column - database name
+    return [row.split("\t")[0] for row in results]
+
+  @classmethod
   def cleanup_db(self, db_name, sync_ddl=1):
     self.client.execute("use default")
     self.client.set_configuration({'sync_ddl': sync_ddl})

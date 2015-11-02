@@ -27,7 +27,7 @@ def compute_stats(impala_client, db_names=None, table_names=None,
   """
   print "Enumerating databases and tables for compute stats."
 
-  all_dbs = set(name.lower() for name in impala_client.execute("show databases").data)
+  all_dbs = set(name.split('\t')[0].lower() for name in impala_client.execute("show databases").data)
   selected_dbs = all_dbs if db_names is None else set(db_names)
   for db in all_dbs.intersection(selected_dbs):
     all_tables =\

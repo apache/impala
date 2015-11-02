@@ -43,9 +43,9 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     CatalogServiceCatalog catalogServerCatalog =
         CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig());
     // Bootstrap the catalog by adding all dbs, tables, and functions.
-    for (String dbName: catalogServerCatalog.getDbNames(null)) {
+    for (Db db: catalogServerCatalog.getDbs(null)) {
       // Adding DB should include all tables/fns in that database.
-      addDb(catalogServerCatalog.getDb(dbName));
+      addDb(db);
     }
     authPolicy_ = ((CatalogServiceTestCatalog) catalogServerCatalog).getAuthPolicy();
     srcCatalog_ = catalogServerCatalog;

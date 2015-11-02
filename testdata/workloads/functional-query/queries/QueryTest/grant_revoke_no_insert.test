@@ -313,10 +313,10 @@ root
 # This privilege actually active
 show databases
 ---- RESULTS
-'default'
-'functional'
+'default','Default Hive database'
+'functional',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- USER
 root
@@ -384,10 +384,10 @@ root
 # The privilege is still active
 show databases
 ---- RESULTS
-'default'
-'functional'
+'default','Default Hive database'
+'functional',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 # Privilege still exists, but grant option is set to false

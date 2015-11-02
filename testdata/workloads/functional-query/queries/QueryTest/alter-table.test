@@ -758,9 +758,9 @@ create database if not exists test_alter_property_length_db
 ---- QUERY
 show databases like 'test_alter_property_length_db'
 ---- RESULTS
-'test_alter_property_length_db'
+'test_alter_property_length_db',''
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 drop table if exists test_alter_property_length_db.property_length
@@ -801,5 +801,5 @@ drop database if exists test_alter_property_length_db
 show databases like 'test_alter_property_length_db'
 ---- RESULTS
 ---- TYPES
-STRING
+STRING,STRING
 ====

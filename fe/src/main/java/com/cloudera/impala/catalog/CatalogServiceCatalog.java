@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
@@ -219,13 +220,7 @@ public class CatalogServiceCatalog extends Catalog {
     // of all items in the catalog.
     catalogLock_.readLock().lock();
     try {
-      for (String dbName: getDbNames(null)) {
-        Db db = getDb(dbName);
-        if (db == null) {
-          LOG.error("Database: " + dbName + " was expected to be in the catalog " +
-              "cache. Skipping database and all child objects for this update.");
-          continue;
-        }
+      for (Db db: getDbs(null)) {
         TCatalogObject catalogDb = new TCatalogObject(TCatalogObjectType.DATABASE,
             db.getCatalogVersion());
         catalogDb.setDb(db.toThrift());
@@ -249,12 +244,12 @@ public class CatalogServiceCatalog extends Catalog {
               catalogTbl.setTable(tbl.toThrift());
             } catch (Exception e) {
               LOG.debug(String.format("Error calling toThrift() on table %s.%s: %s",
-                  dbName, tblName, e.getMessage()), e);
+                  db.getName(), tblName, e.getMessage()), e);
               continue;
             }
             catalogTbl.setCatalog_version(tbl.getCatalogVersion());
           } else {
-            catalogTbl.setTable(new TTable(dbName, tblName));
+            catalogTbl.setTable(new TTable(db.getName(), tblName));
           }
           resp.addToObjects(catalogTbl);
         }
