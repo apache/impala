@@ -392,7 +392,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Timer for materializing rows.  This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
-  /// Number of cols that need to be read.
+  /// Number of columns that need to be read.
   RuntimeProfile::Counter* num_cols_counter_;
 
   /// Number of row groups that need to be read.
@@ -459,6 +459,10 @@ class HdfsParquetScanner : public HdfsScanner {
   /// fields missing in the file.
   Status CreateColumnReaders(const TupleDescriptor& tuple_desc,
       std::vector<ColumnReader*>* column_readers);
+
+  /// Returns the total number of scalar column readers in 'column_readers', including
+  /// the children of collection readers.
+  int CountScalarColumns(const std::vector<ColumnReader*>& column_readers);
 
   /// Creates a column reader for 'node'. slot_desc may be NULL, in which case the
   /// returned column reader can only be used to read def/rep levels.

@@ -1470,6 +1470,25 @@ static int64_t GetRowGroupMidOffset(const parquet::RowGroup& row_group) {
   return start_offset + (end_offset - start_offset) / 2;
 }
 
+int HdfsParquetScanner::CountScalarColumns(const vector<ColumnReader*>& column_readers) {
+  DCHECK(!column_readers.empty());
+  int num_columns = 0;
+  stack<ColumnReader*> readers;
+  BOOST_FOREACH(ColumnReader* r, column_readers_) readers.push(r);
+  while (!readers.empty()) {
+    ColumnReader* col_reader = readers.top();
+    readers.pop();
+    if (col_reader->IsCollectionReader()) {
+      CollectionColumnReader* collection_reader =
+          static_cast<CollectionColumnReader*>(col_reader);
+      BOOST_FOREACH(ColumnReader* r, *collection_reader->children()) readers.push(r);
+      continue;
+    }
+    ++num_columns;
+  }
+  return num_columns;
+}
+
 Status HdfsParquetScanner::ProcessSplit() {
   DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
   // First process the file metadata in the footer
@@ -1480,6 +1499,8 @@ Status HdfsParquetScanner::ProcessSplit() {
 
   // We've processed the metadata and there are columns that need to be materialized.
   RETURN_IF_ERROR(CreateColumnReaders(*scan_node_->tuple_desc(), &column_readers_));
+  COUNTER_SET(num_cols_counter_,
+      static_cast<int64_t>(CountScalarColumns(column_readers_)));
 
   // The scanner-wide stream was used only to read the file footer.  Each column has added
   // its own stream.
@@ -2135,7 +2156,6 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
     (*column_readers)[0]->set_pos_slot_desc(pos_slot_desc);
   }
 
-  COUNTER_ADD(num_cols_counter_, column_readers->size());
   return Status::OK();
 }
 
