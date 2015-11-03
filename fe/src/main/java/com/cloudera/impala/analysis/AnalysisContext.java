@@ -37,6 +37,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
+import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.common.Pair;
 
@@ -305,7 +306,9 @@ public class AnalysisContext {
       return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt)
           && !(stmt_ instanceof AlterViewStmt);
     }
-    public String getJsonLineageGraph() { return analyzer_.getSerializedLineageGraph(); }
+    public TLineageGraph getThriftLineageGraph() {
+      return analyzer_.getThriftSerializedLineageGraph();
+    }
   }
 
   /**

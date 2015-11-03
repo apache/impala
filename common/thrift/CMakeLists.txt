@@ -158,6 +158,7 @@ set (SRC_FILES
   ImpalaInternalService.thrift
   ImpalaService.thrift
   JniCatalog.thrift
+  LineageGraph.thrift
   Llama.thrift
   Logging.thrift
   NetworkTest.thrift

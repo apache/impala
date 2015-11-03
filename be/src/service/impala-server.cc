@@ -64,6 +64,7 @@
 #include "util/error-util.h"
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
+#include "util/lineage-util.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/redactor.h"
@@ -76,6 +77,7 @@
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
+#include "gen-cpp/LineageGraph_types.h"
 
 #include "common/names.h"
 
@@ -362,11 +364,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   exec_env_->SetImpalaServer(this);
 }
 
-Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
+Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
+  const TExecRequest& request = query_exec_state.exec_request();
   if (!request.__isset.query_exec_request && !request.__isset.catalog_op_request) {
     return Status::OK();
   }
-  string lineage_graph;
+  TLineageGraph lineage_graph;
   if (request.__isset.query_exec_request &&
       request.query_exec_request.__isset.lineage_graph) {
     lineage_graph = request.query_exec_request.lineage_graph;
@@ -376,8 +379,11 @@ Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
   } else {
     return Status::OK();
   }
-  DCHECK(!lineage_graph.empty());
-  Status status = lineage_logger_->AppendEntry(lineage_graph);
+  // Set the query end time in TLineageGraph
+  lineage_graph.__set_ended(query_exec_state.end_time().ToUnixTime());
+
+  const Status& status = lineage_logger_->AppendEntry(
+      LineageUtil::TLineageToJSON(lineage_graph));
   if (!status.ok()) {
     LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_lineage_event) {
@@ -534,7 +540,7 @@ void ImpalaServer::LogQueryEvents(const QueryExecState& exec_state) {
     LogAuditRecord(exec_state, exec_state.exec_request());
   }
   if (IsLineageLoggingEnabled() && log_events) {
-    LogLineageRecord(exec_state.exec_request());
+    LogLineageRecord(exec_state);
   }
 }
 

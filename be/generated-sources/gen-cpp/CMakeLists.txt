@@ -65,6 +65,8 @@ set(SRC_FILES
   JniCatalog_constants.cpp
   JniCatalog_types.cpp
   Logging_types.cpp
+  LineageGraph_types.cpp
+  LineageGraph_constants.cpp
   Metrics_constants.cpp
   Metrics_types.cpp
   MetricDefs_constants.cpp

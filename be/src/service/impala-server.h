@@ -521,7 +521,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   Status LogAuditRecord(const QueryExecState& exec_state, const TExecRequest& request);
 
-  Status LogLineageRecord(const TExecRequest& request);
+  Status LogLineageRecord(const QueryExecState& exec_state);
 
   /// Log audit and column lineage events
   void LogQueryEvents(const QueryExecState& exec_state);

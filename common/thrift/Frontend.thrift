@@ -28,6 +28,7 @@ include "TCLIService.thrift"
 include "Status.thrift"
 include "CatalogObjects.thrift"
 include "CatalogService.thrift"
+include "LineageGraph.thrift"
 
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
@@ -368,8 +369,8 @@ struct TQueryExecRequest {
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
   12: required list<Types.TNetworkAddress> host_list
 
-  // Column lineage graph serialized into JSON
-  13: optional string lineage_graph
+  // Column lineage graph
+  13: optional LineageGraph.TLineageGraph lineage_graph
 }
 
 enum TCatalogOpType {
@@ -436,8 +437,8 @@ struct TCatalogOpRequest {
   // Parameters for SHOW FILES
   14: optional TShowFilesParams show_files_params
 
-  // Column lineage graph serialized into JSON
-  15: optional string lineage_graph
+  // Column lineage graph
+  15: optional LineageGraph.TLineageGraph lineage_graph
 
   // Parameters for SHOW_CREATE_FUNCTION
   16: optional TGetFunctionsParams show_create_function_params

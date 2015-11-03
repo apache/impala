@@ -57,6 +57,7 @@ import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.THdfsTable;
+import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -482,7 +483,7 @@ public class PlannerTestBase {
     queryCtx.request.setStmt(query);
     StringBuilder explainBuilder = new StringBuilder();
     TExecRequest execRequest = null;
-    String lineageGraph = null;
+    TLineageGraph lineageGraph = null;
     try {
       execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
       if (execRequest.isSetQuery_exec_request()) {
@@ -508,28 +509,28 @@ public class PlannerTestBase {
             "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
       }
     }
-    LOG.info("lineage graph: " + lineageGraph);
     ArrayList<String> expected =
-        testCase.getSectionContents(Section.LINEAGE);
+      testCase.getSectionContents(Section.LINEAGE);
     if (expected.size() > 0 && lineageGraph != null) {
       String serializedGraph = Joiner.on("\n").join(expected);
       ColumnLineageGraph expectedGraph =
-          ColumnLineageGraph.createFromJSON(serializedGraph);
+        ColumnLineageGraph.createFromJSON(serializedGraph);
       ColumnLineageGraph outputGraph =
-          ColumnLineageGraph.createFromJSON(lineageGraph);
+        ColumnLineageGraph.fromThrift(lineageGraph);
       if (expectedGraph == null || outputGraph == null ||
           !outputGraph.equals(expectedGraph)) {
         StringBuilder lineageError = new StringBuilder();
         lineageError.append("section " + Section.LINEAGE + " of query:\n"
             + query + "\n");
         lineageError.append("Output:\n");
-        lineageError.append(lineageGraph + "\n");
+        lineageError.append(outputGraph.toJson() + "\n");
         lineageError.append("Expected:\n");
         lineageError.append(serializedGraph + "\n");
         errorLog.append(lineageError.toString());
       }
       actualOutput.append(Section.LINEAGE.getHeader());
-      actualOutput.append(TestUtils.prettyPrintJson(lineageGraph) + "\n");
+      actualOutput.append(TestUtils.prettyPrintJson(outputGraph.toJson()));
+      actualOutput.append("\n");
     }
   }
 

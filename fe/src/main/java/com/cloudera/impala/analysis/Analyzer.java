@@ -58,6 +58,7 @@ import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.util.DisjointSet;
@@ -2168,9 +2169,9 @@ public class Analyzer {
   public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
   public ColumnLineageGraph getColumnLineageGraph() { return globalState_.lineageGraph; }
-  public String getSerializedLineageGraph() {
+  public TLineageGraph getThriftSerializedLineageGraph() {
     Preconditions.checkNotNull(globalState_.lineageGraph);
-    return globalState_.lineageGraph.toJson();
+    return globalState_.lineageGraph.toThrift();
   }
 
   public ImmutableList<PrivilegeRequest> getPrivilegeReqs() {

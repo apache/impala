@@ -112,6 +112,7 @@ import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
+import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -877,9 +878,9 @@ public class Frontend {
     if (analysisResult.isCatalogOp()) {
       result.stmt_type = TStmtType.DDL;
       createCatalogOpRequest(analysisResult, result);
-      String jsonLineageGraph = analysisResult.getJsonLineageGraph();
-      if (jsonLineageGraph != null && !jsonLineageGraph.isEmpty()) {
-        result.catalog_op_request.setLineage_graph(jsonLineageGraph);
+      TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
+      if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
+        result.catalog_op_request.setLineage_graph(thriftLineageGraph);
       }
       // All DDL operations except for CTAS are done with analysis at this point.
       if (!analysisResult.isCreateTableAsSelectStmt()) return result;
@@ -993,9 +994,9 @@ public class Frontend {
     queryExecRequest.setQuery_plan(explainString.toString());
     queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
 
-    String jsonLineageGraph = analysisResult.getJsonLineageGraph();
-    if (jsonLineageGraph != null && !jsonLineageGraph.isEmpty()) {
-      queryExecRequest.setLineage_graph(jsonLineageGraph);
+    TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
+    if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
+      queryExecRequest.setLineage_graph(thriftLineageGraph);
     }
 
     if (analysisResult.isExplainStmt()) {

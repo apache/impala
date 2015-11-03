@@ -34,9 +34,14 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
+import com.cloudera.impala.thrift.TEdgeType;
 import com.cloudera.impala.thrift.TQueryCtx;
+import com.cloudera.impala.thrift.TLineageGraph;
+import com.cloudera.impala.thrift.TMultiEdge;
+import com.cloudera.impala.thrift.TVertex;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -89,6 +94,21 @@ final class Vertex implements Comparable<Vertex> {
     int id = ((Long) obj.get("id")).intValue();
     String label = (String) obj.get("vertexId");
     return new Vertex(new VertexId(id), label);
+  }
+
+  /**
+   * Encodes this Vertex object into a thrift object
+   */
+  public TVertex toThrift() {
+    return new TVertex(id_.asInt(), label_);
+  }
+
+  /**
+   * Constructs a Vertex object from a thrift object.
+   */
+  public static Vertex fromThrift(TVertex vertex) {
+    int id = ((Long) vertex.id).intValue();
+    return new Vertex(new VertexId(id), vertex.label);
   }
 
   @Override
@@ -174,6 +194,42 @@ final class MultiEdge {
     obj.put("targets", targetIds);
     obj.put("edgeType", edgeType_.toString());
     return obj;
+  }
+
+  /**
+   * Encodes this MultiEdge object to a thrift object
+   */
+  public TMultiEdge toThrift() {
+    List<TVertex> sources = Lists.newArrayList();
+    for (Vertex vertex: sources_) {
+      sources.add(vertex.toThrift());
+    }
+    List<TVertex> targets = Lists.newArrayList();
+    for (Vertex vertex: targets_) {
+      targets.add(vertex.toThrift());
+    }
+    if (edgeType_ == EdgeType.PROJECTION) {
+      return new TMultiEdge(sources, targets, TEdgeType.PROJECTION);
+    }
+    return new TMultiEdge(sources, targets, TEdgeType.PREDICATE);
+  }
+
+  /**
+   * Constructs a MultiEdge object from a thrift object
+   */
+  public static MultiEdge fromThrift(TMultiEdge obj){
+    Set<Vertex> sources = Sets.newHashSet();
+    for (TVertex vertex: obj.sources) {
+      sources.add(Vertex.fromThrift(vertex));
+    }
+    Set<Vertex> targets = Sets.newHashSet();
+    for (TVertex vertex: obj.targets) {
+      targets.add(Vertex.fromThrift(vertex));
+    }
+    if (obj.edgetype == TEdgeType.PROJECTION) {
+      return new MultiEdge(sources, targets, EdgeType.PROJECTION);
+    }
+    return new MultiEdge(sources, targets, EdgeType.PREDICATE);
   }
 
   @Override
@@ -454,7 +510,7 @@ public class ColumnLineageGraph {
    * Encodes the ColumnLineageGraph object to JSON.
    */
   public String toJson() {
-    if (queryStr_ == null) return "";
+    if (Strings.isNullOrEmpty(queryStr_)) return "";
     Map obj = new LinkedHashMap();
     obj.put("queryText", queryStr_);
     obj.put("hash", getQueryHash(queryStr_));
@@ -474,6 +530,50 @@ public class ColumnLineageGraph {
     }
     obj.put("vertices", vertices);
     return JSONValue.toJSONString(obj);
+  }
+
+  /**
+   * Serializes the ColumnLineageGraph to a thrift object
+   */
+  public TLineageGraph toThrift() {
+    TLineageGraph graph = new TLineageGraph();
+    if (Strings.isNullOrEmpty(queryStr_)) return graph;
+    graph.setQuery_text(queryStr_);
+    graph.setHash(getQueryHash(queryStr_));
+    graph.setUser(user_);
+    graph.setStarted(timestamp_);
+    // Add edges
+    List<TMultiEdge> edges = Lists.newArrayList();
+    for (MultiEdge edge: edges_) {
+      edges.add(edge.toThrift());
+    }
+    graph.setEdges(edges);
+    // Add vertices
+    TreeSet<Vertex> sortedVertices = Sets.newTreeSet(vertices_.values());
+    List<TVertex> vertices = Lists.newArrayList();
+    for (Vertex vertex: sortedVertices) {
+      vertices.add(vertex.toThrift());
+    }
+    graph.setVertices(vertices);
+    return graph;
+  }
+
+  /**
+   * Creates a LineageGraph object from a thrift object
+   */
+  public static ColumnLineageGraph fromThrift(TLineageGraph obj) {
+    ColumnLineageGraph lineage =
+        new ColumnLineageGraph(obj.query_text, obj.user, obj.started);
+    TreeSet<Vertex> vertices = Sets.newTreeSet();
+    for (TVertex vertex: obj.vertices) {
+      vertices.add(Vertex.fromThrift(vertex));
+    }
+    lineage.setVertices(vertices);
+    for (TMultiEdge edge: obj.edges) {
+      MultiEdge e = MultiEdge.fromThrift(edge);
+      lineage.edges_.add(e);
+    }
+    return lineage;
   }
 
   private String getQueryHash(String queryStr) {
