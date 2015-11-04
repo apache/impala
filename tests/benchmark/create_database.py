@@ -18,8 +18,9 @@ from optparse import OptionParser
 
 parser = OptionParser()
 parser.add_option('--host')
-parser.add_option('--port', default=21050)
+parser.add_option('--port', type='int', default=21050)
 parser.add_option('--db_name', default='impala_perf_results')
+parser.add_option('--use_secure_connection', default=False, action='store_true')
 
 options, args = parser.parse_args()
 
@@ -77,7 +78,11 @@ CREATE EXTERNAL TABLE IF NOT EXISTS RuntimeProfiles (
 ''']
 
 def create_database():
-  connection = impala_connect(host=options.host, port=int(options.port))
+  if options.use_secure_connection:
+    connection = impala_connect(options.host, options.port,
+        use_ssl=True, auth_mechanism='GSSAPI')
+  else:
+    connection = impala_connect(options.host, options.port)
   cursor = connection.cursor()
 
   cursor.execute('CREATE DATABASE IF NOT EXISTS {0}'.format(options.db_name))

@@ -78,15 +78,15 @@ parser.add_option("--reference_result_file", dest="reference_result_file",
 parser.add_option("--junit_output_file", dest="junit_output_file", default='',
                  help='If set, outputs results in Junit format to the specified file')
 parser.add_option("--no_output_table", dest="no_output_table", action="store_true",
-                 default= False, help='Outputs results in table format to the console')
+                 default=False, help='Outputs results in table format to the console')
 parser.add_option("--report_description", dest="report_description", default=None,
                  help='Optional description for the report.')
 parser.add_option("--cluster_name", dest="cluster_name", default='UNKNOWN',
                  help="Name of the cluster the results are from (ex. Bolt)")
 parser.add_option("--verbose", "-v", dest="verbose", action="store_true",
-                 default= False, help='Outputs to console with with increased verbosity')
+                 default=False, help='Outputs to console with with increased verbosity')
 parser.add_option("--output_all_summary_nodes", dest="output_all_summary_nodes",
-                 action="store_true", default= False,
+                 action="store_true", default=False,
                  help='Print all execution summary nodes')
 parser.add_option("--build_version", dest="build_version", default='UNKNOWN',
                  help="Build/version info about the Impalad instance results are from.")
@@ -115,15 +115,17 @@ parser.add_option("--allowed_latency_diff_secs",
 
 # These parameters are specific to recording results in a database. This is optional
 parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
-                 default= False, help='Saves results to the specified database.')
+                 default=False, help='Saves results to the specified database.')
 parser.add_option("--is_official", dest="is_official", action="store_true",
-                 default= False, help='Indicates this is an official perf run result')
+                 default=False, help='Indicates this is an official perf run result')
 parser.add_option("--db_host", dest="db_host", default='localhost',
                  help="Machine hosting the database")
 parser.add_option("--db_port", dest="db_port", default='21050',
                  help="Port on the machine hosting the database")
 parser.add_option("--db_name", dest="db_name", default='impala_perf_results',
                  help="Name of the perf database.")
+parser.add_option("--use_secure_connection", dest="use_secure_connection",
+                 action='store_true', default=False, help="Connect using ssl + Kerberos.")
 options, args = parser.parse_args()
 
 def get_dict_from_json(filename):
@@ -1059,7 +1061,8 @@ def write_results_to_datastore(grouped):
   with PerfResultDataStore(
       host=options.db_host,
       port=options.db_port,
-      database_name=options.db_name) as data_store:
+      database_name=options.db_name,
+      use_secure_connection=options.use_secure_connection) as data_store:
 
     for results in all_query_results(grouped):
       for query_result in results[RESULT_LIST]:
