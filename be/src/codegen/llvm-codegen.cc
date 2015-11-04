@@ -31,7 +31,6 @@
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/Host.h>
 #include "llvm/Support/InstIterator.h"
-#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/NoFolder.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
@@ -46,8 +45,9 @@
 
 #include "common/logging.h"
 #include "codegen/codegen-anyval.h"
-#include "codegen/subexpr-elimination.h"
+#include "codegen/impala-ir-data.h"
 #include "codegen/instruction-counter.h"
+#include "codegen/subexpr-elimination.h"
 #include "impala-ir/impala-ir-names.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "util/cpu-info.h"
@@ -126,14 +126,27 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
   SCOPED_TIMER((*codegen)->profile_.total_time_counter());
 
   Module* loaded_module;
-  RETURN_IF_ERROR(LoadModule(codegen->get(), file, &loaded_module));
+  RETURN_IF_ERROR(LoadModuleFromFile(codegen->get(), file, &loaded_module));
   (*codegen)->module_ = loaded_module;
 
   return (*codegen)->Init();
 }
 
-Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
-                               Module** module) {
+Status LlvmCodeGen::LoadFromMemory(ObjectPool* pool, MemoryBuffer* module_ir,
+    const string& module_name, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
+  codegen->reset(new LlvmCodeGen(pool, id));
+  SCOPED_TIMER((*codegen)->profile_.total_time_counter());
+
+  Module* loaded_module;
+  RETURN_IF_ERROR(LoadModuleFromMemory(codegen->get(), module_ir, module_name,
+      &loaded_module));
+  (*codegen)->module_ = loaded_module;
+
+  return (*codegen)->Init();
+}
+
+Status LlvmCodeGen::LoadModuleFromFile(LlvmCodeGen* codegen, const string& file,
+      llvm::Module** module) {
   OwningPtr<MemoryBuffer> file_buffer;
   {
     SCOPED_TIMER(codegen->load_module_timer_);
@@ -147,13 +160,17 @@ Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
   }
 
   COUNTER_ADD(codegen->module_file_size_, file_buffer->getBufferSize());
+  return LoadModuleFromMemory(codegen, file_buffer.get(), file, module);
+}
 
+Status LlvmCodeGen::LoadModuleFromMemory(LlvmCodeGen* codegen, MemoryBuffer* module_ir,
+      std::string module_name, llvm::Module** module) {
   SCOPED_TIMER(codegen->prepare_module_timer_);
   string error;
-  *module = ParseBitcodeFile(file_buffer.get(), codegen->context(), &error);
+  *module = ParseBitcodeFile(module_ir, codegen->context(), &error);
   if (*module == NULL) {
     stringstream ss;
-    ss << "Could not parse module " << file << ": " << error;
+    ss << "Could not parse module " << module_name << ": " << error;
     return Status(ss.str());
   }
   return Status::OK();
@@ -165,7 +182,7 @@ Status LlvmCodeGen::LinkModule(const string& file) {
 
   SCOPED_TIMER(profile_.total_time_counter());
   Module* new_module;
-  RETURN_IF_ERROR(LoadModule(this, file, &new_module));
+  RETURN_IF_ERROR(LoadModuleFromFile(this, file, &new_module));
   string error_msg;
   bool error =
       Linker::LinkModules(module_, new_module, Linker::DestroySource, &error_msg);
@@ -180,16 +197,24 @@ Status LlvmCodeGen::LinkModule(const string& file) {
 
 Status LlvmCodeGen::LoadImpalaIR(
     ObjectPool* pool, const string& id, scoped_ptr<LlvmCodeGen>* codegen_ret) {
-  // Load the statically cross compiled file.  We cannot load an ll file with sse
-  // instructions on a machine without sse support (the load fails, doesn't matter
-  // if those instructions end up getting run or not).
-  string module_file;
+  // Select the appropriate IR version.  We cannot use LLVM IR with sse instructions on
+  // a machine without sse support (loading the module will fail regardless of whether
+  // those instructions are run or not).
+  StringRef module_ir;
+  string module_name;
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
-    PathBuilder::GetFullPath("llvm-ir/impala-sse.ll", &module_file);
+    module_ir = StringRef(reinterpret_cast<const char*>(impala_sse_llvm_ir),
+        impala_sse_llvm_ir_len);
+    module_name = "Impala IR with SSE support";
   } else {
-    PathBuilder::GetFullPath("llvm-ir/impala-no-sse.ll", &module_file);
+    module_ir = StringRef(reinterpret_cast<const char*>(impala_no_sse_llvm_ir),
+        impala_no_sse_llvm_ir_len);
+    module_name = "Impala IR with no SSE support";
   }
-  RETURN_IF_ERROR(LoadFromFile(pool, module_file, id, codegen_ret));
+  scoped_ptr<MemoryBuffer> module_ir_buf(
+      MemoryBuffer::getMemBuffer(module_ir, "", false));
+  RETURN_IF_ERROR(LoadFromMemory(pool, module_ir_buf.get(), module_name, id,
+      codegen_ret));
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types

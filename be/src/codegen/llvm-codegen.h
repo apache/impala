@@ -31,6 +31,7 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include "exprs/expr.h"
@@ -126,6 +127,12 @@ class LlvmCodeGen {
   /// codegen object.
   /// codegen will contain the created object on success.
   static Status LoadFromFile(ObjectPool*, const std::string& file, const std::string& id,
+      boost::scoped_ptr<LlvmCodeGen>* codegen);
+
+  /// Load a pre-compiled IR module from module_ir.  This creates a top level codegen
+  /// object.  codegen will contain the created object on success.
+  static Status LoadFromMemory(ObjectPool*, llvm::MemoryBuffer* module_ir,
+      const std::string& module_name, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Removes all jit compiled dynamically linked functions from the process.
@@ -409,11 +416,16 @@ class LlvmCodeGen {
   /// No-op if size is zero.
   void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, int size);
 
-  /// Loads an LLVM module. 'file' should be the local path to the LLVM bitcode (.ll)
-  /// file. If 'file_size' is not NULL, it will be set to the size of 'file'.
+  /// Loads an LLVM module. 'file' should be the local path to the LLVM bitcode
+  /// file. The caller is responsible for cleaning up module.
+  static Status LoadModuleFromFile(LlvmCodeGen* codegen, const string& file,
+      llvm::Module** module);
+
+  /// Loads an LLVM module. 'module_ir' should be a reference to a memory buffer containing
+  /// LLVM bitcode. module_name is the name of the module to use when reporting errors.
   /// The caller is responsible for cleaning up module.
-  static Status LoadModule(LlvmCodeGen* codegen, const std::string& file,
-                           llvm::Module** module);
+  static Status LoadModuleFromMemory(LlvmCodeGen* codegen, llvm::MemoryBuffer* module_ir,
+      std::string module_name, llvm::Module** module);
 
   /// Loads a module at 'file' and links it to the module associated with
   /// this LlvmCodeGen object. The module must be on the local filesystem.
@@ -462,7 +474,7 @@ class LlvmCodeGen {
   /// Time spent reading the .ir file from the file system.
   RuntimeProfile::Counter* load_module_timer_;
 
-  /// Time spent constructing the in-memory module from the .ir file.
+  /// Time spent constructing the in-memory module from the ir.
   RuntimeProfile::Counter* prepare_module_timer_;
 
   /// Time spent doing codegen (adding IR to the module)
@@ -474,6 +486,7 @@ class LlvmCodeGen {
   /// Time spent compiling the module.
   RuntimeProfile::Counter* compile_timer_;
 
+  /// Total size of modules loaded from disk.
   RuntimeProfile::Counter* module_file_size_;
 
   /// whether or not optimizations are enabled

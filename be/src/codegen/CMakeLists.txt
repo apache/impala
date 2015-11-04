@@ -19,36 +19,41 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 
+# Generated C files for IR
+set(IR_SSE_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-sse-ir.cc)
+set(IR_NO_SSE_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-no-sse-ir.cc)
+
 add_library(CodeGen
   codegen-anyval.cc
   llvm-codegen.cc
   subexpr-elimination.cc
   instruction-counter.cc
+  ${IR_SSE_C_FILE}
+  ${IR_NO_SSE_C_FILE}
 )
-add_dependencies(CodeGen thrift-deps)
+add_dependencies(CodeGen thrift-deps gen_ir_descriptions)
 
 # output cross compile to ir metadata
-# TODO: this doesn't track dependences right.  We need to specify that
-# the files in impala-ir must exist before building.
-#set(IR_DESC_GEN_OUTPUT
-#  ${CMAKE_SOURCE_DIR}/be/generated-sources/impala-ir/impala-ir-names.h
-#  ${CMAKE_SOURCE_DIR}/be/generated-sources/impala-ir/impala-ir-functions.h
-#)
-#add_custom_command(
-#  OUTPUT ${IR_DESC_GEN_OUTPUT}
-#  COMMAND ./gen_ir_descriptions.py
-#  DEPENDS ./gen_ir_descriptions.py
-#  COMMENT "Generating ir cross compile metadata."
-#  VERBATIM
-#)
-#add_custom_target(gen_ir_functions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
-
+set(IR_DESC_GEN_OUTPUT
+  $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-names.h
+  $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-ir-functions.h
+)
+add_custom_command(
+  OUTPUT ${IR_DESC_GEN_OUTPUT}
+  COMMAND ./gen_ir_descriptions.py
+  DEPENDS ./gen_ir_descriptions.py
+  COMMENT "Generating ir cross compile metadata."
+  VERBATIM
+)
+add_custom_target(gen_ir_descriptions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
 
 set(IR_INPUT_FILES impala-ir.cc)
-set(IR_SSE_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-sse-tmp.ll")
-set(IR_NO_SSE_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse-tmp.ll")
-set(IR_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-sse.ll")
-set(IR_NO_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse.ll")
+set(IR_SSE_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-sse-tmp.bc")
+set(IR_NO_SSE_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse-tmp.bc")
+set(IR_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-sse.bc")
+set(IR_NO_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse.bc")
+set(IR_SSE_TMP_C_FILE ${IR_SSE_C_FILE}.tmp)
+set(IR_NO_SSE_TMP_C_FILE ${IR_NO_SSE_C_FILE}.tmp)
 
 # Run the clang compiler to generate IR.  Then run their opt tool to remove
 # unnamed instr.  This makes the IR verifiable and more readable.
@@ -59,7 +64,7 @@ add_custom_command(
   COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} "-msse4.2" ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_SSE_TMP_OUTPUT_FILE}
   COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_SSE_TMP_OUTPUT_FILE} > ${IR_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_SSE_TMP_OUTPUT_FILE}
-  DEPENDS CodeGen Util Exec Exprs Udf
+  DEPENDS Util Exec Exprs Udf ${IR_INPUT_FILES}
 )
 
 # Compile without sse enabled.
@@ -68,11 +73,29 @@ add_custom_command(
   COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_NO_SSE_TMP_OUTPUT_FILE}
   COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_NO_SSE_TMP_OUTPUT_FILE} > ${IR_NO_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_NO_SSE_TMP_OUTPUT_FILE}
-  DEPENDS CodeGen Util Exec Exprs Udf
+  DEPENDS Util Exec Exprs Udf ${IR_INPUT_FILES}
 )
 
-add_custom_target(compile_to_ir_sse ALL DEPENDS ${IR_SSE_OUTPUT_FILE})
-add_custom_target(compile_to_ir_no_sse ALL DEPENDS ${IR_NO_SSE_OUTPUT_FILE})
+add_custom_target(compile_to_ir_sse DEPENDS ${IR_SSE_OUTPUT_FILE})
+add_custom_target(compile_to_ir_no_sse DEPENDS ${IR_NO_SSE_OUTPUT_FILE})
+
+# Convert LLVM bytecode to C array.
+add_custom_command(
+  OUTPUT ${IR_SSE_C_FILE}
+  COMMAND $ENV{IMPALA_HOME}/bin/file2array.sh -n -v impala_sse_llvm_ir ${IR_SSE_OUTPUT_FILE} > ${IR_SSE_TMP_C_FILE}
+  COMMAND mv ${IR_SSE_TMP_C_FILE} ${IR_SSE_C_FILE}
+  DEPENDS $ENV{IMPALA_HOME}/bin/file2array.sh
+  DEPENDS ${IR_SSE_OUTPUT_FILE}
+)
+
+# Convert LLVM bytecode to C array.
+add_custom_command(
+  OUTPUT ${IR_NO_SSE_C_FILE}
+  COMMAND $ENV{IMPALA_HOME}/bin/file2array.sh -n -v impala_no_sse_llvm_ir ${IR_NO_SSE_OUTPUT_FILE} > ${IR_NO_SSE_TMP_C_FILE}
+  COMMAND mv ${IR_NO_SSE_TMP_C_FILE} ${IR_NO_SSE_C_FILE}
+  DEPENDS $ENV{IMPALA_HOME}/bin/file2array.sh
+  DEPENDS ${IR_NO_SSE_OUTPUT_FILE}
+)
 
 ADD_BE_TEST(llvm-codegen-test)
 ADD_BE_TEST(instruction-counter-test)
