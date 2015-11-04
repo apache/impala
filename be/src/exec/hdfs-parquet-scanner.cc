@@ -64,7 +64,8 @@ const int64_t HdfsParquetScanner::FOOTER_SIZE = 100 * 1024;
 // Max data page header size in bytes. This is an estimate and only needs to be an upper
 // bound. It is theoretically possible to have a page header of any size due to string
 // value statistics, but in practice we'll have trouble reading string values this large.
-const int MAX_PAGE_HEADER_SIZE = 8 * 1024 * 1024;
+// Also, this limit is in place to prevent impala from reading corrupt parquet files.
+DEFINE_int32(max_page_header_size, 8*1024*1024, "max parquet page header size in bytes");
 
 // Max dictionary page header size in bytes. This is an estimate and only needs to be an
 // upper bound.
@@ -1080,11 +1081,11 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
           buffer, &header_size, true, &current_page_header_);
       if (status.ok()) break;
 
-      if (buffer_size >= MAX_PAGE_HEADER_SIZE) {
+      if (buffer_size >= FLAGS_max_page_header_size) {
         stringstream ss;
         ss << "ParquetScanner: could not read data page because page header exceeded "
            << "maximum size of "
-           << PrettyPrinter::Print(MAX_PAGE_HEADER_SIZE, TUnit::BYTES);
+           << PrettyPrinter::Print(FLAGS_max_page_header_size, TUnit::BYTES);
         status.AddDetail(ss.str());
         return status;
       }
