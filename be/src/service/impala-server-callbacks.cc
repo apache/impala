@@ -336,7 +336,9 @@ void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     session_json.AddMember("type", type, document->GetAllocator());
 
-    session_json.AddMember("num_queries", state->inflight_queries.size(),
+    session_json.AddMember("inflight_queries", state->inflight_queries.size(),
+        document->GetAllocator());
+    session_json.AddMember("total_queries", state->total_queries,
         document->GetAllocator());
 
     Value user(state->connected_user.c_str(), document->GetAllocator());

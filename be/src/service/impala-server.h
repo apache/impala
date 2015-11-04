@@ -796,11 +796,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// will never update the HS2 version from the default.
     SessionState() : closed(false), expired(false), hs2_version(
         apache::hive::service::cli::thrift::
-        TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1), ref_count(0) { }
+        TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1), total_queries(0), ref_count(0) {
+    }
 
     TSessionType::type session_type;
 
-    /// Time the session was created
+    /// Time the session was created.
     TimestampValue start_time;
 
     /// Connected user for this session, i.e. the user which originated this session.
@@ -809,10 +810,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// The user to delegate to. Empty for no delegation.
     std::string do_as_user;
 
-    /// Client network address
+    /// Client network address.
     TNetworkAddress network_address;
 
-    /// Protects all fields below
+    /// Protects all fields below.
     /// If this lock has to be taken with query_exec_state_map_lock, take this lock first.
     boost::mutex lock;
 
@@ -825,17 +826,20 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// after expiration).
     bool expired;
 
-    /// The default database (changed as a result of 'use' query execution)
+    /// The default database (changed as a result of 'use' query execution).
     std::string database;
 
-    /// The default query options of this session
+    /// The default query options of this session.
     TQueryOptions default_query_options;
 
-    /// For HS2 only, the protocol version this session is expecting
+    /// For HS2 only, the protocol version this session is expecting.
     apache::hive::service::cli::thrift::TProtocolVersion::type hs2_version;
 
     /// Inflight queries belonging to this session
     boost::unordered_set<TUniqueId> inflight_queries;
+
+    /// Total number of queries run as part of this session.
+    int64_t total_queries;
 
     /// Time the session was last accessed.
     int64_t last_accessed_ms;

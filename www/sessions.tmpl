@@ -22,6 +22,7 @@ There are {{num_sessions}} active sessions.
   <tr>
     <th>Session Type</th>
     <th>Open Queries</th>
+    <th>Total Queries</th>
     <th>User</th>
     <th>Delegated User</th>
     <th>Session ID</th>
@@ -37,7 +38,8 @@ There are {{num_sessions}} active sessions.
 {{#sessions}}
   <tr>
     <td>{{type}}</td>
-    <td>{{num_queries}}</td>
+    <td>{{inflight_queries}}</td>
+    <td>{{total_queries}}</td>
     <td>{{user}}</td>
     <td>{{delegated_user}}</td>
     <td>{{session_id}}</td>

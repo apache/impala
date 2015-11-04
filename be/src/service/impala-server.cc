@@ -848,6 +848,7 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
   if (session_state->closed) return Status("Session closed");
   // Add query to the set that will be unregistered if sesssion is closed.
   session_state->inflight_queries.insert(query_id);
+  ++session_state->total_queries;
   // Set query expiration.
   int32_t timeout_s = exec_state->query_options().query_timeout_s;
   if (FLAGS_idle_query_timeout > 0 && timeout_s > 0) {
