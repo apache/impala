@@ -313,8 +313,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
     {
       SCOPED_TIMER(materialize_tuple_timer());
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
-      while (!ReachedLimit() && !row_batch->AtCapacity(tuple_pool) &&
-          InputBatchHasNext()) {
+      while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
         RETURN_IF_ERROR(MaterializeNextRow(tuple_pool));
         int row_idx = row_batch->AddRow();
         TupleRow* tuple_row = row_batch->GetRow(row_idx);
@@ -331,7 +330,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       }
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
-      if (ReachedLimit() || row_batch->AtCapacity(tuple_pool) || input_batch_->eos) {
+      if (ReachedLimit() || row_batch->AtCapacity() || input_batch_->eos) {
         *eos = ReachedLimit() || input_batch_->eos;
         return Status::OK();
       }

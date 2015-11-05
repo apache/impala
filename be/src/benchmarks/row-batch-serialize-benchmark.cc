@@ -188,14 +188,14 @@ class RowBatchSerializeBaseline {
 
       int64_t uncompressed_size = input_batch.uncompressed_size;
       DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
-      tuple_data = batch->tuple_data_pool_->Allocate(uncompressed_size);
+      tuple_data = batch->tuple_data_pool()->Allocate(uncompressed_size);
       status = decompressor->ProcessBlock(true, compressed_size, compressed_data,
           &uncompressed_size, &tuple_data);
       DCHECK(status.ok()) << "RowBatch decompression failed.";
       decompressor->Close();
     } else {
       // Tuple data uncompressed, copy directly into data pool
-      tuple_data = batch->tuple_data_pool_->Allocate(input_batch.tuple_data.size());
+      tuple_data = batch->tuple_data_pool()->Allocate(input_batch.tuple_data.size());
       memcpy(tuple_data, input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
     }
 

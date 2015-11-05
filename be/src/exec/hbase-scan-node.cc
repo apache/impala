@@ -172,7 +172,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
-    if (ReachedLimit() || row_batch->AtCapacity(row_batch->tuple_data_pool())) {
+    if (ReachedLimit() || row_batch->AtCapacity()) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
       *eos = ReachedLimit();

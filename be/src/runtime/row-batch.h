@@ -122,20 +122,17 @@ class RowBatch {
     num_rows_ = num_rows;
   }
 
-  /// Returns true if the row batch has filled all the rows or has accumulated
-  /// enough memory.
+  /// Returns true if the row batch has filled rows up to its capacity or has accumulated
+  /// enough memory. The memory calculation includes the tuple data pool and any
+  /// auxiliary memory attached to the row batch.
   bool AtCapacity() {
-    return num_rows_ == capacity_ || auxiliary_mem_usage_ >= AT_CAPACITY_MEM_USAGE ||
-      num_tuple_streams() > 0 || need_to_return_;
-  }
-
-  /// Returns true if the row batch has filled all the rows or has accumulated
-  /// enough memory. tuple_pool is an intermediate memory pool containing tuple data
-  /// that will eventually be attached to this row batch. We need to make sure
-  /// the tuple pool does not accumulate excessive memory.
-  bool AtCapacity(MemPool* tuple_pool) {
-    DCHECK(tuple_pool != NULL);
-    return AtCapacity() || tuple_pool->total_allocated_bytes() > AT_CAPACITY_MEM_USAGE;
+    DCHECK_LE(num_rows_, capacity_);
+    // Check AtCapacity() conditions enforced in MarkNeedToReturn() and AddTupleStream()
+    if (need_to_return_) DCHECK_EQ(num_rows_, capacity_);
+    if (num_tuple_streams() > 0) DCHECK_EQ(num_rows_, capacity_);
+    DCHECK((num_tuple_streams() == 0 && !need_to_return_) || num_rows_ == capacity_);
+    int64_t mem_usage = auxiliary_mem_usage_ + tuple_data_pool_.total_allocated_bytes();
+    return num_rows_ == capacity_ || mem_usage >= AT_CAPACITY_MEM_USAGE;
   }
 
   TupleRow* GetRow(int row_idx) {
@@ -146,7 +143,7 @@ class RowBatch {
   }
 
   int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
-  MemPool* tuple_data_pool() { return tuple_data_pool_.get(); }
+  MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_io_buffers() const { return io_buffers_.size(); }
   int num_tuple_streams() const { return tuple_streams_.size(); }
 
@@ -164,12 +161,13 @@ class RowBatch {
   /// deleted when freeing resources.
   void AddBlock(BufferedBlockMgr::Block* block);
 
-  /// Called to indicate this row batch must be returned up the operator tree.
+  /// Called to indicate that resources backing this row batch will be cleaned up after
+  /// the next GetNext() call and the batch must be returned up the operator tree.
   /// This is used to control memory management for streaming rows.
-  /// TODO: consider using this mechanism instead of AddIoBuffer/AddTupleStream. This is
-  /// the property we need rather than meticulously passing resources up so the operator
-  /// tree.
-  void MarkNeedToReturn() { need_to_return_ = true; }
+  void MarkNeedToReturn() {
+    need_to_return_ = true;
+    MarkAtCapacity();
+  }
 
   bool need_to_return() { return need_to_return_; }
 
@@ -201,9 +199,6 @@ class RowBatch {
   /// This is used for scan nodes which produce RowBatches asynchronously.  Typically,
   /// an ExecNode is handed a row batch to populate (pull model) but ScanNodes have
   /// multiple threads which push row batches.
-  /// TODO: this is wasteful and makes a copy that's unnecessary.  Think about cleaning
-  /// this up.
-  /// TOOD: rename this or unify with TransferResourceOwnership()
   void AcquireState(RowBatch* src);
 
   /// Deep copy all rows this row batch into dst, using memory allocated from
@@ -229,9 +224,10 @@ class RowBatch {
 
   const RowDescriptor& row_desc() const { return row_desc_; }
 
-  /// Max memory that this row batch can accumulate in tuple_data_pool_ before it
-  /// is considered at capacity.
-  static const int AT_CAPACITY_MEM_USAGE;
+  /// Max memory that this row batch can accumulate before it is considered at capacity.
+  /// This is a soft capacity: row batches may exceed the capacity, preferably only by a
+  /// row's worth of data.
+  static const int AT_CAPACITY_MEM_USAGE = 8 * 1024 * 1024;
 
   /// Computes the maximum size needed to store tuple data for this row batch.
   int MaxTupleBufferSize();
@@ -264,16 +260,27 @@ class RowBatch {
   /// Close owned tuple streams and delete if needed.
   void CloseTupleStreams();
 
-  MemTracker* mem_tracker_;  // not owned
+  /// Mark that no more rows should be added to the batch.
+  void MarkAtCapacity() {
+    DCHECK_LE(num_rows_, capacity_);
+    capacity_ = num_rows_;
+  }
 
   /// All members below need to be handled in RowBatch::AcquireState()
 
-  bool has_in_flight_row_;  // if true, last row hasn't been committed yet
+  // Class members that are accessed on performance-critical paths should appear
+  // up the top to fit in as few cache lines as possible.
+
   int num_rows_;  // # of committed rows
-  int capacity_;  // maximum # of rows
+  int capacity_; // the value of num_rows_ at which batch is considered full.
+
+  bool has_in_flight_row_;  // if true, last row hasn't been committed yet
+
+  /// If true, this batch references unowned memory that will be cleaned up soon.
+  /// See MarkNeedToReturn().
+  bool need_to_return_;
 
   int num_tuples_per_row_;
-  RowDescriptor row_desc_;
 
   /// Array of pointers with capacity_ * num_tuples_per_row_ elements.
   /// The memory ownership depends on whether legacy joins and aggs are enabled.
@@ -291,19 +298,23 @@ class RowBatch {
   /// in Reset(). This mode is required for the legacy join and agg which rely on
   /// the tuple pointers being allocated from the tuple_data_pool_, so they can
   /// acquire ownership of the tuple pointers.
-  Tuple** tuple_ptrs_;
   int tuple_ptrs_size_;
+  Tuple** tuple_ptrs_;
 
   /// Sum of all auxiliary bytes. This includes IoBuffers and memory from
   /// TransferResourceOwnership().
   int64_t auxiliary_mem_usage_;
 
-  /// If true, this batch is considered at capacity. This is explicitly set by streaming
-  /// components that return rows via row batches.
-  bool need_to_return_;
-
   /// holding (some of the) data referenced by rows
-  boost::scoped_ptr<MemPool> tuple_data_pool_;
+  MemPool tuple_data_pool_;
+
+  // Less frequently used members that are not accessed on performance-critical paths
+  // should go below here.
+
+  /// Full row descriptor for rows in this batch.
+  RowDescriptor row_desc_;
+
+  MemTracker* mem_tracker_;  // not owned
 
   /// IO buffers current owned by this row batch. Ownership of IO buffers transfer
   /// between row batches. Any IO buffer will be owned by at most one row batch

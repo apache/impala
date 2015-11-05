@@ -979,11 +979,9 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   const int num_conjuncts = conjunct_ctxs_.size();
   TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
-  const int max_rows = out_batch->capacity() - out_batch->num_rows();
-  int num_rows_added = 0;
+  const int start_num_rows = out_batch->num_rows();
 
-  while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd() &&
-         num_rows_added < max_rows) {
+  while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd()) {
     // Output remaining unmatched build rows.
     if (!hash_tbl_iterator_.IsMatched()) {
       TupleRow* build_row = hash_tbl_iterator_.GetRow();
@@ -994,7 +992,7 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
         CreateOutputRow(out_row, NULL, build_row);
       }
       if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
-        ++num_rows_added;
+        out_batch->CommitLastRow();
         out_row = out_row->next_row(out_batch);
       }
       hash_tbl_iterator_.SetMatched();
@@ -1018,9 +1016,7 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
     }
   }
 
-  DCHECK_LE(num_rows_added, max_rows);
-  out_batch->CommitRows(num_rows_added);
-  num_rows_returned_ += num_rows_added;
+  num_rows_returned_ += out_batch->num_rows() - start_num_rows;
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 }
 
