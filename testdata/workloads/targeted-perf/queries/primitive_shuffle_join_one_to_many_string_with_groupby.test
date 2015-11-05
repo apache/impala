@@ -1,0 +1,17 @@
+====
+---- QUERY: primitive_shuffle_join_one_to_many_string_with_groupby
+---- Description : Fact to fact shuffle join on string column followed by group by.
+---- Target test case : Large Joins and aggregations done against string column
+----   done as part of ETL.
+SELECT Count(*) AS cnt
+FROM
+  ( SELECT Upper(Concat(Cast(l_orderkey AS STRING),'bla')) AS l_orderkey_string
+   FROM lineitem) l
+JOIN /* +shuffle */
+  ( SELECT upper(concat(cast(o_orderkey AS string),'bla')) o_orderkey_string
+   FROM orders) o ON l.l_orderkey_string = o.o_orderkey_string
+GROUP BY o.o_orderkey_string
+HAVING cnt = 999999;
+---- RESULTS
+---- TYPES
+====

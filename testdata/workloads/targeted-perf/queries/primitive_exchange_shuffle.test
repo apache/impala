@@ -1,0 +1,13 @@
+====
+---- QUERY: primitive_exchange_shuffle
+---- Description : Large fact to fact shuffle.
+---- Target test case : Shuffle large amuonts of data over the network.
+SELECT /* +straight_join */ count(*)
+FROM lineitem l1
+JOIN /* +shuffle */  lineitem l2 ON l1.l_orderkey = l2.l_orderkey
+WHERE l2.l_partkey > 0
+  AND l2.l_suppkey > 0
+  AND l2.l_linenumber > 0;
+---- RESULTS
+---- TYPES
+====
