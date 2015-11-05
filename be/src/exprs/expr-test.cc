@@ -312,16 +312,10 @@ class ExprTest : public testing::Test {
 
   // We can't put this into TestValue() because GTest can't resolve
   // the ambiguity in TimestampValue::operator==, even with the appropriate casts.
-  void TestTimestampValue(const string& expr, const TimestampValue& expected_result,
-      const int64_t tolerance_in_seconds = 0) {
+  void TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
     TimestampValue* result;
     GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
-    if (tolerance_in_seconds == 0) {
-      EXPECT_EQ(expected_result, *result);
-    } else {
-      int64_t delta = abs(result->ToUnixTime() - expected_result.ToUnixTime());
-      EXPECT_LE(delta, tolerance_in_seconds);
-    }
+    EXPECT_EQ(expected_result, *result);
   }
 
   // Tests whether the returned TimestampValue is valid.
@@ -330,6 +324,18 @@ class ExprTest : public testing::Test {
     TimestampValue* result;
     GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
     EXPECT_TRUE(result->HasDateOrTime());
+  }
+
+// This macro adds a scoped trace to provide the line number of the caller upon failure.
+#define EXPECT_BETWEEN(start, value, end) { \
+    SCOPED_TRACE(""); \
+    ExpectBetween(start, value, end); \
+  }
+
+  template <typename T>
+  void ExpectBetween(T start, T value, T end) {
+    EXPECT_LE(start, value);
+    EXPECT_LE(value, end);
   }
 
   // Test conversions of Timestamps to and from string/int with values related to the
@@ -3594,30 +3600,44 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValidTimestampValue("current_timestamp()");
   TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
 
-  // Test that the epoch is reasonable. Allow a few seconds to compensate for execution
-  // time.
-  int tolerance_in_seconds = 5;
-  time_t unix_time = (posix_time::microsec_clock::local_time() - from_time_t(0))
-      .total_seconds();
-  stringstream expr_sql;
-  expr_sql << "unix_timestamp() between " << unix_time - tolerance_in_seconds
-      << " and " << unix_time + tolerance_in_seconds;
-  TestValue(expr_sql.str(), TYPE_BOOLEAN, true);
+  // Test that the epoch is reasonable. The default behavior of UNIX_TIMESTAMP()
+  // is incorrect but wasn't changed for compatibility reasons. The function returns
+  // a value as though the current timezone is UTC. Or in other words, 1970-01-01
+  // in the current timezone is the effective epoch. A flag was introduced to enable
+  // the correct behavior. The first test below checks the default/incorrect behavior.
+  time_t unix_start_time =
+      (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
+  int64_t* unix_timestamp_result;
+  GetValue("unix_timestamp()", TYPE_BIGINT,
+      reinterpret_cast<void**>(&unix_timestamp_result));
+  EXPECT_BETWEEN(unix_start_time, *unix_timestamp_result, static_cast<int64_t>(
+      (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds()));
+
+  // Check again with the flag enabled.
   {
     ScopedLocalUnixTimestampConversionOverride use_local;
-    unix_time = time(NULL);
-    expr_sql.str("");
-    expr_sql << "unix_timestamp() between " << unix_time - tolerance_in_seconds
-        << " and " << unix_time + tolerance_in_seconds;
-    TestValue(expr_sql.str(), TYPE_BOOLEAN, true);
+    unix_start_time = time(NULL);
+    GetValue("unix_timestamp()", TYPE_BIGINT,
+        reinterpret_cast<void**>(&unix_timestamp_result));
+    EXPECT_BETWEEN(unix_start_time, *unix_timestamp_result, time(NULL));
   }
+
   // Test that the other current time functions are also reasonable.
-  ptime local_time = c_local_adjustor<ptime>::utc_to_local(from_time_t(unix_time));
-  TestTimestampValue("now()", TimestampValue(local_time), tolerance_in_seconds);
-  TestTimestampValue("current_timestamp()", TimestampValue(local_time),
-      tolerance_in_seconds);
-  TestTimestampValue("cast(unix_timestamp() as timestamp)", TimestampValue(local_time),
-      tolerance_in_seconds);
+  TimestampValue* timestamp_result;
+  TimestampValue start_time = TimestampValue::LocalTime();
+  GetValue("now()", TYPE_TIMESTAMP, reinterpret_cast<void**>(&timestamp_result));
+  EXPECT_BETWEEN(start_time, *timestamp_result, TimestampValue::LocalTime());
+  GetValue("current_timestamp()", TYPE_TIMESTAMP,
+      reinterpret_cast<void**>(&timestamp_result));
+  EXPECT_BETWEEN(start_time, *timestamp_result, TimestampValue::LocalTime());
+  // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
+  // a second to ensure an earlier value.
+  unix_start_time =
+      (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
+  GetValue("cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP,
+      reinterpret_cast<void**>(&timestamp_result));
+  EXPECT_BETWEEN(TimestampValue(unix_start_time - 1), *timestamp_result,
+      TimestampValue::LocalTime());
 
   // Test alias
   TestValue("now() = current_timestamp()", TYPE_BOOLEAN, true);
