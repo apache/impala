@@ -380,8 +380,7 @@ Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
     return Status::OK();
   }
   // Set the query end time in TLineageGraph
-  lineage_graph.__set_ended(query_exec_state.end_time().ToUnixTime());
-
+  lineage_graph.__set_ended(query_exec_state.end_time().ToUnixTimeInUTC());
   const Status& status = lineage_logger_->AppendEntry(
       LineageUtil::TLineageToJSON(lineage_graph));
   if (!status.ok()) {

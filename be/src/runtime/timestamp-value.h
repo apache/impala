@@ -172,6 +172,16 @@ class TimestampValue {
     }
   }
 
+  /// Returns the Unix time (seconds since the Unix epoch) in UTC corresponding to this
+  /// Timestamp instance. Caller should ensure that the TimestampValue instance is a valid
+  /// date before the call.
+  time_t ToUnixTimeInUTC() const {
+    DCHECK(HasDate());
+    const boost::posix_time::ptime temp(date_, time_);
+    tm temp_tm = boost::posix_time::to_tm(temp);
+    return mktime(&temp_tm);
+  }
+
   double ToSubsecondUnixTime() const {
     double temp = ToUnixTime();
     if (LIKELY(HasTime())) {

@@ -90,7 +90,7 @@ class LineageUtil {
       writer.Int64(lineage.started);
       // write query end time
       writer.String("endTime");
-      DCHECK(lineage.ended > lineage.started);
+      DCHECK(lineage.ended >= lineage.started);
       writer.Int64(lineage.ended);
       // Write edges
       writer.String("edges");
