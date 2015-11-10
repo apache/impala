@@ -17,7 +17,7 @@ from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
@@ -200,6 +200,7 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
+  @SkipIfOldAggsJoins.nested_types
   def test_continue_on_error(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('QueryTest/parquet-continue-on-error', vector)
