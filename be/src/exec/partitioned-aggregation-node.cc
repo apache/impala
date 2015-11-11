@@ -185,6 +185,8 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     // even if our input is empty.
     singleton_output_tuple_ =
         ConstructIntermediateTuple(agg_fn_ctxs_, mem_pool_.get(), NULL, NULL);
+    // Check for failures during AggFnEvaluator::Init().
+    RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
   } else {
     ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
@@ -386,6 +388,8 @@ Status PartitionedAggregationNode::Reset(RuntimeState* state) {
     // Re-create the single output tuple for this non-grouping agg.
     singleton_output_tuple_ =
         ConstructIntermediateTuple(agg_fn_ctxs_, mem_pool_.get(), NULL, NULL);
+    // Check for failures during AggFnEvaluator::Init().
+    RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
   } else {
     // Reset the HT and the partitions for this grouping agg.

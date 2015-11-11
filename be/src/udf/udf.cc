@@ -266,11 +266,33 @@ const char* FunctionContext::error_msg() const {
   return NULL;
 }
 
+inline bool FunctionContextImpl::CheckAllocResult(const char* fn_name,
+    uint8_t* buf, int byte_size) {
+  if (UNLIKELY(buf == NULL)) {
+    stringstream ss;
+    ss << string(fn_name) << "() failed to allocate " << byte_size << " bytes.";
+    context_->SetError(ss.str().c_str());
+    return false;
+  }
+#ifndef IMPALA_UDF_SDK_BUILD
+  MemTracker* mem_tracker = pool_->mem_tracker();
+  if (mem_tracker->LimitExceeded()) {
+    ErrorMsg msg = ErrorMsg(TErrorCode::UDF_MEM_LIMIT_EXCEEDED, string(fn_name));
+    state_->SetMemLimitExceeded(mem_tracker, byte_size, &msg);
+  }
+#endif
+  return true;
+}
+
 uint8_t* FunctionContext::Allocate(int byte_size) {
   assert(!impl_->closed_);
   if (byte_size == 0) return NULL;
   uint8_t* buffer = impl_->pool_->Allocate(byte_size);
-  if (impl_->debug_) {
+  if (UNLIKELY(!impl_->CheckAllocResult("FunctionContext::Allocate",
+      buffer, byte_size))) {
+    return NULL;
+  }
+  if (UNLIKELY(impl_->debug_)) {
     impl_->allocations_[buffer] = byte_size;
     memset(buffer, 0xff, byte_size);
   }
@@ -286,7 +308,11 @@ uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) {
            << " size=" << byte_size
            << " ptr=" << reinterpret_cast<void*>(ptr);
   uint8_t* new_ptr = impl_->pool_->Reallocate(ptr, byte_size);
-  if (impl_->debug_) {
+  if (UNLIKELY(!impl_->CheckAllocResult("FunctionContext::Reallocate",
+      new_ptr, byte_size))) {
+    return NULL;
+  }
+  if (UNLIKELY(impl_->debug_)) {
     impl_->allocations_.erase(ptr);
     impl_->allocations_[new_ptr] = byte_size;
   }
@@ -394,8 +420,12 @@ uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
   assert(!closed_);
   if (byte_size == 0) return NULL;
   uint8_t* buffer = pool_->Allocate(byte_size);
+  if (UNLIKELY(!CheckAllocResult("FunctionContextImpl::AllocateLocal",
+      buffer, byte_size))) {
+    return NULL;
+  }
   local_allocations_.push_back(buffer);
-  VLOG_ROW << "Allocate Local: FunctionContext=" << this->context_
+  VLOG_ROW << "Allocate Local: FunctionContext=" << context_
            << " size=" << byte_size
            << " result=" << reinterpret_cast<void*>(buffer);
   return buffer;
@@ -434,18 +464,20 @@ StringVal::StringVal(FunctionContext* context, int len)
     is_null = true;
   } else {
     ptr = context->impl()->AllocateLocal(len);
-    if (ptr == NULL && len > 0) {
+    if (UNLIKELY(ptr == NULL && len > 0)) {
+#ifndef IMPALA_UDF_SDK_BUILD
+      assert(!context->impl()->state()->GetQueryStatus().ok());
+#endif
       len = 0;
       is_null = true;
-      context->SetError("Large Memory allocation failed.");
     }
   }
 }
 
 StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) {
   StringVal result(ctx, len);
-  if (!result.is_null) {
-      memcpy(result.ptr, buf, len);
+  if (LIKELY(!result.is_null)) {
+    memcpy(result.ptr, buf, len);
   }
   return result;
 }

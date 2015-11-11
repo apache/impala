@@ -18,6 +18,7 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/decimal-functions.h"
+#include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 #include "string-functions.h"
@@ -125,6 +126,10 @@ CAST_TO_STRING(BigIntVal);
     if (isnan(val.val)) return StringVal("nan"); \
     /* Add 1 to MAX_FLOAT_CHARS since snprintf adds a trailing '\0' */ \
     StringVal sv(ctx, MAX_FLOAT_CHARS + 1); \
+    if (UNLIKELY(sv.is_null)) { \
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok()); \
+      return sv; \
+    } \
     sv.len = snprintf(reinterpret_cast<char*>(sv.ptr), sv.len, format, val.val); \
     DCHECK_GT(sv.len, 0); \
     DCHECK_LE(sv.len, MAX_FLOAT_CHARS); \
@@ -174,6 +179,10 @@ StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) 
   char* cptr;
   if (type.len > val.len) {
     cptr = reinterpret_cast<char*>(ctx->impl()->AllocateLocal(type.len));
+    if (UNLIKELY(cptr == NULL)) {
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+      return StringVal::null();
+    }
     memcpy(cptr, val.ptr, min(type.len, val.len));
     StringValue::PadWithSpaces(cptr, type.len, val.len);
   } else {

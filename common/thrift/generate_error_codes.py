@@ -204,6 +204,8 @@ error_codes = (
   ("IMPALA_2598_KERBEROS_SSL_DISALLOWED", 65, "Enabling server-to-server SSL connections "
   "in conjunction with Kerberos authentication is not supported at the same time. "
   "Disable server-to-server SSL by unsetting --ssl_client_ca_certificate."),
+
+  ("UDF_MEM_LIMIT_EXCEEDED", 66, "$0's allocations exceeded memory limits.")
 )
 
 import sys

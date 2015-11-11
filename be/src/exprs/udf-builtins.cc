@@ -22,7 +22,9 @@
 #include <string>
 
 #include "gen-cpp/Exprs_types.h"
+#include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
+#include "udf/udf-internal.h"
 #include "util/bit-util.h"
 
 #include "common/names.h"
@@ -46,6 +48,10 @@ DoubleVal UdfBuiltins::Pi(FunctionContext* context) {
 StringVal UdfBuiltins::Lower(FunctionContext* context, const StringVal& v) {
   if (v.is_null) return v;
   StringVal result(context, v.len);
+  if (UNLIKELY(result.is_null)) {
+    DCHECK(!context->impl()->state()->GetQueryStatus().ok());
+    return result;
+  }
   for (int i = 0; i < v.len; ++i) {
     result.ptr[i] = tolower(v.ptr[i]);
   }
@@ -309,8 +315,8 @@ void UdfBuiltins::TruncPrepare(FunctionContext* ctx,
       string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
       ctx->SetError(Substitute("Invalid Truncate Unit: $0", string_unit).c_str());
     } else {
-      TruncUnit::Type* state = reinterpret_cast<TruncUnit::Type*>(
-          ctx->Allocate(sizeof(TruncUnit::Type)));
+      TruncUnit::Type* state = ctx->Allocate<TruncUnit::Type>();
+      RETURN_IF_NULL(ctx, state);
       *state = trunc_unit;
       ctx->SetFunctionState(scope, state);
     }
@@ -432,8 +438,8 @@ void UdfBuiltins::ExtractPrepare(FunctionContext* ctx,
       string string_field(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
       ctx->SetError(Substitute("invalid extract field: $0", string_field).c_str());
     } else {
-      TExtractField::type* state = reinterpret_cast<TExtractField::type*>(
-          ctx->Allocate(sizeof(TExtractField::type)));
+      TExtractField::type* state = ctx->Allocate<TExtractField::type>();
+      RETURN_IF_NULL(ctx, state);
       *state = field;
       ctx->SetFunctionState(scope, state);
     }

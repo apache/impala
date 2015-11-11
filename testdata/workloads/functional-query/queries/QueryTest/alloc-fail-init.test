@@ -1,0 +1,96 @@
+====
+---- QUERY
+select ndv(string_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 1024 bytes.
+====
+---- QUERY
+select min(string_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 1 bytes.
+====
+---- QUERY
+select max(string_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 1 bytes.
+====
+---- QUERY
+select avg(d1) from functional.decimal_tbl
+---- CATCH
+FunctionContext::Allocate() failed to allocate 48 bytes.
+====
+---- QUERY
+select avg(double_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 16 bytes.
+====
+---- QUERY
+select avg(timestamp_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 16 bytes.
+====
+---- QUERY
+select sample(timestamp_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 480232 bytes.
+====
+---- QUERY
+select distinctpc(int_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 256 bytes.
+====
+---- QUERY
+select distinctpcsa(string_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 256 bytes.
+====
+---- QUERY
+select group_concat(string_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 4 bytes.
+====
+---- QUERY
+select rank() over (partition by month order by year) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 16 bytes.
+====
+---- QUERY
+select extract(year from timestamp_col) from functional.alltypes limit 10
+---- CATCH
+FunctionContextImpl::AllocateLocal() failed to allocate 4 bytes.
+====
+---- QUERY
+select trunc(timestamp_col, 'YEAR') from functional.alltypes limit 10
+---- CATCH
+FunctionContextImpl::AllocateLocal() failed to allocate 4 bytes.
+====
+---- QUERY
+select first_value(string_col) over (partition by month order by year) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 1 bytes.
+====
+---- QUERY
+select last_value(string_col) over (partition by month order by year) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 1 bytes.
+====
+---- QUERY
+select rand() from functional.alltypes;
+---- CATCH
+FunctionContext::Allocate() failed to allocate 4 bytes.
+====
+---- QUERY
+select case when min(int_col) = 0 then 0 end from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 16 bytes.
+====
+---- QUERY
+select cast(string_col as char(120)) from functional.alltypes
+---- CATCH
+FunctionContextImpl::AllocateLocal() failed to allocate 120 bytes.
+====
+---- QUERY
+select appx_median(int_col) from functional.alltypes
+---- CATCH
+FunctionContext::Allocate() failed to allocate 320232 bytes.
+====

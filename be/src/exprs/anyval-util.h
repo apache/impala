@@ -16,6 +16,7 @@
 #ifndef IMPALA_EXPRS_ANYVAL_UTIL_H
 #define IMPALA_EXPRS_ANYVAL_UTIL_H
 
+#include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
 #include "util/hash-util.h"
@@ -191,9 +192,7 @@ class AnyValUtil {
   }
 
   static StringVal FromBuffer(FunctionContext* ctx, const char* ptr, int len) {
-    StringVal result(ctx, len);
-    memcpy(result.ptr, ptr, len);
-    return result;
+    return StringVal::CopyFrom(ctx, reinterpret_cast<const uint8_t*>(ptr), len);
   }
 
   static FunctionContext::TypeDesc ColumnTypeToTypeDesc(const ColumnType& type);

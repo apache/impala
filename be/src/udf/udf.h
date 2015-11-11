@@ -136,16 +136,24 @@ class FunctionContext {
   /// Returns the current error message. Returns NULL if there is no error.
   const char* error_msg() const;
 
-  /// Allocates memory. All UDF/UDAs should use this if possible instead of
-  /// malloc/new. The UDF/UDA is responsible for calling Free() on all buffers returned by
-  /// Allocate(). If this Allocate causes the memory limit to be exceeded, the error will
-  /// be set in this object causing the query to fail.
+  /// Allocates memory. All UDF/UDAs should use this if possible instead of malloc/new.
+  /// The UDF/UDA is responsible for calling Free() on all buffers returned by Allocate().
+  /// If Allocate() fails or causes the memory limit to be exceeded, the error will be
+  /// set in this object causing the query to fail.
   uint8_t* Allocate(int byte_size);
+
+  /// Wrapper around Allocate() to allocate a buffer of the given type "T".
+  template<typename T>
+  T* Allocate() {
+    return reinterpret_cast<T*>(Allocate(sizeof(T)));
+  }
 
   /// Reallocates 'ptr' to the new byte_size. If the currently underlying allocation
   /// is big enough, the original ptr will be returned. If the allocation needs to
   /// grow, a new allocation is made that is at least 'byte_size' and the contents
-  /// of 'ptr' will be copied into it.
+  /// of 'ptr' will be copied into it. If the new allocation fails or causes the
+  /// memory limit to be exceeded, the error will be set in this object.
+  ///
   /// This should be used for buffers that constantly get appended to.
   uint8_t* Reallocate(uint8_t* ptr, int byte_size);
 
@@ -224,32 +232,37 @@ class FunctionContext {
 /// The UDF must implement this function prototype. This is not a typedef as the actual
 /// UDF's signature varies from UDF to UDF.
 ///    typedef <*Val> Evaluate(FunctionContext* context, <const Val& arg>);
-//
+///
 /// The UDF must return one of the *Val structs. The UDF must accept a pointer to a
 /// FunctionContext object and then a const reference for each of the input arguments.
 /// Examples of valid Udf signatures are:
 ///  1) DoubleVal Example1(FunctionContext* context);
 ///  2) IntVal Example2(FunctionContext* context, const IntVal& a1, const DoubleVal& a2);
-//
+///
 /// UDFs can be variadic. The variable arguments must all come at the end and must be
 /// the same type. A example signature is:
 ///  StringVal Concat(FunctionContext* context, const StringVal& separator,
 ///    int num_var_args, const StringVal* args);
 /// In this case args[0] is the first variable argument and args[num_var_args - 1] is
 /// the last.
-//
+///
 /// ------- Memory Management -------
 /// ---------------------------------
 /// The UDF can assume that memory from input arguments will have the same lifetime as
 /// results for the UDF. In other words, the UDF can return memory from input arguments
 /// without making copies. For example, a function like substring will not need to
 /// allocate and copy the smaller string.
-//
+///
 /// Any state needed across calls must be stored and accessed via
 /// FunctionContext::SetFunctionState() and FunctionContext::GetFunctionState(). The UDF
 /// should not maintain any other state across calls since there is no guarantee on how
 /// the execution is multithreaded or distributed.
-//
+///
+/// For StringVal return values, the UDF can use StringVal(FunctionContext*, int)
+/// ctor or the function StringVal::CopyFrom(FunctionContext*, const uint8_t*, size_t).
+/// The memory consumed by the StringVal will be managed by Impala. Please see the UDA
+/// section below for details.
+///
 /// -------- Execution Model --------
 /// ---------------------------------
 /// Execution model: For each UDF use occurring in a given query, at least one
@@ -257,13 +270,13 @@ class FunctionContext {
 /// never called concurrently and therefore do not need to be thread-safe. State shared
 /// across UDF invocations should be initialized and cleaned up using prepare and close
 /// functions (described below).
-//
+///
 /// Note that a single UDF use may produce multiple FunctionContexts for that UDF (this is
 /// so the UDF can be executed concurrently in different threads). For example, the query
 /// "select * from tbl where my_udf(x) > 0" may produce multiple FunctionContexts for
 /// 'my_udf', each of which may concurrently be passed to 'my_udf's prepare, close, and
 /// UDF functions.
-//
+///
 /// --- Prepare / Close Functions ---
 /// ---------------------------------
 /// The UDF can optionally include a prepare function, specified in the "CREATE FUNCTION"
@@ -272,7 +285,7 @@ class FunctionContext {
 /// UDF to initialize any shared data structures, validate versions, etc. If there is an
 /// error, this function should call FunctionContext::SetError()/
 /// FunctionContext::AddWarning().
-//
+///
 /// The prepare function is called multiple times with different FunctionStateScopes. It
 /// will be called once per fragment with 'scope' set to FRAGMENT_LOCAL, and once per
 /// execution thread with 'scope' set to THREAD_LOCAL.
@@ -303,7 +316,7 @@ typedef void (*UdfClose)(FunctionContext* context,
 ///  4) Init(), Merge() (repeatedly), Finalize()
 /// The UDA is registered with three types: the result type, the input type and
 /// the intermediate type.
-//
+///
 /// If the UDA needs a fixed byte width intermediate buffer, the type should be
 /// TYPE_FIXED_BUFFER and Impala will allocate the buffer. If the UDA needs an unknown
 /// sized buffer, it should use TYPE_STRING and allocate it from the FunctionContext
@@ -311,15 +324,23 @@ typedef void (*UdfClose)(FunctionContext* context,
 /// For UDAs that need a complex data structure as the intermediate state, the
 /// intermediate type should be string and the UDA can cast the ptr to the structure
 /// it is using.
-//
+///
 /// Memory Management: For allocations that are not returned to Impala, the UDA should use
 /// the FunctionContext::Allocate()/Free() methods. In general, Allocate() is called in
 /// Init(), and then Free() must be called in both Serialize() and Finalize(), since
 /// either of these functions may be called to clean up the state. For StringVal
 /// allocations returned to Impala (e.g. returned by UdaSerialize()), the UDA should
-/// allocate the result via StringVal(FunctionContext*, int) ctor and Impala will
+/// allocate the result via StringVal(FunctionContext*, int) ctor or the function
+/// StringVal::CopyFrom(FunctionContext*, const uint8_t*, size_t) and Impala will
 /// automatically handle freeing it.
 //
+/// Note that in the rare case the StringVal ctor or StringVal::CopyFrom() fail to
+/// allocate memory, the StringVal object will be marked as a null string.
+/// Serialize()/Finalize() should handle allocation failures by checking the is_null
+/// field of the StringVal object and carry out appropriate error handling action.
+/// Similarly, FunctionContext::Allocate()/Reallocate() may also fail to allocate
+/// memory so callers should check the returned values before using them.
+///
 /// For clarity in documenting the UDA interface, the various types will be typedefed
 /// here. The actual execution resolves all the types at runtime and none of these types
 /// should actually be used.
@@ -533,6 +554,7 @@ struct StringVal : public AnyVal {
   /// so the buffer must exist as long as this StringVal does.
   StringVal(uint8_t* ptr = NULL, int len = 0) : len(len), ptr(ptr) {
     assert(len >= 0);
+    if (ptr == NULL) assert(len == 0);
   };
 
   /// Construct a StringVal from NULL-terminated c-string. Note: this does not make a
@@ -551,6 +573,10 @@ struct StringVal : public AnyVal {
   /// Will create a new StringVal with the given dimension and copy the data from the
   /// parameters. In case of an error will return a NULL string and set an error on the
   /// function context.
+  ///
+  /// Note that the memory for the buffer of the new StringVal is managed by Impala.
+  /// Impala will handle freeing it. Callers should not call Free() on the 'ptr' of
+  /// the StringVal returned.
   static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len);
 
   static StringVal null() {

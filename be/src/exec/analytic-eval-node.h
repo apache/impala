@@ -153,7 +153,7 @@ class AnalyticEvalNode : public ExecNode {
 
   /// Initializes state at the start of a new partition. stream_idx is the index of the
   /// current input row from input_stream_.
-  void InitNextPartition(int64_t stream_idx);
+  Status InitNextPartition(RuntimeState* state, int64_t stream_idx);
 
   /// Produces a result tuple with analytic function results by calling GetValue() or
   /// Finalize() for curr_tuple_ on the evaluators_. The result tuple is stored in

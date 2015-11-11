@@ -35,10 +35,15 @@ const int HLL_PRECISION = 10;
 
 void HllInit(FunctionContext* ctx, StringVal* dst) {
   int str_len = pow(2, HLL_PRECISION);
-  dst->is_null = false;
-  dst->ptr = ctx->Allocate(str_len);
-  dst->len = str_len;
-  memset(dst->ptr, 0, str_len);
+  uint8_t* ptr = ctx->Allocate(str_len);
+  if (ptr != NULL) {
+    dst->ptr = ptr;
+    dst->len = str_len;
+    dst->is_null = false;
+    memset(ptr, 0, str_len);
+  } else {
+    *dst = StringVal::null();
+  }
 }
 
 static const uint64_t FNV64_PRIME = 1099511628211UL;

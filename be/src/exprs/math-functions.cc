@@ -22,6 +22,7 @@
 #include "exprs/expr.h"
 #include "exprs/operators.h"
 #include "util/string-parser.h"
+#include "runtime/runtime-state.h"
 
 #include "common/names.h"
 
@@ -134,7 +135,8 @@ DoubleVal MathFunctions::Pow(FunctionContext* ctx, const DoubleVal& base,
 void MathFunctions::RandPrepare(
     FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
-    uint32_t* seed = reinterpret_cast<uint32_t*>(ctx->Allocate(sizeof(uint32_t)));
+    uint32_t* seed = ctx->Allocate<uint32_t>();
+    RETURN_IF_NULL(ctx, seed);
     ctx->SetFunctionState(scope, seed);
     if (ctx->GetNumArgs() == 1) {
       // This is a call to RandSeed, initialize the seed

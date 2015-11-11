@@ -28,6 +28,14 @@
 
 namespace impala {
 
+#define RETURN_IF_NULL(ctx, ptr) \
+  do { \
+    if (UNLIKELY(ptr == NULL)) { \
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok()); \
+      return; \
+    } \
+  } while (false)
+
 class FreePool;
 class MemPool;
 class RuntimeState;
@@ -63,9 +71,12 @@ class FunctionContextImpl {
   /// it.
   impala_udf::FunctionContext* Clone(MemPool* pool);
 
-  /// Allocates a buffer of 'byte_size' with "local" memory management. These
-  /// allocations are not freed one by one but freed as a pool by FreeLocalAllocations()
-  /// This is used where the lifetime of the allocation is clear.
+  /// Allocates a buffer of 'byte_size' with "local" memory management.
+  /// If the new allocation causes the memory limit to be exceeded, the error will be set
+  /// in this object causing the query to fail.
+  ///
+  /// These allocations are not freed one by one but freed as a pool by
+  /// FreeLocalAllocations(). This is used where the lifetime of the allocation is clear.
   /// For UDFs, the allocations can be freed at the row level.
   /// TODO: free them at the batch level and save some copies?
   uint8_t* AllocateLocal(int byte_size);
@@ -97,6 +108,13 @@ class FunctionContextImpl {
  private:
   friend class impala_udf::FunctionContext;
   friend class ExprContext;
+
+  /// A utility function which checks for memory limits and null pointers returned by
+  /// Allocate(), Reallocate() and AllocateLocal() and sets the appropriate error status
+  /// if necessary.
+  ///
+  /// Return false if 'buf' is null; returns true otherwise.
+  bool CheckAllocResult(const char* fn_name, uint8_t* buf, int byte_size);
 
   /// Preallocated buffer for storing varargs (if the function has any). Allocated and
   /// owned by this object, but populated by an Expr function.

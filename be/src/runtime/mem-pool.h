@@ -108,7 +108,6 @@ class MemPool {
     DCHECK_GE(byte_size, 0);
     DCHECK(current_chunk_idx_ != -1);
     ChunkInfo& info = chunks_[current_chunk_idx_];
-    DCHECK(info.owns_data);
     DCHECK_GE(info.allocated_bytes, byte_size);
     info.allocated_bytes -= byte_size;
     total_allocated_bytes_ -= byte_size;
@@ -167,8 +166,7 @@ class MemPool {
   static const int DEFAULT_INITIAL_CHUNK_SIZE = 4 * 1024;
 
   struct ChunkInfo {
-    bool owns_data;  // true if we eventually need to dealloc data
-    uint8_t* data;
+    uint8_t* data; // Owned by the ChunkInfo.
     int64_t size;  // in bytes
 
     /// number of bytes allocated via Allocate() up to but excluding this chunk;
@@ -179,11 +177,10 @@ class MemPool {
     /// bytes allocated via Allocate() in this chunk
     int64_t allocated_bytes;
 
-    explicit ChunkInfo(int64_t size);
+    explicit ChunkInfo(int64_t size, uint8_t* buf);
 
     ChunkInfo()
-      : owns_data(true),
-        data(NULL),
+      : data(NULL),
         size(0),
         cumulative_allocated_bytes(0),
         allocated_bytes(0) {}
@@ -246,15 +243,10 @@ class MemPool {
     if (current_chunk_idx_ == -1
         || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
           > chunks_[current_chunk_idx_].size) {
-      if (CHECK_LIMIT_FIRST) {
-        // If we couldn't allocate a new chunk, return NULL.
-        if (!FindChunk(num_bytes, true)) return NULL;
-      } else {
-        FindChunk(num_bytes, false);
-      }
+      // If we couldn't allocate a new chunk, return NULL.
+      if (UNLIKELY(!FindChunk(num_bytes, CHECK_LIMIT_FIRST))) return NULL;
     }
     ChunkInfo& info = chunks_[current_chunk_idx_];
-    DCHECK(info.owns_data);
     uint8_t* result = info.data + info.allocated_bytes;
     DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
     info.allocated_bytes += num_bytes;

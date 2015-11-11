@@ -220,10 +220,14 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   // An intermediate tuple is only allocated once and is reused.
   curr_tuple_ = Tuple::Create(intermediate_tuple_desc_->byte_size(), mem_pool_.get());
   AggFnEvaluator::Init(evaluators_, fn_ctxs_, curr_tuple_);
+  // Allocate dummy_result_tuple_ even if AggFnEvaluator::Init() may have failed
+  // as it is needed in Close().
   dummy_result_tuple_ = Tuple::Create(result_tuple_desc_->byte_size(), mem_pool_.get());
+  // Check for failures during AggFnEvaluator::Init().
+  RETURN_IF_ERROR(state->GetQueryStatus());
 
   // Initialize state for the first partition.
-  InitNextPartition(0);
+  RETURN_IF_ERROR(InitNextPartition(state, 0));
   prev_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
   curr_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
@@ -454,7 +458,8 @@ inline void AnalyticEvalNode::TryAddRemainingResults(int64_t partition_idx,
   if (last_result_idx_ < partition_idx - 1) AddResultTuple(partition_idx - 1);
 }
 
-inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
+inline Status AnalyticEvalNode::InitNextPartition(RuntimeState* state,
+    int64_t stream_idx) {
   VLOG_FILE << id() << " InitNextPartition idx=" << stream_idx;
   DCHECK_LT(curr_partition_idx_, stream_idx);
   int64_t prev_partition_stream_idx = curr_partition_idx_;
@@ -508,6 +513,8 @@ inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
   // Re-initialize curr_tuple_.
   curr_tuple_->Init(intermediate_tuple_desc_->byte_size());
   AggFnEvaluator::Init(evaluators_, fn_ctxs_, curr_tuple_);
+  // Check for errors in AggFnEvaluator::Init().
+  RETURN_IF_ERROR(state->GetQueryStatus());
 
   // Add a result tuple containing values set by Init() (e.g. NULL for sum(), 0 for
   // count()) for output rows that have no input rows in the window. We need to add this
@@ -535,6 +542,7 @@ inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
       AddResultTuple(curr_partition_idx_ - rows_end_offset_ - 1);
     }
   }
+  return Status::OK();
 }
 
 inline bool AnalyticEvalNode::PrevRowCompare(ExprContext* pred_ctx) {
@@ -619,7 +627,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
       next_partition = !PrevRowCompare(partition_by_eq_expr_ctx_);
     }
     TryAddResultTupleForPrevRow(next_partition, stream_idx, row);
-    if (next_partition) InitNextPartition(stream_idx);
+    if (next_partition) RETURN_IF_ERROR(InitNextPartition(state, stream_idx));
 
     // The evaluators_ are updated with the current row.
     RETURN_IF_ERROR(AddRow(stream_idx, row));

@@ -66,3 +66,10 @@ DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redacti
     "rules. The rules will be applied to all log messages and query text shown in the "
     "Web UI and audit records. Query results will not be affected. Refer to the "
     "documentation for the rule file format.");
+
+// Stress option for testing failed memory allocation. Debug builds only.
+#ifndef NDEBUG
+DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "
+    "to fail once every n allocations where n is the value of this flag. Effective in "
+    "debug builds only.");
+#endif

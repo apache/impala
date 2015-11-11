@@ -151,6 +151,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     // create single intermediate tuple now; we need to output something
     // even if our input is empty
     singleton_intermediate_tuple_ = ConstructIntermediateTuple();
+    // Check for failures during AggFnEvaluator::Init().
+    RETURN_IF_ERROR(state->GetQueryStatus());
     hash_tbl_->Insert(singleton_intermediate_tuple_);
     output_iterator_ = hash_tbl_->Begin();
   }

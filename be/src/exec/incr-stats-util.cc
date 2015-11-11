@@ -20,6 +20,7 @@
 #include <cmath>
 #include <sstream>
 
+#include "common/compiler-util.h"
 #include "common/logging.h"
 #include "service/hs2-util.h"
 #include "udf/udf.h"
@@ -37,9 +38,10 @@ using namespace strings;
 // Finalize method for the NDV_NO_FINALIZE() UDA, which only copies the intermediate state
 // of the NDV computation into its output StringVal.
 StringVal IncrementNdvFinalize(FunctionContext* ctx, const StringVal& src) {
-  DCHECK(!src.is_null);
+  if (UNLIKELY(src.is_null)) return src;
   DCHECK_EQ(src.len, AggregateFunctions::HLL_LEN);
   StringVal result_str(ctx, src.len);
+  if (UNLIKELY(result_str.is_null)) return result_str;
   memcpy(result_str.ptr, src.ptr, src.len);
   ctx->Free(src.ptr);
   return result_str;

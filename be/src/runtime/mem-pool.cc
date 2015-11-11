@@ -45,9 +45,8 @@ MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
   DCHECK(mem_tracker != NULL);
 }
 
-MemPool::ChunkInfo::ChunkInfo(int64_t size)
-  : owns_data(true),
-    data(reinterpret_cast<uint8_t*>(malloc(size))),
+MemPool::ChunkInfo::ChunkInfo(int64_t size, uint8_t* buf)
+  : data(buf),
     size(size),
     cumulative_allocated_bytes(0),
     allocated_bytes(0) {
@@ -59,7 +58,6 @@ MemPool::ChunkInfo::ChunkInfo(int64_t size)
 MemPool::~MemPool() {
   int64_t total_bytes_released = 0;
   for (size_t i = 0; i < chunks_.size(); ++i) {
-    if (!chunks_[i].owns_data) continue;
     total_bytes_released += chunks_[i].size;
     free(chunks_[i].data);
   }
@@ -73,7 +71,6 @@ MemPool::~MemPool() {
 void MemPool::FreeAll() {
   int64_t total_bytes_released = 0;
   for (size_t i = 0; i < chunks_.size(); ++i) {
-    if (!chunks_[i].owns_data) continue;
     total_bytes_released += chunks_[i].size;
     free(chunks_[i].data);
   }
@@ -136,13 +133,22 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
       mem_tracker_->Consume(chunk_size);
     }
 
+    // Allocate a new chunk. Return early if malloc fails.
+    uint8_t* buf = reinterpret_cast<uint8_t*>(malloc(chunk_size));
+    if (UNLIKELY(buf == NULL)) {
+      mem_tracker_->Release(chunk_size);
+      DCHECK_EQ(current_chunk_idx_, static_cast<int>(chunks_.size()));
+      current_chunk_idx_ = static_cast<int>(chunks_.size()) - 1;
+      return false;
+    }
+
     // If there are no free chunks put it at the end, otherwise before the first free.
     if (first_free_idx == static_cast<int>(chunks_.size())) {
-      chunks_.push_back(ChunkInfo(chunk_size));
+      chunks_.push_back(ChunkInfo(chunk_size, buf));
     } else {
       current_chunk_idx_ = first_free_idx;
       vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_;
-      chunks_.insert(insert_chunk, ChunkInfo(chunk_size));
+      chunks_.insert(insert_chunk, ChunkInfo(chunk_size, buf));
     }
     total_reserved_bytes_ += chunk_size;
   }

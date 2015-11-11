@@ -23,6 +23,7 @@
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
+DECLARE_int32(stress_free_pool_alloc);
 DECLARE_bool(disable_mem_pools);
 
 namespace impala {
@@ -52,6 +53,13 @@ class FreePool {
 
   /// Allocates a buffer of size.
   uint8_t* Allocate(int size) {
+#ifndef NDEBUG
+    static int32_t alloc_counts = 0;
+    if (FLAGS_stress_free_pool_alloc > 0 &&
+        (++alloc_counts % FLAGS_stress_free_pool_alloc) == 0) {
+      return NULL;
+    }
+#endif
     ++net_allocations_;
     if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
 
@@ -68,6 +76,10 @@ class FreePool {
       size = 1 << free_list_idx;
       allocation = reinterpret_cast<FreeListNode*>(
           mem_pool_->Allocate(size + sizeof(FreeListNode)));
+      if (UNLIKELY(allocation == NULL)) {
+        --net_allocations_;
+        return NULL;
+      }
     } else {
       // Remove this allocation from the list.
       lists_[free_list_idx].next = allocation->next;
@@ -99,7 +111,17 @@ class FreePool {
   /// Returns an allocation that is at least 'size'. If the current allocation backing
   /// 'ptr' is big enough, 'ptr' is returned. Otherwise a new one is made and the contents
   /// of ptr are copied into it.
+  ///
+  /// NULL will be returned on allocation failure. It's the caller's responsibility to
+  /// free the memory buffer pointed to by "ptr" in this case.
   uint8_t* Reallocate(uint8_t* ptr, int size) {
+#ifndef NDEBUG
+    static int32_t alloc_counts = 0;
+    if (FLAGS_stress_free_pool_alloc > 0 &&
+        (++alloc_counts % FLAGS_stress_free_pool_alloc) == 0) {
+      return NULL;
+    }
+#endif
     if (FLAGS_disable_mem_pools) {
       return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
     }
@@ -119,8 +141,10 @@ class FreePool {
     // Make a new one. Since Allocate() already rounds up to powers of 2, this effectively
     // doubles for the caller.
     uint8_t* new_ptr = Allocate(size);
-    memcpy(new_ptr, ptr, allocation_size);
-    Free(ptr);
+    if (LIKELY(new_ptr != NULL)) {
+      memcpy(new_ptr, ptr, allocation_size);
+      Free(ptr);
+    }
     return new_ptr;
   }
 

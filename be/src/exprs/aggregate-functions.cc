@@ -25,6 +25,7 @@
 
 #include "common/logging.h"
 #include "runtime/decimal-value.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "exprs/anyval-util.h"
@@ -121,6 +122,37 @@ int64_t HllEstimateBias(int64_t estimate) {
 // the custom code in aggregation node.
 namespace impala {
 
+// This function initializes StringVal 'dst' with a newly allocated buffer of
+// 'buf_len' bytes. The new buffer will be filled with zero. If allocation fails,
+// 'dst' will be set to a null string. This allows execution to continue until the
+// next time GetQueryStatus() is called (see IMPALA-2756).
+static void AllocBuffer(FunctionContext* ctx, StringVal* dst, size_t buf_len) {
+  DCHECK_GT(buf_len, 0);
+  uint8_t* ptr = ctx->Allocate(buf_len);
+  if (UNLIKELY(ptr == NULL)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    *dst = StringVal::null();
+  } else {
+    *dst = StringVal(ptr, buf_len);
+    memset(ptr, 0, buf_len);
+  }
+}
+
+// This function initializes StringVal 'dst' with a newly allocated buffer of
+// 'buf_len' bytes and copies the content of StringVal 'src' into it.
+// If allocation fails, 'dst' will be set to a null string.
+static void CopyStringVal(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK_GT(src.len, 0);
+  uint8_t* copy = ctx->Allocate(src.len);
+  if (UNLIKELY(copy == NULL)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    *dst = StringVal::null();
+  } else {
+    *dst = StringVal(copy, src.len);
+    memcpy(dst->ptr, src.ptr, src.len);
+  }
+}
+
 // Converts any UDF Val Type to a string representation
 template <typename T>
 StringVal ToStringVal(FunctionContext* context, T val) {
@@ -206,10 +238,7 @@ struct AvgState {
 };
 
 void AggregateFunctions::AvgInit(FunctionContext* ctx, StringVal* dst) {
-  dst->is_null = false;
-  dst->len = sizeof(AvgState);
-  dst->ptr = ctx->Allocate(dst->len);
-  memset(dst->ptr, 0, sizeof(AvgState));
+  AllocBuffer(ctx, dst, sizeof(AvgState));
 }
 
 template <typename T>
@@ -252,6 +281,7 @@ DoubleVal AggregateFunctions::AvgGetValue(FunctionContext* ctx, const StringVal&
 }
 
 DoubleVal AggregateFunctions::AvgFinalize(FunctionContext* ctx, const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return DoubleVal::null();
   DoubleVal result = AvgGetValue(ctx, src);
   ctx->Free(src.ptr);
   return result;
@@ -292,6 +322,7 @@ TimestampVal AggregateFunctions::TimestampAvgGetValue(FunctionContext* ctx,
 
 TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,
     const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return TimestampVal::null();
   TimestampVal result = TimestampAvgGetValue(ctx, src);
   ctx->Free(src.ptr);
   return result;
@@ -303,10 +334,7 @@ struct DecimalAvgState {
 };
 
 void AggregateFunctions::DecimalAvgInit(FunctionContext* ctx, StringVal* dst) {
-  dst->is_null = false;
-  dst->len = sizeof(DecimalAvgState);
-  dst->ptr = ctx->Allocate(dst->len);
-  memset(dst->ptr, 0, sizeof(DecimalAvgState));
+  AllocBuffer(ctx, dst, sizeof(DecimalAvgState));
 }
 
 void AggregateFunctions::DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal& src,
@@ -390,6 +418,7 @@ DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
 
 DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
     const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return DecimalVal::null();
   DecimalVal result = DecimalAvgGetValue(ctx, src);
   ctx->Free(src.ptr);
   return result;
@@ -483,9 +512,7 @@ void AggregateFunctions::Min(FunctionContext* ctx, const StringVal& src, StringV
   if (dst->is_null ||
       StringValue::FromStringVal(src) < StringValue::FromStringVal(*dst)) {
     if (!dst->is_null) ctx->Free(dst->ptr);
-    uint8_t* copy = ctx->Allocate(src.len);
-    memcpy(copy, src.ptr, src.len);
-    *dst = StringVal(copy, src.len);
+    CopyStringVal(ctx, src, dst);
   }
 }
 
@@ -495,9 +522,7 @@ void AggregateFunctions::Max(FunctionContext* ctx, const StringVal& src, StringV
   if (dst->is_null ||
       StringValue::FromStringVal(src) > StringValue::FromStringVal(*dst)) {
     if (!dst->is_null) ctx->Free(dst->ptr);
-    uint8_t* copy = ctx->Allocate(src.len);
-    memcpy(copy, src.ptr, src.len);
-    *dst = StringVal(copy, src.len);
+    CopyStringVal(ctx, src, dst);
   }
 }
 
@@ -576,7 +601,11 @@ void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
     // Header of the intermediate state holds the length of the first separator.
     const int header_len = sizeof(StringConcatHeader);
     DCHECK(header_len == sizeof(sep->len));
-    *result = StringVal(ctx->Allocate(header_len), header_len);
+    AllocBuffer(ctx, result, header_len);
+    if (UNLIKELY(result->is_null)) {
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+      return;
+    }
     *reinterpret_cast<StringConcatHeader*>(result->ptr) = sep->len;
   }
   unsigned new_len = result->len + sep->len + src.len;
@@ -588,7 +617,7 @@ void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
       result->ptr = ptr;
       result->len = new_len;
     } else {
-      ctx->SetError("Large Memory allocation failed.");
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     }
   } else {
     ctx->SetError("Concatenated string length larger than allowed limit of "
@@ -601,9 +630,12 @@ void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
   if (src.is_null) return;
   const int header_len = sizeof(StringConcatHeader);
   if (result->is_null) {
+    AllocBuffer(ctx, result, header_len);
+    if (UNLIKELY(result->is_null)) {
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+      return;
+    }
     // Copy the header from the first intermediate value.
-    *result = StringVal(ctx->Allocate(header_len), header_len);
-    if (result->is_null) return;
     *reinterpret_cast<StringConcatHeader*>(result->ptr) =
         *reinterpret_cast<StringConcatHeader*>(src.ptr);
   }
@@ -617,7 +649,7 @@ void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
       result->ptr = ptr;
       result->len = new_len;
     } else {
-      ctx->SetError("Large Memory allocation failed.");
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     }
   } else {
     ctx->SetError("Concatenated string length larger than allowed limit of "
@@ -627,7 +659,7 @@ void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
 
 StringVal AggregateFunctions::StringConcatFinalize(FunctionContext* ctx,
     const StringVal& src) {
-  if (src.is_null) return src;
+  if (UNLIKELY(src.is_null)) return src;
   const int header_len = sizeof(StringConcatHeader);
   DCHECK(src.len >= header_len);
   int sep_len = *reinterpret_cast<StringConcatHeader*>(src.ptr);
@@ -674,11 +706,7 @@ void AggregateFunctions::PcInit(FunctionContext* c, StringVal* dst) {
   //
   // We use "string" type for DISTINCT_PC function so that we can use the string
   // slot to hold the bitmaps.
-  dst->is_null = false;
-  int str_len = NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8;
-  dst->ptr = c->Allocate(str_len);
-  dst->len = str_len;
-  memset(dst->ptr, 0, str_len);
+  AllocBuffer(c, dst, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
 }
 
 static inline void SetDistinctEstimateBit(uint8_t* bitmap,
@@ -764,7 +792,7 @@ void AggregateFunctions::PcMerge(FunctionContext* c,
            << DistinctEstimateBitMapToString(dst->ptr);
 }
 
-double DistinceEstimateFinalize(const StringVal& src) {
+static double DistinceEstimateFinalize(const StringVal& src) {
   DCHECK(!src.is_null);
   DCHECK_EQ(src.len, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
   VLOG_ROW << "FinalizeEstimateSlot Bit map:\n"
@@ -810,14 +838,14 @@ double DistinceEstimateFinalize(const StringVal& src) {
 }
 
 BigIntVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& src) {
-  DCHECK(!src.is_null);
+  if (UNLIKELY(src.is_null)) return BigIntVal::null();
   double estimate = DistinceEstimateFinalize(src);
   c->Free(src.ptr);
   return static_cast<int64_t>(estimate);
 }
 
 BigIntVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& src) {
-  DCHECK(!src.is_null);
+  if (UNLIKELY(src.is_null)) return BigIntVal::null();
   // When using stochastic averaging, the result has to be multiplied by NUM_PC_BITMAPS.
   double estimate = DistinceEstimateFinalize(src) * NUM_PC_BITMAPS;
   c->Free(src.ptr);
@@ -888,11 +916,11 @@ struct ReservoirSampleState {
 
 template <typename T>
 void AggregateFunctions::ReservoirSampleInit(FunctionContext* ctx, StringVal* dst) {
-  int str_len = sizeof(ReservoirSampleState<T>);
-  dst->is_null = false;
-  dst->ptr = ctx->Allocate(str_len);
-  dst->len = str_len;
-  memset(dst->ptr, 0, str_len);
+  AllocBuffer(ctx, dst, sizeof(ReservoirSampleState<T>));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
   *reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr) = ReservoirSampleState<T>();
 }
 
@@ -916,9 +944,10 @@ void AggregateFunctions::ReservoirSampleUpdate(FunctionContext* ctx, const T& sr
 template <typename T>
 const StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
     const StringVal& src) {
-  if (src.is_null) return src;
+  if (UNLIKELY(src.is_null)) return src;
   StringVal result = StringVal::CopyFrom(ctx, src.ptr, src.len);
   ctx->Free(src.ptr);
+  if (UNLIKELY(result.is_null)) return result;
 
   ReservoirSampleState<T>* state = reinterpret_cast<ReservoirSampleState<T>*>(result.ptr);
   // Assign keys to the samples that haven't been set (i.e. if serializing after
@@ -1034,7 +1063,7 @@ void PrintSample(const ReservoirSample<TimestampVal>& v, ostream* os) {
 template <typename T>
 StringVal AggregateFunctions::ReservoirSampleFinalize(FunctionContext* ctx,
     const StringVal& src_val) {
-  DCHECK(!src_val.is_null);
+  if (UNLIKELY(src_val.is_null)) return src_val;
   DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
   ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
 
@@ -1045,7 +1074,9 @@ StringVal AggregateFunctions::ReservoirSampleFinalize(FunctionContext* ctx,
   }
   const string& out_str = out.str();
   StringVal result_str(ctx, out_str.size());
-  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  if (LIKELY(!result_str.is_null)) {
+    memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  }
   ctx->Free(src_val.ptr);
   return result_str;
 }
@@ -1053,7 +1084,7 @@ StringVal AggregateFunctions::ReservoirSampleFinalize(FunctionContext* ctx,
 template <typename T>
 StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
     const StringVal& src_val) {
-  DCHECK(!src_val.is_null);
+  if (UNLIKELY(src_val.is_null)) return src_val;
   DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
 
   ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
@@ -1077,7 +1108,7 @@ StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
 template <typename T>
 T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx,
     const StringVal& src_val) {
-  DCHECK(!src_val.is_null);
+  if (UNLIKELY(src_val.is_null)) return T::null();
   DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
 
   ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
@@ -1093,11 +1124,7 @@ T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx,
 }
 
 void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
-  int str_len = HLL_LEN;
-  dst->is_null = false;
-  dst->ptr = ctx->Allocate(str_len);
-  dst->len = str_len;
-  memset(dst->ptr, 0, str_len);
+  AllocBuffer(ctx, dst, HLL_LEN);
 }
 
 template <typename T>
@@ -1168,7 +1195,7 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
 }
 
 BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
-  DCHECK(!src.is_null);
+  if (UNLIKELY(src.is_null)) return BigIntVal::null();
   uint64_t estimate = HllFinalEstimate(src.ptr, src.len);
   ctx->Free(src.ptr);
   return estimate;
@@ -1184,7 +1211,7 @@ struct KnuthVarianceState {
 };
 
 // Set pop=true for population variance, false for sample variance
-double ComputeKnuthVariance(const KnuthVarianceState& state, bool pop) {
+static double ComputeKnuthVariance(const KnuthVarianceState& state, bool pop) {
   // Return zero for 1 tuple specified by
   // http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions212.htm
   if (state.count == 1) return 0.0;
@@ -1200,7 +1227,7 @@ void AggregateFunctions::KnuthVarInit(FunctionContext* ctx, StringVal* dst) {
 
 template <typename T>
 void AggregateFunctions::KnuthVarUpdate(FunctionContext* ctx, const T& src,
-                                        StringVal* dst) {
+    StringVal* dst) {
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(KnuthVarianceState));
   if (src.is_null) return;
@@ -1214,7 +1241,7 @@ void AggregateFunctions::KnuthVarUpdate(FunctionContext* ctx, const T& src,
 }
 
 void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& src,
-                                       StringVal* dst) {
+    StringVal* dst) {
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(KnuthVarianceState));
   DCHECK(!src.is_null);
@@ -1234,6 +1261,7 @@ void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& sr
 
 DoubleVal AggregateFunctions::KnuthVarFinalize(
     FunctionContext* ctx, const StringVal& state_sv) {
+  DCHECK(!state_sv.is_null);
   KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
   if (state->count == 0) return DoubleVal::null();
   double variance = ComputeKnuthVariance(*state, false);
@@ -1250,7 +1278,7 @@ DoubleVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
 }
 
 DoubleVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
-                                                  const StringVal& state_sv) {
+    const StringVal& state_sv) {
   DCHECK(!state_sv.is_null);
   DCHECK_EQ(state_sv.len, sizeof(KnuthVarianceState));
   KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
@@ -1259,7 +1287,7 @@ DoubleVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
 }
 
 DoubleVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
-                                                     const StringVal& state_sv) {
+    const StringVal& state_sv) {
   DCHECK(!state_sv.is_null);
   DCHECK_EQ(state_sv.len, sizeof(KnuthVarianceState));
   KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
@@ -1274,10 +1302,11 @@ struct RankState {
 };
 
 void AggregateFunctions::RankInit(FunctionContext* ctx, StringVal* dst) {
-  int str_len = sizeof(RankState);
-  dst->is_null = false;
-  dst->ptr = ctx->Allocate(str_len);
-  dst->len = str_len;
+  AllocBuffer(ctx, dst, sizeof(RankState));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
   *reinterpret_cast<RankState*>(dst->ptr) = RankState();
 }
 
@@ -1321,7 +1350,7 @@ BigIntVal AggregateFunctions::DenseRankGetValue(FunctionContext* ctx,
 
 BigIntVal AggregateFunctions::RankFinalize(FunctionContext* ctx,
     StringVal& src_val) {
-  DCHECK(!src_val.is_null);
+  if (UNLIKELY(src_val.is_null)) return BigIntVal::null();
   DCHECK_EQ(src_val.len, sizeof(RankState));
   RankState* state = reinterpret_cast<RankState*>(src_val.ptr);
   int64_t result = state->rank;
@@ -1343,13 +1372,16 @@ void AggregateFunctions::LastValUpdate(FunctionContext* ctx, const StringVal& sr
     return;
   }
 
+  uint8_t* new_ptr;
   if (dst->is_null) {
-    dst->ptr = ctx->Allocate(src.len);
-    dst->is_null = false;
+    new_ptr = ctx->Allocate(src.len);
   } else {
-    dst->ptr = ctx->Reallocate(dst->ptr, src.len);
+    new_ptr = ctx->Reallocate(dst->ptr, src.len);
   }
+  RETURN_IF_NULL(ctx, new_ptr);
+  dst->ptr = new_ptr;
   memcpy(dst->ptr, src.ptr, src.len);
+  dst->is_null = false;
   dst->len = src.len;
 }
 
@@ -1388,8 +1420,7 @@ void AggregateFunctions::FirstValUpdate(FunctionContext* ctx, const StringVal& s
     *dst = StringVal::null();
     return;
   }
-  *dst = StringVal(ctx->Allocate(src.len), src.len);
-  if (!dst->is_null) memcpy(dst->ptr, src.ptr, src.len);
+  CopyStringVal(ctx, src, dst);
 }
 
 template <typename T>

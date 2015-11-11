@@ -54,8 +54,11 @@ Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
                       FunctionContext::FunctionStateScope scope) {
   RETURN_IF_ERROR(Expr::Open(state, ctx, scope));
   FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
-  CaseExprState* case_state =
-      reinterpret_cast<CaseExprState*>(fn_ctx->Allocate(sizeof(CaseExprState)));
+  CaseExprState* case_state = fn_ctx->Allocate<CaseExprState>();
+  if (UNLIKELY(case_state == NULL)) {
+    DCHECK(!fn_ctx->impl()->state()->GetQueryStatus().ok());
+    return fn_ctx->impl()->state()->GetQueryStatus();
+  }
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, case_state);
   if (has_case_expr_) {
     case_state->case_val = CreateAnyVal(state->obj_pool(), children_[0]->type());

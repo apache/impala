@@ -55,3 +55,63 @@ select l_comment from tpch_parquet.lineitem) a
 ---- CATCH
 Concatenated string length larger than allowed limit of 1 GB character data
 =====
+---- QUERY
+# IMPALA-2620: Allocation by UDF/UDA need to take into account of memory limit.
+SET mem_limit=512m;
+select length(group_concat(l_comment, "!")) from (
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem union all
+select l_comment from tpch_parquet.lineitem) a
+---- CATCH
+Memory limit exceeded
+====
+---- QUERY
+set mem_limit=0
+====
