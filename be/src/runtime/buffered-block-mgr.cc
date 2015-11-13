@@ -129,8 +129,8 @@ Status BufferedBlockMgr::Block::Unpin() {
   return block_mgr_->UnpinBlock(this);
 }
 
-Status BufferedBlockMgr::Block::Delete() {
-  return block_mgr_->DeleteBlock(this);
+void BufferedBlockMgr::Block::Delete() {
+  block_mgr_->DeleteBlock(this);
 }
 
 void BufferedBlockMgr::Block::Init() {
@@ -563,10 +563,14 @@ MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
 //       IMPALA-1884.
 Status BufferedBlockMgr::DeleteOrUnpinBlock(Block* block, bool unpin) {
   if (block == NULL) {
-    lock_guard<mutex> lock(lock_);
-    return is_cancelled_ ? Status::CANCELLED : Status::OK();
+    return IsCancelled() ? Status::CANCELLED : Status::OK();
   }
-  return unpin ? block->Unpin() : block->Delete();
+  if (unpin) {
+    return block->Unpin();
+  } else {
+    block->Delete();
+    return IsCancelled() ? Status::CANCELLED : Status::OK();
+  }
 }
 
 Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_block,
@@ -851,7 +855,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   }
 }
 
-Status BufferedBlockMgr::DeleteBlock(Block* block) {
+void BufferedBlockMgr::DeleteBlock(Block* block) {
   DCHECK(!block->is_deleted_);
 
   lock_guard<mutex> lock(lock_);
@@ -875,7 +879,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
         << "Should never be writing a small buffer";
     // If a write is still pending, return. Cleanup will be done in WriteComplete().
     DCHECK(block->Validate()) << endl << block->DebugString();
-    return is_cancelled_ ? Status::CANCELLED : Status::OK();
+    return;
   }
 
   if (block->buffer_desc_ != NULL) {
@@ -897,7 +901,6 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   ReturnUnusedBlock(block);
   DCHECK(block->Validate()) << endl << block->DebugString();
   DCHECK(Validate()) << endl << DebugInternal();
-  return is_cancelled_ ? Status::CANCELLED : Status::OK();
 }
 
 void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {

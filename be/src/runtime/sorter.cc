@@ -578,7 +578,7 @@ Status Sorter::Run::UnpinAllBlocks() {
 
   // Clear var_len_blocks_ and replace with it with the contents of sorted_var_len_blocks
   BOOST_FOREACH(BufferedBlockMgr::Block* var_block, var_len_blocks_) {
-    RETURN_IF_ERROR(var_block->Delete());
+    var_block->Delete();
   }
   var_len_blocks_.clear();
   sorted_var_len_blocks.swap(var_len_blocks_);
@@ -652,10 +652,10 @@ Status Sorter::Run::GetNextBatch(RowBatch** output_batch) {
       DCHECK_EQ(buffered_batch_->num_rows(), 0);
       buffered_batch_.reset();
       // The merge is complete. Delete the last blocks in the run.
-      RETURN_IF_ERROR(fixed_len_blocks_.back()->Delete());
+      fixed_len_blocks_.back()->Delete();
       fixed_len_blocks_[fixed_len_blocks_.size() - 1] = NULL;
       if (HasVarLenBlocks()) {
-        RETURN_IF_ERROR(var_len_blocks_.back()->Delete());
+        var_len_blocks_.back()->Delete();
         var_len_blocks_[var_len_blocks_.size() - 1] = NULL;
       }
     }
@@ -682,7 +682,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
     // Pin the next block and delete the previous if set in the previous call to
     // GetNext().
     if (pin_next_fixed_len_block_) {
-      RETURN_IF_ERROR(fixed_len_blocks_[fixed_len_blocks_index_ - 1]->Delete());
+      fixed_len_blocks_[fixed_len_blocks_index_ - 1]->Delete();
       fixed_len_blocks_[fixed_len_blocks_index_ - 1] = NULL;
       bool pinned;
       RETURN_IF_ERROR(fixed_len_block->Pin(&pinned));
@@ -696,7 +696,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       pin_next_fixed_len_block_ = false;
     }
     if (pin_next_var_len_block_) {
-      RETURN_IF_ERROR(var_len_blocks_[var_len_blocks_index_ - 1]->Delete());
+      var_len_blocks_[var_len_blocks_index_ - 1]->Delete();
       var_len_blocks_[var_len_blocks_index_ - 1] = NULL;
       bool pinned;
       RETURN_IF_ERROR(var_len_blocks_[var_len_blocks_index_]->Pin(&pinned));
@@ -1105,7 +1105,7 @@ Status Sorter::SortRun() {
   if (last_block->valid_data_len() > 0) {
     sorted_data_size_->Add(last_block->valid_data_len());
   } else {
-    RETURN_IF_ERROR(last_block->Delete());
+    last_block->Delete();
     unsorted_run_->fixed_len_blocks_.pop_back();
   }
   if (has_var_len_slots_) {
@@ -1114,10 +1114,10 @@ Status Sorter::SortRun() {
     if (last_block->valid_data_len() > 0) {
       sorted_data_size_->Add(last_block->valid_data_len());
     } else {
-      RETURN_IF_ERROR(last_block->Delete());
+      last_block->Delete();
       unsorted_run_->var_len_blocks_.pop_back();
       if (unsorted_run_->var_len_blocks_.size() == 0) {
-        RETURN_IF_ERROR(unsorted_run_->var_len_copy_block_->Delete());
+        unsorted_run_->var_len_copy_block_->Delete();
         unsorted_run_->var_len_copy_block_ = NULL;
       }
     }
@@ -1198,7 +1198,7 @@ Status Sorter::MergeIntermediateRuns() {
     if (last_block->valid_data_len() > 0) {
       RETURN_IF_ERROR(last_block->Unpin());
     } else {
-      RETURN_IF_ERROR(last_block->Delete());
+      last_block->Delete();
       merged_run->fixed_len_blocks_.pop_back();
     }
     if (has_var_len_slots_) {
@@ -1206,7 +1206,7 @@ Status Sorter::MergeIntermediateRuns() {
       if (last_block->valid_data_len() > 0) {
         RETURN_IF_ERROR(last_block->Unpin());
       } else {
-        RETURN_IF_ERROR(last_block->Delete());
+        last_block->Delete();
         merged_run->var_len_blocks_.pop_back();
       }
     }

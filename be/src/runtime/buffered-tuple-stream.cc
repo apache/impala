@@ -276,7 +276,7 @@ Status BufferedTupleStream::NextBlockForRead() {
     read_block_ = blocks_.begin();
     read_block_idx_ = 0;
     if (block_to_free != NULL && !block_to_free->is_max_size()) {
-      RETURN_IF_ERROR(block_to_free->Delete());
+      block_to_free->Delete();
       block_to_free = NULL;
       DCHECK_EQ(num_pinned_, NumPinned(blocks_)) << DebugString();
     }
@@ -296,7 +296,7 @@ Status BufferedTupleStream::NextBlockForRead() {
     if (block_to_free != NULL) {
       SCOPED_TIMER(unpin_timer_);
       if (delete_on_read_) {
-        RETURN_IF_ERROR(block_to_free->Delete());
+        block_to_free->Delete();
         --num_pinned_;
       } else {
         RETURN_IF_ERROR(UnpinBlock(block_to_free));

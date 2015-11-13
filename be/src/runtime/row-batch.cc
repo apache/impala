@@ -153,7 +153,6 @@ RowBatch::~RowBatch() {
   }
   CloseTupleStreams();
   for (int i = 0; i < blocks_.size(); ++i) {
-    // TODO: Delete() returns a Status.
     blocks_[i]->Delete();
   }
   if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
@@ -320,7 +319,6 @@ void RowBatch::Reset() {
   io_buffers_.clear();
   CloseTupleStreams();
   for (int i = 0; i < blocks_.size(); ++i) {
-    // TODO: Delete() returns a Status.
     blocks_[i]->Delete();
   }
   blocks_.clear();

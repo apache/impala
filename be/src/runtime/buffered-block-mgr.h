@@ -151,7 +151,7 @@ class BufferedBlockMgr {
 
     /// Delete a block. Its buffer is released and on-disk location can be over-written.
     /// Non-blocking.
-    Status Delete();
+    void Delete();
 
     void AddRow() { ++num_rows_; }
     int num_rows() const { return num_rows_; }
@@ -347,8 +347,8 @@ class BufferedBlockMgr {
   ///   - If there is memory pressure, block will get the buffer from 'unpin_block'.
   Status GetNewBlock(Client* client, Block* unpin_block, Block** block, int64_t len = -1);
 
-  /// Cancels the block mgr. All subsequent calls fail with Status::CANCELLED.
-  /// Idempotent.
+  /// Cancels the block mgr. All subsequent calls that return a Status fail with
+  /// Status::CANCELLED. Idempotent.
   void Cancel();
 
   /// Returns true if the block manager was cancelled.
@@ -430,7 +430,7 @@ class BufferedBlockMgr {
   /// Unpin() and Delete(). Must be called with the lock_ taken.
   Status PinBlock(Block* block, bool* pinned, Block* src, bool unpin);
   Status UnpinBlock(Block* block);
-  Status DeleteBlock(Block* block);
+  void DeleteBlock(Block* block);
 
   /// If the 'block' is NULL, checks if cancelled and returns. Otherwise, depending on
   /// 'unpin' calls either  DeleteBlock() or UnpinBlock(), which both first check for

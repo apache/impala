@@ -386,12 +386,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
         case Delete:
           rand_pick = rand() % pinned_blocks.size();
           block_data = pinned_blocks[rand_pick];
-          status = block_data.first->Delete();
-          if (close_called || (tid != SINGLE_THREADED_TID && status.IsCancelled())) {
-            EXPECT_TRUE(status.IsCancelled());
-          } else {
-            EXPECT_TRUE(status.ok());
-          }
+          block_data.first->Delete();
           pinned_blocks[rand_pick] = pinned_blocks.back();
           pinned_blocks.pop_back();
           pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
@@ -768,8 +763,7 @@ TEST_F(BufferedBlockMgrTest, Close) {
   bool pinned;
   status = blocks[0]->Pin(&pinned);
   EXPECT_TRUE(status.IsCancelled());
-  status = blocks[1]->Delete();
-  EXPECT_TRUE(status.IsCancelled());
+  blocks[1]->Delete();
 
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
@@ -822,8 +816,7 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   WaitForWrites(block_mgr);
   // Subsequent calls should fail.
   for (int i = 0; i < 2; ++i) {
-    status = blocks[i]->Delete();
-    EXPECT_TRUE(status.IsCancelled());
+    blocks[i]->Delete();
   }
   BufferedBlockMgr::Block* new_block;
   status = block_mgr->GetNewBlock(client, NULL, &new_block);
@@ -985,7 +978,7 @@ TEST_F(BufferedBlockMgrTest, AllocationErrorHandling) {
   WaitForWrites(block_mgrs);
   for (int i = 0; i < blocks.size(); ++i) {
     for (int j = 0; j < blocks[i].size(); ++j) {
-      EXPECT_TRUE(blocks[i][j]->Delete().ok());
+      blocks[i][j]->Delete();
     }
   }
 }
