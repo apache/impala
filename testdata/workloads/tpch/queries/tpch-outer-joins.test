@@ -33,5 +33,18 @@ limit 10
 Memory limit exceeded
 ====
 ---- QUERY
+# Regression test for IMPALA-2612. The following query will cause CastToChar
+# to be invoked when building the hash tables in partitioned hash join nodes.
+# CastToChar will do "local" memory allocation. Without the fix of IMPALA-2612,
+# the peak memory consumption will be higher.
+SET mem_limit = 300m;
+SELECT COUNT(*) from orders t1 LEFT OUTER JOIN orders t2
+ON cast(t1.o_comment as char(120)) = cast(t2.o_comment as char(120))
+---- RESULTS
+1565026
+---- TYPES
+BIGINT
+====
+---- QUERY
 set mem_limit=0
 ====

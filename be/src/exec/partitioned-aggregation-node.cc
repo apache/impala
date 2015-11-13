@@ -938,6 +938,8 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
     do {
       RETURN_IF_ERROR(input_stream->GetNext(&batch, &eos));
       RETURN_IF_ERROR(ProcessBatch<AGGREGATED_ROWS>(&batch, ht_ctx_.get()));
+      RETURN_IF_ERROR(state_->GetQueryStatus());
+      FreeLocalAllocations();
       batch.Reset();
     } while (!eos);
   }

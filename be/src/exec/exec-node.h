@@ -20,6 +20,7 @@
 #include <sstream>
 
 #include "common/status.h"
+#include "exprs/expr-context.h"
 #include "runtime/descriptors.h"  // for RowDescriptor
 #include "util/runtime-profile.h"
 #include "util/blocking-queue.h"
@@ -300,6 +301,9 @@ class ExecNode {
   void AddExprCtxToFree(ExprContext* ctx) { expr_ctxs_to_free_.push_back(ctx); }
   void AddExprCtxsToFree(const std::vector<ExprContext*>& ctxs);
   void AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs);
+
+  /// Free any local allocations made by expr_ctxs_to_free_.
+  void FreeLocalAllocations() { ExprContext::FreeLocalAllocations(expr_ctxs_to_free_); }
 
  private:
   /// Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected

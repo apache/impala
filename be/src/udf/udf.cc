@@ -75,7 +75,7 @@ class FreePool {
 
 class RuntimeState {
  public:
-  void set_query_status(const std::string& error_msg) {
+  void SetQueryStatus(const std::string& error_msg) {
     assert(false);
   }
 
@@ -342,7 +342,7 @@ void FunctionContext::SetError(const char* error_msg) {
     impl_->error_msg_ = error_msg;
     stringstream ss;
     ss << "UDF ERROR: " << error_msg;
-    if (impl_->state_ != NULL) impl_->state_->set_query_status(ss.str());
+    if (impl_->state_ != NULL) impl_->state_->SetQueryStatus(ss.str());
   }
 }
 

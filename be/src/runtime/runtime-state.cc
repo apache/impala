@@ -289,8 +289,7 @@ Status RuntimeState::CheckQueryState() {
   // TODO: it would be nice if this also checked for cancellation, but doing so breaks
   // cases where we use Status::CANCELLED to indicate that the limit was reached.
   if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
-  lock_guard<SpinLock> l(query_status_lock_);
-  return query_status_;
+  return GetQueryStatus();
 }
 
 void RuntimeState::AddBitmapFilter(SlotId slot, Bitmap* bitmap,

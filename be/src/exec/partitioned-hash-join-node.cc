@@ -425,6 +425,8 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
         }
       }
     }
+    RETURN_IF_ERROR(state->GetQueryStatus());
+    parent_->FreeLocalAllocations();
     batch.Reset();
   } while (!eos);
 

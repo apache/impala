@@ -199,7 +199,7 @@ class RuntimeState {
     return block_mgr_.get();
   }
 
-  Status query_status() {
+  Status GetQueryStatus() {
     boost::lock_guard<SpinLock> l(query_status_lock_);
     return query_status_;
   };
@@ -250,7 +250,7 @@ class RuntimeState {
   }
 
   /// Sets query_status_ with err_msg if no error has been set yet.
-  void set_query_status(const std::string& err_msg) {
+  void SetQueryStatus(const std::string& err_msg) {
     boost::lock_guard<SpinLock> l(query_status_lock_);
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);

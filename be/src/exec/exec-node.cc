@@ -426,7 +426,7 @@ bool ExecNode::EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* r
 }
 
 Status ExecNode::QueryMaintenance(RuntimeState* state) {
-  ExprContext::FreeLocalAllocations(expr_ctxs_to_free_);
+  FreeLocalAllocations();
   return state->CheckQueryState();
 }
 

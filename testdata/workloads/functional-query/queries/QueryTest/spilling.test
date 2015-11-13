@@ -333,3 +333,24 @@ order by 1 limit 10
 ---- TYPES
 BIGINT, BIGINT, STRING
 ====
+---- QUERY
+# Regression test for IMPALA-2612. The following query will cause CastToChar
+# to be invoked when building the hash tables in partitioned aggregation
+# nodes. CastToChar will do "local" memory allocation. Without the fix of
+# IMPALA-2612, the peak memory consumption will be higher.
+set mem_limit=800m;
+set num_nodes=1;
+set num_scanner_threads=1;
+select count(distinct concat(cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120))))
+from lineitem
+---- RESULTS
+4502054
+---- TYPES
+BIGINT
+====
+---- QUERY
+set mem_limit=0;
+set num_nodes=0;
+====
