@@ -37,3 +37,6 @@ tests/test-hive-udfs/target/
 cdh-*-hdfs-data/
 avro_schemas/
 cluster_logs/
+
+# Impala toolchain directory
+toolchain/

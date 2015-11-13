@@ -18,6 +18,8 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
+: ${IMPALA_TOOLCHAIN=}
+
 BUILD_TESTS=1
 CLEAN=0
 TARGET_BUILD_TYPE=${TARGET_BUILD_TYPE:-""}

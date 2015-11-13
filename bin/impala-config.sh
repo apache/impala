@@ -20,20 +20,6 @@
 # will be set by other scripts before sourcing this file. Those options are not set in
 # this script because scripts outside this repository may need to be updated and that
 # is not practical at this time.
-
-# Setting up Impala binary toolchain. The default path is /opt/bin-toolchain but can be
-# set to any path that contains the necessary dependencies in the format of
-#   /opt/bin-toolchain/package-X.Y.Z
-: ${IMPALA_TOOLCHAIN=}
-
-# If USE_SYSTEM_GCC is set to 1 the toolchain's GCC will not be used. This flag should
-# only be set if the toolchain was built with the system GCC as well.
-: ${USE_SYSTEM_GCC=0}
-
-# Export both variables
-export USE_SYSTEM_GCC
-export IMPALA_TOOLCHAIN
-
 export JAVA_HOME="${JAVA_HOME:-/usr/java/default}"
 if [ ! -d "$JAVA_HOME" ] ; then
   echo "JAVA_HOME must be set to the location of your JDK!"
@@ -52,6 +38,15 @@ if [ -z $IMPALA_HOME ]; then
     export IMPALA_HOME=$(dirname $(cd $(dirname "${BASH_SOURCE[0]}") && pwd))
   fi
 fi
+
+# Setting up Impala binary toolchain.
+: ${DISABLE_IMPALA_TOOLCHAIN=0}
+: ${IMPALA_TOOLCHAIN=$IMPALA_HOME/toolchain}
+: ${USE_SYSTEM_GCC=0}
+
+export USE_SYSTEM_GCC
+export IMPALA_TOOLCHAIN
+export DISABLE_IMPALA_TOOLCHAIN
 
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}

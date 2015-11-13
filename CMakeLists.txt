@@ -14,19 +14,42 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+if (NOT $ENV{DISABLE_IMPALA_TOOLCHAIN})
+  # Enable toolchain variable if the environment is setup
+  set(IMPALA_TOOLCHAIN ON)
+  message(STATUS "Toolchain build.")
+  # If the toolchain directory does not yet exists, we assume that the dependencies
+  # should be downloaded. If the download script is not available fail the
+  # configuration.
+  if (NOT IS_DIRECTORY $ENV{IMPALA_TOOLCHAIN})
+    set(BOOTSTRAP_CMD "$ENV{IMPALA_HOME}/bin/bootstrap_toolchain.py")
+    # Download and unpack the dependencies
+    message(STATUS "Downloading and extracting dependencies.")
+    execute_process(COMMAND ${BOOTSTRAP_CMD} RESULT_VARIABLE BOOTSTRAP_RESULT)
+    if (${BOOTSTRAP_RESULT} EQUAL 0)
+      message(STATUS "Toolchain bootstrap complete.")
+    else()
+      message(FATAL_ERROR "Toolchain bootstrap failed.")
+    endif()
+  else()
+    message(STATUS "Impala toolchain picked up at $ENV{IMPALA_TOOLCHAIN}")
+  endif()
+else()
+  set(IMPALA_TOOLCHAIN OFF)
+  message(STATUS "Impala toolchain was explicitly disabled using DISABLE_IMPALA_TOOLCHAIN.")
+  message(STATUS "Assuming system search path for dependencies.")
+endif()
+
+# Explicitly define project() to allow modifying the compiler before the project is
+# initialized.
+project(Impala)
+
 if (NOT DEFINED BUILD_SHARED_LIBS)
   set(BUILD_SHARED_LIBS OFF)
 endif()
 
 # Build compile commands database
 set(CMAKE_EXPORT_COMPILE_COMMNDS ON)
-
-# Enable toolchain variable if the environment is setup
-if (NOT IMPALA_TOOLCHAIN)
-   message(STATUS "Regular build.")
-else()
-   message(STATUS "Toolchain build.")
-endif()
 
 # generate CTest input files
 enable_testing()
@@ -58,6 +81,7 @@ if (IMPALA_TOOLCHAIN)
   # Define root path for all dependencies, this is in the form of
   # set_dep_root(PACKAGE) ->
   #   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
+  set_dep_root(GCC)
   set_dep_root(AVRO)
   set_dep_root(BZIP2)
   set_dep_root(CYRUS_SASL)
