@@ -111,6 +111,7 @@ ir_functions = [
   ["STRING_TO_DOUBLE", "IrStringToDouble"],
   ["IS_NULL_STRING", "IrIsNullString"],
   ["GENERIC_IS_NULL_STRING", "IrGenericIsNullString"],
+  ["RAW_VALUE_COMPARE", "8RawValue7Compare"],
 ]
 
 enums_preamble = '\

@@ -79,8 +79,7 @@ Status ExchangeNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   if (is_merging_) {
     RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
-    TupleRowComparator less_than(sort_exec_exprs_.lhs_ordering_expr_ctxs(),
-        sort_exec_exprs_.rhs_ordering_expr_ctxs(), is_asc_order_, nulls_first_);
+    TupleRowComparator less_than(sort_exec_exprs_, is_asc_order_, nulls_first_);
     // CreateMerger() will populate its merging heap with batches from the stream_recvr_,
     // so it is not necessary to call FillInputRowBatch().
     RETURN_IF_ERROR(stream_recvr_->CreateMerger(less_than));

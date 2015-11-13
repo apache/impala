@@ -16,6 +16,7 @@
 #ifndef IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 #define IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 
+#include "exec/sort-exec-exprs.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "runtime/tuple.h"
@@ -24,45 +25,48 @@
 
 namespace impala {
 
+/// Compares two TupleRows based on a set of exprs, in order.
 class TupleRowComparator {
  public:
-  /// Compares two TupleRows based on a set of exprs, in order.
-  /// We use is_asc to determine, for each expr, if it should be ascending or descending
-  /// sort order.
-  /// We use nulls_first to determine, for each expr, if nulls should come before
-  /// or after all other values.
+  /// 'sort_key_exprs' must have already been prepared.
+  /// 'is_asc' determines, for each expr, if it should be ascending or descending sort
+  /// order.
+  /// 'nulls_first' determines, for each expr, if nulls should come before or after all
+  /// other values.
   TupleRowComparator(
-      const std::vector<ExprContext*>& key_expr_ctxs_lhs,
-      const std::vector<ExprContext*>& key_expr_ctxs_rhs,
+      const SortExecExprs& sort_key_exprs,
       const std::vector<bool>& is_asc,
       const std::vector<bool>& nulls_first)
-      : key_expr_ctxs_lhs_(key_expr_ctxs_lhs),
-        key_expr_ctxs_rhs_(key_expr_ctxs_rhs),
-        is_asc_(is_asc) {
-    DCHECK_EQ(key_expr_ctxs_lhs.size(), key_expr_ctxs_rhs.size());
-    DCHECK_EQ(key_expr_ctxs_lhs.size(), is_asc.size());
-    DCHECK_EQ(key_expr_ctxs_lhs.size(), nulls_first.size());
-    nulls_first_.reserve(key_expr_ctxs_lhs.size());
-    for (int i = 0; i < key_expr_ctxs_lhs.size(); ++i) {
+      : key_expr_ctxs_lhs_(sort_key_exprs.lhs_ordering_expr_ctxs()),
+        key_expr_ctxs_rhs_(sort_key_exprs.rhs_ordering_expr_ctxs()),
+        is_asc_(is_asc),
+        codegend_compare_fn_(NULL) {
+    DCHECK_EQ(key_expr_ctxs_lhs_.size(), is_asc.size());
+    DCHECK_EQ(key_expr_ctxs_lhs_.size(), nulls_first.size());
+    nulls_first_.reserve(key_expr_ctxs_lhs_.size());
+    for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
       nulls_first_.push_back(nulls_first[i] ? -1 : 1);
     }
   }
 
-  TupleRowComparator(
-      const std::vector<ExprContext*>& key_expr_ctxs_lhs,
-      const std::vector<ExprContext*>& key_expr_ctxs_rhs,
-      bool is_asc, bool nulls_first)
-      : key_expr_ctxs_lhs_(key_expr_ctxs_lhs),
-        key_expr_ctxs_rhs_(key_expr_ctxs_rhs),
-        is_asc_(key_expr_ctxs_lhs.size(), is_asc),
-        nulls_first_(key_expr_ctxs_lhs.size(), nulls_first ? -1 : 1) {
-    DCHECK_EQ(key_expr_ctxs_lhs.size(), key_expr_ctxs_rhs.size());
+  TupleRowComparator(const SortExecExprs& sort_key_exprs, bool is_asc, bool nulls_first)
+      : key_expr_ctxs_lhs_(sort_key_exprs.lhs_ordering_expr_ctxs()),
+        key_expr_ctxs_rhs_(sort_key_exprs.rhs_ordering_expr_ctxs()),
+        is_asc_(key_expr_ctxs_lhs_.size(), is_asc),
+        nulls_first_(key_expr_ctxs_lhs_.size(), nulls_first ? -1 : 1),
+        codegend_compare_fn_(NULL) {
   }
 
+  /// Codegens a Compare() function for this comparator that is used in the ()
+  /// operator. Returns true if the codegen was successful, false if not.
+  bool Codegen(RuntimeState* state);
+
   /// Returns a negative value if lhs is less than rhs, a positive value if lhs is greater
-  /// than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_)
-  /// must have been prepared and opened before calling this.
+  /// than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_) must
+  /// have been prepared and opened before calling this, i.e. 'sort_key_exprs' in the
+  /// constructor must have been opened.
   int Compare(TupleRow* lhs, TupleRow* rhs) const {
+    DCHECK_EQ(key_expr_ctxs_lhs_.size(), key_expr_ctxs_rhs_.size());
     for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
       void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
       void* rhs_value = key_expr_ctxs_rhs_[i]->GetValue(rhs);
@@ -85,7 +89,8 @@ class TupleRowComparator {
   /// All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
   /// before calling this.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
-    int result = Compare(lhs, rhs);
+    int result = codegend_compare_fn_ == NULL ? Compare(lhs, rhs)
+        : codegend_compare_fn_(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
     if (result < 0) return true;
     return false;
   }
@@ -97,10 +102,17 @@ class TupleRowComparator {
   }
 
  private:
-  std::vector<ExprContext*> key_expr_ctxs_lhs_;
-  std::vector<ExprContext*> key_expr_ctxs_rhs_;
+  const std::vector<ExprContext*>& key_expr_ctxs_lhs_;
+  const std::vector<ExprContext*>& key_expr_ctxs_rhs_;
   std::vector<bool> is_asc_;
   std::vector<int8_t> nulls_first_;
+
+  typedef int (*CompareFn)(ExprContext* const*, ExprContext* const*, TupleRow*, TupleRow*);
+  CompareFn codegend_compare_fn_;
+
+  /// Returns a codegen'd version of the Compare() function.
+  /// TODO: have codegen'd users inline this instead of calling through the () operator
+  llvm::Function* CodegenCompare(RuntimeState* state);
 };
 
 /// Compares the equality of two Tuples, going slot by slot.

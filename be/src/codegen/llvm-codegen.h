@@ -178,6 +178,9 @@ class LlvmCodeGen {
     void AddArgument(const NamedVariable& var) {
       args_.push_back(var);
     }
+    void AddArgument(const std::string& name, llvm::Type* type) {
+      args_.push_back(NamedVariable(name, type));
+    }
 
     /// Generate LLVM function prototype.
     /// If a non-null builder is passed, this function will also create the entry block
@@ -215,6 +218,9 @@ class LlvmCodeGen {
 
   /// Returns the pointer type of the type returned by GetType(name)
   llvm::PointerType* GetPtrType(const std::string& name);
+
+  /// Alloca's an instance of the appropriate pointer type and sets it to point at 'v'
+  llvm::Value* GetPtrTo(LlvmBuilder* builder, llvm::Value* v, const char* name = "");
 
   /// Returns reference to llvm context object.  Each LlvmCodeGen has its own
   /// context to allow multiple threads to be calling into llvm at the same time.
@@ -421,6 +427,12 @@ class LlvmCodeGen {
   static Status LoadModuleFromFile(LlvmCodeGen* codegen, const string& file,
       llvm::Module** module);
 
+  /// Codegens IR to load array[idx] and returns the loaded value. 'array' should be a
+  /// C-style array (e.g. i32*) or an IR array (e.g. [10 x i32]). This function does not
+  /// do bounds checking.
+  llvm::Value* CodegenArrayAt(LlvmBuilder*, llvm::Value* array, int idx,
+      const char* name = "");
+
   /// Loads an LLVM module. 'module_ir' should be a reference to a memory buffer containing
   /// LLVM bitcode. module_name is the name of the module to use when reporting errors.
   /// The caller is responsible for cleaning up module.
@@ -580,4 +592,3 @@ class LlvmCodeGen {
 }
 
 #endif
-

@@ -35,15 +35,16 @@
 #include "exprs/expr-ir.cc"
 #include "exprs/in-predicate-ir.cc"
 #include "exprs/is-null-predicate.cc"
+#include "exprs/like-predicate.cc"
 #include "exprs/math-functions.cc"
 #include "exprs/operators.cc"
 #include "exprs/string-functions.cc"
+#include "exprs/timestamp-functions.cc"
 #include "exprs/udf-builtins.cc"
 #include "exprs/utility-functions.cc"
+#include "runtime/raw-value-ir.cc"
 #include "udf/udf-ir.cc"
 #include "util/hash-util-ir.cc"
-#include "exprs/timestamp-functions.cc"
-#include "exprs/like-predicate.cc"
 #else
 #error "This file should only be used for cross compiling to IR."
 #endif

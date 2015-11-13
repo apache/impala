@@ -22,7 +22,13 @@
 #include "gen-cpp/Types_types.h"  // for TPrimitiveType
 #include "gen-cpp/TCLIService_types.h"  // for HiveServer2 Type
 
+namespace llvm {
+  class ConstantStruct;
+}
+
 namespace impala {
+
+class LlvmCodeGen;
 
 // TODO for 2.3: move into ColumnType, rename to Type, and remove TYPE_ prefix
 enum PrimitiveType {
@@ -231,6 +237,10 @@ struct ColumnType {
     return 16;
   }
 
+  /// Returns the IR version of this ColumnType. Only implemented for scalar types. LLVM
+  /// optimizer can pull out fields of the returned ConstantStruct for constant folding.
+  llvm::ConstantStruct* ToIR(LlvmCodeGen* codegen) const;
+
   apache::hive::service::cli::thrift::TTypeEntry ToHs2Type() const;
   std::string DebugString() const;
 
@@ -245,6 +255,8 @@ struct ColumnType {
   /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
   /// TTypeNodes for this type and its children.
   void ToThrift(TColumnType* thrift_type) const;
+
+  static const char* LLVM_CLASS_NAME;
 };
 
 std::ostream& operator<<(std::ostream& os, const ColumnType& type);

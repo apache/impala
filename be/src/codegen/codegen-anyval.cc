@@ -544,8 +544,13 @@ Value* CodegenAnyVal::ToNativeValue() {
   return raw_val;
 }
 
-void CodegenAnyVal::ToNativePtr(Value* native_ptr) {
-  builder_->CreateStore(ToNativeValue(), native_ptr);
+Value* CodegenAnyVal::ToNativePtr(Value* native_ptr) {
+  Value* v = ToNativeValue();
+  if (native_ptr == NULL) {
+    native_ptr = codegen_->CreateEntryBlockAlloca(*builder_, v->getType());
+  }
+  builder_->CreateStore(v, native_ptr);
+  return native_ptr;
 }
 
 Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
@@ -611,6 +616,18 @@ Value* CodegenAnyVal::EqToNativePtr(Value* native_ptr) {
       DCHECK(false) << "NYI: " << type_.DebugString();
       return NULL;
   }
+}
+
+Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
+  DCHECK_EQ(type_, other->type_);
+  Value* v1 = ToNativePtr();
+  Value* void_v1 = builder_->CreateBitCast(v1, codegen_->ptr_type());
+  Value* v2 = other->ToNativePtr();
+  Value* void_v2 = builder_->CreateBitCast(v2, codegen_->ptr_type());
+  Value* type_ptr = codegen_->GetPtrTo(builder_, type_.ToIR(codegen_), "type");
+  Function* compare_fn = codegen_->GetFunction(IRFunction::RAW_VALUE_COMPARE);
+  Value* args[] = { void_v1, void_v2, type_ptr };
+  return builder_->CreateCall(compare_fn, args, name);
 }
 
 Value* CodegenAnyVal::GetHighBits(int num_bits, Value* v, const char* name) {

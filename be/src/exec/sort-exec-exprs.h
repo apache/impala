@@ -51,16 +51,19 @@ class SortExecExprs {
     return sort_tuple_slot_expr_ctxs_;
   }
 
-  /// Can only be used after calling Prepare()
+  /// Populated in Prepare() (empty before then)
   const std::vector<ExprContext*>& lhs_ordering_expr_ctxs() const {
     return lhs_ordering_expr_ctxs_;
   }
-  /// Can only be used after calling Open()
+  /// Populated in Open() (empty before then)
   const std::vector<ExprContext*>& rhs_ordering_expr_ctxs() const {
     return rhs_ordering_expr_ctxs_;
   }
 
  private:
+  // Give access to testing Init()
+  friend class DataStreamTest;
+
   /// Create two ExprContexts for evaluating over the TupleRows.
   std::vector<ExprContext*> lhs_ordering_expr_ctxs_;
   std::vector<ExprContext*> rhs_ordering_expr_ctxs_;
@@ -73,6 +76,12 @@ class SortExecExprs {
   /// One expr per slot in the materialized tuple. Valid only if
   /// materialize_tuple_ is true.
   std::vector<ExprContext*> sort_tuple_slot_expr_ctxs_;
+
+  /// Initialize directly from already-created ExprContexts. Callers should manually call
+  /// Prepare(), Open(), and Close() on input ExprContexts (instead of calling the
+  /// analogous functions in this class). Used for testing.
+  Status Init(const std::vector<ExprContext*>& lhs_ordering_expr_ctxs,
+              const std::vector<ExprContext*>& rhs_ordering_expr_ctxs);
 };
 
 }

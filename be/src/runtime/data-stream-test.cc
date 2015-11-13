@@ -283,9 +283,11 @@ class DataStreamTest : public testing::Test {
     rhs_slot_ctx_->Prepare(NULL, *row_desc_, &tracker_);
     lhs_slot_ctx_->Open(NULL);
     rhs_slot_ctx_->Open(NULL);
+    SortExecExprs* sort_exprs = obj_pool_.Add(new SortExecExprs());
+    sort_exprs->Init(
+        vector<ExprContext*>(1, lhs_slot_ctx_), vector<ExprContext*>(1, rhs_slot_ctx_));
     less_than_ = obj_pool_.Add(new TupleRowComparator(
-        vector<ExprContext*>(1, lhs_slot_ctx_), vector<ExprContext*>(1, rhs_slot_ctx_),
-        vector<bool>(1, true), vector<bool>(1, false)));
+        *sort_exprs, vector<bool>(1, true), vector<bool>(1, false)));
   }
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.

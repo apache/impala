@@ -71,6 +71,7 @@ add_library(Util
   test-info.cc
   thread.cc
   time.cc
+  tuple-row-compare.cc
   url-parser.cc
   url-coding.cc
 )

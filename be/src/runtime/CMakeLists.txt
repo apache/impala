@@ -45,6 +45,7 @@ add_library(Runtime
   plan-fragment-executor.cc
   types.cc
   raw-value.cc
+  raw-value-ir.cc
   row-batch.cc
   runtime-state.cc
   sorted-run-merger.cc

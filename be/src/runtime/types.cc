@@ -19,12 +19,16 @@
 #include <boost/foreach.hpp>
 
 #include "gen-cpp/TCLIService_constants.h"
+#include "codegen/llvm-codegen.h"
 
 #include "common/names.h"
 
 using namespace apache::hive::service::cli::thrift;
+using namespace llvm;
 
 namespace impala {
+
+const char* ColumnType::LLVM_CLASS_NAME = "struct.impala::ColumnType";
 
 ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
   : len(-1), precision(-1), scale(-1) {
@@ -307,6 +311,30 @@ string ColumnType::DebugString() const {
 ostream& operator<<(ostream& os, const ColumnType& type) {
   os << type.DebugString();
   return os;
+}
+
+ConstantStruct* ColumnType::ToIR(LlvmCodeGen* codegen) const {
+  // ColumnType = { i32, i32, i32, i32, <vector>, <vector> }
+  StructType* column_type_type = cast<StructType>(codegen->GetType(LLVM_CLASS_NAME));
+
+  DCHECK_EQ(sizeof(type), sizeof(int32_t));
+  Constant* type_field = ConstantInt::get(codegen->int_type(), type);
+  DCHECK_EQ(sizeof(len), sizeof(int32_t));
+  Constant* len_field = ConstantInt::get(codegen->int_type(), len);
+  DCHECK_EQ(sizeof(precision), sizeof(int32_t));
+  Constant* precision_field = ConstantInt::get(codegen->int_type(), precision);
+  DCHECK_EQ(sizeof(scale), sizeof(int32_t));
+  Constant* scale_field = ConstantInt::get(codegen->int_type(), scale);
+
+  // Create empty 'children' and 'field_names' vectors
+  DCHECK(children.empty()) << "Nested types NYI";
+  DCHECK(field_names.empty()) << "Nested types NYI";
+  Constant* children_field = Constant::getNullValue(column_type_type->getElementType(4));
+  Constant* field_names_field =
+      Constant::getNullValue(column_type_type->getElementType(5));
+
+  return cast<ConstantStruct>(ConstantStruct::get(column_type_type, type_field, len_field,
+      precision_field, scale_field, children_field, field_names_field, NULL));
 }
 
 }

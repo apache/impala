@@ -193,10 +193,11 @@ class CodegenAnyVal {
   /// This should only be used if this *Val is not null.
   llvm::Value* ToNativeValue();
 
-  /// Sets 'native_ptr' to this *Val's value. 'native_ptr' should be a pointer to a native
-  /// type, StringValue, TimestampValue, etc. This should only be used if this *Val is not
-  /// null.
-  void ToNativePtr(llvm::Value* native_ptr);
+  /// Sets 'native_ptr' to this *Val's value. If non-NULL, 'native_ptr' should be a
+  /// pointer to a native type, StringValue, TimestampValue, etc. If NULL, a pointer is
+  /// alloca'd. In either case the pointer is returned. This should only be used if this
+  /// *Val is not null.
+  llvm::Value* ToNativePtr(llvm::Value* native_ptr = NULL);
 
   /// Returns the i1 result of this == other. this and other must be non-null.
   llvm::Value* Eq(CodegenAnyVal* other);
@@ -206,6 +207,11 @@ class CodegenAnyVal {
   /// type (e.g. if this is an IntVal, 'native_ptr' should have type i32*). Returns the i1
   /// result of the equality comparison.
   llvm::Value* EqToNativePtr(llvm::Value* native_ptr);
+
+  /// Returns the i32 result of comparing this value to 'other' (similar to
+  /// RawValue::Compare()). This and 'other' must be non-null. Return value is < 0 if
+  /// this < 'other', 0 if this == 'other', > 0 if this > 'other'.
+  llvm::Value* Compare(CodegenAnyVal* other, const char* name = "result");
 
   /// Ctor for created an uninitialized CodegenAnYVal that can be assigned to later.
   CodegenAnyVal()

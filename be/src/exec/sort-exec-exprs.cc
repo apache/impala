@@ -39,6 +39,13 @@ Status SortExecExprs::Init(const vector<TExpr>& ordering_exprs,
   return Status::OK();
 }
 
+Status SortExecExprs::Init(const vector<ExprContext*>& lhs_ordering_expr_ctxs,
+                           const vector<ExprContext*>& rhs_ordering_expr_ctxs) {
+  lhs_ordering_expr_ctxs_ = lhs_ordering_expr_ctxs;
+  rhs_ordering_expr_ctxs_ = rhs_ordering_expr_ctxs;
+  return Status::OK();
+}
+
 Status SortExecExprs::Prepare(RuntimeState* state, const RowDescriptor& child_row_desc,
     const RowDescriptor& output_row_desc, MemTracker* expr_mem_tracker) {
   if (materialize_tuple_) {

@@ -991,6 +991,14 @@ void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, in
   builder->CreateCall(memcpy_fn, args);
 }
 
+Value* LlvmCodeGen::CodegenArrayAt(LlvmBuilder* builder, Value* array, int idx,
+    const char* name) {
+  DCHECK(array->getType()->isPointerTy() || array->getType()->isArrayTy())
+      << Print(array->getType());
+  Value* ptr = builder->CreateConstGEP1_32(array, idx);
+  return builder->CreateLoad(ptr, name);
+}
+
 void LlvmCodeGen::ClearHashFns() {
   hash_fns_.clear();
 }
@@ -1143,6 +1151,12 @@ Argument* LlvmCodeGen::GetArgument(Function* fn, int i) {
   Function::arg_iterator iter = fn->arg_begin();
   for (int j = 0; j < i; ++j) ++iter;
   return iter;
+}
+
+Value* LlvmCodeGen::GetPtrTo(LlvmBuilder* builder, Value* v, const char* name) {
+  Value* ptr = CreateEntryBlockAlloca(*builder, v->getType(), name);
+  builder->CreateStore(v, ptr);
+  return ptr;
 }
 
 }
