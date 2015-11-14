@@ -38,10 +38,10 @@ import com.google.common.collect.Lists;
  * via the parameters map attached to every Hive partition object.
  */
 public class PartitionStatsUtil {
-  public static final String INTERMEDIATE_STATS_NUM_CHUNKS =
+  public static final String INCREMENTAL_STATS_NUM_CHUNKS =
       "impala_intermediate_stats_num_chunks";
 
-  public static final String INTERMEDIATE_STATS_CHUNK_PREFIX =
+  public static final String INCREMENTAL_STATS_CHUNK_PREFIX =
       "impala_intermediate_stats_chunk";
 
   private final static Logger LOG = LoggerFactory.getLogger(PartitionStatsUtil.class);
@@ -54,7 +54,7 @@ public class PartitionStatsUtil {
   public static TPartitionStats partStatsFromParameters(
       Map<String, String> hmsParameters) throws ImpalaException {
     if (hmsParameters == null) return null;
-    String numChunksStr = hmsParameters.get(INTERMEDIATE_STATS_NUM_CHUNKS);
+    String numChunksStr = hmsParameters.get(INCREMENTAL_STATS_NUM_CHUNKS);
     if (numChunksStr == null) return null;
     int numChunks = Integer.parseInt(numChunksStr);
     if (numChunks == 0) return null;
@@ -62,7 +62,7 @@ public class PartitionStatsUtil {
     Preconditions.checkState(numChunks >= 0);
     StringBuilder encodedStats = new StringBuilder();
     for (int i = 0; i < numChunks; ++i) {
-      String chunk = hmsParameters.get(INTERMEDIATE_STATS_CHUNK_PREFIX + i);
+      String chunk = hmsParameters.get(INCREMENTAL_STATS_CHUNK_PREFIX + i);
       if (chunk == null) {
         throw new ImpalaRuntimeException("Missing stats chunk: " + i);
       }
@@ -104,9 +104,9 @@ public class PartitionStatsUtil {
       List<String> chunks =
           chunkStringForHms(base64, MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH);
       partition.putToParameters(
-          INTERMEDIATE_STATS_NUM_CHUNKS, Integer.toString(chunks.size()));
+          INCREMENTAL_STATS_NUM_CHUNKS, Integer.toString(chunks.size()));
       for (int i = 0; i < chunks.size(); ++i) {
-        partition.putToParameters(INTERMEDIATE_STATS_CHUNK_PREFIX + i, chunks.get(i));
+        partition.putToParameters(INCREMENTAL_STATS_CHUNK_PREFIX + i, chunks.get(i));
       }
     } catch (TException e) {
       LOG.info("Error saving partition stats: ", e);
@@ -115,10 +115,10 @@ public class PartitionStatsUtil {
   }
 
   public static void deletePartStats(HdfsPartition partition) {
-    partition.putToParameters(INTERMEDIATE_STATS_NUM_CHUNKS, "0");
+    partition.putToParameters(INCREMENTAL_STATS_NUM_CHUNKS, "0");
     for (Iterator<String> it = partition.getParameters().keySet().iterator();
          it.hasNext(); ) {
-      if (it.next().startsWith(INTERMEDIATE_STATS_CHUNK_PREFIX)) {
+      if (it.next().startsWith(INCREMENTAL_STATS_CHUNK_PREFIX)) {
         it.remove();
       }
     }

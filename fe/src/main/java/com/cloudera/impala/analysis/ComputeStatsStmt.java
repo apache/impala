@@ -29,6 +29,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.thrift.TComputeStatsParams;
 import com.cloudera.impala.thrift.TPartitionStats;
 import com.cloudera.impala.thrift.TTableName;
@@ -278,6 +279,20 @@ public class ComputeStatsStmt extends StatementBase {
                   kv.toString());
             }
           }
+      }
+      // For incremental stats, estimate the size of intermediate stats and report an
+      // error if the estimate is greater than MAX_INCREMENTAL_STATS_SIZE_BYTES.
+      if (isIncremental_) {
+        long statsSizeEstimate = hdfsTable.getColumns().size() *
+            hdfsTable.getPartitions().size() * HdfsTable.STATS_SIZE_PER_COLUMN_BYTES;
+        if (statsSizeEstimate > HdfsTable.MAX_INCREMENTAL_STATS_SIZE_BYTES) {
+          LOG.error("Incremental stats size estimate for table " + hdfsTable.getName() +
+              " exceeded " + HdfsTable.MAX_INCREMENTAL_STATS_SIZE_BYTES + ", estimate = "
+              + statsSizeEstimate);
+          throw new AnalysisException("Incremental stats size estimate exceeds "
+              + PrintUtils.printBytes(HdfsTable.MAX_INCREMENTAL_STATS_SIZE_BYTES)
+              + ". Please try COMPUTE STATS instead.");
+        }
       }
     }
 

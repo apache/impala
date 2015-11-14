@@ -151,6 +151,14 @@ public class HdfsTable extends Table {
   // Flag to indicate if the HdfsTable has the partition metadata populated.
   private boolean hasPartitionMd_ = false;
 
+  // Maximum size (in bytes) of incremental stats the catalog is allowed to serialize per
+  // table. This limit is set as a safety check, to prevent the JVM from hitting a maximum
+  // array limit of 1GB (or OOM) while building the thrift objects to send to impalads.
+  public static final long MAX_INCREMENTAL_STATS_SIZE_BYTES = 200 * 1024 * 1024;
+
+  // Estimate (in bytes) of the incremental stats size per column per partition
+  public static final long STATS_SIZE_PER_COLUMN_BYTES = 400;
+
   // Bi-directional map between an integer index and a unique datanode
   // TNetworkAddresses, each of which contains blocks of 1 or more
   // files in this table. The network addresses are stored using IP
@@ -1248,16 +1256,26 @@ public class HdfsTable extends Table {
    * then then all partitions and THdfsFileDescs of each partition should be included.
    * Otherwise, don't include any THdfsFileDescs, and include only those partitions in
    * the refPartitions set (the backend doesn't need metadata for unreferenced
-   * partitions).
+   * partitions). To prevent the catalog from hitting an OOM error while trying to
+   * serialize large partition incremental stats, we estimate the stats size and filter
+   * the incremental stats data from partition objects if the estimate exceeds
+   * MAX_INCREMENTAL_STATS_SIZE_BYTES.
    */
   private THdfsTable getTHdfsTable(boolean includeFileDesc, Set<Long> refPartitions) {
     // includeFileDesc implies all partitions should be included (refPartitions == null).
     Preconditions.checkState(!includeFileDesc || refPartitions == null);
+    int numPartitions =
+        (refPartitions == null) ? partitions_.size() : refPartitions.size();
+    long statsSizeEstimate =
+        numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
+    boolean includeIncrementalStats =
+        (statsSizeEstimate < MAX_INCREMENTAL_STATS_SIZE_BYTES);
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitions_) {
       long id = partition.getId();
       if (refPartitions == null || refPartitions.contains(id)) {
-        idToPartition.put(id, partition.toThrift(includeFileDesc));
+        idToPartition.put(id,
+            partition.toThrift(includeFileDesc, includeIncrementalStats));
       }
     }
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
