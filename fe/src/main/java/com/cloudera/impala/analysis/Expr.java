@@ -141,7 +141,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   protected Type type_;  // result of analysis
   protected boolean isAnalyzed_;  // true after analyze() has been called
-  protected boolean isWhereClauseConjunct_; // set by analyzer
+  protected boolean isOnClauseConjunct_; // set by analyzer
 
   // Flag to indicate whether to wrap this expr's toSql() in parenthesis. Set by parser.
   // Needed for properly capturing expr precedences in the SQL string.
@@ -175,7 +175,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     isAuxExpr_ = other.isAuxExpr_;
     type_ = other.type_;
     isAnalyzed_ = other.isAnalyzed_;
-    isWhereClauseConjunct_ = other.isWhereClauseConjunct_;
+    isOnClauseConjunct_ = other.isOnClauseConjunct_;
     printSqlInParens_ = other.printSqlInParens_;
     selectivity_ = other.selectivity_;
     numDistinctValues_ = other.numDistinctValues_;
@@ -189,8 +189,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public double getSelectivity() { return selectivity_; }
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setPrintSqlInParens(boolean b) { printSqlInParens_ = b; }
-  public boolean isWhereClauseConjunct() { return isWhereClauseConjunct_; }
-  public void setIsWhereClauseConjunct() { isWhereClauseConjunct_ = true; }
+  public boolean isOnClauseConjunct() { return isOnClauseConjunct_; }
+  public void setIsOnClauseConjunct(boolean b) { isOnClauseConjunct_ = b; }
   public boolean isAuxExpr() { return isAuxExpr_; }
   public boolean isRegisteredPredicate() { return id_ != null; }
   public void setIsAuxExpr() { isAuxExpr_ = true; }

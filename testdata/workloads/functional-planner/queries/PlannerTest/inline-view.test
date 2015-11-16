@@ -1025,3 +1025,63 @@ select * from
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-1459: Test correct assignment of On-clause predicate from an enclosing block
+# inside an inline view with an outer join.
+select 1 from
+  (select a.id aid, b.id bid from
+   functional.alltypes a inner join functional.alltypes b
+   on a.id = b.id
+   full outer join functional.alltypessmall c on a.id = c.id) v
+inner join functional.alltypestiny c
+on (aid < bid and aid = c.id)
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = c.id
+|
+|--05:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: a.id = c.id
+|  other predicates: a.id < b.id, a.id = b.id
+|
+|--02:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 files=4 size=6.32KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-2665: Test correct assignment of On-clause predicate from an enclosing block
+# inside an inline view with an outer join.
+select 1 from functional.alltypes t1
+inner join
+  (select a.id, b.int_col
+   from functional.alltypes a left outer join functional.alltypes b
+   on a.id = b.int_col) v
+on (t1.id = v.id and v.int_col is null and v.int_col < 10 and v.id < 10)
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = t1.id
+|
+|--00:SCAN HDFS [functional.alltypes t1]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: t1.id < 10
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.int_col
+|  other predicates: b.int_col IS NULL, b.int_col < 10
+|
+|--02:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: b.int_col < 10
+|
+01:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.id < 10
+====

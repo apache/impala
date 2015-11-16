@@ -1184,11 +1184,12 @@ public class SingleNodePlanner {
     };
     Iterables.removeIf(viewPredicates, isIdentityPredicate);
 
-    // "migrate" conjuncts_ by marking them as assigned and re-registering them with
-    // new ids.
-    // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
-    // have changed.
+    // Migrate the conjuncts by marking the original ones as assigned, and
+    // re-registering the substituted ones with new ids.
     analyzer.markConjunctsAssigned(preds);
+    // Unset the On-clause flag of the migrated conjuncts because the migrated conjuncts
+    // apply to the post-join/agg/analytic result of the inline view.
+    for (Expr e: viewPredicates) e.setIsOnClauseConjunct(false);
     inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
 
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts as
