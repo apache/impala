@@ -68,5 +68,10 @@ popd
 rm -f $IMPALA_HOME/llvm-ir/impala*.ll
 rm -f $IMPALA_HOME/be/generated-sources/impala-ir/*
 
+# Cleanup Impala-lzo
+if [ -e $IMPALA_LZO ]; then
+  pushd $IMPALA_LZO; git clean -fdx .; popd
+fi
+
 # When switching to and from toolchain, make sure to remove all CMake generated files
 find -iname '*cmake*' -not -name CMakeLists.txt | grep -v -e cmake_module | grep -v -e thirdparty | xargs rm -Rf
