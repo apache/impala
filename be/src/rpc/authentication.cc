@@ -438,14 +438,11 @@ static int SaslGetPath(void* context, const char** path) {
 // Return: Only if the first call to 'kinit' fails
 void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
 
-  // Pass the path to the key file and the principal. Make the ticket renewable.
-  // Calling kinit -R ensures the ticket makes it to the cache, and should be a separate
-  // call to kinit.
+  // Pass the path to the key file and the principal.
   const string kinit_cmd = Substitute("kinit -k -t $0 $1 2>&1",
       keytab_file_, principal_);
 
   bool first_time = true;
-  int failures_since_renewal = 0;
   while (true) {
     LOG(INFO) << "Registering " << principal_ << ", keytab file " << keytab_file_;
     string kinit_output;
@@ -461,29 +458,11 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
       } else {
         LOG(ERROR) << err_msg;
       }
+    } else if (first_time) {
+      first_time = false;
+      first_kinit->Set(Status::OK());
     }
 
-    if (success) {
-      if (first_time) {
-        first_time = false;
-        first_kinit->Set(Status::OK());
-      }
-      failures_since_renewal = 0;
-      // Workaround for Kerberos 1.8.1 - wait a short time, before requesting a renewal of
-      // the ticket-granting ticket. The sleep time is >1s, to force the system clock to
-      // roll-over o a new second, avoiding a race between grant and renewal.
-      SleepForMs(1500);
-      string krenew_output;
-      if (RunShellProcess("kinit -R", &krenew_output)) {
-        LOG(INFO) << "Successfully renewed Keberos ticket";
-      } else {
-        // We couldn't renew the ticket so just report the error. Existing connections
-        // are ok and we'll try to renew the ticket later.
-        ++failures_since_renewal;
-        LOG(ERROR) << "Failed to extend Kerberos ticket. Error: " << krenew_output
-                   << ". Failure count: " << failures_since_renewal;
-      }
-    }
     // Sleep for the renewal interval, minus a random time between 0-5 minutes to help
     // avoid a storm at the KDC. Additionally, never sleep less than a minute to
     // reduce KDC stress due to frequent renewals.
