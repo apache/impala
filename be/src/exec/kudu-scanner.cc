@@ -351,6 +351,10 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduScanBatch::RowPtr& row,
         KUDU_RETURN_IF_ERROR(row.GetDouble(i, reinterpret_cast<double*>(slot)),
             "Error getting column value from Kudu.");
         break;
+      case TYPE_BOOLEAN:
+        KUDU_RETURN_IF_ERROR(row.GetBool(i, reinterpret_cast<bool*>(slot)),
+            "Error getting column value from Kudu.");
+        break;
       default:
         DCHECK(false) << "Impala type unsupported in Kudu: "
             << TypeToString(info->type().type);

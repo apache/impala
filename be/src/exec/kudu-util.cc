@@ -59,6 +59,9 @@ Status ImpalaToKuduType(const ColumnType& impala_type,
     case TYPE_DOUBLE:
       *kudu_type = KuduColumnSchema::DOUBLE;
       break;
+    case TYPE_BOOLEAN:
+      *kudu_type = KuduColumnSchema::BOOL;
+      break;
     default:
       DCHECK(false) << "Impala type unsupported in Kudu: "
           << TypeToString(impala_type.type);
