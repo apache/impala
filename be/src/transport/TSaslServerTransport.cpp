@@ -28,6 +28,7 @@
 #include <boost/thread/thread.hpp>
 
 #include <thrift/transport/TBufferTransports.h>
+#include "rpc/thrift-server.h"
 #include "transport/TSaslTransport.h"
 #include "transport/TSaslServerTransport.h"
 
@@ -141,7 +142,8 @@ shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   shared_ptr<TBufferedTransport> ret_transport;
   if (trans_map == transportMap_.end()) {
     shared_ptr<TTransport> wrapped(new TSaslServerTransport(serverDefinitionMap_, trans));
-    ret_transport.reset(new TBufferedTransport(wrapped));
+    ret_transport.reset(new TBufferedTransport(wrapped,
+            impala::ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES));
     ret_transport.get()->open();
     transportMap_[trans] = ret_transport;
   } else {

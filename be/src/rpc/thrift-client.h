@@ -93,8 +93,8 @@ class ThriftClientImpl {
 };
 
 
-/// Utility client to a Thrift server. The parameter type is the Thrift interface type that
-/// the server implements.
+/// Utility client to a Thrift server. The parameter type is the Thrift interface type
+/// that the server implements.
 /// TODO: Consider a builder class to make constructing this class easier.
 template <class InterfaceType>
 class ThriftClient : public ThriftClientImpl {
@@ -131,7 +131,8 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
   // Here transport_->isOpen() will call socker_->isOpen(), when socket_ is NULL,
   // it will crash
   if (socket_ != NULL) {
-    transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
+    ThriftServer::BufferedTransportFactory factory;
+    transport_ = factory.getTransport(socket_);
   }
 
   if (auth_provider_ == NULL) {

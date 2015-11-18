@@ -56,6 +56,7 @@ using namespace apache::thrift;
 
 DEFINE_int32(rpc_cnxn_attempts, 10, "Deprecated");
 DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");
+
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
 DECLARE_string(ssl_client_ca_certificate);

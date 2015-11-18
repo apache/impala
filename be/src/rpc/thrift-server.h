@@ -39,6 +39,26 @@ namespace impala {
 /// TODO: shutdown is buggy (which only harms tests)
 class ThriftServer {
  public:
+  /// Transport factory that procuess buffered transports with a customisable
+  /// buffer-size. A larger buffer is usually more efficient, as it allows the underlying
+  /// transports to perform fewer system calls.
+  class BufferedTransportFactory :
+      public apache::thrift::transport::TBufferedTransportFactory {
+   public:
+    static const int DEFAULT_BUFFER_SIZE_BYTES = 128 * 1024;
+
+    BufferedTransportFactory(uint32_t buffer_size = DEFAULT_BUFFER_SIZE_BYTES) :
+        buffer_size_(buffer_size) { }
+
+    virtual boost::shared_ptr<apache::thrift::transport::TTransport> getTransport(
+        boost::shared_ptr<apache::thrift::transport::TTransport> trans) {
+      return boost::shared_ptr<apache::thrift::transport::TTransport>(
+          new apache::thrift::transport::TBufferedTransport(trans, buffer_size_));
+    }
+   private:
+    uint32_t buffer_size_;
+  };
+
   /// Username.
   typedef std::string Username;
 
