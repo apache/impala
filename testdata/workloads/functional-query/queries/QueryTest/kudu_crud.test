@@ -38,7 +38,7 @@ TBLPROPERTIES(
 Couldn't resolve this master's address bogus.host.name:7051
 ====
 ---- QUERY
-create table tdata ( id int, name string, valf float, vali bigint)
+create table tdata ( id int, name string, valf float, vali bigint, valv varchar(20))
 DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
@@ -50,9 +50,9 @@ TBLPROPERTIES(
 ====
 ---- QUERY
 insert into tdata values
-(1, "martin", 1.0, 232232323),
-(2, "david", cast(1.0 as float), 99398493939),
-(3, "todd", cast(1.0 as float), 993393939)
+(1, "martin", 1.0, 232232323, cast('a' as VARCHAR(20))),
+(2, "david", cast(1.0 as float), 99398493939, cast('b' as VARCHAR(20))),
+(3, "todd", cast(1.0 as float), 993393939, cast('c' as VARCHAR(20)))
 ---- RESULTS
 : 3
 ====
@@ -63,11 +63,25 @@ update tdata set vali=43 where id = 1
 ---- QUERY
 select * from tdata
 ---- RESULTS
-1,'martin',1.0,43
-2,'david',1.0,99398493939
-3,'todd',1.0,993393939
+1,'martin',1.0,43,'a'
+2,'david',1.0,99398493939,'b'
+3,'todd',1.0,993393939,'c'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT
+INT,STRING,FLOAT,BIGINT,STRING
+====
+====
+---- QUERY
+update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as VARCHAR(20)) where id = 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa'
+2,'david',1.0,99398493939,'b'
+3,'todd',1.0,993393939,'c'
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING
 ====
 ---- QUERY
 update tdata set vali=43 where id > 1
@@ -76,11 +90,11 @@ update tdata set vali=43 where id > 1
 ---- QUERY
 select * from tdata
 ---- RESULTS
-1,'martin',1.0,43
-2,'david',1.0,43
-3,'todd',1.0,43
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa'
+2,'david',1.0,43,'b'
+3,'todd',1.0,43,'c'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT
+INT,STRING,FLOAT,BIGINT,STRING
 ====
 ---- QUERY
 update tdata set name='unknown' where name = 'martin'
@@ -89,27 +103,29 @@ update tdata set name='unknown' where name = 'martin'
 ---- QUERY
 select * from tdata
 ---- RESULTS
-1,'unknown',1.0,43
-2,'david',1.0,43
-3,'todd',1.0,43
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa'
+2,'david',1.0,43,'b'
+3,'todd',1.0,43,'c'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT
+INT,STRING,FLOAT,BIGINT,STRING
 ====
 ---- QUERY
-insert into tdata values (40, "he", cast(0.0 as float), 43), (120, "she", cast(0.0 as float), 99)
+insert into tdata values
+(40, "he", cast(0.0 as float), 43, cast('e' as VARCHAR(20))),
+(120, "she", cast(0.0 as float), 99, cast('f' as VARCHAR(20)))
 ---- RESULTS
 : 2
 ====
 ---- QUERY
 select * from tdata
 ---- RESULTS
-1,'unknown',1.0,43
-2,'david',1.0,43
-3,'todd',1.0,43
-40,'he',0.0,43
-120,'she',0.0,99
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa'
+2,'david',1.0,43,'b'
+3,'todd',1.0,43,'c'
+40,'he',0.0,43,'e'
+120,'she',0.0,99,'f'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT
+INT,STRING,FLOAT,BIGINT,STRING
 ====
 ---- QUERY
 update tdata set name=null where id = 40
@@ -118,13 +134,13 @@ update tdata set name=null where id = 40
 ---- QUERY
 select * from tdata
 ---- RESULTS
-1,'unknown',1.0,43
-2,'david',1.0,43
-3,'todd',1.0,43
-40,'NULL',0.0,43
-120,'she',0.0,99
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa'
+2,'david',1.0,43,'b'
+3,'todd',1.0,43,'c'
+40,'NULL',0.0,43,'e'
+120,'she',0.0,99,'f'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT
+INT,STRING,FLOAT,BIGINT,STRING
 ====
 ---- QUERY
 update tdata set name='he' where id = 40
@@ -133,27 +149,27 @@ update tdata set name='he' where id = 40
 ---- QUERY
 select * from tdata
 ---- RESULTS
-1,'unknown',1.0,43
-2,'david',1.0,43
-3,'todd',1.0,43
-40,'he',0.0,43
-120,'she',0.0,99
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa'
+2,'david',1.0,43,'b'
+3,'todd',1.0,43,'c'
+40,'he',0.0,43,'e'
+120,'she',0.0,99,'f'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT
+INT,STRING,FLOAT,BIGINT,STRING
 ====
 ---- QUERY
 # Make sure we can insert empty strings into string columns and that we can scan them
 # back.
-insert into tdata values (320, '', 2.0, 932)
+insert into tdata values (320, '', 2.0, 932, cast('' as VARCHAR(20)))
 ---- RESULTS
 : 1
 ====
 ---- QUERY
-select id, name from tdata where id = 320;
+select id, name, valv from tdata where id = 320;
 ---- RESULTS
-320,''
+320,'',''
 ---- TYPES
-INT,STRING
+INT,STRING,STRING
 ====
 ---- QUERY
 -- Test that string case is ignored
@@ -178,17 +194,20 @@ select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
 INT,STRING,FLOAT,BIGINT
 ====
 ---- QUERY
-insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
+insert into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)))
 ---- RESULTS
 : 1
 ====
 ---- QUERY
-insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
+insert into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)))
 ---- CATCH
 Error while flushing Kudu session:
 ====
 ---- QUERY
-insert ignore into tdata values (666, "The Devil", cast(1.2 as float), 43)
+insert ignore into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)))
 ---- RESULTS
 : 0
 ====
@@ -212,7 +231,8 @@ Error while flushing Kudu session:
 ====
 ---- QUERY
 -- Re-insert the data
-insert into tdata values (666, "The Devil", cast(1.2 as float), 43)
+insert into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)))
 ---- RESULTS
 : 1
 ====

@@ -37,6 +37,7 @@ Status ImpalaToKuduType(const ColumnType& impala_type,
   using kudu::client::KuduColumnSchema;
 
   switch (impala_type.type) {
+    case TYPE_VARCHAR:
     case TYPE_STRING:
       *kudu_type = KuduColumnSchema::STRING;
       break;

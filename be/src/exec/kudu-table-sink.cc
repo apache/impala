@@ -172,7 +172,9 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
         continue;
       }
 
-      switch (output_expr_ctxs_[j]->root()->type().type) {
+      PrimitiveType type = output_expr_ctxs_[j]->root()->type().type;
+      switch (type) {
+        case TYPE_VARCHAR:
         case TYPE_STRING: {
           StringValue* sv = reinterpret_cast<StringValue*>(value);
           kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
@@ -216,7 +218,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
               "Could not add Kudu WriteOp.");
           break;
         default:
-          DCHECK(false);
+          return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
       }
     }
 
