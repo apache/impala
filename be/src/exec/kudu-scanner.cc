@@ -278,7 +278,7 @@ Status KuduScanner::RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool) {
 
     // Extract the string value.
     void* slot_ptr = tuple->GetSlot(slot->tuple_offset());
-    DCHECK(slot->type().type == TYPE_STRING);
+    DCHECK(slot->type().IsStringType());
 
     // The string value of the slot has a pointer to memory from the Kudu row.
     StringValue* val = reinterpret_cast<StringValue*>(slot_ptr);
@@ -308,7 +308,12 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduScanBatch::RowPtr& row,
       continue;
     }
 
+    int max_len = -1;
     switch (info->type().type) {
+      case TYPE_VARCHAR:
+        max_len = info->type().len;
+        DCHECK_GT(max_len, 0);
+        // Fallthrough intended.
       case TYPE_STRING: {
         // For types with auxiliary memory (String, Binary,...) store the original memory
         // location in the tuple. Relocate the memory into the row batch's memory in a
@@ -316,9 +321,10 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduScanBatch::RowPtr& row,
         kudu::Slice slice;
         KUDU_RETURN_IF_ERROR(row.GetString(i, &slice),
             "Error getting column value from Kudu.");
-        reinterpret_cast<StringValue*>(slot)->ptr =
-            const_cast<char*>(reinterpret_cast<const char*>(slice.data()));
-        reinterpret_cast<StringValue*>(slot)->len = static_cast<int>(slice.size());
+        StringValue* sv = reinterpret_cast<StringValue*>(slot);
+        sv->ptr = const_cast<char*>(reinterpret_cast<const char*>(slice.data()));
+        sv->len = static_cast<int>(slice.size());
+        if (max_len > 0) sv->len = std::min(sv->len, max_len);
         break;
       }
       case TYPE_TINYINT:
