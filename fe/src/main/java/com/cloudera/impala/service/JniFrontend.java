@@ -591,12 +591,18 @@ public class JniFrontend {
   }
 
   /**
-   * Return an empty string if short circuit read is properly enabled. If not, return an
-   * error string describing the issues.
+   * Returns an error message if short circuit reads are enabled but misconfigured.
+   * Otherwise, returns an empty string,
    */
   private String checkShortCircuitRead(Configuration conf) {
+    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
+        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
+      LOG.info("Short-circuit reads are not enabled.");
+      return "";
+    }
+
     StringBuilder output = new StringBuilder();
-    String errorMessage = "ERROR: short-circuit local reads is disabled because\n";
+    String errorMessage = "Invalid short-circuit reads configuration:\n";
     String prefix = "  - ";
     StringBuilder errorCause = new StringBuilder();
 
@@ -617,14 +623,6 @@ public class JniFrontend {
         errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
         errorCause.append("\n");
       }
-    }
-
-    // dfs.client.read.shortcircuit must be set to true.
-    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
-        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
-      errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY);
-      errorCause.append(" is not enabled.\n");
     }
 
     // dfs.client.use.legacy.blockreader.local must be set to false
