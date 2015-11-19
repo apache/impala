@@ -877,6 +877,9 @@ Status PartitionedAggregationNode::NextPartition() {
       RETURN_IF_ERROR(CreateHashPartitions(partition->level + 1));
       COUNTER_ADD(num_repartitions_, 1);
 
+      // We are copying rows into the new partitions, so we can delete blocks as we go.
+      partition->aggregated_row_stream.get()->set_delete_on_read(true);
+
       // Rows in this partition could have been spilled into two streams, depending
       // on if it is an aggregated intermediate, or an unaggregated row.
       // Note: we must process the aggregated rows first to save a hash table lookup

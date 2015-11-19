@@ -186,7 +186,7 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
 
     null_probe_rows_ = new BufferedTupleStream(
         state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
-        true /* use small buffers */, false /* delete on read */ );
+        true /* use small buffers */, true /* delete on read */ );
     RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
   }
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
@@ -267,7 +267,8 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
       state->block_mgr(), parent_->block_mgr_client_);
   DCHECK(build_rows_ != NULL);
   probe_rows_ = new BufferedTupleStream(state, parent_->child(0)->row_desc(),
-      state->block_mgr(), parent_->block_mgr_client_);
+      state->block_mgr(), parent_->block_mgr_client_,
+      true /* use_initial_small_buffers*/, true /* delete_on_read */ );
   DCHECK(probe_rows_ != NULL);
 }
 
@@ -783,6 +784,8 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
     DCHECK(input_partition_->is_spilled());
     input_partition_->Spill(false);
     ht_ctx_->set_level(input_partition_->level_ + 1);
+    // We are copying rows into the new partitions, so we can delete blocks as we go.
+    input_partition_->build_rows()->set_delete_on_read(true);
     int64_t num_input_rows = input_partition_->build_rows()->num_rows();
     RETURN_IF_ERROR(ProcessBuildInput(state, input_partition_->level_ + 1));
 

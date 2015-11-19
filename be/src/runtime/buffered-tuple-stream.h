@@ -248,6 +248,13 @@ class BufferedTupleStream {
   bool has_tuple_footprint() const {
     return fixed_tuple_row_size_ > 0 || !string_slots_.empty() || nullable_tuple_;
   }
+
+  /// Switch to delete_on_read mode. Only valid if PrepareForRead() has not been called.
+  void set_delete_on_read(bool delete_on_read) {
+    DCHECK_EQ(read_block_idx_, -1);
+    delete_on_read_ = delete_on_read;
+  }
+
   std::string DebugString() const;
 
  private:
@@ -257,7 +264,7 @@ class BufferedTupleStream {
   bool use_small_buffers_;
 
   /// If true, blocks are deleted after they are read.
-  const bool delete_on_read_;
+  bool delete_on_read_;
 
   /// If true, read and write operations may be interleaved. Otherwise all calls
   /// to AddRow() must occur before calling PrepareForRead() and subsequent calls to

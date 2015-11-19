@@ -183,7 +183,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   input_stream_ = new BufferedTupleStream(state, child(0)->row_desc(),
       state->block_mgr(), client_,
       false /* initial_small_buffers */,
-      !IsInSubplan() /* delete_on_read */,
+      true /* delete_on_read */,
       true /* read_write */);
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
 
