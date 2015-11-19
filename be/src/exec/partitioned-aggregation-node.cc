@@ -474,7 +474,7 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   return hash_tbl->Init();
 }
 
-Status PartitionedAggregationNode::Partition::CleanUp(Tuple* intermediate_tuple) {
+Status PartitionedAggregationNode::Partition::CleanUp() {
   if (parent->needs_serialize_ && aggregated_row_stream->num_rows() != 0) {
     // We need to do a lot more work in this case. This step effectively does a merge
     // aggregation in this node. We need to serialize the intermediates, spill the
@@ -504,15 +504,6 @@ Status PartitionedAggregationNode::Partition::CleanUp(Tuple* intermediate_tuple)
       if (UNLIKELY(!new_stream->AddRow(reinterpret_cast<TupleRow*>(&tuple), &status))) {
         failed_to_add = true;
         break;
-      }
-    }
-
-    if (intermediate_tuple != NULL) {
-      AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, intermediate_tuple);
-      if (!failed_to_add &&
-          !new_stream->AddRow(reinterpret_cast<TupleRow*>(&intermediate_tuple),
-              &status)) {
-        failed_to_add = true;
       }
     }
 
@@ -553,11 +544,11 @@ Status PartitionedAggregationNode::Partition::CleanUp(Tuple* intermediate_tuple)
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
+Status PartitionedAggregationNode::Partition::Spill() {
   DCHECK(!is_closed);
   DCHECK(!is_spilled());
 
-  RETURN_IF_ERROR(CleanUp(intermediate_tuple));
+  RETURN_IF_ERROR(CleanUp());
 
   // Free the in-memory result data.
   for (int i = 0; i < agg_fn_ctxs.size(); ++i) {
@@ -762,10 +753,15 @@ Tuple* PartitionedAggregationNode::GetOutputTuple(
   return dst;
 }
 
-Status PartitionedAggregationNode::AppendRowRetryIOBuffers(BufferedTupleStream* stream,
+Status PartitionedAggregationNode::AppendSpilledRow(BufferedTupleStream* stream,
     TupleRow* row) {
-  DCHECK(stream->using_small_buffers());
+  DCHECK(stream != NULL);
   DCHECK(!stream->is_pinned());
+  DCHECK(stream->has_write_block());
+  if (LIKELY(stream->AddRow(row, &process_batch_status_))) return Status::OK();
+
+  // Adding fails iff either we hit an error or haven't switched to I/O buffers.
+  RETURN_IF_ERROR(process_batch_status_);
   while (true) {
     bool got_buffer;
     RETURN_IF_ERROR(stream->SwitchToIoBuffers(&got_buffer));
@@ -774,11 +770,9 @@ Status PartitionedAggregationNode::AppendRowRetryIOBuffers(BufferedTupleStream* 
   }
 
   // Adding the row should succeed after the I/O buffer switch.
-  if (!stream->AddRow(row, &process_batch_status_)) {
-    DCHECK(!process_batch_status_.ok());
-    return process_batch_status_;
-  }
-  return Status::OK();
+  if (stream->AddRow(row, &process_batch_status_)) return Status::OK();
+  DCHECK(!process_batch_status_.ok());
+  return process_batch_status_;
 }
 
 void PartitionedAggregationNode::DebugString(int indentation_level,
@@ -819,6 +813,22 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
+  return Status::OK();
+}
+
+Status PartitionedAggregationNode::CheckAndResizeHashPartitions(int num_rows,
+    HashTableCtx* ht_ctx) {
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    Partition* partition = hash_partitions_[i];
+    while (!partition->is_spilled()) {
+      {
+        SCOPED_TIMER(ht_resize_timer_);
+        if (partition->hash_tbl->CheckAndResize(num_rows, ht_ctx)) break;
+      }
+      // There was not enough memory for the resize. Spill a partition and retry.
+      RETURN_IF_ERROR(SpillPartition());
+    }
+  }
   return Status::OK();
 }
 
@@ -935,8 +945,7 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
-    Tuple* intermediate_tuple) {
+Status PartitionedAggregationNode::SpillPartition() {
   int64_t max_freed_mem = 0;
   int partition_idx = -1;
 
@@ -959,10 +968,7 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
     return state_->block_mgr()->MemLimitTooLowError(block_mgr_client_, id());
   }
 
-  Partition* spilled_partition = hash_partitions_[partition_idx];
-  RETURN_IF_ERROR(spilled_partition->Spill(
-      spilled_partition == curr_partition ? intermediate_tuple : NULL));
-  return Status::OK();
+  return hash_partitions_[partition_idx]->Spill();
 }
 
 Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
@@ -1462,7 +1468,7 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
         equals_fn, "Equals", &replaced);
-    DCHECK_EQ(replaced, 3);
+    DCHECK_EQ(replaced, 2);
   }
 
   process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,

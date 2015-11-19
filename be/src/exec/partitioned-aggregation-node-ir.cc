@@ -39,124 +39,96 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
   // TODO: Once we have a histogram with the number of rows per partition, we will have
   // accurate resize calls.
   int num_rows = batch->num_rows();
-  for (int partition_idx = 0; partition_idx < PARTITION_FANOUT; ++partition_idx) {
-    Partition* dst_partition = hash_partitions_[partition_idx];
-    while (!dst_partition->is_spilled()) {
-      {
-        SCOPED_TIMER(ht_resize_timer_);
-        if (dst_partition->hash_tbl->CheckAndResize(num_rows, ht_ctx)) break;
-      }
-      // There was not enough memory for the resize. Spill a partition and retry.
-      RETURN_IF_ERROR(SpillPartition());
-    }
-  }
+  RETURN_IF_ERROR(CheckAndResizeHashPartitions(num_rows, ht_ctx));
 
   for (int i = 0; i < num_rows; ++i) {
-    TupleRow* row = batch->GetRow(i);
-    uint32_t hash = 0;
-    if (AGGREGATED_ROWS) {
-      if (!ht_ctx->EvalAndHashBuild(row, &hash)) continue;
-    } else {
-      if (!ht_ctx->EvalAndHashProbe(row, &hash)) continue;
-    }
-
-    // To process this row, we first see if it can be aggregated or inserted into this
-    // partition's hash table. If we need to insert it and that fails, due to OOM, we
-    // spill the partition. The partition to spill is not necessarily dst_partition,
-    // so we can try again to insert the row.
-    Partition* dst_partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
-    if (!dst_partition->is_spilled()) {
-      DCHECK(dst_partition->hash_tbl.get() != NULL);
-      DCHECK(dst_partition->aggregated_row_stream->is_pinned());
-
-      HashTable* ht = dst_partition->hash_tbl.get();
-      if (!AGGREGATED_ROWS) {
-        // If the row is already an aggregate row, it cannot match anything in the
-        // hash table since we process the aggregate rows first. These rows should
-        // have been aggregated in the initial pass.
-        // TODO: change HT interface to use a FindOrInsert() call
-        HashTable::Iterator it = ht->Find(ht_ctx, hash);
-        if (!it.AtEnd()) {
-          // Row is already in hash table. Do the aggregation and we're done.
-          UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
-          continue;
-        }
-      } else {
-        DCHECK(ht->Find(ht_ctx, hash).AtEnd()) << ht->size();
-      }
-
-      Tuple* intermediate_tuple = NULL;
-allocate_tuple:
-#if 0
-      // TODO: this optimization doesn't work. Why?
-      // First construct the intermediate tuple in the dst partition's stream.
-      // TODO: needs_serialize can be removed with codegen.
-      if (AGGREGATED_ROWS && !needs_serialize_) {
-        // We can just copy the row into the stream.
-        if (!dst_partition->aggregated_row_stream->AddRow(
-            row, reinterpret_cast<uint8_t**>(&intermediate_tuple))) {
-          intermediate_tuple = NULL;
-        }
-      }
-#endif
-      // If this aggregate function requires serialize, or we are seeing this
-      // result row the first time, we need to construct the result row and
-      // initialize it.
-      intermediate_tuple = ConstructIntermediateTuple(dst_partition->agg_fn_ctxs,
-          NULL, dst_partition->aggregated_row_stream.get(), &process_batch_status_);
-      if (intermediate_tuple != NULL) {
-        UpdateTuple(&dst_partition->agg_fn_ctxs[0],
-            intermediate_tuple, row, AGGREGATED_ROWS);
-      } else if (!process_batch_status_.ok() &&
-                 !process_batch_status_.IsMemLimitExceeded()) {
-        // TODO: cleanup BufferedBlockMgr returns so that we don't need to check the
-        // status code here.  Unreserved memory requests signal failure with
-        // intermediate_tuple == NULL and Status::OK, but reserved requests fail with
-        // MEM_LIMIT_EXCEEDED.
-        return process_batch_status_;
-      }
-      // After copying and initialize it, try to insert the tuple into the hash table.
-      // If it inserts, we are done.
-      if (intermediate_tuple != NULL && ht->Insert(ht_ctx, intermediate_tuple, hash)) {
-        continue;
-      }
-
-      // In this case, we either did not have enough memory to add the intermediate_tuple
-      // to the stream or we did not have enough memory to insert it into the hash table.
-      // We need to spill until there is enough memory to insert this tuple or
-      // dst_partition is spilled.
-      while (true) {
-        RETURN_IF_ERROR(SpillPartition(dst_partition, intermediate_tuple));
-        if (!dst_partition->is_spilled()) {
-          DCHECK(dst_partition->aggregated_row_stream->is_pinned());
-          // We spilled a different partition, try to insert this tuple.
-          if (intermediate_tuple == NULL) goto allocate_tuple;
-          if (ht->Insert(ht_ctx, intermediate_tuple, hash)) break;
-        } else {
-          break;
-        }
-      }
-
-      // In this case, we were able to add the tuple to the stream but not enough
-      // to put it in the hash table. Nothing left to do, the tuple is spilled.
-      if (intermediate_tuple != NULL) continue;
-    }
-
-    // This partition is already spilled, just append the row.
-    DCHECK(dst_partition->is_spilled());
-    BufferedTupleStream* dst_stream = AGGREGATED_ROWS ?
-        dst_partition->aggregated_row_stream.get() :
-        dst_partition->unaggregated_row_stream.get();
-    DCHECK(dst_stream != NULL);
-    DCHECK(!dst_stream->is_pinned()) << AGGREGATED_ROWS;
-    DCHECK(dst_stream->has_write_block()) << AGGREGATED_ROWS;
-    if (LIKELY(dst_stream->AddRow(row, &process_batch_status_))) continue;
-    // Adding fails iff either we hit an error or haven't switched to I/O buffers.
-    RETURN_IF_ERROR(process_batch_status_);
-    RETURN_IF_ERROR(AppendRowRetryIOBuffers(dst_stream, row));
+    RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(batch->GetRow(i), ht_ctx));
   }
 
   return Status::OK();
+}
+
+template<bool AGGREGATED_ROWS>
+Status PartitionedAggregationNode::ProcessRow(TupleRow* row, HashTableCtx* ht_ctx) {
+  uint32_t hash = 0;
+  if (AGGREGATED_ROWS) {
+    if (!ht_ctx->EvalAndHashBuild(row, &hash)) return Status::OK();
+  } else {
+    if (!ht_ctx->EvalAndHashProbe(row, &hash)) return Status::OK();
+  }
+
+  // To process this row, we first see if it can be aggregated or inserted into this
+  // partition's hash table. If we need to insert it and that fails, due to OOM, we
+  // spill the partition. The partition to spill is not necessarily dst_partition,
+  // so we can try again to insert the row.
+  Partition* dst_partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
+  if (dst_partition->is_spilled()) {
+    // This partition is already spilled, just append the row.
+    return AppendSpilledRow<AGGREGATED_ROWS>(dst_partition, row);
+  }
+
+  HashTable* ht = dst_partition->hash_tbl.get();
+  DCHECK(ht != NULL);
+  DCHECK(dst_partition->aggregated_row_stream->is_pinned());
+  if (AGGREGATED_ROWS) {
+    // If the row is already an aggregate row, it cannot match anything in the
+    // hash table since we process the aggregate rows first. These rows should
+    // have been aggregated in the initial pass.
+    DCHECK(ht->Find(ht_ctx, hash).AtEnd()) << ht->size();
+  } else {
+    // TODO: change HT interface to use a FindOrInsert() call
+    HashTable::Iterator it = ht->Find(ht_ctx, hash);
+    if (!it.AtEnd()) {
+      // Row is already in hash table. Do the aggregation and we're done.
+      UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
+      return Status::OK();
+    }
+  }
+
+  // If we are seeing this result row for the first time, we need to construct the
+  // result row and initialize it.
+  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, ht_ctx, row, hash);
+}
+
+template<bool AGGREGATED_ROWS>
+Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
+    HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash) {
+  while (true) {
+    DCHECK(partition->aggregated_row_stream->is_pinned());
+    Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_ctxs,
+        NULL, partition->aggregated_row_stream.get(), &process_batch_status_);
+
+    if (LIKELY(intermediate_tuple != NULL)) {
+      UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, row, AGGREGATED_ROWS);
+      // After copying and initializing it, insert the tuple into the hash table. This
+      // always succeeds because we know it is not a duplicate entry.
+      bool inserted = partition->hash_tbl.get()->Insert(ht_ctx, intermediate_tuple, hash);
+      DCHECK(inserted);
+      return Status::OK();
+    } else if (!process_batch_status_.ok() &&
+               !process_batch_status_.IsMemLimitExceeded()) {
+      // TODO: cleanup BufferedBlockMgr returns so that we don't need to check the
+      // status code here.  Unreserved memory requests signal failure with
+      // intermediate_tuple == NULL and Status::OK, but reserved requests fail with
+      // MEM_LIMIT_EXCEEDED.
+      return process_batch_status_;
+    }
+
+    // We did not have enough memory to add intermediate_tuple to the stream.
+    RETURN_IF_ERROR(SpillPartition());
+    if (partition->is_spilled()) {
+      return AppendSpilledRow<AGGREGATED_ROWS>(partition, row);
+    }
+  }
+}
+
+template<bool AGGREGATED_ROWS>
+Status PartitionedAggregationNode::AppendSpilledRow(Partition* partition, TupleRow* row) {
+  DCHECK(partition->is_spilled());
+  BufferedTupleStream* stream = AGGREGATED_ROWS ?
+      partition->aggregated_row_stream.get() :
+      partition->unaggregated_row_stream.get();
+  return AppendSpilledRow(stream, row);
 }
 
 Status PartitionedAggregationNode::ProcessBatch_false(

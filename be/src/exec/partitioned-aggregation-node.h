@@ -283,18 +283,15 @@ class PartitionedAggregationNode : public ExecNode {
 
     /// Called in case we need to serialize aggregated rows. This step effectively does
     /// a merge aggregation in this node.
-    Status CleanUp(Tuple* intermediate_tuple);
+    Status CleanUp();
 
     /// Closes this partition. If finalize_rows is true, this iterates over all rows
     /// in aggregated_row_stream and finalizes them (this is only used in the cancellation
     /// path).
     void Close(bool finalize_rows);
 
-    /// Spills this partition, unpinning streams and cleaning up hash tables as
-    /// necessary.
-    /// If tuple is non-NULL, tuple should also be cleaned up (it was added to this
-    /// partitions aggregated_row_stream but not in the hash table).
-    Status Spill(Tuple* tuple = NULL);
+    /// Spills this partition, unpinning streams and cleaning up hash tables as necessary.
+    Status Spill();
 
     bool is_spilled() const { return hash_tbl.get() == NULL; }
 
@@ -382,10 +379,30 @@ class PartitionedAggregationNode : public ExecNode {
   template<bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx);
 
-  /// Used if appending row to a stream of a spilled partition failed because the stream
-  /// has not yet switched to I/O buffers and the small buffers are full. Switches the
-  /// stream to I/O buffers and spills partitions if necessary in order to append the row.
-  Status AppendRowRetryIOBuffers(BufferedTupleStream* stream, TupleRow* row);
+  /// This function processes each individual row in ProcessBatch(). Must be inlined
+  /// into ProcessBatch for codegen to substitute function calls with codegen'd versions.
+  template<bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, HashTableCtx* ht_ctx);
+
+  /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
+  /// the context for the partition's hash table and hash is the precomputed hash of
+  /// the row. The row can be an unaggregated or aggregated row depending on
+  /// AGGREGATED_ROWS. Spills partitions if necessary to append the new intermediate
+  /// tuple to the partition's stream. Must be inlined into ProcessBatch for codegen to
+  /// substitute function calls with codegen'd versions.
+  template<bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE AddIntermediateTuple(Partition* partition,
+      HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash);
+
+  /// Append a row to a spilled partition. May spill partitions if needed to switch to
+  /// I/O buffers. Selects the correct stream according to the argument. Inlined into
+  /// ProcessBatch().
+  template<bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE AppendSpilledRow(Partition* partition, TupleRow* row);
+
+  /// Append a row to a stream of a spilled partition. May spill partitions if needed
+  /// to append the row.
+  Status AppendSpilledRow(BufferedTupleStream* stream, TupleRow* row);
 
   /// Reads all the rows from input_stream and process them by calling ProcessBatch().
   template<bool AGGREGATED_ROWS>
@@ -394,6 +411,10 @@ class PartitionedAggregationNode : public ExecNode {
   /// Initializes hash_partitions_. 'level' is the level for the partitions to create.
   /// Also sets ht_ctx_'s level to 'level'.
   Status CreateHashPartitions(int level);
+
+  /// Ensure that hash tables for all in-memory partitions are large enough to fit
+  /// num_rows additional rows.
+  Status CheckAndResizeHashPartitions(int num_rows, HashTableCtx* ht_ctx);
 
   /// Iterates over all the partitions in hash_partitions_ and returns the number of rows
   /// of the largest spilled partition (in terms of number of aggregated and unaggregated
@@ -407,12 +428,7 @@ class PartitionedAggregationNode : public ExecNode {
   Status NextPartition();
 
   /// Picks a partition from hash_partitions_ to spill.
-  /// If curr_partition and curr_intermediate_tuple are non-NULL, it means if
-  /// curr_partition is spilled, curr_intermediate_tuple must also be cleaned up.
-  /// curr_intermediate_tuple has been added to curr_partition's aggregated_row_stream
-  /// but not the hash table.
-  Status SpillPartition(Partition* curr_partition = NULL,
-      Tuple* curr_intermediate_tuple = NULL);
+  Status SpillPartition();
 
   /// Moves the partitions in hash_partitions_ to aggregated_partitions_ or
   /// spilled_partitions_. Partitions moved to spilled_partitions_ are unpinned.

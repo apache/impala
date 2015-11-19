@@ -357,6 +357,8 @@ class HashTable {
   void Close();
 
   /// Inserts the row to the hash table. Returns true if the insertion was successful.
+  /// Always returns true if the table has free buckets and the key is not a duplicate.
+  /// The caller is responsible for ensuring that the table has free buckets
   /// 'idx' is the index into tuple_stream_ for this row. If the row contains more than
   /// one tuple, the 'idx' is stored instead of the 'row'. The 'row' is not copied by the
   /// hash table and the caller must guarantee it stays in memory. This will not grow the
