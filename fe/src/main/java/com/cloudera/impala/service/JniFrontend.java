@@ -210,7 +210,6 @@ public class JniFrontend {
     return plan;
   }
 
-
   /**
    * Returns a list of table names matching an optional pattern.
    * The argument is a serialized TGetTablesParams object.
@@ -556,65 +555,16 @@ public class JniFrontend {
     }
   }
 
-  public class CdhVersion implements Comparable<CdhVersion> {
-    private final int major;
-    private final int minor;
-
-    public CdhVersion(String versionString) throws IllegalArgumentException {
-      String[] version = versionString.split("\\.");
-      if (version.length != 2) {
-        throw new IllegalArgumentException("Invalid version string:" + versionString);
-      }
-      try {
-        major = Integer.parseInt(version[0]);
-        minor = Integer.parseInt(version[1]);
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid version string:" + versionString);
-      }
-    }
-
-    @Override
-    public int compareTo(CdhVersion o) {
-      return (this.major == o.major) ? (this.minor - o.minor) : (this.major - o.major);
-    }
-
-    @Override
-    public String toString() {
-      return major + "." + minor;
-    }
-  }
-
   /**
    * Returns an error string describing all configuration issues. If no config issues are
    * found, returns an empty string.
-   * Short circuit read checks and block location tracking checks are run only if Impala
-   * can determine that it is running on CDH.
    */
   public String checkConfiguration() {
-    CdhVersion guessedCdhVersion = guessCdhVersionFromNnWebUi();
-    CdhVersion cdh41 = new CdhVersion("4.1");
-    CdhVersion cdh42 = new CdhVersion("4.2");
     StringBuilder output = new StringBuilder();
-
     output.append(checkLogFilePermission());
     output.append(checkFileSystem(CONF));
-
-    if (guessedCdhVersion == null) {
-      // Do not run any additional checks because we cannot determine the CDH version
-      LOG.warn("Cannot detect CDH version. Skipping Hadoop configuration checks");
-      return output.toString();
-    }
-
-    if (guessedCdhVersion.compareTo(cdh41) == 0) {
-      output.append(checkShortCircuitReadCdh41(CONF));
-    } else if (guessedCdhVersion.compareTo(cdh42) >= 0) {
-      output.append(checkShortCircuitRead(CONF));
-    } else {
-      output.append(guessedCdhVersion)
-        .append(" is detected but Impala requires CDH 4.1 or above.");
-    }
+    output.append(checkShortCircuitRead(CONF));
     output.append(checkBlockLocationTracking(CONF));
-
     return output.toString();
   }
 
@@ -638,61 +588,6 @@ public class JniFrontend {
       }
     }
     return "";
-  }
-
-  /**
-   * Guess the CDH version by looking at the version info string from the Namenode web UI
-   * Return the CDH version or null (if we can't determine the version)
-   */
-  private CdhVersion guessCdhVersionFromNnWebUi() {
-    try {
-      // On a large cluster, avoid hitting the name node at the same time
-      Random randomGenerator = new Random();
-      Thread.sleep(randomGenerator.nextInt(2000));
-    } catch (Exception e) {
-    }
-
-    try {
-      URI nnUri = getCurrentNameNodeAddress();
-      if (nnUri == null) return null;
-      URL nnWebUi = new URL(nnUri.toURL(), "/dfshealth.jsp");
-      URLConnection conn = nnWebUi.openConnection();
-      BufferedReader in = new BufferedReader(
-          new InputStreamReader(conn.getInputStream()));
-      String inputLine;
-      while ((inputLine = in.readLine()) != null) {
-        if (inputLine.contains("Version:")) {
-          // Parse the version string cdh<major>.<minor>
-          Pattern cdhVersionPattern = Pattern.compile("cdh\\d\\.\\d");
-          Matcher versionMatcher = cdhVersionPattern.matcher(inputLine);
-          if (versionMatcher.find()) {
-            // Strip out "cdh" before passing to CdhVersion
-            return new CdhVersion(versionMatcher.group().substring(3));
-          }
-          return null;
-        }
-      }
-    } catch (Exception e) {
-      LOG.info(e.toString());
-    }
-    return null;
-  }
-
-  /**
-   * Derive the namenode http address from the current filesystem,
-   * either default or as set by "-fs" in the generic options.
-   *
-   * @return Returns http address or null if failure.
-   */
-  private URI getCurrentNameNodeAddress() throws Exception {
-    // get the filesystem object to verify it is an HDFS system
-    FileSystem fs;
-    fs = FileSystem.get(CONF);
-    if (!(fs instanceof DistributedFileSystem)) {
-      LOG.error("FileSystem is " + fs.getUri());
-      return null;
-    }
-    return DFSUtil.getInfoServer(HAUtil.getAddressOfActive(fs), CONF, "http");
   }
 
   /**
@@ -746,95 +641,6 @@ public class JniFrontend {
     }
 
     return output.toString();
-  }
-
-  /**
-   * Check short circuit read for CDH 4.1.
-   * Return an empty string if short circuit read is properly enabled. If not, return an
-   * error string describing the issues.
-   */
-  private String checkShortCircuitReadCdh41(Configuration conf) {
-    StringBuilder output = new StringBuilder();
-    String errorMessage = "ERROR: short-circuit local reads is disabled because\n";
-    String prefix = "  - ";
-    StringBuilder errorCause = new StringBuilder();
-
-    // Client side checks
-    // dfs.client.read.shortcircuit must be set to true.
-    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
-        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
-      errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY);
-      errorCause.append(" is not enabled.\n");
-    }
-
-    // dfs.client.use.legacy.blockreader.local must be set to true
-    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
-        DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)) {
-      errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL);
-      errorCause.append(" is not enabled.\n");
-    }
-
-    // Server side checks
-    // Check data node server side configuration by reading the CONF from the data node
-    // web UI
-    // TODO: disabled for now
-    //cdh41ShortCircuitReadDatanodeCheck(errorCause, prefix);
-
-    if (errorCause.length() > 0) {
-      output.append(errorMessage);
-      output.append(errorCause);
-    }
-
-    return output.toString();
-  }
-
-  /**
-   *  Checks the data node's server side configuration by reading the CONF from the data
-   *  node.
-   *  This appends error messages to errorCause prefixed by prefix if data node
-   *  configuration is not properly set.
-   */
-  private void cdh41ShortCircuitReadDatanodeCheck(StringBuilder errorCause,
-      String prefix) {
-    String dnWebUiAddr = CONF.get(DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY,
-        DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_DEFAULT);
-    URL dnWebUiUrl = null;
-    try {
-      dnWebUiUrl = new URL("http://" + dnWebUiAddr + "/conf");
-    } catch (Exception e) {
-      LOG.info(e.toString());
-    }
-    Configuration dnConf = new Configuration(false);
-    dnConf.addResource(dnWebUiUrl);
-
-    // dfs.datanode.data.dir.perm should be at least 750
-    int permissionInt = 0;
-    try {
-      String permission = dnConf.get(DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY,
-          DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_DEFAULT);
-      permissionInt = Integer.parseInt(permission);
-    } catch (Exception e) {
-    }
-    if (permissionInt < 750) {
-      errorCause.append(prefix);
-      errorCause.append("Data node configuration ");
-      errorCause.append(DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY);
-      errorCause.append(" is not properly set. It should be set to 750.\n");
-    }
-
-    // dfs.block.local-path-access.user should contain the user account impala is running
-    // under
-    String accessUser = dnConf.get(DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY);
-    if (accessUser == null || !accessUser.contains(System.getProperty("user.name"))) {
-      errorCause.append(prefix);
-      errorCause.append("Data node configuration ");
-      errorCause.append(DFSConfigKeys.DFS_BLOCK_LOCAL_PATH_ACCESS_USER_KEY);
-      errorCause.append(" is not properly set. It should contain ");
-      errorCause.append(System.getProperty("user.name"));
-      errorCause.append("\n");
-    }
   }
 
   /**
