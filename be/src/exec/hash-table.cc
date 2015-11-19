@@ -252,7 +252,7 @@ bool HashTable::Init() {
   }
   buckets_ = reinterpret_cast<Bucket*>(malloc(buckets_byte_size));
   memset(buckets_, 0, buckets_byte_size);
-  return GrowNodeArray();
+  return true;
 }
 
 void HashTable::Close() {
