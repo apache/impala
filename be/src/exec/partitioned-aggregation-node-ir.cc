@@ -70,29 +70,30 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* row, HashTableCtx* ht_ct
   HashTable* ht = dst_partition->hash_tbl.get();
   DCHECK(ht != NULL);
   DCHECK(dst_partition->aggregated_row_stream->is_pinned());
+  bool found;
+  // Find the appropriate bucket in the hash table. There will always be a free
+  // bucket because we checked the size above.
+  HashTable::Iterator it = ht->FindBucket(ht_ctx, hash, &found);
+  DCHECK(!it.AtEnd()) << "Hash table had no free buckets";
   if (AGGREGATED_ROWS) {
     // If the row is already an aggregate row, it cannot match anything in the
     // hash table since we process the aggregate rows first. These rows should
     // have been aggregated in the initial pass.
-    DCHECK(ht->Find(ht_ctx, hash).AtEnd()) << ht->size();
-  } else {
-    // TODO: change HT interface to use a FindOrInsert() call
-    HashTable::Iterator it = ht->Find(ht_ctx, hash);
-    if (!it.AtEnd()) {
-      // Row is already in hash table. Do the aggregation and we're done.
-      UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
-      return Status::OK();
-    }
+    DCHECK(!found);
+  } else if (found) {
+    // Row is already in hash table. Do the aggregation and we're done.
+    UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
+    return Status::OK();
   }
 
   // If we are seeing this result row for the first time, we need to construct the
   // result row and initialize it.
-  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, ht_ctx, row, hash);
+  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, ht_ctx, row, hash, it);
 }
 
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
-    HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash) {
+    HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, HashTable::Iterator insert_it) {
   while (true) {
     DCHECK(partition->aggregated_row_stream->is_pinned());
     Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_ctxs,
@@ -100,10 +101,8 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
 
     if (LIKELY(intermediate_tuple != NULL)) {
       UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, row, AGGREGATED_ROWS);
-      // After copying and initializing it, insert the tuple into the hash table. This
-      // always succeeds because we know it is not a duplicate entry.
-      bool inserted = partition->hash_tbl.get()->Insert(ht_ctx, intermediate_tuple, hash);
-      DCHECK(inserted);
+      // After copying and initializing the tuple, insert it into the hash table.
+      insert_it.SetTuple(intermediate_tuple, hash);
       return Status::OK();
     } else if (!process_batch_status_.ok() &&
                !process_batch_status_.IsMemLimitExceeded()) {

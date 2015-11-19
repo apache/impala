@@ -381,6 +381,13 @@ class HashTable {
   /// Used during the probe phase of hash joins.
   Iterator IR_ALWAYS_INLINE Find(HashTableCtx* ht_ctx, uint32_t hash);
 
+  /// If a match is found in the table, return an iterator as in Find(). If a match was
+  /// not present, return an iterator pointing to the empty bucket where the key should
+  /// be inserted. Returns End() if the table is full. The caller can set the data in
+  /// the bucket using a Set*() method on the iterator.
+  Iterator IR_ALWAYS_INLINE FindBucket(HashTableCtx* ht_ctx, uint32_t hash,
+      bool* found);
+
   /// Returns number of elements inserted in the hash table
   int64_t size() const {
     return num_filled_buckets_ - num_buckets_with_duplicates_ + num_duplicate_nodes_;
@@ -481,6 +488,11 @@ class HashTable {
     TupleRow* GetRow() const;
     Tuple* GetTuple() const;
 
+    /// Set the current tuple for an empty bucket. Designed to be used with the
+    /// iterator returned from FindBucket() in the case when the value is not found.
+    /// It is not valid to call this function if the bucket already has an entry.
+    void SetTuple(Tuple* tuple, uint32_t hash);
+
     /// Sets as matched the Bucket or DuplicateNode currently pointed by the iterator,
     /// depending on whether the bucket has duplicates or not. The iterator cannot be
     /// AtEnd().
@@ -568,8 +580,8 @@ class HashTable {
   /// allocate a new DuplicateNode.
   DuplicateNode* IR_ALWAYS_INLINE InsertDuplicateNode(int64_t bucket_idx);
 
-  /// Resets the contents of the bucket with index 'bucket_idx', in preparation for an
-  /// insert. Sets all the fields of the bucket other than 'data'.
+  /// Resets the contents of the empty bucket with index 'bucket_idx', in preparation for
+  /// an insert. Sets all the fields of the bucket other than 'data'.
   void IR_ALWAYS_INLINE PrepareBucketForInsert(int64_t bucket_idx, uint32_t hash);
 
   /// Return the TupleRow pointed by 'htdata'.
@@ -650,7 +662,7 @@ class HashTable {
 
   /// The stats below can be used for debugging perf.
   /// TODO: Should we make these statistics atomic?
-  /// Number of calls to either Find, Insert or FindOrInsert an entry.
+  /// Number of Find(), Insert(), or FindBucket() calls that probe the hash table.
   int64_t num_probes_;
 
   /// Number of probes that failed and had to fall back to linear probing without cap.

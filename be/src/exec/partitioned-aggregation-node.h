@@ -389,10 +389,11 @@ class PartitionedAggregationNode : public ExecNode {
   /// the row. The row can be an unaggregated or aggregated row depending on
   /// AGGREGATED_ROWS. Spills partitions if necessary to append the new intermediate
   /// tuple to the partition's stream. Must be inlined into ProcessBatch for codegen to
-  /// substitute function calls with codegen'd versions.
+  /// substitute function calls with codegen'd versions. insert_it is an iterator for
+  /// insertion returned from HashTable::FindOrInsert().
   template<bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE AddIntermediateTuple(Partition* partition,
-      HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash);
+      HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, HashTable::Iterator insert_it);
 
   /// Append a row to a spilled partition. May spill partitions if needed to switch to
   /// I/O buffers. Selects the correct stream according to the argument. Inlined into

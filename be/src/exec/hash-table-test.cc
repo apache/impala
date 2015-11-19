@@ -361,18 +361,34 @@ class HashTableTest : public testing::Test {
     // successfully inserted and probed.
     uint32_t hash = 0;
     HashTable::Iterator iter;
+    bool found;
     for (int build_row_val = 0; build_row_val < table_size; ++build_row_val) {
       TupleRow* row = CreateTupleRow(build_row_val);
       bool passes = ht_ctx.EvalAndHashBuild(row, &hash);
       EXPECT_TRUE(passes);
-      bool inserted = hash_table.Insert(&ht_ctx, row->GetTuple(0), hash);
-      EXPECT_TRUE(inserted);
+
+      // Insert using both Insert() and FindBucket() methods.
+      if (build_row_val % 2 == 0) {
+        bool inserted = hash_table.Insert(&ht_ctx, row->GetTuple(0), hash);
+        EXPECT_TRUE(inserted);
+      } else {
+        iter = hash_table.FindBucket(&ht_ctx, hash, &found);
+        EXPECT_FALSE(iter.AtEnd());
+        EXPECT_FALSE(found);
+        iter.SetTuple(row->GetTuple(0), hash);
+      }
       EXPECT_EQ(hash_table.EmptyBuckets(), table_size - build_row_val - 1);
 
       passes = ht_ctx.EvalAndHashProbe(row, &hash);
       EXPECT_TRUE(passes);
       iter = hash_table.Find(&ht_ctx, hash);
       EXPECT_FALSE(iter.AtEnd());
+      EXPECT_EQ(row->GetTuple(0), iter.GetTuple());
+
+      iter = hash_table.FindBucket(&ht_ctx, hash, &found);
+      EXPECT_FALSE(iter.AtEnd());
+      EXPECT_TRUE(found);
+      EXPECT_EQ(row->GetTuple(0), iter.GetTuple());
     }
 
     // Probe for a tuple that does not exist. This should exercise the probe of a full
@@ -383,6 +399,12 @@ class HashTableTest : public testing::Test {
     EXPECT_TRUE(passes);
     iter = hash_table.Find(&ht_ctx, hash);
     EXPECT_TRUE(iter.AtEnd());
+
+    // Since hash_table is full, FindBucket cannot find an empty bucket, so returns End().
+    iter = hash_table.FindBucket(&ht_ctx, hash, &found);
+    EXPECT_TRUE(iter.AtEnd());
+    EXPECT_FALSE(found);
+
     hash_table.Close();
     pool.FreeAll();
     mem_pool_.FreeAll();

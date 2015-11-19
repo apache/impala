@@ -125,6 +125,14 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) 
   return End();
 }
 
+inline HashTable::Iterator HashTable::FindBucket(HashTableCtx* ht_ctx, uint32_t hash,
+    bool* found) {
+  ++num_probes_;
+  int64_t bucket_idx = Probe(buckets_, num_buckets_, ht_ctx, hash, found);
+  return Iterator(this, ht_ctx->row(), bucket_idx,
+      buckets_[bucket_idx].bucketData.duplicates);
+}
+
 inline HashTable::Iterator HashTable::Begin(HashTableCtx* ctx) {
   int64_t bucket_idx = Iterator::BUCKET_NOT_FOUND;
   DuplicateNode* node = NULL;
@@ -251,6 +259,13 @@ inline Tuple* HashTable::Iterator::GetTuple() const {
   } else {
     return bucket->bucketData.htdata.tuple;
   }
+}
+
+inline void HashTable::Iterator::SetTuple(Tuple* tuple, uint32_t hash) {
+  DCHECK(!AtEnd());
+  DCHECK(table_->stores_tuples_);
+  table_->PrepareBucketForInsert(bucket_idx_, hash);
+  table_->buckets_[bucket_idx_].bucketData.htdata.tuple = tuple;
 }
 
 inline void HashTable::Iterator::SetMatched() {

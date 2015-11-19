@@ -1470,7 +1470,7 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
         equals_fn, "Equals", &replaced);
-    DCHECK_EQ(replaced, 2);
+    DCHECK_EQ(replaced, 1);
   }
 
   process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
