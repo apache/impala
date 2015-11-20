@@ -601,3 +601,52 @@ where a.float_col = b.float_col and b.smallint_col = 1 and d.tinyint_col < 10
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-2144: Test correct assignment of Having-clause predicates
+# referencing a grouping column coming from an outer-joined table ref.
+select b.int_col, sum(b.double_col)
+from functional.alltypes a left outer join functional.alltypestiny b
+  on (a.id = b.id)
+group by a.bool_col, a.int_col, b.bool_col, b.int_col
+having a.bool_col is null and a.int_col is not null
+  and b.bool_col is null and b.int_col is not null
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: sum(b.double_col)
+|  group by: a.bool_col, a.int_col, b.bool_col, b.int_col
+|  having: b.bool_col IS NULL, b.int_col IS NOT NULL
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     predicates: b.int_col IS NOT NULL
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.bool_col IS NULL, a.int_col IS NOT NULL
+====
+# IMPALA-2144: Same as above but with a full outer join.
+select b.int_col, sum(b.double_col)
+from functional.alltypes a full outer join functional.alltypestiny b
+  on (a.id = b.id)
+group by a.bool_col, a.int_col, b.bool_col, b.int_col
+having a.bool_col is null and a.int_col is not null
+  and b.bool_col is null and b.int_col is not null
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: sum(b.double_col)
+|  group by: a.bool_col, a.int_col, b.bool_col, b.int_col
+|  having: a.bool_col IS NULL, a.int_col IS NOT NULL, b.bool_col IS NULL, b.int_col IS NOT NULL
+|
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     predicates: b.int_col IS NOT NULL
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col IS NOT NULL
+====
