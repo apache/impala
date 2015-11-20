@@ -67,10 +67,9 @@ Status TopNNode::Prepare(RuntimeState* state) {
   AddExprCtxsToFree(sort_exec_exprs_);
   tuple_row_less_than_.reset(
       new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
-  if (state->codegen_enabled()) {
-    bool success = tuple_row_less_than_->Codegen(state);
-    if (success) AddRuntimeExecOption("Codegen Enabled");
-  }
+  bool codegen_enabled = false;
+  if (state->codegen_enabled()) codegen_enabled = tuple_row_less_than_->Codegen(state);
+  AddCodegenExecOption(codegen_enabled);
   priority_queue_.reset(
       new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
           *tuple_row_less_than_));

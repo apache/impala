@@ -158,21 +158,21 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
       "LargestPartitionPercent", TUnit::UNIT);
 
+  bool build_codegen_enabled = false;
+  bool probe_codegen_enabled = false;
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
     Function* hash_fn = ht_ctx_->CodegenHashCurrentRow(state, false);
     Function* murmur_hash_fn = ht_ctx_->CodegenHashCurrentRow(state, true);
     if (hash_fn != NULL && murmur_hash_fn != NULL) {
       // Codegen for build path
-      if (CodegenProcessBuildBatch(state, hash_fn, murmur_hash_fn)) {
-        AddRuntimeExecOption("Build Side Codegen Enabled");
-      }
+      build_codegen_enabled = CodegenProcessBuildBatch(state, hash_fn, murmur_hash_fn);
       // Codegen for probe path
-      if (CodegenProcessProbeBatch(state, hash_fn, murmur_hash_fn)) {
-        AddRuntimeExecOption("Probe Side Codegen Enabled");
-      }
+      probe_codegen_enabled = CodegenProcessProbeBatch(state, hash_fn, murmur_hash_fn);
     }
   }
+  AddCodegenExecOption(build_codegen_enabled, "Build Side");
+  AddCodegenExecOption(probe_codegen_enabled, "Probe Side");
   return Status::OK();
 }
 

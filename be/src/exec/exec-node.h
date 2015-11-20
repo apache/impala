@@ -284,6 +284,11 @@ class ExecNode {
   /// Appends option to 'runtime_exec_options_'
   void AddRuntimeExecOption(const std::string& option);
 
+  /// Helper wrapper around AddRuntimeExecOption() for adding "Codegen Enabled" or
+  /// "Codegen Disabled" exec options. If specified, 'extra_label' is prepended to the
+  /// exec option.
+  void AddCodegenExecOption(bool codegen_enabled, const string& extra_label = "");
+
   /// Frees any local allocations made by expr_ctxs_to_free_ and returns the result of
   /// state->CheckQueryState(). Nodes should call this periodically, e.g. once per input
   /// row batch. This should not be called outside the main execution thread.
@@ -316,4 +321,3 @@ class ExecNode {
 
 }
 #endif
-

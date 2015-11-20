@@ -110,6 +110,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
       false, state->fragment_hash_seed(), mem_tracker()));
 
+  bool build_codegen_enabled = false;
+  bool probe_codegen_enabled = false;
   if (state->codegen_enabled()) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
@@ -123,7 +125,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     if (codegen_process_build_batch_fn_ != NULL) {
       codegen->AddFunctionToJit(codegen_process_build_batch_fn_,
           reinterpret_cast<void**>(&process_build_batch_fn_));
-      AddRuntimeExecOption("Build Side Codegen Enabled");
+      build_codegen_enabled = true;
     }
 
     // Codegen for probe path (only for left joins)
@@ -132,11 +134,12 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       if (codegen_process_probe_batch_fn != NULL) {
         codegen->AddFunctionToJit(codegen_process_probe_batch_fn,
             reinterpret_cast<void**>(&process_probe_batch_fn_));
-        AddRuntimeExecOption("Probe Side Codegen Enabled");
+        probe_codegen_enabled = true;
       }
     }
   }
-
+  AddCodegenExecOption(build_codegen_enabled, "Build Side");
+  AddCodegenExecOption(probe_codegen_enabled, "Probe Side");
   return Status::OK();
 }
 

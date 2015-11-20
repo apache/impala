@@ -157,6 +157,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     output_iterator_ = hash_tbl_->Begin();
   }
 
+  bool codegen_enabled;
   if (state->codegen_enabled()) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
@@ -168,10 +169,11 @@ Status AggregationNode::Prepare(RuntimeState* state) {
         // Update to using codegen'd process row batch.
         codegen->AddFunctionToJit(codegen_process_row_batch_fn_,
             reinterpret_cast<void**>(&process_row_batch_fn_));
-        AddRuntimeExecOption("Codegen Enabled");
+        codegen_enabled = true;
       }
     }
   }
+  AddCodegenExecOption(codegen_enabled);
   return Status::OK();
 }
 

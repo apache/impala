@@ -206,6 +206,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     DCHECK(serialize_stream_->has_write_block());
   }
 
+  bool codegen_enabled = false;
   if (state->codegen_enabled()) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
@@ -213,9 +214,10 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     if (codegen_process_row_batch_fn != NULL) {
       codegen->AddFunctionToJit(codegen_process_row_batch_fn,
           reinterpret_cast<void**>(&process_row_batch_fn_));
-      AddRuntimeExecOption("Codegen Enabled");
+      codegen_enabled = true;
     }
   }
+  AddCodegenExecOption(codegen_enabled);
   return Status::OK();
 }
 
