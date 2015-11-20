@@ -109,8 +109,8 @@ class Coordinator::BackendExecState {
   const TNetworkAddress backend_address;  // of ImpalaInternalService
   int64_t total_split_size;  // summed up across all splits; in bytes
 
-  // created in Coordinator::Exec() and destroyed after call to
-  // ParallelExecutor::Exec to release the memory.
+  // Created in Coordinator::Exec() and destroyed after call to
+  // ParallelExecutor::Exec() to release the memory.
   TExecPlanFragmentParams* rpc_params;
 
   // Fragment idx for this ExecState
@@ -149,9 +149,9 @@ class Coordinator::BackendExecState {
     : fragment_instance_id(params.instance_ids[instance_idx]),
       backend_address(params.hosts[instance_idx]),
       total_split_size(0),
+      rpc_params(plan_fragment_params),
       fragment_idx(fragment_idx),
       instance_idx(instance_idx),
-      rpc_params(plan_fragment_params),
       initiated(false),
       done(false),
       profile_created(false),
@@ -404,7 +404,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   md.__set_kind(TMetricKind::STATS);
   StatsMetric<double> latencies(md);
 
-  // TExecPlanFragmentParams can be arbitrary large depending on number of tables &
+  // TExecPlanFragmentParams can be arbitrarily large depending on number of tables &
   // partitions in rpc_params->desc_tbl, to avoid memory pressure on the coordinator
   // rpc_params is stored in rpc_params_pool which is cleared after
   // ParallelExecutor::Exec as the rpc_params are no longer needed.
@@ -426,10 +426,10 @@ Status Coordinator::Exec(QuerySchedule& schedule,
             : NULL);
 
       TExecPlanFragmentParams* rpc_params =
-              rpc_params_pool.Add(new TExecPlanFragmentParams());
+          rpc_params_pool.Add(new TExecPlanFragmentParams());
       SetExecPlanFragmentParams(schedule, backend_num,
-              request.fragments[fragment_idx], fragment_idx,params,instance_idx,
-              coord, rpc_params);
+          request.fragments[fragment_idx], fragment_idx,params,instance_idx,
+          coord, rpc_params);
 
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
@@ -1154,7 +1154,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   }
 
   // rpc_params are not needed beyond this point, set the pointer to NULL.
-  // Memory is freed in Coordinator::Exec when rpc_params_pool is cleared.
+  // Memory is freed in Coordinator::Exec().
   exec_state->rpc_params = NULL;
 
   exec_state->status = thrift_result.status;
@@ -1657,10 +1657,26 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
       case TPlanNodeType::DATA_SOURCE_NODE:
         tuple_ids.insert(plan_node.data_source_node.tuple_id);
         break;
+      case TPlanNodeType::HASH_JOIN_NODE:
+      case TPlanNodeType::AGGREGATION_NODE:
+      case TPlanNodeType::SORT_NODE:
+      case TPlanNodeType::EMPTY_SET_NODE:
+      case TPlanNodeType::EXCHANGE_NODE:
+      case TPlanNodeType::UNION_NODE:
+      case TPlanNodeType::SELECT_NODE:
+      case TPlanNodeType::NESTED_LOOP_JOIN_NODE:
+      case TPlanNodeType::ANALYTIC_EVAL_NODE:
+      case TPlanNodeType::SINGULAR_ROW_SRC_NODE:
+      case TPlanNodeType::UNNEST_NODE:
+      case TPlanNodeType::SUBPLAN_NODE:
+        // Do nothing
+        break;
+      default:
+        DCHECK(false) << "Invalid node type: " << plan_node.node_type;
     }
   }
 
-  // Collect tableId(s) matching the tuple_id(s).
+  // Collect TTableId(s) matching the TTupleId(s).
   unordered_set<TTableId> table_ids;
   BOOST_FOREACH(const TTupleId& tuple_id, tuple_ids) {
     BOOST_FOREACH(const TTupleDescriptor& tuple_desc, desc_tbl_.tupleDescriptors) {

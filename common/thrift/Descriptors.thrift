@@ -89,6 +89,7 @@ struct TDescriptorTable {
   1: optional list<TSlotDescriptor> slotDescriptors
   2: required list<TTupleDescriptor> tupleDescriptors
 
-  // table descriptors referenced by tupleDescriptors; possibly a subset
+  // TTableDescriptor(s) referenced by tupleDescriptors and scan nodes in
+  // the fragment.
   3: optional list<TTableDescriptor> tableDescriptors
 }
