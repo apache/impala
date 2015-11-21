@@ -41,10 +41,7 @@ DECLARE_int32(beeswax_port);
 
 TEST(SessionTest, TestExpiry) {
   FLAGS_idle_session_timeout = 1;
-  InProcessImpalaServer* impala =
-      new InProcessImpalaServer("localhost", FLAGS_be_port, 0, 0, "", 0);
-  EXIT_IF_ERROR(
-      impala->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1, false));
+  InProcessImpalaServer* impala = InProcessImpalaServer::StartWithEphemeralPorts();
   IntCounter* expired_metric =
       impala->metrics()->FindMetricForTesting<IntCounter>(
           ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);
@@ -64,11 +61,11 @@ TEST(SessionTest, TestExpiry) {
   // Create five Beeswax clients and five HS2 clients (each HS2 gets one session each)
   for (int i = 0; i < 5; ++i) {
     beeswax_clients[i].reset(new ThriftClient<ImpalaServiceClient>(
-        "localhost", FLAGS_beeswax_port));
+        "localhost", impala->beeswax_port()));
     EXPECT_TRUE(beeswax_clients[i]->Open().ok());
 
     hs2_clients[i].reset(new ThriftClient<ImpalaHiveServer2ServiceClient>(
-        "localhost", FLAGS_beeswax_port + 1));
+        "localhost", impala->hs2_port()));
     EXPECT_TRUE(hs2_clients[i]->Open().ok());
     TOpenSessionResp response;
     TOpenSessionReq request;

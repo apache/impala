@@ -51,9 +51,6 @@
 
 #include "common/names.h"
 
-DECLARE_int32(be_port);
-DECLARE_int32(beeswax_port);
-DECLARE_string(impalad);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disable_optimization_passes);
 DECLARE_bool(use_utc_for_unix_timestamp_conversions);
@@ -5611,17 +5608,12 @@ int main(int argc, char **argv) {
 
   // Create an in-process Impala server and in-process backends for test environment
   // without any startup validation check
-  FLAGS_impalad = "localhost:21000";
   FLAGS_abort_on_config_error = false;
   VLOG_CONNECTION << "creating test env";
   VLOG_CONNECTION << "starting backends";
-  InProcessImpalaServer* impala_server =
-      new InProcessImpalaServer("localhost", FLAGS_be_port, 0, 0, "", 0);
-  EXIT_IF_ERROR(
-      impala_server->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1,
-                                            false));
-  impala_server->SetCatalogInitialized();
-  executor_ = new ImpaladQueryExecutor();
+  InProcessImpalaServer* impala_server = InProcessImpalaServer::StartWithEphemeralPorts();
+  executor_ = new ImpaladQueryExecutor(impala_server->hostname(),
+      impala_server->beeswax_port());
   EXIT_IF_ERROR(executor_->Setup());
 
   vector<string> options;

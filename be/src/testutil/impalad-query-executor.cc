@@ -21,7 +21,6 @@
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-util.h"
 
-DEFINE_string(impalad, "localhost:21000", "host:port of impalad process");
 DECLARE_int32(num_nodes);
 
 #include "common/names.h"
@@ -33,10 +32,12 @@ using namespace beeswax;
 
 namespace impala {
 
-ImpaladQueryExecutor::ImpaladQueryExecutor()
+ImpaladQueryExecutor::ImpaladQueryExecutor(const string& hostname, uint32_t port)
   : query_in_progress_(false),
     current_row_(0),
-    eos_(false) {
+    eos_(false),
+    hostname_(hostname),
+    port_(port) {
 }
 
 ImpaladQueryExecutor::~ImpaladQueryExecutor() {
@@ -44,20 +45,10 @@ ImpaladQueryExecutor::~ImpaladQueryExecutor() {
 }
 
 Status ImpaladQueryExecutor::Setup() {
-  DCHECK(!FLAGS_impalad.empty());
-  vector<string> elems;
-  split(elems, FLAGS_impalad, is_any_of(":"));
-  DCHECK_EQ(elems.size(), 2);
-  int port = atoi(elems[1].c_str());
-  DCHECK_GT(port, 0);
-
-  client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port));
-
+  client_.reset(new ThriftClient<ImpalaServiceClient>(hostname_, port_));
   // Wait for up to 10s for the server to start, polling at 50ms intervals
-  RETURN_IF_ERROR(WaitForServer(elems[0], port, 200, 50));
-
+  RETURN_IF_ERROR(WaitForServer(hostname_, port_, 200, 50));
   RETURN_IF_ERROR(client_->Open());
-
   return Status::OK();
 }
 

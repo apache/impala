@@ -84,9 +84,9 @@ fi
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
   TEST_RET_CODE=0
-  # Preemptively force kill impalads and the statestore to clean up any running instances.
-  # The BE unit tests cannot run when impalads are started.
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
+
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
+      ${TEST_START_CLUSTER_ARGS}
 
   if [[ "$BE_TEST" = true ]]; then
     # Run backend tests.
@@ -94,9 +94,6 @@ do
       TEST_RET_CODE=1
     fi
   fi
-
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
-      ${TEST_START_CLUSTER_ARGS}
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   if ! ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1 \

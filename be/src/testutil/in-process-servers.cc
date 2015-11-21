@@ -14,6 +14,9 @@
 
 #include "testutil/in-process-servers.h"
 
+#include <boost/scoped_ptr.hpp>
+#include <stdlib.h>
+
 #include "statestore/statestore.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
@@ -31,14 +34,49 @@ DECLARE_string(ssl_private_key);
 
 using namespace apache::thrift;
 using namespace impala;
+using boost::shared_ptr;
+
+/// Pick a random port in the range of ephemeral ports
+/// https://tools.ietf.org/html/rfc6335
+static uint32_t RandomEphemeralPort() {
+  static uint32_t LOWER = 49152, UPPER = 65000;
+  return LOWER + rand() % (UPPER - LOWER);
+}
+
+InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
+    const string& statestore_host, int statestore_port) {
+  for (uint32_t tries = 0; tries < 10; ++tries) {
+    uint32_t p = RandomEphemeralPort();
+    uint32_t backend_port = p, subscriber_port = ++p, webserver_port = ++p,
+        beeswax_port = ++p, hs2_port = ++p;
+    InProcessImpalaServer* impala =
+        new InProcessImpalaServer("localhost", backend_port, subscriber_port,
+            webserver_port, statestore_host, statestore_port);
+    // Start the daemon and check if it works, if not delete the current server object and
+    // pick a new set of ports
+    Status started = impala->StartWithClientServers(beeswax_port, hs2_port,
+        !statestore_host.empty());
+    if (started.ok()) {
+      impala->SetCatalogInitialized();
+      return impala;
+    }
+    delete impala;
+  }
+  DCHECK(false) << "Could not find port to start Impalad.";
+  return NULL;
+}
 
 InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend_port,
     int subscriber_port, int webserver_port, const string& statestore_host,
     int statestore_port)
-  : hostname_(hostname), backend_port_(backend_port),
-    impala_server_(NULL),
-    exec_env_(new ExecEnv(hostname, backend_port, subscriber_port, webserver_port,
-                          statestore_host, statestore_port)) {
+    : hostname_(hostname), backend_port_(backend_port),
+      subscriber_port_(subscriber_port),
+      webserver_port_(webserver_port),
+      beeswax_port_(0),
+      hs2_port_(0),
+      impala_server_(NULL),
+      exec_env_(new ExecEnv(hostname, backend_port, subscriber_port, webserver_port,
+          statestore_host, statestore_port)) {
 }
 
 void InProcessImpalaServer::SetCatalogInitialized() {
@@ -49,6 +87,8 @@ void InProcessImpalaServer::SetCatalogInitialized() {
 Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_port,
     bool use_statestore) {
   RETURN_IF_ERROR(exec_env_->StartServices());
+  beeswax_port_ = beeswax_port;
+  hs2_port_ = hs2_port;
   ThriftServer* be_server;
   ThriftServer* hs2_server;
   ThriftServer* beeswax_server;
@@ -64,8 +104,7 @@ Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_p
   RETURN_IF_ERROR(beeswax_server_->Start());
 
   // Wait for up to 1s for the backend server to start
-  RETURN_IF_ERROR(WaitForServer(hostname_, backend_port_, 100, 100));
-
+  RETURN_IF_ERROR(WaitForServer(hostname_, backend_port_, 10, 100));
   return Status::OK();
 }
 
@@ -82,6 +121,18 @@ Status InProcessImpalaServer::StartAsBackendOnly(bool use_statestore) {
 Status InProcessImpalaServer::Join() {
   be_server_->Join();
   return Status::OK();
+}
+
+InProcessStatestore* InProcessStatestore::StartWithEphemeralPorts() {
+  for (uint32_t tries = 0; tries < 10; ++tries) {
+    uint32_t p = RandomEphemeralPort();
+    uint32_t statestore_port = p, webserver_port = ++p;
+    InProcessStatestore* ips = new InProcessStatestore(statestore_port, webserver_port);
+    if (ips->Start().ok()) return ips;
+    delete ips;
+  }
+  DCHECK(false) << "Could not find port to start Statestore.";
+  return NULL;
 }
 
 InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port)

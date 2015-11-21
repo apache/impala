@@ -37,7 +37,7 @@ class RowBatch;
 /// Query execution against running impalad process.
 class ImpaladQueryExecutor {
  public:
-  ImpaladQueryExecutor();
+  ImpaladQueryExecutor(const std::string& hostname, uint32_t port);
   ~ImpaladQueryExecutor();
 
   Status Setup();
@@ -100,6 +100,8 @@ class ImpaladQueryExecutor {
   bool query_in_progress_;
   int current_row_;
   bool eos_;
+  std::string hostname_;
+  uint32_t port_;
 
   /// call beeswax.close() for current query, if one in progress
   Status Close();

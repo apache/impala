@@ -44,7 +44,17 @@ class InProcessImpalaServer {
                         int subscriber_port, int webserver_port,
                         const std::string& statestore_host, int statestore_port);
 
-  /// Starts all servers, including the beeswas and hs2 client
+  /// Starts an in-process Impala server with ephemeral ports that are independent of the
+  /// ports used by a concurrently running normal Impala daemon. The hostname is set to
+  /// "localhost" and the ports are picked from the ephemeral port range and exposed as
+  /// member variables. Internally this will call StartWithClientservers() and
+  /// SetCatalogInitialized(). The default values for statestore_host and statestore_port
+  /// indicate that a statestore connection should not be used. These values are directly
+  /// forwarded to the ExecEnv.
+  static InProcessImpalaServer* StartWithEphemeralPorts(
+      const std::string& statestore_host = "", int statestore_port = 0);
+
+  /// Starts all servers, including the beeswax and hs2 client
   /// servers. If use_statestore is set, a connection to the statestore
   /// is established. If there is no error, returns Status::OK.
   Status StartWithClientServers(int beeswax_port, int hs2_port, bool use_statestore);
@@ -65,12 +75,24 @@ class InProcessImpalaServer {
   /// start up a catalogd, then there is no one to initialize it otherwise.
   void SetCatalogInitialized();
 
- private:
-  /// Hostname for this server, usually FLAGS_hostname
-  const std::string hostname_;
+  uint32_t beeswax_port() const { return beeswax_port_; }
 
-  /// Port to start the backend server on
-  const uint32_t backend_port_;
+  uint32_t hs2_port() const { return hs2_port_; }
+
+  const std::string& hostname() const { return hostname_; }
+
+ private:
+  std::string hostname_;
+
+  uint32_t backend_port_;
+
+  uint32_t subscriber_port_;
+
+  uint32_t webserver_port_;
+
+  uint32_t beeswax_port_;
+
+  uint32_t hs2_port_;
 
   /// The ImpalaServer that handles client and backend requests. Not owned by this class;
   /// instead it's owned via shared_ptrs in the ThriftServers. See CreateImpalaServer for
@@ -94,6 +116,11 @@ class InProcessImpalaServer {
 /// An in-process statestore, with webserver and metrics.
 class InProcessStatestore {
  public:
+
+  // Creates and starts an InProcessStatestore with ports chosen from the ephemeral port
+  // range. Returns NULL if no server could be started.
+  static InProcessStatestore* StartWithEphemeralPorts();
+
   /// Constructs but does not start the statestore.
   InProcessStatestore(int statestore_port, int webserver_port);
 
