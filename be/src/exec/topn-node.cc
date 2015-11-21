@@ -71,6 +71,9 @@ Status TopNNode::Prepare(RuntimeState* state) {
     bool success = tuple_row_less_than_->Codegen(state);
     if (success) AddRuntimeExecOption("Codegen Enabled");
   }
+  priority_queue_.reset(
+      new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
+          *tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   return Status::OK();
 }
@@ -82,14 +85,6 @@ Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
 
-  // Avoid creating them after every Reset()/Open().
-  // TODO: For some reason initializing priority_queue_ in Prepare() causes a 30% perf
-  // regression. Why??
-  if (priority_queue_.get() == NULL) {
-    priority_queue_.reset(
-        new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
-            *tuple_row_less_than_));
-  }
   // Allocate memory for a temporary tuple.
   tmp_tuple_ = reinterpret_cast<Tuple*>(
       tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));

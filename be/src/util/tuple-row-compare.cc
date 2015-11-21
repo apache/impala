@@ -27,7 +27,8 @@ bool TupleRowComparator::Codegen(RuntimeState* state) {
   LlvmCodeGen* codegen;
   bool got_codegen = state->GetCodegen(&codegen).ok();
   DCHECK(got_codegen);
-  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(&codegend_compare_fn_));
+  codegend_compare_fn_ = state->obj_pool()->Add(new CompareFn);
+  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(codegend_compare_fn_));
   return true;
 }
 

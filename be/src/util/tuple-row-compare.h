@@ -89,8 +89,8 @@ class TupleRowComparator {
   /// All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
   /// before calling this.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
-    int result = codegend_compare_fn_ == NULL ? Compare(lhs, rhs)
-        : codegend_compare_fn_(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
+    int result = codegend_compare_fn_ == NULL ? Compare(lhs, rhs) :
+        (*codegend_compare_fn_)(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
     if (result < 0) return true;
     return false;
   }
@@ -107,8 +107,16 @@ class TupleRowComparator {
   std::vector<bool> is_asc_;
   std::vector<int8_t> nulls_first_;
 
-  typedef int (*CompareFn)(ExprContext* const*, ExprContext* const*, TupleRow*, TupleRow*);
-  CompareFn codegend_compare_fn_;
+  /// We store a pointer to the codegen'd function pointer (adding an extra level of
+  /// indirection) so that copies of this TupleRowComparator will have the same pointer to
+  /// the codegen'd function. This is necessary because the codegen'd function pointer is
+  /// only set after the IR module is compiled. Without the indirection, if this
+  /// TupleRowComparator is copied before the module is compiled, the copy will still have
+  /// its function pointer set to NULL. The function pointer is allocated from the runtime
+  /// state's object pool so that its lifetime will be >= that of any copies.
+  typedef int (*CompareFn)(ExprContext* const*, ExprContext* const*, TupleRow*,
+      TupleRow*);
+  CompareFn* codegend_compare_fn_;
 
   /// Returns a codegen'd version of the Compare() function.
   /// TODO: have codegen'd users inline this instead of calling through the () operator
