@@ -117,7 +117,8 @@ class TestImpalaShellInteractive(object):
     self._send_cmd_to_shell(p, command)
     sleep(3)
     os.kill(p.pid, signal.SIGINT)
-    get_shell_cmd_result(p)
+    result = get_shell_cmd_result(p)
+    assert "Cancelled" not in result.stderr
     assert impalad.wait_for_num_in_flight_queries(0)
 
   @pytest.mark.execute_serially

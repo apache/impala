@@ -86,10 +86,10 @@ class ImpalaShell(cmd.Cmd):
   # If not connected to an impalad, the server version is unknown.
   UNKNOWN_SERVER_VERSION = "Not Connected"
   DISCONNECTED_PROMPT = "[Not connected] > "
-  # Error and warning that is printed by cancel_query
-  CANCELLATION_ERROR = 'Cancelled'
   # Message to display in shell when cancelling a query
   CANCELLATION_MESSAGE = ' Cancelling Query'
+  # Number of times to attempt cancellation before giving up.
+  CANCELLATION_TRIES = 3
   # Commands are terminated with the following delimiter.
   CMD_DELIM = ';'
   DEFAULT_DB = 'default'
@@ -375,17 +375,23 @@ class ImpalaShell(cmd.Cmd):
     if self.last_query_handle is None or self.query_handle_closed:
       return
     # Create a new connection to the impalad and cancel the query.
-    try:
-      self.query_handle_closed = True
-      print_to_stderr(ImpalaShell.CANCELLATION_MESSAGE)
-      new_imp_client = ImpalaClient(self.impalad)
-      new_imp_client.connect()
-      new_imp_client.cancel_query(self.last_query_handle, False)
-      self.imp_client.close_query(self.last_query_handle)
-      self._validate_database()
-    except Exception, e:
-      print_to_stderr("Failed to reconnect and close: %s" % str(e))
-      # TODO: Add a retry here
+    for cancel_try in xrange(ImpalaShell.CANCELLATION_TRIES):
+      try:
+        self.query_handle_closed = True
+        print_to_stderr(ImpalaShell.CANCELLATION_MESSAGE)
+        new_imp_client = ImpalaClient(self.impalad)
+        new_imp_client.connect()
+        new_imp_client.cancel_query(self.last_query_handle, False)
+        self.imp_client.close_query(self.last_query_handle)
+        self._validate_database()
+        break
+      except Exception, e:
+        # Suppress harmless errors.
+        err_msg = str(e).strip()
+        if err_msg in ['ERROR: Cancelled', 'ERROR: Invalid or unknown query handle']:
+          break
+        print_to_stderr("Failed to reconnect and close (try %i/%i): %s" % (
+            cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg))
 
   def precmd(self, args):
     args = self.sanitise_input(args)
@@ -799,14 +805,11 @@ class ImpalaShell(cmd.Cmd):
       return CmdStatus.SUCCESS
     except RPCException, e:
       # could not complete the rpc successfully
-      # suppress error if reason is cancellation
-      if self._no_cancellation_error(e):
-        print_to_stderr(e)
+      print_to_stderr(e)
     except QueryStateException, e:
       # an exception occurred while executing the query
-      if self._no_cancellation_error(e):
-        self.imp_client.close_query(self.last_query_handle, self.query_handle_closed)
-        print_to_stderr(e)
+      self.imp_client.close_query(self.last_query_handle, self.query_handle_closed)
+      print_to_stderr(e)
     except DisconnectedException, e:
       # the client has lost the connection
       print_to_stderr(e)
@@ -828,10 +831,6 @@ class ImpalaShell(cmd.Cmd):
       self.imp_client.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     return CmdStatus.ERROR
-
-  def _no_cancellation_error(self, error):
-    if ImpalaShell.CANCELLATION_ERROR not in str(error):
-      return True
 
   def construct_table_with_header(self, column_names):
     """ Constructs the table header for a given query handle.
@@ -1195,14 +1194,11 @@ if __name__ == "__main__":
         shell.prompt = shell.DISCONNECTED_PROMPT
       except QueryStateException, e:
         # an exception occurred while executing the query
-        if shell._no_cancellation_error(e):
-          shell.imp_client.close_query(shell.last_query_handle,
-                                       shell.query_handle_closed)
-          print_to_stderr(e)
+        shell.imp_client.close_query(shell.last_query_handle,
+                                     shell.query_handle_closed)
+        print_to_stderr(e)
       except RPCException, e:
         # could not complete the rpc successfully
-        # suppress error if reason is cancellation
-        if shell._no_cancellation_error(e):
-          print_to_stderr(e)
+        print_to_stderr(e)
     finally:
       intro = ''
