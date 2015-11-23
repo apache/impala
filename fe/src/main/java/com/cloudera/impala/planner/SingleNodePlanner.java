@@ -32,6 +32,7 @@ import com.cloudera.impala.analysis.AnalyticInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.CollectionTableRef;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprId;
@@ -1189,8 +1190,7 @@ public class SingleNodePlanner {
     Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
       @Override
       public boolean apply(Expr expr) {
-        return (expr instanceof BinaryPredicate)
-            && ((BinaryPredicate) expr).getOp().isEquivalence()
+        return com.cloudera.impala.analysis.Predicate.isEquivalencePredicate(expr)
             && ((BinaryPredicate) expr).isInferred()
             && expr.getChild(0).equals(expr.getChild(1));
       }
@@ -1372,33 +1372,12 @@ public class SingleNodePlanner {
     List<Expr> candidates = analyzer.getEqJoinConjuncts(lhsTblRefIds, rhsTblRefIds);
     Preconditions.checkNotNull(candidates);
     for (Expr e: candidates) {
-      // Ignore predicate if one of its children is a constant.
-      if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) continue;
-
-      Expr rhsExpr = null;
-      if (e.getChild(0).isBoundByTupleIds(rhsTblRefIds)) {
-        rhsExpr = e.getChild(0);
-      } else {
-        Preconditions.checkState(e.getChild(1).isBoundByTupleIds(rhsTblRefIds));
-        rhsExpr = e.getChild(1);
-      }
-
-      Expr lhsExpr = null;
-      if (e.getChild(1).isBoundByTupleIds(lhsTblRefIds)) {
-        lhsExpr = e.getChild(1);
-      } else if (e.getChild(0).isBoundByTupleIds(lhsTblRefIds)) {
-        lhsExpr = e.getChild(0);
-      } else {
-        // not an equi-join condition between the lhs and rhs ids
-        continue;
-      }
-
-      Preconditions.checkState(lhsExpr != rhsExpr);
-      BinaryPredicate joinConjunct =
-          new BinaryPredicate(((BinaryPredicate)e).getOp(), lhsExpr, rhsExpr);
+      if (!(e instanceof BinaryPredicate)) continue;
+      BinaryPredicate normalizedJoinConjunct =
+          getNormalizedEqPred(e, lhsTblRefIds, rhsTblRefIds, analyzer);
+      if (normalizedJoinConjunct == null) continue;
       analyzer.markConjunctAssigned(e);
-      joinConjunct.analyzeNoThrow(analyzer);
-      result.add(joinConjunct);
+      result.add(normalizedJoinConjunct);
     }
     if (!result.isEmpty()) return result;
 
@@ -1418,6 +1397,34 @@ public class SingleNodePlanner {
         }
       }
     }
+    return result;
+  }
+
+  /**
+   * Returns a normalized version of a binary equality predicate 'expr' where the lhs
+   * child expr is bound by some tuple in 'lhsTids' and the rhs child expr is bound by
+   * some tuple in 'rhsTids'. Returns 'expr' if this predicate is already normalized.
+   * Returns null in any of the following cases:
+   * 1. It is not an equality predicate
+   * 2. One of the operands is a constant
+   * 3. Both children of this predicate are the same expr
+   * 4. Cannot be normalized
+   */
+  public static BinaryPredicate getNormalizedEqPred(Expr expr, List<TupleId> lhsTids,
+      List<TupleId> rhsTids, Analyzer analyzer) {
+    if (!(expr instanceof BinaryPredicate)) return null;
+    BinaryPredicate pred = (BinaryPredicate) expr;
+    if (!pred.getOp().isEquivalence() && pred.getOp() != Operator.NULL_MATCHING_EQ) {
+      return null;
+    }
+    if (pred.getChild(0).isConstant() || pred.getChild(1).isConstant()) return null;
+
+    Expr lhsExpr = Expr.getFirstBoundChild(pred, lhsTids);
+    Expr rhsExpr = Expr.getFirstBoundChild(pred, rhsTids);
+    if (lhsExpr == null || rhsExpr == null || lhsExpr == rhsExpr) return null;
+
+    BinaryPredicate result = new BinaryPredicate(pred.getOp(), lhsExpr, rhsExpr);
+    result.analyzeNoThrow(analyzer);
     return result;
   }
 

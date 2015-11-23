@@ -313,6 +313,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::DISABLE_STREAMING_PREAGGREGATIONS:
         query_options->__set_disable_streaming_preaggregations(atoi(value.c_str()));
         break;
+      case TImpalaQueryOptions::ENABLE_RUNTIME_FILTER_PROPAGATION:
+        query_options->__set_enable_runtime_filter_propagation(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

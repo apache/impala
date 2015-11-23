@@ -893,6 +893,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return true;
   }
 
+  public static Expr getFirstBoundChild(Expr expr, List<TupleId> tids) {
+    for (Expr child: expr.getChildren()) {
+      if (child.isBoundByTupleIds(tids)) return child;
+    }
+    return null;
+  }
+
   public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
     Set<TupleId> tupleIdSet = Sets.newHashSet();
     Set<SlotId> slotIdSet = Sets.newHashSet();

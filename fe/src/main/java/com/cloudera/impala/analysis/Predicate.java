@@ -76,6 +76,11 @@ public abstract class Predicate extends Expr {
     return true;
   }
 
+  public static boolean isEquivalencePredicate(Expr expr) {
+    return (expr instanceof BinaryPredicate)
+        && ((BinaryPredicate) expr).getOp().isEquivalence();
+  }
+
   /**
    * If predicate is of the form "<slotref> = <slotref>", returns both SlotRefs,
    * otherwise returns null.

@@ -41,7 +41,8 @@ public class Planner {
 
   /**
    * Returns a list of plan fragments for executing an analyzed parse tree.
-   * May return a single-node or distributed executable plan.
+   * May return a single-node or distributed executable plan. If enabled (through a
+   * query option), computes runtime filters for dynamic partition pruning.
    *
    * Plan generation may fail and throw for the following reasons:
    * 1. Expr evaluation failed, e.g., during partition pruning.
@@ -74,6 +75,11 @@ public class Planner {
         // Only one scanner thread for small queries
         ctx_.getQueryOptions().setNum_scanner_threads(1);
       }
+    } else if (ctx_.getQueryOptions().isEnable_runtime_filter_propagation()) {
+      RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
+          singleNodePlan);
+      ctx_.getRootAnalyzer().getTimeline().markEvent(
+          "Runtime filters computed");
     }
 
     if (ctx_.isSingleNodeExec()) {

@@ -304,10 +304,10 @@ public class BinaryPredicate extends Predicate {
       case GT:
         newOp = Operator.LE;
         break;
-    case DISTINCT_FROM:
+      case DISTINCT_FROM:
         newOp = Operator.NOT_DISTINCT;
         break;
-    case NOT_DISTINCT:
+      case NOT_DISTINCT:
         newOp = Operator.DISTINCT_FROM;
         break;
       case NULL_MATCHING_EQ:

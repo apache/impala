@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -592,6 +593,10 @@ public class Analyzer {
 
   public TupleDescriptor getTupleDesc(TupleId id) {
     return globalState_.descTbl.getTupleDesc(id);
+  }
+
+  public SlotDescriptor getSlotDesc(SlotId id) {
+    return globalState_.descTbl.getSlotDesc(id);
   }
 
   public TableRef getTableRef(TupleId tid) { return tableRefMap_.get(tid); }
@@ -1954,6 +1959,11 @@ public class Analyzer {
     return globalState_.equivClassBySlotId.get(slotId);
   }
 
+  public Collection<SlotId> getEquivSlots(SlotId slotId) {
+    EquivalenceClassId classId = globalState_.equivClassBySlotId.get(slotId);
+    return globalState_.equivClassMembers.get(classId);
+  }
+
   public ExprSubstitutionMap getEquivClassSmap() { return globalState_.equivClassSmap; }
 
   /**
@@ -2374,6 +2384,9 @@ public class Analyzer {
   }
   public Expr getConjunct(ExprId exprId) {
     return globalState_.conjuncts.get(exprId);
+  }
+  public Map<TupleId, List<ExprId>> getEqJoinConjuncts() {
+    return globalState_.eqJoinConjuncts;
   }
 
   public int incrementCallDepth() { return ++callDepth_; }

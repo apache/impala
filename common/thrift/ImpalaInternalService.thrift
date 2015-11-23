@@ -146,6 +146,9 @@ struct TQueryOptions {
 
   // If true, the planner will not generate plans with streaming preaggregations.
   36: optional bool disable_streaming_preaggregations = 0
+
+  // If true, runtime filter propagation is enabled
+  37: optional bool enable_runtime_filter_propagation = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

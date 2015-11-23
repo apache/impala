@@ -15,6 +15,7 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -26,17 +27,18 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprId;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.TreeNode;
+import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import com.cloudera.impala.thrift.TExecStats;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TQueryOptions;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -114,6 +116,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // estimated per-host memory requirement for this node;
   // set in computeCosts(); invalid: -1
   protected long perHostMemCost_ = -1;
+
+  // Runtime filters assigned to this node.
+  protected List<RuntimeFilter> runtimeFilters_ = Lists.newArrayList();
 
   protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String displayName) {
     id_ = id;
@@ -369,6 +374,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for (Expr e: conjuncts_) {
       msg.addToConjuncts(e.treeToThrift());
     }
+    // Serialize any runtime filters
+    for (RuntimeFilter filter: runtimeFilters_) {
+      msg.addToRuntime_filters(filter.toThrift());
+    }
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.
@@ -591,5 +600,25 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       sum = addCardinalities(sum, tmp);
     }
     return sum;
+  }
+
+  protected void addRuntimeFilter(RuntimeFilter filter) { runtimeFilters_.add(filter); }
+
+  protected Collection<RuntimeFilter> getRuntimeFilters() { return runtimeFilters_; }
+
+  protected String getRuntimeFilterExplainString(boolean isBuildNode) {
+    if (runtimeFilters_.isEmpty()) return "";
+    final String applyNodeFilterFormat = "%s -> %s";
+    final String buildNodeFilterFormat = "%s <- %s";
+    String format = isBuildNode ? buildNodeFilterFormat : applyNodeFilterFormat;
+    StringBuilder output = new StringBuilder();
+    List<String> filtersStr = Lists.newArrayList();
+    for (RuntimeFilter filter: runtimeFilters_) {
+      Expr expr =
+          (isBuildNode) ? filter.getSrcExpr() : filter.getTargetExpr();
+      filtersStr.add(String.format(format, filter.getFilterId(), expr.toSql()));
+    }
+    output.append(Joiner.on(", ").join(filtersStr) + "\n");
+    return output.toString();
   }
 }

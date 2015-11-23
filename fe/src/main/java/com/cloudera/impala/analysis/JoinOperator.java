@@ -53,6 +53,9 @@ public enum JoinOperator {
     return this == INNER_JOIN;
   }
 
+  public boolean isLeftOuterJoin() { return this == LEFT_OUTER_JOIN; }
+  public boolean isRightOuterJoin() { return this == RIGHT_OUTER_JOIN; }
+
   public boolean isOuterJoin() {
     return this == LEFT_OUTER_JOIN
         || this == RIGHT_OUTER_JOIN

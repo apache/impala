@@ -1,0 +1,945 @@
+# Two-way join query
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2
+where t1.year = t2.int_col and t2.id < 10 and t1.id = 10
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  runtime filters: RF000 <- t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id < 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: t1.id = 10
+   runtime filters: RF000 -> t1.year
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.year = t2.int_col
+|  runtime filters: RF000 <- t2.int_col
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id < 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: t1.id = 10
+   runtime filters: RF000 -> t1.year
+====
+# Four-way join query
+select straight_join * from functional.alltypestiny t1, functional.alltypesagg t2,
+  functional.alltypestiny t3, functional.alltypesnopart t4
+where t1.year = t2.int_col and t3.tinyint_col = t2.id and t3.month = t4.id and
+  t2.bool_col = true and t4.bigint_col < 10
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.month = t4.id
+|  runtime filters: RF000 <- t4.id
+|
+|--03:SCAN HDFS [functional.alltypesnopart t4]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t4.bigint_col < 10
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.tinyint_col
+|  runtime filters: RF001 <- t3.tinyint_col
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> t3.month
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  runtime filters: RF002 <- t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypesagg t2]
+|     partitions=11/11 files=11 size=814.73KB
+|     predicates: t2.bool_col = TRUE
+|     runtime filters: RF001 -> t2.id
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF002 -> t1.year
+====
+# Two-way join query where multiple runtime filters are generated
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2
+where t1.year = t2.int_col and t1.month = t2.bigint_col and t2.id = 10
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.int_col, t1.month = t2.bigint_col
+|  runtime filters: RF000 <- t2.int_col, RF001 <- t2.bigint_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id = 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+====
+# Two-way join query with an inline view in the build side of the join
+select straight_join * from functional.alltypesagg t1,
+  (select * from functional.alltypesnopart t2 where t2.id = 1) v
+where t1.year = v.int_col
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  runtime filters: RF000 <- t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id = 1
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# Two-way join query with an inline view in the build side of the join where the
+# right child of the join predicate is an arithmetic expr between two slots
+select straight_join * from functional.alltypesagg t1,
+  (select id + int_col as id1 from functional.alltypesnopart t2
+   where t2.bigint_col < 10) v
+where v.id1 = t1.year
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = id + int_col
+|  runtime filters: RF000 <- id + int_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.bigint_col < 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# Two-way join query where the lhs of the join predicate is an arithmetic expr
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2
+where t1.year + 1 = t2.id and t2.int_col < 10
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year + 1 = t2.id
+|  runtime filters: RF000 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.int_col < 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year + 1
+====
+# Two-way join query with join predicates that are not suitable for hashing
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2
+where t1.id = t2.id and t1.year + t2.int_col = t1.month + t2.tinyint_col
+and t1.year = t1.month + t2.int_col and t1.year + t2.smallint_col = t2.tinyint_col
+and t1.int_col = 1 and 1 = t2.bigint_col
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t1.year + t2.int_col = t1.month + t2.tinyint_col, t1.year = t1.month + t2.int_col, t1.year + t2.smallint_col = t2.tinyint_col
+|  runtime filters: RF000 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: 1 = t2.bigint_col
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: t1.int_col = 1
+   runtime filters: RF000 -> t1.id
+====
+# Two-way join query where the left child of the equi-join predicate
+# is an arithmetic expr between two slots from the same scan tuple
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2
+where t1.year + t1.month = t2.id and t1.int_col + 1 - t1.tinyint_col = t2.smallint_col + 10
+and t1.int_col * 100 = t2.bigint_col / 100 and t2.bool_col = false
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year + t1.month = t2.id, t1.int_col + 1 - t1.tinyint_col = t2.smallint_col + 10, t1.int_col * 100 = t2.bigint_col / 100
+|  runtime filters: RF000 <- t2.id, RF001 <- t2.smallint_col + 10, RF002 <- t2.bigint_col / 100
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.bool_col = FALSE
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year + t1.month, RF001 -> t1.int_col + 1 - t1.tinyint_col, RF002 -> t1.int_col * 100
+====
+# Three-way join query with an inline view on the probe side of the join where the left
+# child of the equi-join predicate is an arithmetic expr between two slots from
+# different scan tuples
+select straight_join * from
+  (select t1.year + t2.year as year from functional.alltypesagg t1 inner join
+   functional.alltypes t2 on t1.id = t2.id) v,
+  functional.alltypesnopart t3
+where v.year = t3.int_col and t3.bool_col = true
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year + t2.year = t3.int_col
+|
+|--03:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.bool_col = TRUE
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.id
+====
+# Two-way join query with an inline view in the build side of the join that has an
+# aggregation
+select straight_join * from functional.alltypesagg t1,
+  (select id, count(int_col) as cnt from functional.alltypesnopart t2 group by id
+   having count(int_col) < 10) v
+where v.cnt = t1.year and v.id = t1.month
+---- PLAN
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = count(int_col), t1.month = id
+|  runtime filters: RF000 <- count(int_col), RF001 <- id
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(int_col)
+|  |  group by: id
+|  |  having: count(int_col) < 10
+|  |
+|  01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=0/11 files=0 size=0B
+   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+====
+# Two-way join query with an inline view in the build side of the join that has a
+# two-way join (bushy plan)
+select straight_join * from functional.alltypesagg t1,
+  (select t2.id + t3.id as id, t3.tinyint_col from functional.alltypesnopart t2,
+   functional.alltypesnopart t3 where t2.int_col = t3.int_col) v
+where v.id = t1.year and t1.month = v.tinyint_col
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.id + t3.id, t1.month = t3.tinyint_col
+|  runtime filters: RF000 <- t2.id + t3.id, RF001 <- t3.tinyint_col
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.int_col = t3.int_col
+|  |  runtime filters: RF002 <- t3.int_col
+|  |
+|  |--02:SCAN HDFS [functional.alltypesnopart t3]
+|  |     partitions=1/1 files=0 size=0B
+|  |
+|  01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     runtime filters: RF002 -> t2.int_col
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+====
+# Four-way join query with an inline view in the build side of the join where the
+# inline view has a tree-way cyclic join (bushy plan)
+select straight_join * from functional.alltypesagg t1,
+  (select t2.int_col, t3.id, t4.tinyint_col from functional.alltypesnopart t2,
+   functional.alltypesnopart t3, functional.alltypesnopart t4
+   where t2.id = t3.id and t3.int_col = t4.int_col and t4.tinyint_col = t2.tinyint_col) v
+where t1.year = v.int_col and t1.year = v.id and t1.month = v.tinyint_col
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.int_col, t1.month = t4.tinyint_col
+|  runtime filters: RF000 <- t2.int_col, RF001 <- t4.tinyint_col
+|
+|--05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t3.int_col = t4.int_col, t2.tinyint_col = t4.tinyint_col
+|  |  runtime filters: RF003 <- t4.tinyint_col, RF002 <- t4.int_col
+|  |
+|  |--03:SCAN HDFS [functional.alltypesnopart t4]
+|  |     partitions=1/1 files=0 size=0B
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t3.id
+|  |  runtime filters: RF004 <- t3.id
+|  |
+|  |--02:SCAN HDFS [functional.alltypesnopart t3]
+|  |     partitions=1/1 files=0 size=0B
+|  |     runtime filters: RF002 -> t3.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.int_col = t2.id
+|     runtime filters: RF003 -> t2.tinyint_col, RF004 -> t2.id
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+====
+# Four-way join query between base tables in a star schema
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2,
+  functional.alltypesnopart t3, functional.alltypesnopart t4
+where t1.year = t2.id and t1.year = t3.int_col and t1.year = t4.tinyint_col and
+  t2.bool_col = false and t3.bool_col = true and t4.bigint_col in (1,2)
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t4.tinyint_col
+|  runtime filters: RF000 <- t4.tinyint_col
+|
+|--03:SCAN HDFS [functional.alltypesnopart t4]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t4.bigint_col IN (1, 2)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t3.int_col
+|  runtime filters: RF001 <- t3.int_col
+|
+|--02:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.bool_col = TRUE
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.id
+|  runtime filters: RF002 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.bool_col = FALSE
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year, RF001 -> t1.year, RF002 -> t1.year
+====
+# Five-way cyclic join query
+select straight_join * from functional.alltypesagg t1, functional.alltypesnopart t2,
+  functional.alltypessmall t3, functional.alltypesnopart t4, functional.alltypesnopart t5
+where t1.year = t2.id and t2.int_col = t3.tinyint_col and t3.month = t4.bigint_col
+  and t4.smallint_col = t5.smallint_col and t5.id = t1.month
+---- PLAN
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: t4.smallint_col = t5.smallint_col, t1.month = t5.id
+|  runtime filters: RF001 <- t5.id, RF000 <- t5.smallint_col
+|
+|--04:SCAN HDFS [functional.alltypesnopart t5]
+|     partitions=1/1 files=0 size=0B
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.month = t4.bigint_col
+|  runtime filters: RF002 <- t4.bigint_col
+|
+|--03:SCAN HDFS [functional.alltypesnopart t4]
+|     partitions=1/1 files=0 size=0B
+|     runtime filters: RF000 -> t4.smallint_col
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.int_col = t3.tinyint_col
+|  runtime filters: RF003 <- t3.tinyint_col
+|
+|--02:SCAN HDFS [functional.alltypessmall t3]
+|     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF002 -> t3.month
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.id
+|  runtime filters: RF004 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     runtime filters: RF003 -> t2.int_col
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF001 -> t1.month, RF004 -> t1.year
+====
+# Two-way left outer join query; no runtime filters should be generated from the
+# ON-clause equi-join predicate
+select straight_join * from functional.alltypesagg t1 left outer join functional.alltypesnopart t2
+  on t1.year = t2.int_col
+where t2.id = 1
+---- PLAN
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  other predicates: t2.id = 1
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id = 1
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+# Two-way left outer join query where not all equi-join predicates should
+# generate a runtime filter
+select straight_join * from functional.alltypesagg t1 left outer join functional.alltypesnopart t2
+  on t1.year = t2.int_col
+where t2.id = 2 and t1.month = t2.tinyint_col
+---- PLAN
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  other predicates: t2.id = 2, t1.month = t2.tinyint_col
+|  runtime filters: RF000 <- t2.tinyint_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id = 2
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.month
+====
+# Multi-way join query with outer joins
+select straight_join * from functional.alltypesagg t1 left outer join functional.alltypesnopart t2
+  on t1.year = t2.int_col left outer join functional.alltypesnopart t3
+  on t1.year = t3.id full outer join functional.alltypesnopart t4
+  on t1.year = t4.tinyint_col right outer join functional.alltypesnopart t5
+  on t1.year = t5.smallint_col
+where t2.id = 1 and t3.int_col = 1 and t4.bool_col = true and t5.bool_col = false
+---- PLAN
+08:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t1.year = t5.smallint_col
+|  other predicates: t2.id = 1, t3.int_col = 1, t4.bool_col = TRUE
+|  runtime filters: RF000 <- t5.smallint_col
+|
+|--04:SCAN HDFS [functional.alltypesnopart t5]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t5.bool_col = FALSE
+|
+07:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: t1.year = t4.tinyint_col
+|
+|--03:SCAN HDFS [functional.alltypesnopart t4]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t4.bool_col = TRUE
+|
+06:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.year = t3.id
+|
+|--02:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.int_col = 1
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id = 1
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# Two-way right outer join query where a runtime filter can be pushed to the nullable
+# probe side
+select straight_join *
+from functional.alltypesagg t1 right outer join functional.alltypesnopart t2
+  on t1.year = t2.int_col and t1.month = 1 and t2.int_col = 10
+where t2.id = 10 and t1.month = t2.tinyint_col and t1.int_col = 1
+---- PLAN
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  other join predicates: t2.int_col = 10
+|  other predicates: t1.month = t2.tinyint_col, t1.int_col = 1
+|  runtime filters: RF000 <- t2.int_col, RF001 <- t2.tinyint_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.id = 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=0/11 files=0 size=0B
+   predicates: t1.int_col = 1
+   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+====
+# Three-way join query with semi joins
+select straight_join * from functional.alltypesagg t1 left semi join functional.alltypesnopart t2
+  on t1.year = t2.int_col right semi join functional.alltypesnopart t3
+  on t1.month = t3.tinyint_col
+where t3.id = 1
+---- PLAN
+04:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: t1.month = t3.tinyint_col
+|  runtime filters: RF000 <- t3.tinyint_col
+|
+|--02:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.id = 1
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  runtime filters: RF001 <- t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.month, RF001 -> t1.year
+====
+# Query with a subquery that is converted to a null-aware left anti join
+select straight_join * from functional.alltypesagg t1
+where t1.year not in (select id from functional.alltypesnopart where int_col = 10)
+and t1.int_col < 10
+---- PLAN
+02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  hash predicates: t1.year = id
+|
+|--01:SCAN HDFS [functional.alltypesnopart]
+|     partitions=1/1 files=0 size=0B
+|     predicates: int_col = 10
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: t1.int_col < 10
+====
+# Two-way join query between two inline views where the scan node to apply the filter
+# is below an aggregation node in the probe side of the join
+select straight_join * from
+  (select year, count(*) from functional.alltypesagg t1 group by year) v1,
+  (select id, int_col from functional.alltypesnopart where tinyint_col < 10) v2
+where v1.year = v2.id
+---- PLAN
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: year = id
+|  runtime filters: RF000 <- id
+|
+|--02:SCAN HDFS [functional.alltypesnopart]
+|     partitions=1/1 files=0 size=0B
+|     predicates: tinyint_col < 10
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: year
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# Two-way join query where the lhs of the join is an inline view with an aggregation;
+# the runtime filter cannot be pushed through the aggregation node
+select straight_join * from
+  (select year, count(*) as cnt from functional.alltypesagg t1 group by year) v1,
+  functional.alltypes t2
+where v1.cnt = t2.id and t2.int_col = 1
+---- PLAN
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: count(*) = t2.id
+|
+|--02:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: t2.int_col = 1
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: year
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+# Two-way join query with multiple nested inline views in the probe side of the join
+# where the scan node to apply the filter is below multiple aggregation nodes
+select straight_join * from
+  (select year, int_col, count(*) from
+    (select year, month, max(id) from functional.alltypesagg t1 group by year, month) v1,
+     functional.alltypesnopart t2 where v1.month = t2.int_col
+     group by v1.year, t2.int_col) v2,
+   functional.alltypesnopart t3
+where v2.year = t3.smallint_col and t3.id = 1
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: v1.year = t3.smallint_col
+|  runtime filters: RF000 <- t3.smallint_col
+|
+|--05:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.id = 1
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: year, t2.int_col
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: month = t2.int_col
+|  runtime filters: RF001 <- t2.int_col
+|
+|--02:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|
+01:AGGREGATE [FINALIZE]
+|  group by: year, month
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+====
+# Four-way join query between an inline view with an aggregation and three base tables
+select straight_join 1 from
+  (select distinct id, year, month from functional.alltypes) v
+join functional.alltypestiny a on v.year = a.year
+join functional.alltypestiny b on v.year = b.year
+join functional.alltypestiny c on v.year = c.year
+where b.int_col < 10
+---- PLAN
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: year = c.year
+|  runtime filters: RF000 <- c.year
+|
+|--04:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: year = b.year
+|  runtime filters: RF001 <- b.year
+|
+|--03:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     predicates: b.int_col < 10
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: year = a.year
+|  runtime filters: RF002 <- a.year
+|
+|--02:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|
+01:AGGREGATE [FINALIZE]
+|  group by: id, year, month
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.year, RF001 -> functional.alltypes.year, RF002 -> functional.alltypes.year
+====
+# Two-way join query with an inline view in the probe side of the join where the
+# scan node to apply the filter is below a top-n (order by with limit) operator
+select straight_join * from
+  (select year, int_col from functional.alltypesagg order by year limit 10) v1,
+  functional.alltypesnopart t2
+where v1.year = t2.id and v1.int_col = t2.int_col and t2.smallint_col = 1
+---- PLAN
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: year = t2.id, int_col = t2.int_col
+|
+|--02:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.smallint_col = 1
+|
+01:TOP-N [LIMIT=10]
+|  order by: year ASC
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+====
+# Two-way join query with an inline in the probe side of the join that has a union
+# TODO Support runtime filter propagation through all union operands
+select straight_join * from
+  (select year from functional.alltypesagg t1 union all
+   select year from functional.alltypestiny t2) v,
+  functional.alltypesnopart t3
+where v.year = t3.int_col and t3.bool_col = false
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: year = t3.int_col
+|  runtime filters: RF000 <- t3.int_col
+|
+|--03:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.bool_col = FALSE
+|
+00:UNION
+|
+|--02:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# UNION ALL query
+select straight_join t2.id, t1.year from functional.alltypesagg t1, functional.alltypesnopart t2
+where t1.year = t2.int_col and t2.bool_col = false
+union all
+select straight_join t4.id, t3.year from functional.alltypes t3, functional.alltypesnopart t4
+where t3.month = t4.smallint_col and t4.bool_col = true
+---- PLAN
+00:UNION
+|
+|--06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t3.month = t4.smallint_col
+|  |  runtime filters: RF001 <- t4.smallint_col
+|  |
+|  |--05:SCAN HDFS [functional.alltypesnopart t4]
+|  |     partitions=1/1 files=0 size=0B
+|  |     predicates: t4.bool_col = TRUE
+|  |
+|  04:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF001 -> t3.month
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.int_col
+|  runtime filters: RF000 <- t2.int_col
+|
+|--02:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t2.bool_col = FALSE
+|
+01:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# Two-way join query with an inline view in the probe side of the join where the
+# scan node to apply the filter in below an analytic function on the probe side of the join
+select straight_join * from
+  (select t1.year, t1.month, count(t2.id) over(partition by year order by month desc)
+   from functional.alltypesagg t1 inner join functional.alltypesnopart t2
+     on t1.year = t2.id) v1,
+   functional.alltypesnopart t3
+where v1.month = t3.tinyint_col and v1.year = t3.id and t3.bool_col = false
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: month = t3.tinyint_col, year = t3.id
+|
+|--05:SCAN HDFS [functional.alltypesnopart t3]
+|     partitions=1/1 files=0 size=0B
+|     predicates: t3.bool_col = FALSE
+|
+04:ANALYTIC
+|  functions: count(id)
+|  partition by: year
+|  order by: month DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: year ASC NULLS FIRST, month DESC
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.id
+|  runtime filters: RF000 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.year
+====
+# Two-way join query with an analytic function on the probe side
+# TODO: Propagate a runtime filter through the analytic function
+select straight_join * from
+  (select id, int_col, year,
+   sum(int_col) over (partition by year order by id) as s
+   from functional.alltypes) v, functional.alltypestiny v1
+where v.year = v1.int_col and v.year = 2009
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: year = v1.int_col
+|
+|--03:SCAN HDFS [functional.alltypestiny v1]
+|     partitions=4/4 files=4 size=460B
+|     predicates: v1.int_col = 2009
+|
+02:ANALYTIC
+|  functions: sum(int_col)
+|  partition by: year
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: year ASC NULLS FIRST, id ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=12/24 files=12 size=238.68KB
+====
+# Multi-way join query with a bushy plan
+select straight_join * from
+  (select t1.* from functional.alltypesagg t1,
+    (select t2.id + t3.id + 1 as id, t3.int_col
+     from functional.alltypesnopart t2 left outer join functional.alltypesnopart t3
+       on t2.id = t3.id
+     where t3.bool_col = false) v1
+   where t1.year = v1.id
+  ) v2,
+  (select t4.int_col as intcol1, t5.bigint_col as intcol2
+   from functional.alltypesnopart t4 left outer join functional.alltypesnopart t5
+     on t4.smallint_col = t5.smallint_col
+   where t5.bool_col = true
+  ) v3
+where v2.month = v3.intcol1
+---- PLAN
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.month = t4.int_col
+|  runtime filters: RF000 <- t4.int_col
+|
+|--07:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: t4.smallint_col = t5.smallint_col
+|  |  other predicates: t5.bool_col = TRUE
+|  |
+|  |--06:SCAN HDFS [functional.alltypesnopart t5]
+|  |     partitions=1/1 files=0 size=0B
+|  |     predicates: t5.bool_col = TRUE
+|  |
+|  05:SCAN HDFS [functional.alltypesnopart t4]
+|     partitions=1/1 files=0 size=0B
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.year = t2.id + t3.id + 1
+|  runtime filters: RF001 <- t2.id + t3.id + 1
+|
+|--03:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: t2.id = t3.id
+|  |  other predicates: t3.bool_col = FALSE
+|  |
+|  |--02:SCAN HDFS [functional.alltypesnopart t3]
+|  |     partitions=1/1 files=0 size=0B
+|  |     predicates: t3.bool_col = FALSE
+|  |
+|  01:SCAN HDFS [functional.alltypesnopart t2]
+|     partitions=1/1 files=0 size=0B
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.month, RF001 -> t1.year
+====
+# Multi-way join query where the slots of all the join predicates belong to the same
+# equivalence class
+select straight_join 1 from functional.alltypestiny t1 join functional.alltypestiny t2 on t1.id = t2.id
+  join functional.alltypestiny t3 on t2.id = t3.id
+where t3.int_col = 1
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.id
+|  runtime filters: RF000 <- t3.id
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|     predicates: t3.int_col = 1
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF001 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.id, RF001 -> t1.id
+====
+# Equivalent query to the one above; the same runtime filters should be generated
+select straight_join 1 from functional.alltypestiny t1 join functional.alltypestiny t2 on t1.id = t2.id
+  join functional.alltypestiny t3 on t1.id = t3.id
+where t3.int_col = 1
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t3.id
+|  runtime filters: RF000 <- t3.id
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|     predicates: t3.int_col = 1
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF001 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.id, RF001 -> t1.id
+====
+# Check that runtime filters are not generated in subplans
+select straight_join 1 from tpch_nested_parquet.customer c,
+(select o1.o_orderkey
+ from c.c_orders o1 join c.c_orders o2
+   on o1.o_orderkey = o2.o_orderkey) v
+where c_custkey = v.o_orderkey
+---- PLAN
+01:SUBPLAN
+|
+|--06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: c_custkey = o1.o_orderkey
+|  |
+|  |--05:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: o1.o_orderkey = o2.o_orderkey
+|  |  |
+|  |  |--04:UNNEST [c.c_orders o2]
+|  |  |
+|  |  03:UNNEST [c.c_orders o1]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
+====
+# Two-way join query where the build side is optimized into an empty set
+select straight_join 1
+from functional.alltypestiny t1 join
+  (select * from functional.alltypessmall t2 where false) v on t1.id = v.id
+where v.int_col = 1
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|
+|--01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.id
+====
+# Two-way join query where both the build side and probe side are optimized
+# into empty sets
+select straight_join 1 from
+  (select * from functional.alltypestiny where false) v1 join
+  (select * from functional.alltypessmall where false) v2 on v1.id = v2.id
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypestiny.id = functional.alltypessmall.id
+|
+|--01:EMPTYSET
+|
+00:EMPTYSET
+====
+# Multi-way join query where a runtime filter can be assigned to scan node
+# even though the apply expr is bound by different scan tuple descriptors
+select straight_join 1 from functional.alltypestiny t1 join functional.alltypestiny t2
+  on t1.id = t2.id
+  join functional.alltypestiny t3 on t1.id = t3.id
+  join functional.alltypestiny t4 on t1.id + t2.id = t4.id
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id + t2.id = t4.id
+|  runtime filters: RF000 <- t4.id
+|
+|--03:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 files=4 size=460B
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t3.id
+|  runtime filters: RF001 <- t3.id
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF002 <- t2.id
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.id + t1.id, RF001 -> t1.id, RF002 -> t1.id
+====

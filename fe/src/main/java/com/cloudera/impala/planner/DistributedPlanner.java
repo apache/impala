@@ -30,6 +30,7 @@ import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.JoinNode.DistributionMode;
+import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -394,6 +395,10 @@ public class DistributedPlanner {
       doBroadcast = true;
     } else {
       doBroadcast = false;
+    }
+
+    for (RuntimeFilter runtimeFilter: node.getRuntimeFilters()) {
+      runtimeFilter.setIsBroadcast(doBroadcast);
     }
 
     if (doBroadcast) {

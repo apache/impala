@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.Column;
@@ -37,6 +38,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
+import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.THdfsFileBlock;
@@ -203,6 +205,10 @@ public class HdfsScanNode extends ScanNode {
           firstComplexTypedCol.getName(), firstComplexTypedCol.getType().toSql(),
           errSuffix));
     }
+  }
+
+  public boolean isPartitionedTable() {
+    return desc_.getTable().getNumClusteringCols() > 0;
   }
 
   /**
@@ -539,6 +545,10 @@ public class HdfsScanNode extends ScanNode {
               detailPrefix, alias, getExplainString(entry.getValue())));
         }
       }
+      if (!runtimeFilters_.isEmpty()) {
+        output.append(detailPrefix + "runtime filters: ");
+        output.append(getRuntimeFilterExplainString(false));
+      }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(getStatsExplainString(detailPrefix, detailLevel));
@@ -620,4 +630,10 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
+
+  @Override
+  protected void addRuntimeFilter(RuntimeFilter filter) {
+    Preconditions.checkState(filter.getTargetExpr().isBoundByTupleIds(tupleIds_));
+    super.addRuntimeFilter(filter);
+  }
 }

@@ -186,6 +186,9 @@ enum TImpalaQueryOptions {
 
   // If true, the planner will not generate plans with streaming preaggregations.
   DISABLE_STREAMING_PREAGGREGATIONS,
+
+  // If true, enable runtime filter propagation
+  ENABLE_RUNTIME_FILTER_PROPAGATION
 }
 
 // The summary of an insert.

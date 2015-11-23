@@ -215,4 +215,10 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("disable-preaggregations", options);
   }
 
+  @Test
+  public void testRuntimeFilterPropagation() {
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_runtime_filter_propagation(true);
+    runPlannerTestFile("runtime-filter-propagation", options);
+  }
 }

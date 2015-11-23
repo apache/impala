@@ -163,6 +163,10 @@ public class HashJoinNode extends JoinNode {
         output.append(detailPrefix + "other predicates: ")
         .append(getExplainString(conjuncts_) + "\n");
       }
+      if (!runtimeFilters_.isEmpty()) {
+        output.append(detailPrefix + "runtime filters: ");
+        output.append(getRuntimeFilterExplainString(true));
+      }
     }
     return output.toString();
   }

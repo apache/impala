@@ -262,7 +262,11 @@ public abstract class QueryStmt extends StatementBase {
           analyzer.copySlotDescriptor(origSlotDesc, sortTupleDesc);
       SlotRef cloneRef = new SlotRef(materializedDesc);
       substOrderBy.put(origSlotRef, cloneRef);
-      analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);
+      if (hasLimit()) {
+        analyzer.registerValueTransfer(origSlotRef.getSlotId(), cloneRef.getSlotId());
+      } else {
+        analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);
+      }
       sortTupleExprs.add(origSlotRef);
     }
 
