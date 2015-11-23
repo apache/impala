@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef STATESTORE_QUERY_SCHEDULE_H
-#define STATESTORE_QUERY_SCHEDULE_H
+#ifndef SCHEDULING_QUERY_SCHEDULE_H
+#define SCHEDULING_QUERY_SCHEDULE_H
 
 #include <vector>
 #include <string>
@@ -23,7 +23,7 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
-#include "statestore/query-resource-mgr.h"
+#include "scheduling/query-resource-mgr.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress

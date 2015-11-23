@@ -13,15 +13,15 @@
 // limitations under the License.
 
 
-#ifndef STATESTORE_SCHEDULER_H
-#define STATESTORE_SCHEDULER_H
+#ifndef SCHEDULING_SCHEDULER_H
+#define SCHEDULING_SCHEDULER_H
 
 #include <vector>
 #include <string>
 
 #include "common/global-types.h"
 #include "common/status.h"
-#include "statestore/query-schedule.h"
+#include "scheduling/query-schedule.h"
 #include "util/container-util.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 #include "gen-cpp/StatestoreService_types.h"

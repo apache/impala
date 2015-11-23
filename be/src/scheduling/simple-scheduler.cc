@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "statestore/simple-scheduler.h"
+#include "scheduling/simple-scheduler.h"
 
 #include <vector>
 

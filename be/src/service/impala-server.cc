@@ -56,7 +56,7 @@
 #include "service/impala-internal-service.h"
 #include "service/query-exec-state.h"
 #include "service/query-options.h"
-#include "statestore/simple-scheduler.h"
+#include "scheduling/simple-scheduler.h"
 #include "util/bit-util.h"
 #include "util/cgroups-mgr.h"
 #include "util/container-util.h"

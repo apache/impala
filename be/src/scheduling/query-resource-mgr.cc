@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "statestore/query-resource-mgr.h"
+#include "scheduling/query-resource-mgr.h"
 
 #include <boost/foreach.hpp>
 #include <boost/uuid/uuid.hpp>

@@ -26,8 +26,8 @@
 
 #include "common/status.h"
 #include "scheduling/request-pool-service.h"
+#include "scheduling/query-schedule.h"
 #include "statestore/statestore-subscriber.h"
-#include "statestore/query-schedule.h"
 #include "util/internal-queue.h"
 #include "util/thread.h"
 

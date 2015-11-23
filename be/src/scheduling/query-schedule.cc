@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "statestore/query-schedule.h"
+#include "scheduling/query-schedule.h"
 
 #include <sstream>
 #include <boost/algorithm/string/join.hpp>

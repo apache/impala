@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef STATESTORE_QUERY_RESOURCE_MGR_H
-#define STATESTORE_QUERY_RESOURCE_MGR_H
+#ifndef SCHEDULING_QUERY_RESOURCE_MGR_H
+#define SCHEDULING_QUERY_RESOURCE_MGR_H
 
 #include "common/atomic.h"
 #include "common/status.h"

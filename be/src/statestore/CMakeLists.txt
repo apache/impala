@@ -21,16 +21,12 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 
 add_library(Statestore
   failure-detector.cc
-  query-resource-mgr.cc
-  simple-scheduler.cc
   statestore.cc
   statestore-subscriber.cc
-  query-schedule.cc
 )
 add_dependencies(Statestore thrift-deps)
 
 add_executable(statestored statestored-main.cc)
 target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 
-ADD_BE_TEST(simple-scheduler-test)
 ADD_BE_TEST(statestore-test)

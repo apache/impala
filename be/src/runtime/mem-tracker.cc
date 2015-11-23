@@ -20,7 +20,7 @@
 
 #include "runtime/exec-env.h"
 #include "resourcebroker/resource-broker.h"
-#include "statestore/query-resource-mgr.h"
+#include "scheduling/query-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/mem-info.h"
 #include "util/pretty-printer.h"

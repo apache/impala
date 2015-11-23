@@ -26,7 +26,7 @@
 /// stringstream is a typedef, so can't forward declare it.
 #include <sstream>
 
-#include "statestore/query-resource-mgr.h"
+#include "scheduling/query-resource-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "runtime/disk-io-mgr.h"  // for DiskIoMgr::RequestContext

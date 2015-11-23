@@ -37,7 +37,7 @@
 #include "util/progress-updater.h"
 #include "util/runtime-profile.h"
 #include "runtime/runtime-state.h"
-#include "statestore/simple-scheduler.h"
+#include "scheduling/simple-scheduler.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Frontend_types.h"
 

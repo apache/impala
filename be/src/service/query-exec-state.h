@@ -20,7 +20,7 @@
 #include "util/runtime-profile.h"
 #include "runtime/timestamp-value.h"
 #include "service/child-query.h"
-#include "statestore/query-schedule.h"
+#include "scheduling/query-schedule.h"
 #include "gen-cpp/Frontend_types.h"
 #include "service/impala-server.h"
 #include "gen-cpp/Frontend_types.h"

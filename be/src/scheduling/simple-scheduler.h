@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef STATESTORE_SIMPLE_SCHEDULER_H
-#define STATESTORE_SIMPLE_SCHEDULER_H
+#ifndef SCHEDULING_SIMPLE_SCHEDULER_H
+#define SCHEDULING_SIMPLE_SCHEDULER_H
 
 #include <vector>
 #include <string>
@@ -23,7 +23,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
-#include "statestore/scheduler.h"
+#include "scheduling/scheduler.h"
 #include "statestore/statestore-subscriber.h"
 #include "statestore/statestore.h"
 #include "util/metrics.h"

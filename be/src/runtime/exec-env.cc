@@ -33,7 +33,7 @@
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/request-pool-service.h"
 #include "service/frontend.h"
-#include "statestore/simple-scheduler.h"
+#include "scheduling/simple-scheduler.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"

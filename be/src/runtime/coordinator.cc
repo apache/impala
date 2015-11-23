@@ -46,7 +46,7 @@
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
 #include "runtime/parallel-executor.h"
-#include "statestore/scheduler.h"
+#include "scheduling/scheduler.h"
 #include "exec/data-sink.h"
 #include "exec/scan-node.h"
 #include "util/container-util.h"

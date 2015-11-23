@@ -21,7 +21,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
-#include "statestore/simple-scheduler.h"
+#include "scheduling/simple-scheduler.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"

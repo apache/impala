@@ -22,9 +22,13 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 # TODO: Move other scheduling-related classes here
 add_library(Scheduling STATIC
   admission-controller.cc
+  query-resource-mgr.cc
+  query-schedule.cc
   request-pool-service.cc
+  simple-scheduler.cc
 )
 add_dependencies(Scheduling thrift-deps)
 
+ADD_BE_TEST(simple-scheduler-test)
 # TODO: Add BE test
 # ADD_BE_TEST(admission-controller-test)
