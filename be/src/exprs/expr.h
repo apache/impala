@@ -395,7 +395,7 @@ class Expr {
   friend class ExprCodegenTest;
 
   /// Create a new Expr based on texpr_node.node_type within 'pool'.
-  static Status CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr);
+  static Expr* CreateExpr(ObjectPool* pool, const TExprNode& texpr_node);
 
   /// Creates an expr tree for the node rooted at 'node_idx' via depth-first traversal.
   /// parameters

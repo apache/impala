@@ -168,8 +168,7 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
     return Status("Failed to reconstruct expression tree from thrift.");
   }
   int num_children = nodes[*node_idx].num_children;
-  Expr* expr = NULL;
-  RETURN_IF_ERROR(CreateExpr(pool, nodes[*node_idx], &expr));
+  Expr* expr = CreateExpr(pool, nodes[*node_idx]);
   DCHECK(expr != NULL);
   if (parent != NULL) {
     parent->AddChild(expr);
@@ -191,71 +190,57 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
   return Status::OK();
 }
 
-Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr) {
+Expr* Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node) {
   switch (texpr_node.node_type) {
     case TExprNodeType::BOOL_LITERAL:
     case TExprNodeType::FLOAT_LITERAL:
     case TExprNodeType::INT_LITERAL:
     case TExprNodeType::STRING_LITERAL:
     case TExprNodeType::DECIMAL_LITERAL:
-      *expr = pool->Add(new Literal(texpr_node));
-      return Status::OK();
+      return pool->Add(new Literal(texpr_node));
     case TExprNodeType::CASE_EXPR:
-      if (!texpr_node.__isset.case_expr) {
-        return Status("Case expression not set in thrift node");
-      }
-      *expr = pool->Add(new CaseExpr(texpr_node));
-      return Status::OK();
+      DCHECK(texpr_node.__isset.case_expr);
+      return pool->Add(new CaseExpr(texpr_node));
     case TExprNodeType::COMPOUND_PRED:
       if (texpr_node.fn.name.function_name == "and") {
-        *expr = pool->Add(new AndPredicate(texpr_node));
+        return pool->Add(new AndPredicate(texpr_node));
       } else if (texpr_node.fn.name.function_name == "or") {
-        *expr = pool->Add(new OrPredicate(texpr_node));
+        return pool->Add(new OrPredicate(texpr_node));
       } else {
         DCHECK_EQ(texpr_node.fn.name.function_name, "not");
-        *expr = pool->Add(new ScalarFnCall(texpr_node));
+        return pool->Add(new ScalarFnCall(texpr_node));
       }
-      return Status::OK();
     case TExprNodeType::NULL_LITERAL:
-      *expr = pool->Add(new NullLiteral(texpr_node));
-      return Status::OK();
+      return pool->Add(new NullLiteral(texpr_node));
     case TExprNodeType::SLOT_REF:
-      if (!texpr_node.__isset.slot_ref) {
-        return Status("Slot reference not set in thrift node");
-      }
-      *expr = pool->Add(new SlotRef(texpr_node));
-      return Status::OK();
+      DCHECK(texpr_node.__isset.slot_ref);
+      return pool->Add(new SlotRef(texpr_node));
     case TExprNodeType::TUPLE_IS_NULL_PRED:
-      *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
-      return Status::OK();
+      return pool->Add(new TupleIsNullPredicate(texpr_node));
     case TExprNodeType::FUNCTION_CALL:
-      if (!texpr_node.__isset.fn) {
-        return Status("Function not set in thrift node");
-      }
+      DCHECK(texpr_node.__isset.fn);
       // Special-case functions that have their own Expr classes
       // TODO: is there a better way to do this?
       if (texpr_node.fn.name.function_name == "if") {
-        *expr = pool->Add(new IfExpr(texpr_node));
+        return pool->Add(new IfExpr(texpr_node));
       } else if (texpr_node.fn.name.function_name == "nullif") {
-        *expr = pool->Add(new NullIfExpr(texpr_node));
+        return pool->Add(new NullIfExpr(texpr_node));
       } else if (texpr_node.fn.name.function_name == "isnull" ||
                  texpr_node.fn.name.function_name == "ifnull" ||
                  texpr_node.fn.name.function_name == "nvl") {
-        *expr = pool->Add(new IsNullExpr(texpr_node));
+        return pool->Add(new IsNullExpr(texpr_node));
       } else if (texpr_node.fn.name.function_name == "coalesce") {
-        *expr = pool->Add(new CoalesceExpr(texpr_node));
+        return pool->Add(new CoalesceExpr(texpr_node));
 
       } else if (texpr_node.fn.binary_type == TFunctionBinaryType::HIVE) {
-        *expr = pool->Add(new HiveUdfCall(texpr_node));
+        return pool->Add(new HiveUdfCall(texpr_node));
       } else {
-        *expr = pool->Add(new ScalarFnCall(texpr_node));
+        return pool->Add(new ScalarFnCall(texpr_node));
       }
-      return Status::OK();
-    default:
-      stringstream os;
-      os << "Unknown expr node type: " << texpr_node.node_type;
-      return Status(os.str());
+    case TExprNodeType::AGGREGATE_EXPR:
+      DCHECK(false) << "Aggregate functions must be handled by AggFnEvaluator";
   }
+  UNREACHABLE;
 }
 
 struct MemLayoutData {
@@ -464,10 +449,19 @@ Function* Expr::GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen) {
       return codegen->GetFunction(IRFunction::EXPR_GET_TIMESTAMP_VAL);
     case TYPE_DECIMAL:
       return codegen->GetFunction(IRFunction::EXPR_GET_DECIMAL_VAL);
-    default:
-      DCHECK(false) << "Invalid type: " << type.DebugString();
-      return NULL;
+    case TYPE_NULL:
+      DCHECK(false) << "TYPE_NULL cannot be returned by an expr";
+    case INVALID_TYPE:
+      DCHECK(false) << "Invalid type";
+    case TYPE_DATE:
+    case TYPE_DATETIME:
+    case TYPE_BINARY:
+    case TYPE_STRUCT:
+    case TYPE_ARRAY:
+    case TYPE_MAP:
+      DCHECK(false) << "NYI";
   }
+  UNREACHABLE;
 }
 
 Function* Expr::CreateIrFunctionPrototype(LlvmCodeGen* codegen, const string& name,
@@ -554,8 +548,18 @@ AnyVal* Expr::GetConstVal(ExprContext* context) {
       constant_val_.reset(new DecimalVal(GetDecimalVal(context, NULL)));
       break;
     }
-    default:
-      DCHECK(false) << "Type not implemented: " << type();
+    case INVALID_TYPE:
+      DCHECK(false) << "Invalid type";
+    case TYPE_NULL:
+      DCHECK(false) << "No AnyVal representation of TYPE_NULL";
+    case TYPE_DATE:
+    case TYPE_DATETIME:
+    case TYPE_BINARY:
+    case TYPE_STRUCT:
+    case TYPE_ARRAY:
+    case TYPE_MAP:
+      DCHECK(false) << "NYI";
+
   }
   DCHECK(constant_val_.get() != NULL);
   return constant_val_.get();
@@ -571,10 +575,8 @@ template<> int Expr::GetConstant(const FunctionContext& ctx, ExprConstant c, int
       DCHECK_GE(i, 0);
       DCHECK_LT(i, ctx.GetNumArgs());
       return AnyValUtil::TypeDescToColumnType(*ctx.GetArgType(i)).GetByteSize();
-    default:
-      CHECK(false) << "NYI";
-      return -1;
   }
+  UNREACHABLE;
 }
 
 Value* Expr::GetIrConstant(LlvmCodeGen* codegen, ExprConstant c, int i) {
@@ -587,10 +589,8 @@ Value* Expr::GetIrConstant(LlvmCodeGen* codegen, ExprConstant c, int i) {
       DCHECK_LT(i, children_.size());
       return ConstantInt::get(
           codegen->GetType(TYPE_INT), children_[i]->type_.GetByteSize());
-    default:
-      CHECK(false) << "NYI";
-      return NULL;
   }
+  UNREACHABLE;
 }
 
 int Expr::InlineConstants(LlvmCodeGen* codegen, Function* fn) {

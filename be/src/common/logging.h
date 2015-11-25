@@ -45,6 +45,15 @@
   #include <gflags/gflags.h>
 #endif
 
+// This macro should be used to indicate code paths that can never be reached, e.g., after
+// a switch statement where every enum case is handled and returns a value. In this case
+// it can be used to silence a "control reaches end of non-void function" warning.
+#ifdef NDEBUG
+  #define UNREACHABLE __builtin_unreachable()
+#else
+  #define UNREACHABLE DCHECK(false) << "Unreachable"
+#endif
+
 /// Define verbose logging levels.  Per-row logging is more verbase than per-file /
 /// per-rpc logging which is more verbose than per-connection / per-query logging.
 #define VLOG_CONNECTION VLOG(1)

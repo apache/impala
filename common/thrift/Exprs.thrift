@@ -23,10 +23,6 @@ enum TExprNodeType {
   COMPOUND_PRED,
   FLOAT_LITERAL,
   INT_LITERAL,
-  IN_PRED,
-  IS_NULL_PRED,
-  LIKE_PRED,
-  LITERAL_PRED,
   NULL_LITERAL,
   SLOT_REF,
   STRING_LITERAL,
@@ -145,4 +141,3 @@ struct TExpr {
 struct TExprBatch {
   1: required list<TExpr> exprs
 }
-
