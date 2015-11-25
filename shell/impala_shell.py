@@ -26,6 +26,7 @@ import shlex
 import signal
 import socket
 import sqlparse
+import subprocess
 import sys
 import textwrap
 import time
@@ -116,7 +117,7 @@ class ImpalaShell(cmd.Cmd):
     self.use_ssl = options.ssl
     self.ca_cert = options.ca_cert
     self.user = options.user
-    self.ldap_password = None;
+    self.ldap_password = options.ldap_password
     self.use_ldap = options.use_ldap
 
     self.verbose = options.verbose
@@ -1139,6 +1140,21 @@ if __name__ == "__main__":
     print_to_stderr("Starting Impala Shell using LDAP-based authentication")
   else:
     print_to_stderr("Starting Impala Shell without Kerberos authentication")
+
+  options.ldap_password = None
+  if options.use_ldap and options.ldap_password_cmd:
+    try:
+      p = subprocess.Popen(shlex.split(options.ldap_password_cmd), stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
+      options.ldap_password, stderr = p.communicate()
+      if p.returncode != 0:
+        print_to_stderr("Error retrieving LDAP password (command was '%s', error was: "
+                        "'%s')" % (options.ldap_password_cmd, stderr.strip()))
+        sys.exit(1)
+    except Exception, e:
+      print_to_stderr("Error retrieving LDAP password (command was: '%s', exception "
+                      "was: '%s')" % (options.ldap_password_cmd, e))
+      sys.exit(1)
 
   if options.ssl:
     if options.ca_cert is None:

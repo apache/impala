@@ -344,24 +344,24 @@ class TestImpalaShell(object):
 
   @pytest.mark.execute_serially
   def test_config_file(self):
-      """Test the optional configuration file"""
-      # Positive tests
-      args = '--config_file=%s/good_impalarc' % QUERY_FILE_PATH
-      result = run_impala_shell_cmd(args)
-      assert 'Query: select 1' in  result.stderr
-      assert 'Invalidating Metadata' in result.stderr
-      # override option in config file through command line
-      args = '--config_file=%s/good_impalarc --query="select 2"' % QUERY_FILE_PATH
-      result = run_impala_shell_cmd(args)
-      assert 'Query: select 2' in result.stderr
+    """Test the optional configuration file"""
+    # Positive tests
+    args = '--config_file=%s/good_impalarc' % QUERY_FILE_PATH
+    result = run_impala_shell_cmd(args)
+    assert 'Query: select 1' in  result.stderr
+    assert 'Invalidating Metadata' in result.stderr
+    # override option in config file through command line
+    args = '--config_file=%s/good_impalarc --query="select 2"' % QUERY_FILE_PATH
+    result = run_impala_shell_cmd(args)
+    assert 'Query: select 2' in result.stderr
 
-      # Negative Tests
-      # specified config file does not exist
-      args = '--config_file=%s/does_not_exist' % QUERY_FILE_PATH
-      run_impala_shell_cmd(args, expect_success=False)
-      # bad formatting of config file
-      args = '--config_file=%s/bad_impalarc' % QUERY_FILE_PATH
-      run_impala_shell_cmd(args, expect_success=False)
+    # Negative Tests
+    # specified config file does not exist
+    args = '--config_file=%s/does_not_exist' % QUERY_FILE_PATH
+    run_impala_shell_cmd(args, expect_success=False)
+    # bad formatting of config file
+    args = '--config_file=%s/bad_impalarc' % QUERY_FILE_PATH
+    run_impala_shell_cmd(args, expect_success=False)
 
   @pytest.mark.execute_serially
   def test_execute_queries_from_stdin(self):
@@ -391,6 +391,19 @@ class TestImpalaShell(object):
 
     # TODO: Without an Impala daemon running LDAP authentication, we can't test if
     # --auth_creds_ok_in_clear works when correctly set.
+
+  @pytest.mark.execute_serially
+  def test_ldap_password_from_shell(self):
+    args = "-l --auth_creds_ok_in_clear --ldap_password_cmd='%s'"
+    result = run_impala_shell_cmd(args % 'cmddoesntexist', expect_success=False)
+    assert ("Error retrieving LDAP password (command was: 'cmddoesntexist', exception "
+            "was: '[Errno 2] No such file or directory')") in result.stderr
+    result = run_impala_shell_cmd(args % 'cat filedoesntexist', expect_success=False)
+    assert ("Error retrieving LDAP password (command was 'cat filedoesntexist', error "
+            "was: 'cat: filedoesntexist: No such file or directory')") in result.stderr
+
+    # TODO: Without an Impala daemon with LDAP authentication enabled, we can't test the
+    # positive case where the password is correct.
 
 def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
   """Runs the Impala shell on the commandline.
