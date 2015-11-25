@@ -15,7 +15,7 @@
 #include <sstream>
 #include <boost/functional/hash.hpp>
 
-#include "runtime/array-value.h"
+#include "runtime/collection-value.h"
 #include "runtime/raw-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
@@ -163,9 +163,9 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
       break;
     case TYPE_ARRAY:
     case TYPE_MAP: {
-      DCHECK(pool == NULL) << "RawValue::Write(): deep copy of ArrayValues NYI";
-      const ArrayValue* src = reinterpret_cast<const ArrayValue*>(value);
-      ArrayValue* dest = reinterpret_cast<ArrayValue*>(dst);
+      DCHECK(pool == NULL) << "RawValue::Write(): deep copy of CollectionValues NYI";
+      const CollectionValue* src = reinterpret_cast<const CollectionValue*>(value);
+      CollectionValue* dest = reinterpret_cast<CollectionValue*>(dst);
       dest->num_tuples = src->num_tuples;
       dest->ptr = src->ptr;
       break;

@@ -17,7 +17,7 @@
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 
-#include "runtime/array-value.h"
+#include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
@@ -577,9 +577,9 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
       ReadStrings(string_slots_[j].second, data_len, tuple);
     }
 
-    // Update collection slot ptrs. We traverse the array structure in the same order as
-    // it was written to the stream, allowing us to infer the data layout based on the
-    // length of arrays and strings.
+    // Update collection slot ptrs. We traverse the collection structure in the same order
+    // as it was written to the stream, allowing us to infer the data layout based on the
+    // length of collections and strings.
     for (int j = 0; j < collection_slots_.size(); ++j) {
       Tuple* tuple = row->GetTuple(collection_slots_[j].first);
       if (HasNullableTuple && tuple == NULL) continue;
@@ -624,21 +624,21 @@ void BufferedTupleStream::ReadCollections(const vector<SlotDescriptor*>& collect
     const SlotDescriptor* slot_desc = collection_slots[i];
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
-    ArrayValue* av = tuple->GetCollectionSlot(slot_desc->tuple_offset());
+    CollectionValue* cv = tuple->GetCollectionSlot(slot_desc->tuple_offset());
     const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
-    int array_byte_size = av->num_tuples * item_desc.byte_size();
-    DCHECK_LE(array_byte_size, data_len - read_bytes_);
-    av->ptr = reinterpret_cast<uint8_t*>(read_ptr_);
-    read_ptr_ += array_byte_size;
-    read_bytes_ += array_byte_size;
+    int coll_byte_size = cv->num_tuples * item_desc.byte_size();
+    DCHECK_LE(coll_byte_size, data_len - read_bytes_);
+    cv->ptr = reinterpret_cast<uint8_t*>(read_ptr_);
+    read_ptr_ += coll_byte_size;
+    read_bytes_ += coll_byte_size;
 
     if (!item_desc.HasVarlenSlots()) continue;
-    uint8_t* array_data = av->ptr;
-    for (int j = 0; j < av->num_tuples; ++j) {
-      Tuple* item = reinterpret_cast<Tuple*>(array_data);
+    uint8_t* coll_data = cv->ptr;
+    for (int j = 0; j < cv->num_tuples; ++j) {
+      Tuple* item = reinterpret_cast<Tuple*>(coll_data);
       ReadStrings(item_desc.string_slots(), data_len, item);
       ReadCollections(item_desc.collection_slots(), data_len, item);
-      array_data += item_desc.byte_size();
+      coll_data += item_desc.byte_size();
     }
   }
 }

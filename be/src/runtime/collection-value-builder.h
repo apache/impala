@@ -12,30 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_RUNTIME_ARRAY_VALUE_BUILDER_H
-#define IMPALA_RUNTIME_ARRAY_VALUE_BUILDER_H
+#ifndef IMPALA_RUNTIME_COLLECTION_VALUE_BUILDER_H
+#define IMPALA_RUNTIME_COLLECTION_VALUE_BUILDER_H
 
-#include "runtime/array-value.h"
+#include "runtime/collection-value.h"
 #include "runtime/tuple.h"
 
 namespace impala {
 
-/// Class for constructing an ArrayValue when the total size isn't known up-front. This
-/// class handles allocating the buffer backing the array from a MemPool, and uses a
-/// doubling strategy for growing the array.
-class ArrayValueBuilder {
+/// Class for constructing an CollectionValue when the total size isn't known
+/// up-front. This class handles allocating the buffer backing the collection from a
+/// MemPool, and uses a doubling strategy for growing the collection.
+class CollectionValueBuilder {
  public:
   // I did not pick this default for any meaningful reason, feel free to change!
   static const int DEFAULT_INITIAL_TUPLE_CAPACITY = 4;
 
-  ArrayValueBuilder(ArrayValue* array_value, const TupleDescriptor& tuple_desc,
+  CollectionValueBuilder(CollectionValue* coll_value, const TupleDescriptor& tuple_desc,
       MemPool* pool, int initial_tuple_capacity = DEFAULT_INITIAL_TUPLE_CAPACITY)
-    : array_value_(array_value),
+    : coll_value_(coll_value),
       tuple_desc_(tuple_desc),
       pool_(pool) {
     buffer_size_ = initial_tuple_capacity * tuple_desc_.byte_size();
-    array_value_->ptr = pool_->TryAllocate(buffer_size_);
-    if (array_value_->ptr == NULL) buffer_size_ = 0;
+    coll_value_->ptr = pool_->TryAllocate(buffer_size_);
+    if (coll_value_->ptr == NULL) buffer_size_ = 0;
   }
 
   /// Returns memory to write new tuples to in *tuple_mem and returns the maximum number
@@ -48,60 +48,60 @@ class ArrayValueBuilder {
       // field can count
       return INT_MAX;
     }
-    int64_t bytes_written = array_value_->ByteSize(tuple_desc_);
+    int64_t bytes_written = coll_value_->ByteSize(tuple_desc_);
     DCHECK_GE(buffer_size_, bytes_written);
     if (buffer_size_ == bytes_written) {
       // Double tuple buffer
       int64_t new_buffer_size = max<int64_t>(buffer_size_ * 2, tuple_desc_.byte_size());
       // TODO: actual allocation limit is lower than INT_MAX - see IMPALA-1619.
       if (UNLIKELY(new_buffer_size > INT_MAX)) {
-        LOG(INFO) << "Array allocation failure: failed to allocate " << new_buffer_size
-                  << " bytes. Cannot allocate more than " << INT_MAX
+        LOG(INFO) << "Collection allocation failure: failed to allocate "
+                  << new_buffer_size << " bytes. Cannot allocate more than " << INT_MAX
                   << " bytes in a single allocation. Current buffer size: "
-                  << buffer_size_ << ", num tuples: " << array_value_->num_tuples;
+                  << buffer_size_ << ", num tuples: " << coll_value_->num_tuples;
         *tuple_mem = NULL;
         return 0;
       }
       uint8_t* new_buf = pool_->TryAllocate(new_buffer_size);
       if (new_buf == NULL) {
-        LOG(INFO) << "Array allocation failure: failed to allocate " << new_buffer_size
-                  << " bytes. Current buffer size: " << buffer_size_
-                  << ", num tuples: " << array_value_->num_tuples;
+        LOG(INFO) << "Collection allocation failure: failed to allocate "
+                  << new_buffer_size << " bytes. Current buffer size: " << buffer_size_
+                  << ", num tuples: " << coll_value_->num_tuples;
         *tuple_mem = NULL;
         return 0;
       }
-      memcpy(new_buf, array_value_->ptr, bytes_written);
-      array_value_->ptr = new_buf;
+      memcpy(new_buf, coll_value_->ptr, bytes_written);
+      coll_value_->ptr = new_buf;
       buffer_size_ = new_buffer_size;
     }
-    *tuple_mem = reinterpret_cast<Tuple*>(array_value_->ptr + bytes_written);
+    *tuple_mem = reinterpret_cast<Tuple*>(coll_value_->ptr + bytes_written);
     int num_tuples = (buffer_size_ - bytes_written) / tuple_desc_.byte_size();
     DCHECK_EQ((buffer_size_ - bytes_written) % tuple_desc_.byte_size(), 0);
     DCHECK_GT(num_tuples, 0);
     return num_tuples;
   }
 
-  /// Adds 'num_tuples' to the size of the array. 'num_tuples' must be <= the last value
-  /// returned by GetMemory().
+  /// Adds 'num_tuples' to the size of the collection. 'num_tuples' must be <= the last
+  /// value returned by GetMemory().
   void CommitTuples(int num_tuples) {
-    array_value_->num_tuples += num_tuples;
-    DCHECK_LE(array_value_->ByteSize(tuple_desc_), buffer_size_);
+    coll_value_->num_tuples += num_tuples;
+    DCHECK_LE(coll_value_->ByteSize(tuple_desc_), buffer_size_);
   }
 
   const TupleDescriptor& tuple_desc() const { return tuple_desc_; }
   MemPool* pool() const { return pool_; }
 
  private:
-  ArrayValue* array_value_;
+  CollectionValue* coll_value_;
 
-  /// The tuple desc for array_value_'s items
+  /// The tuple desc for coll_value_'s items
   const TupleDescriptor& tuple_desc_;
 
-  /// The pool backing array_value_'s buffer
+  /// The pool backing coll_value_'s buffer
   MemPool* pool_;
 
-  /// The current size of array_value_'s buffer in bytes, including any unused space
-  /// (i.e. buffer_size_ is equal to or larger than array_value_->ByteSize()).
+  /// The current size of coll_value_'s buffer in bytes, including any unused space
+  /// (i.e. buffer_size_ is equal to or larger than coll_value_->ByteSize()).
   int64_t buffer_size_;
 };
 

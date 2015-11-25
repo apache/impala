@@ -746,17 +746,17 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges
 }
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
-  InitNullArrayValues(row_batch);
+  InitNullCollectionValues(row_batch);
   materialized_row_batches_->AddBatch(row_batch);
 }
 
-void HdfsScanNode::InitNullArrayValues(const TupleDescriptor* tuple_desc,
+void HdfsScanNode::InitNullCollectionValues(const TupleDescriptor* tuple_desc,
     Tuple* tuple) const {
   BOOST_FOREACH(const SlotDescriptor* slot_desc, tuple_desc->collection_slots()) {
-    ArrayValue* slot = reinterpret_cast<ArrayValue*>(
+    CollectionValue* slot = reinterpret_cast<CollectionValue*>(
         tuple->GetSlot(slot_desc->tuple_offset()));
     if (tuple->IsNull(slot_desc->null_indicator_offset())) {
-      *slot = ArrayValue();
+      *slot = CollectionValue();
       continue;
     }
     // Recursively traverse collection items.
@@ -765,12 +765,12 @@ void HdfsScanNode::InitNullArrayValues(const TupleDescriptor* tuple_desc,
     for (int i = 0; i < slot->num_tuples; ++i) {
       int item_offset = i * item_desc->byte_size();
       Tuple* collection_item = reinterpret_cast<Tuple*>(slot->ptr + item_offset);
-      InitNullArrayValues(item_desc, collection_item);
+      InitNullCollectionValues(item_desc, collection_item);
     }
   }
 }
 
-void HdfsScanNode::InitNullArrayValues(RowBatch* row_batch) const {
+void HdfsScanNode::InitNullCollectionValues(RowBatch* row_batch) const {
   DCHECK_EQ(row_batch->row_desc().tuple_descriptors().size(), 1);
   const TupleDescriptor& tuple_desc =
       *row_batch->row_desc().tuple_descriptors()[tuple_idx()];
@@ -778,7 +778,7 @@ void HdfsScanNode::InitNullArrayValues(RowBatch* row_batch) const {
   for (int i = 0; i < row_batch->num_rows(); ++i) {
     Tuple* tuple = row_batch->GetRow(i)->GetTuple(tuple_idx());
     DCHECK(tuple != NULL);
-    InitNullArrayValues(&tuple_desc, tuple);
+    InitNullCollectionValues(&tuple_desc, tuple);
   }
 }
 

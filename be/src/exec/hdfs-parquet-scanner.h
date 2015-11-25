@@ -21,7 +21,7 @@
 
 namespace impala {
 
-struct ArrayValueBuilder;
+class CollectionValueBuilder;
 struct HdfsFileDesc;
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
@@ -78,10 +78,12 @@ struct HdfsFileDesc;
 ///           opt int32 item      d=5 r=2
 ///
 /// Each element in the schema has been annotated with the maximum def level and maximum
-/// rep level corresponding to that element. Note that repeated elements add a def
-/// level. This distinguished between 0 items (empty list) and more than 0 items
+/// rep level corresponding to that element. Note that the repeated elements add a def
+/// level. This distinguishes between 0 items (empty list) and more than 0 items
 /// (non-empty list). The containing optional LIST element for each array determines
-/// whether the whole list is null or non-null.
+/// whether the whole list is null or non-null. Maps work the same way, the only
+/// differences being that the repeated group contains two child fields ("key" and "value"
+/// instead of "item"), and the outer element is annotated with MAP instead of LIST.
 ///
 /// Only scalar schema elements are materialized in parquet files; internal nested
 /// elements can be reconstructed using the def and rep levels. To illustrate this, here
@@ -153,14 +155,14 @@ struct HdfsFileDesc;
 ///        +==========+     +======+    +======+
 ///
 ///   The top-level row batch contains two slots, one containing the int64_t 'id' slot and
-///   the other containing the ArrayValue 'array_col' slot. The ArrayValues in turn
-///   contain pointers to their item tuple data. Each item tuple contains a single
-///   ArrayColumn slot ('array_col.item'). The inner ArrayValues' item tuples contain a
-///   single int 'item' slot.
+///   the other containing the CollectionValue 'array_col' slot. The CollectionValues in
+///   turn contain pointers to their item tuple data. Each item tuple contains a single
+///   ArrayColumn slot ('array_col.item'). The inner CollectionValues' item tuples contain
+///   a single int 'item' slot.
 ///
-///   Note that the scanner materializes a NULL ArrayValue for empty arrays. This is
-///   technically a bug (it should materialize an ArrayValue with num_tuples = 0), but we
-///   don't distinguish between these two cases yet.
+///   Note that the scanner materializes a NULL CollectionValue for empty collections.
+///   This is technically a bug (it should materialize a CollectionValue with num_tuples =
+///   0), but we don't distinguish between these two cases yet.
 ///   TODO: fix this (IMPALA-2272)
 ///
 ///   The column readers that materialize this structure form a tree analagous to the
@@ -403,8 +405,8 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Reads data using 'column_readers' to materialize instances of 'tuple_desc'
   /// (including recursively reading collections).
   ///
-  /// If reading into a collection, 'array_value_builder' should be non-NULL and
-  /// 'new_collection_rep_level' set appropriately. Otherwise, 'array_value_builder'
+  /// If reading into a collection, 'coll_value_builder' should be non-NULL and
+  /// 'new_collection_rep_level' set appropriately. Otherwise, 'coll_value_builder'
   /// should be NULL and 'new_collection_rep_level' should be -1.
   ///
   /// Returns when the row group is complete, the end of the current collection is reached
@@ -424,7 +426,7 @@ class HdfsParquetScanner : public HdfsScanner {
   template <bool IN_COLLECTION, bool MATERIALIZING_COLLECTION>
   bool AssembleRows(const TupleDescriptor* tuple_desc,
       const std::vector<ColumnReader*>& column_readers, int new_collection_rep_level,
-      int row_group_idx, ArrayValueBuilder* array_value_builder);
+      int row_group_idx, CollectionValueBuilder* coll_value_builder);
 
   /// Function used by AssembleRows() to read a single row into 'tuple'. Returns false if
   /// execution should be aborted for some reason, otherwise returns true.

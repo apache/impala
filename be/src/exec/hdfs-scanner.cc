@@ -26,7 +26,7 @@
 #include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr-context.h"
-#include "runtime/array-value-builder.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
@@ -143,7 +143,7 @@ int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_r
   return batch_->capacity() - batch_->num_rows();
 }
 
-int HdfsScanner::GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool,
+int HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
     Tuple** tuple_mem, TupleRow** tuple_row_mem) {
   DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_"
       << parse_status_.GetDetail();

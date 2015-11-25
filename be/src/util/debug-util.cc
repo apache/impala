@@ -19,7 +19,7 @@
 #include <boost/foreach.hpp>
 
 #include "common/version.h"
-#include "runtime/array-value.h"
+#include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple-row.h"
@@ -182,13 +182,13 @@ string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
       out << "null";
     } else if (slot_d->type().IsCollectionType()) {
       const TupleDescriptor* item_d = slot_d->collection_item_descriptor();
-      const ArrayValue* array_value =
-          reinterpret_cast<const ArrayValue*>(t->GetSlot(slot_d->tuple_offset()));
-      uint8_t* array_buf = array_value->ptr;
+      const CollectionValue* coll_value =
+          reinterpret_cast<const CollectionValue*>(t->GetSlot(slot_d->tuple_offset()));
+      uint8_t* coll_buf = coll_value->ptr;
       out << "[";
-      for (int j = 0; j < array_value->num_tuples; ++j) {
-        out << PrintTuple(reinterpret_cast<Tuple*>(array_buf), *item_d);
-        array_buf += item_d->byte_size();
+      for (int j = 0; j < coll_value->num_tuples; ++j) {
+        out << PrintTuple(reinterpret_cast<Tuple*>(coll_buf), *item_d);
+        coll_buf += item_d->byte_size();
       }
       out << "]";
     } else {

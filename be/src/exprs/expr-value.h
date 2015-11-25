@@ -15,7 +15,7 @@
 #ifndef IMPALA_EXPRS_EXPR_VALUE_H
 #define IMPALA_EXPRS_EXPR_VALUE_H
 
-#include "runtime/array-value.h"
+#include "runtime/collection-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
@@ -36,7 +36,7 @@ struct ExprValue {
   Decimal4Value decimal4_val;
   Decimal8Value decimal8_val;
   Decimal16Value decimal16_val;
-  ArrayValue array_val;
+  CollectionValue collection_val;
 
   ExprValue()
     : bool_val(false),
@@ -51,7 +51,7 @@ struct ExprValue {
       decimal4_val(),
       decimal8_val(),
       decimal16_val(),
-      array_val() {
+      collection_val() {
   }
 
   ExprValue(bool v) : bool_val(v) {}

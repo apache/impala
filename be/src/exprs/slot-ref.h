@@ -51,7 +51,7 @@ class SlotRef : public Expr {
   virtual impala_udf::StringVal GetStringVal(ExprContext* context, TupleRow*);
   virtual impala_udf::TimestampVal GetTimestampVal(ExprContext* context, TupleRow*);
   virtual impala_udf::DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::ArrayVal GetArrayVal(ExprContext* context, TupleRow*);
+  virtual impala_udf::CollectionVal GetCollectionVal(ExprContext* context, TupleRow*);
 
  protected:
   int tuple_idx_;  // within row

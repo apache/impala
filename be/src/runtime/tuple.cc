@@ -18,7 +18,7 @@
 
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
-#include "runtime/array-value.h"
+#include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
@@ -53,12 +53,12 @@ int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
   for (; slot != desc.collection_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsCollectionType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
-    const ArrayValue* array_val = GetCollectionSlot((*slot)->tuple_offset());
-    uint8_t* array_data = array_val->ptr;
+    const CollectionValue* coll_value = GetCollectionSlot((*slot)->tuple_offset());
+    uint8_t* coll_data = coll_value->ptr;
     const TupleDescriptor& item_desc = *(*slot)->collection_item_descriptor();
-    for (int i = 0; i < array_val->num_tuples; ++i) {
-      result += reinterpret_cast<Tuple*>(array_data)->TotalByteSize(item_desc);
-      array_data += item_desc.byte_size();
+    for (int i = 0; i < coll_value->num_tuples; ++i) {
+      result += reinterpret_cast<Tuple*>(coll_data)->TotalByteSize(item_desc);
+      coll_data += item_desc.byte_size();
     }
   }
   return result;
@@ -94,17 +94,17 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
        slot != desc.collection_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsCollectionType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
-    ArrayValue* av = GetCollectionSlot((*slot)->tuple_offset());
+    CollectionValue* cv = GetCollectionSlot((*slot)->tuple_offset());
     const TupleDescriptor* item_desc = (*slot)->collection_item_descriptor();
-    int array_byte_size = av->num_tuples * item_desc->byte_size();
-    uint8_t* array_data = reinterpret_cast<uint8_t*>(pool->Allocate(array_byte_size));
-    memcpy(array_data, av->ptr, array_byte_size);
-    av->ptr = array_data;
+    int coll_byte_size = cv->num_tuples * item_desc->byte_size();
+    uint8_t* coll_data = reinterpret_cast<uint8_t*>(pool->Allocate(coll_byte_size));
+    memcpy(coll_data, cv->ptr, coll_byte_size);
+    cv->ptr = coll_data;
     if (!item_desc->HasVarlenSlots()) continue;
 
-    for (int i = 0; i < av->num_tuples; ++i) {
+    for (int i = 0; i < cv->num_tuples; ++i) {
       int item_offset = i * item_desc->byte_size();
-      Tuple* dst_item = reinterpret_cast<Tuple*>(array_data + item_offset);
+      Tuple* dst_item = reinterpret_cast<Tuple*>(coll_data + item_offset);
       dst_item->DeepCopyVarlenData(*item_desc, pool);
     }
   }
@@ -138,23 +138,23 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* of
     DCHECK((*slot)->type().IsCollectionType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
-    ArrayValue* array_val = GetCollectionSlot((*slot)->tuple_offset());
+    CollectionValue* coll_value = GetCollectionSlot((*slot)->tuple_offset());
     const TupleDescriptor& item_desc = *(*slot)->collection_item_descriptor();
-    int array_byte_size = array_val->num_tuples * item_desc.byte_size();
-    memcpy(*data, array_val->ptr, array_byte_size);
-    uint8_t* array_data = reinterpret_cast<uint8_t*>(*data);
+    int coll_byte_size = coll_value->num_tuples * item_desc.byte_size();
+    memcpy(*data, coll_value->ptr, coll_byte_size);
+    uint8_t* coll_data = reinterpret_cast<uint8_t*>(*data);
 
-    array_val->ptr = convert_ptrs ? reinterpret_cast<uint8_t*>(*offset) : array_data;
+    coll_value->ptr = convert_ptrs ? reinterpret_cast<uint8_t*>(*offset) : coll_data;
 
-    *data += array_byte_size;
-    *offset += array_byte_size;
+    *data += coll_byte_size;
+    *offset += coll_byte_size;
 
     // Copy per-tuple varlen data if necessary.
     if (!item_desc.HasVarlenSlots()) continue;
-    for (int i = 0; i < array_val->num_tuples; ++i) {
-      reinterpret_cast<Tuple*>(array_data)->DeepCopyVarlenData(
+    for (int i = 0; i < coll_value->num_tuples; ++i) {
+      reinterpret_cast<Tuple*>(coll_data)->DeepCopyVarlenData(
           item_desc, data, offset, convert_ptrs);
-      array_data += item_desc.byte_size();
+      coll_data += item_desc.byte_size();
     }
   }
 }
@@ -175,16 +175,16 @@ void Tuple::ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple
     DCHECK((*slot)->type().IsCollectionType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
-    ArrayValue* array_val = GetCollectionSlot((*slot)->tuple_offset());
-    int offset = reinterpret_cast<intptr_t>(array_val->ptr);
-    array_val->ptr = tuple_data + offset;
+    CollectionValue* coll_value = GetCollectionSlot((*slot)->tuple_offset());
+    int offset = reinterpret_cast<intptr_t>(coll_value->ptr);
+    coll_value->ptr = tuple_data + offset;
 
-    uint8_t* array_data = array_val->ptr;
+    uint8_t* coll_data = coll_value->ptr;
     const TupleDescriptor& item_desc = *(*slot)->collection_item_descriptor();
-    for (int i = 0; i < array_val->num_tuples; ++i) {
-      reinterpret_cast<Tuple*>(array_data)->ConvertOffsetsToPointers(
+    for (int i = 0; i < coll_value->num_tuples; ++i) {
+      reinterpret_cast<Tuple*>(coll_data)->ConvertOffsetsToPointers(
           item_desc, tuple_data);
-      array_data += item_desc.byte_size();
+      coll_data += item_desc.byte_size();
     }
   }
 }

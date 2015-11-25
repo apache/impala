@@ -14,8 +14,8 @@
 
 #include <gtest/gtest.h>
 
-#include "runtime/array-value.h"
-#include "runtime/array-value-builder.h"
+#include "runtime/collection-value.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
@@ -111,22 +111,22 @@ class RowBatchSerializeTest : public testing::Test {
 
       if (type.IsCollectionType()) {
         const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
-        ArrayValue* array_value = reinterpret_cast<ArrayValue*>(slot);
-        ArrayValue* deserialized_array_value =
-            reinterpret_cast<ArrayValue*>(deserialized_slot);
-        EXPECT_EQ(array_value->num_tuples, deserialized_array_value->num_tuples);
+        CollectionValue* coll_value = reinterpret_cast<CollectionValue*>(slot);
+        CollectionValue* deserialized_coll_value =
+            reinterpret_cast<CollectionValue*>(deserialized_slot);
+        EXPECT_EQ(coll_value->num_tuples, deserialized_coll_value->num_tuples);
 
-        uint8_t* array_data = array_value->ptr;
-        uint8_t* deserialized_array_data = deserialized_array_value->ptr;
-        for (int i = 0; i < array_value->num_tuples; ++i) {
-          TestTuplesEqual(item_desc, reinterpret_cast<Tuple*>(array_data),
-              reinterpret_cast<Tuple*>(deserialized_array_data));
-          array_data += item_desc.byte_size();
-          deserialized_array_data += item_desc.byte_size();
+        uint8_t* coll_data = coll_value->ptr;
+        uint8_t* deserialized_coll_data = deserialized_coll_value->ptr;
+        for (int i = 0; i < coll_value->num_tuples; ++i) {
+          TestTuplesEqual(item_desc, reinterpret_cast<Tuple*>(coll_data),
+              reinterpret_cast<Tuple*>(deserialized_coll_data));
+          coll_data += item_desc.byte_size();
+          deserialized_coll_data += item_desc.byte_size();
         }
 
-        // Check that array values have different pointers
-        EXPECT_NE(array_value->ptr, deserialized_array_value->ptr);
+        // Check that collection values have different pointers
+        EXPECT_NE(coll_value->ptr, deserialized_coll_value->ptr);
       }
     }
   }
@@ -159,8 +159,8 @@ class RowBatchSerializeTest : public testing::Test {
       case TYPE_ARRAY: {
         const TupleDescriptor* item_desc = slot_desc.collection_item_descriptor();
         int array_len = rand() % (MAX_ARRAY_LEN + 1);
-        ArrayValue av;
-        ArrayValueBuilder builder(&av, *item_desc, pool, array_len);
+        CollectionValue cv;
+        CollectionValueBuilder builder(&cv, *item_desc, pool, array_len);
         Tuple* tuple_mem;
         int n = builder.GetFreeMemory(&tuple_mem);
         DCHECK_GE(n, array_len);
@@ -175,7 +175,7 @@ class RowBatchSerializeTest : public testing::Test {
         }
         builder.CommitTuples(array_len);
         // Array data already lives in 'pool'
-        RawValue::Write(&av, tuple, &slot_desc, NULL);
+        RawValue::Write(&cv, tuple, &slot_desc, NULL);
         break;
       }
       default:
@@ -597,16 +597,16 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
     uint8_t* tuple_mem = pool->Allocate(array_tuple_desc->byte_size());
     memset(tuple_mem, 0, array_tuple_desc->byte_size());
     Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
-    ArrayValue av;
-    av.ptr = pool->Allocate(array_item_desc->byte_size());
-    memset(av.ptr, 0, array_item_desc->byte_size());
-    av.num_tuples = 1;
+    CollectionValue cv;
+    cv.ptr = pool->Allocate(array_item_desc->byte_size());
+    memset(cv.ptr, 0, array_item_desc->byte_size());
+    cv.num_tuples = 1;
     StringValue huge_string_value((char*)huge_string.data(), huge_string_size);
-    RawValue::Write(&huge_string_value, reinterpret_cast<Tuple*>(av.ptr),
+    RawValue::Write(&huge_string_value, reinterpret_cast<Tuple*>(cv.ptr),
         string_slot_desc, NULL);
-    RawValue::Write(&av, tuple, array_slot_desc, NULL);
+    RawValue::Write(&cv, tuple, array_slot_desc, NULL);
     tuples[array_tuple_idx].push_back(tuple);
-    total_byte_size += array_tuple_desc->byte_size() + av.ByteSize(*array_item_desc) +
+    total_byte_size += array_tuple_desc->byte_size() + cv.ByteSize(*array_item_desc) +
         huge_string_size;
   }
   LOG(INFO) << "Building row batch";

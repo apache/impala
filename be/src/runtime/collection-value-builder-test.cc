@@ -14,14 +14,14 @@
 
 #include <gtest/gtest.h>
 
-#include "runtime/array-value-builder.h"
+#include "runtime/collection-value-builder.h"
 #include "testutil/desc-tbl-builder.h"
 
 #include "common/names.h"
 
 using namespace impala;
 
-TEST(ArrayValueBuilderTest, MaxBufferSize) {
+TEST(CollectionValueBuilderTest, MaxBufferSize) {
   ObjectPool obj_pool;
   DescriptorTblBuilder builder(&obj_pool);
   builder.DeclareTuple() << TYPE_TINYINT;
@@ -32,21 +32,21 @@ TEST(ArrayValueBuilderTest, MaxBufferSize) {
   const TupleDescriptor& tuple_desc = *descs[0];
   DCHECK_EQ(tuple_desc.byte_size(), 2);
 
-  // Create ArrayValue with buffer size of slightly more than INT_MAX / 2
-  ArrayValue array_value;
+  // Create CollectionValue with buffer size of slightly more than INT_MAX / 2
+  CollectionValue coll_value;
   MemTracker tracker;
   MemPool pool(&tracker);
   int initial_capacity = (INT_MAX / 4) + 1;
-  ArrayValueBuilder array_value_builder(
-      &array_value, tuple_desc, &pool, initial_capacity);
+  CollectionValueBuilder coll_value_builder(
+      &coll_value, tuple_desc, &pool, initial_capacity);
   EXPECT_EQ(tracker.consumption(), initial_capacity * 2);
 
   // Attempt to double the buffer. This should fail due to the new buffer size exceeding
   // INT_MAX.
   DCHECK_GT(tracker.consumption(), INT_MAX / 2);
-  array_value_builder.CommitTuples(initial_capacity);
+  coll_value_builder.CommitTuples(initial_capacity);
   Tuple* tuple_mem;
-  int num_tuples = array_value_builder.GetFreeMemory(&tuple_mem);
+  int num_tuples = coll_value_builder.GetFreeMemory(&tuple_mem);
   EXPECT_EQ(num_tuples, 0);
   EXPECT_EQ(tracker.consumption(), initial_capacity * 2);
 

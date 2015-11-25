@@ -292,11 +292,11 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
     }
     case TYPE_ARRAY:
     case TYPE_MAP: {
-      impala_udf::ArrayVal v = e->GetArrayVal(this, row);
+      impala_udf::CollectionVal v = e->GetCollectionVal(this, row);
       if (v.is_null) return NULL;
-      result_.array_val.ptr = v.ptr;
-      result_.array_val.num_tuples = v.num_tuples;
-      return &result_.array_val;
+      result_.collection_val.ptr = v.ptr;
+      result_.collection_val.num_tuples = v.num_tuples;
+      return &result_.collection_val;
     }
     default:
       DCHECK(false) << "Type not implemented: " << e->type_.DebugString();
@@ -341,8 +341,8 @@ DoubleVal ExprContext::GetDoubleVal(TupleRow* row) {
 StringVal ExprContext::GetStringVal(TupleRow* row) {
   return root_->GetStringVal(this, row);
 }
-ArrayVal ExprContext::GetArrayVal(TupleRow* row) {
-  return root_->GetArrayVal(this, row);
+CollectionVal ExprContext::GetCollectionVal(TupleRow* row) {
+  return root_->GetCollectionVal(this, row);
 }
 TimestampVal ExprContext::GetTimestampVal(TupleRow* row) {
   return root_->GetTimestampVal(this, row);

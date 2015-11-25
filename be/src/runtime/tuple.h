@@ -24,7 +24,7 @@
 
 namespace impala {
 
-struct ArrayValue;
+struct CollectionValue;
 struct StringValue;
 class TupleDescriptor;
 class TupleRow;
@@ -96,11 +96,11 @@ class Tuple {
 
   /// This function should only be called on tuples created by DeepCopy() with
   /// 'convert_ptrs' = true. It takes all pointers contained in this tuple (i.e. in
-  /// StringValues and ArrayValues, including those contained within other ArrayValues),
-  /// and converts the offset values into pointers into 'tuple_data'. 'tuple_data' should
-  /// be the serialized tuple buffer created by DeepCopy(). Note that 'tuple_data' should
-  /// always be the beginning of this buffer, regardless of this tuple's offset in
-  /// 'tuple_data'.
+  /// StringValues and CollectionValues, including those contained within other
+  /// CollectionValues), and converts the offset values into pointers into
+  /// 'tuple_data'. 'tuple_data' should be the serialized tuple buffer created by
+  /// DeepCopy(). Note that 'tuple_data' should always be the beginning of this buffer,
+  /// regardless of this tuple's offset in 'tuple_data'.
   void ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple_data);
 
   /// Materialize this by evaluating the expressions in materialize_exprs
@@ -157,14 +157,14 @@ class Tuple {
         reinterpret_cast<const char*>(this) + offset);
   }
 
-  ArrayValue* GetCollectionSlot(int offset) {
+  CollectionValue* GetCollectionSlot(int offset) {
     DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
-    return reinterpret_cast<ArrayValue*>(reinterpret_cast<char*>(this) + offset);
+    return reinterpret_cast<CollectionValue*>(reinterpret_cast<char*>(this) + offset);
   }
 
-  const ArrayValue* GetCollectionSlot(int offset) const {
+  const CollectionValue* GetCollectionSlot(int offset) const {
     DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
-    return reinterpret_cast<const ArrayValue*>(
+    return reinterpret_cast<const CollectionValue*>(
         reinterpret_cast<const char*>(this) + offset);
   }
 

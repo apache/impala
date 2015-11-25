@@ -31,7 +31,7 @@
 
 namespace impala {
 
-class ArrayValueBuilder;
+class CollectionValueBuilder;
 class Compression;
 class DescriptorTbl;
 class Expr;
@@ -248,7 +248,7 @@ class HdfsScanner {
   /// call GetMemory again after calling this function.
   int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
 
-  /// Gets memory for outputting tuples into the ArrayValue being constructed via
+  /// Gets memory for outputting tuples into the CollectionValue being constructed via
   /// 'builder.' Same output params as GetMemory(). Returns the maximum number of tuples
   /// that can be output, or 0 if OOM. Sets parse_status_ if OOM (parse_status_ should not
   /// already be set when calling this function to avoid overwriting it).
@@ -257,8 +257,8 @@ class HdfsScanner {
   /// it). Instead, incrementing *tuple_mem will update *tuple_row_mem to be pointing at
   /// the next tuple. This also means its unnecessary to call
   /// (*tuple_row_mem)->SetTuple().
-  int GetCollectionMemory(ArrayValueBuilder* builder, MemPool** pool, Tuple** tuple_mem,
-      TupleRow** tuple_row_mem);
+  int GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
+      Tuple** tuple_mem, TupleRow** tuple_row_mem);
 
   /// Commit num_rows to the current row batch.  If this completes, the row batch is
   /// enqueued with the scan node and StartNewRowBatch() is called.

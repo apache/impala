@@ -27,7 +27,7 @@
 #include "exec/scanner-context.inline.h"
 #include "exec/read-write-util.h"
 #include "exprs/expr.h"
-#include "runtime/array-value-builder.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
@@ -209,11 +209,11 @@ class HdfsParquetScanner::LevelDecoder : protected RleDecoder {
 };
 
 /// Base class for reading a column. Reads a logical column, not necessarily a column
-/// materialized in the file (e.g. arrays). The two subclasses are BaseScalarColumnReader
-/// and CollectionColumnReader. Column readers read one def and rep level pair at a
-/// time. The current def and rep level are exposed to the user, and the corresponding
-/// value (if defined) can optionally be copied into a slot via ReadValue(). Can also
-/// write position slots.
+/// materialized in the file (e.g. collections). The two subclasses are
+/// BaseScalarColumnReader and CollectionColumnReader. Column readers read one def and rep
+/// level pair at a time. The current def and rep level are exposed to the user, and the
+/// corresponding value (if defined) can optionally be copied into a slot via
+/// ReadValue(). Can also write position slots.
 class HdfsParquetScanner::ColumnReader {
  public:
   virtual ~ColumnReader() { }
@@ -234,15 +234,15 @@ class HdfsParquetScanner::ColumnReader {
     pos_slot_desc_ = pos_slot_desc;
   }
 
-  /// Returns true if this reader materializes collections (i.e. ArrayValues).
+  /// Returns true if this reader materializes collections (i.e. CollectionValues).
   virtual bool IsCollectionReader() const { return false; }
 
   const char* filename() const { return parent_->filename(); };
 
   /// Read the current value (or null) into 'tuple' for this column. This should only be
   /// called when a value is defined, i.e., def_level() >=
-  /// def_level_of_immediate_repeated_ancestor() (since empty or NULL arrays produce no
-  /// output values), otherwise NextLevels() should be called instead.
+  /// def_level_of_immediate_repeated_ancestor() (since empty or NULL collections produce
+  /// no output values), otherwise NextLevels() should be called instead.
   ///
   /// Advances this column reader to the next value (i.e. NextLevels() doesn't need to be
   /// called after calling ReadValue()).
@@ -272,9 +272,9 @@ class HdfsParquetScanner::ColumnReader {
       bool* conjuncts_passed) = 0;
 
   /// Advances this column reader's def and rep levels to the next logical value, i.e. to
-  /// the next scalar value or the beginning of the next array, without attempting to read
-  /// the value. This is used to skip past def/rep levels that don't materialize a value,
-  /// such as the def/rep levels corresponding to an empty containing array.
+  /// the next scalar value or the beginning of the next collection, without attempting to
+  /// read the value. This is used to skip past def/rep levels that don't materialize a
+  /// value, such as the def/rep levels corresponding to an empty containing collection.
   ///
   /// NextLevels() must be called on this reader before calling ReadValue() for the first
   /// time. This is to initialize the current value that ReadValue() will read.
@@ -371,7 +371,7 @@ class HdfsParquetScanner::CollectionColumnReader :
   /// collection).
   int new_collection_rep_level() const { return max_rep_level() - 1; }
 
-  /// Materializes ArrayValue into tuple slot (if materializing) and advances to next
+  /// Materializes CollectionValue into tuple slot (if materializing) and advances to next
   /// value.
   virtual bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed);
 
@@ -401,8 +401,8 @@ class HdfsParquetScanner::CollectionColumnReader :
   /// reader's state.
   void UpdateDerivedState();
 
-  /// Recursively reads from children_ to assemble a single ArrayValue into *slot. Also
-  /// advances rep_level_ and def_level_ via NextLevels().
+  /// Recursively reads from children_ to assemble a single CollectionValue into
+  /// *slot. Also advances rep_level_ and def_level_ via NextLevels().
   ///
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
@@ -1376,12 +1376,13 @@ bool HdfsParquetScanner::CollectionColumnReader::ReadSlot(
   DCHECK_LE(rep_level_, new_collection_rep_level());
 
   // TODO: do something with conjuncts_passed? We still need to "read" the value in order
-  // to advance children_ but we don't need to materialize the array.
+  // to advance children_ but we don't need to materialize the collection.
 
-  // Recursively read the collection into a new ArrayValue.
-  ArrayValue* array_slot = reinterpret_cast<ArrayValue*>(slot);
-  *array_slot = ArrayValue();
-  ArrayValueBuilder builder(array_slot, *slot_desc_->collection_item_descriptor(), pool);
+  // Recursively read the collection into a new CollectionValue.
+  CollectionValue* coll_slot = reinterpret_cast<CollectionValue*>(slot);
+  *coll_slot = CollectionValue();
+  CollectionValueBuilder builder(
+      coll_slot, *slot_desc_->collection_item_descriptor(), pool);
   bool continue_execution = parent_->AssembleRows<true, true>(
       slot_desc_->collection_item_descriptor(), children_, new_collection_rep_level(), -1,
       &builder);
@@ -1403,10 +1404,10 @@ void HdfsParquetScanner::CollectionColumnReader::UpdateDerivedState() {
   for (int i = 0; i < children_.size(); ++i) {
     DCHECK_EQ(children_[i]->rep_level(), rep_level_);
     if (def_level_ < max_def_level()) {
-      // Array not defined
+      // Collection not defined
       FILE_CHECK_EQ(children_[i]->def_level(), def_level_);
     } else {
-      // Array is defined
+      // Collection is defined
       FILE_CHECK_GE(children_[i]->def_level(), max_def_level());
     }
   }
@@ -1579,14 +1580,14 @@ Status HdfsParquetScanner::ProcessSplit() {
 template <bool IN_COLLECTION, bool MATERIALIZING_COLLECTION>
 bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
     const vector<ColumnReader*>& column_readers, int new_collection_rep_level,
-    int row_group_idx, ArrayValueBuilder* array_value_builder) {
+    int row_group_idx, CollectionValueBuilder* coll_value_builder) {
   DCHECK(!column_readers.empty());
   if (MATERIALIZING_COLLECTION) {
     DCHECK_GE(new_collection_rep_level, 0);
-    DCHECK(array_value_builder != NULL);
+    DCHECK(coll_value_builder != NULL);
   } else {
     DCHECK_EQ(new_collection_rep_level, -1);
-    DCHECK(array_value_builder == NULL);
+    DCHECK(coll_value_builder == NULL);
   }
 
   Tuple* template_tuple = template_tuple_map_[tuple_desc];
@@ -1601,7 +1602,7 @@ bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
   // group (otherwise it would always be true because we're on the "edge" of two
   // collections), and only ProcessSplit() should call AssembleRows() at the end of the
   // row group.
-  if (array_value_builder != NULL) DCHECK(!end_of_collection);
+  if (coll_value_builder != NULL) DCHECK(!end_of_collection);
 
   while (!end_of_collection && continue_execution) {
     MemPool* pool;
@@ -1613,17 +1614,17 @@ bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
       // We're assembling the top-level tuples into row batches
       num_rows = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
     } else {
-      // We're assembling item tuples into an ArrayValue
+      // We're assembling item tuples into an CollectionValue
       num_rows = static_cast<int64_t>(
-          GetCollectionMemory(array_value_builder, &pool, &tuple, &row));
+          GetCollectionMemory(coll_value_builder, &pool, &tuple, &row));
       if (num_rows == 0) {
         DCHECK(!parse_status_.ok());
         continue_execution = false;
         break;
       }
-      // 'num_rows' can be very high if we're writing to a large ArrayValue. Limit the
-      // number of rows we read at one time so we don't spend too long in the 'num_rows'
-      // loop below before checking for cancellation or limit reached.
+      // 'num_rows' can be very high if we're writing to a large CollectionValue. Limit
+      // the number of rows we read at one time so we don't spend too long in the
+      // 'num_rows' loop below before checking for cancellation or limit reached.
       num_rows = std::min(
           num_rows, static_cast<int64_t>(scan_node_->runtime_state()->batch_size()));
     }
@@ -1669,7 +1670,7 @@ bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
       Status query_status = CommitRows(num_to_commit);
       if (!query_status.ok()) continue_execution = false;
     } else {
-      array_value_builder->CommitTuples(num_to_commit);
+      coll_value_builder->CommitTuples(num_to_commit);
     }
     continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
   }
@@ -2188,8 +2189,8 @@ Status HdfsParquetScanner::CreateCountingReader(
   DCHECK(parent_path.empty() || parent_node->is_repeated());
 
   if (!parent_node->children.empty()) {
-    // Find a non-struct (i.e. array or scalar) child of 'parent_node', which we will use to
-    // create the item reader
+    // Find a non-struct (i.e. collection or scalar) child of 'parent_node', which we will
+    // use to create the item reader
     const SchemaNode* target_node = &parent_node->children[0];
     while (!target_node->children.empty() && !target_node->is_repeated()) {
       target_node = &target_node->children[0];

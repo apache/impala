@@ -99,7 +99,7 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
-#include "udf/udf-internal.h" // for ArrayVal
+#include "udf/udf-internal.h" // for CollectionVal
 
 using namespace impala_udf;
 
@@ -139,7 +139,7 @@ class Expr {
   virtual FloatVal GetFloatVal(ExprContext* context, TupleRow*);
   virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow*);
   virtual StringVal GetStringVal(ExprContext* context, TupleRow*);
-  virtual ArrayVal GetArrayVal(ExprContext* context, TupleRow*);
+  virtual CollectionVal GetCollectionVal(ExprContext* context, TupleRow*);
   virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow*);
   virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
 

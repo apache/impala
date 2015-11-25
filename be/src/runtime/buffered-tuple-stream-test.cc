@@ -24,13 +24,13 @@
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "gutil/gscoped_ptr.h"
-#include "runtime/array-value.h"
-#include "runtime/array-value-builder.h"
 #include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/collection-value.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/row-batch.h"
+#include "runtime/string-value.h"
 #include "runtime/test-env.h"
 #include "runtime/tmp-file-mgr.h"
-#include "runtime/string-value.h"
 #include "service/fe-support.h"
 #include "testutil/desc-tbl-builder.h"
 #include "util/test-info.h"
@@ -729,10 +729,10 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     const TupleDescriptor* item_desc = array_slot_desc->collection_item_descriptor();
 
     int array_len = array_lens[array_len_index++ % num_array_lens];
-    ArrayValue* av = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
-    av->ptr = NULL;
-    av->num_tuples = 0;
-    ArrayValueBuilder builder(av, *item_desc, mem_pool_.get(), array_len);
+    CollectionValue* cv = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
+    cv->ptr = NULL;
+    cv->num_tuples = 0;
+    CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), array_len);
     Tuple* array_data;
     builder.GetFreeMemory(&array_data);
     expected_row_size += item_desc->byte_size() * array_len;
@@ -778,10 +778,10 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
 
       const TupleDescriptor* item_desc = array_slot_desc->collection_item_descriptor();
       int expected_array_len = array_lens[array_len_index++ % num_array_lens];
-      ArrayValue* av = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
-      ASSERT_EQ(expected_array_len, av->num_tuples);
-      for (int j = 0; j < av->num_tuples; ++j) {
-        Tuple* item = reinterpret_cast<Tuple*>(av->ptr + j * item_desc->byte_size());
+      CollectionValue* cv = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
+      ASSERT_EQ(expected_array_len, cv->num_tuples);
+      for (int j = 0; j < cv->num_tuples; ++j) {
+        Tuple* item = reinterpret_cast<Tuple*>(cv->ptr + j * item_desc->byte_size());
         const SlotDescriptor* string_desc = item_desc->slots()[0];
         ASSERT_FALSE(item->IsNull(string_desc->null_indicator_offset()));
         const StringValue* expected = &STRINGS[strings_index++ % NUM_STRINGS];
