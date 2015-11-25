@@ -9,7 +9,7 @@ $IMPALA_HOME/testdata/bin/kill-mini-dfs.sh
 
 
 # kill all impalad and statestored processes
-killall -9 impalad
-killall -9 statestored
-killall -9 catalogd
-killall -9 mini-impala-cluster
+killall -9 -u $USER impalad
+killall -9 -u $USER statestored
+killall -9 -u $USER catalogd
+killall -9 -u $USER mini-impala-cluster

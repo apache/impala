@@ -386,7 +386,7 @@ function stop_cluster {
     done
   fi
   # Kill everything anyways just in case a git clean -xdf was done
-  pkill -f $KILL_CLUSTER_MARKER || true
+  pkill -u $USER -f $KILL_CLUSTER_MARKER || true
 }
 
 function delete_data {
@@ -394,7 +394,7 @@ function delete_data {
 }
 
 function delete_cluster {
-  pkill -f $KILL_CLUSTER_MARKER || true
+  pkill -u $USER -f $KILL_CLUSTER_MARKER || true
   rm -rf "$NODES_DIR"
 }
 

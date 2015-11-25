@@ -17,16 +17,9 @@
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
 import os
-# psutil does not exist on hosts which build Impala packages. Furthermore, it is not
-# needed as the packaging code does not start any processes.
-# TODO: Remove this logic and all usage of psutil_exists once we switch to using a python
-# virtualenv.
-try:
-  import psutil
-  psutil_exists = True
-except ImportError:
-  psutil_exists = False
+import psutil
 import sys
+from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser
 from testdata.common import cgroups
@@ -100,14 +93,14 @@ def check_process_exists(binary, attempts=1):
   otherwise.
   TODO: The conditional import will go away once we start using virtualenv.
   """
-  if not psutil_exists:
-    print "psutil not available, process invocations and kills may be unstable."
-    return True
   for _ in range(attempts):
     for pid in psutil.get_pid_list():
       try:
         process = psutil.Process(pid)
-        if process.name == binary: return True
+        if process.username == getuser() and process.name == binary: return True
+      except KeyError, e:
+        if "uid not found" not in str(e):
+          raise
       except psutil.NoSuchProcess, e:
         # Ignore the case when a process is no longer exists
         pass
@@ -133,11 +126,11 @@ def kill_cluster_processes(force=False):
 def kill_matching_processes(binary_name, force=False):
   """Kills all processes with the given binary name"""
   # -w = Wait for processes to die.
-  kill_cmd = "killall -w"
+  kill_cmd = "killall -w -u $USER"
   if force: kill_cmd += " -9"
   os.system("%s %s" % (kill_cmd, binary_name))
 
-  if psutil_exists and check_process_exists(binary_name):
+  if check_process_exists(binary_name):
     raise RuntimeError("Unable to kill %s. Check process permissions." % (binary_name, ))
 
 def start_statestore():
