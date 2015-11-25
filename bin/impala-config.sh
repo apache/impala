@@ -54,9 +54,9 @@ if [ -z $IMPALA_HOME ]; then
 fi
 
 export CDH_MAJOR_VERSION=5
-export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
-export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
-export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/Impala-auxiliary-tests}
+export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}
+export IMPALA_LZO=${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}
+export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-$IMPALA_HOME/../Impala-auxiliary-tests}
 export TARGET_FILESYSTEM=${TARGET_FILESYSTEM-"hdfs"}
 export FILESYSTEM_PREFIX=${FILESYSTEM_PREFIX-""}
 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY-"DummySecretAccessKey"}
