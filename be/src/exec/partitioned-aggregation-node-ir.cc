@@ -104,12 +104,7 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
       // After copying and initializing the tuple, insert it into the hash table.
       insert_it.SetTuple(intermediate_tuple, hash);
       return Status::OK();
-    } else if (!process_batch_status_.ok() &&
-               !process_batch_status_.IsMemLimitExceeded()) {
-      // TODO: cleanup BufferedBlockMgr returns so that we don't need to check the
-      // status code here.  Unreserved memory requests signal failure with
-      // intermediate_tuple == NULL and Status::OK, but reserved requests fail with
-      // MEM_LIMIT_EXCEEDED.
+    } else if (!process_batch_status_.ok()) {
       return process_batch_status_;
     }
 

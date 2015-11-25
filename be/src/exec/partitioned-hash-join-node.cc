@@ -504,9 +504,6 @@ void PartitionedHashJoinNode::CleanupProbeFilters() {
 
 bool PartitionedHashJoinNode::AppendRowStreamFull(BufferedTupleStream* stream,
     TupleRow* row, Status* status) {
-  // TODO: should this (and other AddRow() status checks below) try to continue if
-  // status->IsMemLimitExceeded()?
-
   while (status->ok()) {
     // Check if the stream is still using small buffers and try to switch to IO-buffers.
     if (stream->using_small_buffers()) {
