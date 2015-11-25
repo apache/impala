@@ -17,6 +17,10 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
@@ -25,18 +29,23 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetLocationParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TPartitionKeyValue;
+import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.fs.permission.FsAction;
+import com.google.common.collect.Lists;
 
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET LOCATION statement.
  */
 public class AlterTableSetLocationStmt extends AlterTableSetStmt {
+  // max num of partitions printed during error reporting.
+  private static final int NUM_PARTITION_LOG_LIMIT = 3;
   private final HdfsUri location_;
 
   public AlterTableSetLocationStmt(TableName tableName,
-      PartitionSpec partitionSpec, HdfsUri location) {
-    super(tableName, partitionSpec);
+      PartitionSet partitionSet, HdfsUri location) {
+    super(tableName, partitionSet);
     Preconditions.checkNotNull(location);
     this.location_ = location;
   }
@@ -49,8 +58,10 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
     params.setAlter_type(TAlterTableType.SET_LOCATION);
     TAlterTableSetLocationParams locationParams =
         new TAlterTableSetLocationParams(location_.toString());
-    if (getPartitionSpec() != null) {
-      locationParams.setPartition_spec(getPartitionSpec().toThrift());
+    if (getPartitionSet() != null) {
+      List<List<TPartitionKeyValue>> tPartitionSet = getPartitionSet().toThrift();
+      Preconditions.checkState(tPartitionSet.size() == 1);
+      locationParams.setPartition_spec(tPartitionSet.get(0));
     }
     params.setSet_location_params(locationParams);
     return params;
@@ -65,16 +76,31 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
     Preconditions.checkNotNull(table);
     if (table instanceof HdfsTable) {
       HdfsTable hdfsTable = (HdfsTable) table;
-      if (getPartitionSpec() != null) {
+      if (getPartitionSet() != null) {
         // Targeting a partition rather than a table.
-        PartitionSpec partitionSpec = getPartitionSpec();
-        HdfsPartition partition = hdfsTable.getPartition(
-            partitionSpec.getPartitionSpecKeyValues());
-        Preconditions.checkNotNull(partition);
-        if (partition.isMarkedCached()) {
+        List<HdfsPartition> partitions = getPartitionSet().getPartitions();
+        if (partitions.size() != 1) {
+          // Sort the partitions to get a consistent error reporting.
+          List<HdfsPartition> sortedPartitions = Lists.newArrayList(partitions);
+          Collections.sort(sortedPartitions);
+          List<String> sortedPartitionNames =
+              Lists.transform(sortedPartitions.subList(0, NUM_PARTITION_LOG_LIMIT),
+                  new Function<HdfsPartition, String>() {
+                    @Override
+                    public String apply(HdfsPartition hdfsPartition) {
+                      return hdfsPartition.getPartitionName();
+                    }
+                  });
+          throw new AnalysisException(String.format(
+              "Partition expr in set location statements can only match " +
+              "one partition. Too many matched partitions %s %s",
+              Joiner.on(",").join(sortedPartitionNames),
+              sortedPartitions.size() < partitions.size() ? "..." : "."));
+        }
+        if (partitions.get(0).isMarkedCached()) {
           throw new AnalysisException(String.format("Target partition is cached, " +
               "please uncache before changing the location using: ALTER TABLE %s %s " +
-              "SET UNCACHED", table.getFullName(), partitionSpec.toSql()));
+              "SET UNCACHED", table.getFullName(), getPartitionSet().toSql()));
         }
       } else if (hdfsTable.isMarkedCached()) {
         throw new AnalysisException(String.format("Target table is cached, please " +

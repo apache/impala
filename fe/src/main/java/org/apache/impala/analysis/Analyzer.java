@@ -553,11 +553,11 @@ public class Analyzer {
         if (rawPath.size() > 1) {
           registerPrivReq(new PrivilegeRequestBuilder()
               .onTable(rawPath.get(0), rawPath.get(1))
-              .allOf(Privilege.SELECT).toRequest());
+              .allOf(tableRef.getPrivilege()).toRequest());
         }
         registerPrivReq(new PrivilegeRequestBuilder()
             .onTable(getDefaultDb(), rawPath.get(0))
-            .allOf(Privilege.SELECT).toRequest());
+            .allOf(tableRef.getPrivilege()).toRequest());
       }
       throw e;
     } catch (TableLoadingException e) {
@@ -2568,28 +2568,28 @@ public class Analyzer {
   }
 
   /**
-   * Registers a table-level SELECT privilege request and an access event for auditing
-   * for the given table. The given table must be a base table or a catalog view (not
-   * a local view).
+   * Registers a table-level privilege request and an access event for auditing
+   * for the given table and privilege. The table must be a base table or a
+   * catalog view (not a local view).
    */
-  public void registerAuthAndAuditEvent(Table table, Analyzer analyzer) {
+  public void registerAuthAndAuditEvent(Table table, Privilege priv) {
     // Add access event for auditing.
     if (table instanceof View) {
       View view = (View) table;
       Preconditions.checkState(!view.isLocalView());
-      analyzer.addAccessEvent(new TAccessEvent(
+      addAccessEvent(new TAccessEvent(
           table.getFullName(), TCatalogObjectType.VIEW,
-          Privilege.SELECT.toString()));
+          priv.toString()));
     } else {
-      analyzer.addAccessEvent(new TAccessEvent(
+      addAccessEvent(new TAccessEvent(
           table.getFullName(), TCatalogObjectType.TABLE,
-          Privilege.SELECT.toString()));
+          priv.toString()));
     }
     // Add privilege request.
     TableName tableName = table.getTableName();
-    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+    registerPrivReq(new PrivilegeRequestBuilder()
         .onTable(tableName.getDb(), tableName.getTbl())
-        .allOf(Privilege.SELECT).toRequest());
+        .allOf(priv).toRequest());
   }
 
   /**

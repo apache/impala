@@ -345,4 +345,18 @@ public class TupleDescriptor {
     }
     return true;
   }
+
+  /**
+   * Returns a list of slot ids that correspond to partition columns.
+   */
+  public List<SlotId> getPartitionSlots() {
+    List<SlotId> partitionSlots = Lists.newArrayList();
+    for (SlotDescriptor slotDesc: getSlots()) {
+      if (slotDesc.getColumn() == null) continue;
+      if (slotDesc.getColumn().getPosition() < getTable().getNumClusteringCols()) {
+        partitionSlots.add(slotDesc.getId());
+      }
+    }
+    return partitionSlots;
+  }
 }

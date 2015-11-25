@@ -358,7 +358,7 @@ location 'file://$IMPALA_HOME/testdata/data/cached_local_part'
 # Turning on caching for this new partition should fail
 alter table cached_tbl_local partition(j=0) set cached in 'testPool'
 ---- CATCH
-Partition (j=0) cannot be cached. Please check if the table or partitions are on a filesystem which supports caching.
+Partition(s) (j=0) cannot be cached. Please check if the table or partitions are on a filesystem which supports caching.
 ====
 ---- QUERY
 # Turning on caching should also fail for this table

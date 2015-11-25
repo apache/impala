@@ -47,9 +47,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   private final TTablePropertyType targetProperty_;
   private final HashMap<String, String> tblProperties_;
 
-  public AlterTableSetTblProperties(TableName tableName, PartitionSpec partitionSpec,
+  public AlterTableSetTblProperties(TableName tableName, PartitionSet partitionSet,
       TTablePropertyType targetProperty, HashMap<String, String> tblProperties) {
-    super(tableName, partitionSpec);
+    super(tableName, partitionSet);
     Preconditions.checkNotNull(tblProperties);
     Preconditions.checkNotNull(targetProperty);
     targetProperty_ = targetProperty;
@@ -67,8 +67,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
        new TAlterTableSetTblPropertiesParams();
    tblPropertyParams.setTarget(targetProperty_);
    tblPropertyParams.setProperties(tblProperties_);
-   if (partitionSpec_ != null) {
-     tblPropertyParams.setPartition_spec(partitionSpec_.toThrift());
+   if (partitionSet_ != null) {
+     tblPropertyParams.setPartition_set(partitionSet_.toThrift());
    }
    params.setSet_tbl_properties_params(tblPropertyParams);
    return params;

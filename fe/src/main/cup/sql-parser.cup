@@ -370,6 +370,10 @@ nonterminal StatementBase explain_stmt;
 nonterminal PartitionSpec opt_partition_spec;
 // Required partition spec
 nonterminal PartitionSpec partition_spec;
+// Optional partition set
+nonterminal PartitionSet opt_partition_set;
+// Required partition set
+nonterminal PartitionSet partition_set;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
 nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
@@ -904,34 +908,39 @@ alter_tbl_stmt ::=
     column_def:col_def
   {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
-    partition_spec:partition purge_val:purge
-  {: RESULT = new AlterTableDropPartitionStmt(table, partition, if_exists, purge); :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET KW_FILEFORMAT
+    partition_set:partitions purge_val:purge
+  {: RESULT = new AlterTableDropPartitionStmt(table, partitions, if_exists, purge); :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET KW_FILEFORMAT
     file_format_val:file_format
-  {: RESULT = new AlterTableSetFileFormatStmt(table, partition, file_format); :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
+  {: RESULT = new AlterTableSetFileFormatStmt(table, partitions, file_format); :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET
     KW_LOCATION STRING_LITERAL:location
-  {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsUri(location)); :}
+  {:
+    // Need to check in analysis that the partition set only matches a single partition.
+    // Avoids a reduce/reduce conflict and allows the user to select a partition without
+    // fully specifying all partition-key values.
+    RESULT = new AlterTableSetLocationStmt(table, partitions, new HdfsUri(location));
+  :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(table, new_table, true); :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET
     table_property_type:target LPAREN properties_map:properties RPAREN
-  {: RESULT = new AlterTableSetTblProperties(table, partition, target, properties); :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
+  {: RESULT = new AlterTableSetTblProperties(table, partitions, target, properties); :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partition KW_SET
     KW_COLUMN KW_STATS IDENT:col LPAREN properties_map:map RPAREN
   {:
-    // The opt_partition_spec is used to avoid conflicts even though
+    // The opt_partition_set is used to avoid conflicts even though
     // a partition clause does not make sense for this stmt. If a partition
     // is given, manually throw a parse error.
     if (partition != null) parser.parseError("set", SqlParserSymbols.KW_SET);
     RESULT = new AlterTableSetColumnStats(table, col, map);
   :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET
     cache_op_val:cache_op
   {:
     // Ensure a parser error is thrown for ALTER statements if no cache op is specified.
     if (cache_op == null) parser.parseError("set", SqlParserSymbols.KW_SET);
-    RESULT = new AlterTableSetCachedStmt(table, partition, cache_op);
+    RESULT = new AlterTableSetCachedStmt(table, partitions, cache_op);
   :}
   | KW_ALTER KW_TABLE table_name:table KW_RECOVER KW_PARTITIONS
   {: RESULT = new AlterTableRecoverPartitionsStmt(table); :}
@@ -1550,15 +1559,15 @@ compute_stats_stmt ::=
   {: RESULT = new ComputeStatsStmt(table); :}
   | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table
   {: RESULT = new ComputeStatsStmt(table, true, null); :}
-  | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table partition_spec:spec
-  {: RESULT = new ComputeStatsStmt(table, true, spec); :}
+  | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table partition_set:partitions
+  {: RESULT = new ComputeStatsStmt(table, true, partitions); :}
   ;
 
 drop_stats_stmt ::=
   KW_DROP KW_STATS table_name:table
   {: RESULT = new DropStatsStmt(table); :}
-  | KW_DROP KW_INCREMENTAL KW_STATS table_name:table partition_spec:spec
-  {: RESULT = new DropStatsStmt(table, spec); :}
+  | KW_DROP KW_INCREMENTAL KW_STATS table_name:table partition_set:partitions
+  {: RESULT = new DropStatsStmt(table, partitions); :}
   ;
 
 drop_db_stmt ::=
@@ -1624,6 +1633,23 @@ partition_key_value_list ::=
     list.add(item);
     RESULT = list;
   :}
+  ;
+
+// TODO: reuse this for INSERT statement.
+// A partition set is a set of expressions used to select a list of partitions
+// for certain operation such as DROP PARTITION. This is different than a partition
+// clause in an INSERT statement. Partition clause contains dynamic and static
+// partition key/values.
+partition_set ::=
+  KW_PARTITION LPAREN expr_list:list RPAREN
+  {: RESULT = new PartitionSet(list); :}
+  ;
+
+opt_partition_set ::=
+  partition_set:partition_set
+  {: RESULT = partition_set; :}
+  | /* Empty */
+  {: RESULT = null; :}
   ;
 
 // A partition spec is a set of static partition key/value pairs. This is a bit
@@ -2020,8 +2046,8 @@ show_create_function_stmt ::=
   ;
 
 show_files_stmt ::=
-  KW_SHOW KW_FILES KW_IN table_name:table opt_partition_spec:partition
-  {: RESULT = new ShowFilesStmt(table, partition); :}
+  KW_SHOW KW_FILES KW_IN table_name:table opt_partition_set:partitions
+  {: RESULT = new ShowFilesStmt(table, partitions); :}
   ;
 
 describe_db_stmt ::=

@@ -516,6 +516,9 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     DCHECK(exec_request_.__isset.query_exec_request);
     RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
   }
+
+  // Set the results to be reported to the client.
+  SetResultSet(catalog_op_executor_->ddl_exec_response());
   return Status::OK();
 }
 
@@ -919,6 +922,13 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
   return Status::OK();
 }
 
+void ImpalaServer::QueryExecState::SetResultSet(const TDdlExecResponse* ddl_resp) {
+  if (ddl_resp != NULL && ddl_resp->__isset.result_set) {
+    result_metadata_ = ddl_resp->result_set.schema;
+    request_result_set_.reset(new vector<TResultRow>(ddl_resp->result_set.rows));
+  }
+}
+
 void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
   request_result_set_.reset(new vector<TResultRow>);
   request_result_set_->resize(results.size());
@@ -1026,14 +1036,7 @@ Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats(
       exec_request_.query_options.sync_ddl));
 
   // Set the results to be reported to the client.
-  const TDdlExecResponse* ddl_resp = catalog_op_executor_->ddl_exec_response();
-  if (ddl_resp != NULL && ddl_resp->__isset.result_set) {
-    result_metadata_ = ddl_resp->result_set.schema;
-    request_result_set_.reset(new vector<TResultRow>);
-    request_result_set_->assign(
-        ddl_resp->result_set.rows.begin(), ddl_resp->result_set.rows.end());
-  }
-
+  SetResultSet(catalog_op_executor_->ddl_exec_response());
   query_events_->MarkEvent("Metastore update finished");
   return Status::OK();
 }

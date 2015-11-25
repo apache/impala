@@ -38,19 +38,12 @@ import com.google.common.collect.Sets;
 /*
  * Represents a partition spec - a collection of partition key/values.
  */
-public class PartitionSpec implements ParseNode {
+public class PartitionSpec extends PartitionSpecBase {
   private final ImmutableList<PartitionKeyValue> partitionSpec_;
-  private TableName tableName_;
-  private Boolean partitionShouldExist_;
-  private Privilege privilegeRequirement_;
 
   // Flag to determine if the partition already exists in the target table.
   // Set during analysis.
   private Boolean partitionExists_;
-
- // The value Hive is configured to use for NULL partition key values.
- // Set during analysis.
- private String nullPartitionKeyValue_;
 
   public PartitionSpec(List<PartitionKeyValue> partitionSpec) {
     this.partitionSpec_ = ImmutableList.copyOf(partitionSpec);
@@ -60,48 +53,14 @@ public class PartitionSpec implements ParseNode {
     return partitionSpec_;
   }
 
-  public String getTbl() { return tableName_.getTbl(); }
-  public void setTableName(TableName tableName) { this.tableName_ = tableName; }
   public boolean partitionExists() {
     Preconditions.checkNotNull(partitionExists_);
     return partitionExists_;
   }
 
-  // The value Hive is configured to use for NULL partition key values.
-  // Set during analysis.
-  public String getNullPartitionKeyValue() {
-    Preconditions.checkNotNull(nullPartitionKeyValue_);
-    return nullPartitionKeyValue_;
-  }
-
-  // If set, an additional analysis check will be performed to validate the target table
-  // contains the given partition spec.
-  public void setPartitionShouldExist() { partitionShouldExist_ = Boolean.TRUE; }
-
-  // If set, an additional analysis check will be performed to validate the target table
-  // does not contain the given partition spec.
-  public void setPartitionShouldNotExist() { partitionShouldExist_ = Boolean.FALSE; }
-
-  // Set the privilege requirement for this partition spec. Must be set prior to
-  // analysis.
-  public void setPrivilegeRequirement(Privilege privilege) {
-    privilegeRequirement_ = privilege;
-  }
-
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    Preconditions.checkNotNull(tableName_);
-    Preconditions.checkNotNull(privilegeRequirement_);
-
-    // Skip adding an audit event when analyzing partitions. The parent table should
-    // be audited outside of the PartitionSpec.
-    Table table = analyzer.getTable(tableName_, privilegeRequirement_, false);
-    String tableName = table.getDb().getName() + "." + getTbl();
-
-    // Make sure the target table is partitioned.
-    if (table.getMetaStoreTable().getPartitionKeysSize() == 0) {
-      throw new AnalysisException("Table is not partitioned: " + tableName);
-    }
+    super.analyze(analyzer);
 
     // Make sure static partition key values only contain constant exprs.
     for (PartitionKeyValue kv: partitionSpec_) {
@@ -110,7 +69,7 @@ public class PartitionSpec implements ParseNode {
 
     // Get all keys in the target table.
     Set<String> targetPartitionKeys = Sets.newHashSet();
-    for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
+    for (FieldSchema fs: table_.getMetaStoreTable().getPartitionKeys()) {
       targetPartitionKeys.add(fs.getName().toLowerCase());
     }
 
@@ -118,7 +77,7 @@ public class PartitionSpec implements ParseNode {
     if (targetPartitionKeys.size() != partitionSpec_.size()) {
       throw new AnalysisException(String.format("Items in partition spec must exactly " +
           "match the partition columns in the table definition: %s (%d vs %d)",
-          tableName, partitionSpec_.size(), targetPartitionKeys.size()));
+          tableName_, partitionSpec_.size(), targetPartitionKeys.size()));
     }
 
     Set<String> keyNames = Sets.newHashSet();
@@ -130,14 +89,14 @@ public class PartitionSpec implements ParseNode {
         throw new AnalysisException("Duplicate partition key name: " + pk.getColName());
       }
 
-      Column c = table.getColumn(pk.getColName());
+      Column c = table_.getColumn(pk.getColName());
       if (c == null) {
         throw new AnalysisException(String.format(
-            "Partition column '%s' not found in table: %s", pk.getColName(), tableName));
+            "Partition column '%s' not found in table: %s", pk.getColName(), tableName_));
       } else if (!targetPartitionKeys.contains(pk.getColName().toLowerCase())) {
         throw new AnalysisException(String.format(
             "Column '%s' is not a partition column in table: %s",
-             pk.getColName(), tableName));
+             pk.getColName(), tableName_));
       } else if (pk.getValue() instanceof NullLiteral) {
         // No need for further analysis checks of this partition key value.
         continue;
@@ -160,12 +119,7 @@ public class PartitionSpec implements ParseNode {
             pk.getValue().toSql(), colType.toString(), pk.getColName()));
       }
     }
-    // Only HDFS tables are partitioned.
-    Preconditions.checkState(table instanceof HdfsTable);
-    HdfsTable hdfsTable = (HdfsTable) table;
-    nullPartitionKeyValue_ = hdfsTable.getNullPartitionKeyValue();
-
-    partitionExists_ = hdfsTable.getPartition(partitionSpec_) != null;
+    partitionExists_ = table_.getPartition(partitionSpec_) != null;
     if (partitionShouldExist_ != null) {
       if (partitionShouldExist_ && !partitionExists_) {
           throw new AnalysisException("Partition spec does not exist: (" +

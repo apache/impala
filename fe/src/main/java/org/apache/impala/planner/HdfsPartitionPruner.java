@@ -74,8 +74,7 @@ public class HdfsPartitionPruner {
   private final static int PARTITION_PRUNING_BATCH_SIZE = 1024;
 
   private final HdfsTable tbl_;
-
-  private final List<SlotId> partitionSlots_ = Lists.newArrayList();
+  private final List<SlotId> partitionSlots_;
 
   // For converting BetweenPredicates to CompoundPredicates so they can be
   // executed in the BE.
@@ -85,21 +84,17 @@ public class HdfsPartitionPruner {
   public HdfsPartitionPruner(TupleDescriptor tupleDesc) {
     Preconditions.checkState(tupleDesc.getTable() instanceof HdfsTable);
     tbl_ = (HdfsTable)tupleDesc.getTable();
+    partitionSlots_ = tupleDesc.getPartitionSlots();
 
-    // Collect all the partitioning columns from TupleDescriptor.
-    for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-      if (slotDesc.getColumn() == null) continue;
-      if (slotDesc.getColumn().getPosition() < tbl_.getNumClusteringCols()) {
-        partitionSlots_.add(slotDesc.getId());
-      }
-    }
   }
 
   /**
    * Return a list of partitions left after applying the conjuncts. Please note
-   * that conjuncts used for filtering will be removed from the list 'conjuncts'.
+   * that conjunts used for filtering will be removed from the list 'conjuncts'.
+   * If 'allowEmpty' is False, empty partitions are not returned.
    */
-  public List<HdfsPartition> prunePartitions(Analyzer analyzer, List<Expr> conjuncts)
+  public List<HdfsPartition> prunePartitions(
+      Analyzer analyzer, List<Expr> conjuncts, boolean allowEmpty)
       throws InternalException, AnalysisException {
     // Start with creating a collection of partition filters for the applicable conjuncts.
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
@@ -159,7 +154,7 @@ public class HdfsPartitionPruner {
     for (Long id: matchingPartitionIds) {
       HdfsPartition partition = partitionMap.get(id);
       Preconditions.checkNotNull(partition);
-      if (partition.hasFileDescriptors()) {
+      if (partition.hasFileDescriptors() || allowEmpty) {
         results.add(partition);
         analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
       }

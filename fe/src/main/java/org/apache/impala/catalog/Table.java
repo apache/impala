@@ -245,6 +245,10 @@ public abstract class Table implements CatalogObject {
     return newTable;
   }
 
+  public boolean isClusteringColumn(Column c) {
+    return c.getPosition() < numClusteringCols_;
+  }
+
   protected void loadFromThrift(TTable thriftTable) throws TableLoadingException {
     List<TColumn> columns = new ArrayList<TColumn>();
     columns.addAll(thriftTable.getClustering_columns());

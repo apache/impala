@@ -1768,8 +1768,8 @@ public class ParserTest extends FrontendTestBase {
     ParserError("SHOW TABLE STATS 'strlit'");
     // Missing table.
     ParserError("SHOW FILES IN");
-    // Invalid partition.
-    ParserError("SHOW FILES IN db.tbl PARTITION(p)");
+
+    ParsesOk("SHOW FILES IN db.tbl PARTITION(p)");
   }
 
   @Test
@@ -2002,9 +2002,6 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("ALTER TABLE Foo ADD PARTITION (i=NULL, j=2, k=NULL)");
     ParsesOk("ALTER TABLE Foo ADD PARTITION (i=abc, j=(5*8+10), k=!true and false)");
 
-    // Cannot use dynamic partition syntax
-    ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (partcol)");
-    ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, partcol)");
     // Location needs to be a string literal
     ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, s='Hello') LOCATION a/b");
 
@@ -2070,10 +2067,6 @@ public class ParserTest extends FrontendTestBase {
       ParsesOk(String.format("ALTER TABLE Foo DROP PARTITION (i=abc, "
         + "j=(5*8+10), k=!true and false) %s", kw));
 
-      // Cannot use dynamic partition syntax
-      ParserError(String.format("ALTER TABLE Foo DROP PARTITION (partcol) %s", kw));
-      ParserError(String.format("ALTER TABLE Foo DROP PARTITION (i=1, j) %s", kw));
-
       ParserError(String.format("ALTER TABLE Foo DROP IF NOT EXISTS "
         + "PARTITION (i=1, s='Hello') %s", kw));
       ParserError(String.format("ALTER TABLE TestDb.Foo DROP (i=1, s='Hello') %s", kw));
@@ -2126,10 +2119,7 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("ALTER TABLE Foo PARTITION (i=1,s='str') SET LOCATION '/a/i=1/s=str'");
     ParsesOk("ALTER TABLE Foo PARTITION (s='str') SET LOCATION '/a/i=1/s=str'");
 
-    ParserError("ALTER TABLE Foo PARTITION (s) SET LOCATION '/a'");
     ParserError("ALTER TABLE Foo PARTITION () SET LOCATION '/a'");
-    ParserError("ALTER TABLE Foo PARTITION ('str') SET FILEFORMAT TEXTFILE");
-    ParserError("ALTER TABLE Foo PARTITION (a=1, 5) SET FILEFORMAT TEXTFILE");
     ParserError("ALTER TABLE Foo PARTITION () SET FILEFORMAT PARQUETFILE");
     ParserError("ALTER TABLE Foo PARTITION (,) SET FILEFORMAT PARQUET");
     ParserError("ALTER TABLE Foo PARTITION (a=1) SET FILEFORMAT");
@@ -3331,13 +3321,10 @@ public class ParserTest extends FrontendTestBase {
 
     ParsesOk(
         "COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
-    // No dynamic partition specs
-    ParserError("COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month, year)");
 
     ParserError("COMPUTE INCREMENTAL STATS");
 
     ParsesOk("DROP INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
-    ParserError("DROP INCREMENTAL STATS functional.alltypes PARTITION(month, year)");
     ParserError("DROP INCREMENTAL STATS functional.alltypes");
   }
 

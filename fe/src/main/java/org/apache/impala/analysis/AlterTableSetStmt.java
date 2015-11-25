@@ -26,15 +26,15 @@ import org.apache.impala.common.AnalysisException;
  * Base class for all ALTER TABLE ... SET statements
  */
 public class AlterTableSetStmt extends AlterTableStmt {
-  protected final PartitionSpec partitionSpec_;
+  protected final PartitionSet partitionSet_;
 
-  public AlterTableSetStmt(TableName tableName, PartitionSpec partitionSpec) {
+  public AlterTableSetStmt(TableName tableName, PartitionSet partitionSet) {
     super(tableName);
-    partitionSpec_ = partitionSpec;
-    if (partitionSpec_ != null) partitionSpec_.setTableName(tableName);
+    partitionSet_ = partitionSet;
+    if (partitionSet_ != null) partitionSet_.setTableName(tableName);
   }
 
-  public PartitionSpec getPartitionSpec() { return partitionSpec_; }
+  PartitionSet getPartitionSet() { return partitionSet_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -49,10 +49,10 @@ public class AlterTableSetStmt extends AlterTableStmt {
     }
 
     // Altering the table rather than the partition.
-    if (partitionSpec_ == null) return;
+    if (partitionSet_ == null) return;
 
-    partitionSpec_.setPartitionShouldExist();
-    partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
-    partitionSpec_.analyze(analyzer);
+    partitionSet_.setPartitionShouldExist();
+    partitionSet_.setPrivilegeRequirement(Privilege.ALTER);
+    partitionSet_.analyze(analyzer);
   }
 }

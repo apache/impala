@@ -374,6 +374,7 @@ class ImpalaServer::QueryExecState {
 
   /// Copies results into request_result_set_
   /// TODO: Have the FE return list<Data.TResultRow> so that this isn't necessary
+  void SetResultSet(const TDdlExecResponse* ddl_resp);
   void SetResultSet(const std::vector<std::string>& results);
   void SetResultSet(const std::vector<std::string>& col1,
       const std::vector<std::string>& col2);

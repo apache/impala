@@ -932,6 +932,25 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Drops the partitions specified in 'partitionSet' from 'tbl'. Throws a
+   * CatalogException if 'tbl' is not an HdfsTable. Returns the target table.
+   */
+  public Table dropPartitions(Table tbl, List<List<TPartitionKeyValue>> partitionSet)
+      throws CatalogException {
+    Preconditions.checkNotNull(tbl);
+    Preconditions.checkNotNull(partitionSet);
+    Preconditions.checkState(Thread.holdsLock(tbl));
+    if (!(tbl instanceof HdfsTable)) {
+      throw new CatalogException("Table " + tbl.getFullName() + " is not an Hdfs table");
+    }
+    HdfsTable hdfsTable = (HdfsTable) tbl;
+    List<HdfsPartition> partitions =
+        hdfsTable.getPartitionsFromPartitionSet(partitionSet);
+    hdfsTable.dropPartitions(partitions);
+    return hdfsTable;
+  }
+
+  /**
    * Drops the partition specified in 'partitionSpec' from 'tbl'. Throws a
    * CatalogException if 'tbl' is not an HdfsTable. If the partition having the given
    * partition spec does not exist, null is returned. Otherwise, the modified table is

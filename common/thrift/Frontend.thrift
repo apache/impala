@@ -209,9 +209,9 @@ struct TShowTablesParams {
 struct TShowFilesParams {
   1: required CatalogObjects.TTableName table_name
 
-  // An optional partition spec. Set if this operation should apply to a specific
-  // partition rather than the base table.
-  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+  // An optional partition set. Set if this operation should apply to a list of
+  // partitions rather than the base table.
+  2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
 // Parameters for SHOW [CURRENT] ROLES and SHOW ROLE GRANT GROUP <groupName> commands

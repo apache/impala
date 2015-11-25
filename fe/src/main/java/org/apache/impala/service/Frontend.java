@@ -1203,7 +1203,7 @@ public class Frontend {
     Table table = impaladCatalog_.getTable(request.getTable_name().getDb_name(),
         request.getTable_name().getTable_name());
     if (table instanceof HdfsTable) {
-      return ((HdfsTable) table).getFiles(request.getPartition_spec());
+      return ((HdfsTable) table).getFiles(request.getPartition_set());
     } else {
       throw new InternalException("SHOW FILES only supports Hdfs table. " +
           "Unsupported table class: " + table.getClass());

@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
@@ -77,6 +78,9 @@ public class TableRef implements ParseNode {
   // Indicates whether this table ref is given an explicit alias,
   protected boolean hasExplicitAlias_;
 
+  // Analysis registers privilege and/or audit requests based on this privilege.
+  protected final Privilege priv_;
+
   protected JoinOperator joinOp_;
   protected ArrayList<String> joinHints_;
   protected List<String> usingColNames_;
@@ -125,7 +129,10 @@ public class TableRef implements ParseNode {
   /////////////////////////////////////////
 
   public TableRef(List<String> path, String alias) {
-    super();
+    this(path, alias, Privilege.SELECT);
+  }
+
+  public TableRef(List<String> path, String alias, Privilege priv) {
     rawPath_ = path;
     if (alias != null) {
       aliases_ = new String[] { alias.toLowerCase() };
@@ -133,6 +140,7 @@ public class TableRef implements ParseNode {
     } else {
       hasExplicitAlias_ = false;
     }
+    priv_ = priv;
     isAnalyzed_ = false;
     replicaPreference_ = null;
     randomReplica_ = false;
@@ -146,6 +154,7 @@ public class TableRef implements ParseNode {
     resolvedPath_ = other.resolvedPath_;
     aliases_ = other.aliases_;
     hasExplicitAlias_ = other.hasExplicitAlias_;
+    priv_ = other.priv_;
     joinOp_ = other.joinOp_;
     joinHints_ =
         (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
@@ -252,6 +261,7 @@ public class TableRef implements ParseNode {
     Preconditions.checkNotNull(resolvedPath_);
     return resolvedPath_.getRootTable();
   }
+  public Privilege getPrivilege() { return priv_; }
   public ArrayList<String> getJoinHints() { return joinHints_; }
   public ArrayList<String> getTableHints() { return tableHints_; }
   public Expr getOnClause() { return onClause_; }

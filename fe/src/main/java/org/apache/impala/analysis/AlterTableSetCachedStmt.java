@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.Table;
@@ -27,14 +29,14 @@ import org.apache.impala.thrift.TAlterTableType;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents an ALTER TABLE [PARTITION partitionSpec] SET [UNCACHED|CACHED 'pool'].
+ * Represents an ALTER TABLE [PARTITION partitionSet] SET [UNCACHED|CACHED 'pool'].
  */
 public class AlterTableSetCachedStmt extends AlterTableSetStmt {
   private final HdfsCachingOp cacheOp_;
 
   public AlterTableSetCachedStmt(TableName tableName,
-      PartitionSpec partitionSpec, HdfsCachingOp cacheOp) {
-    super(tableName, partitionSpec);
+      PartitionSet partitionSet, HdfsCachingOp cacheOp) {
+    super(tableName, partitionSet);
     Preconditions.checkNotNull(cacheOp);
     cacheOp_ = cacheOp;
   }
@@ -45,8 +47,8 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
     params.setAlter_type(TAlterTableType.SET_CACHED);
     TAlterTableSetCachedParams cachingParams =
         new TAlterTableSetCachedParams();
-    if (getPartitionSpec() != null) {
-      cachingParams.setPartition_spec(getPartitionSpec().toThrift());
+    if (getPartitionSet() != null) {
+      cachingParams.setPartition_set(getPartitionSet().toThrift());
     }
     cachingParams.setCache_op(cacheOp_.toThrift());
     params.setSet_cached_params(cachingParams);
@@ -66,18 +68,18 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
     }
 
     if (cacheOp_.shouldCache()) {
-      boolean isCacheable;
-      PartitionSpec partSpec = getPartitionSpec();
+      boolean isCacheable = true;
+      PartitionSet partitionSet = getPartitionSet();
       HdfsTable hdfsTable = (HdfsTable)table;
       StringBuilder nameSb = new StringBuilder();
-      if (partSpec != null) {
-        HdfsPartition part = hdfsTable.getPartition(partSpec.getPartitionSpecKeyValues());
-        if (part == null) {
-          throw new AnalysisException("Partition spec does not exist: " +
-              partSpec.toSql());
+      if (partitionSet != null) {
+        List<HdfsPartition> parts = partitionSet.getPartitions();
+        nameSb.append("Partition(s) (");
+        for(HdfsPartition part: parts) {
+          isCacheable = isCacheable && part.isCacheable();
+          if(!part.isCacheable()) nameSb.append(part.getPartitionName());
         }
-        isCacheable = part.isCacheable();
-        nameSb.append("Partition (" + part.getPartitionName() + ")");
+        nameSb.append(")");
       } else {
         isCacheable = hdfsTable.isCacheable();
         nameSb.append("Table ").append(table.getFullName());

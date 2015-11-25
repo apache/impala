@@ -93,7 +93,8 @@ public class InlineViewRef extends TableRef {
    * C'tor for creating inline views that replace a local or catalog view ref.
    */
   public InlineViewRef(View view, TableRef origTblRef) {
-    super(view.getTableName().toPath(), origTblRef.getExplicitAlias());
+    super(view.getTableName().toPath(), origTblRef.getExplicitAlias(),
+        origTblRef.getPrivilege());
     queryStmt_ = view.getQueryStmt().clone();
     queryStmt_.reset();
     if (view.isLocalView()) queryStmt_.reset();
@@ -142,7 +143,7 @@ public class InlineViewRef extends TableRef {
     // Catalog views refs require special analysis settings for authorization.
     boolean isCatalogView = (view_ != null && !view_.isLocalView());
     if (isCatalogView) {
-      analyzer.registerAuthAndAuditEvent(view_, analyzer);
+      analyzer.registerAuthAndAuditEvent(view_, priv_);
       if (inlineViewAnalyzer_.isExplain()) {
         // If the user does not have privileges on the view's definition
         // then we report a masked authorization error so as not to reveal
