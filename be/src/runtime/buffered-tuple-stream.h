@@ -181,9 +181,8 @@ class BufferedTupleStream {
   Status SwitchToIoBuffers(bool* got_buffer);
 
   /// Adds a single row to the stream. Returns false and sets *status if an error
-  /// occurred.  BufferedTupleStream will do a deep copy of the memory in the row.  *dst
-  /// is the ptr to the memory (in the underlying block) that this row was copied to.
-  bool AddRow(TupleRow* row, Status* status, uint8_t** dst = NULL);
+  /// occurred.  BufferedTupleStream will do a deep copy of the memory in the row.
+  bool AddRow(TupleRow* row, Status* status);
 
   /// Allocates space to store a row of size 'size' and returns a pointer to the memory
   /// when successful. Returns NULL if there is not enough memory or an error occurred.
@@ -357,10 +356,8 @@ class BufferedTupleStream {
 
   /// Copies 'row' into write_block_. Returns false if there is not enough space in
   /// 'write_block_'.
-  /// *dst is the ptr to the memory (in the underlying write block) where this row
-  /// was copied to.
   template <bool HasNullableTuple>
-  bool DeepCopyInternal(TupleRow* row, uint8_t** dst);
+  bool DeepCopyInternal(TupleRow* row);
 
   // Helper function to copy strings from tuple into write_block_. Increments
   // bytes_allocated by the number of bytes allocated from write_block_.
@@ -373,7 +370,7 @@ class BufferedTupleStream {
       const std::vector<SlotDescriptor*>& collection_slots, int* bytes_allocated);
 
   /// Wrapper of the templated DeepCopyInternal() function.
-  bool DeepCopy(TupleRow* row, uint8_t** dst);
+  bool DeepCopy(TupleRow* row);
 
   /// Gets a new block from the block_mgr_, updating write_block_ and write_tuple_idx_,
   /// and setting *got_block. If there are no blocks available, *got_block is set to

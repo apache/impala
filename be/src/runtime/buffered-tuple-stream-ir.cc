@@ -20,18 +20,18 @@
 
 using namespace impala;
 
-bool BufferedTupleStream::DeepCopy(TupleRow* row, uint8_t** dst) {
+bool BufferedTupleStream::DeepCopy(TupleRow* row) {
   if (nullable_tuple_) {
-    return DeepCopyInternal<true>(row, dst);
+    return DeepCopyInternal<true>(row);
   } else {
-    return DeepCopyInternal<false>(row, dst);
+    return DeepCopyInternal<false>(row);
   }
 }
 
 // TODO: this really needs codegen
 // TODO: in case of duplicate tuples, this can redundantly serialize data.
 template <bool HasNullableTuple>
-bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
+bool BufferedTupleStream::DeepCopyInternal(TupleRow* row) {
   if (UNLIKELY(write_block_ == NULL)) return false;
   DCHECK_GE(null_indicators_write_block_, 0);
   DCHECK(write_block_->is_pinned()) << DebugString() << std::endl
@@ -45,7 +45,6 @@ bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
   }
   // Allocate the maximum possible buffer for the fixed portion of the tuple.
   uint8_t* tuple_buf = write_block_->Allocate<uint8_t>(fixed_tuple_row_size_);
-  if (dst != NULL) *dst = tuple_buf;
   // Total bytes allocated in write_block_ for this row. Saved so we can roll back
   // if this row doesn't fit.
   int bytes_allocated = fixed_tuple_row_size_;

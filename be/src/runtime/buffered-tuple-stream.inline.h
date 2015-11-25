@@ -22,14 +22,14 @@
 
 namespace impala {
 
-inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status, uint8_t** dst) {
+inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) {
   DCHECK(!closed_);
-  if (LIKELY(DeepCopy(row, dst))) return true;
+  if (LIKELY(DeepCopy(row))) return true;
   bool got_block;
   int64_t row_size = ComputeRowSize(row);
   *status = NewBlockForWrite(row_size, &got_block);
   if (!status->ok() || !got_block) return false;
-  return DeepCopy(row, dst);
+  return DeepCopy(row);
 }
 
 inline uint8_t* BufferedTupleStream::AllocateRow(int size, Status *status) {
