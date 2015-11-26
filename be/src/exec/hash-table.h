@@ -299,7 +299,8 @@ class HashTable {
     /// TODO: Fold this flag in the next pointer below.
     bool matched;
 
-    DuplicateNode* next; // Chain to next duplicate node, NULL when end of list.
+    /// Chain to next duplicate node, NULL when end of list.
+    DuplicateNode* next;
     HtData htdata;
   };
 
@@ -331,24 +332,21 @@ class HashTable {
  public:
   class Iterator;
 
-  /// Create a hash table.
+  /// Returns a newly allocated HashTable. The probing algorithm is set by the
+  /// FLAG_enable_quadratic_probing.
   ///  - client: block mgr client to allocate data pages from.
   ///  - num_build_tuples: number of Tuples in the build tuple row.
   ///  - tuple_stream: the tuple stream which contains the tuple rows index by the
   ///    hash table. Can be NULL if the rows contain only a single tuple, in which
-  ///    the 'tuple_stream' is unused.
+  ///    case the 'tuple_stream' is unused.
   ///  - max_num_buckets: the maximum number of buckets that can be stored. If we
   ///    try to grow the number of buckets to a larger number, the inserts will fail.
   ///    -1, if it unlimited.
-  ///  - initial_num_buckets: number of buckets that the hash table
-  ///    should be initialized with.
-  HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-      int num_build_tuples, BufferedTupleStream* tuple_stream,
-      int64_t max_num_buckets, int64_t initial_num_buckets = 1024);
-
-  /// Ctor used only for testing. Memory is allocated from the 'pool' instead of the
-  /// block mgr.
-  HashTable(MemPool* pool, bool quadratic_probing, int num_buckets);
+  ///  - initial_num_buckets: number of buckets that the hash table should be initialized
+  ///    with.
+  static HashTable* Create(RuntimeState* state, BufferedBlockMgr::Client* client,
+      int num_build_tuples, BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
+      int64_t initial_num_buckets);
 
   /// Allocates the initial bucket structure. Returns false if OOM.
   bool Init();
@@ -533,6 +531,14 @@ class HashTable {
   friend class Iterator;
   friend class HashTableTest;
 
+  /// Hash table constructor. Private because Create() should be used, instead
+  /// of calling this constructor directly.
+  ///  - quadratic_probing: set to true when the probing algorithm is quadratic, as
+  ///    opposed to linear.
+  HashTable(bool quadratic_probing, RuntimeState* state, BufferedBlockMgr::Client* client,
+      int num_build_tuples, BufferedTupleStream* tuple_stream,
+      int64_t max_num_buckets, int64_t initial_num_buckets);
+
   /// Performs the probing operation according to the probing algorithm (linear or
   /// quadratic. Returns one of the following:
   /// (a) the index of the bucket that contains the entry that matches with the last row
@@ -547,7 +553,7 @@ class HashTable {
   /// EvalAndHashBuild() or EvalAndHashProb(e) must have been called before calling this.
   /// 'hash' must be the hash returned by these functions.
   /// 'found' indicates that a bucket that contains an equal row is found.
-  //
+  ///
   /// There are wrappers of this function that perform the Find and Insert logic.
   int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
       HashTableCtx* ht_ctx, uint32_t hash,  bool* found);
@@ -608,9 +614,6 @@ class HashTable {
   /// is removed by the hash table.
   BufferedTupleStream* tuple_stream_;
 
-  /// Only used for tests to allocate data pages instead of the block mgr.
-  MemPool* data_page_pool_;
-
   /// Constants on how the hash table should behave. Joins and aggs have slightly
   /// different behavior.
   /// TODO: these constants are an ideal candidate to be removed with codegen.
@@ -653,7 +656,7 @@ class HashTable {
 
   /// Number of build tuples, used for constructing temp row* for probes.
   /// TODO: We should remove it.
-  int num_build_tuples_;
+  const int num_build_tuples_;
 
   /// Flag used to disable spilling hash tables that already had matches in case of
   /// right joins (IMPALA-1488).

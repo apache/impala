@@ -397,7 +397,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   // We always start with small pages in the hash table.
   int64_t estimated_num_buckets = build_rows()->has_tuple_footprint() ?
       HashTable::EstimateNumBuckets(build_rows()->num_rows()) : state->batch_size() * 2;
-  hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
+  hash_tbl_.reset(HashTable::Create(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
       1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;

@@ -313,7 +313,7 @@ class BufferedBlockMgr {
   /// fail all of them with mem limit exceeded.
   /// The min reserved buffers is often independent of data size and we still want
   /// to run small queries with very small limits.
-  /// If tracker is non-NULL, buffers used by this client are reflected in tracker.
+  /// Buffers used by this client are reflected in tracker.
   /// TODO: The fact that we allow oversubscription is problematic.
   /// as the code expects the reservations to always be granted (currently not the case).
   Status RegisterClient(int num_reserved_buffers, MemTracker* tracker,

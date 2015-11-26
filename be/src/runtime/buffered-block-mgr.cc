@@ -53,6 +53,7 @@ struct BufferedBlockMgr::Client {
         num_reserved_buffers_(num_reserved_buffers),
         num_tmp_reserved_buffers_(0),
         num_pinned_buffers_(0) {
+    DCHECK(tracker != NULL);
   }
 
   /// Unowned.
@@ -61,13 +62,13 @@ struct BufferedBlockMgr::Client {
   /// Unowned.
   RuntimeState* state_;
 
-  /// Tracker for this client. Can be NULL. Unowned.
-  /// If this is set, when the client gets a buffer, we update the consumption on this
-  /// tracker. However, we don't want to transfer the buffer from the block mgr to the
-  /// client (i.e. release from the block mgr), since the block mgr is where the
-  /// block mem usage limit is enforced. Even when we give a buffer to a client, the
-  /// buffer is still owned and counts against the block mgr tracker (i.e. there is a
-  /// fixed pool of buffers regardless of if they are in the block mgr or the clients).
+  /// Tracker for this client. Unowned.
+  /// When the client gets a buffer, we update the consumption on this tracker. However,
+  /// we don't want to transfer the buffer from the block mgr to the client (i.e. release
+  /// from the block mgr), since the block mgr is where the block mem usage limit is
+  /// enforced. Even when we give a buffer to a client, the buffer is still owned and
+  /// counts against the block mgr tracker (i.e. there is a fixed pool of buffers
+  /// regardless of if they are in the block mgr or the clients).
   MemTracker* tracker_;
 
   /// This is the common ancestor between the block mgr tracker and the client tracker.
@@ -87,7 +88,7 @@ struct BufferedBlockMgr::Client {
     DCHECK(buffer != NULL);
     if (buffer->len == mgr_->max_block_size()) {
       ++num_pinned_buffers_;
-      if (tracker_ != NULL) tracker_->ConsumeLocal(buffer->len, query_tracker_);
+      tracker_->ConsumeLocal(buffer->len, query_tracker_);
     }
   }
 
@@ -96,7 +97,7 @@ struct BufferedBlockMgr::Client {
     if (buffer->len == mgr_->max_block_size()) {
       DCHECK_GT(num_pinned_buffers_, 0);
       --num_pinned_buffers_;
-      if (tracker_ != NULL) tracker_->ReleaseLocal(buffer->len, query_tracker_);
+      tracker_->ReleaseLocal(buffer->len, query_tracker_);
     }
   }
 

@@ -279,12 +279,20 @@ class RuntimeState {
   void SetQueryResourceMgr(QueryResourceMgr* res_mgr) { query_resource_mgr_ = res_mgr; }
 
  private:
+  /// Allow TestEnv to set block_mgr manually for testing.
+  friend class TestEnv;
+
   /// Set per-fragment state.
   Status Init(ExecEnv* exec_env);
 
   /// Create a codegen object in codegen_. No-op if it has already been called. This is
   /// created on first use.
   Status CreateCodegen();
+
+  /// Use a custom block manager for the query for testing purposes.
+  void set_block_mgr(const boost::shared_ptr<BufferedBlockMgr>& block_mgr) {
+    block_mgr_ = block_mgr;
+  }
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 

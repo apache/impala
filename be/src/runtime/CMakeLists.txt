@@ -43,6 +43,7 @@ add_library(Runtime
   multi-precision.cc
   parallel-executor.cc
   plan-fragment-executor.cc
+  test-env.cc
   types.cc
   raw-value.cc
   raw-value-ir.cc

@@ -465,12 +465,13 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   DCHECK(hash_tbl.get() == NULL);
   // We use the upper PARTITION_FANOUT num bits to pick the partition so only the
   // remaining bits can be used for the hash table.
-  // TODO: how many buckets?
   // TODO: we could switch to 64 bit hashes and then we don't need a max size.
   // It might be reasonable to limit individual hash table size for other reasons
   // though. Always start with small buffers.
-  hash_tbl.reset(new HashTable(parent->state_, parent->block_mgr_client_, 1, NULL,
-      1 << (32 - NUM_PARTITIONING_BITS)));
+  // TODO: How many buckets? We currently use a default value, 1024.
+  static const int64_t PAGG_DEFAULT_HASH_TABLE_SZ = 1024;
+  hash_tbl.reset(HashTable::Create(parent->state_, parent->block_mgr_client_, 1,
+      NULL, 1 << (32 - NUM_PARTITIONING_BITS), PAGG_DEFAULT_HASH_TABLE_SZ));
   return hash_tbl->Init();
 }
 
