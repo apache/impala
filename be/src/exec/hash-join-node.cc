@@ -90,8 +90,10 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // right and left children, respectively
   RETURN_IF_ERROR(
       Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
+  AddExprCtxsToFree(build_expr_ctxs_);
   RETURN_IF_ERROR(
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
+  AddExprCtxsToFree(probe_expr_ctxs_);
 
   // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
   // build and probe tuples; full_row_desc is not necessarily the same as the output row
@@ -99,6 +101,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
   RETURN_IF_ERROR(Expr::Prepare(
       other_join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
+  AddExprCtxsToFree(other_join_conjunct_ctxs_);
 
   // TODO: default buckets
   bool stores_nulls =

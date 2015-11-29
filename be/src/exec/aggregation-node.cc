@@ -102,6 +102,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
       output_tuple_desc_->slots().size());
   RETURN_IF_ERROR(
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
+  AddExprCtxsToFree(probe_expr_ctxs_);
 
   // Construct build exprs from intermediate_agg_tuple_desc_
   for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
@@ -123,6 +124,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   RowDescriptor build_row_desc(intermediate_tuple_desc_, false);
   RETURN_IF_ERROR(
       Expr::Prepare(build_expr_ctxs_, state, build_row_desc, expr_mem_tracker()));
+  AddExprCtxsToFree(build_expr_ctxs_);
 
   agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();
