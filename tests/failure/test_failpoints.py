@@ -16,7 +16,7 @@ from tests.util.test_file_parser import QueryTestSectionReader
 from time import sleep
 
 FAILPOINT_ACTION = ['FAIL', 'CANCEL']
-FAILPOINT_LOCATION = ['PREPARE', 'OPEN', 'GETNEXT', 'CLOSE']
+FAILPOINT_LOCATION = ['PREPARE', 'PREPARE_SCANNER', 'OPEN', 'GETNEXT', 'CLOSE']
 
 # The goal of this query is to use all of the node types.
 # TODO: This query could be simplified a bit...
@@ -77,18 +77,24 @@ class TestFailpoints(ImpalaTestSuite):
 
     # These are invalid test cases.
     # For more info see IMPALA-55 and IMPALA-56.
-    cls.TestMatrix.add_constraint(lambda v: not (\
-        v.get_value('action') == 'FAIL' and\
-        v.get_value('location') in ['CLOSE'] and\
-        v.get_value('target_node')[0] in ['AGGREGATE', 'HASH JOIN']) and\
-        not (v.get_value('location') in ['PREPARE'] and \
+    cls.TestMatrix.add_constraint(lambda v: not (
+        v.get_value('action') == 'FAIL' and
+        v.get_value('location') in ['CLOSE'] and
+        v.get_value('target_node')[0] in ['AGGREGATE', 'HASH JOIN']) and
+        not (v.get_value('location') in ['PREPARE'] and
              v.get_value('action') == 'CANCEL'))
 
     # Don't create CLOSE:WAIT debug actions to avoid leaking plan fragments (there's no
     # way to cancel a plan fragment once Close() has been called)
     cls.TestMatrix.add_constraint(
-      lambda v: not (v.get_value('action') == 'CANCEL'
+        lambda v: not (v.get_value('action') == 'CANCEL'
                      and v.get_value('location') == 'CLOSE'))
+
+    # No need to test error in scanner preparation for non-scan nodes.
+    cls.TestMatrix.add_constraint(
+        lambda v: (v.get_value('location') != 'PREPARE_SCANNER' or
+            v.get_value('target_node')[0] == 'SCAN HDFS'))
+
 
   def test_failpoints(self, vector):
     query = QUERY

@@ -46,8 +46,10 @@ enum TPlanNodeType {
 }
 
 // phases of an execution node
+// must be kept in sync with tests/failure/test_failpoints.py
 enum TExecNodePhase {
   PREPARE,
+  PREPARE_SCANNER,
   OPEN,
   GETNEXT,
   CLOSE,

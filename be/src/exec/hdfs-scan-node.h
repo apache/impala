@@ -465,14 +465,17 @@ class HdfsScanNode : public ScanNode {
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
 
   /// Create and prepare new scanner for this partition type.
-  /// If the scanner cannot be created, return NULL.
-  HdfsScanner* CreateAndPrepareScanner(HdfsPartitionDescriptor* partition_desc,
-      ScannerContext* context, Status* status);
+  /// If the scanner is successfully created, it is returned in 'scanner'.
+  Status CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
+      ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner);
 
   /// Main function for scanner thread. This thread pulls the next range to be
   /// processed from the IoMgr and then processes the entire range end to end.
   /// This thread terminates when all scan ranges are complete or an error occurred.
   void ScannerThread();
+
+  /// Process the entire scan range with a new scanner object. Executed in scanner thread.
+  Status ProcessSplit(DiskIoMgr::ScanRange* scan_range);
 
   /// Returns true if there is enough memory (against the mem tracker limits) to
   /// have a scanner thread.
