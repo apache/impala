@@ -22,6 +22,7 @@
 
 #include "gutil/macros.h"
 
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/buffered-block-mgr.h"
 
 namespace impala {
@@ -54,7 +55,12 @@ class BloomFilter {
   /// BufferedBlockMgr::ConsumeMemory() and ReleaseMemory().
   BloomFilter(
       const int log_heap_space, RuntimeState* state, BufferedBlockMgr::Client* client);
+  BloomFilter(const TBloomFilter& thrift, RuntimeState* state,
+      BufferedBlockMgr::Client* client);
   ~BloomFilter();
+
+  /// Serializes this filter as Thrift.
+  void ToThrift(TBloomFilter* thrift) const;
 
   /// Adds an element to the BloomFilter. The function used to generate 'hash' need not
   /// have good uniformity, but it should have low collision probability. For instance, if
@@ -66,6 +72,9 @@ class BloomFilter {
   /// Finds an element in the BloomFilter, returning true if it is found and false (with
   /// high probabilty) if it is not.
   bool Find(const uint32_t hash) const;
+
+  /// Computes the logical OR of this filter with 'other' and stores the result in 'this'.
+  void Or(const BloomFilter& other);
 
   /// As more distinct items are inserted into a BloomFilter, the false positive rate
   /// rises. MaxNdv() returns the NDV (number of distinct values) at which a BloomFilter
@@ -84,6 +93,10 @@ class BloomFilter {
   /// Returns amount of heap space used, in bytes
   int64_t GetHeapSpaceUsed() const { return sizeof(Bucket) * (1ll << log_num_buckets_); }
 
+  static int64_t GetExpectedHeapSpaceUsed(uint32_t log_heap_size) {
+    return sizeof(Bucket) * (1ll << (log_heap_size - LOG_BUCKET_WORD_BITS));
+  }
+
  private:
   /// log_directory_space_ is the log (base 2) of the number of buckets in the directory.
   const int log_num_buckets_;
@@ -93,16 +106,22 @@ class BloomFilter {
   const uint32_t directory_mask_;
 
   /// The BloomFilter is divided up into Buckets, each of which is a cache line.
-  static constexpr uint64_t BUCKET_WORDS = 8;
+  static const uint64_t BUCKET_WORDS = 8;
   typedef uint64_t BucketWord;
+
   // log2(number of bits in a BucketWord)
   // TODO: Use BitUtil::Log2(numeric_limits<BucketWord>::digits) once we enable C++14 for
   // codegen.
-  static constexpr int LOG_BUCKET_WORD_BITS = 6;
-  static constexpr BucketWord BUCKET_WORD_MASK =
-      (static_cast<BucketWord>(1) << LOG_BUCKET_WORD_BITS) - 1;
-  static_assert((1 << LOG_BUCKET_WORD_BITS) == std::numeric_limits<BucketWord>::digits,
-      "BucketWord must have a bit-width that is be a power of 2, like 64 for uint64_t.");
+  static const int LOG_BUCKET_WORD_BITS = 6;
+  static const BucketWord BUCKET_WORD_MASK = 63; // 2^LOG_BUCKET_WORD_BITS - 1
+
+  /// log2(number of bytes in a bucket)
+  static const int LOG_BUCKET_BYTE_SIZE = 6;
+
+  // TODO: Re-enable static_asserts when C++14 is enabled.
+  //static_assert((1 << LOG_BUCKET_WORD_BITS) == std::numeric_limits<BucketWord>::digits,
+  // "BucketWord must have a bit-width that is be a power of 2, like 64 for uint64_t.");
+
   typedef BucketWord Bucket[BUCKET_WORDS];
   Bucket* directory_;
 
@@ -127,9 +146,8 @@ inline void BloomFilter::Insert(const uint32_t hash) {
   // random bits for a split Bloom filter, but log2(512) * 8 = 72 random bits for a
   // standard Bloom filter. In fact, this leaves the most significant 16 bits of
   // bits_to_set unused.
-  static_assert(std::numeric_limits<decltype(bits_to_set)>::digits >=
-          LOG_BUCKET_WORD_BITS * BUCKET_WORDS,
-      "bits_to_set must have enough bits to index into all the bucket words");
+  DCHECK_GE(std::numeric_limits<uint64_t>::digits, LOG_BUCKET_WORD_BITS * BUCKET_WORDS)
+      << "bits_to_set must have enough bits to index into all the bucket words";
   for (int i = 0; i < BUCKET_WORDS; ++i) {
     // Use LOG_BUCKET_WORD_BITS bits of hash data to index into a BucketWord and set one
     // of its bits.

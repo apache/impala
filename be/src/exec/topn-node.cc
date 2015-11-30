@@ -46,8 +46,8 @@ TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     priority_queue_(NULL) {
 }
 
-Status TopNNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.sort_node.sort_info, pool_));
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;

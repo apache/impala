@@ -10,6 +10,7 @@ where b.month = 1
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: month = b.month
+|  runtime filters: RF000 <- b.month
 |
 |--03:SCAN HDFS [functional.alltypessmall b]
 |     partitions=1/4 files=1 size=1.57KB
@@ -21,11 +22,13 @@ where b.month = 1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
+   runtime filters: RF000 -> functional.alltypes.month
 ---- DISTRIBUTEDPLAN
 06:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: month = b.month
+|  runtime filters: RF000 <- b.month
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -39,6 +42,7 @@ where b.month = 1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
+   runtime filters: RF000 -> functional.alltypes.month
 ====
 // Only UNION ALL, no nested unions
 select * from functional.alltypestiny where year=2009 and month=1
@@ -2444,12 +2448,14 @@ select 1000, 2000
 |
 |--06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF000 <- b.id
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  04:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: sum(int_col)
@@ -2471,6 +2477,7 @@ select 1000, 2000
 |
 |--06:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF000 <- b.id
 |  |
 |  |--09:EXCHANGE [BROADCAST]
 |  |  |
@@ -2479,6 +2486,7 @@ select 1000, 2000
 |  |
 |  04:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 08:AGGREGATE [FINALIZE]
 |  output: sum:merge(int_col)
@@ -2561,12 +2569,14 @@ select 1000, 2000
 |
 |--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF000 <- b.id
 |  |
 |  |--09:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  08:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 |--07:AGGREGATE [FINALIZE]
 |  |  output: sum(int_col)
@@ -2625,6 +2635,7 @@ select 1000, 2000
 |
 |--10:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF000 <- b.id
 |  |
 |  |--16:EXCHANGE [BROADCAST]
 |  |  |
@@ -2633,6 +2644,7 @@ select 1000, 2000
 |  |
 |  08:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 15:AGGREGATE [FINALIZE]
 |  output: sum:merge(int_col)

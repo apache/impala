@@ -48,8 +48,8 @@ ExchangeNode::ExchangeNode(
   DCHECK(is_merging_ || (offset_ == 0));
 }
 
-Status ExchangeNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status ExchangeNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   if (!is_merging_) return Status::OK();
 
   RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.exchange_node.sort_info, pool_));

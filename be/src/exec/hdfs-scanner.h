@@ -74,7 +74,8 @@ struct FieldLocation {
 /// and parsing.
 //
 /// If a split is compressed, then a decompressor will be created, either during Prepare()
-/// or at the beginning of ProcessSplit(), and used for decompressing and reading the split.
+/// or at the beginning of ProcessSplit(), and used for decompressing and reading the
+/// split.
 //
 /// For codegen, the implementation is split into two parts.
 /// 1. During the Prepare() phase of the ScanNode, the scanner subclass's static

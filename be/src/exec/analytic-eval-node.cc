@@ -103,8 +103,8 @@ AnalyticEvalNode::~AnalyticEvalNode() {
   DCHECK(input_stream_ == NULL);
 }
 
-Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK_EQ(conjunct_ctxs_.size(), 0);
   const TAnalyticNode& analytic_node = tnode.analytic_node;
   bool has_lead_fn = false;

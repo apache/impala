@@ -25,7 +25,7 @@ select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
 |  03:UNNEST [t.a]
 |
 00:SCAN HDFS [functional_avro_snap.complextypes_fileformat t]
-   partitions=1/1 files=1 size=649B
+   partitions=1/1 files=1 size=622B
    predicates: !empty(t.a)
 ====
 # Complex types are not supported on text files.

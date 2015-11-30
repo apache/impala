@@ -124,6 +124,7 @@ on (a.year = b.year)
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: year = year
+|  runtime filters: RF000 <- year
 |
 |--01:AGGREGATE [FINALIZE]
 |  |  group by: year
@@ -137,6 +138,7 @@ on (a.year = b.year)
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.year
 ====
 # Test queries with tableRefs which cannot be evaluated by metadata.
 select min(a.year), ndv(b.timestamp_col) from
@@ -179,6 +181,7 @@ on (t1.int_col = t3.int_col)
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.int_col = min(t2.year)
+|  runtime filters: RF000 <- min(t2.year)
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: min(t2.year)
@@ -188,6 +191,7 @@ on (t1.int_col = t3.int_col)
 |
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.int_col
 ====
 # Test with with clauses on the partition keys.
 with c1 as (select distinct month from functional.alltypes),

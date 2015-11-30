@@ -32,8 +32,8 @@ SubplanNode::SubplanNode(ObjectPool* pool, const TPlanNode& tnode,
       subplan_eos_(false) {
 }
 
-Status SubplanNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status SubplanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK_EQ(children_.size(), 2);
   SetContainingSubplan(this, child(1));
   return Status::OK();

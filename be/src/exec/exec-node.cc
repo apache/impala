@@ -125,7 +125,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
 ExecNode::~ExecNode() {
 }
 
-Status ExecNode::Init(const TPlanNode& tnode) {
+Status ExecNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.conjuncts, &conjunct_ctxs_));
   return Status::OK();
@@ -212,14 +212,14 @@ void ExecNode::AddCodegenExecOption(bool codegen_enabled, const string& extra_in
   AddRuntimeExecOption(str);
 }
 
-Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan,
-    const DescriptorTbl& descs, ExecNode** root, RuntimeState* state) {
+Status ExecNode::CreateTree(RuntimeState* state, const TPlan& plan,
+    const DescriptorTbl& descs, ExecNode** root) {
   if (plan.nodes.size() == 0) {
     *root = NULL;
     return Status::OK();
   }
   int node_idx = 0;
-  Status status = CreateTreeHelper(pool, plan.nodes, descs, NULL, &node_idx, root, state);
+  Status status = CreateTreeHelper(state, plan.nodes, descs, NULL, &node_idx, root);
   if (status.ok() && node_idx + 1 != plan.nodes.size()) {
     status = Status(
         "Plan tree only partially reconstructed. Not all thrift nodes were used.");
@@ -231,14 +231,8 @@ Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan,
   return status;
 }
 
-Status ExecNode::CreateTreeHelper(
-    ObjectPool* pool,
-    const vector<TPlanNode>& tnodes,
-    const DescriptorTbl& descs,
-    ExecNode* parent,
-    int* node_idx,
-    ExecNode** root,
-    RuntimeState* state) {
+Status ExecNode::CreateTreeHelper(RuntimeState* state, const vector<TPlanNode>& tnodes,
+    const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root) {
   // propagate error case
   if (*node_idx >= tnodes.size()) {
     return Status("Failed to reconstruct plan tree from thrift.");
@@ -247,7 +241,7 @@ Status ExecNode::CreateTreeHelper(
 
   int num_children = tnode.num_children;
   ExecNode* node = NULL;
-  RETURN_IF_ERROR(CreateNode(pool, tnode, descs, &node, state));
+  RETURN_IF_ERROR(CreateNode(state->obj_pool(), tnode, descs, &node, state));
   if (parent != NULL) {
     parent->children_.push_back(node);
   } else {
@@ -255,8 +249,7 @@ Status ExecNode::CreateTreeHelper(
   }
   for (int i = 0; i < num_children; ++i) {
     ++*node_idx;
-    RETURN_IF_ERROR(
-        CreateTreeHelper(pool, tnodes, descs, node, node_idx, NULL, state));
+    RETURN_IF_ERROR(CreateTreeHelper(state, tnodes, descs, node, node_idx, NULL));
     // we are expecting a child, but have used all nodes
     // this means we have been given a bad tree and must fail
     if (*node_idx >= tnodes.size()) {
@@ -265,7 +258,7 @@ Status ExecNode::CreateTreeHelper(
   }
 
   // Call Init() after children have been set and Init()'d themselves
-  RETURN_IF_ERROR(node->Init(tnode));
+  RETURN_IF_ERROR(node->Init(tnode, state));
 
   // build up tree of profiles; add children >0 first, so that when we print
   // the profile, child 0 is printed last (makes the output more readable)

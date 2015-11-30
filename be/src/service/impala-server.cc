@@ -1950,4 +1950,16 @@ void ImpalaServer::DetectNmFailures() {
   freeaddrinfo(addr);
 }
 
+void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
+    const TUpdateFilterParams& params) {
+  shared_ptr<QueryExecState> query_exec_state = GetQueryExecState(params.query_id, true);
+  if (query_exec_state.get() == NULL) {
+    LOG(INFO) << "Could not find query exec state: " << params.query_id;
+    return;
+  }
+
+  lock_guard<mutex> l(*query_exec_state->lock(), adopt_lock_t());
+  query_exec_state->coord()->UpdateFilter(params);
+}
+
 }

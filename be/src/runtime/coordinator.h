@@ -45,6 +45,7 @@
 namespace impala {
 
 class CountingBarrier;
+class BloomFilter;
 class DataStreamMgr;
 class DataSink;
 class RowBatch;
@@ -180,6 +181,12 @@ class Coordinator {
   }
 
   SpinLock& GetExecSummaryLock() const { return exec_summary_lock_; }
+
+  /// Receive a local filter update from a fragment instance. Aggregate that filter update
+  /// with others for the same filter ID into a global filter. If all updates for that
+  /// filter ID have been received (may be 1 or more per filter), broadcast the global
+  /// filter to fragment instances.
+  void UpdateFilter(const TUpdateFilterParams& params);
 
  private:
   class FragmentInstanceState;
@@ -350,6 +357,38 @@ class Coordinator {
   /// Total time spent in finalization (typically 0 except for INSERT into hdfs tables)
   RuntimeProfile::Counter* finalization_timer_;
 
+  /// Barrier that is released when all fragment instances have been started. Initialised
+  /// during StartRemoteFragments().
+  boost::scoped_ptr<CountingBarrier> fragment_start_barrier_;
+
+  struct Filter {
+    TPlanNodeId src;
+    TPlanNodeId dst;
+
+    // Index into fragment_instance_states_
+    std::vector<int> fragment_instance_idxs;
+
+    /// Number of remaining backends to hear from before filter is complete.
+    int pending_count;
+
+    /// BloomFilter aggregated from all source plan nodes, to be broadcast to all
+    /// destination plan fragment instances. Owned by the coordinator's object pool.
+    BloomFilter* bloom_filter;
+
+    Filter() : bloom_filter(NULL) { }
+  };
+
+  /// Protects filter_routing_table_.
+  SpinLock filter_lock_;
+
+  /// Map from filter ID to filter.
+  typedef boost::unordered_map<int32_t, Filter> FilterRoutingTable;
+  FilterRoutingTable filter_routing_table_;
+
+  RuntimeProfile::Counter* filters_received_;
+
+  std::string FilterDebugString();
+
   /// Fill in rpc_params based on parameters.
   /// 'fragment_instance_idx' is the 0-based query-wide ordinal of the fragment instance.
   /// 'fragment_idx' is the 0-based query-wide ordinal of the fragment of which it is an
@@ -367,7 +406,7 @@ class Coordinator {
   void ExecRemoteFragment(const FragmentExecParams* fragment_exec_params,
       const TPlanFragment* plan_fragment, DebugOptions* debug_options,
       QuerySchedule* schedule, int fragment_instance_idx, int fragment_idx,
-      int per_fragment_instance_idx, CountingBarrier* fragment_start_barrier);
+      int per_fragment_instance_idx);
 
   /// Determine fragment number, given fragment id.
   int GetFragmentNum(const TUniqueId& fragment_id);

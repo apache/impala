@@ -23,6 +23,7 @@
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "util/codec.h"
 #include "util/decompress.h"
@@ -102,7 +103,8 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
               ss << "For better performance, snappy, gzip and bzip-compressed files "
                  << "should not be split into multiple hdfs-blocks. file="
                  << files[i]->filename << " offset " << split->offset();
-              scan_node->runtime_state()->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+              scan_node->runtime_state()->LogError(
+                  ErrorMsg(TErrorCode::GENERAL, ss.str()));
               warning_written = true;
             }
             // We assign the entire file to one scan range, so mark all but one split
@@ -150,6 +152,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     // This will dlopen the lzo binary and can fail if the lzo binary is not present.
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(scan_node, lzo_text_files));
   }
+
   return Status::OK();
 }
 

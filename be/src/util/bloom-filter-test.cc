@@ -53,7 +53,7 @@ TEST(BloomFilter, Insert) {
   }
 }
 
-// After Insert()ing someting into a Bloom filter, it can be found again immediately.
+// After Insert()ing something into a Bloom filter, it can be found again immediately.
 TEST(BloomFilter, Find) {
   srand(0);
   for (int i = 13; i < 17; ++i) {
@@ -66,7 +66,7 @@ TEST(BloomFilter, Find) {
   }
 }
 
-// After Insert()ing someting into a Bloom filter, it can be found again much later.
+// After Insert()ing something into a Bloom filter, it can be found again much later.
 TEST(BloomFilter, CumulativeFind) {
   srand(0);
   for (int i = 5; i < 11; ++i) {
@@ -184,6 +184,40 @@ TEST(BloomFilter, MinSpaceForFpp) {
       // log space at which we can guarantee the requested fpp.
     }
   }
+}
+
+TEST(BloomFilter, Thrift) {
+  BloomFilter bf(BloomFilter::MinLogSpace(100, 0.01), NULL, NULL);
+  for (int i = 0; i < 10; ++i) bf.Insert(i);
+  // Check no unexpected new false positives.
+  set<int> missing_ints;
+  for (int i = 11; i < 100; ++i) {
+    if (!bf.Find(i)) missing_ints.insert(i);
+  }
+
+  TBloomFilter to_thrift;
+  bf.ToThrift(&to_thrift);
+
+  BloomFilter from_thrift(to_thrift, NULL, NULL);
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(from_thrift.Find(i));
+  for (int missing: missing_ints) ASSERT_FALSE(from_thrift.Find(missing));
+}
+
+TEST(BloomFilter, Or) {
+  BloomFilter bf1(BloomFilter::MinLogSpace(100, 0.01), NULL, NULL);
+  BloomFilter bf2(BloomFilter::MinLogSpace(100, 0.01), NULL, NULL);
+  for (int i = 60; i < 80; ++i) bf2.Insert(i);
+
+  for (int i = 0; i < 10; ++i) bf1.Insert(i);
+  bf2.Or(bf1);
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(bf2.Find(i));
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(bf2.Find(i));
+
+  for (int i = 11; i < 50; ++i) bf1.Insert(i);
+  bf2.Or(bf1);
+  for (int i = 11; i < 50; ++i) ASSERT_TRUE(bf2.Find(i));
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(bf2.Find(i));
+  ASSERT_FALSE(bf2.Find(81));
 }
 
 }  // namespace impala

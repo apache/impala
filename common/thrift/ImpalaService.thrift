@@ -188,7 +188,11 @@ enum TImpalaQueryOptions {
   DISABLE_STREAMING_PREAGGREGATIONS,
 
   // If true, enable runtime filter propagation
-  ENABLE_RUNTIME_FILTER_PROPAGATION
+  ENABLE_RUNTIME_FILTER_PROPAGATION,
+
+  // Size (in bytes) of a runtime Bloom Filter. Will be rounded up to nearest power of
+  // two.
+  RUNTIME_BLOOM_FILTER_SIZE
 }
 
 // The summary of an insert.

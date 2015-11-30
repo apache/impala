@@ -55,7 +55,7 @@ class ExecNode {
   /// Initializes this object from the thrift tnode desc. The subclass should
   /// do any initialization that can fail in Init() rather than the ctor.
   /// If overridden in subclass, must first call superclass's Init().
-  virtual Status Init(const TPlanNode& tnode);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
 
   /// Sets up internal structures, etc., without doing any actual work.
   /// Must be called prior to Open(). Will only be called once in this
@@ -69,8 +69,6 @@ class ExecNode {
   /// Performs any preparatory work prior to calling GetNext().
   /// Caller must not be holding any io buffers. This will cause deadlock.
   /// If overridden in subclass, must first call superclass's Open().
-  /// If a parent exec node adds slot filters (see RuntimeState::AddBitmapFilter()),
-  /// they need to be added before calling Open() on the child that will consume them.
   /// Open() is called after Prepare() or Reset(), i.e., possibly multiple times
   /// throughout the lifetime of this node.
   virtual Status Open(RuntimeState* state);
@@ -121,10 +119,10 @@ class ExecNode {
   virtual void Close(RuntimeState* state);
 
   /// Creates exec node tree from list of nodes contained in plan via depth-first
-  /// traversal. All nodes are placed in pool and have Init() called on them.
+  /// traversal. All nodes are placed in state->obj_pool() and have Init() called on them.
   /// Returns error if 'plan' is corrupted, otherwise success.
-  static Status CreateTree(ObjectPool* pool, const TPlan& plan,
-      const DescriptorTbl& descs, ExecNode** root, RuntimeState* state);
+  static Status CreateTree(RuntimeState* state, const TPlan& plan,
+      const DescriptorTbl& descs, ExecNode** root);
 
   /// Set debug action for node with given id in 'tree'
   static void SetDebugOptions(int node_id, TExecNodePhase::type phase,
@@ -270,9 +268,9 @@ class ExecNode {
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       const DescriptorTbl& descs, ExecNode** node, RuntimeState* state);
 
-  static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
-      const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root,
-      RuntimeState* state);
+  static Status CreateTreeHelper(RuntimeState* state,
+      const std::vector<TPlanNode>& tnodes, const DescriptorTbl& descs, ExecNode* parent,
+      int* node_idx, ExecNode** root);
 
   virtual bool IsScanNode() const { return false; }
 

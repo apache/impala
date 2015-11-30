@@ -32,7 +32,7 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.planner.PlanNode;
-import com.cloudera.impala.thrift.TRuntimeFilter;
+import com.cloudera.impala.thrift.TRuntimeFilterDesc;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -121,8 +121,8 @@ public final class RuntimeFilterGenerator {
     @Override
     public int hashCode() { return id_.hashCode(); }
 
-    public TRuntimeFilter toThrift() {
-      TRuntimeFilter tFilter = new TRuntimeFilter();
+    public TRuntimeFilterDesc toThrift() {
+      TRuntimeFilterDesc tFilter = new TRuntimeFilterDesc();
       tFilter.setFilter_id(id_.asInt());
       tFilter.setTarget_expr(targetExpr_.treeToThrift());
       tFilter.setSrc_expr(srcExpr_.treeToThrift());

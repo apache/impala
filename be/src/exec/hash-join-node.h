@@ -49,7 +49,7 @@ class HashJoinNode : public BlockingJoinNode {
  public:
   HashJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   // Open() implemented in BlockingJoinNode
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
@@ -69,8 +69,11 @@ class HashJoinNode : public BlockingJoinNode {
 
   /// our equi-join predicates "<lhs> = <rhs>" are separated into
   /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
-    std::vector<ExprContext*> probe_expr_ctxs_;
-    std::vector<ExprContext*> build_expr_ctxs_;
+  std::vector<ExprContext*> probe_expr_ctxs_;
+  std::vector<ExprContext*> build_expr_ctxs_;
+
+  /// Expressions used to build runtime filters, one per entry in filters_.
+  std::vector<ExprContext*> filter_expr_ctxs_;
 
   /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
   /// NOT DISTINCT FROM, rather than equality.
@@ -103,6 +106,9 @@ class HashJoinNode : public BlockingJoinNode {
   typedef int (*ProcessProbeBatchFn)(HashJoinNode*, RowBatch*, RowBatch*, int);
   /// Jitted ProcessProbeBatch function pointer.  Null if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
+
+  /// RuntimeFilters to build.
+  std::vector<RuntimeFilter*> filters_;
 
   RuntimeProfile::Counter* build_buckets_counter_;   // num buckets in hash table
   RuntimeProfile::Counter* hash_tbl_load_factor_counter_;

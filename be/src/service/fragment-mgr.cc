@@ -126,7 +126,8 @@ void FragmentMgr::CancelPlanFragment(TCancelPlanFragmentResult& return_val,
   shared_ptr<FragmentExecState> exec_state =
       GetFragmentExecState(params.fragment_instance_id);
   if (exec_state.get() == NULL) {
-    Status status(ErrorMsg(TErrorCode::INTERNAL_ERROR, Substitute("Unknown fragment id: $0",
+    Status status(ErrorMsg(TErrorCode::INTERNAL_ERROR,
+        Substitute("Unknown fragment id: $0",
         lexical_cast<string>(params.fragment_instance_id))));
     status.SetTStatus(&return_val);
     return;
@@ -135,4 +136,16 @@ void FragmentMgr::CancelPlanFragment(TCancelPlanFragmentResult& return_val,
   // are removed when fragment execution terminates (which is at present still
   // running in exec_state->exec_thread_)
   exec_state->Cancel().SetTStatus(&return_val);
+}
+
+void FragmentMgr::PublishFilter(TPublishFilterResult& return_val,
+    const TPublishFilterParams& params) {
+  shared_ptr<FragmentExecState> fragment_exec_state =
+      GetFragmentExecState(params.dst_instance_id);
+  if (fragment_exec_state.get() == NULL) {
+    LOG(INFO) << "Unknown fragment (ID: " << params.dst_instance_id
+              << ") for filter (ID: " << params.filter_id << ")";
+    return;
+  }
+  fragment_exec_state->PublishFilter(params.filter_id, params.bloom_filter);
 }

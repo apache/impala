@@ -25,12 +25,14 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=1/4 files=1 size=1.58KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 files=12 size=238.68KB
+   runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -45,6 +47,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -53,6 +56,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 files=12 size=238.68KB
+   runtime filters: RF000 -> a.id
 ====
 # CTAS with a view that has a limit clause (IMPALA-1411)
 create table t as

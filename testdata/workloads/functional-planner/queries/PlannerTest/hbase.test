@@ -494,12 +494,14 @@ where
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = b.int_col
+|  runtime filters: RF000 <- b.int_col
 |
 |--00:SCAN HBASE [functional_hbase.alltypessmall b]
 |     predicates: b.bool_col = FALSE
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = c.int_col
+|  runtime filters: RF001 <- c.int_col
 |
 |--02:SCAN HBASE [functional_hbase.alltypessmall c]
 |     predicates: c.month = 4

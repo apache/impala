@@ -4,6 +4,7 @@ where t1.zip = 94611
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.testtbl t2]
 |     partitions=1/1 files=0 size=0B
@@ -11,11 +12,13 @@ where t1.zip = 94611
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
    predicates: t1.zip = 94611
+   runtime filters: RF000 -> t1.id
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -25,6 +28,7 @@ where t1.zip = 94611
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
    predicates: t1.zip = 94611
+   runtime filters: RF000 -> t1.id
 ====
 # general exprs on both sides of equi-join predicates
 select *
@@ -65,23 +69,27 @@ from (select * from functional.alltypestiny) t1
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: coalesce(functional.alltypestiny.id, functional.alltypestiny.id) = t3.id
+|  runtime filters: RF000 <- t3.id
 |
 |--02:SCAN HDFS [functional.alltypestiny t3]
 |     partitions=4/4 files=4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypestiny.id = functional.alltypestiny.id
+|  runtime filters: RF001 <- functional.alltypestiny.id
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> coalesce(functional.alltypestiny.id, functional.alltypestiny.id), RF001 -> functional.alltypestiny.id
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: coalesce(functional.alltypestiny.id, functional.alltypestiny.id) = t3.id
+|  runtime filters: RF000 <- t3.id
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -90,6 +98,7 @@ from (select * from functional.alltypestiny) t1
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypestiny.id = functional.alltypestiny.id
+|  runtime filters: RF001 <- functional.alltypestiny.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -98,6 +107,7 @@ from (select * from functional.alltypestiny) t1
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> coalesce(functional.alltypestiny.id, functional.alltypestiny.id), RF001 -> functional.alltypestiny.id
 ====
 # multiple join predicates;
 # scan predicates get propagated correctly;
@@ -113,6 +123,7 @@ and a.tinyint_col + b.tinyint_col < 15
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
 |  other predicates: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
+|  runtime filters: RF000 <- b.id, RF001 <- b.int_col
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=2/4 files=2 size=3.17KB
@@ -121,12 +132,14 @@ and a.tinyint_col + b.tinyint_col < 15
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
 |  other predicates: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
+|  runtime filters: RF000 <- b.id, RF001 <- b.int_col
 |
 |--04:EXCHANGE [HASH(b.id,b.int_col)]
 |  |
@@ -139,6 +152,7 @@ and a.tinyint_col + b.tinyint_col < 15
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ====
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
@@ -214,7 +228,6 @@ on a.x = b.x
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
----- DISTRIBUTEDPLAN
 ====
 # join using values() in a subquery
 select a.int_col, b.x from functional.alltypessmall a inner join
@@ -222,17 +235,20 @@ select a.int_col, b.x from functional.alltypessmall a inner join
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--01:UNION
 |     constant-operands=3
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.int_col
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -241,6 +257,7 @@ select a.int_col, b.x from functional.alltypessmall a inner join
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.int_col
 ====
 # hbase-hdfs join
 select *
@@ -248,16 +265,19 @@ from functional.alltypesagg join functional_hbase.alltypessmall using (id, int_c
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypesagg.id = functional_hbase.alltypessmall.id, functional.alltypesagg.int_col = functional_hbase.alltypessmall.int_col
+|  runtime filters: RF000 <- functional_hbase.alltypessmall.id, RF001 <- functional_hbase.alltypessmall.int_col
 |
 |--01:SCAN HBASE [functional_hbase.alltypessmall]
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> functional.alltypesagg.id, RF001 -> functional.alltypesagg.int_col
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypesagg.id = functional_hbase.alltypessmall.id, functional.alltypesagg.int_col = functional_hbase.alltypessmall.int_col
+|  runtime filters: RF000 <- functional_hbase.alltypessmall.id, RF001 <- functional_hbase.alltypessmall.int_col
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -265,6 +285,7 @@ from functional.alltypesagg join functional_hbase.alltypessmall using (id, int_c
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> functional.alltypesagg.id, RF001 -> functional.alltypesagg.int_col
 ====
 # hbase-hdfs join with scan filtering
 select *
@@ -280,6 +301,7 @@ and a.tinyint_col + b.tinyint_col < 15
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = CAST(b.id AS INT), a.int_col = b.int_col
 |  other predicates: a.tinyint_col + b.tinyint_col < 15
+|  runtime filters: RF000 <- CAST(b.id AS INT), RF001 <- b.int_col
 |
 |--01:SCAN HBASE [functional_hbase.stringids b]
 |     start key: 5
@@ -289,6 +311,7 @@ and a.tinyint_col + b.tinyint_col < 15
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -304,6 +327,7 @@ NODE 1:
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = CAST(b.id AS INT), a.int_col = b.int_col
 |  other predicates: a.tinyint_col + b.tinyint_col < 15
+|  runtime filters: RF000 <- CAST(b.id AS INT), RF001 <- b.int_col
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -315,6 +339,7 @@ NODE 1:
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ====
 # left join followed by right join and then aggregate
 select x.tinyint_col, count(x.day)
@@ -347,24 +372,28 @@ limit 5
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = d.id
+|  runtime filters: RF000 <- d.id
 |
 |--03:SCAN HDFS [functional.alltypesagg d]
 |     partitions=11/11 files=11 size=814.73KB
 |
 05:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: b.id = c.id
+|  runtime filters: RF001 <- c.id
 |
 |--02:SCAN HDFS [functional.alltypesnopart c]
 |     partitions=1/1 files=0 size=0B
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  runtime filters: RF002 <- b.id, RF003 <- b.int_col
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> a.id, RF001 -> a.id, RF002 -> a.id, RF003 -> a.int_col
 ---- DISTRIBUTEDPLAN
 10:TOP-N [LIMIT=5]
 |  order by: count(x.day) ASC
@@ -385,6 +414,7 @@ limit 5
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.id = d.id
+|  runtime filters: RF000 <- d.id
 |
 |--14:EXCHANGE [HASH(d.id)]
 |  |
@@ -393,6 +423,7 @@ limit 5
 |
 05:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: b.id = c.id
+|  runtime filters: RF001 <- c.id
 |
 |--13:EXCHANGE [HASH(c.id)]
 |  |
@@ -403,6 +434,7 @@ limit 5
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  runtime filters: RF002 <- b.id, RF003 <- b.int_col
 |
 |--11:EXCHANGE [BROADCAST]
 |  |
@@ -411,12 +443,14 @@ limit 5
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> a.id, RF001 -> a.id, RF002 -> a.id, RF003 -> a.int_col
 ====
 # join without "other join conjuncts"
 select * from functional.alltypessmall a, functional.alltypessmall b where a.id = b.id limit 1
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |  limit: 1
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
@@ -424,12 +458,14 @@ select * from functional.alltypessmall a, functional.alltypessmall b where a.id 
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |  limit: 1
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |  limit: 1
 |
 |--04:EXCHANGE [HASH(b.id)]
@@ -441,6 +477,7 @@ select * from functional.alltypessmall a, functional.alltypessmall b where a.id 
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ====
 # join conjunct is derived from equivalence classes
 # (no explicit join conjunct between t1 and t2)
@@ -450,23 +487,27 @@ where t1.id = t3.id and t2.id = t3.id
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t3.id
+|  runtime filters: RF000 <- t3.id
 |
 |--02:SCAN HDFS [functional.testtbl t3]
 |     partitions=1/1 files=0 size=0B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF001 <- t2.id
 |
 |--01:SCAN HDFS [functional.testtbl t2]
 |     partitions=1/1 files=0 size=0B
 |
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
+   runtime filters: RF000 -> t1.id, RF001 -> t1.id
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t3.id
+|  runtime filters: RF000 <- t3.id
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -475,6 +516,7 @@ where t1.id = t3.id and t2.id = t3.id
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF001 <- t2.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -483,6 +525,7 @@ where t1.id = t3.id and t2.id = t3.id
 |
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
+   runtime filters: RF000 -> t1.id, RF001 -> t1.id
 ====
 # join involving a table with no table stats (functional.emptytable)
 # tests that the default join strategy is broadcast
@@ -491,17 +534,20 @@ functional.alltypes b on a.f2 = b.int_col
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
 |
 |--00:SCAN HDFS [functional.emptytable a]
 |     partitions=0/0 files=0 size=0B
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.int_col
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: b.int_col = a.f2
+|  runtime filters: RF000 <- a.f2
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -510,6 +556,7 @@ functional.alltypes b on a.f2 = b.int_col
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.int_col
 ====
 # cross join
 select *
@@ -571,23 +618,27 @@ on (b.id = c.id and c.int_col = b.int_col)
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = c.id, b.int_col = c.int_col
+|  runtime filters: RF000 <- c.id, RF001 <- c.int_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
 |     partitions=24/24 files=24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  runtime filters: RF002 <- b.id, RF003 <- b.int_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col, RF002 -> a.id, RF003 -> a.int_col
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.id = c.id, b.int_col = c.int_col
+|  runtime filters: RF000 <- c.id, RF001 <- c.int_col
 |
 |--07:EXCHANGE [HASH(c.id,c.int_col)]
 |  |
@@ -596,6 +647,7 @@ on (b.id = c.id and c.int_col = b.int_col)
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  runtime filters: RF002 <- b.id, RF003 <- b.int_col
 |
 |--06:EXCHANGE [HASH(b.id,b.int_col)]
 |  |
@@ -606,6 +658,7 @@ on (b.id = c.id and c.int_col = b.int_col)
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col, RF002 -> a.id, RF003 -> a.int_col
 ====
 # Tests that the partitioned join between a and b exploits the existing
 # data partition of its rhs input.
@@ -617,6 +670,7 @@ on (a.int_col = b.int_col and b.bool_col = a.bool_col)
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = int_col, a.bool_col = bool_col
+|  runtime filters: RF000 <- int_col, RF001 <- bool_col
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -627,11 +681,13 @@ on (a.int_col = b.int_col and b.bool_col = a.bool_col)
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.int_col, RF001 -> a.bool_col
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.int_col = int_col, a.bool_col = bool_col
+|  runtime filters: RF000 <- int_col, RF001 <- bool_col
 |
 |--05:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
@@ -650,6 +706,7 @@ on (a.int_col = b.int_col and b.bool_col = a.bool_col)
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.int_col, RF001 -> a.bool_col
 ====
 # Tests that the partitioned join between b and c exploits the existing
 # data partition of its lhs and rhs inputs.
@@ -663,6 +720,7 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 ---- PLAN
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: b.int_col = int_col, b.bool_col = bool_col
+|  runtime filters: RF000 <- int_col, RF001 <- bool_col
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -673,17 +731,20 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
+|  runtime filters: RF002 <- b.int_col, RF003 <- b.bool_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.int_col, RF001 -> a.bool_col, RF002 -> a.int_col, RF003 -> a.bool_col
 ---- DISTRIBUTEDPLAN
 10:EXCHANGE [UNPARTITIONED]
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.int_col = int_col, b.bool_col = bool_col
+|  runtime filters: RF000 <- int_col, RF001 <- bool_col
 |
 |--09:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
@@ -700,6 +761,7 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
+|  runtime filters: RF002 <- b.int_col, RF003 <- b.bool_col
 |
 |--07:EXCHANGE [HASH(b.int_col,b.bool_col)]
 |  |
@@ -710,6 +772,7 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.int_col, RF001 -> a.bool_col, RF002 -> a.int_col, RF003 -> a.bool_col
 ====
 # Tests that all predicates from the On-clause are applied (IMPALA-805)
 # and that slot equivalences are enforced at lowest possible plan node.
@@ -726,6 +789,7 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = a.id, b.string_col = a.string_col
+|  runtime filters: RF000 <- a.id, RF001 <- a.string_col
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
@@ -734,7 +798,7 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
    predicates: b.id = b.int_col, b.id = b.bigint_col, b.string_col = b.date_string_col
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> b.id, RF001 -> b.string_col
 ====
 # Tests that all predicates from the On-clause are applied (IMPALA-805).
 select 1 from functional.alltypes a
@@ -750,6 +814,7 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 ---- PLAN
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: b.id = a.id, b.int_col = a.id, b.bigint_col = a.id, b.id = a.tinyint_col, b.id = a.smallint_col, b.id = a.int_col, b.id = a.bigint_col, b.string_col = a.string_col, b.date_string_col = a.string_col
+|  runtime filters: RF000 <- a.id, RF001 <- a.id, RF002 <- a.id, RF003 <- a.tinyint_col, RF004 <- a.smallint_col, RF005 <- a.int_col, RF006 <- a.bigint_col, RF007 <- a.string_col, RF008 <- a.string_col
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
@@ -757,7 +822,7 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> b.id, RF001 -> b.int_col, RF002 -> b.bigint_col, RF003 -> b.id, RF004 -> b.id, RF005 -> b.id, RF006 -> b.id, RF007 -> b.string_col, RF008 -> b.date_string_col
 ====
 # Tests elimination of redundant join predicates (IMPALA-912).
 select * from
@@ -771,19 +836,21 @@ where a.id = c.id and a.int_col = c.int_col
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = c.id, b.int_col = c.int_col
+|  runtime filters: RF000 <- c.id, RF001 <- c.int_col
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
+|  runtime filters: RF002 <- b.id, RF003 <- b.int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col, RF002 -> a.id, RF003 -> a.int_col
 ====
 # Tests elimination of redundant join predicates (IMPALA-912).
 # This test relies on the desired join order b,a,c which requires
@@ -797,12 +864,14 @@ where a.id = c.id and b.int_col = c.int_col and b.int_col = c.id
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: c.id = a.id
+|  runtime filters: RF000 <- a.id
 |
 |--00:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: b.int_col = c.int_col
+|  runtime filters: RF001 <- c.int_col
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
@@ -810,7 +879,7 @@ where a.id = c.id and b.int_col = c.int_col and b.int_col = c.id
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> b.int_col, RF001 -> b.int_col
 ====
 # Tests elimination of redundant join predicates (IMPALA-912)
 # and that slot equivalences are enforced at the lowest possible plan node.
@@ -824,6 +893,7 @@ on a.int_col = b.int_col and a.int_col = b.smallint_col and a.int_col = b.c
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -840,7 +910,7 @@ on a.int_col = b.int_col and a.int_col = b.smallint_col and a.int_col = b.c
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> functional.alltypes.int_col
 ====
 # Test retainment of join predicates referencing outer-joined tuples
 # that are otherwise redundant (equivalence class already covered
@@ -862,6 +932,7 @@ and t3.bigint_col = t2.bigint_col
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.smallint_col = t3.int_col, t2.bigint_col = t3.int_col
+|  runtime filters: RF000 <- t3.int_col, RF001 <- t3.int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny t3]
 |     partitions=4/4 files=4 size=460B
@@ -869,17 +940,20 @@ and t3.bigint_col = t2.bigint_col
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.smallint_col = t1.smallint_col
+|  runtime filters: RF002 <- t1.smallint_col
 |
 |--00:SCAN HDFS [functional.alltypes t1]
 |     partitions=24/24 files=24 size=478.45KB
 |
 01:SCAN HDFS [functional.alltypesagg t2]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t2.smallint_col, RF001 -> t2.bigint_col, RF002 -> t2.smallint_col
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: t1.smallint_col = t3.int_col, t2.bigint_col = t3.int_col
+|  runtime filters: RF000 <- t3.int_col, RF001 <- t3.int_col
 |
 |--07:EXCHANGE [HASH(t3.int_col)]
 |  |
@@ -889,6 +963,7 @@ and t3.bigint_col = t2.bigint_col
 |
 03:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: t2.smallint_col = t1.smallint_col
+|  runtime filters: RF002 <- t1.smallint_col
 |
 |--06:EXCHANGE [HASH(t1.smallint_col)]
 |  |
@@ -899,6 +974,7 @@ and t3.bigint_col = t2.bigint_col
 |
 01:SCAN HDFS [functional.alltypesagg t2]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t2.smallint_col, RF001 -> t2.bigint_col, RF002 -> t2.smallint_col
 ====
 # Test correct removal of redundant join predicates (IMPALA-1353):
 # Equivalences among inline-view slots are enforced. The predicates
@@ -914,6 +990,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id + id, a.int_col = int_col * int_col
+|  runtime filters: RF000 <- id + id, RF001 <- int_col * int_col
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -921,7 +998,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ====
 # Test correct removal of redundant join predicates (IMPALA-1353):
 # Equivalences among inline-view slots are enforced. The predicates
@@ -938,6 +1015,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id + id, a.int_col = int_col * int_col
+|  runtime filters: RF000 <- id + id, RF001 <- int_col * int_col
 |
 |--03:SELECT
 |  |  predicates: id + id = tinyint_col, int_col * int_col = bigint_col
@@ -950,7 +1028,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ====
 # Test correct removal of redundant join predicates (IMPALA-1353):
 # Equivalences among inline-view slots are enforced. The predicates
@@ -967,6 +1045,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 ---- PLAN
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id + id, a.int_col = int_col * int_col
+|  runtime filters: RF000 <- id + id, RF001 <- int_col * int_col
 |
 |--04:SELECT
 |  |  predicates: id + id = sum(tinyint_col), int_col * int_col = count(bigint_col)
@@ -982,7 +1061,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id, RF001 -> a.int_col
 ====
 # Test correct removal of redundant join predicates (IMPALA-1353):
 # No predicates are removed from the On-clause. The resulting plan is correct
@@ -1003,6 +1082,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = x, a.id = tinyint_col, a.int_col = y, a.int_col = bigint_col
+|  runtime filters: RF000 <- x, RF001 <- tinyint_col, RF002 <- y, RF003 <- bigint_col
 |
 |--01:UNION
 |  |
@@ -1014,7 +1094,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id, RF001 -> a.id, RF002 -> a.int_col, RF003 -> a.int_col
 ====
 # Test creation of predicates at a join node for constructing the
 # minimum spanning tree to cover known slot equivalences (IMPALA-1102).
@@ -1027,19 +1107,21 @@ on t2.string_col = t1.string_col and t3.date_string_col = t2.string_col
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.string_col = t2.string_col
+|  runtime filters: RF000 <- t2.string_col
 |
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.tinyint_col = t3.smallint_col, t1.string_col = t3.date_string_col
+|  runtime filters: RF001 <- t3.smallint_col, RF002 <- t3.date_string_col
 |
 |--01:SCAN HDFS [functional.alltypestiny t3]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> t1.string_col, RF001 -> t1.tinyint_col, RF002 -> t1.string_col
 ====
 # Regression test for IMPALA-935.
 select 1 from
@@ -1104,12 +1186,12 @@ inner join
 functional.alltypestiny b
 on a.id = b.id
 where b.id < 5
----- PLAN
 ---- DISTRIBUTEDPLAN
 06:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -1127,6 +1209,7 @@ where b.id < 5
 01:SCAN HDFS [functional.alltypessmall]
    partitions=1/4 files=1 size=1.57KB
    predicates: functional.alltypessmall.id < 5
+   runtime filters: RF000 -> functional.alltypessmall.id
 ====
 # Test joins with union inputs. One input is a union.
 select a.id, b.id, a.string_col, b.string_col
@@ -1142,12 +1225,12 @@ left outer join
    select 0, '1234') a
 on a.id = b.id
 where b.id < 5
----- PLAN
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--06:EXCHANGE [HASH(b.id)]
 |  |
@@ -1167,6 +1250,7 @@ where b.id < 5
 02:SCAN HDFS [functional.alltypessmall]
    partitions=1/4 files=1 size=1.57KB
    predicates: functional.alltypessmall.id < 5
+   runtime filters: RF000 -> functional.alltypessmall.id
 ====
 # Test joins with union inputs. Both inputs are a union.
 select a.id, b.id, a.string_col, b.string_col
@@ -1188,7 +1272,6 @@ full outer join
    select 0, '5678') b
 on a.id = b.id
 where b.id < 5
----- PLAN
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
 |
@@ -1230,13 +1313,14 @@ from functional.decimal_tbl a join functional.decimal_tbl b on a.d1 = b.d5
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.d1 = b.d5
+|  runtime filters: RF000 <- b.d5
 |
 |--01:SCAN HDFS [functional.decimal_tbl b]
 |     partitions=1/1 files=1 size=195B
 |
 00:SCAN HDFS [functional.decimal_tbl a]
    partitions=1/1 files=1 size=195B
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.d1
 ====
 # Test left semi join including correct predicate assignment and propagation
 select j.* from functional.jointbl j left semi join functional.dimtbl d
@@ -1246,6 +1330,7 @@ where j.test_id < 10
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: j.test_id = d.id
 |  other join predicates: j.test_zip < d.zip
+|  runtime filters: RF000 <- d.id
 |
 |--01:SCAN HDFS [functional.dimtbl d]
 |     partitions=1/1 files=1 size=171B
@@ -1254,7 +1339,7 @@ where j.test_id < 10
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 files=1 size=433B
    predicates: j.test_id < 10
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> j.test_id
 ====
 # Test right semi join including correct predicate assignment and propagation
 select b.* from functional.alltypes a right semi join functional.alltypestiny b
@@ -1264,6 +1349,7 @@ where b.id < 10
 02:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: a.int_col < b.int_col
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
@@ -1272,7 +1358,7 @@ where b.id < 10
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col = FALSE, a.id < 10
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id
 ====
 # Test left anti join including correct predicate assignment and propagation
 select j.* from functional.jointbl j left anti join functional.dimtbl d
@@ -1290,7 +1376,6 @@ where j.test_id < 10
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 files=1 size=433B
    predicates: j.test_id < 10
----- DISTRIBUTEDPLAN
 ====
 # Test query with anti join and inner join and predicates
 select count(*) from functional.JoinTbl j
@@ -1302,6 +1387,7 @@ inner join functional.JoinTbl k on j.test_id = k.test_id and j.alltypes_id = 500
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: j.test_id = k.test_id
+|  runtime filters: RF000 <- k.test_id
 |
 |--02:SCAN HDFS [functional.jointbl k]
 |     partitions=1/1 files=1 size=433B
@@ -1315,18 +1401,18 @@ inner join functional.JoinTbl k on j.test_id = k.test_id and j.alltypes_id = 500
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 files=1 size=433B
    predicates: j.alltypes_id = 5000
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> j.test_id
 ====
 # Test legacy-style join hints.
 select straight_join * from functional.alltypestiny a
 inner join [broadcast] functional.alltypes b on a.id = b.id
 inner join [shuffle] functional.alltypessmall c on b.id = c.id
----- PLAN
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
 |
 |--07:EXCHANGE [HASH(c.id)]
 |  |
@@ -1337,6 +1423,7 @@ inner join [shuffle] functional.alltypessmall c on b.id = c.id
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF001 <- b.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -1345,17 +1432,18 @@ inner join [shuffle] functional.alltypessmall c on b.id = c.id
 |
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> a.id, RF001 -> a.id
 ====
 # Test traditional commented join hints.
 select /* +straight_join */ * from functional.alltypestiny a
 inner join /* +broadcast */ functional.alltypes b on a.id = b.id
 inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
----- PLAN
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
 |
 |--07:EXCHANGE [HASH(c.id)]
 |  |
@@ -1366,6 +1454,7 @@ inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF001 <- b.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -1374,6 +1463,7 @@ inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
 |
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> a.id, RF001 -> a.id
 ====
 # Test end-of-line commented join hints.
 select
@@ -1385,12 +1475,12 @@ functional.alltypes b on a.id = b.id
 inner join
 -- +shuffle
 functional.alltypessmall c on b.id = c.id
----- PLAN
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
 |
 |--07:EXCHANGE [HASH(c.id)]
 |  |
@@ -1401,6 +1491,7 @@ functional.alltypessmall c on b.id = c.id
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF001 <- b.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -1409,6 +1500,7 @@ functional.alltypessmall c on b.id = c.id
 |
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> a.id, RF001 -> a.id
 ====
 # Regression test for IMPALA-1289. Predicates should be assigned correctly
 # to inverted joins.
@@ -1425,16 +1517,17 @@ where c.id != b.id
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF000 <- b.id
 |  |
 |  |--01:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  00:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
 ====
 # Tests the generation of a distributed plan in which the input fragments
 # of a join node have compatible but not the same number of partitioning exprs with
@@ -1452,12 +1545,12 @@ inner join
 on (v1.tinyint_col = v2.tinyint_col and
     v1.tinyint_col = v2.int_col and
     v1.tinyint_col = v2.bigint_col)
----- PLAN
 ---- DISTRIBUTEDPLAN
 10:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: tinyint_col = tinyint_col
+|  runtime filters: RF000 <- tinyint_col
 |
 |--09:EXCHANGE [HASH(tinyint_col,tinyint_col,tinyint_col)]
 |  |
@@ -1483,6 +1576,7 @@ on (v1.tinyint_col = v2.tinyint_col and
 02:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.tinyint_col = functional.alltypessmall.int_col, functional.alltypessmall.tinyint_col = functional.alltypessmall.bigint_col
+   runtime filters: RF000 -> functional.alltypessmall.tinyint_col
 ====
 # Same as above but with a full outer join.
 # Tests the generation of a distributed plan in which the input fragments
@@ -1501,7 +1595,6 @@ full outer join
 on (v1.tinyint_col = v2.tinyint_col and
     v1.tinyint_col = v2.int_col and
     v1.tinyint_col = v2.bigint_col)
----- PLAN
 ---- DISTRIBUTEDPLAN
 10:EXCHANGE [UNPARTITIONED]
 |
@@ -1548,12 +1641,12 @@ inner join
    group by string_col, bigint_col) v2
 on (v1.string_col = v2.string_col and
     v1.bigint_col = v2.bigint_col)
----- PLAN
 ---- DISTRIBUTEDPLAN
 10:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: string_col = string_col, bigint_col = bigint_col
+|  runtime filters: RF000 <- string_col, RF001 <- bigint_col
 |
 |--09:EXCHANGE [HASH(bigint_col,string_col)]
 |  |
@@ -1578,6 +1671,7 @@ on (v1.string_col = v2.string_col and
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.string_col, RF001 -> functional.alltypestiny.bigint_col
 ====
 # Test that hash exprs are re-ordered as necessary when placing a join into
 # a fragment with a compatible data partition (IMPALA-1324)
@@ -1587,12 +1681,12 @@ select straight_join * from
 left semi join functional.alltypes b
 # predicates are in reverse order of compatible group by exprs
 on (a.string_col = b.string_col and a.int_col = b.int_col)
----- PLAN
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: string_col = b.string_col, int_col = b.int_col
+|  runtime filters: RF000 <- b.string_col, RF001 <- b.int_col
 |
 |--06:EXCHANGE [HASH(b.int_col,b.string_col)]
 |  |
@@ -1609,6 +1703,7 @@ on (a.string_col = b.string_col and a.int_col = b.int_col)
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.string_col, RF001 -> functional.alltypestiny.int_col
 ====
 # Same as above but with the join inverted.
 select straight_join * from
@@ -1618,12 +1713,12 @@ right semi join
    from functional.alltypestiny) b
 # predicates are in reverse order of compatible group by exprs
 on (a.string_col = b.string_col and a.int_col = b.int_col)
----- PLAN
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: a.string_col = string_col, a.int_col = int_col
+|  runtime filters: RF000 <- string_col, RF001 <- int_col
 |
 |--05:AGGREGATE [FINALIZE]
 |  |  group by: int_col, string_col
@@ -1640,6 +1735,7 @@ on (a.string_col = b.string_col and a.int_col = b.int_col)
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.string_col, RF001 -> a.int_col
 ====
 # Complex combined regression test for IMPALA-1307 and IMPALA-1324
 select straight_join * from
@@ -1656,12 +1752,12 @@ inner join
     from functional.alltypes
     where bigint_col = smallint_col and smallint_col = tinyint_col) c
 on (b.int_col = c.smallint_col and b.string_col = c.string_col)
----- PLAN
 ---- DISTRIBUTEDPLAN
 16:EXCHANGE [UNPARTITIONED]
 |
 07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = smallint_col, string_col = string_col
+|  runtime filters: RF000 <- smallint_col, RF001 <- string_col
 |
 |--15:EXCHANGE [HASH(string_col,smallint_col,smallint_col)]
 |  |
@@ -1679,6 +1775,7 @@ on (b.int_col = c.smallint_col and b.string_col = c.string_col)
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col, string_col = string_col
+|  runtime filters: RF002 <- int_col, RF003 <- string_col
 |
 |--12:EXCHANGE [HASH(string_col,int_col,int_col)]
 |  |
@@ -1705,6 +1802,7 @@ on (b.int_col = c.smallint_col and b.string_col = c.string_col)
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.smallint_col = functional.alltypessmall.int_col
+   runtime filters: RF000 -> functional.alltypessmall.int_col, RF001 -> functional.alltypessmall.string_col, RF002 -> functional.alltypessmall.int_col, RF003 -> functional.alltypessmall.string_col
 ====
 # Assignment of predicates from the On-clause of an
 # anti join; inner join followed by anti join (IMPALA-1387)
@@ -1729,13 +1827,14 @@ where not exists (select *
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> a.id
 ====
 # Assignment of predicates from the On-clause of an anti join;
 # sequence of inner joins interleaved with an anti join.
@@ -1753,6 +1852,7 @@ where a.float_col < b.float_col
 ---- PLAN
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = d.tinyint_col
+|  runtime filters: RF000 <- d.tinyint_col
 |
 |--03:SCAN HDFS [functional.alltypesagg d]
 |     partitions=11/11 files=11 size=814.73KB
@@ -1768,14 +1868,16 @@ where a.float_col < b.float_col
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = a.id
 |  other predicates: a.float_col < b.float_col
+|  runtime filters: RF001 <- a.id
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: a.int_col < 10
+|     runtime filters: RF000 -> a.tinyint_col
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
+   runtime filters: RF001 -> b.id
 ====
 # Inner joins with non-equi join predicates
 select *
@@ -1802,12 +1904,14 @@ where a.int_col = 10 and c.bigint_col = d.bigint_col
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: d.bigint_col = c.bigint_col
+|  runtime filters: RF000 <- c.bigint_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
 |     partitions=24/24 files=24 size=478.45KB
 |
 03:SCAN HDFS [functional.alltypesagg d]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> d.bigint_col
 ---- DISTRIBUTEDPLAN
 11:EXCHANGE [UNPARTITIONED]
 |
@@ -1830,6 +1934,7 @@ where a.int_col = 10 and c.bigint_col = d.bigint_col
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: d.bigint_col = c.bigint_col
+|  runtime filters: RF000 <- c.bigint_col
 |
 |--08:EXCHANGE [HASH(c.bigint_col)]
 |  |
@@ -1840,6 +1945,7 @@ where a.int_col = 10 and c.bigint_col = d.bigint_col
 |
 03:SCAN HDFS [functional.alltypesagg d]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> d.bigint_col
 ====
 # Inner joins between inline views with non-equi join predicates
 select *
@@ -1876,7 +1982,6 @@ where vv1.tinyint_col < 10
 03:SCAN HDFS [functional.alltypesagg c]
    partitions=11/11 files=11 size=814.73KB
    predicates: c.tinyint_col = 10
----- DISTRIBUTEDPLAN
 ====
 # Inner, left-outer, left-semi and left-anti joins with non-equi join
 # predicates
@@ -1918,7 +2023,6 @@ where a.id < 10
 |
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
----- DISTRIBUTEDPLAN
 ====
 # Regression test for IMPALA-2495: Crash: impala::InPredicate::SetLookupPrepare
 select count(id) from functional.alltypestiny t1
@@ -1938,7 +2042,6 @@ where t2.int_col in (t2.int_col, 10);
 |
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
----- DISTRIBUTEDPLAN
 ====
 # Test queries that appear earlier in this file, but substitute "<=>" or "IS DISTINCT
 # FROM" for "=" in the join predicates.
@@ -1948,6 +2051,7 @@ where t1.id <=> t2.id and t1.zip = 94611
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id IS NOT DISTINCT FROM t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.testtbl t2]
 |     partitions=1/1 files=0 size=0B
@@ -1955,7 +2059,7 @@ where t1.id <=> t2.id and t1.zip = 94611
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
    predicates: t1.zip = 94611
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> t1.id
 ====
 select *
 from functional.testtbl t1 join functional.testtbl t2
@@ -1963,6 +2067,7 @@ where t1.id is not distinct from t2.id and t1.zip = 94611
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id IS NOT DISTINCT FROM t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.testtbl t2]
 |     partitions=1/1 files=0 size=0B
@@ -1970,7 +2075,7 @@ where t1.id is not distinct from t2.id and t1.zip = 94611
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
    predicates: t1.zip = 94611
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> t1.id
 ====
 select *
 from functional.testtbl t1 join functional.testtbl t2
@@ -1985,7 +2090,6 @@ where (t1.id IS DISTINCT FROM t2.id) and t1.zip = 94611
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
    predicates: t1.zip = 94611
----- DISTRIBUTEDPLAN
 ====
 # Test that "is not distinct from" plans the same as "=" in the same query above.
 select t1.*
@@ -2001,13 +2105,14 @@ from (select * from functional.alltypestiny) t1
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypestiny.id IS NOT DISTINCT FROM functional.alltypestiny.id
+|  runtime filters: RF000 <- functional.alltypestiny.id
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> functional.alltypestiny.id
 ====
 select *
 from functional.alltypesagg a
@@ -2039,7 +2144,6 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
    partitions=2/10 files=2 size=148.10KB
----- DISTRIBUTEDPLAN
 ====
 select t1.d, t2.d from functional.nulltable t1, functional.nulltable t2
 where not(t1.d IS DISTINCT FROM t2.d)
@@ -2052,7 +2156,6 @@ where not(t1.d IS DISTINCT FROM t2.d)
 |
 00:SCAN HDFS [functional.nulltable t1]
    partitions=1/1 files=1 size=18B
----- DISTRIBUTEDPLAN
 ====
 select t1.d, t2.d
 from functional.nulltable t1, functional.nulltable t2, functional.nulltable t3
@@ -2073,5 +2176,4 @@ and t3.a != t2.g
 |
 00:SCAN HDFS [functional.nulltable t1]
    partitions=1/1 files=1 size=18B
----- DISTRIBUTEDPLAN
 ====

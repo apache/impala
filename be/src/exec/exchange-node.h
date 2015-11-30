@@ -40,7 +40,7 @@ class ExchangeNode : public ExecNode {
  public:
   ExchangeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   /// Blocks until the first batch is available for consumption via GetNext().
   virtual Status Open(RuntimeState* state);
@@ -106,4 +106,3 @@ class ExchangeNode : public ExecNode {
 };
 
 #endif
-

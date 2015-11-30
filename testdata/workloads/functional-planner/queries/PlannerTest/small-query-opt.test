@@ -172,6 +172,7 @@ select * from
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -180,6 +181,7 @@ select * from
 |
 00:SCAN HDFS [functional.testtbl a]
    partitions=1/1 files=0 size=0B
+   runtime filters: RF000 -> a.id
 ====
 select * from
   functional.testtbl a, functional.testtbl b
@@ -205,6 +207,7 @@ where a.id in (select id from functional.alltypestiny limit 5) limit 5
 |
 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: a.id = id
+|  runtime filters: RF000 <- id
 |  limit: 5
 |
 |--04:EXCHANGE [BROADCAST]
@@ -218,6 +221,7 @@ where a.id in (select id from functional.alltypestiny limit 5) limit 5
 |
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> a.id
 ====
 # Test correct single-node planning for mixed union distinct/all (IMPALA-1553).
 select

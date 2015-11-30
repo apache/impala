@@ -72,7 +72,7 @@ enum TReplicaPreference {
 }
 
 // Specification of a runtime filter
-struct TRuntimeFilter {
+struct TRuntimeFilterDesc {
   // Filter unique id (within a query)
   1: required i32 filter_id
 
@@ -443,7 +443,7 @@ struct TPlanNode {
   20: optional ExecStats.TExecStats estimated_stats
 
   // Runtime filters assigned to this plan node
-  22: optional list<TRuntimeFilter> runtime_filters
+  22: optional list<TRuntimeFilterDesc> runtime_filters
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

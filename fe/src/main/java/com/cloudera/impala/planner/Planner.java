@@ -75,7 +75,8 @@ public class Planner {
         // Only one scanner thread for small queries
         ctx_.getQueryOptions().setNum_scanner_threads(1);
       }
-    } else if (ctx_.getQueryOptions().isEnable_runtime_filter_propagation()) {
+    } else {
+      // Always compute filters, even if the BE won't always use all of them.
       RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
           singleNodePlan);
       ctx_.getRootAnalyzer().getTimeline().markEvent(

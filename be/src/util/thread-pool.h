@@ -175,7 +175,6 @@ class CallableThreadPool : public ThreadPool<boost::function<void()> > {
   }
 };
 
-
 }
 
 #endif

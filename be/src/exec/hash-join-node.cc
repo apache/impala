@@ -58,12 +58,11 @@ HashJoinNode::HashJoinNode(
   match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
   match_all_build_ =
     (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
-  can_add_probe_filters_ = tnode.hash_join_node.add_probe_filters;
-  can_add_probe_filters_ &= FLAGS_enable_probe_side_filtering;
+  can_add_runtime_filters_ = FLAGS_enable_probe_side_filtering;
 }
 
-Status HashJoinNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode));
+Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
   DCHECK(tnode.__isset.hash_join_node);
   const vector<TEqJoinCondition>& eq_join_conjuncts =
       tnode.hash_join_node.eq_join_conjuncts;
@@ -78,6 +77,19 @@ Status HashJoinNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
+
+  BOOST_FOREACH(const TRuntimeFilterDesc& tfilter, tnode.runtime_filters) {
+    // If filter propagation not enabled, only consider building broadcast joins (that may
+    // be consumed by this fragment).
+    if (!state->query_options().enable_runtime_filter_propagation &&
+        !tfilter.is_broadcast_join) {
+      continue;
+    }
+    filters_.push_back(state->filter_bank()->RegisterFilter(tfilter, true));
+    ExprContext* ctx;
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, tfilter.src_expr, &ctx));
+    filter_expr_ctxs_.push_back(ctx);
+  }
   return Status::OK();
 }
 
@@ -98,6 +110,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
   AddExprCtxsToFree(probe_expr_ctxs_);
+  RETURN_IF_ERROR(
+      Expr::Prepare(filter_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
+  AddExprCtxsToFree(probe_expr_ctxs_);
 
   // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
   // build and probe tuples; full_row_desc is not necessarily the same as the output row
@@ -113,8 +128,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(), false,
                       std::logical_or<bool>());
   hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
-      child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
-      is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker()));
+          filter_expr_ctxs_,
+          child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
+          is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
 
   bool build_codegen_enabled = false;
   bool probe_codegen_enabled = false;
@@ -159,6 +175,7 @@ void HashJoinNode::Close(RuntimeState* state) {
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
+  Expr::Close(filter_expr_ctxs_, state);
   Expr::Close(other_join_conjunct_ctxs_, state);
   BlockingJoinNode::Close(state);
 }
@@ -166,6 +183,7 @@ void HashJoinNode::Close(RuntimeState* state) {
 Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
+  RETURN_IF_ERROR(Expr::Open(filter_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
 
   // Do a full scan of child(1) and store everything in hash_tbl_
@@ -211,12 +229,13 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // We only do this if the build side is sufficiently small.
   // TODO: Better heuristic? Currently we simply compare the size of the HT with a
   // constant value.
-  if (can_add_probe_filters_) {
-    if (hash_tbl_->size() < state->slot_filter_bitmap_size()) {
-      AddRuntimeExecOption("Build-Side Filter Pushed Down");
-      hash_tbl_->AddBitmapFilters();
+  if (can_add_runtime_filters_) {
+    if (!state->filter_bank()->ShouldDisableFilter(hash_tbl_->size())) {
+      AddRuntimeExecOption("Build-Side Filter Built");
+      hash_tbl_->AddBloomFilters();
     } else {
-      VLOG(2) << "Disabling probe filter push down because build table is too large: "
+      AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
+      VLOG(2) << "Disabling runtime filter build because build table is too large: "
               << hash_tbl_->size();
     }
   }

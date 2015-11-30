@@ -31,6 +31,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
+#include "runtime/runtime-filter.h"
 #include "util/bitmap.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -73,7 +74,8 @@ RuntimeState::RuntimeState(const TExecPlanFragmentParams& fragment_params,
         "Fragment " + PrintId(fragment_ctx().fragment_instance_id)),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
-    root_node_id_(-1) {
+    root_node_id_(-1),
+    filter_bank_(fragment_ctx().query_ctx, this) {
   Status status = Init(exec_env);
   DCHECK(status.ok()) << status.GetDetail();
 }
@@ -86,7 +88,8 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
-    root_node_id_(-1) {
+    root_node_id_(-1),
+    filter_bank_(query_ctx, this) {
   fragment_params_.fragment_instance_ctx.__set_query_ctx(query_ctx);
   fragment_params_.fragment_instance_ctx.query_ctx.request.query_options
       .__set_batch_size(DEFAULT_BATCH_SIZE);
@@ -94,15 +97,6 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
 
 RuntimeState::~RuntimeState() {
   block_mgr_.reset();
-
-  typedef boost::unordered_map<SlotId, Bitmap*>::iterator SlotBitmapIterator;
-  for (SlotBitmapIterator it = slot_bitmap_filters_.begin();
-       it != slot_bitmap_filters_.end(); ++it) {
-    if (it->second != NULL) {
-      delete it->second;
-      it->second = NULL;
-    }
-  }
 
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
@@ -291,24 +285,6 @@ Status RuntimeState::CheckQueryState() {
   // cases where we use Status::CANCELLED to indicate that the limit was reached.
   if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
   return GetQueryStatus();
-}
-
-void RuntimeState::AddBitmapFilter(SlotId slot, Bitmap* bitmap,
-    bool* acquired_ownership) {
-  *acquired_ownership = false;
-  if (bitmap != NULL) {
-    lock_guard<SpinLock> l(bitmap_lock_);
-    if (slot_bitmap_filters_.find(slot) != slot_bitmap_filters_.end()) {
-      Bitmap* existing_bitmap = slot_bitmap_filters_[slot];
-      DCHECK(existing_bitmap != NULL);
-      existing_bitmap->And(bitmap);
-    } else {
-      // This is the first time we set the slot_bitmap_filters_[slot]. We avoid
-      // allocating a new bitmap by using the passed bitmap.
-      slot_bitmap_filters_[slot] = bitmap;
-      *acquired_ownership = true;
-    }
-  }
 }
 
 Status RuntimeState::GetCodegen(LlvmCodeGen** codegen, bool initialize) {

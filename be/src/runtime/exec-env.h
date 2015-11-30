@@ -96,6 +96,7 @@ class ExecEnv {
   ImpalaServer* impala_server() { return impala_server_; }
   Frontend* frontend() { return frontend_.get(); };
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
+  CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -141,6 +142,7 @@ class ExecEnv {
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
   boost::scoped_ptr<CallableThreadPool> fragment_exec_thread_pool_;
+  boost::scoped_ptr<CallableThreadPool> async_rpc_pool_;
 
   /// Not owned by this class
   ImpalaServer* impala_server_;

@@ -76,11 +76,13 @@ on e.id = f.id
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: f.id = t1.id
+|  runtime filters: RF000 <- t1.id
 |
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall f]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> f.id
 ====
 # Constant conjunct causes union operand to be dropped.
 select * from functional.alltypessmall
@@ -143,12 +145,14 @@ on (a.id = b.id and !true)
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: NOT TRUE
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -196,11 +200,13 @@ on e.id = f.id
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: f.id = t1.id
+|  runtime filters: RF000 <- t1.id
 |
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall f]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> f.id
 ====
 # Limit 0 causes union operand to be dropped.
 select * from functional.alltypessmall
@@ -435,7 +441,7 @@ where c_custkey < 10
 |  03:EMPTYSET
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: c_custkey < 10
 ====
 # IMPALA-2539: Test empty union operands containing relative table refs.
@@ -467,7 +473,7 @@ where c_custkey = 1
 |  04:UNNEST [c.c_orders o1]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: c_custkey = 1
 ====
 # IMPALA-2215: Having clause without aggregation.

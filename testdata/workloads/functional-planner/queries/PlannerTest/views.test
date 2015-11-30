@@ -22,6 +22,7 @@ select * from functional.complex_view
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
@@ -29,6 +30,7 @@ select * from functional.complex_view
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: a.bigint_col < 50
+   runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: b.string_col ASC
@@ -50,6 +52,7 @@ select * from functional.complex_view
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -59,6 +62,7 @@ select * from functional.complex_view
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: a.bigint_col < 50
+   runtime filters: RF000 -> a.id
 ====
 # Basic test with a view on a view
 select int_col, string_col from functional.view_view
@@ -115,6 +119,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 ---- PLAN
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = count(a.bigint_col)
+|  runtime filters: RF000 <- count(a.bigint_col)
 |
 |--06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
@@ -126,6 +131,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF002 <- b.id
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -133,9 +139,11 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  02:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
+|     runtime filters: RF002 -> a.id
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -144,11 +152,13 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 15:EXCHANGE [UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = count(a.bigint_col)
+|  runtime filters: RF000 <- count(a.bigint_col)
 |
 |--14:EXCHANGE [BROADCAST]
 |  |
@@ -172,6 +182,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = b.id
+|  |  runtime filters: RF002 <- b.id
 |  |
 |  |--10:EXCHANGE [BROADCAST]
 |  |  |
@@ -181,9 +192,11 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  02:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
+|     runtime filters: RF002 -> a.id
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--09:EXCHANGE [BROADCAST]
 |  |
@@ -194,6 +207,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ====
 # Self-join of view to make sure the on clause is properly set
 # in the cloned view instances.
@@ -203,23 +217,27 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF001 <- functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -228,6 +246,7 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF001 <- functional.alltypes.id
 |
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -238,6 +257,7 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ====
 # Self-join views to make sure the using clause is properly set
 # in the cloned view instances.
@@ -247,23 +267,27 @@ inner join functional.alltypes_view t3 using(id)
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF001 <- functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -272,6 +296,7 @@ inner join functional.alltypes_view t3 using(id)
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF001 <- functional.alltypes.id
 |
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -282,6 +307,7 @@ inner join functional.alltypes_view t3 using(id)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ====
 # Self-join of view to make sure the join op is properly set
 # in the cloned view instances.
@@ -337,23 +363,27 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF001 <- functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -364,6 +394,7 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
+|  runtime filters: RF001 <- functional.alltypes.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -372,6 +403,7 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ====
 # Tests that parentheses are preserved when creating a view
 # enabling proper partition pruning for this particular view.

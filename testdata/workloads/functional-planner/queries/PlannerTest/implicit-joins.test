@@ -13,12 +13,14 @@ from (select * from functional.alltypestiny) t1
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypestiny.id = functional.alltypestiny.id
+|  runtime filters: RF000 <- functional.alltypestiny.id
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.id
 ====
 select *
 from
@@ -52,12 +54,14 @@ where
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
 ====
 select *
 from
@@ -74,12 +78,14 @@ where
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t3.id
+|  runtime filters: RF000 <- t3.id
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
 ====
 # The hash join will not be executed first, because this is the first executable
 # plan we find and t1 is the largest table (which is moved to the front of
@@ -94,6 +100,7 @@ where
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
+|  runtime filters: RF000 <- t3.id
 |
 |--02:SCAN HDFS [functional.alltypessmall t3]
 |     partitions=4/4 files=4 size=6.32KB
@@ -102,6 +109,7 @@ where
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> t2.id
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
@@ -163,6 +171,7 @@ where a.id = d.id and b.id = c.id
 ---- PLAN
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = d.id
+|  runtime filters: RF000 <- d.id
 |
 |--03:SCAN HDFS [functional.alltypes d]
 |     partitions=24/24 files=24 size=478.45KB
@@ -171,15 +180,18 @@ where a.id = d.id and b.id = c.id
 |
 |--00:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = c.id
+|  runtime filters: RF001 <- c.id
 |
 |--02:SCAN HDFS [functional.alltypestiny c]
 |     partitions=4/4 files=4 size=460B
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF001 -> b.id
 ====
 # Do not allow a non-equi outer join
 select count(*)
@@ -232,6 +244,7 @@ where
 |  hash predicates: t1.id = t2.id
 |  other join predicates: t1.id < t2.id
 |  other predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
@@ -243,6 +256,7 @@ where
 |
 01:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
 ====
 select count(*)
 from
@@ -265,6 +279,7 @@ where
 |  hash predicates: t1.id = t2.id
 |  other join predicates: t1.id < t2.id
 |  other predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
@@ -276,6 +291,7 @@ where
 |
 01:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
 ====
 select count(*)
 from
@@ -344,10 +360,12 @@ functional.alltypes t4
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
 ====

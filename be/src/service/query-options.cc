@@ -317,6 +317,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enable_runtime_filter_propagation(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE: {
+          int32 size = atoi(value.c_str());
+          query_options->__set_runtime_bloom_filter_size(size);
+          break;
+        }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

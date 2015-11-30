@@ -160,6 +160,7 @@ ExecEnv::ExecEnv()
     fragment_exec_thread_pool_(
         new CallableThreadPool("coordinator-fragment-rpc", "worker",
             FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
+    async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false),
@@ -213,6 +214,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     fragment_exec_thread_pool_(
         new CallableThreadPool("coordinator-fragment-rpc", "worker",
             FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
+    async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false),

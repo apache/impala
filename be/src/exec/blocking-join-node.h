@@ -43,7 +43,7 @@ class BlockingJoinNode : public ExecNode {
 
   /// Subclasses should call BlockingJoinNode::Init() and then perform any other Init()
   /// work, e.g. creating expr trees.
-  virtual Status Init(const TPlanNode& tnode);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
 
   /// Subclasses should call BlockingJoinNode::Prepare() and then perform any other
   /// Prepare() work, e.g. codegen.
@@ -91,10 +91,10 @@ class BlockingJoinNode : public ExecNode {
   /// so this tuple is temporarily assembled for evaluating the conjuncts.
   TupleRow* semi_join_staging_row_;
 
-  /// If true, this node can add filters to the probe (left child) node after processing
-  /// the entire build side.
+  /// If true, this node can build filters from the build side that can be used elsewhere
+  /// in the plan to eliminate rows early.
   /// Note that we disable probe filters if we are inside a subplan.
-  bool can_add_probe_filters_;
+  bool can_add_runtime_filters_;
 
   RuntimeProfile::Counter* build_timer_;   // time to prepare build side
   RuntimeProfile::Counter* probe_timer_;   // time to process the probe (left child) batch

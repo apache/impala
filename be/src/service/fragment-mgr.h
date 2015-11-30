@@ -61,6 +61,10 @@ class FragmentMgr {
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(
       const TUniqueId& fragment_instance_id);
 
+  /// Publishes a global runtime filter to a local fragment.
+  void PublishFilter(TPublishFilterResult& return_val,
+      const TPublishFilterParams& params);
+
  private:
   /// protects fragment_exec_state_map_
   SpinLock fragment_exec_state_map_lock_;

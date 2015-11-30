@@ -21,7 +21,6 @@
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "runtime/mem-pool.h"
-#include "util/bitmap.h"
 #include "util/hash-util.h"
 #include "util/runtime-profile.h"
 
@@ -35,6 +34,7 @@ class Expr;
 class ExprContext;
 class LlvmCodeGen;
 class MemTracker;
+class RuntimeFilter;
 class RowDescriptor;
 class RuntimeState;
 class Tuple;
@@ -91,6 +91,7 @@ class OldHashTable {
   /// Create a hash table.
   ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
   ///  - probe_exprs are used during Find()
+  ///  - filter_expr_ctxs are used to build runtime filters.
   ///  - num_build_tuples: number of Tuples in the build tuple row
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   ///  - finds_nulls: if finds_nulls[i] is false, Find() returns End() for TupleRows with
@@ -106,9 +107,11 @@ class OldHashTable {
   ///       in which nulls are stored and columns in which they are not, which could save
   ///       space by not storing some rows we know will never match.
   OldHashTable(RuntimeState* state, const std::vector<ExprContext*>& build_expr_ctxs,
-      const std::vector<ExprContext*>& probe_expr_ctxs, int num_build_tuples,
+      const std::vector<ExprContext*>& probe_expr_ctxs,
+      const std::vector<ExprContext*>& filter_expr_ctxs, int num_build_tuples,
       bool stores_nulls, const std::vector<bool>& finds_nulls, int32_t initial_seed,
-      MemTracker* mem_tracker, bool stores_tuples = false, int64_t num_buckets = 1024);
+      MemTracker* mem_tracker, const std::vector<RuntimeFilter*>& filters,
+      bool stores_tuples = false, int64_t num_buckets = 1024);
 
   /// Call to cleanup any resources. Must be called once.
   void Close();
@@ -207,13 +210,9 @@ class OldHashTable {
     return expr_value_null_bits_[expr_idx];
   }
 
-  /// Can be called after all insert calls to add bitmap filters for the probe
-  /// side values.
-  /// For each probe_expr_ that is a slot ref, generate a bitmap filter on that slot.
-  /// These filters are added to the runtime state.
-  /// The bitmap filter is similar to a Bloom filter in that has no false negatives
-  /// but will have false positives.
-  void AddBitmapFilters();
+  /// Can be called after all insert calls to generate runtime filters, which are then
+  /// published to the local runtime state's RuntimeFilterBank.
+  void AddBloomFilters();
 
   /// Returns an iterator at the beginning of the hash table.  Advancing this iterator
   /// will traverse all elements.
@@ -431,6 +430,13 @@ class OldHashTable {
 
   const std::vector<ExprContext*>& build_expr_ctxs_;
   const std::vector<ExprContext*>& probe_expr_ctxs_;
+
+  /// Expression, one per filter in filters_, to evaluate per-build row which produces the
+  /// value with which to update the corresponding filter.
+  std::vector<ExprContext*> filter_expr_ctxs_;
+
+  /// List of filters to build during build phase.
+  std::vector<RuntimeFilter*> filters_;
 
   /// Number of Tuple* in the build tuple row
   const int num_build_tuples_;

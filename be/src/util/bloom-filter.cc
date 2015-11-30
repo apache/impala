@@ -22,6 +22,8 @@
 #include "runtime/runtime-state.h"
 #include "util/hash-util.h"
 
+using namespace std;
+
 namespace impala {
 
 BloomFilter::BloomFilter(const int log_heap_space, RuntimeState* state,
@@ -41,7 +43,7 @@ BloomFilter::BloomFilter(const int log_heap_space, RuntimeState* state,
       << "Bloom filter too large. log_heap_space: " << log_heap_space;
   DCHECK_EQ(client_ == NULL, state_ == NULL);
   // Each bucket has 64 = 2^6 bytes:
-  const size_t alloc_size = 1ull << (log_num_buckets_ + 6);
+  const size_t alloc_size = 1ull << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
   if (state_) {
     const bool consume_success = state_->block_mgr()->ConsumeMemory(client_, alloc_size);
     DCHECK(consume_success) << "ConsumeMemory failed. log_heap_space: "
@@ -57,14 +59,41 @@ BloomFilter::BloomFilter(const int log_heap_space, RuntimeState* state,
   memset(directory_, 0, alloc_size);
 }
 
+BloomFilter::BloomFilter(const TBloomFilter& thrift, RuntimeState* state,
+    BufferedBlockMgr::Client* client)
+    : BloomFilter(thrift.log_heap_space, state, client) {
+  DCHECK_EQ(thrift.directory.size(), 1ll << log_num_buckets_);
+  for (int i = 0; i < thrift.directory.size(); ++i) {
+    memcpy(&directory_[i], &thrift.directory[i][0], sizeof(BucketWord) * BUCKET_WORDS);
+  }
+}
+
 BloomFilter::~BloomFilter() {
   if (directory_) {
     if (state_) {
-      state_->block_mgr()->ReleaseMemory(client_, 1ll << (log_num_buckets_ + 6));
+      state_->block_mgr()->ReleaseMemory(client_,
+          1ll << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE));
     }
     free(directory_);
     directory_ = NULL;
   }
+}
+
+void BloomFilter::ToThrift(TBloomFilter* thrift) const {
+  thrift->log_heap_space = log_num_buckets_ + LOG_BUCKET_BYTE_SIZE;
+  for (int i = 0; i < (1ll << log_num_buckets_); ++i) {
+    thrift->directory.push_back(string(reinterpret_cast<char*>(&directory_[i]),
+        sizeof(BucketWord) * BUCKET_WORDS));
+  }
+}
+
+void BloomFilter::Or(const BloomFilter& other) {
+  DCHECK_EQ(log_num_buckets_, other.log_num_buckets_);
+  BucketWord* dir_ptr = reinterpret_cast<BucketWord*>(directory_);
+  const BucketWord* other_dir_ptr = reinterpret_cast<const BucketWord*>(other.directory_);
+  int directory_size =
+      (1ull << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE)) / sizeof(BucketWord);
+  for (int i = 0; i < directory_size; ++i) dir_ptr[i] |= other_dir_ptr[i];
 }
 
 // The following three methods are derived from

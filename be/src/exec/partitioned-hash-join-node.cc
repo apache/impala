@@ -62,8 +62,9 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     process_probe_batch_fn_(NULL),
     process_probe_batch_fn_level0_(NULL) {
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
-  can_add_probe_filters_ = tnode.hash_join_node.add_probe_filters;
-  can_add_probe_filters_ &= FLAGS_enable_phj_probe_side_filtering;
+
+  can_add_runtime_filters_ =
+      FLAGS_enable_phj_probe_side_filtering && tnode.runtime_filters.size() > 0;
 }
 
 PartitionedHashJoinNode::~PartitionedHashJoinNode() {
@@ -71,8 +72,9 @@ PartitionedHashJoinNode::~PartitionedHashJoinNode() {
   DCHECK(null_probe_rows_ == NULL);
 }
 
-Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode));
+
+Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
   DCHECK(tnode.__isset.hash_join_node);
   const vector<TEqJoinCondition>& eq_join_conjuncts =
       tnode.hash_join_node.eq_join_conjuncts;
@@ -87,6 +89,19 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
+
+  BOOST_FOREACH(const TRuntimeFilterDesc& filter, tnode.runtime_filters) {
+    // If filter propagation not enabled, only consider building broadcast joins (that may
+    // be consumed by this fragment).
+    if (!state->query_options().enable_runtime_filter_propagation &&
+        !filter.is_broadcast_join) {
+      continue;
+    }
+    FilterContext filter_ctx;
+    filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, true);
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, filter.src_expr, &filter_ctx.expr));
+    filters_.push_back(filter_ctx);
+  }
 
   DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ||
       eq_join_conjuncts.size() == 1);
@@ -106,7 +121,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   // Disable probe-side filters if we are inside a subplan because no node
   // inside the subplan can use them.
-  if (IsInSubplan()) can_add_probe_filters_ = false;
+  if (IsInSubplan()) can_add_runtime_filters_ = false;
 
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   runtime_state_ = state;
@@ -117,6 +132,10 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
   RETURN_IF_ERROR(
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
+  BOOST_FOREACH(const FilterContext& ctx, filters_) {
+    RETURN_IF_ERROR(ctx.expr->Prepare(state, child(1)->row_desc(), expr_mem_tracker()));
+  }
+
   // Although ConstructBuildSide() maybe be run in a separate thread, it is safe to free
   // local allocations in QueryMaintenance() since the build thread is not run
   // concurrently with other expr evaluation in this join node.
@@ -224,7 +243,6 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
   ht_ctx_->set_level(0);
   ClosePartitions();
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
-  CleanupProbeFilters();
   return ExecNode::Reset(state);
 }
 
@@ -273,7 +291,9 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(other_join_conjunct_ctxs_, state);
-  CleanupProbeFilters();
+  BOOST_FOREACH(const FilterContext& ctx, filters_) {
+    ctx.expr->Close(state);
+  }
   BlockingJoinNode::Close(state);
 }
 
@@ -381,15 +401,15 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
 }
 
 Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
-    bool* built, const bool add_probe_filters) {
-  if (add_probe_filters) {
+    bool* built, const bool add_runtime_filters) {
+  if (add_runtime_filters) {
     return BuildHashTableInternal<true>(state, built);
   } else {
     return BuildHashTableInternal<false>(state, built);
   }
 }
 
-template<bool const AddProbeFilters>
+template<bool const BUILD_RUNTIME_FILTERS>
 Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     RuntimeState* state, bool* built) {
   DCHECK(build_rows_ != NULL);
@@ -408,7 +428,6 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   HashTableCtx* ctx = parent_->ht_ctx_.get();
   // TODO: move the batch and indices as members to avoid reallocating.
   vector<BufferedTupleStream::RowIdx> indices;
-  uint32_t seed0 = ctx->seed(0);
   bool eos = false;
 
   // Allocate the partition-local hash table. Initialize the number of buckets based on
@@ -428,7 +447,9 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
-  if (AddProbeFilters) DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
+  if (BUILD_RUNTIME_FILTERS) {
+    DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
+  }
   do {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
@@ -440,14 +461,13 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
       if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) goto not_built;
-      if (AddProbeFilters) {
-        // Update the probe filters for this row.
-        for (int j = 0; j < parent_->probe_filters_.size(); ++j) {
-          if (parent_->probe_filters_[j].second == NULL) continue;
-          void* e = parent_->build_expr_ctxs_[j]->GetValue(row);
-          uint32_t h = RawValue::GetHashValue(e,
-              parent_->build_expr_ctxs_[j]->root()->type(), seed0);
-          parent_->probe_filters_[j].second->Set<true>(h, true);
+      if (BUILD_RUNTIME_FILTERS) {
+        BOOST_FOREACH(const FilterContext& ctx, parent_->filters_) {
+          if (ctx.local_bloom_filter == NULL) continue;
+          void* e = ctx.expr->GetValue(row);
+          uint32_t h = RawValue::GetHashValue(e, ctx.expr->root()->type(),
+              RuntimeFilterBank::DefaultHashSeed());
+          ctx.local_bloom_filter->Insert(h);
         }
       }
     }
@@ -469,63 +489,38 @@ not_built:
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
-  if (parent_->can_add_probe_filters_) {
-    // Disabling probe filter push down because not all rows will be included in the
-    // probe filter due to a spilled partition.
-    parent_->can_add_probe_filters_ = false;
-    VLOG(2) << "Disabling probe filter push down because a partition will spill.";
+  if (parent_->can_add_runtime_filters_) {
+    // Disabling runtime filter push down because not all rows will be included in the
+    // filter due to a spilled partition.
+    parent_->can_add_runtime_filters_ = false;
+    parent_->AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (Spilling)");
+    VLOG(2) << "Disabling runtime filter construction because a partition will spill.";
   }
   return Status::OK();
 }
 
-bool PartitionedHashJoinNode::AllocateProbeFilters(RuntimeState* state) {
-  if (!can_add_probe_filters_) return false;
+bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
+  if (!can_add_runtime_filters_) return false;
   DCHECK(ht_ctx_.get() != NULL);
-  DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
-  probe_filters_.resize(probe_expr_ctxs_.size());
-  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
-    if (probe_expr_ctxs_[i]->root()->is_slotref()) {
-      // TODO: Enable probe filters not only for "naked" slotrefs.
-      probe_filters_[i].first =
-          reinterpret_cast<SlotRef*>(probe_expr_ctxs_[i]->root())->slot_id();
-      probe_filters_[i].second = new Bitmap(state->slot_filter_bitmap_size());
-    } else {
-      probe_filters_[i].second = NULL;
-    }
+  for (int i = 0; i < filters_.size(); ++i) {
+    filters_[i].local_bloom_filter = state->filter_bank()->AllocateScratchBloomFilter();
   }
   return true;
 }
 
-bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
-  if (can_add_probe_filters_) {
-    // Add all the bitmaps to the runtime state.
+bool PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state) {
+  if (can_add_runtime_filters_) {
+    // Add all the bloom filters to the runtime state.
     // TODO: DCHECK(!is_in_subplan());
-    AddRuntimeExecOption("Build-Side Filter Pushed Down");
-    bool acquired_ownership = false;
-    for (int i = 0; i < probe_filters_.size(); ++i) {
-      if (probe_filters_[i].second == NULL) continue;
-      state->AddBitmapFilter(probe_filters_[i].first, probe_filters_[i].second,
-                             &acquired_ownership);
-      VLOG(2) << "Bitmap filter added on slot: " << probe_filters_[i].first;
-      if (!acquired_ownership) {
-        delete probe_filters_[i].second;
-      }
-      probe_filters_[i].second = NULL;
+    AddRuntimeExecOption("Build-Side Runtime-Filter Produced");
+    BOOST_FOREACH(const FilterContext& ctx, filters_) {
+      if (ctx.local_bloom_filter == NULL) continue;
+      state->filter_bank()->UpdateFilterFromLocal(ctx.filter->filter_desc().filter_id,
+          ctx.local_bloom_filter);
     }
     return true;
-  } else {
-    // Make sure there are no memory leaks.
-    CleanupProbeFilters();
-    return false;
   }
-}
-
-void PartitionedHashJoinNode::CleanupProbeFilters() {
-  for (int i = 0; i < probe_filters_.size(); ++i) {
-    if (probe_filters_[i].second == NULL) continue;
-    delete probe_filters_[i].second;
-    probe_filters_[i].second = NULL;
-  }
+  return false;
 }
 
 bool PartitionedHashJoinNode::AppendRowStreamFull(BufferedTupleStream* stream,
@@ -595,7 +590,10 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
-  AllocateProbeFilters(state);
+  BOOST_FOREACH(const FilterContext& filter, filters_) {
+    RETURN_IF_ERROR(filter.expr->Open(state));
+  }
+  AllocateRuntimeFilters(state);
 
   // Do a full scan of child(1) and partition the rows.
   {
@@ -604,7 +602,7 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   }
   RETURN_IF_ERROR(ProcessBuildInput(state, 0));
 
-  AttachProbeFilters(state);
+  PublishRuntimeFilters(state);
   UpdateState(PROCESSING_PROBE);
   return Status::OK();
 }
@@ -1191,22 +1189,23 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
 
   // Decide whether probe filters will be built.
-  if (input_partition_ == NULL && can_add_probe_filters_) {
+  if (input_partition_ == NULL && can_add_runtime_filters_) {
     uint64_t num_build_rows = 0;
     BOOST_FOREACH(Partition* partition, hash_partitions_) {
       const uint64_t partition_num_rows = partition->build_rows()->num_rows();
       num_build_rows += partition_num_rows;
     }
-    // TODO: Using this simple heuristic where we compare the number of build rows
-    // to the size of the slot filter bitmap. This is essentially not a Bloom filter
-    // but a 1-1 filter, and probably it is missing oportunities. Should revisit.
-    if (num_build_rows >= state->slot_filter_bitmap_size()) {
-      can_add_probe_filters_ = false;
-      VLOG(2) << "Disabling probe filter push down because build side is too large: "
-              << num_build_rows;
+    // Use num_build_rows to estimate efficacy of Bloom filter, and disable filter
+    // production if so. However, the number of build rows could be a very poor estimate
+    // of the NDV - particularly if the filter expression is a function of several
+    // columns.
+    // TODO: Better heuristic.
+    if (state->filter_bank()->ShouldDisableFilter(num_build_rows)) {
+      AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
+      can_add_runtime_filters_ = false;
     }
   } else {
-    can_add_probe_filters_ = false;
+    can_add_runtime_filters_ = false;
   }
 
   // First loop over the partitions and build hash tables for the partitions that did
@@ -1221,7 +1220,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     if (!partition->is_spilled()) {
       bool built = false;
       DCHECK(partition->build_rows()->is_pinned());
-      RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_probe_filters_));
+      RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_runtime_filters_));
       // If we did not have enough memory to build this hash table, we need to spill this
       // partition (clean up the hash table, unpin build).
       if (!built) RETURN_IF_ERROR(partition->Spill(true));

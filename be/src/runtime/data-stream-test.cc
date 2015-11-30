@@ -84,6 +84,12 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
   virtual void CancelPlanFragment(
       TCancelPlanFragmentResult& return_val, const TCancelPlanFragmentParams& params) {}
 
+  virtual void UpdateFilter(
+      TUpdateFilterResult& return_val, const TUpdateFilterParams& params) {}
+
+  virtual void PublishFilter(
+      TPublishFilterResult& return_val, const TPublishFilterParams& params) {}
+
   virtual void TransmitData(
       TTransmitDataResult& return_val, const TTransmitDataParams& params) {
     if (!params.eos) {

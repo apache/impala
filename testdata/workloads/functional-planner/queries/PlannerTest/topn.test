@@ -119,6 +119,7 @@ limit 2
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
@@ -126,6 +127,7 @@ limit 2
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> t1.id
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
@@ -136,6 +138,7 @@ limit 2
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -145,6 +148,7 @@ limit 2
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> t1.id
 ====
 # Test that the top-n is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id limit 2
@@ -197,6 +201,7 @@ limit 10 offset 5
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
@@ -204,6 +209,7 @@ limit 10 offset 5
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> t1.id
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -226,6 +232,7 @@ NODE 1:
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -235,6 +242,7 @@ NODE 1:
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> t1.id
 ====
 # test distributed top-n over a union (IMPALA-831)
 select int_col, bigint_col from

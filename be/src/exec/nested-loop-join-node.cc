@@ -44,8 +44,8 @@ NestedLoopJoinNode::~NestedLoopJoinNode() {
   DCHECK(is_closed());
 }
 
-Status NestedLoopJoinNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode));
+Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
   DCHECK(tnode.__isset.nested_loop_join_node);
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.nested_loop_join_node.join_conjuncts,
@@ -676,4 +676,3 @@ Status NestedLoopJoinNode::NextProbeRow(RuntimeState* state, RowBatch* output_ba
   VLOG_ROW << "left row: " << GetLeftChildRowString(current_probe_row_);
   return Status::OK();
 }
-

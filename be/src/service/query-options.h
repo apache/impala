@@ -32,7 +32,7 @@ class TQueryOptions;
 // the DCHECK.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::ENABLE_RUNTIME_FILTER_PROPAGATION + 1);\
+      TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE + 1);\
   QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR)\
   QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -69,7 +69,8 @@ class TQueryOptions;
   QUERY_OPT_FN(random_replica, RANDOM_REPLICA)\
   QUERY_OPT_FN(scan_node_codegen_threshold, SCAN_NODE_CODEGEN_THRESHOLD)\
   QUERY_OPT_FN(disable_streaming_preaggregations, DISABLE_STREAMING_PREAGGREGATIONS)\
-  QUERY_OPT_FN(enable_runtime_filter_propagation, ENABLE_RUNTIME_FILTER_PROPAGATION);
+  QUERY_OPT_FN(enable_runtime_filter_propagation, ENABLE_RUNTIME_FILTER_PROPAGATION);\
+  QUERY_OPT_FN(runtime_bloom_filter_size, RUNTIME_BLOOM_FILTER_SIZE);
 
 /// Converts a TQueryOptions struct into a map of key, value pairs.
 void TQueryOptionsToMap(const TQueryOptions& query_options,

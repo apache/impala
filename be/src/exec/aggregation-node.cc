@@ -69,8 +69,8 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     hash_table_buckets_counter_(NULL) {
 }
 
-Status AggregationNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status AggregationNode::Init(RuntimeState* state, const TPlanNode& tnode) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_expr_ctxs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
@@ -137,8 +137,9 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
 
   // TODO: how many buckets?
-  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_, 1, true,
-      std::vector<bool>(build_expr_ctxs_.size(), true), id(), mem_tracker(), true));
+  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
+      vector<ExprContext*>(), 1, true,  vector<bool>(build_expr_ctxs_.size(), true), id(),
+      mem_tracker(), vector<RuntimeFilter*>(), true));
 
   if (probe_expr_ctxs_.empty()) {
     // create single intermediate tuple now; we need to output something

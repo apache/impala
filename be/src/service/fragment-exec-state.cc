@@ -20,6 +20,7 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "rpc/thrift-util.h"
 #include "gutil/strings/substitute.h"
+#include "util/bloom-filter.h"
 
 #include "common/names.h"
 
@@ -115,4 +116,11 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
     // TODO: Do we really need to cancel?
     executor_.Cancel();
   }
+}
+
+void FragmentMgr::FragmentExecState::PublishFilter(int32_t filter_id,
+    const TBloomFilter& thrift_bloom_filter) {
+  // TODO: Could be racy wrt Prepare(), after IMPALA-1599.
+  executor_.runtime_state()->filter_bank()->PublishGlobalFilter(filter_id,
+      thrift_bloom_filter);
 }

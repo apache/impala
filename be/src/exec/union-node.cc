@@ -36,8 +36,8 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
       child_eos_(false) {
 }
 
-Status UnionNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK(tnode.__isset.union_node);
   // Create const_expr_ctx_lists_ from thrift exprs.
   const vector<vector<TExpr> >& const_texpr_lists = tnode.union_node.const_expr_lists;

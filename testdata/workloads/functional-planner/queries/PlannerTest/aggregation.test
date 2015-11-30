@@ -123,12 +123,14 @@ having count(t2.int_col) = count(t1.bigint_col)
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.smallint_col = t2.smallint_col
+|  runtime filters: RF000 <- t2.smallint_col
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.smallint_col
 ====
 # Tests proper slot materialization of agg-tuple slots for avg (IMP-1271).
 # 't.x > 10' is picked up as an unassigned conjunct, and not as a binding
@@ -569,12 +571,14 @@ limit 1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.id
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count(cnt)
@@ -602,6 +606,7 @@ limit 1
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--07:EXCHANGE [BROADCAST]
 |  |
@@ -610,6 +615,7 @@ limit 1
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t1.id
 ====
 # IMPALA-2089: Tests correct elimination of redundant predicates.
 # The equivalences between inline-view slots are enforced inside the inline-view plan.
@@ -718,8 +724,8 @@ group by day
 |  group by: day, string_col
 |
 04:MERGING-EXCHANGE [UNPARTITIONED]
-| order by: id ASC
-| limit: 99999
+|  order by: id ASC
+|  limit: 99999
 |
 01:TOP-N [LIMIT=99999]
 |  order by: id ASC

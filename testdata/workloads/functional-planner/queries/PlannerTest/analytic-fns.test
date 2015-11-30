@@ -542,12 +542,14 @@ order by a.tinyint_col, a.int_col
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: tinyint_col ASC, int_col ASC
@@ -568,6 +570,7 @@ order by a.tinyint_col, a.int_col
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -576,6 +579,7 @@ order by a.tinyint_col, a.int_col
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id
 ====
 # analytics on a grouped aggregation with a final order by
 select bool_col,
@@ -1170,6 +1174,7 @@ where int_col in
 ---- PLAN
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: int_col = min(bigint_col)
+|  runtime filters: RF000 <- min(bigint_col)
 |
 |--03:ANALYTIC
 |  |  functions: min(bigint_col)
@@ -1184,11 +1189,13 @@ where int_col in
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> int_col
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: int_col = min(bigint_col)
+|  runtime filters: RF000 <- min(bigint_col)
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -1207,6 +1214,7 @@ where int_col in
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> int_col
 ====
 # test conjunct assignment and slot materialization due to conjuncts
 # (see IMPALA-1243)
@@ -1891,12 +1899,14 @@ where v.x + v.y < 10
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypesagg t2]
 |     partitions=11/11 files=11 size=814.73KB
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
 ====
 # Don't propagate a predicate through an inline view with an analytic function
 # when the select list items contain a complex (non SlotRef) expr on a partition by
@@ -1970,12 +1980,14 @@ on (t1.id = t2.a + 100)
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id + 100 = t1.id
+|  runtime filters: RF000 <- t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
 |     partitions=4/4 files=4 size=460B
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> id + 100
 ====
 # IMPALA-1519: Check that the first analytic sort of a select block
 # materializes TupleIsNullPredicates to be substituted in ancestor nodes.
@@ -2023,12 +2035,14 @@ group by d
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id + 100 = t1.id
+|  runtime filters: RF000 <- t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
 |     partitions=4/4 files=4 size=460B
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> id + 100
 ====
 # IMPALA-1519: Check that expr wrapping with a TupleIsNullPredicate
 # is performed correctly with analytics and multiple nesting levels.
@@ -2134,6 +2148,7 @@ on (a.id = b.id and b.int_col < 10)
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t1.id
+|  |  runtime filters: RF000 <- t1.id
 |  |
 |  |--01:SCAN HDFS [functional.alltypestiny t1]
 |  |     partitions=4/4 files=4 size=460B
@@ -2141,6 +2156,7 @@ on (a.id = b.id and b.int_col < 10)
 |  |
 |  02:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> t2.id
 |
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B

@@ -205,8 +205,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // set up plan
   DCHECK(request.__isset.fragment);
-  RETURN_IF_ERROR(ExecNode::CreateTree(obj_pool(), request.fragment.plan, *desc_tbl,
-      &plan_, runtime_state_.get()));
+  RETURN_IF_ERROR(ExecNode::CreateTree(runtime_state_.get(), request.fragment.plan,
+      *desc_tbl, &plan_));
   runtime_state_->set_fragment_root_id(plan_->id());
 
   if (request.params.__isset.debug_node_id) {
@@ -586,6 +586,7 @@ void PlanFragmentExecutor::Close() {
       runtime_state_->io_mgr()->UnregisterContext(context);
     }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
+    runtime_state_->filter_bank()->Close();
   }
   if (mem_usage_sampled_counter_ != NULL) {
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);

@@ -42,11 +42,11 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
     probe_batch_pos_(-1),
     current_probe_row_(NULL),
     semi_join_staging_row_(NULL),
-    can_add_probe_filters_(false) {
+    can_add_runtime_filters_(false) {
 }
 
-Status BlockingJoinNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status BlockingJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK((join_op_ != TJoinOp::LEFT_SEMI_JOIN && join_op_ != TJoinOp::LEFT_ANTI_JOIN &&
       join_op_ != TJoinOp::RIGHT_SEMI_JOIN && join_op_ != TJoinOp::RIGHT_ANTI_JOIN &&
       join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) || conjunct_ctxs_.size() == 0);

@@ -21,6 +21,7 @@
 
 #include "common/compiler-util.h"
 #include "common/status.h"
+#include "exec/filter-context.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/row-batch.h"
 
@@ -58,7 +59,7 @@ class ScannerContext {
   /// get pushed to) and the scan range to process.
   /// This context starts with 1 stream.
   ScannerContext(RuntimeState*, HdfsScanNode*, HdfsPartitionDescriptor*,
-      DiskIoMgr::ScanRange* scan_range);
+      DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs);
 
   /// Encapsulates a stream (continuous byte range) that can be read.  A context
   /// can contain one or more streams.  For non-columnar files, there is only
@@ -276,6 +277,7 @@ class ScannerContext {
 
   int num_completed_io_buffers() const { return num_completed_io_buffers_; }
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
+  const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
 
  private:
   friend class Stream;
@@ -290,6 +292,10 @@ class ScannerContext {
 
   /// Always equal to the sum of completed_io_buffers_.size() across all streams.
   int num_completed_io_buffers_;
+
+  /// Filter contexts for all filters applicable to this scan. Memory attached to the
+  /// context is owned by the scan node.
+  std::vector<FilterContext> filter_ctxs_;
 };
 
 }

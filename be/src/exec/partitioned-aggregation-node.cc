@@ -138,8 +138,8 @@ PartitionedAggregationNode::PartitionedAggregationNode(
   }
 }
 
-Status PartitionedAggregationNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status PartitionedAggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &grouping_expr_ctxs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {

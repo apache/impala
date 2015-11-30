@@ -54,13 +54,18 @@ static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
                                 HashUtil::FNV_SEED, HashUtil::FNV_SEED,
                                 HashUtil::FNV_SEED, HashUtil::FNV_SEED };
 
-OldHashTable::OldHashTable(RuntimeState* state, const vector<ExprContext*>& build_expr_ctxs,
-    const vector<ExprContext*>& probe_expr_ctxs, int num_build_tuples, bool stores_nulls,
-    const std::vector<bool>& finds_nulls, int32_t initial_seed, MemTracker* mem_tracker,
-    bool stores_tuples, int64_t num_buckets)
+OldHashTable::OldHashTable(RuntimeState* state,
+    const vector<ExprContext*>& build_expr_ctxs,
+    const vector<ExprContext*>& probe_expr_ctxs,
+    const vector<ExprContext*>& filter_expr_ctxs, int num_build_tuples, bool stores_nulls,
+    const vector<bool>& finds_nulls, int32_t initial_seed, MemTracker* mem_tracker,
+    const vector<RuntimeFilter*>& runtime_filters, bool stores_tuples,
+    int64_t num_buckets)
   : state_(state),
     build_expr_ctxs_(build_expr_ctxs),
     probe_expr_ctxs_(probe_expr_ctxs),
+    filter_expr_ctxs_(filter_expr_ctxs),
+    filters_(runtime_filters),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
     finds_nulls_(finds_nulls),
@@ -130,41 +135,32 @@ bool OldHashTable::EvalRow(
   return has_null;
 }
 
-void OldHashTable::AddBitmapFilters() {
-  DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
-  vector<pair<SlotId, Bitmap*> > bitmaps;
-  bitmaps.resize(probe_expr_ctxs_.size());
-  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
-    if (probe_expr_ctxs_[i]->root()->is_slotref()) {
-      bitmaps[i].first =
-          reinterpret_cast<SlotRef*>(probe_expr_ctxs_[i]->root())->slot_id();
-      bitmaps[i].second = new Bitmap(state_->slot_filter_bitmap_size());
-    } else {
-      bitmaps[i].second = NULL;
-    }
+void OldHashTable::AddBloomFilters() {
+  vector<BloomFilter*> bloom_filters;
+  bloom_filters.resize(filters_.size());
+  for (int i = 0; i < filters_.size(); ++i) {
+    bloom_filters[i] = state_->filter_bank()->AllocateScratchBloomFilter();
   }
 
-  // Walk the build table and generate a bitmap for each probe side slot.
   OldHashTable::Iterator iter = Begin();
   while (iter != End()) {
     TupleRow* row = iter.GetRow();
-    for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
-      if (bitmaps[i].second == NULL) continue;
-      void* e = build_expr_ctxs_[i]->GetValue(row);
+    for (int i = 0; i < filters_.size(); ++i) {
+      if (bloom_filters[i] == NULL) continue;
+      void* e = filter_expr_ctxs_[i]->GetValue(row);
       uint32_t h =
-          RawValue::GetHashValue(e, build_expr_ctxs_[i]->root()->type(), initial_seed_);
-      bitmaps[i].second->Set<true>(h, true);
+          RawValue::GetHashValue(e, build_expr_ctxs_[i]->root()->type(),
+              RuntimeFilterBank::DefaultHashSeed());
+      bloom_filters[i]->Insert(h);
     }
     iter.Next<false>();
   }
 
-  // Add all the bitmaps to the runtime state.
-  bool acquired_ownership = false;
-  for (int i = 0; i < bitmaps.size(); ++i) {
-    if (bitmaps[i].second == NULL) continue;
-    state_->AddBitmapFilter(bitmaps[i].first, bitmaps[i].second, &acquired_ownership);
-    VLOG(2) << "Bitmap filter added on slot: " << bitmaps[i].first;
-    if (!acquired_ownership) delete bitmaps[i].second;
+  // Update all the local filters in the filter bank.
+  for (int i = 0; i < filters_.size(); ++i) {
+    if (bloom_filters[i] == NULL) continue;
+    state_->filter_bank()->UpdateFilterFromLocal(filters_[i]->filter_desc().filter_id,
+        bloom_filters[i]);
   }
 }
 

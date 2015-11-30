@@ -73,23 +73,27 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.int_col, RF001 -> int_col
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -98,6 +102,7 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -106,6 +111,7 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.int_col, RF001 -> int_col
 ====
 # Multiple dependent views in with-clause
 with t1 as (
@@ -185,23 +191,27 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
@@ -210,6 +220,7 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
@@ -220,6 +231,7 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
 ====
 # Self-join of with-clause table to make sure the using clause is properly set
 # in the cloned inline-view instances.
@@ -228,23 +240,27 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
@@ -253,6 +269,7 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
@@ -263,6 +280,7 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
 ====
 # Self-join of with-clause table to make sure the join op is properly set
 # in the cloned inline-view instances.
@@ -316,23 +334,27 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
 |
 |--07:EXCHANGE [HASH(int_col)]
 |  |
@@ -343,6 +365,7 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -351,6 +374,7 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))

@@ -52,6 +52,7 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN DATA SOURCE [functional.alltypes_datasource b]
 |--predicates: b.id = b.int_col, b.id = b.bigint_col

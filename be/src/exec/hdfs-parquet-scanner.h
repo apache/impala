@@ -270,7 +270,16 @@ struct HdfsFileDesc;
 ///   than the full 3-level structure. Note that the collection reader references the
 ///   outer array, which determines how long each materialized array is, and the items in
 ///   the array are from the inner array.
-
+///
+/// ---- Runtime filters ----
+///
+/// HdfsParquetScanner is able to apply runtime filters that arrive before or during
+/// scanning. Filters are applied at both the row group (see AssembleRows()) and row (see
+/// ScalarColumnReader::ReadSlot()) scope. If all filter predicates do not pass, the row
+/// or row group will be excluded from output. Only partition-colum filters are applied at
+/// AssembleRows(), and only single-column filters are applied at ReadSlot(). The
+/// FilterContexts for these filters are cloned from the parent scan node and attached to
+/// the ScannerContext.
 class HdfsParquetScanner : public HdfsScanner {
  public:
   HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state);
@@ -420,13 +429,18 @@ class HdfsParquetScanner : public HdfsScanner {
   /// 'row_group_idx' is used for error checking when this is called on the table-level
   /// tuple. If reading into a collection, 'row_group_idx' doesn't matter.
   ///
+  /// If 'filters_pass' is set to false by this method, the partition columns associated
+  /// with this row group did not pass all the runtime filters (and therefore only filter
+  /// contexts that apply only to partition columns are checked).
+  ///
   /// IN_COLLECTION is true if the columns we are materializing are part of a Parquet
   /// collection. MATERIALIZING_COLLECTION is true if we are materializing tuples inside
   /// a nested collection.
   template <bool IN_COLLECTION, bool MATERIALIZING_COLLECTION>
   bool AssembleRows(const TupleDescriptor* tuple_desc,
       const std::vector<ColumnReader*>& column_readers, int new_collection_rep_level,
-      int row_group_idx, CollectionValueBuilder* coll_value_builder);
+      int row_group_idx, CollectionValueBuilder* coll_value_builder,
+      bool* filters_pass);
 
   /// Function used by AssembleRows() to read a single row into 'tuple'. Returns false if
   /// execution should be aborted for some reason, otherwise returns true.

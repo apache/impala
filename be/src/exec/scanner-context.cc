@@ -37,11 +37,13 @@ static const int64_t DEFAULT_READ_PAST_SIZE = 1024; // in bytes
 static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
-    HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range)
+    HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range,
+    const vector<FilterContext>& filter_ctxs)
   : state_(state),
     scan_node_(scan_node),
     partition_desc_(partition_desc),
-    num_completed_io_buffers_(0) {
+    num_completed_io_buffers_(0),
+    filter_ctxs_(filter_ctxs) {
   AddStream(scan_range);
 }
 

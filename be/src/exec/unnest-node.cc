@@ -43,8 +43,8 @@ UnnestNode::UnnestNode(ObjectPool* pool, const TPlanNode& tnode,
     num_collections_counter_(NULL) {
 }
 
-Status UnnestNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+Status UnnestNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK(tnode.__isset.unnest_node);
   Expr::CreateExprTree(pool_, tnode.unnest_node.collection_expr, &coll_expr_ctx_);
   return Status::OK();

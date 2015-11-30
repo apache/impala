@@ -35,6 +35,7 @@ add_library(Exec
   exec-node.cc
   exchange-node.cc
   external-data-source-executor.cc
+  filter-context.cc
   hash-join-node.cc
   hash-join-node-ir.cc
   old-hash-table.cc

@@ -309,6 +309,7 @@ order by c.string_col desc, a.smallint_col
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = c.id
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
+|  runtime filters: RF000 <- c.id
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
@@ -316,6 +317,7 @@ order by c.string_col desc, a.smallint_col
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.smallint_col = b.id
+|  runtime filters: RF001 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=4/4 files=4 size=6.32KB
@@ -324,6 +326,7 @@ order by c.string_col desc, a.smallint_col
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=1/11 files=1 size=73.39KB
    predicates: a.int_col > 899
+   runtime filters: RF000 -> a.tinyint_col, RF001 -> a.smallint_col
 ---- DISTRIBUTEDPLAN
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: string_col DESC, smallint_col ASC
@@ -334,6 +337,7 @@ order by c.string_col desc, a.smallint_col
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.tinyint_col = c.id
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
+|  runtime filters: RF000 <- c.id
 |
 |--07:EXCHANGE [BROADCAST]
 |  |
@@ -343,6 +347,7 @@ order by c.string_col desc, a.smallint_col
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.smallint_col = b.id
+|  runtime filters: RF001 <- b.id
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -353,6 +358,7 @@ order by c.string_col desc, a.smallint_col
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=1/11 files=1 size=73.39KB
    predicates: a.int_col > 899
+   runtime filters: RF000 -> a.tinyint_col, RF001 -> a.smallint_col
 ====
 # agg in ordering
 select int_col, count(*), avg(tinyint_col)
@@ -788,17 +794,20 @@ join B on (A.string_col = B.string_col)
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.string_col = functional.alltypes.string_col
+|  runtime filters: RF000 <- functional.alltypes.string_col
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.string_col
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.string_col = functional.alltypes.string_col
+|  runtime filters: RF000 <- functional.alltypes.string_col
 |
 |--04:EXCHANGE [HASH(functional.alltypes.string_col)]
 |  |
@@ -809,6 +818,7 @@ join B on (A.string_col = B.string_col)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.string_col
 ====
 # ignore order by with no limit in insert
 insert into functional.alltypes partition(year, month)

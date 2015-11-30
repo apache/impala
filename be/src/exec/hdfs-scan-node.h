@@ -27,6 +27,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 
+#include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
@@ -44,6 +45,7 @@ namespace impala {
 class DescriptorTbl;
 class HdfsScanner;
 class RowBatch;
+class RuntimeFilter;
 class Status;
 class Tuple;
 class TPlanNode;
@@ -106,6 +108,20 @@ struct ScanRangeMetadata {
 /// 4. The scanner processes the buffers, issuing more scan ranges if necessary.
 /// 5. The scanner finishes the scan range and informs the scan node so it can track
 ///    end of stream.
+///
+/// An HdfsScanNode may expect to receive runtime filters produced elsewhere in the plan
+/// (even from remote fragments). These filters arrive asynchronously during execution,
+/// and are applied as soon as they arrive. Filters may be applied by the scan node in the
+/// following scopes:
+///
+/// 1. Per-file (all file formats, partition column filters only) - filtering at this
+/// scope saves IO as the filters are applied before scan ranges are issued.
+/// 2. Per-scan-range (all file formats, partition column filters only) - filtering at
+/// this scope saves CPU as filtered scan ranges are never scanned.
+///
+/// Scanners may also use the same filters to eliminate rows at finer granularities
+/// (e.g. per row).
+///
 /// TODO: this class allocates a bunch of small utility objects that should be
 /// recycled.
 class HdfsScanNode : public ScanNode {
@@ -115,7 +131,7 @@ class HdfsScanNode : public ScanNode {
   ~HdfsScanNode();
 
   /// ExecNode methods
-  virtual Status Init(const TPlanNode& tnode);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
@@ -282,6 +298,17 @@ class HdfsScanNode : public ScanNode {
   /// Description string for the per volume stats output.
   static const std::string HDFS_SPLIT_STATS_DESC;
 
+  /// Returns true if partition 'partition_id' passes all the filter predicates in
+  /// 'filter_ctxs' and should not be filtered out. 'stats_name' is the key of one of the
+  /// counter groups in FilterStats, and is used to update the correct statistics.
+  ///
+  /// 'filter_ctxs' is either an empty list, in which case filtering is disabled and the
+  /// function returns true, or a set of filter contexts to evaluate.
+  bool PartitionPassesFilterPredicates(int32_t partition_id,
+      const std::string& stats_name, const std::vector<FilterContext>& filter_ctxs);
+
+  const std::vector<FilterContext> filter_ctxs() const { return filter_ctxs_; }
+
  private:
   friend class ScannerContext;
 
@@ -295,6 +322,11 @@ class HdfsScanNode : public ScanNode {
 
   /// Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;
+
+  /// Map from partition ID to a template tuple (owned by scan_node_pool_) which has only
+  /// the partition columns for that partition materialized. Used to filter files and scan
+  /// ranges on partition-column filters. Populated in Prepare().
+  boost::unordered_map<int64_t, Tuple*> partition_template_tuple_map_;
 
   /// Descriptor for the hdfs table, including partition and format metadata.
   /// Set in Prepare, owned by RuntimeState
@@ -347,6 +379,11 @@ class HdfsScanNode : public ScanNode {
   /// Maps from a slot's path to its index into materialized_slots_.
   typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
   PathToSlotIdxMap path_to_materialized_slot_idx_;
+
+  /// List of contexts for expected runtime filters for this scan node. These contexts are
+  /// cloned by individual scanners to be used in multi-threaded contexts, passed through
+  /// the per-scanner ScannerContext..
+  std::vector<FilterContext> filter_ctxs_;
 
   /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
   /// for 0 <= i < total # columns in table
@@ -472,8 +509,11 @@ class HdfsScanNode : public ScanNode {
   /// This thread terminates when all scan ranges are complete or an error occurred.
   void ScannerThread();
 
-  /// Process the entire scan range with a new scanner object. Executed in scanner thread.
-  Status ProcessSplit(DiskIoMgr::ScanRange* scan_range);
+  /// Process the entire scan range with a new scanner object. Executed in scanner
+  /// thread. 'filter_ctxs' is a clone of the class-wide filter_ctxs_, used to filter rows
+  /// in this split.
+  Status ProcessSplit(const std::vector<FilterContext>& filter_ctxs,
+      DiskIoMgr::ScanRange* scan_range);
 
   /// Returns true if there is enough memory (against the mem tracker limits) to
   /// have a scanner thread.
@@ -507,6 +547,12 @@ class HdfsScanNode : public ScanNode {
   /// Helper to call InitNullCollectionValues() on all tuples produced by this scan
   /// in 'row_batch'.
   void InitNullCollectionValues(RowBatch* row_batch) const;
+
+  /// Returns false if, according to filters in 'filter_ctxs', 'file' should be filtered
+  /// and therefore not processed. 'file_type' is the the format of 'file', and is used
+  /// for bookkeeping. Returns true if all filters pass or are not present.
+  bool FilePassesFilterPredicates(const std::vector<FilterContext>& filter_ctxs,
+      const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
 };
 
 }

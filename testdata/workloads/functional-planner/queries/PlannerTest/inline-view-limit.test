@@ -74,6 +74,7 @@ where a.id < 5 limit 5
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |  limit: 5
 |
 |--03:TOP-N [LIMIT=5]
@@ -89,12 +90,14 @@ where a.id < 5 limit 5
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
+   runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |  limit: 5
 |
 |--08:EXCHANGE [BROADCAST]
@@ -122,6 +125,7 @@ where a.id < 5 limit 5
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
+   runtime filters: RF000 -> functional.alltypes.id
 ====
 # predicate pushdown is prevented in presence of limit clause; variant w/ join
 select *
@@ -137,6 +141,7 @@ where id < 5 limit 5
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = functional.alltypessmall.id
+|  runtime filters: RF000 <- functional.alltypessmall.id
 |  limit: 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
@@ -144,6 +149,7 @@ where id < 5 limit 5
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
 03:SELECT
 |  predicates: a.id < 5
@@ -154,6 +160,7 @@ where id < 5 limit 5
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = functional.alltypessmall.id
+|  runtime filters: RF000 <- functional.alltypessmall.id
 |  limit: 10
 |
 |--04:EXCHANGE [BROADCAST]
@@ -163,6 +170,7 @@ where id < 5 limit 5
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ====
 # predicate pushdown is prevented in presence of order by/limit clause
 select *
@@ -213,6 +221,7 @@ limit 5
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = functional.alltypessmall.id
+|  runtime filters: RF000 <- functional.alltypessmall.id
 |  limit: 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
@@ -220,6 +229,7 @@ limit 5
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
 04:TOP-N [LIMIT=5]
 |  order by: id ASC
@@ -232,6 +242,7 @@ limit 5
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = functional.alltypessmall.id
+|  runtime filters: RF000 <- functional.alltypessmall.id
 |  limit: 10
 |
 |--05:EXCHANGE [BROADCAST]
@@ -241,6 +252,7 @@ limit 5
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> a.id
 ====
 # join against subquery with limit creates a merge fragment that applies the limit
 select *
@@ -249,6 +261,7 @@ from functional.alltypes
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -256,11 +269,13 @@ from functional.alltypes
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -273,6 +288,7 @@ from functional.alltypes
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id
 ====
 # join against subquery with limit creates a merge fragment that applies the limit;
 # topn is distributed
@@ -282,6 +298,7 @@ from functional.alltypes
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |
 |--02:TOP-N [LIMIT=10]
 |  |  order by: id ASC
@@ -291,11 +308,13 @@ from functional.alltypes
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 06:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -311,6 +330,7 @@ from functional.alltypes
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> functional.alltypes.id
 ====
 # join against subquery with limit;
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -329,9 +349,11 @@ limit 5
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = a.id
+|  runtime filters: RF000 <- a.id
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = functional.alltypestiny.id
+|  |  runtime filters: RF001 <- functional.alltypestiny.id
 |  |  limit: 10
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
@@ -339,10 +361,12 @@ limit 5
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF001 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
+   runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
@@ -353,6 +377,7 @@ limit 5
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = a.id
+|  runtime filters: RF000 <- a.id
 |
 |--08:EXCHANGE [BROADCAST]
 |  |
@@ -361,6 +386,7 @@ limit 5
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = functional.alltypestiny.id
+|  |  runtime filters: RF001 <- functional.alltypestiny.id
 |  |  limit: 10
 |  |
 |  |--06:EXCHANGE [BROADCAST]
@@ -370,10 +396,12 @@ limit 5
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF001 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
+   runtime filters: RF000 -> functional.alltypes.id
 ====
 # join against subquery with order by/limit;
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -393,22 +421,26 @@ limit 5
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |
 |--04:TOP-N [LIMIT=10]
 |  |  order by: int_col ASC
 |  |
 |  03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = functional.alltypestiny.id
+|  |  runtime filters: RF001 <- functional.alltypestiny.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF001 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
+   runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
@@ -419,6 +451,7 @@ limit 5
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = id
+|  runtime filters: RF000 <- id
 |
 |--09:EXCHANGE [BROADCAST]
 |  |
@@ -431,6 +464,7 @@ limit 5
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = functional.alltypestiny.id
+|  |  runtime filters: RF001 <- functional.alltypestiny.id
 |  |
 |  |--07:EXCHANGE [BROADCAST]
 |  |  |
@@ -439,10 +473,12 @@ limit 5
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF001 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
+   runtime filters: RF000 -> functional.alltypes.id
 ====
 # Subquery containing limit and offset
 select x.id from (
@@ -495,7 +531,6 @@ where a.id > 10 and b.id > 20
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: id != 1, functional.alltypes.id > 10
----- DISTRIBUTEDPLAN
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer a.id->b.id is legal.
@@ -510,6 +545,7 @@ where a.id > 10 and b.id > 20
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 20
+|  runtime filters: RF000 <- id
 |
 |--01:SELECT
 |  |  predicates: id > 10
@@ -522,7 +558,7 @@ where a.id > 10 and b.id > 20
 02:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.id != 1, id != 2, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> id
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer b.id->a.id is illegal due to the limit in a.
@@ -537,6 +573,7 @@ where a.id > 10 and b.id > 20
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 10
+|  runtime filters: RF000 <- id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -545,8 +582,8 @@ where a.id > 10 and b.id > 20
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: id != 1
+   runtime filters: RF000 -> id
    limit: 10
----- DISTRIBUTEDPLAN
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer b.id->a.id is legal.
@@ -561,6 +598,7 @@ where a.id > 10 and b.id > 20
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 10
+|  runtime filters: RF000 <- id
 |
 |--02:SELECT
 |  |  predicates: id > 20
@@ -573,5 +611,5 @@ where a.id > 10 and b.id > 20
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: id != 1, functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20
----- DISTRIBUTEDPLAN
+   runtime filters: RF000 -> id
 ====
