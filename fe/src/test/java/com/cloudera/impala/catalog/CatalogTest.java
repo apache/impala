@@ -9,10 +9,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.junit.Test;
@@ -23,7 +25,10 @@ import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
@@ -525,16 +530,18 @@ public class CatalogTest {
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 0);
 
-    ScalarFunction udf1 = new ScalarFunction(new FunctionName("default", "Foo"),
-        args1, Type.INVALID, new HdfsUri("/Foo"), "Foo.class", null, null);
+    ScalarFunction udf1 = ScalarFunction.createForTesting(
+        "default", "Foo", args1, Type.INVALID, "/Foo", "Foo.class", null,
+        null, TFunctionBinaryType.NATIVE);
     catalog_.addFunction(udf1);
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo()"));
 
     // Same function name, overloaded arguments
-    ScalarFunction udf2 = new ScalarFunction(new FunctionName("default", "Foo"),
-        args2, Type.INVALID, new HdfsUri("/Foo"), "Foo.class", null, null);
+    ScalarFunction udf2 = ScalarFunction.createForTesting(
+        "default", "Foo", args2, Type.INVALID, "/Foo", "Foo.class", null,
+        null, TFunctionBinaryType.NATIVE);
     catalog_.addFunction(udf2);
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 2);
@@ -542,8 +549,9 @@ public class CatalogTest {
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Add a function with a new name
-    ScalarFunction udf3 = new ScalarFunction(new FunctionName("default", "Bar"),
-        args2, Type.INVALID, new HdfsUri("/Foo"), "Foo.class", null, null);
+    ScalarFunction udf3 = ScalarFunction.createForTesting(
+        "default", "Bar", args2, Type.INVALID, "/Foo", "Foo.class", null,
+        null, TFunctionBinaryType.NATIVE);
     catalog_.addFunction(udf3);
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 3);
@@ -552,47 +560,74 @@ public class CatalogTest {
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop Foo()
-    catalog_.removeFunction(new Function(
-        new FunctionName("default", "Foo"), args1, Type.INVALID, false));
+    catalog_.removeFunction(Function.createFunction("default", "Foo", args1,
+          Type.INVALID, false, TFunctionBinaryType.NATIVE));
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop it again, no-op
-    catalog_.removeFunction(new Function(
-        new FunctionName("default", "Foo"), args1, Type.INVALID, false));
+    catalog_.removeFunction(Function.createFunction("default", "Foo", args1,
+          Type.INVALID, false, TFunctionBinaryType.NATIVE));
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(), no-op
-    catalog_.removeFunction(new Function(
-        new FunctionName("default", "Bar"), args1, Type.INVALID, false));
+    catalog_.removeFunction(Function.createFunction("default", "Bar", args1,
+          Type.INVALID, false, TFunctionBinaryType.NATIVE));
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(tinyint), no-op
-    catalog_.removeFunction(new Function(
-        new FunctionName("default", "Bar"), args3, Type.INVALID, false));
+    catalog_.removeFunction(Function.createFunction("default", "Bar", args3,
+          Type.INVALID, false, TFunctionBinaryType.NATIVE));
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(int)
-    catalog_.removeFunction(new Function(
-        new FunctionName("default", "Bar"), args2, Type.INVALID, false));
+    catalog_.removeFunction(Function.createFunction("default", "Bar", args2,
+          Type.INVALID, false, TFunctionBinaryType.NATIVE));
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Drop foo(int)
-    catalog_.removeFunction(new Function(
-        new FunctionName("default", "foo"), args2, Type.INVALID, false));
+    catalog_.removeFunction(Function.createFunction("default", "Foo", args2,
+          Type.INVALID, false, TFunctionBinaryType.NATIVE));
+    fnNames = getFunctionSignatures("default");
+    assertEquals(fnNames.size(), 0);
+
+    // Test to check if catalog can handle loading corrupt udfs
+    HashMap<String, String> dbParams = Maps.newHashMap();
+    String badFnKey = "impala_registered_function_badFn";
+    String badFnVal = Base64.encodeBase64String("badFn".getBytes());
+    String dbName = "corrupt_udf_test";
+    dbParams.put(badFnKey, badFnVal);
+    Db db = catalog_.getDb(dbName);
+    assertEquals(db, null);
+    db = new Db(dbName, catalog_,
+        new org.apache.hadoop.hive.metastore.api.Database(dbName,
+        "", "", dbParams));
+    catalog_.addDb(db);
+    db = catalog_.getDb(dbName);
+    assertTrue(db != null);
+    fnNames = getFunctionSignatures(dbName);
+    assertEquals(fnNames.size(), 0);
+
+    // Test large functions that exceed HMS 4K param limit. We try to add a sample udf
+    // with a very long name, exceeding the hms imposed limit and this is expected to
+    // fail.
+    ScalarFunction largeUdf = ScalarFunction.createForTesting(
+        "default", Strings.repeat("Foo", 5000), args2, Type.INVALID, "/Foo",
+        "Foo.class", null, null, TFunctionBinaryType.NATIVE);
+    assertTrue(catalog_.addFunction(largeUdf) == false);
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 0);
   }

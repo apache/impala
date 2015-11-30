@@ -41,6 +41,7 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -1752,32 +1753,31 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestUdfs() {
-    HdfsUri dummyUri = new HdfsUri("");
-
     AnalysisError("select udf()", "default.udf() unknown");
     AnalysisError("select functional.udf()", "functional.udf() unknown");
     AnalysisError("select udf(1)", "default.udf() unknown");
 
     // Add a udf default.udf(), default.udf(int), default.udf(string...),
     // default.udf(int, string...) and functional.udf(double)
-    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
-        new ArrayList<Type>(), Type.INT, dummyUri, null, null, null));
-    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.<Type>newArrayList(Type.INT),
-        Type.INT, dummyUri, null, null, null));
-    ScalarFunction varArgsUdf1 = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.<Type>newArrayList(Type.STRING),
-        Type.INT, dummyUri, null, null, null);
+    catalog_.addFunction(ScalarFunction.createForTesting("default", "udf",
+        new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null, null,
+        TFunctionBinaryType.NATIVE));
+    catalog_.addFunction(ScalarFunction.createForTesting("default", "udf",
+        Lists.<Type>newArrayList(Type.INT), Type.INT, "/dummy", "dummy.class",
+        null, null, TFunctionBinaryType.NATIVE));
+    ScalarFunction varArgsUdf1 = ScalarFunction.createForTesting("default",
+        "udf", Lists.<Type>newArrayList(Type.STRING), Type.INT, "/dummy",
+        "dummy.class", null, null, TFunctionBinaryType.NATIVE);
     varArgsUdf1.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf1);
-    ScalarFunction varArgsUdf2 = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.<Type>newArrayList(Type.INT, Type.STRING),
-        Type.INT, dummyUri, null, null, null);
+    ScalarFunction varArgsUdf2 = ScalarFunction.createForTesting("default",
+        "udf", Lists.<Type>newArrayList(Type.INT, Type.STRING), Type.INT,
+        "/dummy", "dummy.class", null, null, TFunctionBinaryType.NATIVE);
     varArgsUdf2.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf2);
-    ScalarFunction udf = new ScalarFunction(new FunctionName("functional", "udf"),
-        Lists.<Type>newArrayList(Type.DOUBLE),
-        Type.INT, dummyUri, null, null, null);
+    ScalarFunction udf = ScalarFunction.createForTesting("functional", "udf",
+        Lists.<Type>newArrayList(Type.DOUBLE), Type.INT, "/dummy",
+        "dummy.class", null, null, TFunctionBinaryType.NATIVE);
     catalog_.addFunction(udf);
 
     AnalyzesOk("select udf()");
@@ -1853,8 +1853,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("lower(", "'abc'", ")");
 
     // UDF.
-    ScalarFunction udf = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.<Type>newArrayList(Type.INT), Type.INT, new HdfsUri(""), null, null, null);
+    ScalarFunction udf = ScalarFunction.createForTesting("default", "udf",
+        Lists.<Type>newArrayList(Type.INT), Type.INT, "/dummy",
+        "dummy.class", null, null, TFunctionBinaryType.NATIVE);
     catalog_.addFunction(udf);
     try {
       testFuncExprDepthLimit("udf(", "1", ")");

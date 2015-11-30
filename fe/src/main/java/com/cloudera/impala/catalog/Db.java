@@ -20,35 +20,57 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDatabase;
+import com.cloudera.impala.thrift.TFunction;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
  * Not thread safe.
- *
- * The static initialisation method loadDb is the only way to construct a Db
- * object.
  *
  * Tables are stored in a map from the table name to the table object. They may
  * be loaded 'eagerly' at construction or 'lazily' on first reference.
  * Tables are accessed via getTable which may trigger a metadata read in two cases:
  *  * if the table has never been loaded
  *  * if the table loading failed on the previous attempt
+ *
+ * Native user added functions are persisted to the parameters map of the hive metastore
+ * db object corresponding to this instance. This map's key is the function signature and
+ * value is the base64 representation of the thrift serialized function object.
+ *
+ * TODO: Implement persistence of java based hive udf/udas.
  */
 public class Db implements CatalogObject {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
+  private static TSerializer serializer =
+      new TSerializer(new TCompactProtocol.Factory());
   private final Catalog parentCatalog_;
   private final TDatabase thriftDb_;
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
+
+  private static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
+
+  // Hive metastore imposes a limit of 4000 bytes on the key and value strings
+  // in DB parameters map. We need ensure that this limit isn't crossed
+  // while serializing functions to the metastore.
+  private static final int HIVE_METASTORE_DB_PARAM_LIMIT_BYTES = 4000;
 
   // Table metadata cache.
   private final CatalogObjectCache<Table> tableCache_;
@@ -56,8 +78,9 @@ public class Db implements CatalogObject {
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
   // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
   // This includes both UDFs and UDAs. Updates are made thread safe by synchronizing
-  // on this map. Functions are sorted in a canonical order defined by
-  // FunctionResolutionOrder.
+  // on this map. When a new Db object is initialized, this list is updated with the
+  // UDF/UDAs already persisted, if any, in the metastore DB. Functions are sorted in a
+  // canonical order defined by FunctionResolutionOrder.
   private final HashMap<String, List<Function>> functions_;
 
   // If true, this database is an Impala system database.
@@ -71,6 +94,7 @@ public class Db implements CatalogObject {
     thriftDb_.setMetastore_db(msDb);
     tableCache_ = new CatalogObjectCache<Table>();
     functions_ = new HashMap<String, List<Function>>();
+    loadFunctionsFromDbParams(msDb);
   }
 
   public void setIsSystemDb(boolean b) { isSystemDb_ = b; }
@@ -80,6 +104,53 @@ public class Db implements CatalogObject {
    */
   public static Db fromTDatabase(TDatabase db, Catalog parentCatalog) {
     return new Db(db.getDb_name(), parentCatalog, db.getMetastore_db());
+  }
+
+  /**
+   * Extracts Impala functions stored in metastore db parameters and adds them to
+   * the catalog cache.
+   */
+  private void loadFunctionsFromDbParams(
+      org.apache.hadoop.hive.metastore.api.Database msDb) {
+    if (msDb == null || msDb.getParameters() == null) return;
+    LOG.info("Loading functions for database :" + getName());
+    TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
+    for (String key: msDb.getParameters().keySet()) {
+      if (!key.startsWith(FUNCTION_INDEX_PREFIX)) continue;
+      try {
+        TFunction fn = new TFunction();
+        JniUtil.deserializeThrift(protocolFactory, fn,
+            Base64.decodeBase64(msDb.getParameters().get(key)));
+        addFunction(Function.fromThrift(fn), false);
+      } catch (ImpalaException e) {
+        LOG.error("Encountered an error during function load: key=" + key
+            + ",continuing", e);
+      }
+    }
+  }
+
+  /**
+   * Updates the hms parameters map by adding the input <k,v> pair.
+   */
+  private void putToHmsParameters(String k, String v) {
+    org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.metastore_db;
+    Preconditions.checkNotNull(msDb);
+    Map<String, String> hmsParams = msDb.getParameters();
+    if (hmsParams == null) hmsParams = Maps.newHashMap();
+    hmsParams.put(k,v);
+    msDb.setParameters(hmsParams);
+  }
+
+  /**
+   * Updates the hms parameters map by removing the <k,v> pair corresponding to
+   * input key <k>. Returns true if the parameters map contains a pair <k,v>
+   * corresponding to input k and it is removed, false otherwise.
+   */
+  private boolean removeFromHmsParameters(String k) {
+    org.apache.hadoop.hive.metastore.api.Database msDb = thriftDb_.metastore_db;
+    Preconditions.checkNotNull(msDb);
+    if (msDb.getParameters() == null) return false;
+    return msDb.getParameters().remove(k) != null;
   }
 
   public boolean isSystemDb() { return isSystemDb_; }
@@ -235,11 +306,45 @@ public class Db implements CatalogObject {
   }
 
   /**
-   * See comment in Catalog.
+   * Adds the user defined function fn to metastore DB params. fn is
+   * serialized to thrift using TBinaryProtocol and then base64-encoded
+   * to be compatible with the HMS' representation of params.
    */
+  private boolean addFunctionToDbParams(Function fn) {
+    Preconditions.checkState(
+        fn.getBinaryType() != TFunctionBinaryType.BUILTIN &&
+        fn.getBinaryType() != TFunctionBinaryType.HIVE);
+    try {
+      byte[] serializedFn = serializer.serialize(fn.toThrift());
+      String base64Fn = Base64.encodeBase64String(serializedFn);
+      String fnKey = FUNCTION_INDEX_PREFIX + fn.signatureString();
+      if (base64Fn.length() > HIVE_METASTORE_DB_PARAM_LIMIT_BYTES) {
+        throw new ImpalaRuntimeException(
+            "Serialized function size exceeded HMS 4K byte limit");
+      }
+      putToHmsParameters(fnKey, base64Fn);
+    } catch (ImpalaException | TException  e) {
+      LOG.error("Error adding function " + fn.getName() + " to DB params", e);
+      return false;
+    }
+    return true;
+  }
+
   public boolean addFunction(Function fn) {
+    // Currently we don't persist java based udfs into the DB params.
+    // TODO: Remove this once hive udf support is ready.
+    boolean addToDbParams = !(fn.getBinaryType() == TFunctionBinaryType.HIVE);
+    return addFunction(fn, addToDbParams);
+  }
+
+  /**
+   * Registers the function fn to this database. If addToDbParams is true,
+   * fn is added to the metastore DB params. Returns false if the function
+   * fn already exists or when a failure is encountered while adding it to
+   * the metastore DB params and true otherwise.
+   */
+  private boolean addFunction(Function fn, boolean addToDbParams) {
     Preconditions.checkState(fn.dbName().equals(getName()));
-    // TODO: add this to persistent store
     synchronized (functions_) {
       if (getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
         return false;
@@ -249,11 +354,10 @@ public class Db implements CatalogObject {
         fns = Lists.newArrayList();
         functions_.put(fn.functionName(), fns);
       }
-      if (fns.add(fn)) {
-        Collections.sort(fns, FUNCTION_RESOLUTION_ORDER);
-        return true;
-      }
-      return false;
+      if (addToDbParams && !addFunctionToDbParams(fn)) return false;
+      fns.add(fn);
+      Collections.sort(fns, FUNCTION_RESOLUTION_ORDER);
+      return true;
     }
   }
 
@@ -261,7 +365,6 @@ public class Db implements CatalogObject {
    * See comment in Catalog.
    */
   public Function removeFunction(Function desc) {
-    // TODO: remove this from persistent store.
     synchronized (functions_) {
       Function fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
       if (fn == null) return null;
@@ -269,6 +372,12 @@ public class Db implements CatalogObject {
       Preconditions.checkNotNull(fns);
       fns.remove(fn);
       if (fns.isEmpty()) functions_.remove(desc.functionName());
+      // TODO: Remove this once hive udf support is ready
+      if (fn.getBinaryType() == TFunctionBinaryType.HIVE) return fn;
+      // Remove the function from the metastore database parameters
+      String fnKey = FUNCTION_INDEX_PREFIX + fn.signatureString();
+      boolean removeFn = removeFromHmsParameters(fnKey);
+      Preconditions.checkState(removeFn);
       return fn;
     }
   }
@@ -314,7 +423,7 @@ public class Db implements CatalogObject {
     Preconditions.checkState(isSystemDb());
     Preconditions.checkState(fn != null);
     Preconditions.checkState(getFunction(fn, Function.CompareMode.IS_IDENTICAL) == null);
-    addFunction(fn);
+    addFunction(fn, false);
   }
 
   /**

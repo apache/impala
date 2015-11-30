@@ -47,6 +47,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
@@ -119,8 +120,9 @@ public class AnalyzerTest {
       ArrayList<ScalarType> args, boolean varArgs) {
     ArrayList<Type> argTypes = Lists.newArrayList();
     argTypes.addAll(args);
-    Function fn = new ScalarFunction(
-        new FunctionName(db, fnName), argTypes, Type.INT, null, null, null, null);
+    Function fn = ScalarFunction.createForTesting(
+        db, fnName, argTypes, Type.INT, "/Foo", "Foo.class", null,
+        null, TFunctionBinaryType.NATIVE);
     fn.setHasVarArgs(varArgs);
     catalog_.addFunction(fn);
     return fn;
@@ -129,8 +131,10 @@ public class AnalyzerTest {
   protected void addTestUda(String name, Type retType, Type... argTypes) {
     FunctionName fnName = new FunctionName("default", name);
     catalog_.addFunction(
-        new AggregateFunction(fnName, Lists.newArrayList(argTypes), retType, retType,
-            null, null, null, null, null, null, null, null));
+        AggregateFunction.createForTesting(
+            fnName, Lists.newArrayList(argTypes), retType, retType,
+            null, "init_fn_symbol", "update_fn_symbol", null, null,
+            null, null, null, TFunctionBinaryType.NATIVE));
   }
 
   /**

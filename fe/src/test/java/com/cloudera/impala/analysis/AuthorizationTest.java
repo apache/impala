@@ -52,6 +52,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TNetworkAddress;
@@ -1688,10 +1689,12 @@ public class AuthorizationTest {
           "Cannot modify system database.");
 
       // Add default.f(), tpch.f()
-      catalog_.addFunction(new ScalarFunction(new FunctionName("default", "f"),
-          new ArrayList<Type>(), Type.INT, null, null, null, null));
-      catalog_.addFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-          new ArrayList<Type>(), Type.INT, null, null, null, null));
+      catalog_.addFunction(ScalarFunction.createForTesting("default", "f",
+          new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
+      catalog_.addFunction(ScalarFunction.createForTesting("tpch", "f",
+          new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
 
       AuthzOk("drop function tpch.f()");
     } finally {
@@ -1707,10 +1710,12 @@ public class AuthorizationTest {
 
       //Other tests don't expect tpch to contain functions
       //Specifically, if these functions are not cleaned up, TestDropDatabase() will fail
-      catalog_.removeFunction(new ScalarFunction(new FunctionName("default", "f"),
-          new ArrayList<Type>(), Type.INT, null, null, null, null));
-      catalog_.removeFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-          new ArrayList<Type>(), Type.INT, null, null, null, null));
+      catalog_.removeFunction(ScalarFunction.createForTesting("default", "f",
+          new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
+      catalog_.removeFunction(ScalarFunction.createForTesting("tpch", "f",
+          new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
     }
   }
 

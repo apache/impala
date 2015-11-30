@@ -92,6 +92,20 @@ public class AggregateFunction extends Function {
     returnsNonNullOnEmpty_ = false;
   }
 
+  public static AggregateFunction createForTesting(FunctionName fnName,
+      List<Type> argTypes, Type retType, Type intermediateType,
+      HdfsUri location, String updateFnSymbol, String initFnSymbol,
+      String serializeFnSymbol, String mergeFnSymbol, String getValueFnSymbol,
+      String removeFnSymbol, String finalizeFnSymbol,
+      TFunctionBinaryType fnType) {
+    AggregateFunction fn = new AggregateFunction(fnName, argTypes, retType,
+        intermediateType, location, updateFnSymbol, initFnSymbol,
+        serializeFnSymbol, mergeFnSymbol, getValueFnSymbol, removeFnSymbol,
+        finalizeFnSymbol);
+    fn.setBinaryType(fnType);
+    return fn;
+  }
+
   public static AggregateFunction createBuiltin(Db db, String name,
       List<Type> argTypes, Type retType, Type intermediateType,
       String initFnSymbol, String updateFnSymbol, String mergeFnSymbol,

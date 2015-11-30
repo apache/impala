@@ -352,17 +352,6 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       nextTableId_.set(0);
 
-      // Since UDFs/UDAs are not persisted in the metastore, we won't clear
-      // them across reset. To do this, we store all the functions before
-      // clearing and restore them after.
-      // TODO: Everything about this. Persist them.
-      List<Pair<String, HashMap<String, List<Function>>>> functions =
-          Lists.newArrayList();
-      for (Db db: dbCache_.get().values()) {
-        if (db.numFunctions() == 0) continue;
-        functions.add(Pair.create(db.getName(), db.getAllFunctions()));
-      }
-
       // Build a new DB cache, populate it, and replace the existing cache in one
       // step.
       ConcurrentHashMap<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
@@ -387,29 +376,6 @@ public class CatalogServiceCatalog extends Catalog {
         }
       } finally {
         msClient.release();
-      }
-
-      // Restore UDFs/UDAs.
-      for (Pair<String, HashMap<String, List<Function>>> dbFns: functions) {
-        Db db = null;
-        try {
-          db = newDbCache.get(dbFns.first);
-        } catch (Exception e) {
-          continue;
-        }
-        if (db == null) {
-          // DB no longer exists - it was probably dropped externally.
-          // TODO: We could restore this DB and then add the functions back?
-          continue;
-        }
-
-        for (List<Function> fns: dbFns.second.values()) {
-          for (Function fn: fns) {
-            if (fn.getBinaryType() == TFunctionBinaryType.BUILTIN) continue;
-            fn.setCatalogVersion(incrementAndGetCatalogVersion());
-            db.addFunction(fn);
-          }
-        }
       }
       dbCache_.set(newDbCache);
       // Submit tables for background loading.

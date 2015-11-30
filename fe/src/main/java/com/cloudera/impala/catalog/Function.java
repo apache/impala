@@ -117,6 +117,17 @@ public class Function implements CatalogObject {
     }
   }
 
+  /**
+   * Static helper method to create a function with a given TFunctionBinaryType.
+   */
+  public static Function createFunction(String db, String fnName, List<Type> args,
+      Type retType, boolean varArgs, TFunctionBinaryType fnType) {
+    Function fn =
+        new Function(new FunctionName(db, fnName), args, retType, varArgs);
+    fn.setBinaryType(fnType);
+    return fn;
+  }
+
   public FunctionName getFunctionName() { return name_; }
   public String functionName() { return name_.getFunction(); }
   public String dbName() { return name_.getDb(); }

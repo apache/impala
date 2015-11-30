@@ -190,6 +190,20 @@ public class ScalarFunction extends Function {
     return fn;
   }
 
+  /**
+   * Static helper method to create a scalar function of given
+   * TFunctionBinaryType.
+   */
+  public static ScalarFunction createForTesting(String db,
+      String fnName, ArrayList<Type> args, Type retType, String uriPath,
+      String symbolName, String initFnSymbol, String closeFnSymbol,
+      TFunctionBinaryType type) {
+    ScalarFunction fn = new ScalarFunction(new FunctionName(db, fnName), args,
+        retType, new HdfsUri(uriPath), symbolName, initFnSymbol, closeFnSymbol);
+    fn.setBinaryType(type);
+    return fn;
+  }
+
   public void setSymbolName(String s) { symbolName_ = s; }
   public void setPrepareFnSymbol(String s) { prepareFnSymbol_ = s; }
   public void setCloseFnSymbol(String s) { closeFnSymbol_ = s; }
