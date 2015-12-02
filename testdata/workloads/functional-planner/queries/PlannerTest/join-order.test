@@ -211,23 +211,23 @@ limit 100
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|
-|--03:SCAN HDFS [tpch.supplier s]
-|     partitions=1/1 files=1 size=1.33MB
-|
-09:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
 |
 |--05:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'ASIA'
 |
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: tpch.customer.c_nationkey = tpch.nation.n_nationkey
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n_nationkey
 |
 |--04:SCAN HDFS [tpch.nation]
 |     partitions=1/1 files=1 size=2.15KB
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--03:SCAN HDFS [tpch.supplier s]
+|     partitions=1/1 files=1 size=1.33MB
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -263,29 +263,29 @@ limit 100
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|
-|--17:EXCHANGE [BROADCAST]
-|  |
-|  03:SCAN HDFS [tpch.supplier s]
-|     partitions=1/1 files=1 size=1.33MB
-|
-09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n_regionkey = r_regionkey
 |
-|--16:EXCHANGE [BROADCAST]
+|--17:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'ASIA'
 |
-08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: tpch.customer.c_nationkey = tpch.nation.n_nationkey
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n_nationkey
 |
-|--15:EXCHANGE [BROADCAST]
+|--16:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpch.nation]
 |     partitions=1/1 files=1 size=2.15KB
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpch.supplier s]
+|     partitions=1/1 files=1 size=1.33MB
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -707,6 +707,7 @@ cross join functional.alltypes c
 |
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Test that tables are not re-ordered across outer/semi joins (IMPALA-860),
 # but the tables to the left/right of outer/semi joins are still re-ordered.
@@ -733,26 +734,27 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 files=24 size=478.45KB
 |
-08:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: t3.id = t4.id
+08:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t4.id = t3.id
 |
-|--03:SCAN HDFS [functional.alltypesagg t4]
-|     partitions=11/11 files=11 size=814.73KB
+|--07:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t3.id
+|  |
+|  |--02:SCAN HDFS [functional.alltypessmall t3]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t1.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny t1]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
 |
-07:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = t3.id
-|
-|--02:SCAN HDFS [functional.alltypessmall t3]
-|     partitions=4/4 files=4 size=6.32KB
-|
-06:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = t1.id
-|
-|--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 files=4 size=460B
-|
-01:SCAN HDFS [functional.alltypes t2]
-   partitions=24/24 files=24 size=478.45KB
+03:SCAN HDFS [functional.alltypesagg t4]
+   partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # No tables can be re-ordered because of semi and outer joins that must
 # remain at a fixed position in the plan (IMPALA-860).
@@ -767,38 +769,39 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 11:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-10:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: t5.id = t6.id
+10:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t6.id = t5.id
 |
-|--05:SCAN HDFS [functional.alltypestiny t6]
-|     partitions=4/4 files=4 size=460B
-|
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: t3.id = t5.id
-|
-|--04:SCAN HDFS [functional.alltypes t5]
-|     partitions=24/24 files=24 size=478.45KB
-|
-08:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: t3.id = t4.id
-|
-|--03:SCAN HDFS [functional.alltypesagg t4]
+|--09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t3.id = t5.id
+|  |
+|  |--04:SCAN HDFS [functional.alltypes t5]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  08:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: t4.id = t3.id
+|  |
+|  |--07:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: t2.id = t3.id
+|  |  |
+|  |  |--02:SCAN HDFS [functional.alltypessmall t3]
+|  |  |     partitions=4/4 files=4 size=6.32KB
+|  |  |
+|  |  06:HASH JOIN [RIGHT OUTER JOIN]
+|  |  |  hash predicates: t2.id = t1.id
+|  |  |
+|  |  |--00:SCAN HDFS [functional.alltypestiny t1]
+|  |  |     partitions=4/4 files=4 size=460B
+|  |  |
+|  |  01:SCAN HDFS [functional.alltypes t2]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  03:SCAN HDFS [functional.alltypesagg t4]
 |     partitions=11/11 files=11 size=814.73KB
 |
-07:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = t3.id
-|
-|--02:SCAN HDFS [functional.alltypessmall t3]
-|     partitions=4/4 files=4 size=6.32KB
-|
-06:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: t2.id = t1.id
-|
-|--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 files=4 size=460B
-|
-01:SCAN HDFS [functional.alltypes t2]
-   partitions=24/24 files=24 size=478.45KB
+05:SCAN HDFS [functional.alltypestiny t6]
+   partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Check that a join in between outer/semi joins is re-ordered correctly.
 # We expect t4 is joined before t3.
@@ -819,32 +822,33 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 files=4 size=460B
 |
-10:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: t4.id = t5.id
+10:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: t5.id = t4.id
 |
-|--04:SCAN HDFS [functional.alltypes t5]
+|--09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t3.id = t4.id
+|  |
+|  |--03:SCAN HDFS [functional.alltypessmall t4]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |
+|  08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t3.id
+|  |
+|  |--02:SCAN HDFS [functional.alltypesagg t3]
+|  |     partitions=11/11 files=11 size=814.73KB
+|  |
+|  07:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: t2.id = t1.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny t1]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = t3.id
-|
-|--02:SCAN HDFS [functional.alltypesagg t3]
-|     partitions=11/11 files=11 size=814.73KB
-|
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.id = t4.id
-|
-|--03:SCAN HDFS [functional.alltypessmall t4]
-|     partitions=4/4 files=4 size=6.32KB
-|
-07:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: t2.id = t1.id
-|
-|--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 files=4 size=460B
-|
-01:SCAN HDFS [functional.alltypes t2]
+04:SCAN HDFS [functional.alltypes t5]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Same above but using an anti join instead of a semi join.
 select count(*) from
@@ -864,32 +868,33 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 files=4 size=460B
 |
-10:HASH JOIN [LEFT ANTI JOIN]
-|  hash predicates: t4.id = t5.id
+10:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: t5.id = t4.id
 |
-|--04:SCAN HDFS [functional.alltypes t5]
+|--09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t3.id = t4.id
+|  |
+|  |--03:SCAN HDFS [functional.alltypessmall t4]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |
+|  08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t3.id
+|  |
+|  |--02:SCAN HDFS [functional.alltypesagg t3]
+|  |     partitions=11/11 files=11 size=814.73KB
+|  |
+|  07:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: t2.id = t1.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny t1]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = t3.id
-|
-|--02:SCAN HDFS [functional.alltypesagg t3]
-|     partitions=11/11 files=11 size=814.73KB
-|
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.id = t4.id
-|
-|--03:SCAN HDFS [functional.alltypessmall t4]
-|     partitions=4/4 files=4 size=6.32KB
-|
-07:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: t2.id = t1.id
-|
-|--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 files=4 size=460B
-|
-01:SCAN HDFS [functional.alltypes t2]
+04:SCAN HDFS [functional.alltypes t5]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Test inverting outer joins in a complex query plan.
 select 1 from
@@ -946,6 +951,7 @@ on (t3.id = t4.id)
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Same as above but with full outer joins.
 select 1 from
@@ -1002,6 +1008,7 @@ on (t3.id = t4.id)
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Test inverting semi joins in a complex query plan.
 select 1 from
@@ -1057,6 +1064,7 @@ where t2.month = 1
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Same as above but with anti joins.
 select 1 from
@@ -1112,6 +1120,7 @@ where t2.month = 1
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Regression test for IMPALA-1343.
 SELECT sum(t4.tinyint_col)
@@ -1163,6 +1172,7 @@ WHERE `$a$2`.`$c$1` > t4.id
 |
 01:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Tests assignment of conjuncts to inverted outer joins (IMPALA-1342).
 select 1
@@ -1181,6 +1191,7 @@ where a.int_col = b.int_col and b.bigint_col < a.tinyint_col
 |
 01:SCAN HDFS [functional.alltypessmall b]
    partitions=4/4 files=4 size=6.32KB
+---- DISTRIBUTEDPLAN
 ====
 # Tests assignment of conjuncts to inverted outer joins (IMPALA-1342).
 select 1
@@ -1208,6 +1219,7 @@ where a.int_col = b.int_col and b.bigint_col < a.tinyint_col
 |
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Tests assignment of conjuncts to inverted outer joins (IMPALA-1342).
 select 1
@@ -1234,6 +1246,7 @@ where b.tinyint_col = c.tinyint_col and b.bool_col != c.bool_col
 |
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Regression test for IMPALA-1342.
 select count(1) from
@@ -1263,6 +1276,7 @@ on (t3.string_col = t1.string_col_1 and t3.date_string_col = t1.string_col_2)
 |
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Test that filtering with "<=>" sets selectivity, just as "=" does. First, the
 # base case: functional.alltypes.timestamp_col has more distinct vals than
@@ -1287,6 +1301,7 @@ and a.date_string_col = ''
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.date_string_col = ''
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypes a
 left semi join
@@ -1305,6 +1320,7 @@ and a.timestamp_col = now()
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: date_string_col = ''
+---- DISTRIBUTEDPLAN
 ====
 # The same should hold true when the filtering is done with "<=>" rather than "=".
 select * from functional.alltypes a
@@ -1324,6 +1340,7 @@ and a.date_string_col <=> ''
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.date_string_col IS NOT DISTINCT FROM ''
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypes a
 left semi join
@@ -1342,4 +1359,5 @@ and a.timestamp_col <=> now()
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: date_string_col IS NOT DISTINCT FROM ''
+---- DISTRIBUTEDPLAN
 ====

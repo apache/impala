@@ -24,7 +24,7 @@ public abstract class Predicate extends Expr {
 
   public Predicate() {
     super();
-    this.isEqJoinConjunct_ = false;
+    isEqJoinConjunct_ = false;
   }
 
   /**

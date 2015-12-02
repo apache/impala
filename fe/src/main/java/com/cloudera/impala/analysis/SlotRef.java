@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Path.PathType;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -111,8 +112,13 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new AnalysisException("Unsupported type in '" + toSql() + "'.");
     }
+
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
-    if (type_.isBoolean()) selectivity_ = DEFAULT_SELECTIVITY;
+    Table rootTable = resolvedPath.getRootTable();
+    if (rootTable != null && rootTable.getNumRows() > 0) {
+      // The NDV cannot exceed the #rows in the table.
+      numDistinctValues_ = Math.min(numDistinctValues_, rootTable.getNumRows());
+    }
     isAnalyzed_ = true;
   }
 

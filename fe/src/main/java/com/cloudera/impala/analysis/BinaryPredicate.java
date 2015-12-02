@@ -216,18 +216,17 @@ public class BinaryPredicate extends Predicate {
     // required will be performed when the subquery is unnested.
     if (!contains(Subquery.class)) castForFunctionCall(true);
 
-    // determine selectivity
-    // TODO: Compute selectivity for nested predicates
+    // Determine selectivity
+    // TODO: Compute selectivity for nested predicates.
+    // TODO: Improve estimation using histograms.
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if ((op_ == Operator.EQ || op_ == Operator.NOT_DISTINCT)
-        && isSingleColumnPredicate(slotRefRef, null)
-        && slotRefRef.getRef().getNumDistinctValues() > 0) {
-      Preconditions.checkState(slotRefRef.getRef() != null);
-      selectivity_ = 1.0 / slotRefRef.getRef().getNumDistinctValues();
-      selectivity_ = Math.max(0, Math.min(1, selectivity_));
-    } else {
-      // TODO: improve using histograms, once they show up
-      selectivity_ = Expr.DEFAULT_SELECTIVITY;
+        && isSingleColumnPredicate(slotRefRef, null)) {
+      long distinctValues = slotRefRef.getRef().getNumDistinctValues();
+      if (distinctValues > 0) {
+        selectivity_ = 1.0 / distinctValues;
+        selectivity_ = Math.max(0, Math.min(1, selectivity_));
+      }
     }
   }
 

@@ -41,8 +41,9 @@ public abstract class JoinNode extends PlanNode {
   // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
   protected final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
 
-  // Default join selectivity when we cannot come up with a better estimate.
-  private final static double DEFAULT_JOIN_SELECTIVITY = 0.1;
+  // Slop in percent allowed when comparing stats for the purpose of determining whether
+  // an equi-join condition is a foreign/primary key join.
+  protected final static double FK_PK_MAX_STATS_DELTA_PERC = 0.05;
 
   protected JoinOperator joinOp_;
 
@@ -139,79 +140,144 @@ public abstract class JoinNode extends PlanNode {
 
   /**
    * Returns the estimated cardinality of an inner or outer join.
-   * For a join between child(0) and child(1), we look for join conditions "L.c = R.d"
-   * (with L being from child(0) and R from child(1)) and use as the cardinality
-   * estimate the maximum of
-   *   |child(0)| * |R| / NDV(R.d) * |child(1)| / |R|
-   * across all suitable join conditions, which simplifies to
-   *   |child(0)| * |child(1)| / NDV(R.d)
-   * The reasoning is that
-   * - each row in child(0) joins with |R| / NDV(R.d) rows in R
-   * - each row in R is 'present' in |child(1)| / |R| rows in child(1)
    *
-   * This handles the very frequent case of a fact table/dimension table join
-   * (aka foreign key/primary key join) if the primary key is a single column, with
-   * possible additional predicates against the dimension table. An example:
-   * FROM FactTbl F JOIN Customers C ON (F.cust_id = C.id) ... WHERE C.region = 'US'
-   * - if there are 5 regions, the selectivity of "C.region = 'US'" would be 0.2
-   *   and the output cardinality of the Customers scan would be 0.2 * # rows in
-   *   Customers
-   * - # rows in Customers == # of distinct values for Customers.id
-   * - the output cardinality of the join would be F.cardinality * 0.2
+   * We estimate the cardinality based on equality join predicates of the form
+   * "L.c = R.d", with L being a table from child(0) and R a table from child(1).
+   * For each such join predicate we try to determine whether it is a foreign/primary
+   * key (FK/PK) join condition, and either use a special FK/PK estimation or a generic
+   * estimation method. We maintain the minimum cardinality for each method separately,
+   * and finally return in order of preference:
+   * - the FK/PK estimate, if there was at least one FP/PK predicate
+   * - the generic estimate, if there was at least one predicate with sufficient stats
+   * - otherwise, we optimistically assume a FK/PK join with a join selectivity of 1,
+   *   and return |child(0)|
+   *
+   * FK/PK estimation:
+   * cardinality = |child(0)| * (|child(1)| / |R|) * (NDV(R.d) / NDV(L.c))
+   * - the cardinality of a FK/PK must be <= |child(0)|
+   * - |child(1)| / |R| captures the reduction in join cardinality due to
+   *   predicates on the PK side
+   * - NDV(R.d) / NDV(L.c) adjusts the join cardinality to avoid underestimation
+   *   due to an independence assumption if the PK side has a higher NDV than the FK
+   *   side. The rationale is that rows filtered from the PK side do not necessarily
+   *   have a match on the FK side, and therefore would not affect the join cardinality.
+   *   TODO: Revisit this pessimistic adjustment that tends to overestimate.
+   *
+   * Generic estimation:
+   * cardinality = |child(0)| * |child(1)| / max(NDV(L.c), NDV(R.d))
+   * - case A: NDV(L.c) <= NDV(R.d)
+   *   every row from child(0) joins with |child(1)| / NDV(R.d) rows
+   * - case B: NDV(L.c) > NDV(R.d)
+   *   every row from child(1) joins with |child(0)| / NDV(L.c) rows
+   * - we adjust the NDVs from both sides to account for predicates that may
+   *   might have reduce the cardinality and NDVs
    */
   private long getJoinCardinality(Analyzer analyzer) {
-    Preconditions.checkState(joinOp_.isInnerJoin() || joinOp_.isOuterJoin());
-    long maxNumDistinct = 0;
-    for (Expr eqJoinPredicate: eqJoinConjuncts_) {
-      if (eqJoinPredicate.getChild(0).unwrapSlotRef(false) == null) continue;
-      SlotRef rhsSlotRef = eqJoinPredicate.getChild(1).unwrapSlotRef(false);
-      if (rhsSlotRef == null) continue;
-      SlotDescriptor slotDesc = rhsSlotRef.getDesc();
-      if (slotDesc == null) continue;
-      ColumnStats stats = slotDesc.getStats();
-      if (!stats.hasNumDistinctValues()) continue;
-      long numDistinct = stats.getNumDistinctValues();
-      Table rhsTbl = slotDesc.getParent().getTable();
-      if (rhsTbl != null && rhsTbl.getNumRows() != -1) {
-        // we can't have more distinct values than rows in the table, even though
-        // the metastore stats may think so
-        LOG.debug("#distinct=" + numDistinct + " #rows="
-            + Long.toString(rhsTbl.getNumRows()));
-        numDistinct = Math.min(numDistinct, rhsTbl.getNumRows());
+    Preconditions.checkState(
+        joinOp_ == JoinOperator.INNER_JOIN || joinOp_.isOuterJoin());
+
+    long lhsCard = getChild(0).cardinality_;
+    long rhsCard = getChild(1).cardinality_;
+    if (lhsCard == -1 || rhsCard == -1) return -1;
+
+    // Minimum of estimated join cardinalities for FK/PK join conditions.
+    long fkPkJoinCard = -1;
+    // Minimum of estimated join cardinalities for other join conditions.
+    long genericJoinCard = -1;
+    for (Expr eqJoinConjunct: eqJoinConjuncts_) {
+      SlotStats lhsStats = SlotStats.create(eqJoinConjunct.getChild(0));
+      SlotStats rhsStats = SlotStats.create(eqJoinConjunct.getChild(1));
+      // Ignore the equi-join conjunct if we have no relevant table or column stats.
+      if (lhsStats == null || rhsStats == null) continue;
+
+      // We assume a FK/PK join based on the following intuitions:
+      // 1. NDV(L.c) <= NDV(R.d)
+      //    The reasoning is that a FK/PK join is unlikely if the foreign key
+      //    side has a higher NDV than the primary key side. We may miss true
+      //    FK/PK joins due to inaccurate and/or stale stats.
+      // 2. R.d is probably a primary key.
+      //    Requires that NDV(R.d) is very close to |R|.
+      // The idea is that, by default, we assume that every join is a FK/PK join unless
+      // we have compelling evidence that suggests otherwise, so by using || we give the
+      // FK/PK assumption more chances to succeed.
+      if (lhsStats.ndv <= rhsStats.ndv * (1.0 + FK_PK_MAX_STATS_DELTA_PERC) ||
+          Math.abs(rhsStats.numRows - rhsStats.ndv) / (double) rhsStats.numRows
+            <= FK_PK_MAX_STATS_DELTA_PERC) {
+        // Adjust the join selectivity based on the NDV ratio to avoid underestimating
+        // the cardinality if the PK side has a higher NDV than the FK side.
+        double ndvRatio = (double) rhsStats.ndv / (double) lhsStats.ndv;
+        double rhsSelectivity = (double) rhsCard / (double) rhsStats.numRows;
+        long joinCard = (long) Math.ceil(lhsCard * rhsSelectivity * ndvRatio);
+        // FK/PK join cardinality must be <= the lhs cardinality.
+        joinCard = Math.min(lhsCard, joinCard);
+        if (fkPkJoinCard == -1) {
+          fkPkJoinCard = joinCard;
+        } else {
+          fkPkJoinCard = Math.min(fkPkJoinCard, joinCard);
+        }
+      } else {
+        // Adjust the NDVs on both sides to account for predicates. Intuitively, the NDVs
+        // should only decrease, so we bail if the adjustment would lead to an increase.
+        // TODO: Adjust the NDVs more systematically throughout the plan tree to
+        // get a more accurate NDV at this plan node.
+        if (lhsCard > lhsStats.numRows || rhsCard > rhsStats.numRows) continue;
+        double lhsAdjNdv = lhsStats.ndv * ((double)lhsCard / lhsStats.numRows);
+        double rhsAdjNdv = rhsStats.ndv * ((double)rhsCard / rhsStats.numRows);
+        // Generic join cardinality estimation.
+        long joinCard = (long) Math.ceil(
+            (lhsCard / Math.max(lhsAdjNdv, rhsAdjNdv)) * rhsCard);
+        if (genericJoinCard == -1) {
+          genericJoinCard = joinCard;
+        } else {
+          genericJoinCard = Math.min(genericJoinCard, joinCard);
+        }
       }
-      if (getChild(1).cardinality_ != -1 && numDistinct != -1) {
-        // The number of distinct values of a slot cannot exceed the cardinality_
-        // of the plan node the slot is coming from.
-        numDistinct = Math.min(numDistinct, getChild(1).cardinality_);
-      }
-      maxNumDistinct = Math.max(maxNumDistinct, numDistinct);
-      LOG.debug("min slotref=" + rhsSlotRef.toSql() + " #distinct="
-          + Long.toString(numDistinct));
     }
 
-    long result = -1;
-    if (maxNumDistinct == 0) {
-      // if we didn't find any suitable join predicates or don't have stats
-      // on the relevant columns, we very optimistically assume we're doing an
-      // FK/PK join (which doesn't alter the cardinality of the left-hand side)
-      result = getChild(0).cardinality_;
-      if (eqJoinConjuncts_.isEmpty()) {
-        // No equi-join conjuncts.
-        result = multiplyCardinalities(getChild(0).cardinality_,
-            getChild(1).cardinality_);
-        if (!otherJoinConjuncts_.isEmpty() || !conjuncts_.isEmpty()) {
-          // We estimate the cardinality as 10% of the multiplied cardinalities
-          // from the left and right hand side.
-          result = Math.round(result * DEFAULT_JOIN_SELECTIVITY);
-        }
-        result = result < 0 ? -1 : result;
-      }
-    } else if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
-      result = multiplyCardinalities(getChild(0).cardinality_,
-          getChild(1).cardinality_);
-      result = Math.round((double)result / (double) maxNumDistinct);
+    if (fkPkJoinCard != -1) {
+      return fkPkJoinCard;
+    } else if (genericJoinCard != -1) {
+      return genericJoinCard;
+    } else {
+      // Optimistic FK/PK assumption with join selectivity of 1.
+      return lhsCard;
     }
-    return result;
+  }
+
+  /**
+   * Class combining column and table stats for a particular slot. Contains the NDV
+   * for the slot and the number of rows in the originating table.
+   */
+  private static class SlotStats {
+    // Number of distinct values of the slot.
+    public final long ndv;
+    // Number of rows in the originating table.
+    public final long numRows;
+
+    public SlotStats(long ndv, long numRows) {
+      // Cap NDV at num rows of the table.
+      this.ndv = Math.min(ndv, numRows);
+      this.numRows = numRows;
+    }
+
+    /**
+     * Returns a new SlotStats object from the given expr that is guaranteed
+     * to have valid stats.
+     * Returns null if 'e' is not a SlotRef or a cast SlotRef, or if there are no
+     * valid table/column stats for 'e'.
+     */
+    public static SlotStats create(Expr e) {
+      // We need both the table and column stats, but 'e' might not directly reference
+      // a scan slot, e.g., if 'e' references a grouping slot of an agg. So we look for
+      // that source scan slot, traversing through materialization points if necessary.
+      SlotDescriptor slotDesc = e.findSrcScanSlot();
+      if (slotDesc == null) return null;
+      Table table = slotDesc.getParent().getTable();
+      if (table == null || table.getNumRows() == -1) return null;
+      if (!slotDesc.getStats().hasNumDistinctValues()) return null;
+      return new SlotStats(
+          slotDesc.getStats().getNumDistinctValues(), table.getNumRows());
+    }
   }
 
   /**

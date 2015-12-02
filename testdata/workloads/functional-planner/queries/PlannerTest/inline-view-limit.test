@@ -495,6 +495,7 @@ where a.id > 10 and b.id > 20
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: id != 1, functional.alltypes.id > 10
+---- DISTRIBUTEDPLAN
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer a.id->b.id is legal.
@@ -506,21 +507,22 @@ left outer join
 on (a.id = b.id)
 where a.id > 10 and b.id > 20
 ---- PLAN
-03:HASH JOIN [LEFT OUTER JOIN]
+03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 20
 |
-|--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
-|     predicates: functional.alltypessmall.id != 1, id != 2, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20
+|--01:SELECT
+|  |  predicates: id > 10
+|  |
+|  00:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: id != 1
+|     limit: 10
 |
-01:SELECT
-|  predicates: id > 10
-|
-00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
-   predicates: id != 1
-   limit: 10
+02:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 files=4 size=6.32KB
+   predicates: functional.alltypessmall.id != 1, id != 2, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20
+---- DISTRIBUTEDPLAN
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer b.id->a.id is illegal due to the limit in a.
@@ -544,6 +546,7 @@ where a.id > 10 and b.id > 20
    partitions=24/24 files=24 size=478.45KB
    predicates: id != 1
    limit: 10
+---- DISTRIBUTEDPLAN
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer b.id->a.id is legal.
@@ -570,4 +573,5 @@ where a.id > 10 and b.id > 20
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: id != 1, functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20
+---- DISTRIBUTEDPLAN
 ====

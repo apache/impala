@@ -5,6 +5,7 @@ where item > 10
 00:SCAN HDFS [functional.allcomplextypes.int_array_col]
    partitions=0/0 files=0 size=0B
    predicates: item > 10
+---- DISTRIBUTEDPLAN
 ====
 # Scan of a nested map with scalar key and value.
 select * from functional.allcomplextypes.int_map_col
@@ -13,6 +14,7 @@ where key = 'test' and value < 10
 00:SCAN HDFS [functional.allcomplextypes.int_map_col]
    partitions=0/0 files=0 size=0B
    predicates: key = 'test', value < 10
+---- DISTRIBUTEDPLAN
 ====
 # Scan of a deeply nested collection.
 select count(f21) from functional.allcomplextypes.complex_nested_struct_col.f2.f12
@@ -24,6 +26,7 @@ where key = 'test'
 00:SCAN HDFS [functional.allcomplextypes.complex_nested_struct_col.f2.f12]
    partitions=0/0 files=0 size=0B
    predicates: key = 'test'
+---- DISTRIBUTEDPLAN
 ====
 # Join on two nested collections with structs.
 select count(*) from
@@ -45,6 +48,7 @@ where a.f2 = 'test_a' and b.f2 = 'test_b'
 00:SCAN HDFS [functional.allcomplextypes.struct_array_col a]
    partitions=0/0 files=0 size=0B
    predicates: a.f2 = 'test_a'
+---- DISTRIBUTEDPLAN
 ====
 # Test assignment of equi-join conjuncts and enforcement of
 # slot equivalences in a bushy join.
@@ -57,13 +61,7 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
   and c_comment = s_comment and n_comment = s_comment
 ---- PLAN
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: n_nationkey = s_nationkey, c_comment = s_comment
-|
-|--06:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=111.08MB
-|
-07:HASH JOIN [INNER JOIN]
-|  hash predicates: c_nationkey = n_nationkey, c.c_comment = n.n_comment
+|  hash predicates: c_nationkey = n_nationkey, s_comment = n_comment
 |
 |--01:SUBPLAN
 |  |
@@ -76,8 +74,15 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |  00:SCAN HDFS [tpch_nested_parquet.region r]
 |     partitions=1/1 files=1 size=4.18KB
 |
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: c_comment = s_comment, c.c_nationkey = s.s_nationkey
+|
+|--06:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
 05:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Cross join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a cross join a.int_array_col b
@@ -95,6 +100,7 @@ where a.id < 10 and b.item % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Left semi join of parent and relative ref without On-clause.
 select a.id from functional.allcomplextypes a left semi join a.int_array_col b
@@ -111,6 +117,7 @@ where a.id < 10
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Right semi join of parent and relative ref without On-clause.
 select b.item from functional.allcomplextypes a right semi join a.int_array_col b
@@ -127,6 +134,7 @@ where b.item % 2 = 0
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Left anti join of parent and relative ref without On-clause.
 select a.id from functional.allcomplextypes a left anti join a.int_array_col b
@@ -143,6 +151,7 @@ where a.id < 10
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Same as above but with an equivalent inline view on the rhs.
 select a.id from functional.allcomplextypes a
@@ -160,6 +169,7 @@ where a.id < 10
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Right anti join of parent and relative ref without On-clause.
 # TODO: Transform the join op into a CROSS JOIN.
@@ -178,6 +188,7 @@ where b.item % 2 = 0
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Left outer join of parent and relative ref without On-clause.
 select a.id, b.item from functional.allcomplextypes a left outer join a.int_array_col b
@@ -194,6 +205,7 @@ where a.id < 10
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Same as above but with an equivalent inline view on the rhs.
 select a.id, v.item from functional.allcomplextypes a
@@ -211,6 +223,7 @@ where a.id < 10
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Right outer join of parent and relative ref without On-clause.
 # TODO: Transform the join op into a CROSS JOIN.
@@ -229,6 +242,7 @@ where b.item % 2 = 0
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Full outer join of parent and relative ref without On-clause.
 # TODO: Transform the join op into an INNER JOIN.
@@ -248,6 +262,7 @@ where b.item % 2 = 0 and a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi inner join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a, a.int_array_col b
@@ -266,6 +281,7 @@ where a.id < 10 and b.item % 2 = 0 and a.id < b.item
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi left semi join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -285,6 +301,7 @@ where a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi right semi join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -305,6 +322,7 @@ where b.item % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi left anti join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -324,6 +342,7 @@ where a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi right anti join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -344,6 +363,7 @@ where b.item % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi left outer join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a
@@ -363,6 +383,7 @@ where a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi right outer join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -383,6 +404,7 @@ where b.item % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Non-equi full outer join of parent and relative ref.
 # TODO: Transform the join op into LEFT OUTER JOIN.
@@ -403,6 +425,7 @@ where b.item % 2 = 0
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates on b: b.item % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Inner equi-join of parent and relative ref.
 select a.id, b.f1, b.f2 from functional.allcomplextypes a
@@ -423,6 +446,7 @@ where a.id < 10 and b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10, a.id % 2 = 0
    predicates on b: b.f1 < 10, b.f1 % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Left-semi equi-join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -443,6 +467,7 @@ where a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id % 2 = 0, a.id < 10
    predicates on b: b.f1 % 2 = 0, b.f1 < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Right-semi equi-join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -464,6 +489,7 @@ where b.f1 % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10, a.id % 2 = 0
    predicates on b: b.f1 < 10, b.f1 % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Left-anti equi-join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -484,6 +510,7 @@ where a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.f1 % 2 = 0, b.f1 < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Right-anti equi-join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -505,6 +532,7 @@ where b.f1 % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id % 2 = 0, a.id < 10
    predicates on b: b.f1 % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Left-outer equi-join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -525,6 +553,7 @@ where a.id < 10
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.f1 % 2 = 0, b.f1 < 10
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Right-outer equi-join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -546,6 +575,7 @@ where b.f1 % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10, a.id % 2 = 0
    predicates on b: b.f1 % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Full-outer equi-join of parent and relative ref.
 # TODO: Transform the join op into an LEFT OUTER JOIN.
@@ -568,6 +598,7 @@ where a.id < 10 and b.f1 % 2 = 0
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
    predicates on b: b.f1 % 2 = 0
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Test multiple relative refs, disjunctive predicates,
 # and correct join ordering within a subplan.
@@ -604,6 +635,7 @@ select 1 from functional.allcomplextypes a
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates on e: e.f2 = 'test'
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Test that subplans are not re-ordered across semi/outer joins.
 # The 'alltypes*' tables are purposely placed with increasing size to test
@@ -645,6 +677,7 @@ where e.f1 < 10
 |
 02:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 files=4 size=6.32KB
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Same test as above but the relative table ref is wedged in between
 # semi/outer joins, and the join types are different.
@@ -685,6 +718,7 @@ inner join functional.alltypes d on (b.id = d.id)
 |
 01:SCAN HDFS [functional.alltypestiny b]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Test joining relative refs with independent table refs.
 # The 'alltypes*' tables are purposely placed with increasing size to test
@@ -730,6 +764,7 @@ where b.item < 10 and c.int_col > 30
 |
 06:SCAN HDFS [functional.alltypes e]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Same as above but with different join types
 select *
@@ -774,6 +809,7 @@ where b.item < 10 and c.int_col > 30
 05:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 files=4 size=6.32KB
    predicates: c.int_col > 30
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and aggregate subplan.
 select a.id, v.cnt
@@ -795,6 +831,7 @@ where v.cnt < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and grouping aggregate subplan.
 select a.id, v.f1, v.cnt
@@ -817,6 +854,7 @@ where v.cnt < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Top-n inside subplan.
 select a.id, v.f1, v.f2
@@ -840,6 +878,7 @@ where v.f2 = 'test'
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and analytic subplan.
 select a.id, v.key, v.rnum
@@ -868,6 +907,7 @@ where v.key != 'bad'
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and uncorrelated scalar subquery.
 select a.id from functional.allcomplextypes a
@@ -887,6 +927,7 @@ where id < (select avg(item) from a.int_array_col)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and uncorrelated exists subquery.
 select a.id from functional.allcomplextypes a
@@ -903,6 +944,7 @@ where exists (select item from a.int_array_col where item > 100)
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates on int_array_col: item > 100
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and uncorrelated not exists subquery.
 select a.id from functional.allcomplextypes a
@@ -918,6 +960,7 @@ where not exists (select item from a.int_array_col)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and correlated exists subquery
 # without an equi-join condition.
@@ -935,6 +978,7 @@ where exists (select m.key from a.struct_map_col m where a.id < m.f1)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and correlated not exists subquery
 # without an equi-join condition.
@@ -952,6 +996,7 @@ where not exists (select c.f2 from a.struct_array_col c where a.id < c.f1)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and a correlated IN subquery.
 # Note: The Nested Loop Join here is intentional because there is no
@@ -971,6 +1016,7 @@ where id in (select b.item from a.int_array_col b where a.year < b.item)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and an uncorrelated NOT IN subquery.
 # Note: We must use a hash join because the nested-loop join does not support
@@ -991,6 +1037,7 @@ where id not in (select b.item from a.int_array_col b)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Parent scan and a correlated NOT IN subquery.
 # Note: We must use a hash join because the nested-loop join does not support
@@ -1012,6 +1059,7 @@ where id not in (select b.item from a.int_array_col b where a.year < b.item)
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Bushy plan with multiple subplans.
 select a.id, c.item, d.key, d.value, v.cnt
@@ -1064,6 +1112,7 @@ cross join
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Same as above but with an INNER JOIN between c and d.
 select a.id, c.item, d.key, d.value, v.cnt
@@ -1119,6 +1168,7 @@ where b.id = d.value
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Same as above but with a LEFT OUTER JOIN between c and d.
 # The outer join needs to be moved after the join between a and b to
@@ -1170,6 +1220,7 @@ cross join
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Nested subplans.
 select 1
@@ -1199,6 +1250,7 @@ limit 10
    predicates: c_custkey < 10
    predicates on o: o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
+---- DISTRIBUTEDPLAN
 ====
 # Nested subplans.
 select 1
@@ -1225,6 +1277,7 @@ cross join
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: straight_join should place the Subplan in FROM-clause order
 # while coalescing adjacent ones.
@@ -1260,6 +1313,7 @@ cross join (select avg(item) a from b.int_array_col) v2
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # Test subplans: Enforcement of slot equivalences and removal
 # of redundant predicates.
@@ -1294,6 +1348,7 @@ where c.c_custkey = o.o_orderkey and c.c_custkey = o.o_shippriority
    predicates: c.c_custkey = c.c_nationkey
    predicates on o: o.o_orderkey = o.o_shippriority
    predicates on l: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
+---- DISTRIBUTEDPLAN
 ====
 # Test assignment of nested conjuncts in the parent scan and its limitations.
 select *
@@ -1345,6 +1400,7 @@ where a.item between 10 and 20
    predicates on m: m.key = 'test', m.value != 30
    predicates on c: c.f11 >= 10, c.f11 <= 20, c.f11 % 2 = 0
    predicates on f12: f12.key = 'test2'
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2358: Test join ordering of relative collection table refs inside
 # a subquery.
@@ -1380,6 +1436,7 @@ where s.s_suppkey not in
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
    partitions=1/1 files=1 size=111.08MB
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2383: Test join ordering of relative collection ref after an outer join.
 select 1 from functional.allcomplextypes t1
@@ -1403,6 +1460,7 @@ inner join t2.int_array_col
 |
 00:SCAN HDFS [functional.allcomplextypes t1]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2401: Test correlated inline view with an analytic function and grouping.
 select a from functional.allcomplextypes t,
@@ -1429,6 +1487,7 @@ select a from functional.allcomplextypes t,
 |
 00:SCAN HDFS [functional.allcomplextypes t]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2349: Test planning of nested subplans with straight_join.
 select straight_join 1
@@ -1461,6 +1520,7 @@ inner join m1.value m2
 |
 00:SCAN HDFS [functional.allcomplextypes t1]
    partitions=0/0 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2412: Test join ordering in nested subplans.
 select 1
@@ -1504,6 +1564,7 @@ where c.c_custkey in
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2412: Test join ordering in nested subplans. Same as above
 # but with a few inner joins.
@@ -1548,6 +1609,7 @@ where c.c_custkey in
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2412: Test join ordering in nested subplans.
 select 1
@@ -1589,6 +1651,7 @@ where c.c_custkey in
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
 # the ON clause and there are predicates in the WHERE clause that can be assigned to
@@ -1610,6 +1673,7 @@ where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
    partitions=0/0 files=0 size=0B
    predicates: t1.int_struct_col.f1 = 10
    predicates on t2: t2.item = 1
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2446: Test predicate assignment when right outer join has no conjuncts in
 # the ON clause and there are predicates in the WHERE clause that can be assigned to
@@ -1631,6 +1695,7 @@ where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
    partitions=0/0 files=0 size=0B
    predicates: t1.int_struct_col.f1 = 10
    predicates on t2: t2.item = 1
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2446: Test predicate assignment when full outer join has no conjuncts in
 # the ON clause and there are predicates in the WHERE clause that can be assigned to
@@ -1652,6 +1717,7 @@ where t1.id = t2.pos and t1.int_struct_col.f1 = 10 and t2.item = 1
    partitions=0/0 files=0 size=0B
    predicates: t1.int_struct_col.f1 = 10
    predicates on t2: t2.item = 1
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2478: Test assignment of where-clause conjuncts with an outer-joined
 # # correlated inline view.
@@ -1671,6 +1737,7 @@ select id from functional.allcomplextypes t1 left outer join
 00:SCAN HDFS [functional.allcomplextypes t1]
    partitions=0/0 files=0 size=0B
    predicates on t2: t2.item = 1
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2445: Test ordering of nested subplans.
 select 1 from tpch_nested_parquet.customer c
@@ -1696,4 +1763,5 @@ inner join o.o_lineitems
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
+---- DISTRIBUTEDPLAN
 ====

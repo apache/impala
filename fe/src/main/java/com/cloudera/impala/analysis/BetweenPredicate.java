@@ -77,8 +77,6 @@ public class BetweenPredicate extends Predicate {
           "supported in a between predicate: " + toSqlImpl());
     }
     analyzer.castAllToCompatibleType(originalChildren_);
-    // TODO: improve with histograms
-    selectivity_ = Expr.DEFAULT_SELECTIVITY;
 
     // Rewrite between predicate into a conjunctive/disjunctive compound predicate.
     if (isNotBetween_) {

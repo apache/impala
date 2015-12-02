@@ -12,6 +12,7 @@ where id in
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # NOT IN predicate rewritten into a null-aware anti join
 select *
@@ -27,6 +28,7 @@ where id not in
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated NOT IN rewritten into a null-aware anti join
 select *
@@ -47,6 +49,7 @@ and a.int_col < 100
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col < 100
+---- DISTRIBUTEDPLAN
 ====
 # Correlated NOT IN subquery resulting in the same eq conjunct
 # being used in both the hash and the other join predicate
@@ -63,6 +66,7 @@ where a.id not in (select id from functional.alltypes b where a.id = b.id)
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Subquery with predicate in the WHERE clause
 select count(*)
@@ -84,6 +88,7 @@ and bool_col = false
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Complex expression in the IN predicate
 select *
@@ -99,6 +104,7 @@ where t.int_col + 1 in
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple subqueries in the WHERE clause
 select *
@@ -124,6 +130,7 @@ and t.bigint_col < 1000
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
    predicates: t.bigint_col < 1000
+---- DISTRIBUTEDPLAN
 ====
 # Multiple tables in the FROM clause of the outer query block
 select count(*)
@@ -149,6 +156,7 @@ where a.id = t.id and a.int_col in
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple tables in the subquery
 select count(*)
@@ -177,6 +185,7 @@ and a.int_col < 10
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: a.int_col < 10
+---- DISTRIBUTEDPLAN
 ====
 # Outer join between the tables in the outer query block
 select count(*)
@@ -205,6 +214,7 @@ and t.bool_col = false
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Subquery in the outer-joined table
 select count(*)
@@ -234,6 +244,7 @@ where a.bool_col = false and t.bigint_col < 100
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Multiple tables in the FROM clause of the subquery
 select count(distinct id)
@@ -249,27 +260,28 @@ where a.int_col in
 07:AGGREGATE
 |  group by: id
 |
-06:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: t.int_col = a.int_col
+06:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.int_col = t.int_col
 |
-|--00:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 files=11 size=814.73KB
+|--05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: s.bigint_col = n.bigint_col
+|  |
+|  |--03:SCAN HDFS [functional.alltypestiny n]
+|  |     partitions=4/4 files=4 size=460B
+|  |     predicates: n.bool_col = FALSE
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t.id = s.id
+|  |
+|  |--02:SCAN HDFS [functional.alltypessmall s]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |
+|  01:SCAN HDFS [functional.alltypes t]
+|     partitions=24/24 files=24 size=478.45KB
 |
-05:HASH JOIN [INNER JOIN]
-|  hash predicates: s.bigint_col = n.bigint_col
-|
-|--03:SCAN HDFS [functional.alltypestiny n]
-|     partitions=4/4 files=4 size=460B
-|     predicates: n.bool_col = FALSE
-|
-04:HASH JOIN [INNER JOIN]
-|  hash predicates: t.id = s.id
-|
-|--02:SCAN HDFS [functional.alltypessmall s]
-|     partitions=4/4 files=4 size=6.32KB
-|
-01:SCAN HDFS [functional.alltypes t]
-   partitions=24/24 files=24 size=478.45KB
+00:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Subqueries with inline views
 select *
@@ -298,6 +310,7 @@ where t.id in
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 with t as (select a.* from functional.alltypes a where id in
   (select id from functional.alltypestiny))
@@ -312,6 +325,7 @@ select * from t where t.bool_col = false and t.int_col = 10
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col = FALSE, a.int_col = 10
+---- DISTRIBUTEDPLAN
 ====
 # Subqueries in WITH, FROM and WHERE clauses
 with t as (select a.* from functional.alltypes a
@@ -350,6 +364,7 @@ and s.bool_col = false
 03:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
    predicates: g.bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Correlated subqueries
 select *
@@ -367,6 +382,7 @@ and t.bool_col = false
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
    predicates: t.bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Multiple nesting levels (uncorrelated queries)
 select *
@@ -393,6 +409,7 @@ and bigint_col < 1000
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
    predicates: bigint_col < 1000
+---- DISTRIBUTEDPLAN
 ====
 # Multiple nesting levels (correlated queries)
 select *
@@ -417,6 +434,7 @@ where id in
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple nesting levels (correlated and uncorrelated queries)
 select *
@@ -439,6 +457,7 @@ where id in
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Predicate propagation with uncorrelated subqueries
 select *
@@ -456,6 +475,7 @@ where id in
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Predicate propagation with correlated subqueries
 select *
@@ -479,6 +499,7 @@ where t.int_col < 10 and t.int_col in
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated EXISTS
 select count(*)
@@ -497,6 +518,7 @@ where exists
 |
 01:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated EXISTS with an analytic function and a group by clause
 select 1
@@ -520,6 +542,7 @@ and tinyint_col < 10
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: tinyint_col < 10
+---- DISTRIBUTEDPLAN
 ====
 # Correlated NOT EXISTS
 select count(*)
@@ -538,6 +561,7 @@ where not exists
 |
 01:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated NOT EXISTS with an analytic function and a group by clause
 select count(*)
@@ -552,25 +576,26 @@ and bool_col = false
 06:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-05:HASH JOIN [RIGHT ANTI JOIN]
-|  hash predicates: b.int_col = a.int_col
+05:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: a.int_col = b.int_col
 |
-|--00:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 files=11 size=814.73KB
-|     predicates: bool_col = FALSE
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: b.id, b.int_col, b.bigint_col
+|  |
+|  03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: c.id = b.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypessmall b]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: c.bool_col = FALSE
 |
-04:AGGREGATE [FINALIZE]
-|  group by: b.id, b.int_col, b.bigint_col
-|
-03:HASH JOIN [INNER JOIN]
-|  hash predicates: c.id = b.id
-|
-|--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 files=4 size=6.32KB
-|
-02:SCAN HDFS [functional.alltypes c]
-   partitions=24/24 files=24 size=478.45KB
-   predicates: c.bool_col = FALSE
+00:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated EXISTS
 select *
@@ -586,6 +611,7 @@ where exists (select * from functional.alltypessmall s where s.id < 5)
 |
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated EXISTS with an analytic function and a group by clause
 select 1
@@ -607,6 +633,7 @@ where exists
 01:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
    predicates: tinyint_col = 10
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated EXISTS with a LIMIT 0 clause
 select 1
@@ -614,6 +641,7 @@ from functional.alltypestiny t
 where exists (select * from functional.alltypessmall limit 0)
 ---- PLAN
 00:EMPTYSET
+---- DISTRIBUTEDPLAN
 ====
 # Multiple nesting levels
 select count(*)
@@ -641,6 +669,7 @@ where exists
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple subquery predicates
 select g.int_col, count(*)
@@ -701,6 +730,7 @@ having count(*) < 100
 04:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
    predicates: t.bool_col = TRUE
+---- DISTRIBUTEDPLAN
 ====
 # Subqueries with aggregation
 select *
@@ -724,6 +754,7 @@ and a.bigint_col < 10
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bigint_col < 10
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated aggregation subquery
 select *
@@ -745,6 +776,7 @@ and a.bigint_col > 10
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bigint_col > 10
+---- DISTRIBUTEDPLAN
 ====
 # Aggregation subquery with constant comparison expr
 select *
@@ -765,6 +797,7 @@ and a.int_col < 10
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: a.int_col < 10
+---- DISTRIBUTEDPLAN
 ====
 # Correlated aggregation subquery
 select a.int_col, count(*)
@@ -794,6 +827,7 @@ group by a.int_col
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: a.bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Aggregation subquery with multiple tables
 select t.tinyint_col, count(*)
@@ -838,6 +872,7 @@ group by t.tinyint_col
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple aggregation subqueries
 select *
@@ -881,6 +916,7 @@ and t.bool_col = false
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple nesting levels with aggregation subqueries
 select *
@@ -919,6 +955,7 @@ where t.int_col <
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Multiple nesting of aggregate subquery predicates with count
 select *
@@ -959,6 +996,7 @@ where a.int_col <
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Distinct in the outer select block
 select distinct id, bool_col
@@ -982,6 +1020,7 @@ and bool_col = false
 00:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
    predicates: bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Distinct with an unqualified star in the outer select block
 select distinct *
@@ -1008,6 +1047,7 @@ and g.bigint_col < 1000 and g.bigint_col = true
 00:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
    predicates: g.bigint_col < 1000, g.bigint_col = TRUE
+---- DISTRIBUTEDPLAN
 ====
 # Aggregate subquery in an IS NULL predicate
 select *
@@ -1026,6 +1066,7 @@ where (select max(int_col) from functional.alltypesagg where int_col is null) is
 |
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Correlated aggregate subquery with a count in an IS NULL predicate
 select int_col, count(*)
@@ -1053,6 +1094,7 @@ group by int_col
 |
 01:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated aggregate subquery in an IS NULL predicate
 select *
@@ -1078,6 +1120,7 @@ and t.bool_col = false
 01:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
    predicates: g.int_col IS NULL
+---- DISTRIBUTEDPLAN
 ====
 # Complex expr with a scalar subquery
 select *
@@ -1099,6 +1142,7 @@ and t.bigint_col < 100
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 files=4 size=460B
    predicates: t.bigint_col < 100
+---- DISTRIBUTEDPLAN
 ====
 # Scalar subquery in a function
 select *
@@ -1120,6 +1164,7 @@ and t.id < 10
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 files=4 size=460B
    predicates: t.id < 10
+---- DISTRIBUTEDPLAN
 ====
 # Correlated aggregate subquery with a LIMIT clause that is removed during the rewrite
 select min(t.id)
@@ -1148,6 +1193,7 @@ group by t.bool_col
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Between predicate with subqueries
 select *
@@ -1178,6 +1224,7 @@ where int_col between
 |
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Aggregate subquery with count (subquery op slotRef)
 select t1.id
@@ -1200,6 +1247,7 @@ where
 |
 01:SCAN HDFS [functional.alltypestiny tt1]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Correlated aggregate subquery with count in a function participating in
 # a complex arithmetic expr
@@ -1227,6 +1275,7 @@ group by int_col
 |
 01:SCAN HDFS [functional.alltypes s]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated scalar subquery with an aggregate function that returns a
 # non-numeric type on empty input
@@ -1255,6 +1304,7 @@ group by int_col
 |
 01:SCAN HDFS [functional.alltypes s]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated scalar subquery where columns from the outer appear in both sides
 # of the binary predicate
@@ -1273,6 +1323,7 @@ where (select count(*) from functional.alltypessmall) + t1.int_col = t1.bigint_c
 |
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated scalar subquery in complex binary predicate that contains columns
 # from two tables of the outer
@@ -1297,6 +1348,7 @@ where (select count(*) from functional.alltypes) + 1 = t1.int_col + t2.int_col
 |
 01:SCAN HDFS [functional.alltypessmall t2]
    partitions=4/4 files=4 size=6.32KB
+---- DISTRIBUTEDPLAN
 ====
 # Uncorrelated scalar subquery in complex binary predicate that contains columns
 # from two tables of the outer that appear in both sides of the predicate
@@ -1322,6 +1374,7 @@ where
 |
 01:SCAN HDFS [functional.alltypessmall t2]
    partitions=4/4 files=4 size=6.32KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated scalar subquery with complex correlated predicate (IMPALA-1335)
 select 1
@@ -1350,6 +1403,7 @@ where
 |
 01:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated scalar subquery with complex correlared predicate (IMPALA-1335)
 select 1
@@ -1377,6 +1431,7 @@ where
 |
 01:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Outer query block with multiple tables and a correlated scalar subquery with
 # complex correlated predicate that references multiple subquery tables and multiple
@@ -1413,6 +1468,7 @@ where
 |
 02:SCAN HDFS [functional.alltypesagg tt1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 # Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
 # aggregates. All predicates evaluate to FALSE. (IMPALA-1550)
@@ -1428,6 +1484,7 @@ and not exists
    where t1.id = t3.id)
 ---- PLAN
 00:EMPTYSET
+---- DISTRIBUTEDPLAN
 ====
 # Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
 # aggregates. All predicates evaluate to TRUE. (IMPALA-1550)
@@ -1452,6 +1509,7 @@ and not exists
 ---- PLAN
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
 ====
 # Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
 # aggregates. Some predicates evaluate to TRUE while others need to
@@ -1496,6 +1554,7 @@ and not exists
 01:SCAN HDFS [functional.alltypesagg t3]
    partitions=11/11 files=11 size=814.73KB
    predicates: t3.id > 100
+---- DISTRIBUTEDPLAN
 ====
 # Tests for <=> (aka IS NOT DISTINCT FROM) and IS DISTINCT FROM
 select * from functional.alltypesagg t1
@@ -1515,6 +1574,7 @@ where t1.int_col is not distinct from t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id is distinct from
@@ -1534,6 +1594,7 @@ where t1.int_col is not distinct from t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id =
@@ -1552,6 +1613,7 @@ where t1.int_col is not distinct from t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id !=
@@ -1571,6 +1633,7 @@ where t1.int_col is not distinct from t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id is not distinct from
@@ -1589,6 +1652,7 @@ where t1.int_col = t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id is distinct from
@@ -1608,6 +1672,7 @@ where t1.int_col = t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id =
@@ -1626,6 +1691,7 @@ where t1.int_col = t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====
 select * from functional.alltypesagg t1
 where t1.id !=
@@ -1645,4 +1711,5 @@ where t1.int_col = t2.int_col);
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
 ====

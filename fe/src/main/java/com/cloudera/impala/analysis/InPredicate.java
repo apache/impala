@@ -178,8 +178,6 @@ public class InPredicate extends Predicate {
       selectivity_ = (double) (getChildren().size() - 1)
           / (double) slotRefRef.getRef().getNumDistinctValues();
       selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
-    } else {
-      selectivity_ = Expr.DEFAULT_SELECTIVITY;
     }
   }
 

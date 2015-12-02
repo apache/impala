@@ -161,6 +161,7 @@ from functional.testtbl t1
 |
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 files=0 size=0B
+---- DISTRIBUTEDPLAN
 ====
 # correct placement of predicates with right outer joins; t1 and t2 are nullable
 select *
@@ -390,6 +391,7 @@ where b.bigint_col > 10
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Predicate assignment when query has a full outer followed by an inner join
 select *
@@ -418,6 +420,7 @@ where b.tinyint_col > 20
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.tinyint_col < 10
+---- DISTRIBUTEDPLAN
 ====
 # Predicate assignment when query has an inner join followed by a full outer join
 select *
@@ -432,22 +435,23 @@ full outer join functional.alltypes c
 where a.smallint_col = 100 and a.float_col > b.float_col
 ---- PLAN
 04:HASH JOIN [FULL OUTER JOIN]
-|  hash predicates: a.int_col = c.int_col
+|  hash predicates: c.int_col = a.int_col
 |  other join predicates: a.tinyint_col < b.tinyint_col, a.bigint_col < 10
 |  other predicates: a.smallint_col = 100, a.float_col > b.float_col
 |
-|--02:SCAN HDFS [functional.alltypes c]
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: b.id = a.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypes a]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |     predicates: a.smallint_col = 100
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |
-03:HASH JOIN [INNER JOIN]
-|  hash predicates: b.id = a.id
-|
-|--00:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 files=24 size=478.45KB
-|     predicates: a.smallint_col = 100
-|
-01:SCAN HDFS [functional.alltypes b]
+02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Predicate assignment when query has a sequence of full outer joins interleaved with
 # an inner join
@@ -489,6 +493,7 @@ where a.bool_col = false and a.float_col < b.float_col
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col = FALSE
+---- DISTRIBUTEDPLAN
 ====
 # Predicate assignment through an inline-view that has a full outer join
 select 1
@@ -534,6 +539,7 @@ where x != y
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Predicate assignment when query has an inner join followed by full outer join
 select 1
@@ -562,6 +568,7 @@ where a.bigint_col = b.bigint_col and a.tinyint_col < b.tinyint_col
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # Predicate assignment when query has a sequence of inner, outer and full
 # outer joins
@@ -584,22 +591,23 @@ where a.float_col = b.float_col and b.smallint_col = 1 and d.tinyint_col < 10
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: d.tinyint_col < 10
 |
-05:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: a.int_col = c.int_col
+05:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: c.int_col = a.int_col
 |  other join predicates: c.tinyint_col = 10
 |
-|--02:SCAN HDFS [functional.alltypes c]
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypes b]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |     predicates: b.smallint_col = 1
+|  |
+|  00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
 |
-04:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = b.id
-|
-|--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
-|     predicates: b.smallint_col = 1
-|
-00:SCAN HDFS [functional.alltypes a]
+02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2144: Test correct assignment of Having-clause predicates
 # referencing a grouping column coming from an outer-joined table ref.
@@ -625,6 +633,7 @@ having a.bool_col is null and a.int_col is not null
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.bool_col IS NULL, a.int_col IS NOT NULL
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2144: Same as above but with a full outer join.
 select b.int_col, sum(b.double_col)
@@ -649,6 +658,7 @@ having a.bool_col is null and a.int_col is not null
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col IS NOT NULL
+---- DISTRIBUTEDPLAN
 ====
 # IMPALA-2765: Predicate assignment when outer joins have case expressions as predicates
 select *
@@ -671,4 +681,5 @@ where (
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
 ====

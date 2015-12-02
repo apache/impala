@@ -322,7 +322,7 @@ public class DistributedPlanner {
     long broadcastCost = Long.MAX_VALUE;
     if (rhsTree.getCardinality() != -1 && leftChildFragment.getNumNodes() != -1) {
       rhsDataSize = Math.round(
-          (double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
+          rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
       broadcastCost = rhsDataSize * leftChildFragment.getNumNodes();
     }
     LOG.debug("broadcast: cost=" + Long.toString(broadcastCost));
@@ -350,9 +350,11 @@ public class DistributedPlanner {
           rightChildFragment.getDataPartition().getPartitionExprs());
 
       double lhsCost = (lhsHasCompatPartition) ? 0.0 :
-        Math.round((double) lhsTree.getCardinality() * lhsTree.getAvgRowSize());
+        Math.round(
+            lhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(lhsTree));
       double rhsCost = (rhsHasCompatPartition) ? 0.0 :
-        Math.round((double) rhsTree.getCardinality() * rhsTree.getAvgRowSize());
+        Math.round(
+            rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
       partitionCost = Math.round(lhsCost + rhsCost);
     }
     LOG.debug("partition: cost=" + Long.toString(partitionCost));

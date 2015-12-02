@@ -465,13 +465,7 @@ order by
 |  group by: n_name
 |
 16:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|
-|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=111.08MB
-|
-15:HASH JOIN [INNER JOIN]
-|  hash predicates: c.c_nationkey = n.n_nationkey
+|  hash predicates: s_nationkey = n_nationkey
 |
 |--11:SUBPLAN
 |  |
@@ -484,6 +478,12 @@ order by
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
 |     partitions=1/1 files=1 size=4.18KB
 |     predicates: r_name = 'ASIA'
+|
+15:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
 01:SUBPLAN
 |
@@ -522,17 +522,9 @@ order by
 |  group by: n_name
 |
 16:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|  hash predicates: s_nationkey = n_nationkey
 |
 |--20:EXCHANGE [BROADCAST]
-|  |
-|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=111.08MB
-|
-15:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c.c_nationkey = n.n_nationkey
-|
-|--19:EXCHANGE [BROADCAST]
 |  |
 |  11:SUBPLAN
 |  |
@@ -545,6 +537,14 @@ order by
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
 |     partitions=1/1 files=1 size=4.18KB
 |     predicates: r_name = 'ASIA'
+|
+15:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
 01:SUBPLAN
 |
@@ -644,23 +644,23 @@ order by
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
 |
 14:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n1.n_nationkey
+|  hash predicates: c_nationkey = n2.n_nationkey
 |  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
+|
+|--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
+|     partitions=1/1 files=1 size=4.18KB
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n1.n_nationkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
 |     partitions=1/1 files=1 size=4.18KB
 |
-13:HASH JOIN [INNER JOIN]
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |
 |--09:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=111.08MB
-|
-12:HASH JOIN [INNER JOIN]
-|  hash predicates: c_nationkey = n2.n_nationkey
-|
-|--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=4.18KB
 |
 01:SUBPLAN
 |
@@ -699,29 +699,29 @@ order by
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
 |
 14:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s_nationkey = n1.n_nationkey
+|  hash predicates: c_nationkey = n2.n_nationkey
 |  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
 |
 |--19:EXCHANGE [BROADCAST]
 |  |
-|  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
+|  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
 |     partitions=1/1 files=1 size=4.18KB
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey
+|  hash predicates: s_nationkey = n1.n_nationkey
 |
 |--18:EXCHANGE [BROADCAST]
 |  |
-|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=111.08MB
+|  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
+|     partitions=1/1 files=1 size=4.18KB
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_nationkey = n2.n_nationkey
+|  hash predicates: l_suppkey = s_suppkey
 |
 |--17:EXCHANGE [BROADCAST]
 |  |
-|  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=4.18KB
+|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
 01:SUBPLAN
 |
@@ -794,12 +794,6 @@ order by
 |     partitions=1/1 files=1 size=4.18KB
 |
 19:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey
-|
-|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=111.08MB
-|
-18:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
 |
 |--12:SUBPLAN
@@ -814,12 +808,18 @@ order by
 |     partitions=1/1 files=1 size=4.18KB
 |     predicates: r_name = 'AMERICA'
 |
-17:HASH JOIN [INNER JOIN]
+18:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.part p]
 |     partitions=1/1 files=1 size=6.30MB
 |     predicates: p_type = 'ECONOMY ANODIZED STEEL'
+|
+17:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
 01:SUBPLAN
 |
@@ -866,17 +866,9 @@ order by
 |     partitions=1/1 files=1 size=4.18KB
 |
 19:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey
-|
-|--25:EXCHANGE [BROADCAST]
-|  |
-|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=111.08MB
-|
-18:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n1.n_nationkey
 |
-|--24:EXCHANGE [BROADCAST]
+|--25:EXCHANGE [BROADCAST]
 |  |
 |  12:SUBPLAN
 |  |
@@ -890,14 +882,22 @@ order by
 |     partitions=1/1 files=1 size=4.18KB
 |     predicates: r_name = 'AMERICA'
 |
-17:HASH JOIN [INNER JOIN, BROADCAST]
+18:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
 |
-|--23:EXCHANGE [BROADCAST]
+|--24:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.part p]
 |     partitions=1/1 files=1 size=6.30MB
 |     predicates: p_type = 'ECONOMY ANODIZED STEEL'
+|
+17:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--23:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
 01:SUBPLAN
 |
@@ -965,6 +965,13 @@ order by
 |     partitions=1/1 files=1 size=4.18KB
 |
 13:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = p_partkey
+|
+|--10:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_name LIKE '%green%'
+|
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
 |
 |--06:SUBPLAN
@@ -977,13 +984,6 @@ order by
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=111.08MB
-|
-12:HASH JOIN [INNER JOIN]
-|  hash predicates: l_partkey = p_partkey
-|
-|--10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
-|     predicates: p_name LIKE '%green%'
 |
 01:SUBPLAN
 |
@@ -1021,9 +1021,18 @@ order by
 |     partitions=1/1 files=1 size=4.18KB
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
+|  hash predicates: l_partkey = p_partkey
 |
 |--18:EXCHANGE [BROADCAST]
+|  |
+|  10:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_name LIKE '%green%'
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
+|
+|--17:EXCHANGE [BROADCAST]
 |  |
 |  06:SUBPLAN
 |  |
@@ -1035,15 +1044,6 @@ order by
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=111.08MB
-|
-12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_partkey = p_partkey
-|
-|--17:EXCHANGE [BROADCAST]
-|  |
-|  10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
-|     predicates: p_name LIKE '%green%'
 |
 01:SUBPLAN
 |
@@ -1502,14 +1502,14 @@ where
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: p_partkey = l_partkey
+|  hash predicates: l_partkey = p_partkey
 |
-|--00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.13MB
-|     predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
+|--01:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
 |
-01:SCAN HDFS [tpch_nested_parquet.part p]
-   partitions=1/1 files=1 size=6.30MB
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.13MB
+   predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum:merge(l_extendedprice * (1 - l_discount))
@@ -1520,16 +1520,16 @@ where
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: p_partkey = l_partkey
+|  hash predicates: l_partkey = p_partkey
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
-|  00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.13MB
-|     predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
+|  01:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
 |
-01:SCAN HDFS [tpch_nested_parquet.part p]
-   partitions=1/1 files=1 size=6.30MB
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.13MB
+   predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
 ====
 # TPCH-Q15
 # Q15 - Top Supplier Query
@@ -2044,42 +2044,42 @@ order by
 12:AGGREGATE [FINALIZE]
 |  group by: s_name, s_address
 |
-11:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: s_suppkey = l_suppkey, ps_partkey = l_partkey
+11:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: l_suppkey = s_suppkey, l_partkey = ps_partkey
 |  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
 |
-|--08:AGGREGATE [FINALIZE]
-|  |  output: sum(l_quantity)
-|  |  group by: l_partkey, l_suppkey
+|--10:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: ps_partkey = p_partkey
 |  |
-|  07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.13MB
-|     predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
-|
-10:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: ps_partkey = p_partkey
-|
-|--06:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
-|     predicates: p_name LIKE 'forest%'
-|
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n_nationkey
-|
-|--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
-|     predicates: n_name = 'CANADA'
-|
-01:SUBPLAN
-|
-|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |--06:SCAN HDFS [tpch_nested_parquet.part p]
+|  |     partitions=1/1 files=1 size=6.30MB
+|  |     predicates: p_name LIKE 'forest%'
 |  |
-|  |--02:SINGULAR ROW SRC
+|  09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: s_nationkey = n_nationkey
 |  |
-|  03:UNNEST [s.s_partsupps ps]
+|  |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|  |     partitions=1/1 files=1 size=4.18KB
+|  |     predicates: n_name = 'CANADA'
+|  |
+|  01:SUBPLAN
+|  |
+|  |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--02:SINGULAR ROW SRC
+|  |  |
+|  |  03:UNNEST [s.s_partsupps ps]
+|  |
+|  00:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
-00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=111.08MB
+08:AGGREGATE [FINALIZE]
+|  output: sum(l_quantity)
+|  group by: l_partkey, l_suppkey
+|
+07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.13MB
+   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
 21:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_name ASC
@@ -2095,54 +2095,54 @@ order by
 12:AGGREGATE
 |  group by: s_name, s_address
 |
-11:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
-|  hash predicates: s_suppkey = l_suppkey, ps_partkey = l_partkey
+11:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: l_suppkey = s_suppkey, l_partkey = ps_partkey
 |  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
 |
-|--18:EXCHANGE [BROADCAST]
+|--18:EXCHANGE [HASH(ps_partkey,s_suppkey)]
 |  |
-|  17:AGGREGATE [FINALIZE]
-|  |  output: sum:merge(l_quantity)
-|  |  group by: l_partkey, l_suppkey
+|  10:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: ps_partkey = p_partkey
 |  |
-|  16:EXCHANGE [HASH(l_partkey,l_suppkey)]
+|  |--17:EXCHANGE [BROADCAST]
+|  |  |
+|  |  06:SCAN HDFS [tpch_nested_parquet.part p]
+|  |     partitions=1/1 files=1 size=6.30MB
+|  |     predicates: p_name LIKE 'forest%'
 |  |
-|  08:AGGREGATE
-|  |  output: sum(l_quantity)
-|  |  group by: l_partkey, l_suppkey
+|  09:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: s_nationkey = n_nationkey
 |  |
-|  07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=554.13MB
-|     predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
+|  |--16:EXCHANGE [BROADCAST]
+|  |  |
+|  |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|  |     partitions=1/1 files=1 size=4.18KB
+|  |     predicates: n_name = 'CANADA'
+|  |
+|  01:SUBPLAN
+|  |
+|  |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--02:SINGULAR ROW SRC
+|  |  |
+|  |  03:UNNEST [s.s_partsupps ps]
+|  |
+|  00:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
 |
-10:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
-|  hash predicates: ps_partkey = p_partkey
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_quantity)
+|  group by: l_partkey, l_suppkey
 |
-|--15:EXCHANGE [BROADCAST]
-|  |
-|  06:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
-|     predicates: p_name LIKE 'forest%'
+14:EXCHANGE [HASH(l_partkey,l_suppkey)]
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s_nationkey = n_nationkey
+08:AGGREGATE
+|  output: sum(l_quantity)
+|  group by: l_partkey, l_suppkey
 |
-|--14:EXCHANGE [BROADCAST]
-|  |
-|  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=4.18KB
-|     predicates: n_name = 'CANADA'
-|
-01:SUBPLAN
-|
-|--04:NESTED LOOP JOIN [CROSS JOIN]
-|  |
-|  |--02:SINGULAR ROW SRC
-|  |
-|  03:UNNEST [s.s_partsupps ps]
-|
-00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=111.08MB
+07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.13MB
+   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ====
 # TPCH-Q21
 # Q21 - Suppliers Who Kept Orders Waiting Query

@@ -133,9 +133,9 @@ public class CompoundPredicate extends Predicate {
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     castForFunctionCall(false);
 
-    if (getChild(0).selectivity_ == -1
-        || children_.size() == 2 && getChild(1).selectivity_ == -1) {
-      // give up if we're missing an input
+    if (!getChild(0).hasSelectivity() ||
+        (children_.size() == 2 && !getChild(1).hasSelectivity())) {
+      // Give up if one of our children has an unknown selectivity.
       selectivity_ = -1;
       return;
     }

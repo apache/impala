@@ -114,14 +114,7 @@ select * from functional.alltypes_view t1, functional.alltypes_view_sub t2,
 functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 ---- PLAN
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypes.id = int_col
-|
-|--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
-|     predicates: functional.alltypes.int_col > 1
-|
-07:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypes.id = count(a.bigint_col)
+|  hash predicates: int_col = count(a.bigint_col)
 |
 |--06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
@@ -141,6 +134,13 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |     partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
 |
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = int_col
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: functional.alltypes.int_col > 1
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
@@ -148,32 +148,23 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 15:EXCHANGE [UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: functional.alltypes.id = int_col
+|  hash predicates: int_col = count(a.bigint_col)
 |
 |--14:EXCHANGE [BROADCAST]
 |  |
-|  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
-|     predicates: functional.alltypes.int_col > 1
-|
-07:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: functional.alltypes.id = count(a.bigint_col)
-|
-|--13:EXCHANGE [BROADCAST]
-|  |
-|  12:MERGING-EXCHANGE [UNPARTITIONED]
+|  13:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: b.string_col ASC
 |  |  limit: 100
 |  |
 |  06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
 |  |
-|  11:AGGREGATE [FINALIZE]
+|  12:AGGREGATE [FINALIZE]
 |  |  output: count:merge(a.bigint_col)
 |  |  group by: b.string_col
 |  |  having: count(a.bigint_col) > 1
 |  |
-|  10:EXCHANGE [HASH(b.string_col)]
+|  11:EXCHANGE [HASH(b.string_col)]
 |  |
 |  05:AGGREGATE
 |  |  output: count(a.bigint_col)
@@ -182,7 +173,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = b.id
 |  |
-|  |--09:EXCHANGE [BROADCAST]
+|  |--10:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -190,6 +181,15 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  02:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.id = int_col
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: functional.alltypes.int_col > 1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
