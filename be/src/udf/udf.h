@@ -553,13 +553,6 @@ struct StringVal : public AnyVal {
   /// function context.
   static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len);
 
-  /// Append the passed buffer to this StringVal. Reallocate memory to fit the buffer. If
-  /// the memory allocation becomes too large, will set an error on FunctionContext and
-  /// return a NULL string.
-  void Append(FunctionContext* ctx, const uint8_t* buf, size_t len);
-  void Append(FunctionContext* ctx, const uint8_t* buf, size_t len, const uint8_t* buf2,
-      size_t buf2_len);
-
   static StringVal null() {
     StringVal sv;
     sv.is_null = true;

@@ -450,39 +450,6 @@ StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t l
   return result;
 }
 
-void StringVal::Append(FunctionContext* ctx, const uint8_t* buf, size_t buf_len) {
-  if (UNLIKELY(len + buf_len > StringVal::MAX_LENGTH)) {
-    ctx->SetError("Concatenated string length larger than allowed limit of "
-        "1 GB character data.");
-    ctx->Free(ptr);
-    ptr = NULL;
-    len = 0;
-    is_null = true;
-  } else {
-    ptr = ctx->Reallocate(ptr, len + buf_len);
-    memcpy(ptr + len, buf, buf_len);
-    len += buf_len;
-  }
-}
-void StringVal::Append(FunctionContext* ctx, const uint8_t* buf, size_t buf_len,
-    const uint8_t* buf2, size_t buf2_len) {
-  if (UNLIKELY(len + buf_len + buf2_len > StringVal::MAX_LENGTH)) {
-    ctx->SetError("Concatenated string length larger than allowed limit of "
-        "1 GB character data.");
-    ctx->Free(ptr);
-    ptr = NULL;
-    len = 0;
-    is_null = true;
-  } else {
-    ptr = ctx->Reallocate(ptr, len + buf_len + buf2_len);
-    memcpy(ptr + len, buf, buf_len);
-    memcpy(ptr + len + buf_len, buf2, buf2_len);
-    len += buf_len + buf2_len;
-  }
-}
-
-
-
 // TODO: why doesn't libudasample.so build if this in udf-ir.cc?
 const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
   if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;

@@ -579,7 +579,21 @@ void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
     *result = StringVal(ctx->Allocate(header_len), header_len);
     *reinterpret_cast<StringConcatHeader*>(result->ptr) = sep->len;
   }
-  result->Append(ctx, sep->ptr, sep->len, src.ptr, src.len);
+  unsigned new_len = result->len + sep->len + src.len;
+  if (LIKELY(new_len <= StringVal::MAX_LENGTH)) {
+    uint8_t* ptr = ctx->Reallocate(result->ptr, new_len);
+    if (LIKELY(ptr != NULL)) {
+      memcpy(ptr + result->len, sep->ptr, sep->len);
+      memcpy(ptr + result->len + sep->len, src.ptr, src.len);
+      result->ptr = ptr;
+      result->len = new_len;
+    } else {
+      ctx->SetError("Large Memory allocation failed.");
+    }
+  } else {
+    ctx->SetError("Concatenated string length larger than allowed limit of "
+        "1 GB character data.");
+  }
 }
 
 void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
@@ -594,7 +608,21 @@ void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
         *reinterpret_cast<StringConcatHeader*>(src.ptr);
   }
   // Append the string portion of the intermediate src to result (omit src's header).
-  result->Append(ctx, src.ptr + header_len, src.len - header_len);
+  unsigned buf_len = src.len - header_len;
+  unsigned new_len = result->len + buf_len;
+  if (LIKELY(new_len <= StringVal::MAX_LENGTH)) {
+    uint8_t* ptr = ctx->Reallocate(result->ptr, new_len);
+    if (LIKELY(ptr != NULL)) {
+      memcpy(ptr + result->len, src.ptr + header_len, buf_len);
+      result->ptr = ptr;
+      result->len = new_len;
+    } else {
+      ctx->SetError("Large Memory allocation failed.");
+    }
+  } else {
+    ctx->SetError("Concatenated string length larger than allowed limit of "
+        "1 GB character data.");
+  }
 }
 
 StringVal AggregateFunctions::StringConcatFinalize(FunctionContext* ctx,
