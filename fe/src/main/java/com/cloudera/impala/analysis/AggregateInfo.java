@@ -640,6 +640,25 @@ public class AggregateInfo extends AggregateInfoBase {
   }
 
   /**
+   * Checks if all materialized aggregate expressions have distinct semantics.
+   * It returns true if either of the following is true:
+   * (1) all materialized aggregate expressions have distinct semantics
+   *     (e.g. MIN, MAX, NDV). In other words, this optimization will work
+   *     for COUNT(DISTINCT c) but not COUNT(c).
+   * (2) there are no aggregate expressions but only grouping expressions.
+   */
+  public boolean hasAllDistinctAgg() {
+    if (hasAggregateExprs()) {
+      for (FunctionCallExpr aggExpr : getMaterializedAggregateExprs()) {
+        if (!aggExpr.isDistinct() && !aggExpr.ignoresDistinct()) return false;
+      }
+    } else {
+      Preconditions.checkState(!groupingExprs_.isEmpty());
+    }
+    return true;
+  }
+
+  /**
    * Validates the internal state of this agg info: Checks that the number of
    * materialized slots of the output tuple corresponds to the number of materialized
    * aggregate functions plus the number of grouping exprs. Also checks that the return

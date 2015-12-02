@@ -202,6 +202,11 @@ public class FunctionCallExpr extends Expr {
     return params_.isDistinct();
   }
 
+  public boolean ignoresDistinct() {
+    Preconditions.checkState(isAggregateFunction());
+    return ((AggregateFunction)fn_).ignoresDistinct();
+  }
+
   public FunctionName getFnName() { return fnName_; }
   public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
   public void setIsInternalFnCall(boolean v) { isInternalFnCall_ = v; }

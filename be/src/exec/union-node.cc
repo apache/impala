@@ -173,7 +173,6 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
       RETURN_IF_ERROR(EvalAndMaterializeExprs(
           const_result_expr_ctx_lists_[const_result_expr_idx_], true, &tuple,
           row_batch));
-
     }
     ++const_result_expr_idx_;
     *eos = ReachedLimit();

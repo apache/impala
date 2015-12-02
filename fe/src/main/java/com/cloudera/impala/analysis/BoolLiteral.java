@@ -63,6 +63,9 @@ public class BoolLiteral extends LiteralExpr {
     return ((BoolLiteral) obj).value_ == value_;
   }
 
+  @Override
+  public int hashCode() { return value_ ? 1 : 0; }
+
   public boolean getValue() { return value_; }
 
   @Override

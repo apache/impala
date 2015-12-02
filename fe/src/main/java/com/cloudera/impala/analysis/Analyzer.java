@@ -1103,16 +1103,23 @@ public class Analyzer {
   }
 
   /**
-   * Return all unassigned registered conjuncts that are fully bound by node's
-   * (logical) tuple ids, can be evaluated by 'node' and are not tied to an Outer Join
-   * clause.
+   * Return all unassigned registered conjuncts for node's table ref ids.
+   * Wrapper around getUnassignedConjuncts(List<TupleId> tupleIds).
    */
   public List<Expr> getUnassignedConjuncts(PlanNode node) {
-    List<TupleId> tupleIds = node.getTblRefIds();
+    return getUnassignedConjuncts(node.getTblRefIds());
+  }
+
+  /**
+   * Return all unassigned registered conjuncts that are fully bound by the given
+   * (logical) tuple ids, can be evaluated by 'tupleIds' and are not tied to an
+   * Outer Join clause.
+   */
+  public List<Expr> getUnassignedConjuncts(List<TupleId> tupleIds) {
     LOG.trace("getUnassignedConjuncts for node with " + Id.printIds(tupleIds));
     List<Expr> result = Lists.newArrayList();
     for (Expr e: getUnassignedConjuncts(tupleIds, true)) {
-      if (canEvalPredicate(node, e)) {
+      if (canEvalPredicate(tupleIds, e)) {
         result.add(e);
         LOG.trace("getUnassignedConjunct: " + e.toSql());
       }
@@ -1321,10 +1328,6 @@ public class Analyzer {
       if (!tupleIds.containsAll(rhsRef.getAllTupleIds())) return false;
     }
     return true;
-  }
-
-  private boolean canEvalPredicate(PlanNode node, Expr e) {
-    return canEvalPredicate(node.getTblRefIds(), e);
   }
 
   /**
@@ -2074,7 +2077,6 @@ public class Analyzer {
     globalState_.descTbl.markSlotsMaterialized(slotIds);
   }
 
-
   /**
    * Returns assignment-compatible type of expr.getType() and lastCompatibleType.
    * If lastCompatibleType is null, returns expr.getType() (if valid).
@@ -2455,7 +2457,7 @@ public class Analyzer {
     /**
      * Computes all direct and transitive value transfers based on the registered
      * conjuncts of the form <slotref> = <slotref>. The high-level steps are:
-     * 1. Identify complete subgraps based on bi-directional value transfers, and
+     * 1. Identify complete subgraphs based on bi-directional value transfers, and
      *    coalesce the slots of each complete subgraph into a single slot.
      * 2. Map the remaining uni-directional value transfers into the new slot domain.
      * 3. Identify the connected components of the uni-directional value transfers.

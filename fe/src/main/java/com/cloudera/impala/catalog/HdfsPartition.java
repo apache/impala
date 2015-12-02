@@ -450,6 +450,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * Returns an immutable list of partition key expressions
    */
   public List<LiteralExpr> getPartitionValues() { return partitionKeyValues_; }
+  public LiteralExpr getPartitionValue(int i) { return partitionKeyValues_.get(i); }
   public List<HdfsPartition.FileDescriptor> getFileDescriptors() {
     return fileDescriptors_;
   }

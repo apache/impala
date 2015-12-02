@@ -111,6 +111,11 @@ struct TQueryOptions {
   // If the number of rows that are processed for a single query is below the
   // threshold, it will be executed on the coordinator only with codegen disabled
   31: optional i32 exec_single_node_rows_threshold = 100
+
+  // If true, use the table's metadata to produce the partition columns instead of table
+  // scans whenever possible. This option is opt-in by default as this optimization may
+  // produce different results than the scan based approach in some edge cases.
+  32: optional bool optimize_partition_key_scans = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

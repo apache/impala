@@ -59,6 +59,9 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
+  public int hashCode() { return value_.hashCode(); }
+
+  @Override
   public String toSqlImpl() {
     return "'" + value_ + "'";
   }

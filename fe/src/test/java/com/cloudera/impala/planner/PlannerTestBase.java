@@ -461,7 +461,13 @@ public class PlannerTestBase {
     String locationsStr = null;
     if (execRequest != null && execRequest.isSetQuery_exec_request()) {
       buildMaps(execRequest.query_exec_request);
-      testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
+      // If we optimize the partition key scans, we may get all the partition key values
+      // from the metadata and don't reference any table. Skip the check in this case.
+      TQueryOptions options = execRequest.getQuery_options();
+      if (!(options.isSetOptimize_partition_key_scans() &&
+          options.optimize_partition_key_scans)) {
+        testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
+      }
       locationsStr =
           PrintScanRangeLocations(execRequest.query_exec_request).toString();
     }

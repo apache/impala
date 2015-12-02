@@ -119,6 +119,9 @@ public class NumericLiteral extends LiteralExpr {
   }
 
   @Override
+  public int hashCode() { return value_.hashCode(); }
+
+  @Override
   public String toSqlImpl() { return getStringValue(); }
   @Override
   public String getStringValue() { return value_.toString(); }

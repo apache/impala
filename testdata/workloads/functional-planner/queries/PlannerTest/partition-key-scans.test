@@ -1,0 +1,222 @@
+# Test with aggregate expressions which ignore the distinct keyword.
+select min(month), max(year), ndv(day) from functional.alltypesagg
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: min(month), max(year), ndv(day)
+|
+00:UNION
+   constant-operands=11
+---- DISTRIBUTEDPLAN
+01:AGGREGATE [FINALIZE]
+|  output: min(month), max(year), ndv(day)
+|
+00:UNION
+   constant-operands=11
+====
+# Test with explicit distinct keyword.
+select count(distinct year), ndv(day) from functional.alltypesagg
+---- PLAN
+02:AGGREGATE [FINALIZE]
+|  output: count(year), ndv:merge(day)
+|
+01:AGGREGATE
+|  output: ndv(day)
+|  group by: year
+|
+00:UNION
+   constant-operands=11
+---- DISTRIBUTEDPLAN
+02:AGGREGATE [FINALIZE]
+|  output: count(year), ndv:merge(day)
+|
+01:AGGREGATE
+|  output: ndv(day)
+|  group by: year
+|
+00:UNION
+   constant-operands=11
+====
+# Test static partition pruning.
+select min(month), max(day) from functional.alltypesagg where year = 2010 and day = 1;
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: min(month), max(day)
+|
+00:UNION
+   constant-operands=1
+====
+# Test with cases where all partitions are pruned.
+select c1, c2 from
+  (select min(year) c1, max(month) c2, count(int_col) c3
+   from functional.alltypes where year = 2000) t;
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: min(year), max(month)
+|
+00:UNION
+====
+# Test with group by and having clauses.
+select ndv(month) from functional.alltypesagg group by year having max(day)=10
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: ndv(month), max(day)
+|  group by: year
+|  having: max(day) = 10
+|
+00:UNION
+   constant-operands=11
+====
+# Test with group-by clauses (no aggregate expressions) only.
+select month from functional.alltypes group by month
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  group by: month
+|
+00:UNION
+   constant-operands=12
+====
+# Test with distinct select list.
+select distinct month from functional.alltypes where month % 2 = 0
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  group by: month
+|
+00:UNION
+   constant-operands=6
+====
+# Test with joins on the partition keys.
+select min(a.month)
+from functional.alltypes as a, functional.alltypesagg as b
+where a.year = b.year
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: min(a.month)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.year = b.year
+|
+|--01:UNION
+|     constant-operands=1
+|
+00:UNION
+   constant-operands=24
+---- DISTRIBUTEDPLAN
+03:AGGREGATE [FINALIZE]
+|  output: min(a.month)
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.year = b.year
+|
+|--04:EXCHANGE [UNPARTITIONED]
+|  |
+|  01:UNION
+|     constant-operands=1
+|
+00:UNION
+   constant-operands=24
+====
+# Test query which contains both distinct and non-distinct aggregate
+# expressions and make sure the optimization is applied when applicable.
+select * from
+  (select distinct year from functional.alltypes) a join
+  (select year, count(month) from functional.alltypes group by year) b
+on (a.year = b.year)
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: year = year
+|
+|--01:AGGREGATE [FINALIZE]
+|  |  group by: year
+|  |
+|  00:UNION
+|     constant-operands=2
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(month)
+|  group by: year
+|
+02:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test queries with tableRefs which cannot be evaluated by metadata.
+select min(a.year), ndv(b.timestamp_col) from
+functional.alltypes a, functional.alltypesnopart b
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: min(a.year), ndv(b.timestamp_col)
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--01:SCAN HDFS [functional.alltypesnopart b]
+|     partitions=1/1 files=0 size=0B
+|
+00:UNION
+   constant-operands=2
+====
+# Test that non-partitioning slots which aren't materialized won't block the
+# optimization from being applied.
+select c1, c2 from
+  (select ndv(a.year + b.year) c1, min(a.month + b.month) c2, count(a.int_col) c3 from
+   functional.alltypes a, functional.alltypesagg b) t
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: ndv(a.year + b.year), min(a.month + b.month)
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--01:UNION
+|     constant-operands=1
+|
+00:UNION
+   constant-operands=24
+====
+# Test with with clauses on the partition keys.
+with c1 as (select distinct month from functional.alltypes),
+     c2 as (select distinct year from functional.alltypes)
+select ndv(month) from (select * from c1 union all select * from c2) t
+---- PLAN
+05:AGGREGATE [FINALIZE]
+|  output: ndv(month)
+|
+00:UNION
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: year
+|  |
+|  03:UNION
+|     constant-operands=2
+|
+02:AGGREGATE [FINALIZE]
+|  group by: month
+|
+01:UNION
+   constant-operands=12
+====
+# If slots other than partition keys are accessed, make sure scan nodes are generated.
+select date_string_col, min(month) from functional.alltypes group by date_string_col
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: min(month)
+|  group by: date_string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Make sure non-distinct aggregation functions will generate scan nodes.
+select count(month) from functional.alltypes
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(month)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Make sure that queries without any aggregation will generate scan nodes.
+select month from functional.alltypes order by year
+---- PLAN
+01:SORT
+|  order by: year ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

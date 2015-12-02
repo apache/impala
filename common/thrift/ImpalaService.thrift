@@ -165,6 +165,11 @@ enum TImpalaQueryOptions {
   // If the number of rows that are processed for a single query is below the
   // threshold, it will be executed on the coordinator only with codegen disabled
   EXEC_SINGLE_NODE_ROWS_THRESHOLD
+
+  // If true, use the table's metadata to produce the partition columns instead of table
+  // scans whenever possible. This option is opt-in by default as this optimization may
+  // produce different results than the scan based approach in some edge cases.
+  OPTIMIZE_PARTITION_KEY_SCANS
 }
 
 // The summary of an insert.

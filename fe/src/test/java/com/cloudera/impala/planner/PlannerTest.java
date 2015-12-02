@@ -152,6 +152,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testPartitionKeyScans() {
+    TQueryOptions options = new TQueryOptions();
+    options.setOptimize_partition_key_scans(true);
+    runPlannerTestFile("partition-key-scans", options);
+  }
+
+  @Test
   public void testLineage() {
     runPlannerTestFile("lineage");
   }

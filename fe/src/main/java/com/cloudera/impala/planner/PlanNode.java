@@ -461,17 +461,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Marks all slots referenced in exprs as materialized.
-   */
-  protected void markSlotsMaterialized(Analyzer analyzer, List<Expr> exprs) {
-    List<SlotId> refdIdList = Lists.newArrayList();
-    for (Expr expr: exprs) {
-      expr.getIds(null, refdIdList);
-    }
-    analyzer.getDescTbl().markSlotsMaterialized(refdIdList);
-  }
-
-  /**
    * Call computeMemLayout() for all materialized tuples.
    */
   protected void computeMemLayout(Analyzer analyzer) {
