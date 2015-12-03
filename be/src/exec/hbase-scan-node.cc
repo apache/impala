@@ -57,7 +57,6 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HBASE_READ_TIMER);
 
-  tuple_pool_.reset(new MemPool(mem_tracker()));
   hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_factory(), state));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
@@ -129,9 +128,9 @@ Status HBaseScanNode::Open(RuntimeState* state) {
 void HBaseScanNode::WriteTextSlot(
     const string& family, const string& qualifier,
     void* value, int value_length, SlotDescriptor* slot,
-    RuntimeState* state, bool* error_in_row) {
+    RuntimeState* state, MemPool* pool, bool* error_in_row) {
   if (!text_converter_->WriteSlot(slot, tuple_,
-      reinterpret_cast<char*>(value), value_length, true, false, tuple_pool_.get())) {
+      reinterpret_cast<char*>(value), value_length, true, false, pool)) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
       stringstream ss;
@@ -162,7 +161,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 
   // Create new tuple buffer for row_batch.
   tuple_buffer_size_ = row_batch->MaxTupleBufferSize();
-  tuple_ = Tuple::Create(tuple_buffer_size_, tuple_pool_.get());
+  tuple_ = Tuple::Create(tuple_buffer_size_, row_batch->tuple_data_pool());
 
   // Indicates whether the current row has conversion errors. Used for error reporting.
   bool error_in_row = false;
@@ -173,10 +172,9 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
-    if (ReachedLimit() || row_batch->AtCapacity(tuple_pool_.get())) {
+    if (ReachedLimit() || row_batch->AtCapacity(row_batch->tuple_data_pool())) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
-      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), !ReachedLimit());
       *eos = ReachedLimit();
       return Status::OK();
     }
@@ -187,7 +185,6 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
             static_cast<const HBaseTableDescriptor*> (tuple_desc_->table_desc());
         state->ReportFileErrors(hbase_table->table_name(), num_errors_);
       }
-      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
       *eos = true;
       return Status::OK();
     }
@@ -208,7 +205,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
           void* key;
           int key_length;
           RETURN_IF_ERROR(hbase_scanner_->GetRowKey(env, &key, &key_length));
-          WriteTextSlot("key", "", key, key_length, row_key_slot_, state, &error_in_row);
+          WriteTextSlot("key", "", key, key_length, row_key_slot_, state,
+              row_batch->tuple_data_pool(), &error_in_row);
         }
       }
 
@@ -226,7 +224,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
             tuple_->SetNull(sorted_non_key_slots_[i]->null_indicator_offset());
           } else {
             WriteTextSlot(sorted_cols_[i]->family, sorted_cols_[i]->qualifier,
-                value, value_length, sorted_non_key_slots_[i], state, &error_in_row);
+                value, value_length, sorted_non_key_slots_[i], state,
+                row_batch->tuple_data_pool(), &error_in_row);
           }
         }
       }
@@ -284,7 +283,6 @@ void HBaseScanNode::Close(RuntimeState* state) {
     JNIEnv* env = getJNIEnv();
     hbase_scanner_->Close(env);
   }
-  if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
 
   // Report total number of errors.
   if (num_errors_ > 0) state->ReportFileErrors(table_name_, num_errors_);
