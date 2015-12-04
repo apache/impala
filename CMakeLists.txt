@@ -49,7 +49,7 @@ if (NOT DEFINED BUILD_SHARED_LIBS)
 endif()
 
 # Build compile commands database
-set(CMAKE_EXPORT_COMPILE_COMMNDS ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # generate CTest input files
 enable_testing()
