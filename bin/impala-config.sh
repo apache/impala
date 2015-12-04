@@ -255,10 +255,10 @@ export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
 # Optionally set the Thrift home to the toolchain
 if [[ -z $IMPALA_TOOLCHAIN ]]; then
-  THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
-  export THRIFT_HOME=${THRIFT_SRC_DIR}build/
+  THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}
+  export THRIFT_HOME=${THRIFT_SRC_DIR}/build
 else
-  export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}/
+  export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}
 fi
 
 # ASAN needs a matching version of llvm-symbolizer to symbolize stack traces.

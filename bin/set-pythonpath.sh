@@ -16,12 +16,17 @@
 PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$IMPALA_HOME/testdata/
 
 # There should be just a single version of python that created the
-# site-packages directory.
+# site-packages directory. We find it by performing shell independent expansion
+# of the following pattern:
+# ${THRIFT_HOME}/python/lib{64,}/python*/site-packages
 # Note: this could go wrong if we have used two different versions of
 # Python to build Thrift on this machine, and the first version is not
 # compatible with the second.
-for PYTHON_DIR in ${THRIFT_HOME}/python/lib{64,}/python*/site-packages; do
-    PYTHONPATH=$PYTHONPATH:${PYTHON_DIR}/
+for PYTHON_DIR in ${THRIFT_HOME}/python/lib{64,}; do
+    [[ -d $PYTHON_DIR ]] || continue
+    for PKG_DIR in $PYTHON_DIR/python*/site-packages; do
+      PYTHONPATH=$PYTHONPATH:${PKG_DIR}/
+    done
 done
 
 # Add Hive after Thrift because Hive supplies its own Thrift modules
