@@ -2202,6 +2202,40 @@ TEST_F(ExprTest, StringParseUrlFunction) {
   TestIsNull("parse_url('example.com/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'HOST')", TYPE_STRING);
 
+  // IMPALA-1170: '@' character in PATH
+  TestStringValue("parse_url('http://example.com/index.html@Top2,Right1',"
+      "'HOST')", "example.com");
+  TestStringValue("parse_url('http://user:pass@example.com/index.html@Top2,Right1',"
+      "'HOST')", "example.com");
+  TestStringValue("parse_url('http://user:pass@example.com/index.html?mail=foo@bar',"
+      "'HOST')", "example.com");
+  // '@' in path
+  TestStringValue("parse_url('http://example.com/index.html@Top2,Right1',"
+      "'FILE')", "/index.html@Top2,Right1");
+  TestStringValue("parse_url('http://user:pass@example.com/index.html@Top2,Right1',"
+      "'FILE')", "/index.html@Top2,Right1");
+  // '@' in query
+  TestStringValue("parse_url('http://example.com/index.html@Top2,Right1?foo@bar',"
+      "'QUERY')", "foo@bar");
+  TestStringValue("parse_url('http://user:pass@example.com/index.html@Top2,Right1?foo@bar',"
+      "'QUERY')", "foo@bar");
+  // '?' before '/'
+  TestStringValue("parse_url('http://user:pass@example.com?dir=/etc',"
+      "'HOST')", "example.com");
+  TestStringValue("parse_url('http://user:pass@example.com?dir=/etc',"
+      "'QUERY')", "dir=/etc");
+  // '@' in forbidden places
+  // TODO: Return NULL for invalid URLs like the ones below. Our parser currently does not
+  // validate URLs.
+  TestStringValue("parse_url('htt@p://example.com/docs',"
+      "'PROTOCOL')", "htt@p");
+  TestStringValue("parse_url('htt@p://example.com/docs',"
+      "'HOST')", "example.com");
+  TestStringValue("parse_url('http://foo@baa@example.com/docs',"
+      "'HOST')", "baa@example.com");
+  TestStringValue("parse_url('http://foo@baa@example.com/docs',"
+      "'USERINFO')", "foo");
+
   // PATH part.
   TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'PATH')",

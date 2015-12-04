@@ -86,28 +86,44 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
     }
 
     case HOST: {
-      // Find '@'.
-      int32_t start_pos = at_search.Search(&protocol_end);
-      if (start_pos < 0) {
-        // No '@' was found, i.e., no user:pass info was given, start after protocol.
-        start_pos = 0;
+      // The '@' character can occur at three places: in the authority, in the path, or in
+      // the query. An example for all three would be:
+      // http://user:pass@e.com/get/@me?mail=foo@bar
+
+      // In order to get the host part we first extract the authority and then strip away
+      // the userinfo and port.
+
+      // The authority ends at the first '/' or '?'.
+      int32_t first_slash = slash_search.Search(&protocol_end);
+      int32_t first_question = question_search.Search(&protocol_end);
+
+      int32_t auth_end_pos = first_slash;
+      if (first_slash < 0) {
+        // No slash found.
+        auth_end_pos = first_question;
+      }
+      if (0 <= first_question && first_question < first_slash) {
+        // Found question mark and it is left of the first slash.
+        // e.g. http://example.com?dir=/etc
+        auth_end_pos = first_question;
+      }
+
+      StringValue authority = protocol_end.Substring(0, auth_end_pos);
+
+      // Find '@' to strip away userinfo.
+      int32_t at_pos = at_search.Search(&authority);
+      if (at_pos < 0) {
+        // No '@' was found, i.e., no user:pass info was given, so start after protocol.
+        at_pos = 0;
       } else {
         // Skip '@'.
-        start_pos += at.len;
+        at_pos += at.len;
       }
-      StringValue host_start = protocol_end.Substring(start_pos);
-
-      // Find the start of the query
-      int32_t query_start_pos = question_search.Search(&host_start);
-      StringValue url_only = host_start.Substring(0, query_start_pos);
-
-      // Find the first '/' in url_only to determine host<:port>
-      int32_t hostport_end_pos = slash_search.Search(&url_only);
-      StringValue hostport = url_only.Substring(0, hostport_end_pos);
+      StringValue host_and_port = authority.Substring(at_pos);
 
       // Find ':' to strip out port.
-      int32_t end_pos = colon_search.Search(&hostport);
-      *result = hostport.Substring(0, end_pos);
+      int32_t colon_pos = colon_search.Search(&host_and_port);
+      *result = host_and_port.Substring(0, colon_pos);
       break;
     }
 
