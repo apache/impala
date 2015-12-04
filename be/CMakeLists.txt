@@ -41,10 +41,6 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
-if (IMPALA_TOOLCHAIN)
-  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -static-libstdc++")
-endif()
-
 # For any clang builds (currently only ASAN):
 #   -Qunused-arguments: quiet warnings about unused arguments to clang because ccache
 #        makes extra calls to clang which may have extra includes (-I) that are unused.
