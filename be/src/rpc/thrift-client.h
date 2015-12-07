@@ -67,6 +67,7 @@ class ThriftClientImpl {
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
       : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
+    if (ssl_) ssl_factory_.reset(new TSSLSocketFactory());
     socket_create_status_ = CreateSocket();
   }
 
@@ -85,6 +86,11 @@ class ThriftClientImpl {
   /// Sasl Client object.  Contains client kerberos identification data.
   /// Will be NULL if kerberos is not being used.
   boost::shared_ptr<sasl::TSasl> sasl_client_;
+
+  /// This factory sets up the openSSL library state and needs to be alive as long as its
+  /// owner(a ThriftClientImpl instance) does. Otherwise the OpenSSL state is lost
+  /// (refer IMPALA-2747).
+  boost::scoped_ptr<apache::thrift::transport::TSSLSocketFactory> ssl_factory_;
 
   /// All shared pointers, because Thrift requires them to be
   boost::shared_ptr<apache::thrift::transport::TSocket> socket_;

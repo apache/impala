@@ -88,12 +88,8 @@ Status ThriftClientImpl::CreateSocket() {
     socket_.reset(new TSocket(address_.hostname, address_.port));
   } else {
     try {
-      TSSLSocketFactory factory;
-      // TODO: No need to do this every time we create a socket, the factory can be
-      // shared. But since there may be many certificates, this needs some slightly more
-      // complex infrastructure to do right.
-      factory.loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
-      socket_ = factory.createSocket(address_.hostname, address_.port);
+      ssl_factory_->loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
+      socket_ = ssl_factory_->createSocket(address_.hostname, address_.port);
     } catch (const TException& e) {
       return Status(Substitute("Failed to create socket: $0", e.what()));
     }

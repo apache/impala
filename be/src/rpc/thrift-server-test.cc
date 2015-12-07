@@ -118,6 +118,22 @@ TEST(PasswordProtectedPemFile, BadCommand) {
       SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY, "cmd-no-exist").ok());
 }
 
+TEST(SslTest, ClientBeforeServer) {
+  // Instantiate a thrift client before a thrift server and test if it works (IMPALA-2747)
+  FLAGS_ssl_client_ca_certificate = SERVER_CERT;
+  ThriftClient<StatestoreServiceClient> ssl_client(
+      "localhost", FLAGS_state_store_port + 6, "", NULL, true);
+  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(),
+      FLAGS_state_store_port + 6, NULL, NULL, 5);
+  EXPECT_TRUE(
+      server->EnableSsl(SERVER_CERT, PRIVATE_KEY).ok());
+  EXPECT_TRUE(server->Start().ok());
+
+  EXPECT_TRUE(ssl_client.Open().ok());
+  TRegisterSubscriberResponse resp;
+    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+}
+
 int main(int argc, char** argv) {
   InitCommonRuntime(argc, argv, false);
   ::testing::InitGoogleTest(&argc, argv);
