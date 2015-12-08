@@ -89,7 +89,7 @@ class ClientCacheHelper {
   Status ReopenClient(ClientFactory factory_method, ClientKey* client_key);
 
   /// Returns a client to the cache. Upon return, *client_key will be NULL, and the
-  /// associated client will be available in the per-host cache..
+  /// associated client will be available in the per-host cache.
   void ReleaseClient(ClientKey* client_key);
 
   /// Close all connections to a host (e.g., in case of failure) so that on their

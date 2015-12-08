@@ -618,7 +618,7 @@ TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   Status rpc_status;
   ImpalaBackendConnection client(exec_env_.impalad_client_cache(),
       MakeNetworkAddress("localhost", FLAGS_port), &rpc_status);
-  EXPECT_TRUE(rpc_status.ok());
+  EXPECT_OK(rpc_status);
   TTransmitDataParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   params.__set_eos(true);

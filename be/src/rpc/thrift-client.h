@@ -52,6 +52,7 @@ class ThriftClientImpl {
 
   /// Open the connection to the remote server. May be called repeatedly, is idempotent
   /// unless there is a failure to connect.
+  /// If Open() fails, the connection remains closed.
   Status Open();
 
   /// Retry the Open num_retries time waiting wait_ms milliseconds between retries.
