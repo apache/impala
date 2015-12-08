@@ -129,8 +129,9 @@ inline HashTable::Iterator HashTable::FindBucket(HashTableCtx* ht_ctx, uint32_t 
     bool* found) {
   ++num_probes_;
   int64_t bucket_idx = Probe(buckets_, num_buckets_, ht_ctx, hash, found);
-  return Iterator(this, ht_ctx->row(), bucket_idx,
-      buckets_[bucket_idx].bucketData.duplicates);
+  DuplicateNode* duplicates = LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND) ?
+      buckets_[bucket_idx].bucketData.duplicates : NULL;
+  return Iterator(this, ht_ctx->row(), bucket_idx, duplicates);
 }
 
 inline HashTable::Iterator HashTable::Begin(HashTableCtx* ctx) {

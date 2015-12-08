@@ -241,6 +241,7 @@ class HashTableTest : public testing::Test {
     ProbeTest(&hash_table, &ht_ctx, probe_rows, 10, false);
 
     hash_table.Close();
+    ht_ctx.Close();
     mem_pool_.FreeAll();
   }
 
@@ -290,6 +291,7 @@ class HashTableTest : public testing::Test {
 
     delete [] probe_rows;
     hash_table.Close();
+    ht_ctx.Close();
     mem_pool_.FreeAll();
   }
 
@@ -341,6 +343,7 @@ class HashTableTest : public testing::Test {
       }
     }
     hash_table.Close();
+    ht_ctx.Close();
     pool.FreeAll();
     mem_pool_.FreeAll();
   }
@@ -406,6 +409,7 @@ class HashTableTest : public testing::Test {
     EXPECT_FALSE(found);
 
     hash_table.Close();
+    ht_ctx.Close();
     pool.FreeAll();
     mem_pool_.FreeAll();
   }
@@ -487,6 +491,7 @@ TEST_F(HashTableTest, HashEmpty) {
   ht_ctx.set_level(1);
   EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, seed));
   EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, ht_ctx.Hash(NULL, 0, seed)));
+  ht_ctx.Close();
 }
 
 }
