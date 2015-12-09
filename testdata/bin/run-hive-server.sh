@@ -1,7 +1,8 @@
 #!/bin/bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 . ${IMPALA_HOME}/bin/set-pythonpath.sh
 
@@ -25,7 +26,6 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 mkdir -p ${LOGDIR}
-
 
 while [ -n "$*" ]
 do

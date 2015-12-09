@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2012 Cloudera Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +15,17 @@
 #
 # Runs the Impala process failure tests.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 # Disable HEAPCHECK for the process failure tests because they can cause false positives.
 export HEAPCHECK=
-set -u
 
 RESULTS_DIR=${IMPALA_HOME}/tests/results
 mkdir -p ${RESULTS_DIR}
 
-pushd ${IMPALA_HOME}/tests
+cd ${IMPALA_HOME}/tests
 . ${IMPALA_HOME}/bin/set-classpath.sh &> /dev/null
 impala-py.test experiments/test_process_failures.py \
     --junitxml="${RESULTS_DIR}/TEST-impala-proc-failure.xml" \
     --resultlog="${RESULTS_DIR}/TEST-impala-proc-failure.log" "$@"
-EXIT_CODE=$?
-popd
-exit $EXIT_CODE

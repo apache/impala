@@ -24,7 +24,10 @@
 # kept as close as possible to a real cluster. For example, the first node will live in
 # the dir "cdh-<version>/node-1" and its logs would be at "cdh-<version>/node-1/var/log".
 
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
+: ${IMPALA_KERBERIZE=}
 
 while getopts vk OPT; do
   case $OPT in
@@ -412,4 +415,7 @@ function get_hadoop_client_conf_dir {
 
 COMMAND=$1
 shift
-$COMMAND "$@"
+# Use an "if" to avoid triggering the ERR trap.
+if ! $COMMAND "$@"; then
+  exit 1
+fi

@@ -16,6 +16,11 @@
 # setup your environment. If $IMPALA_HOME is undefined
 # this script will set it to the current working directory.
 
+# This file must be kept compatible with bash options "set -euo pipefail". Those options
+# will be set by other scripts before sourcing this file. Those options are not set in
+# this script because scripts outside this repository may need to be updated and that
+# is not practical at this time.
+
 # Setting up Impala binary toolchain. The default path is /opt/bin-toolchain but can be
 # set to any path that contains the necessary dependencies in the format of
 #   /opt/bin-toolchain/package-X.Y.Z
@@ -205,6 +210,7 @@ export PATH=$IMPALA_HOME/bin:$PATH
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
+: ${HADOOP_CLASSPATH=}
 export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:"${HADOOP_HOME}/share/hadoop/tools/lib/*"
 export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH

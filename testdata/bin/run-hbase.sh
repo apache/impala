@@ -1,8 +1,8 @@
-#! /bin/bash
+#!/bin/bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-set -e
-set -o pipefail
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 CLUSTER_BIN=${IMPALA_HOME}/testdata/bin
 HBASE_JAAS_CLIENT=${HBASE_CONF_DIR}/hbase-jaas-client.conf

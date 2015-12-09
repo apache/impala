@@ -16,12 +16,13 @@
 # Loads a hive metastore snapshot file to re-create its postgres database.
 # A metastore snapshot file is produced as an artifact of a successful
 # full data load build.
+
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
-# Always run in Debug mode.
-set -x
-
-if [[ ! $1 ]]; then
+if [[ $# -ne 1 ]]; then
   echo "Usage: load-metastore-snapshot.sh [<metastore_snapshot_file>]"
   exit 1
 fi
@@ -64,10 +65,9 @@ elif [[ "${DEFAULT_FS}" != "hdfs://localhost:20500" ]]; then
 fi
 
 # Drop and re-create the hive metastore database
-dropdb -U hiveuser hive_impala
-# Fail if any of these actions don't succeed.
-set -e
+dropdb -U hiveuser hive_impala || true
 createdb -U hiveuser hive_impala
+
 # Copy the contents of the SNAPSHOT_FILE
 psql -U hiveuser hive_impala < ${TMP_SNAPSHOT_FILE} > /dev/null 2>&1
 # Two tables (tpch.nation and functional.alltypestiny) have cache_directive_id set in

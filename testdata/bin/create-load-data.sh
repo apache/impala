@@ -24,10 +24,11 @@
 # For more information look at testdata/bin/load-test-warehouse-snapshot.sh and
 # bin/load-data.py
 
-# Exit on error.
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
+
 SKIP_METADATA_LOAD=0
 SKIP_SNAPSHOT_LOAD=0
 SNAPSHOT_FILE=""
@@ -138,7 +139,11 @@ function load-data {
   LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with -u
-  impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}
+  if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
+    echo Error loading data. The end of the log file is:
+    tail -n 20 $LOG_FILE
+    return 1
+  fi
 }
 
 function cache-test-tables {
@@ -152,15 +157,19 @@ function cache-test-tables {
 }
 
 function load-aux-workloads {
-  echo LOADING AUXILIARY WORKLOADS
   LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-auxiliary-workloads-core.log
   rm -f $LOG_FILE
   # Load all the auxiliary workloads (if any exist)
   if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
-    impala-python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
+    echo Loading auxiliary workloads. Logging to $LOG_FILE.
+    if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
         --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\
         --dataset_dir=${IMPALA_AUX_DATASET_DIR}\
-        --exploration_strategy=core ${LOAD_DATA_ARGS} &>> $LOG_FILE
+        --exploration_strategy=core ${LOAD_DATA_ARGS} &>> $LOG_FILE; then
+      echo Error loading aux workloads. The end of the log file is:
+      tail -n 20 $LOG_FILE
+      return 1
+    fi
   else
     echo "Skipping load of auxilary workloads because directories do not exist"
   fi
@@ -292,10 +301,6 @@ function copy-and-load-ext-data-source {
     ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
 }
 
-
-# Enable debug logging.
-set -x
-
 # For kerberized clusters, use kerberos
 if ${CLUSTER_DIR}/admin is_kerberized; then
   LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
@@ -356,7 +361,10 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   # TODO: Modify the .sql file that creates the table to take an alternative location into
   # account.
   copy-and-load-ext-data-source
-  ${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
+  if ! OUTPUT=$(${IMPALA_HOME}/testdata/bin/split-hbase.sh 2>&1); then
+    echo -e Failed to split Hbase:\\n"$OUTPUT" >&2
+    exit 1
+  fi
   create-internal-hbase-table
 fi
 # TODO: Investigate why all stats are not preserved. Theorectically, we only need to

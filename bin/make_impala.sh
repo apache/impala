@@ -15,11 +15,8 @@
 
 # Incrementally compiles the BE.
 
-# Exit on reference to uninitialized variable
-set -u
-
-# Exit on non-zero return value
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 BUILD_TESTS=1
 CLEAN=0

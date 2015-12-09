@@ -80,12 +80,14 @@ JSKC=java.security.krb5.conf
 export JAVA_KERBEROS_MAGIC="${JAVA_KERBEROS_MAGIC} -D${JSKC}=${MINIKDC_KRB5CONF}"
 
 # Add the magic to HADOOP_OPTS so that hdfs can find the krb5.conf file
-if ! echo ${HADOOP_OPTS} | grep -q "${JSKC}"; then
+: ${HADOOP_OPTS=}
+if [[ "${HADOOP_OPTS}" =~ "${JSKC}" ]]; then
   export HADOOP_OPTS="${HADOOP_OPTS} ${JAVA_KERBEROS_MAGIC}"
 fi
 
 # Ditto with YARN_OPTS
-if ! echo ${YARN_OPTS} | grep -q "${JSKC}"; then
+: ${YARN_OPTS=}
+if [[ "${YARN_OPTS}" =~ "${JSKC}" ]]; then
   export YARN_OPTS="${YARN_OPTS} ${JAVA_KERBEROS_MAGIC}"
 fi
 

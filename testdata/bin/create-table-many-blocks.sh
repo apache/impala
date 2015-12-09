@@ -20,9 +20,10 @@
 # way a table with 100K blocks can be created by using 100 partitions x 1000
 # blocks/files.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
-set -e
-set -u
 
 LOCAL_OUTPUT_DIR=$(mktemp -dt "impala_test_tmp.XXXXXX")
 echo $LOCAL_OUTPUT_DIR

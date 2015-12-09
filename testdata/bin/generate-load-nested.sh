@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
-#set -x
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 SHELL_CMD=${IMPALA_HOME}/bin/impala-shell.sh
 

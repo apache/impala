@@ -3,8 +3,10 @@
 #
 # This script copies the test data source library into hdfs.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
-set -e
 
 hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/data-sources/
 

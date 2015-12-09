@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
-set -x
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 CONF_DIR=$1
 SCRIPT=$2

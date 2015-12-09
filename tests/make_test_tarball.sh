@@ -18,6 +18,9 @@
 # ${IMPALA_HOME}/tests/build. Assumes Impala and /thirdparty have been built
 # built prior to running this script.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 if [ "x${IMPALA_HOME}" == "x" ]; then
   echo "\$IMPALA_HOME must be set"
   exit 1
@@ -40,9 +43,6 @@ TMP_ROOT_DIR=$(mktemp -dt "impala_test_tmp.XXXXXX")
 TARBALL_ROOT=${TMP_ROOT_DIR}/impala-tests-${VERSION}
 OUTPUT_DIR=${IMPALA_HOME}/tests/build
 
-set -u
-set -e
-set -x
 echo "Root of temp output dir: ${TMP_ROOT_DIR}"
 
 echo "Creating required directories"

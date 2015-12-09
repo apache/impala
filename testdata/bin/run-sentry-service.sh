@@ -1,6 +1,9 @@
 #!/bin/bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-set -u
+
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 . ${IMPALA_HOME}/bin/set-classpath.sh
 
 SENTRY_SERVICE_CONFIG=${SENTRY_CONF_DIR}/sentry-site.xml

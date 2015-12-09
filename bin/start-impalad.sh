@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2012 Cloudera Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +17,8 @@
 # arguments. An optional -build_type parameter can be passed to determine the build
 # type to use for the impalad instance.
 
-set -e
-set -u
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 BUILD_TYPE=debug
 IMPALAD_ARGS=""

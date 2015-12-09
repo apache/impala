@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 # run buildall.sh -help to see options
 
 ROOT=`dirname "$0"`
@@ -21,13 +24,13 @@ ROOT=`cd "$ROOT"; pwd`
 # Grab this *before* we source impala-config.sh to see if the caller has
 # kerberized environment variables already or not.
 NEEDS_RE_SOURCE_NOTE=1
+: ${MINIKDC_REALM=}
 if [ ! -z "${MINIKDC_REALM}" ]; then
   NEEDS_RE_SOURCE_NOTE=0
 fi
 
 export IMPALA_HOME=$ROOT
-. "$ROOT"/bin/impala-config.sh
-if [ $? = 1 ]; then
+if ! . "$ROOT"/bin/impala-config.sh; then
   echo "Bad configuration, aborting buildall."
   exit 1
 fi
@@ -47,12 +50,6 @@ MAKE_IMPALA_ARGS=""
 # commandline.
 : ${EXPLORATION_STRATEGY:=core}
 : ${TARGET_BUILD_TYPE:=Debug}
-
-# Exit on reference to uninitialized variable
-set -u
-
-# Exit on non-zero return value
-set -e
 
 # parse command line options
 # TODO: We have to change this to use getopts, or something more sensible.
@@ -333,8 +330,8 @@ fi
 #
 # Don't try to run tests without data!
 #
-TESTWH_ITEMS=`hadoop fs -ls ${FILESYSTEM_PREFIX}/test-warehouse 2> /dev/null | \
-    grep test-warehouse |wc -l`
+TESTWH_ITEMS=`(hadoop fs -ls ${FILESYSTEM_PREFIX}/test-warehouse 2> /dev/null || true) | \
+    (grep test-warehouse || true) | wc -l`
 if [ ${TESTS_ACTION} -eq 1 -a \
      ${TESTDATA_ACTION} -eq 0 -a \
      ${TESTWH_ITEMS} -lt 5 ]; then
@@ -361,7 +358,7 @@ if [ $TESTDATA_ACTION -eq 1 ]; then
   elif [[ -z $SNAPSHOT_FILE && $METASTORE_SNAPSHOT_FILE ]]; then
     CREATE_LOAD_DATA_ARGS="-skip_metadata_load -skip_snapshot_load"
   fi
-  yes | ${IMPALA_HOME}/testdata/bin/create-load-data.sh ${CREATE_LOAD_DATA_ARGS}
+  ${IMPALA_HOME}/testdata/bin/create-load-data.sh ${CREATE_LOAD_DATA_ARGS} <<< Y
 fi
 
 if [ $TESTS_ACTION -eq 1 ]; then

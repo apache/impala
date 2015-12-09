@@ -18,6 +18,9 @@
 # run out-of-the-box with no configuration. The final tarball is left in
 # ${IMPALA_HOME}/shell/build.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 if [ "x${IMPALA_HOME}" == "x" ]; then
   echo "\$IMPALA_HOME must be set"
   exit 1
@@ -41,8 +44,6 @@ SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
 
-set -u
-set -e
 echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null

@@ -15,25 +15,23 @@
 #
 # Starts up a mini-dfs test cluster and related services
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 # If -format is passed, format the mini-dfs cluster.
 
-if [ "$1" == "-format" ]; then
+if [[ $# -eq 1 && "$1" == "-format" ]]; then
   echo "Formatting cluster"
   HDFS_FORMAT_CLUSTER="-format"
-elif [[ $1 ]]; then
+elif [[ $# -ne 0 ]]; then
   echo "Usage: run-all.sh [-format]"
   echo "[-format] : Format the mini-dfs cluster before starting"
   exit 1
 fi
 
-set -u
-
 # Kill and clean data for a clean start.
 echo "Killing running services..."
 $IMPALA_HOME/testdata/bin/kill-all.sh &>${IMPALA_TEST_CLUSTER_LOG_DIR}/kill-all.log
-
-set -e
-set -o pipefail
 
 # Starts up a mini-cluster which includes:
 # - HDFS with 3 DNs

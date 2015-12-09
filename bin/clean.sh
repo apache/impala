@@ -17,10 +17,8 @@
 # between releases. In addition must be used before switching from a toolchain enabled
 # branch to a non-toolchain branch due to caching in CMake generated files.
 
-# Exit on non-true return value
-set -e
-# Exit on reference to uninitialized variable
-set -u
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 # If the project was never build, no Makefile will exist and thus make clean will fail.
 # Combine the make command with the bash noop to always return true.
@@ -74,4 +72,6 @@ if [ -e $IMPALA_LZO ]; then
 fi
 
 # When switching to and from toolchain, make sure to remove all CMake generated files
-find -iname '*cmake*' -not -name CMakeLists.txt | grep -v -e cmake_module | grep -v -e thirdparty | xargs rm -Rf
+find -iname '*cmake*' -not -name CMakeLists.txt \
+    -not -path '*cmake_modules*' \
+    -not -path '*thirdparty*' | xargs rm -Rf

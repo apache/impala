@@ -20,16 +20,18 @@
 # NOTE: Running this script will remove your existing test-warehouse directory. Be sure
 # to backup any data you need before running this script.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
-if [[ ! $1 ]]; then
+if [[ $# -ne 1 ]]; then
   echo "Usage: load-test-warehouse-snapshot.sh [test-warehouse-SNAPSHOT.tar.gz]"
   exit 1
 fi
 
 TEST_WAREHOUSE_DIR="/test-warehouse"
 
-set -u
 SNAPSHOT_FILE=$1
 if [ ! -f ${SNAPSHOT_FILE} ]; then
   echo "Snapshot tarball file '${SNAPSHOT_FILE}' not found"
@@ -43,14 +45,13 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
   # Create a new warehouse directory. If one already exist, remove it first.
   if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     # TODO: The aws cli emits a lot of spew, redirect /dev/null once it's deemed stable.
-    aws s3 rm --recursive s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
-    if [ $? != 0 ]; then
+    if ! aws s3 rm --recursive s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}; then
       echo "Deleting pre-existing data in s3 failed, aborting."
+      exit 1
     fi
   else
     # Either isilon or hdfs, no change in procedure.
-    hadoop fs -test -d ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
-    if [ $? -eq 0 ]; then
+    if hadoop fs -test -d ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}; then
       echo "Removing existing test-warehouse directory"
       # For filesystems that don't allow 'rm' without 'x', chmod to 777 for the
       # subsequent 'rm -r'.
@@ -67,8 +68,6 @@ else
   echo -e "\nAborting."
   exit 1
 fi
-
-set -e
 
 echo "Loading snapshot file: ${SNAPSHOT_FILE}"
 SNAPSHOT_STAGING_DIR=`dirname ${SNAPSHOT_FILE}`/hdfs-staging-tmp
@@ -90,13 +89,14 @@ echo "Copying data to ${TARGET_FILESYSTEM}"
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # hive does not yet work well with s3, so we won't need hive builtins.
   # TODO: The aws cli emits a lot of spew, redirect /dev/null once it's deemed stable.
-  aws s3 cp --recursive ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR} \
-      s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
-  if [ $? != 0 ]; then
+  if ! aws s3 cp --recursive ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR} \
+      s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}; then
     echo "Copying the test-warehouse to s3 failed, aborting."
+    exit 1
   fi
 else
-  hadoop fs -put ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/* ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+  hadoop fs -put ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/* \
+      ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
 fi
 
 ${IMPALA_HOME}/bin/create_testdata.sh

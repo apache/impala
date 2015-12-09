@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
 # TODO: remove this once we understand why Hive looks in HDFS for many of its jars

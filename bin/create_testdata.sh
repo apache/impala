@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
-
-set -e
 
 # location of the generated data
 DATALOC=$IMPALA_HOME/testdata/target

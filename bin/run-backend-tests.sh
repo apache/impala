@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 # Prepare output directory
 mkdir -p $IMPALA_TEST_CLUSTER_LOG_DIR/be_test
 export GTEST_OUTPUT="xml:$IMPALA_TEST_CLUSTER_LOG_DIR/be_test/"
@@ -9,8 +12,6 @@ export GTEST_OUTPUT="xml:$IMPALA_TEST_CLUSTER_LOG_DIR/be_test/"
 
 # The backend unit tests currently do not work when HEAPCHECK is enabled.
 export HEAPCHECK=
-set -e
-set -u
 
 BE_TEST_ARGS=""
 if [[ -n "$SKIP_BE_TEST_PATTERN" ]]; then

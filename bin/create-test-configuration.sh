@@ -17,8 +17,11 @@
 # Hadoop config files: core-site.xml, hbase-site.xml, hive-site.xml as well
 # as creation of the Hive metastore.
 
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+
 CREATE_METASTORE=0
+: ${IMPALA_KERBERIZE=}
 
 # parse command line options
 for ARG in $*
@@ -47,9 +50,7 @@ fi
 
 # If a specific metastore db is defined, use that. Otherwise create unique metastore
 # DB name based on the current directory.
-if [ -z "${METASTORE_DB}" ]; then
-  METASTORE_DB=`basename ${IMPALA_HOME} | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
-fi
+: ${METASTORE_DB=`basename ${IMPALA_HOME} | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`}
 
 ${CLUSTER_DIR}/admin create_cluster
 

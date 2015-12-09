@@ -15,7 +15,8 @@
 
 # Starts up the StateStored with the specified command line arguments.
 
-set -e
+set -euo pipefail
+trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 BUILD_TYPE=debug
 STATESTORED_ARGS=""
