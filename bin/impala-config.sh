@@ -20,6 +20,9 @@
 # set to any path that contains the necessary dependencies in the format of
 #   /opt/bin-toolchain/package-X.Y.Z
 : ${IMPALA_TOOLCHAIN=}
+
+# If USE_SYSTEM_GCC is set to 1 the toolchain's GCC will not be used. This flag should
+# only be set if the toolchain was built with the system GCC as well.
 : ${USE_SYSTEM_GCC=0}
 
 # Export both variables
@@ -147,7 +150,6 @@ export IMPALA_THRIFT_VERSION=0.9.0
 export IMPALA_THRIFT_JAVA_VERSION=0.9.0
 export IMPALA_ZLIB_VERSION=1.2.8
 
-
 # Some of the variables need to be overwritten to explicitely mark the patch level
 if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   IMPALA_AVRO_VERSION+=-p3
@@ -158,6 +160,16 @@ if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   IMPALA_RE2_VERSION+=-p1
   IMPALA_LLVM_VERSION+=-p1
 fi
+
+if [[ $OSTYPE == "darwin"* ]]; then
+  IMPALA_CYRUS_SASL_VERSION=2.1.26
+  IMPALA_GPERFTOOLS_VERSION=2.3
+  IMPALA_LLVM_VERSION=3.3-p1
+  IMPALA_OPENSSL_VERSION=1.0.1p
+  IMPALA_THRIFT_VERSION=0.9.2
+  IMPALA_THRIFT_JAVA_VERSION=0.9.2
+fi
+
 
 if [[ ! -z "${IMPALA_CYRUS_SASL_INSTALL_DIR:-}" ]]
 then

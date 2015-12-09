@@ -17,6 +17,7 @@
 #define IMPALA_UTIL_STOPWATCH_H
 
 #include <boost/cstdint.hpp>
+#include <util/time.h>
 #include <time.h>
 
 namespace impala {
@@ -75,24 +76,21 @@ class StopWatch {
   bool running_;
 };
 
-/// Stop watch for reporting elapsed time in nanosec based on CLOCK_MONOTONIC.
+/// Stop watch for reporting elapsed time in nanosec based on MonotonicNanos.
 /// It is as fast as Rdtsc.
 /// It is also accurate because it not affected by cpu frequency changes and
 /// it is not affected by user setting the system clock.
-/// CLOCK_MONOTONIC represents monotonic time since some unspecified starting point.
+/// A monotonic clock represents monotonic time since some unspecified starting point.
 /// It is good for computing elapsed time.
 class MonotonicStopWatch {
  public:
-  MonotonicStopWatch() {
-    total_time_ = 0;
-    running_ = false;
-    // Used to signal that time_ceiling_ is not set.
-    has_time_ceiling_ = false;
+  MonotonicStopWatch() : start_(0), total_time_(0),
+                         time_ceiling_(0), running_(false) {
   }
 
   void Start() {
     if (!running_) {
-      clock_gettime(CLOCK_MONOTONIC, &start_);
+      start_ = MonotonicNanos();
       running_ = true;
     }
   }
@@ -105,15 +103,15 @@ class MonotonicStopWatch {
   }
 
   /// Set the time ceiling of the stop watch. The stop watch won't run past the ceiling.
-  void SetTimeCeiling(const timespec& ceiling) {
-    time_ceiling_ = ceiling;
-    has_time_ceiling_ = true;
-  }
+  void SetTimeCeiling(const uint64_t ceiling) { time_ceiling_ = ceiling; }
 
   /// Restarts the timer. Returns the elapsed time until this point.
   uint64_t Reset() {
     uint64_t ret = ElapsedTime();
-    if (running_) clock_gettime(CLOCK_MONOTONIC, &start_);
+    if (running_) {
+      start_ = MonotonicNanos();
+      time_ceiling_ = 0;
+    }
     return ret;
   }
 
@@ -130,33 +128,28 @@ class MonotonicStopWatch {
   }
 
  private:
-  timespec time_ceiling_;
-  bool has_time_ceiling_;
-  timespec start_;
-  uint64_t total_time_; // in nanosec
-  bool running_;
+  /// Start epoch value.
+  uint64_t start_;
 
-  /// Return true if t1 is less than t2.
-  static bool TimeLessThan(const timespec& t1, const timespec& t2) {
-    return ((t1.tv_sec < t2.tv_sec) ||
-        (t1.tv_sec == t2.tv_sec && t1.tv_nsec < t2.tv_nsec));
-  }
+  /// Total elapsed time in nanoseconds.
+  uint64_t total_time_;
+
+  /// Upper bound of the running time as a epoch value. If the value is larger than 0,
+  /// the stopwatch interprets this as a time ceiling is set.
+  uint64_t time_ceiling_;
+
+  /// True if stopwatch is running.
+  bool running_;
 
   /// Returns the time since start.
   /// If time_ceiling_ is set, the stop watch won't run pass the ceiling.
   uint64_t RunningTime() const {
-    timespec end;
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    const timespec* actual_end = &end;
-
-    if (has_time_ceiling_) {
-      // If time_ceiling_ is less than start time, return 0.
-      if (TimeLessThan(time_ceiling_, start_)) return 0;
-      // If time_ceiling_ is less than end, use it as end time.
-      if (TimeLessThan(time_ceiling_, end)) actual_end = &time_ceiling_;
+    uint64_t end = MonotonicNanos();
+    if (time_ceiling_ > 0) {
+      if (time_ceiling_ < start_) return 0;
+      if (time_ceiling_ < end) end = time_ceiling_;
     }
-    return (actual_end->tv_sec - start_.tv_sec) * 1000L * 1000L * 1000L +
-        (actual_end->tv_nsec - start_.tv_nsec);
+    return end - start_;
   }
 };
 

@@ -39,6 +39,12 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-p
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+
+# On Apple we build with clang and need libstdc++ instead of libc++
+if (APPLE)
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -stdlib=libstdc++")
+endif()
+
 SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
 # For any clang builds (currently only ASAN):
@@ -222,8 +228,15 @@ endif()
 # the order in which impala libraries are listed below does not matter.
 # Note: The ld documentation discourages auto-resolving cyclic dependencies
 # for performance reasons.
+if (NOT APPLE)
+  # When compiling on Mac with clang using these linker flags are undefined and Clang on
+  # Mac will abort on unknown compiler or linker flags. In the long-term we should
+  # move away from using these flags to have a coherent build on OS X and Linux.
+  set(WL_START_GROUP "-Wl,--start-group")
+  set(WL_END_GROUP "-Wl,--end-group")
+endif()
 set (IMPALA_LINK_LIBS
-  -Wl,--start-group
+  ${WL_START_GROUP}
   Catalog
   CodeGen
   Common
@@ -242,7 +255,7 @@ set (IMPALA_LINK_LIBS
   Udf
   Util
   Webserver
-  -Wl,--end-group
+  ${WL_END_GROUP}
 )
 
 # If using dynamic linking, -Wl does not have any effect (it's only for .a files). So we

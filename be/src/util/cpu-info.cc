@@ -14,6 +14,10 @@
 
 #include "util/cpu-info.h"
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <fstream>
@@ -110,10 +114,22 @@ void CpuInfo::Init() {
   }
   if (cpuinfo.is_open()) cpuinfo.close();
 
+#ifdef __APPLE__
+  // On Mac OS X use sysctl() to get the cache sizes
+  size_t len = 0;
+  sysctlbyname("hw.cachesize", NULL, &len, NULL, 0);
+  uint64_t* data = static_cast<uint64_t*>(malloc(len));
+  sysctlbyname("hw.cachesize", data, &len, NULL, 0);
+  DCHECK(len / sizeof(uint64_t) >= 3);
+  for (size_t i = 0; i < 3; ++i) {
+    cache_sizes_[i] = data[i];
+  }
+#else
   // Call sysconf to query for the cache sizes
   cache_sizes_[0] = sysconf(_SC_LEVEL1_DCACHE_SIZE);
   cache_sizes_[1] = sysconf(_SC_LEVEL2_CACHE_SIZE);
   cache_sizes_[2] = sysconf(_SC_LEVEL3_CACHE_SIZE);
+#endif
 
   if (max_mhz != 0) {
     cycles_per_ms_ = max_mhz * 1000;

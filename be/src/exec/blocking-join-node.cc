@@ -21,6 +21,7 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
+#include "util/time.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -193,9 +194,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     Status open_status = child(0)->Open(state);
 
     // The left/right child overlap stops here.
-    timespec overlap_stops_time;
-    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time);
-    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time);
+    built_probe_overlap_stop_watch_.SetTimeCeiling(MonotonicNanos());
 
     // Blocks until ConstructBuildSide has returned, after which the build side structures
     // are fully constructed.
@@ -212,10 +211,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(ConstructBuildSide(state));
   } else {
     // The left/right child never overlap. The overlap stops here.
-    timespec overlap_stops_time;
-    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time);
-    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time);
-
+    built_probe_overlap_stop_watch_.SetTimeCeiling(MonotonicNanos());
     RETURN_IF_ERROR(ConstructBuildSide(state));
     RETURN_IF_ERROR(child(0)->Open(state));
   }

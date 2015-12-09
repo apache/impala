@@ -16,7 +16,11 @@
 #ifndef IMPALA_BIT_UTIL_H
 #define IMPALA_BIT_UTIL_H
 
+#if defined(__APPLE__)
+#include <machine/endian.h>
+#else
 #include <endian.h>
+#endif
 
 #include <boost/type_traits/make_unsigned.hpp>
 

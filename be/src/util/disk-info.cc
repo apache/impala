@@ -14,7 +14,11 @@
 
 #include "util/disk-info.h"
 
+#ifdef __APPLE__
+#include <sys/mount.h>
+#else
 #include <sys/vfs.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

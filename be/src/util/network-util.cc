@@ -33,6 +33,12 @@
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
 
+#ifdef __APPLE__
+// OS X does not seem to have a similar limitation as Linux and thus the
+// macro is not defined.
+#define HOST_NAME_MAX 64
+#endif
+
 namespace impala {
 
 static const string LOCALHOST("127.0.0.1");

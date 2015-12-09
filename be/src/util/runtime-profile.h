@@ -761,6 +761,14 @@ class ScopedTimer {
   const bool* is_cancelled_;
 };
 
+#ifdef __APPLE__
+// On OS X rusage via thread is not supported. In addition, the majority of the fields of
+// the usage structs will be zeroed out. Since Apple is not going to be a major plaform
+// initially it will most likely be enough to capture only time.
+// C.f. http://blog.kuriositaet.de/?p=257
+#define RUSAGE_THREAD RUSAGE_SELF
+#endif
+
 /// Utility class to update ThreadCounter when the object goes out of scope or when Stop is
 /// called. Threads measurements will then be taken using getrusage.
 /// This is ~5x slower than ScopedTimer due to calling getrusage.
