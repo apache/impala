@@ -310,10 +310,10 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
     metrics_enabled_ = true;
     stringstream count_ss;
     count_ss << "impala.thrift-server." << name << ".connections-in-use";
-    num_current_connections_metric_ = metrics->AddGauge(count_ss.str(), 0L);
+    num_current_connections_metric_ = metrics->AddGauge<int64_t>(count_ss.str(), 0);
     stringstream max_ss;
     max_ss << "impala.thrift-server." << name << ".total-connections";
-    total_connections_metric_ = metrics->AddCounter(max_ss.str(), 0L);
+    total_connections_metric_ = metrics->AddCounter<int64_t>(max_ss.str(), 0);
   } else {
     metrics_enabled_ = false;
   }

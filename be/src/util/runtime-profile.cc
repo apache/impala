@@ -358,7 +358,7 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
     }
   }
   // Counters have some margin, set to 0 if it was negative.
-  local_time_ns_ = ::max(0L, local_time_ns_);
+  local_time_ns_ = ::max<int64_t>(0, local_time_ns_);
   local_time_percent_ =
       static_cast<double>(local_time_ns_) / total_time_counter()->value();
   local_time_percent_ = ::min(1.0, local_time_percent_) * 100;

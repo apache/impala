@@ -116,7 +116,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
 
   DCHECK(metrics != NULL);
   num_active_scratch_dirs_metric_ =
-      metrics->AddGauge(TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS, 0L);
+      metrics->AddGauge<int64_t>(TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS, 0);
   active_scratch_dirs_metric_ = SetMetric<string>::CreateAndRegister(metrics,
       TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST, set<string>());
   num_active_scratch_dirs_metric_->set_value(tmp_dirs_.size());

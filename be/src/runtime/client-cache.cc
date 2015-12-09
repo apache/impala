@@ -203,11 +203,11 @@ void ClientCacheHelper::InitMetrics(MetricGroup* metrics, const string& key_pref
   lock_guard<mutex> lock(cache_lock_);
   stringstream count_ss;
   count_ss << key_prefix << ".client-cache.clients-in-use";
-  clients_in_use_metric_ = metrics->AddGauge(count_ss.str(), 0L);
+  clients_in_use_metric_ = metrics->AddGauge<int64_t>(count_ss.str(), 0);
 
   stringstream max_ss;
   max_ss << key_prefix << ".client-cache.total-clients";
-  total_clients_metric_ = metrics->AddGauge(max_ss.str(), 0L);
+  total_clients_metric_ = metrics->AddGauge<int64_t>(max_ss.str(), 0);
   metrics_enabled_ = true;
 }
 

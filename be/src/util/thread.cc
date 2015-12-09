@@ -204,7 +204,8 @@ void ThreadMgr::ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args,
   BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {
     Value val(kObjectType);
     val.AddMember("name", category.first.c_str(), document->GetAllocator());
-    val.AddMember("size", category.second.size(), document->GetAllocator());
+    val.AddMember("size", static_cast<uint64_t>(category.second.size()),
+        document->GetAllocator());
     // TODO: URLEncode() name?
     lst.PushBack(val, document->GetAllocator());
   }
@@ -226,7 +227,8 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
     categories_to_print.push_back(&category->second);
     Value val(kObjectType);
     val.AddMember("category", category->first.c_str(), document->GetAllocator());
-    val.AddMember("size", category->second.size(), document->GetAllocator());
+    val.AddMember("size", static_cast<uint64_t>(category->second.size()),
+        document->GetAllocator());
     document->AddMember("thread-group", val, document->GetAllocator());
   } else {
     BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {

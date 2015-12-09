@@ -201,7 +201,7 @@ MemTracker::~MemTracker() {
 }
 
 void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
-  num_gcs_metric_ = metrics->AddCounter(Substitute("$0.num-gcs", prefix), 0L);
+  num_gcs_metric_ = metrics->AddCounter<int64_t>(Substitute("$0.num-gcs", prefix), 0);
 
   // TODO: Consider a total amount of bytes freed counter
   bytes_freed_by_last_gc_metric_ = metrics->AddGauge<int64_t>(

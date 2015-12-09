@@ -230,7 +230,8 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
 int64_t BufferedBlockMgr::available_buffers(Client* client) const {
   int64_t unused_reserved = client->num_reserved_buffers_ +
       client->num_tmp_reserved_buffers_ - client->num_pinned_buffers_;
-  return max(0L, remaining_unreserved_buffers()) + max(0L, unused_reserved);
+  return max<int64_t>(0, remaining_unreserved_buffers()) +
+      max<int64_t>(0, unused_reserved);
 }
 
 int64_t BufferedBlockMgr::remaining_unreserved_buffers() const {
@@ -298,8 +299,8 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
     return true;
   }
 
-  if (max(0L, remaining_unreserved_buffers()) + client->num_tmp_reserved_buffers_ <
-      buffers_needed) {
+  if (max<int64_t>(0, remaining_unreserved_buffers()) +
+      client->num_tmp_reserved_buffers_ < buffers_needed) {
     return false;
   }
 

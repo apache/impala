@@ -1,6 +1,6 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_EXPERIMENT_DATPROVIDER_H
+#ifndef IMPALA_EXPERIMENT_DATAPROVIDER_H
 #define IMPALA_EXPERIMENT_DATAPROVIDER_H
 
 #include <math.h>
@@ -234,4 +234,3 @@ template<> inline double DataProvider::ColDesc::Generate<double>(double d, int i
 }
 
 #endif
-

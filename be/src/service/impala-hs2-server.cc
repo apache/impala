@@ -168,8 +168,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
     const HS2ColumnarResultSet* o = static_cast<const HS2ColumnarResultSet*>(other);
     DCHECK_EQ(metadata_.columns.size(), o->metadata_.columns.size());
     if (start_idx >= o->num_rows_) return 0;
-    const int rows_added =
-        min(static_cast<long>(num_rows), o->num_rows_ - start_idx);
+    const int rows_added = min<int64_t>(num_rows, o->num_rows_ - start_idx);
     for (int j = 0; j < metadata_.columns.size(); ++j) {
       thrift::TColumn* from = &o->result_set_->columns[j];
       thrift::TColumn* to = &result_set_->columns[j];
@@ -660,7 +659,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     connection_to_sessions_map_[connection_id].push_back(session_id);
   }
 
-  ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(1L);
+  ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(1);
 
   return_val.__isset.configuration = true;
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);

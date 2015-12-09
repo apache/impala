@@ -103,6 +103,8 @@ class RuntimeProfile {
 
     virtual void Set(int64_t value) { value_ = value; }
 
+    virtual void Set(int value) { value_ = value; }
+
     virtual void Set(double value) {
       value_ = *reinterpret_cast<int64_t*>(&value);
     }

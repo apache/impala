@@ -87,7 +87,7 @@ const Statestore::TopicEntry::Value Statestore::TopicEntry::NULL_VALUE = "";
 // value needs to be less than TopicEntry::TOPIC_ENTRY_INITIAL_VERSION to distinguish
 // between the case where a Topic is empty and the case where the Topic only contains
 // an item with the initial version.
-const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERSION = 0L;
+const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERSION = 0;
 
 // Used to control the maximum size of the pending topic-update queue, in which there is
 // at most one entry per subscriber.
@@ -127,8 +127,8 @@ void Statestore::TopicEntry::SetValue(const Statestore::TopicEntry::Value& bytes
 Statestore::TopicEntry::Version Statestore::Topic::Put(const string& key,
     const Statestore::TopicEntry::Value& bytes) {
   TopicEntryMap::iterator entry_it = entries_.find(key);
-  int64_t key_size_delta = 0L;
-  int64_t value_size_delta = 0L;
+  int64_t key_size_delta = 0;
+  int64_t value_size_delta = 0;
   if (entry_it == entries_.end()) {
     entry_it = entries_.insert(make_pair(key, TopicEntry())).first;
     key_size_delta += key.size();
@@ -146,8 +146,8 @@ Statestore::TopicEntry::Version Statestore::Topic::Put(const string& key,
 
   total_key_size_bytes_ += key_size_delta;
   total_value_size_bytes_ += value_size_delta;
-  DCHECK_GE(total_key_size_bytes_, 0L);
-  DCHECK_GE(total_value_size_bytes_, 0L);
+  DCHECK_GE(total_key_size_bytes_, static_cast<int64_t>(0));
+  DCHECK_GE(total_value_size_bytes_, static_cast<int64_t>(0));
   key_size_metric_->Increment(key_size_delta);
   value_size_metric_->Increment(value_size_delta);
   topic_size_metric_->Increment(key_size_delta + value_size_delta);
@@ -164,7 +164,7 @@ void Statestore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
     topic_update_log_.erase(version);
     topic_update_log_.insert(make_pair(++last_version_, key));
     total_value_size_bytes_ -= entry_it->second.value().size();
-    DCHECK_GE(total_value_size_bytes_, 0L);
+    DCHECK_GE(total_value_size_bytes_, static_cast<int64_t>(0));
 
     value_size_metric_->Increment(entry_it->second.value().size());
     topic_size_metric_->Increment(entry_it->second.value().size());
@@ -233,12 +233,12 @@ Statestore::Statestore(MetricGroup* metrics)
 
   DCHECK(metrics != NULL);
   num_subscribers_metric_ =
-      metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0L);
+      metrics->AddGauge<int64_t>(STATESTORE_LIVE_SUBSCRIBERS, 0);
   subscriber_set_metric_ = SetMetric<string>::CreateAndRegister(metrics,
       STATESTORE_LIVE_SUBSCRIBERS_LIST, set<string>());
-  key_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0L);
-  value_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0L);
-  topic_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
+  key_size_metric_ = metrics->AddGauge<int64_t>(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0);
+  value_size_metric_ = metrics->AddGauge<int64_t>(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0);
+  topic_size_metric_ = metrics->AddGauge<int64_t>(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0);
 
   topic_update_duration_metric_ =
       StatsMetric<double>::CreateAndRegister(metrics, STATESTORE_UPDATE_DURATION);
@@ -273,7 +273,8 @@ void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
 
     Value topic_id(topic.second.id().c_str(), document->GetAllocator());
     topic_json.AddMember("topic_id", topic_id, document->GetAllocator());
-    topic_json.AddMember("num_entries", topic.second.entries().size(),
+    topic_json.AddMember("num_entries",
+        static_cast<uint64_t>(topic.second.entries().size()),
         document->GetAllocator());
     topic_json.AddMember("version", topic.second.last_version(), document->GetAllocator());
 
@@ -317,9 +318,11 @@ void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     sub_json.AddMember("address", address, document->GetAllocator());
 
-    sub_json.AddMember("num_topics", subscriber.second->subscribed_topics().size(),
+    sub_json.AddMember("num_topics",
+        static_cast<uint64_t>(subscriber.second->subscribed_topics().size()),
         document->GetAllocator());
-    sub_json.AddMember("num_transient", subscriber.second->transient_entries().size(),
+    sub_json.AddMember("num_transient",
+        static_cast<uint64_t>(subscriber.second->transient_entries().size()),
         document->GetAllocator());
 
     Value registration_id(PrintId(subscriber.second->registration_id()).c_str(),
@@ -386,7 +389,7 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   }
 
   // Add the subscriber to the update queue, with an immediate schedule.
-  ScheduledSubscriberUpdate update = make_pair(0L, subscriber_id);
+  ScheduledSubscriberUpdate update = make_pair(0, subscriber_id);
   RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
   RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
 
@@ -610,7 +613,7 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     const ScheduledSubscriberUpdate& update) {
   int64_t update_deadline = update.first;
   const string hb_type = is_heartbeat ? "heartbeat" : "topic update";
-  if (update_deadline != 0L) {
+  if (update_deadline != 0) {
     // Wait until deadline.
     int64_t diff_ms = update_deadline - UnixMillis();
     while (diff_ms > 0) {

@@ -15,6 +15,7 @@
 #ifndef IMPALA_UTIL_PROMISE_H
 #define IMPALA_UTIL_PROMISE_H
 
+#include <algorithm>
 #include <boost/thread.hpp>
 
 #include "common/logging.h"
@@ -80,7 +81,8 @@ class Promise {
     now = start = MonotonicMicros();
     while (!val_is_set_ && (now - start) < timeout_micros) {
       boost::posix_time::microseconds wait_time =
-          boost::posix_time::microseconds(std::max(1L, timeout_micros - (now - start)));
+          boost::posix_time::microseconds(std::max<int64_t>(
+              1, timeout_micros - (now - start)));
       val_set_cond_.timed_wait(l, wait_time);
       now = MonotonicMicros();
     }

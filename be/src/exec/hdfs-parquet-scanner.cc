@@ -1092,7 +1092,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
 
       // Didn't read entire header, increase buffer size and try again
       Status status;
-      int64_t new_buffer_size = max(buffer_size * 2, 1024L);
+      int64_t new_buffer_size = max<int64_t>(buffer_size * 2, 1024);
       bool success = stream_->GetBytes(
           new_buffer_size, &buffer, &new_buffer_size, &status, /* peek */ true);
       if (!success) {
@@ -1803,7 +1803,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
     while (metadata_bytes_to_read > 0) {
-      int64_t to_read = ::min(static_cast<int64_t>(io_mgr->max_read_buffer_size()),
+      int64_t to_read = ::min<int64_t>(io_mgr->max_read_buffer_size(),
           metadata_bytes_to_read);
       DiskIoMgr::ScanRange* range = scan_node_->AllocateScanRange(
           metadata_range_->fs(), filename(), to_read, metadata_start + copy_offset, -1,
@@ -1847,7 +1847,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
       Tuple* tuple;
       TupleRow* current_row;
       int max_tuples = GetMemory(&pool, &tuple, &current_row);
-      max_tuples = min(static_cast<int64_t>(max_tuples), num_tuples);
+      max_tuples = min<int64_t>(max_tuples, num_tuples);
       num_tuples -= max_tuples;
 
       int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
@@ -2288,7 +2288,7 @@ Status HdfsParquetScanner::InitColumns(
       // dictionary page header size in total_compressed_size and total_uncompressed_size
       // (see IMPALA-694). We pad col_len to compensate.
       int64_t bytes_remaining = file_desc->file_length - col_end;
-      int64_t pad = min(static_cast<int64_t>(MAX_DICT_HEADER_SIZE), bytes_remaining);
+      int64_t pad = min<int64_t>(MAX_DICT_HEADER_SIZE, bytes_remaining);
       col_len += pad;
     }
 

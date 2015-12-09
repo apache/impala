@@ -323,7 +323,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       schedule->set_is_admitted(false);
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
           PROFILE_INFO_VAL_REJECTED);
-      if (pool_metrics != NULL) pool_metrics->local_rejected->Increment(1L);
+      if (pool_metrics != NULL) pool_metrics->local_rejected->Increment(1);
       return rejectStatus;
     }
 
@@ -339,7 +339,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   }
 
   int64_t wait_start_ms = MonotonicMillis();
-  int64_t queue_wait_timeout_ms = max(0L, FLAGS_queue_wait_timeout_ms);
+  int64_t queue_wait_timeout_ms = max<int64_t>(0, FLAGS_queue_wait_timeout_ms);
   // We just call Get() to block until the result is set or it times out. Note that we
   // don't hold the admission_ctrl_lock_ while we wait on this promise so we need to
   // check the state after acquiring the lock in order to avoid any races because it is
@@ -554,7 +554,8 @@ void AdmissionController::UpdateClusterAggregates(const string& pool_name) {
 void AdmissionController::UpdateLocalMemUsage(const string& pool_name) {
   TPoolStats* stats = &local_pool_stats_[pool_name];
   MemTracker* tracker = MemTracker::GetRequestPoolMemTracker(pool_name, NULL);
-  const int64_t current_usage = tracker == NULL ? 0L : tracker->consumption();
+  const int64_t current_usage = tracker == NULL ?
+      static_cast<int64_t>(0) : tracker->consumption();
   if (current_usage != stats->mem_usage) {
     stats->mem_usage = current_usage;
     pools_for_updates_.insert(pool_name);
@@ -638,7 +639,7 @@ void AdmissionController::DequeueLoop() {
         // TODO: Use a simple heuristic rather than a lower bound of 1 to avoid admitting
         // too many requests globally when only a single request can be admitted.
         max_to_dequeue = min(local_stats->num_queued,
-            max(1L, static_cast<int64_t>(queue_size_ratio * total_available)));
+            max<int64_t>(1, queue_size_ratio * total_available));
       } else {
         max_to_dequeue = local_stats->num_queued; // No limit on num running requests
       }
@@ -689,41 +690,41 @@ AdmissionController::GetPoolMetrics(const string& pool_name) {
   if (it != pool_metrics_map_.end()) return &it->second;
 
   PoolMetrics* pool_metrics = &pool_metrics_map_[pool_name];
-  pool_metrics->local_admitted = metrics_->AddCounter(
-      LOCAL_ADMITTED_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_queued = metrics_->AddCounter(
-      LOCAL_QUEUED_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_dequeued = metrics_->AddCounter(
-      LOCAL_DEQUEUED_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_rejected = metrics_->AddCounter(
-      LOCAL_REJECTED_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_timed_out = metrics_->AddCounter(
-      LOCAL_TIMED_OUT_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_completed = metrics_->AddCounter(
-      LOCAL_COMPLETED_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_time_in_queue_ms = metrics_->AddCounter(
-      LOCAL_TIME_IN_QUEUE_METRIC_KEY_FORMAT, 0L, pool_name);
+  pool_metrics->local_admitted = metrics_->AddCounter<int64_t>(
+      LOCAL_ADMITTED_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_queued = metrics_->AddCounter<int64_t>(
+      LOCAL_QUEUED_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_dequeued = metrics_->AddCounter<int64_t>(
+      LOCAL_DEQUEUED_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_rejected = metrics_->AddCounter<int64_t>(
+      LOCAL_REJECTED_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_timed_out = metrics_->AddCounter<int64_t>(
+      LOCAL_TIMED_OUT_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_completed = metrics_->AddCounter<int64_t>(
+      LOCAL_COMPLETED_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_time_in_queue_ms = metrics_->AddCounter<int64_t>(
+      LOCAL_TIME_IN_QUEUE_METRIC_KEY_FORMAT, 0, pool_name);
 
-  pool_metrics->cluster_num_running = metrics_->AddGauge(
-      CLUSTER_NUM_RUNNING_METRIC_KEY_FORMAT, 0L, pool_name);
+  pool_metrics->cluster_num_running = metrics_->AddGauge<int64_t>(
+      CLUSTER_NUM_RUNNING_METRIC_KEY_FORMAT, 0, pool_name);
 
-  pool_metrics->cluster_in_queue = metrics_->AddGauge(
-      CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->cluster_mem_usage = metrics_->AddGauge(
-      CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->cluster_mem_estimate = metrics_->AddGauge(
-      CLUSTER_MEM_ESTIMATE_METRIC_KEY_FORMAT, 0L, pool_name);
+  pool_metrics->cluster_in_queue = metrics_->AddGauge<int64_t>(
+      CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->cluster_mem_usage = metrics_->AddGauge<int64_t>(
+      CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->cluster_mem_estimate = metrics_->AddGauge<int64_t>(
+      CLUSTER_MEM_ESTIMATE_METRIC_KEY_FORMAT, 0, pool_name);
 
-  pool_metrics->local_num_running = metrics_->AddGauge(
-      LOCAL_NUM_RUNNING_METRIC_KEY_FORMAT, 0L, pool_name);
+  pool_metrics->local_num_running = metrics_->AddGauge<int64_t>(
+      LOCAL_NUM_RUNNING_METRIC_KEY_FORMAT, 0, pool_name);
 
-  pool_metrics->local_in_queue = metrics_->AddGauge(
-      LOCAL_IN_QUEUE_METRIC_KEY_FORMAT, 0L, pool_name);
+  pool_metrics->local_in_queue = metrics_->AddGauge<int64_t>(
+      LOCAL_IN_QUEUE_METRIC_KEY_FORMAT, 0, pool_name);
 
-  pool_metrics->local_mem_usage = metrics_->AddGauge(
-      LOCAL_MEM_USAGE_METRIC_KEY_FORMAT, 0L, pool_name);
-  pool_metrics->local_mem_estimate = metrics_->AddGauge(
-      LOCAL_MEM_ESTIMATE_METRIC_KEY_FORMAT, 0L, pool_name);
+  pool_metrics->local_mem_usage = metrics_->AddGauge<int64_t>(
+      LOCAL_MEM_USAGE_METRIC_KEY_FORMAT, 0, pool_name);
+  pool_metrics->local_mem_estimate = metrics_->AddGauge<int64_t>(
+      LOCAL_MEM_ESTIMATE_METRIC_KEY_FORMAT, 0, pool_name);
   return pool_metrics;
 }
 }

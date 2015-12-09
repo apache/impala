@@ -70,7 +70,7 @@ class MetricsTest : public testing::Test {
 TEST_F(MetricsTest, CounterMetrics) {
   MetricGroup metrics("CounterMetrics");
   AddMetricDef("counter", TMetricKind::COUNTER, TUnit::UNIT);
-  IntCounter* int_counter = metrics.AddCounter("counter", 0L);
+  IntCounter* int_counter = metrics.AddCounter<int64_t>("counter", 0);
   AssertValue(int_counter, 0, "0");
   int_counter->Increment(1);
   AssertValue(int_counter, 1, "1");
@@ -81,14 +81,14 @@ TEST_F(MetricsTest, CounterMetrics) {
 
   AddMetricDef("counter_with_units", TMetricKind::COUNTER, TUnit::BYTES);
   IntCounter* int_counter_with_units =
-      metrics.AddCounter("counter_with_units", 10L);
+      metrics.AddCounter<int64_t>("counter_with_units", 10);
   AssertValue(int_counter_with_units, 10, "10.00 B");
 }
 
 TEST_F(MetricsTest, GaugeMetrics) {
   MetricGroup metrics("GaugeMetrics");
   AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
-  IntGauge* int_gauge = metrics.AddGauge("gauge", 0L);
+  IntGauge* int_gauge = metrics.AddGauge<int64_t>("gauge", 0);
   AssertValue(int_gauge, 0, "0");
   int_gauge->Increment(-1);
   AssertValue(int_gauge, -1, "-1");
@@ -99,7 +99,7 @@ TEST_F(MetricsTest, GaugeMetrics) {
 
   AddMetricDef("gauge_with_units", TMetricKind::GAUGE, TUnit::TIME_S);
   IntGauge* int_gauge_with_units =
-      metrics.AddGauge("gauge_with_units", 10L);
+      metrics.AddGauge<int64_t>("gauge_with_units", 10);
   AssertValue(int_gauge_with_units, 10, "10s000ms");
 }
 
@@ -250,7 +250,7 @@ void AssertJson(const Value& val, const string& name, const string& value,
 TEST_F(MetricsTest, CountersJson) {
   MetricGroup metrics("CounterMetrics");
   AddMetricDef("counter", TMetricKind::COUNTER, TUnit::UNIT, "description");
-  metrics.AddCounter("counter", 0L);
+  metrics.AddCounter<int64_t>("counter", 0);
   Document document;
   Value val;
   metrics.ToJson(true, &document, &val);
@@ -262,7 +262,7 @@ TEST_F(MetricsTest, CountersJson) {
 TEST_F(MetricsTest, GaugesJson) {
   MetricGroup metrics("GaugeMetrics");
   AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
-  metrics.AddGauge("gauge", 10L);
+  metrics.AddGauge<int64_t>("gauge", 10);
   Document document;
   Value val;
   metrics.ToJson(true, &document, &val);

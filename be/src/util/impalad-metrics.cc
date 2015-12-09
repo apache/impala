@@ -154,76 +154,76 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   IMPALA_SERVER_READY = m->AddProperty<bool>(
       ImpaladMetricKeys::IMPALA_SERVER_READY, false);
 
-  IMPALA_SERVER_NUM_QUERIES = m->AddCounter(
-      ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0L);
-  NUM_QUERIES_EXPIRED = m->AddCounter(
-      ImpaladMetricKeys::NUM_QUERIES_EXPIRED, 0L);
-  NUM_QUERIES_SPILLED = m->AddCounter(
-      ImpaladMetricKeys::NUM_QUERIES_SPILLED, 0L);
-  IMPALA_SERVER_NUM_FRAGMENTS = m->AddCounter(
-      ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0L);
+  IMPALA_SERVER_NUM_QUERIES = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0);
+  NUM_QUERIES_EXPIRED = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::NUM_QUERIES_EXPIRED, 0);
+  NUM_QUERIES_SPILLED = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::NUM_QUERIES_SPILLED, 0);
+  IMPALA_SERVER_NUM_FRAGMENTS = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0);
   IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0L);
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0);
   IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS, 0L);
-  NUM_SESSIONS_EXPIRED = m->AddCounter(
-      ImpaladMetricKeys::NUM_SESSIONS_EXPIRED, 0L);
-  RESULTSET_CACHE_TOTAL_NUM_ROWS = m->AddGauge(
-      ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS, 0L);
-  RESULTSET_CACHE_TOTAL_BYTES = m->AddGauge(
-      ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES, 0L);
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS, 0);
+  NUM_SESSIONS_EXPIRED = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::NUM_SESSIONS_EXPIRED, 0);
+  RESULTSET_CACHE_TOTAL_NUM_ROWS = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS, 0);
+  RESULTSET_CACHE_TOTAL_BYTES = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES, 0);
 
   // Initialize scan node metrics
-  NUM_RANGES_PROCESSED = m->AddCounter(
-      ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED, 0L);
-  NUM_RANGES_MISSING_VOLUME_ID = m->AddCounter(
-      ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0L);
+  NUM_RANGES_PROCESSED = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED, 0);
+  NUM_RANGES_MISSING_VOLUME_ID = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0);
 
   // Initialize memory usage metrics
   MEM_POOL_TOTAL_BYTES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L);
-  HASH_TABLE_TOTAL_BYTES = m->AddGauge(
-      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L);
+      ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0);
+  HASH_TABLE_TOTAL_BYTES = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0);
 
   // Initialize insert metrics
   NUM_FILES_OPEN_FOR_INSERT = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT, 0L);
+      ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT, 0);
 
   // Initialize IO mgr metrics
   IO_MGR_NUM_OPEN_FILES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0L);
-  IO_MGR_NUM_BUFFERS = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0L);
-  IO_MGR_TOTAL_BYTES = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0L);
+      ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0);
+  IO_MGR_NUM_BUFFERS = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0);
+  IO_MGR_TOTAL_BYTES = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0);
   IO_MGR_NUM_UNUSED_BUFFERS = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0L);
+      ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0);
   IO_MGR_NUM_CACHED_FILE_HANDLES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES, 0L);
+      ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES, 0);
   IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING, 0L);
+      ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING, 0);
 
   IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT, 0L);
+      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT, 0);
 
   IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0L);
+      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0);
 
-  IO_MGR_BYTES_READ = m->AddCounter(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0L);
-  IO_MGR_LOCAL_BYTES_READ = m->AddCounter(
-      ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0L);
+  IO_MGR_BYTES_READ = m->AddCounter<int64_t>(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0);
+  IO_MGR_LOCAL_BYTES_READ = m->AddCounter<int64_t>(
+      ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0);
   IO_MGR_CACHED_BYTES_READ = m->AddCounter<int64_t>(
-      ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0L);
+      ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0);
   IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddCounter<int64_t>(
-      ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L);
+      ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0);
   IO_MGR_BYTES_WRITTEN = m->AddCounter<int64_t>(
-      ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L);
+      ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0);
 
   IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
       StatsMetric<uint64_t, StatsType::MEAN>::CreateAndRegister(m,
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO);
 
   // Initialize catalog metrics
-  CATALOG_NUM_DBS = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_DBS, 0L);
-  CATALOG_NUM_TABLES = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
+  CATALOG_NUM_DBS = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_DBS, 0);
+  CATALOG_NUM_TABLES = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
   CATALOG_READY = m->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
 
   // Maximum duration to be tracked by the query durations metric. No particular reasoning

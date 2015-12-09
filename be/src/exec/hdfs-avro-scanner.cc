@@ -483,7 +483,7 @@ Status HdfsAvroScanner::ProcessRange() {
       Tuple* tuple;
       TupleRow* tuple_row;
       int max_tuples = GetMemory(&pool, &tuple, &tuple_row);
-      max_tuples = min(num_records, static_cast<int64_t>(max_tuples));
+      max_tuples = min<int64_t>(num_records, max_tuples);
       int num_to_commit;
       if (scan_node_->materialized_slots().empty()) {
         // No slots to materialize (e.g. count(*)), no need to decode data

@@ -282,7 +282,7 @@ int64_t BlockingJoinNode::LocalTimeCounterFn(const RuntimeProfile::Counter* tota
   // If the child time counter is updated before the parent time counter, then the child
   // time will be greater. Stop watch is not thread safe, which can return invalid value.
   // Don't return a negative number in those cases.
-  return ::max(0L, local_time);
+  return ::max<int64_t>(0, local_time);
 }
 
 // This function is replaced by codegen

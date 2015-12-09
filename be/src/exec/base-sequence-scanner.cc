@@ -46,7 +46,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   for (int i = 0; i < files.size(); ++i) {
     ScanRangeMetadata* metadata =
         reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
-    int64_t header_size = min(static_cast<int64_t>(HEADER_SIZE), files[i]->file_length);
+    int64_t header_size = min<int64_t>(HEADER_SIZE, files[i]->file_length);
     // The header is almost always a remote read. Set the disk id to -1 and indicate
     // it is not cached.
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
@@ -234,7 +234,7 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
     // then we read these bytes plus the first sync_size - 1 bytes of the next buffer.
     // This guarantees that we find any syncs that start in the current buffer and end in
     // the next buffer.
-    int64_t to_skip = max(static_cast<int64_t>(0), buffer_len - (sync_size - 1));
+    int64_t to_skip = max<int64_t>(0, buffer_len - (sync_size - 1));
     RETURN_IF_FALSE(stream_->SkipBytes(to_skip, &parse_status_));
     // Peek so we don't advance stream_ into the next buffer. If we don't find a sync here
     // then we'll need to check all of the next buffer, including the first sync_size -1

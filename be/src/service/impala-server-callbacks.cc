@@ -292,7 +292,8 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
     in_flight_queries.PushBack(record_json, document->GetAllocator());
   }
   document->AddMember("in_flight_queries", in_flight_queries, document->GetAllocator());
-  document->AddMember("num_in_flight_queries", sorted_query_records.size(),
+  document->AddMember("num_in_flight_queries",
+      static_cast<uint64_t>(sorted_query_records.size()),
       document->GetAllocator());
 
   Value completed_queries(kArrayType);
@@ -316,7 +317,7 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
       Value location_name(lexical_cast<string>(location.first).c_str(),
           document->GetAllocator());
       location_json.AddMember("location", location_name, document->GetAllocator());
-      location_json.AddMember("count", location.second.size(),
+      location_json.AddMember("count", static_cast<uint64_t>(location.second.size()),
           document->GetAllocator());
       query_locations.PushBack(location_json, document->GetAllocator());
     }
@@ -336,7 +337,8 @@ void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     session_json.AddMember("type", type, document->GetAllocator());
 
-    session_json.AddMember("inflight_queries", state->inflight_queries.size(),
+    session_json.AddMember("inflight_queries",
+        static_cast<uint64_t>(state->inflight_queries.size()),
         document->GetAllocator());
     session_json.AddMember("total_queries", state->total_queries,
         document->GetAllocator());
@@ -374,7 +376,8 @@ void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
   }
 
   document->AddMember("sessions", sessions, document->GetAllocator());
-  document->AddMember("num_sessions", session_state_map_.size(), document->GetAllocator());
+  document->AddMember("num_sessions", static_cast<uint64_t>(session_state_map_.size()),
+      document->GetAllocator());
 }
 
 void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
@@ -478,7 +481,8 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
       max_time = ::max(max_time, stat.latency_ns);
     }
     value->AddMember("output_card", cardinality, document->GetAllocator());
-    value->AddMember("num_instances", summary->second.exec_stats.size(),
+    value->AddMember("num_instances",
+        static_cast<uint64_t>(summary->second.exec_stats.size()),
         document->GetAllocator());
     if (summary->second.is_broadcast) {
       value->AddMember("is_broadcast", true, document->GetAllocator());

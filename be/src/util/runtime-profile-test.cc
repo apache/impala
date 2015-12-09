@@ -55,7 +55,7 @@ TEST(CountersTest, Basic) {
   counter_a->Add(10);
   counter_a->Add(-5);
   EXPECT_EQ(counter_a->value(), 5);
-  counter_a->Set(1L);
+  counter_a->Set(1);
   EXPECT_EQ(counter_a->value(), 1);
 
   counter_b = profile_a2.AddCounter("B", TUnit::BYTES);
@@ -79,7 +79,7 @@ TEST(CountersTest, Basic) {
   EXPECT_EQ(counter_merged->value(), 1);
 
   counter_a = profile_a2.AddCounter("A", TUnit::UNIT);
-  counter_a->Set(3L);
+  counter_a->Set(3);
   averaged_profile.UpdateAverage(&profile_a2);
   EXPECT_EQ(counter_merged->value(), 2);
 
@@ -236,9 +236,9 @@ TEST(CountersTest, DerivedCounters) {
       profile.AddDerivedCounter("throughput", TUnit::BYTES,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
 
-  bytes_counter->Set(10L);
+  bytes_counter->Set(10);
   EXPECT_EQ(throughput_counter->value(), 10);
-  bytes_counter->Set(20L);
+  bytes_counter->Set(20);
   EXPECT_EQ(throughput_counter->value(), 20);
   ticks_counter->Set(ticks_counter->value() / 2);
   EXPECT_EQ(throughput_counter->value(), 40);
@@ -252,23 +252,23 @@ TEST(CountersTest, AverageSetCounters) {
   RuntimeProfile::Counter* bytes_2_counter =
       profile.AddCounter("bytes 2", TUnit::BYTES);
 
-  bytes_1_counter->Set(10L);
+  bytes_1_counter->Set(10);
   RuntimeProfile::AveragedCounter bytes_avg(TUnit::BYTES);
   bytes_avg.UpdateCounter(bytes_1_counter);
   // Avg of 10L
-  EXPECT_EQ(bytes_avg.value(), 10L);
+  EXPECT_EQ(bytes_avg.value(), 10);
   bytes_1_counter->Set(20L);
   bytes_avg.UpdateCounter(bytes_1_counter);
   // Avg of 20L
-  EXPECT_EQ(bytes_avg.value(), 20L);
+  EXPECT_EQ(bytes_avg.value(), 20);
   bytes_2_counter->Set(40L);
   bytes_avg.UpdateCounter(bytes_2_counter);
   // Avg of 20L and 40L
-  EXPECT_EQ(bytes_avg.value(), 30L);
+  EXPECT_EQ(bytes_avg.value(), 30);
   bytes_2_counter->Set(30L);
   bytes_avg.UpdateCounter(bytes_2_counter);
   // Avg of 20L and 30L
-  EXPECT_EQ(bytes_avg.value(), 25L);
+  EXPECT_EQ(bytes_avg.value(), 25);
 
   RuntimeProfile::Counter* double_1_counter =
       profile.AddCounter("double 1", TUnit::DOUBLE_VALUE);
@@ -379,7 +379,7 @@ TEST(CountersTest, BucketCounters) {
       profile.AddCounter("unit", TUnit::UNIT);
 
   // Set the unit to 1 before sampling
-  unit_counter->Set(1L);
+  unit_counter->Set(1);
 
   // Create the bucket counters and start sampling
   vector<RuntimeProfile::Counter*> buckets;

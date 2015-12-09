@@ -162,7 +162,8 @@ class StatsMetric : public Metric {
     container.AddMember("units", units, document->GetAllocator());
 
     if (StatsSelection & StatsType::COUNT) {
-      container.AddMember("count", boost::accumulators::count(acc_),
+      container.AddMember("count",
+          static_cast<uint64_t>(boost::accumulators::count(acc_)),
           document->GetAllocator());
     }
 
@@ -170,7 +171,8 @@ class StatsMetric : public Metric {
       container.AddMember("last", value_, document->GetAllocator());
 
       if (StatsSelection & StatsType::MIN) {
-        container.AddMember("min", boost::accumulators::min(acc_),
+        container.AddMember("min",
+            static_cast<uint64_t>(boost::accumulators::min(acc_)),
             document->GetAllocator());
       }
 

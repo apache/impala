@@ -158,7 +158,7 @@ Status QueryResourceMgr::RequestMemExpansion(int64_t requested_bytes,
   DCHECK(allocated_bytes != NULL);
   *allocated_bytes = 0;
   int64_t requested_mb = BitUtil::Ceil(requested_bytes, 1024L * 1024L);
-  llama::TResource res = CreateResource(max(1L, requested_mb), 0);
+  llama::TResource res = CreateResource(max<int64_t>(1, requested_mb), 0);
   llama::TUniqueId expansion_id;
   llama::TAllocatedResource resource;
   RETURN_IF_ERROR(ExecEnv::GetInstance()->resource_broker()->Expand(reservation_id_,

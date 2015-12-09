@@ -201,8 +201,8 @@ Status SimpleScheduler::Init() {
     }
   }
   if (metrics_ != NULL) {
-    total_assignments_ = metrics_->AddCounter(ASSIGNMENTS_KEY, 0L);
-    total_local_assignments_ = metrics_->AddCounter(LOCAL_ASSIGNMENTS_KEY, 0L);
+    total_assignments_ = metrics_->AddCounter<int64_t>(ASSIGNMENTS_KEY, 0);
+    total_local_assignments_ = metrics_->AddCounter<int64_t>(LOCAL_ASSIGNMENTS_KEY, 0);
     initialised_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
     num_backends_metric_ = metrics_->AddGauge<int64_t>(
         NUM_BACKENDS_KEY, backend_map_.size());
@@ -413,7 +413,7 @@ Status SimpleScheduler::GetBackend(const TNetworkAddress& data_location,
   if (metrics_ != NULL) {
     total_assignments_->Increment(1);
     if (local_assignment) {
-      total_local_assignments_->Increment(1L);
+      total_local_assignments_->Increment(1);
     }
   }
 
@@ -858,7 +858,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   schedule->set_request_pool(pool);
   // Statestore topic may not have been updated yet if this is soon after startup, but
   // there is always at least this backend.
-  schedule->set_num_hosts(max(num_backends_metric_->value(), 1L));
+  schedule->set_num_hosts(max<int64_t>(num_backends_metric_->value(), 1));
 
   if (!FLAGS_disable_admission_control) {
     RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
