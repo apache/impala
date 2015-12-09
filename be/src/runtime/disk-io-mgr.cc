@@ -1110,20 +1110,8 @@ void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
 }
 
 Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
-  // First ensure that disk space is allocated via fallocate().
-  int file_desc = fileno(file_handle);
-  int success = 0;
-  if (write_range->len_ > 0) {
-    success = posix_fallocate(file_desc, write_range->offset(), write_range->len_);
-  }
-  if (success != 0) {
-    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
-        Substitute("posix_fallocate($0, $1, $2) failed for file $3"
-            " with returnval=$4 description=$5", file_desc, write_range->offset(),
-            write_range->len_, write_range->file_, success, GetStrErrMsg())));
-  }
   // Seek to the correct offset and perform the write.
-  success = fseek(file_handle, write_range->offset(), SEEK_SET);
+  int success = fseek(file_handle, write_range->offset(), SEEK_SET);
   if (success != 0) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("fseek($0, $1, SEEK_SET) failed with errno=$2 description=$3",
