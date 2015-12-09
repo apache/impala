@@ -56,6 +56,9 @@
 #include "common/names.h"
 
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
+DEFINE_bool(suppress_unknown_disk_id_warnings, false,
+    "Suppress unknown disk id warnings generated when the HDFS implementation does not"
+    " provide volume/disk information.");
 DECLARE_string(cgroup_hierarchy_path);
 DECLARE_bool(enable_rm);
 
@@ -445,7 +448,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     bool expected_local = (*scan_range_params_)[i].__isset.is_remote &&
         !(*scan_range_params_)[i].is_remote;
     if (expected_local && (*scan_range_params_)[i].volume_id == -1) {
-      if (!unknown_disk_id_warned_) {
+      if (!FLAGS_suppress_unknown_disk_id_warnings && !unknown_disk_id_warned_) {
         AddRuntimeExecOption("Missing Volume Id");
         runtime_state()->LogError(ErrorMsg(TErrorCode::HDFS_SCAN_NODE_UNKNOWN_DISK));
         unknown_disk_id_warned_ = true;
