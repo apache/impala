@@ -73,6 +73,9 @@ if (IMPALA_TOOLCHAIN)
   set_dep_root(SNAPPY)
   set_dep_root(THRIFT)
   set_dep_root(ZLIB)
+  if (APPLE)
+    set_dep_root(OPENSSL)
+  endif()
 endif ()
 
 # find libraries that will be statically linked if they were compiled with -fPIC
@@ -278,3 +281,5 @@ add_custom_target(loadtestdata
 add_custom_target(benchmark_run
   COMMAND ${CMAKE_SOURCE_DIR}/be/bin/run_hive_benchmark.py
 )
+
+SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
