@@ -407,7 +407,7 @@ DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
   bool is_nan = false;
   bool overflow = false;
   Decimal16Value result = sum.Divide<int128_t>(sum_type, count, count_type,
-      output_desc.scale, &is_nan, &overflow);
+      output_desc.precision, output_desc.scale, &is_nan, &overflow);
   if (UNLIKELY(is_nan)) return DecimalVal::null();
   if (UNLIKELY(overflow)) {
     ctx->AddWarning("Avg computation overflowed, returning NULL");

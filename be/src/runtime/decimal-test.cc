@@ -391,120 +391,120 @@ TEST(DecimalTest, Overflow) {
 
   // Adding same sign
   overflow = false;
-  d_max.Add<int128_t>(t1, one, t1, 0, &overflow);
+  d_max.Add<int128_t>(t1, one, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  one.Add<int128_t>(t1, d_max, t1, 0, &overflow);
+  one.Add<int128_t>(t1, d_max, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  d_max.Add<int128_t>(t1, d_max, t1, 0, &overflow);
+  d_max.Add<int128_t>(t1, d_max, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  result = d_max.Add<int128_t>(t1, zero, t1, 0, &overflow);
+  result = d_max.Add<int128_t>(t1, zero, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Subtracting same sign
   overflow = false;
-  result = d_max.Subtract<int128_t>(t1, one, t1, 0, &overflow);
+  result = d_max.Subtract<int128_t>(t1, one, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
 
   overflow = false;
   EXPECT_TRUE(result.value() == d_max.value() - 1);
-  result = one.Subtract<int128_t>(t1, d_max, t1, 0, &overflow);
+  result = one.Subtract<int128_t>(t1, d_max, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
 
   overflow = false;
   EXPECT_TRUE(result.value() == -(d_max.value() - 1));
-  result = d_max.Subtract<int128_t>(t1, d_max, t1, 0, &overflow);
+  result = d_max.Subtract<int128_t>(t1, d_max, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
 
   overflow = false;
   EXPECT_TRUE(result.value() == 0);
-  result = d_max.Subtract<int128_t>(t1, zero, t1, 0, &overflow);
+  result = d_max.Subtract<int128_t>(t1, zero, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Adding different sign
   overflow = false;
-  result = d_max.Add<int128_t>(t1, -one, t1, 0, &overflow);
+  result = d_max.Add<int128_t>(t1, -one, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value() - 1);
 
   overflow = false;
-  result = one.Add<int128_t>(t1, -d_max, t1, 0, &overflow);
+  result = one.Add<int128_t>(t1, -d_max, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == -(d_max.value() - 1));
 
   overflow = false;
-  result = d_max.Add<int128_t>(t1, -d_max, t1, 0, &overflow);
+  result = d_max.Add<int128_t>(t1, -d_max, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
 
   overflow = false;
-  result = d_max.Add<int128_t>(t1, -zero, t1, 0, &overflow);
+  result = d_max.Add<int128_t>(t1, -zero, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Subtracting different sign
   overflow = false;
-  d_max.Subtract<int128_t>(t1, -one, t1, 0, &overflow);
+  d_max.Subtract<int128_t>(t1, -one, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
-  one.Subtract<int128_t>(t1, -d_max, t1, 0, &overflow);
-  EXPECT_TRUE(overflow);
-
-  overflow = false;
-  d_max.Subtract<int128_t>(t1, -d_max, t1, 0, &overflow);
+  one.Subtract<int128_t>(t1, -d_max, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  result = d_max.Subtract<int128_t>(t1, -zero, t1, 0, &overflow);
+  d_max.Subtract<int128_t>(t1, -d_max, t1, 38, 0, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  result = d_max.Subtract<int128_t>(t1, -zero, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Multiply
   overflow = false;
-  result = d_max.Multiply<int128_t>(t1, one, t1, 0, &overflow);
+  result = d_max.Multiply<int128_t>(t1, one, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   overflow = false;
-  result = d_max.Multiply<int128_t>(t1, -one, t1, 0, &overflow);
+  result = d_max.Multiply<int128_t>(t1, -one, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == -d_max.value());
 
   overflow = false;
-  result = d_max.Multiply<int128_t>(t1, two, t1, 0, &overflow);
+  result = d_max.Multiply<int128_t>(t1, two, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  result = d_max.Multiply<int128_t>(t1, -two, t1, 0, &overflow);
+  result = d_max.Multiply<int128_t>(t1, -two, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  result = d_max.Multiply<int128_t>(t1, d_max, t1, 0, &overflow);
+  result = d_max.Multiply<int128_t>(t1, d_max, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  result = d_max.Multiply<int128_t>(t1, -d_max, t1, 0, &overflow);
+  result = d_max.Multiply<int128_t>(t1, -d_max, t1, 38, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   // Multiply by 0
   overflow = false;
-  result = zero.Multiply<int128_t>(t1, one, t1, 0, &overflow);
+  result = zero.Multiply<int128_t>(t1, one, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
 
   overflow = false;
-  result = one.Multiply<int128_t>(t1, zero, t1, 0, &overflow);
+  result = one.Multiply<int128_t>(t1, zero, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
 
   overflow = false;
-  result = zero.Multiply<int128_t>(t1, zero, t1, 0, &overflow);
+  result = zero.Multiply<int128_t>(t1, zero, t1, 38, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
 
@@ -512,18 +512,18 @@ TEST(DecimalTest, Overflow) {
   // digit is set.
   ColumnType t2 = ColumnType::CreateDecimalType(1, 1);
   overflow = false;
-  result = d_max.Add<int128_t>(t1, zero, t2, 1, &overflow);
+  result = d_max.Add<int128_t>(t1, zero, t2, 38, 1, &overflow);
   EXPECT_TRUE(overflow);
 
   // Add 37 9's (with scale 0)
   Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL / 10);
   overflow = false;
-  result = d3.Add<int128_t>(t1, zero, t2, 1, &overflow);
+  result = d3.Add<int128_t>(t1, zero, t2, 38, 1, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 9);
 
   overflow = false;
-  result = d3.Add<int128_t>(t1, one, t2, 1, &overflow);
+  result = d3.Add<int128_t>(t1, one, t2, 38, 1, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 8);
 
@@ -531,17 +531,17 @@ TEST(DecimalTest, Overflow) {
   overflow = false;
   bool is_nan;
   ColumnType t3 = ColumnType::CreateDecimalType(38, 20);
-  result = d3.Mod<int128_t>(t1, d3, t3, 20, &is_nan, &overflow);
+  result = d3.Mod<int128_t>(t1, d3, t3, 38, 20, &is_nan, &overflow);
   EXPECT_TRUE(overflow);
   EXPECT_FALSE(is_nan);
 
   overflow = false;
-  result = d3.Mod<int128_t>(t1, two, t1, 0, &is_nan, &overflow);
+  result = d3.Mod<int128_t>(t1, two, t1, 38, 0, &is_nan, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_FALSE(is_nan);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL % 2);
 
-  result = d3.Mod<int128_t>(t1, zero, t2, 1, &is_nan, &overflow);
+  result = d3.Mod<int128_t>(t1, zero, t2, 38, 1, &is_nan, &overflow);
   EXPECT_TRUE(is_nan);
 }
 
@@ -557,7 +557,7 @@ TEST(DecimalTest, MultiplyScaleOverflow) {
 
   // x = 0.<37 zeroes>1. y = 0.<37 zeroes>3 The result should be 0.<74 zeroes>3.
   // Since this can't be  represented, the result will truncate to 0.
-  Decimal16Value result = x.Multiply<int128_t>(max_scale, y, max_scale, 38, &overflow);
+  Decimal16Value result = x.Multiply<int128_t>(max_scale, y, max_scale, 38, 38, &overflow);
   EXPECT_TRUE(result.value() == 0);
   EXPECT_FALSE(overflow);
 
@@ -566,7 +566,7 @@ TEST(DecimalTest, MultiplyScaleOverflow) {
   // x = 0.<36 zeroes>1, y = 0.3
   // The result should be 0.<37 zeroes>11, which would require scale = 39.
   // The truncated version should 0.<37 zeroes>3.
-  result = x.Multiply<int128_t>(scale_37, y, scale_1, 38, &overflow);
+  result = x.Multiply<int128_t>(scale_37, y, scale_1, 38, 38, &overflow);
   EXPECT_TRUE(result.value() == 3);
   EXPECT_FALSE(overflow);
 }
@@ -631,17 +631,23 @@ TEST(DecimalArithmetic, Basic) {
 
   bool overflow = false;
   // TODO: what's the best way to author a bunch of tests like this?
-  VerifyFuzzyEquals(d1.Add<int64_t>(t1, d2, t2, t1_plus_2.scale, &overflow),
+  VerifyFuzzyEquals(d1.Add<int64_t>(
+      t1, d2, t2, t1_plus_2.precision, t1_plus_2.scale, &overflow),
       t1_plus_2, d1_double + d2_double, overflow);
-  VerifyFuzzyEquals(d1.Add<int64_t>(t1, d3, t2, t1_plus_2.scale, &overflow),
+  VerifyFuzzyEquals(d1.Add<int64_t>(
+      t1, d3, t2, t1_plus_2.precision, t1_plus_2.scale, &overflow),
       t1_plus_2, d1_double + d3_double, overflow);
-  VerifyFuzzyEquals(d1.Subtract<int64_t>(t1, d2, t2, t1_plus_2.scale, &overflow),
+  VerifyFuzzyEquals(d1.Subtract<int64_t>(
+      t1, d2, t2, t1_plus_2.precision, t1_plus_2.scale, &overflow),
       t1_plus_2, d1_double - d2_double, overflow);
-  VerifyFuzzyEquals(d1.Subtract<int64_t>(t1, d3, t2, t1_plus_2.scale, &overflow),
+  VerifyFuzzyEquals(d1.Subtract<int64_t>(
+      t1, d3, t2, t1_plus_2.precision, t1_plus_2.scale, &overflow),
       t1_plus_2, d1_double - d3_double, overflow);
-  VerifyFuzzyEquals(d1.Multiply<int128_t>(t1, d2, t2, t1_times_2.scale, &overflow),
+  VerifyFuzzyEquals(d1.Multiply<int128_t>(
+      t1, d2, t2, t1_times_2.precision, t1_times_2.scale, &overflow),
       t1_times_2, d1_double * d2_double, overflow);
-  VerifyFuzzyEquals(d1.Multiply<int64_t>(t1, d3, t2, t1_times_2.scale, &overflow),
+  VerifyFuzzyEquals(d1.Multiply<int64_t>(
+      t1, d3, t2, t1_times_2.precision, t1_times_2.scale, &overflow),
       t1_times_2, d1_double * d3_double, overflow);
 }
 
@@ -659,7 +665,8 @@ TEST(DecimalArithmetic, Divide) {
           ColumnType t3 = GetResultType(t1, t2, DIVIDE);
           bool is_nan = false;
           bool is_overflow = false;
-          Decimal8Value r = x.Divide<int64_t>(t1, y, t2, t3.scale, &is_nan, &is_overflow);
+          Decimal8Value r = x.Divide<int64_t>(
+              t1, y, t2, t3.precision, t3.scale, &is_nan, &is_overflow);
           double approx_x = x.ToDouble(t1);
           double approx_y = y.ToDouble(t2);
           double approx_r = r.ToDouble(t3);
@@ -681,7 +688,7 @@ TEST(DecimalArithmetic, Divide) {
   bool is_nan = false;
   bool is_overflow = false;
   Decimal8Value r = x.Divide<int64_t>(ColumnType::CreateDecimalType(10, 0),
-      Decimal4Value(0), ColumnType::CreateDecimalType(2,0), 4, &is_nan, &is_overflow);
+      Decimal4Value(0), ColumnType::CreateDecimalType(2,0), 38, 4, &is_nan, &is_overflow);
   EXPECT_TRUE(is_nan) << "Expected NaN, got: " << r;
   EXPECT_FALSE(is_overflow);
 
@@ -692,7 +699,7 @@ TEST(DecimalArithmetic, Divide) {
   Decimal16Value y2(5399450);
   is_nan = false;
   is_overflow = false;
-  x2.Divide<int128_t>(t4, y2, t4, 38, &is_nan, &is_overflow);
+  x2.Divide<int128_t>(t4, y2, t4, 38, 38, &is_nan, &is_overflow);
   EXPECT_TRUE(is_overflow);
   EXPECT_FALSE(is_nan);
 }
@@ -708,13 +715,14 @@ TEST(DecimalArithmetic, DivideLargeScales) {
   Decimal16Value y(10000);
   bool is_nan = false;
   bool is_overflow = false;
-  Decimal16Value r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan, &is_overflow);
+  Decimal16Value r =
+      x.Divide<int128_t>(t1, y, t2, t3.precision, t3.scale, &is_nan, &is_overflow);
   VerifyToString(r, t3, "31939128.06356147605500000000000000000");
   EXPECT_FALSE(is_nan);
   EXPECT_FALSE(is_overflow);
 
   y = -y;
-  r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan, &is_overflow);
+  r = x.Divide<int128_t>(t1, y, t2, t3.precision, t3.scale, &is_nan, &is_overflow);
   VerifyToString(r, t3, "-31939128.06356147605500000000000000000");
   EXPECT_FALSE(is_nan);
   EXPECT_FALSE(is_overflow);
@@ -759,9 +767,11 @@ TEST(DecimalArithmetic, RandTesting) {
     ColumnType add_t = GetResultType(t1, t2, ADD);
 
     bool overflow = false;
-    VerifyFuzzyEquals(dec1.Add<int64_t>(t1, dec2, t2, add_t.scale, &overflow),
+    VerifyFuzzyEquals(dec1.Add<int64_t>(
+        t1, dec2, t2, add_t.precision, add_t.scale, &overflow),
         add_t, t1_d + t2_d, overflow);
-    VerifyFuzzyEquals(dec1.Subtract<int64_t>(t1, dec2, t2, add_t.scale, &overflow),
+    VerifyFuzzyEquals(dec1.Subtract<int64_t>(
+        t1, dec2, t2, add_t.precision, add_t.scale, &overflow),
         add_t, t1_d - t2_d, overflow);
 #if 0
     TODO: doubles are not precise enough for this

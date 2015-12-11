@@ -577,24 +577,24 @@ BooleanVal DecimalOperators::CastToBooleanVal(
       case 4: { \
         Decimal4Value x_val = GetDecimal4Value(x, x_type, &overflow); \
         Decimal4Value y_val = GetDecimal4Value(y, y_type, &overflow); \
-        Decimal4Value result = x_val.OP_FN<int32_t>( \
-            x_type.scale, y_val, y_type.scale, return_type.scale, &overflow); \
+        Decimal4Value result = x_val.OP_FN<int32_t>(x_type.scale, y_val, y_type.scale, \
+            return_type.precision, return_type.scale, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         return DecimalVal(result.value()); \
       } \
       case 8: { \
         Decimal8Value x_val = GetDecimal8Value(x, x_type, &overflow); \
         Decimal8Value y_val = GetDecimal8Value(y, y_type, &overflow); \
-        Decimal8Value result = x_val.OP_FN<int64_t>( \
-            x_type.scale, y_val, y_type.scale, return_type.scale, &overflow); \
+        Decimal8Value result = x_val.OP_FN<int64_t>(x_type.scale, y_val, y_type.scale, \
+            return_type.precision, return_type.scale, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         return DecimalVal(result.value()); \
       } \
       case 16: { \
         Decimal16Value x_val = GetDecimal16Value(x, x_type, &overflow); \
         Decimal16Value y_val = GetDecimal16Value(y, y_type, &overflow); \
-        Decimal16Value result = x_val.OP_FN<int128_t>( \
-            x_type.scale, y_val, y_type.scale, return_type.scale, &overflow); \
+        Decimal16Value result = x_val.OP_FN<int128_t>(x_type.scale, y_val, y_type.scale, \
+            return_type.precision, return_type.scale, &overflow); \
         RETURN_IF_OVERFLOW(context, overflow); \
         return DecimalVal(result.value()); \
       } \
@@ -617,8 +617,8 @@ BooleanVal DecimalOperators::CastToBooleanVal(
       case 4: { \
         Decimal4Value x_val = GetDecimal4Value(x, x_type, &overflow); \
         Decimal4Value y_val = GetDecimal4Value(y, y_type, &overflow); \
-        Decimal4Value result = x_val.OP_FN<int32_t>( \
-            x_type.scale, y_val, y_type.scale, return_type.scale, &is_nan, &overflow); \
+        Decimal4Value result = x_val.OP_FN<int32_t>(x_type.scale, y_val, y_type.scale, \
+            return_type.precision, return_type.scale, &is_nan, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
@@ -626,8 +626,8 @@ BooleanVal DecimalOperators::CastToBooleanVal(
       case 8: { \
         Decimal8Value x_val = GetDecimal8Value(x, x_type, &overflow); \
         Decimal8Value y_val = GetDecimal8Value(y, y_type, &overflow); \
-        Decimal8Value result = x_val.OP_FN<int64_t>( \
-            x_type.scale, y_val, y_type.scale, return_type.scale, &is_nan, &overflow); \
+        Decimal8Value result = x_val.OP_FN<int64_t>(x_type.scale, y_val, y_type.scale, \
+            return_type.precision, return_type.scale, &is_nan, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
@@ -635,8 +635,8 @@ BooleanVal DecimalOperators::CastToBooleanVal(
       case 16: { \
         Decimal16Value x_val = GetDecimal16Value(x, x_type, &overflow); \
         Decimal16Value y_val = GetDecimal16Value(y, y_type, &overflow); \
-        Decimal16Value result = x_val.OP_FN<int128_t>( \
-            x_type.scale, y_val, y_type.scale, return_type.scale, &is_nan, &overflow); \
+        Decimal16Value result = x_val.OP_FN<int128_t>(x_type.scale, y_val, y_type.scale, \
+            return_type.precision, return_type.scale, &is_nan, &overflow); \
         RETURN_IF_OVERFLOW(context, overflow); \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
