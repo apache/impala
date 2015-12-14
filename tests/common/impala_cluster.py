@@ -14,20 +14,15 @@
 #
 # Basic object model of an Impala cluster (set of Impala processes).
 #
-import json
 import logging
-import os
 import psutil
 import socket
-import sys
-import urllib
 
-from collections import defaultdict
-from HTMLParser import HTMLParser
-from random import choice, shuffle
+from getpass import getuser
+from random import choice
 from tests.common.impala_service import *
 from tests.util.shell_util import exec_process_async, exec_process
-from time import sleep, time
+from time import sleep
 
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_cluster')
@@ -97,7 +92,6 @@ class ImpalaCluster(object):
     impalads = list()
     statestored = list()
     catalogd = None
-    # TODO: Consider using process_iter() here
     for pid in psutil.get_pid_list():
       try:
         process = psutil.Process(pid)
@@ -105,6 +99,13 @@ class ImpalaCluster(object):
         # A process from get_pid_list() no longer exists, continue.
         LOG.info(e)
         continue
+      try:
+        if process.username != getuser():
+          continue
+      except KeyError, e:
+        if "uid not found" in str(e):
+          continue
+        raise
       if process.name == 'impalad' and len(process.cmdline) >= 1:
         impalads.append(ImpaladProcess(process.cmdline))
       elif process.name == 'statestored' and len(process.cmdline) >= 1:
