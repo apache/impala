@@ -47,6 +47,7 @@ fi
 export USE_SYSTEM_GCC
 export IMPALA_TOOLCHAIN
 export DISABLE_IMPALA_TOOLCHAIN
+export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
 
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}

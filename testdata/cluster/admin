@@ -79,6 +79,12 @@ fi
 EASY_ACCESS_LOG_DIR="$IMPALA_HOME/cluster_logs"
 MINIKDC_INIT=${IMPALA_HOME}/testdata/bin/minikdc.sh
 
+if $IS_OSX; then
+  FIND_EXECUTABLE_FILTER="-perm +0111"
+else
+  FIND_EXECUTABLE_FILTER="-executable"
+fi
+
 #
 # Various initialization routines for a Kerberized cluster setup.  We
 # do this if either
@@ -193,8 +199,9 @@ function create_cluster {
   #
   # It is possible this hostname must also mactch the impala hostname, which will
   # never be "localhost".
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    HADOOP_HOSTNAME=$(dscacheutil -q host -a ip_address 127.0.0.1 | head -n 1 | awk '{print $2}')
+  if $IS_OSX; then
+    HADOOP_HOSTNAME=$(dscacheutil -q host -a ip_address 127.0.0.1 | head -n 1 \
+        | awk '{print $2}')
   else
     if getent hosts 127.0.0.1 1>/dev/null; then
       HADOOP_HOSTNAME=$(getent hosts 127.0.0.1 | awk '{print $2}')
@@ -339,8 +346,8 @@ function exec_init_script {
   SCRIPT_NAME="$1"
   shift
 
-  for SCRIPT in \
-      $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" -perm +0111 -type f); do
+  for SCRIPT in $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" \
+      $FIND_EXECUTABLE_FILTER -type f); do
     if "$SCRIPT" status &>/dev/null; then
       RUNNING=true
     else
@@ -364,7 +371,8 @@ function check_cluster_status {
   ROLE_COUNT=0
   NOT_RUNNING=()
   for NODE_DIR in "$NODES_DIR/$NODE_PREFIX"*; do
-    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/*" -perm +0111 -type f); do
+    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/*" $FIND_EXECUTABLE_FILTER \
+        -type f); do
       ROLE_COUNT=$((ROLE_COUNT + 1))
       if ! "$SCRIPT" status &>/dev/null; then
         NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
@@ -402,10 +410,10 @@ function delete_cluster {
 }
 
 function get_node_dir {
-  if [[ ! "$OSTYPE" == "darwin"* ]]; then
-    readlink -f "$NODES_DIR/$1"
-  else
+  if $IS_OSX; then
     greadlink -f "$NODES_DIR/$1"
+  else
+    readlink -f "$NODES_DIR/$1"
   fi
 }
 
