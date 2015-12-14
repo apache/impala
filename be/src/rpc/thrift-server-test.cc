@@ -78,7 +78,7 @@ TEST(SslTest, Connectivity) {
   // Disable SSL for this client.
   ThriftClient<StatestoreServiceClient> non_ssl_client(
       "localhost", FLAGS_state_store_port + 1, "", NULL, false);
-  EXPECT_TRUE(ssl_client.Open().ok());
+  EXPECT_TRUE(non_ssl_client.Open().ok());
   EXPECT_THROW(non_ssl_client.iface()->RegisterSubscriber(
       resp, TRegisterSubscriberRequest()), TTransportException);
 }
