@@ -459,18 +459,25 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     PlanNodeId node_id, const vector<TScanRangeLocations>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment) {
-  // If cached reads are enabled, we will always prefer cached replicas over non-cached
-  // replicas. Since it is likely that only one replica is cached, this could generate
-  // hotspots which is why this is controllable by a query option.
-  //
-  // We schedule greedily in this order:
-  // cached collocated replicas > collocated replicas > remote (cached or not) replicas.
-  // The query option to disable cached reads removes the first group.
-  bool schedule_with_caching = !query_options.disable_cached_reads;
+  // We adjust all replicas with memory distance less than base_distance to base_distance
+  // and view all replicas with equal or better distance as the same. For a full list of
+  // memory distance classes see TReplicaPreference in ImpalaInternalService.thrift.
+  TReplicaPreference::type base_distance = query_options.replica_preference;
 
-  // map from datanode host to total assigned bytes;
-  // If the data node does not have a collocated impalad, the actual assigned bytes is
-  // "total assigned - numeric_limits<int64_t>::max()".
+  // The query option to disable cached reads adjusts the memory base distance to view
+  // all replicas as disk_local or worse.
+  // TODO remove in CDH6
+  if (query_options.disable_cached_reads &&
+      base_distance == TReplicaPreference::CACHE_LOCAL) {
+    base_distance = TReplicaPreference::DISK_LOCAL;
+  }
+
+  // On otherwise equivalent disk replicas we either pick the first one, or we pick a
+  // random one. Picking random ones helps with preventing hot spots across several
+  // queries. On cached replica we will always break ties randomly.
+  bool random_non_cached_tiebreak = query_options.random_replica;
+
+  // map from datanode host to total assigned bytes.
   unordered_map<TNetworkAddress, uint64_t> assigned_bytes_per_host;
   unordered_set<TNetworkAddress> remote_hosts;
   int64_t remote_bytes = 0L;
@@ -478,60 +485,88 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   int64_t cached_bytes = 0L;
 
   BOOST_FOREACH(const TScanRangeLocations& scan_range_locations, locations) {
-    // assign this scan range to the host w/ the fewest assigned bytes
+    // Assign scans to replica with smallest memory distance.
+    TReplicaPreference::type min_distance = TReplicaPreference::REMOTE;
+    // Assign this scan range to the host w/ the fewest assigned bytes.
     uint64_t min_assigned_bytes = numeric_limits<uint64_t>::max();
     const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
     int volume_id = -1;
     bool is_cached = false;
+    bool remote_read = false;
 
-    // Separate cached replicas from non-cached replicas
-    vector<const TScanRangeLocation*> cached_locations;
-    if (schedule_with_caching) {
-      BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
-        // Adjust whether or not this replica should count as being cached based on
-        // the query option and whether it is collocated. If the DN is not collocated
-        // treat the replica as not cached (network transfer dominates anyway in this
-        // case).
+    // Equivalent replicas have the same adjusted memory distance and the same number of
+    // assigned bytes.
+    int num_equivalent_replicas = 0;
+    BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
+      TReplicaPreference::type memory_distance = TReplicaPreference::REMOTE;
+      const TNetworkAddress& replica_host = host_list[location.host_idx];
+      if (HasLocalBackend(replica_host)) {
+        // Adjust whether or not this replica should count as being cached based on the
+        // query option and whether it is collocated. If the DN is not collocated treat
+        // the replica as not cached (network transfer dominates anyway in this case).
         // TODO: measure this in a cluster setup. Are remote reads better with caching?
-        if (location.is_cached && HasLocalBackend(host_list[location.host_idx])) {
-          cached_locations.push_back(&location);
-        }
-      }
-    }
-    // If no replicas are cached find the ones based on assigned bytes
-    if (cached_locations.size() == 0) {
-      BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
-        DCHECK_LT(location.host_idx, host_list.size());
-        const TNetworkAddress& replica_host = host_list[location.host_idx];
-        // Deprioritize non-collocated datanodes by assigning a very high initial bytes
-        uint64_t initial_bytes =
-            HasLocalBackend(replica_host) ? 0L : numeric_limits<int64_t>::max();
-        uint64_t* assigned_bytes =
-            FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
-        // Update the assignment if this is a less busy host.
-        if (*assigned_bytes < min_assigned_bytes) {
-          min_assigned_bytes = *assigned_bytes;
-          data_host = &replica_host;
-          volume_id = location.volume_id;
+        if (location.is_cached) {
+          is_cached = true;
+          memory_distance = TReplicaPreference::CACHE_LOCAL;
+        } else {
           is_cached = false;
+          memory_distance = TReplicaPreference::DISK_LOCAL;
+        }
+        remote_read = false;
+      } else {
+        is_cached = false;
+        remote_read = true;
+        memory_distance = TReplicaPreference::REMOTE;
+      }
+      memory_distance = max(memory_distance, base_distance);
+
+      // Named variable is needed here for template parameter deduction to work.
+      uint64_t initial_bytes = 0L;
+      uint64_t assigned_bytes =
+          *FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
+
+      bool found_new_replica = false;
+
+      // Check if we can already accept based on memory distance.
+      if (memory_distance < min_distance) {
+        min_distance = memory_distance;
+        num_equivalent_replicas = 1;
+        found_new_replica = true;
+      } else if (memory_distance == min_distance) {
+        // Check the effective memory distance of the current replica to decide whether to
+        // treat it as cached. If the actual distance has been increased to base_distance,
+        // then cached_replica will be different from is_cached.
+        bool cached_replica = memory_distance == TReplicaPreference::CACHE_LOCAL;
+        // Load based scheduling
+        if (assigned_bytes < min_assigned_bytes) {
+          num_equivalent_replicas = 1;
+          found_new_replica = true;
+        } else if (assigned_bytes == min_assigned_bytes &&
+            (random_non_cached_tiebreak || cached_replica)) {
+          // We do reservoir sampling: assume we have k equivalent replicas and encounter
+          // another equivalent one. Then we want to select the new one with probability
+          // 1/(k+1). This is achieved by rand % k+1 == 0. Now, assume the probability for
+          // one of the other replicas to be selected had been 1/k before. It will now be
+          // 1/k * k/(k+1) = 1/(k+1). Thus we achieve the goal of picking a replica
+          // uniformly at random.
+          ++num_equivalent_replicas;
+          const int r = rand();  // make debugging easier.
+          found_new_replica = (r % num_equivalent_replicas == 0);
         }
       }
-    } else {
-      // Randomly pick a cached host based on the extracted list of cached local hosts
-      size_t rand_host = rand() % cached_locations.size();
-      const TNetworkAddress& replica_host = host_list[cached_locations[rand_host]->host_idx];
-      uint64_t initial_bytes = 0L;
-      min_assigned_bytes = *FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
-      data_host = &replica_host;
-      volume_id = cached_locations[rand_host]->volume_id;
-      is_cached = true;
-    }
+
+      if (found_new_replica) {
+        min_assigned_bytes = assigned_bytes;
+        data_host = &replica_host;
+        volume_id = location.volume_id;
+      }
+    }  // end of BOOST_FOREACH
 
     int64_t scan_range_length = 0;
     if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
       scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;
     }
-    bool remote_read = min_assigned_bytes >= numeric_limits<int64_t>::max();
+
     if (remote_read) {
       remote_bytes += scan_range_length;
       remote_hosts.insert(*data_host);
@@ -580,6 +615,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
       BOOST_FOREACH(const TNetworkAddress& remote_host, remote_hosts) {
         remote_node_log << remote_host << " ";
       }
+      VLOG_FILE << remote_node_log.str();
     }
 
     BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
@@ -865,7 +901,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
     RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
   }
   if (ExecEnv::GetInstance()->impala_server()->IsOffline()) {
-    return Status("This Impala server is offine. Please retry your query later.");
+    return Status("This Impala server is offline. Please retry your query later.");
   }
 
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));

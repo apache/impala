@@ -163,6 +163,11 @@ void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
         break;
       case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
         val << query_options.optimize_partition_key_scans;
+      case TImpalaQueryOptions::REPLICA_PREFERENCE:
+        val << query_options.replica_preference;
+        break;
+      case TImpalaQueryOptions::RANDOM_REPLICA:
+        val << query_options.random_replica;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
@@ -309,8 +314,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_reservation_request_timeout(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::DISABLE_CACHED_READS:
-        query_options->__set_disable_cached_reads(
-            iequals(value, "true") || iequals(value, "1"));
+        if (iequals(value, "true") || iequals(value, "1")) {
+          if (query_options->replica_preference == TReplicaPreference::CACHE_LOCAL ||
+              query_options->replica_preference == TReplicaPreference::CACHE_RACK) {
+            stringstream ss;
+            ss << "Conflicting settings: DISABLE_CACHED_READS = true and"
+               << " REPLICA_PREFERENCE = " << _TReplicaPreference_VALUES_TO_NAMES.at(
+                query_options->replica_preference);
+            return Status(ss.str());
+          }
+          query_options->__set_disable_cached_reads(true);
+        }
         break;
       case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
         query_options->__set_disable_outermost_topn(
@@ -346,6 +360,34 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
         query_options->__set_optimize_partition_key_scans(atoi(value.c_str()));
+      case TImpalaQueryOptions::REPLICA_PREFERENCE:
+        if (iequals(value, "cache_local") || iequals(value, "0")) {
+          if (query_options->disable_cached_reads) {
+            return Status("Conflicting settings: DISABLE_CACHED_READS = true and"
+                " REPLICA_PREFERENCE = CACHE_LOCAL");
+          }
+          query_options->__set_replica_preference(TReplicaPreference::CACHE_LOCAL);
+        } else if (iequals(value, "cache_rack") || iequals(value, "1")) {
+          if (query_options->disable_cached_reads)
+            return Status("Conflicting settings: DISABLE_CACHED_READS = true and"
+                " REPLICA_PREFERENCE = CACHE_RACK");
+          query_options->__set_replica_preference(TReplicaPreference::CACHE_RACK);
+        } else if (iequals(value, "disk_local") || iequals(value, "2")) {
+          query_options->__set_replica_preference(TReplicaPreference::DISK_LOCAL);
+        } else if (iequals(value, "disk_rack") || iequals(value, "3")) {
+          query_options->__set_replica_preference(TReplicaPreference::DISK_RACK);
+        } else if (iequals(value, "remote") || iequals(value, "4")) {
+          query_options->__set_replica_preference(TReplicaPreference::REMOTE);
+        } else {
+          return Status(Substitute("Invalid replica memory distance policy '$0'. Valid"
+              " values are CACHE_LOCAL(0), CACHE_RACK(1), DISK_LOCAL(2), DISK_RACK(3),"
+              " REMOTE(4)",
+              value));
+        }
+        break;
+      case TImpalaQueryOptions::RANDOM_REPLICA:
+        query_options->__set_random_replica(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

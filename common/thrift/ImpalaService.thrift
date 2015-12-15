@@ -138,7 +138,9 @@ enum TImpalaQueryOptions {
   // a resource request to be granted by Llama/Yarn (only relevant with RM).
   RESERVATION_REQUEST_TIMEOUT,
 
-  // if true, disables cached reads
+  // if true, disables cached reads. This option has no effect if REPLICA_PREFERENCE is
+  // configured.
+  // TODO: Retire in C6
   DISABLE_CACHED_READS,
 
   // Temporary testing flag
@@ -149,27 +151,35 @@ enum TImpalaQueryOptions {
 
   // Time, in s, before a query will be timed out if it is inactive. May not exceed
   // --idle_query_timeout if that flag > 0.
-  QUERY_TIMEOUT_S
+  QUERY_TIMEOUT_S,
 
   // Test hook for spill to disk operators
   MAX_BLOCK_MGR_MEMORY,
 
   // Transforms all count(distinct) aggregations into NDV()
-  APPX_COUNT_DISTINCT
+  APPX_COUNT_DISTINCT,
 
   // If true, allows Impala to internally disable spilling for potentially
   // disastrous query plans. Impala will excercise this option if a query
   // has no plan hints, and at least one table is missing relevant stats.
-  DISABLE_UNSAFE_SPILLS
+  DISABLE_UNSAFE_SPILLS,
 
   // If the number of rows that are processed for a single query is below the
   // threshold, it will be executed on the coordinator only with codegen disabled
-  EXEC_SINGLE_NODE_ROWS_THRESHOLD
+  EXEC_SINGLE_NODE_ROWS_THRESHOLD,
 
   // If true, use the table's metadata to produce the partition columns instead of table
   // scans whenever possible. This option is opt-in by default as this optimization may
   // produce different results than the scan based approach in some edge cases.
-  OPTIMIZE_PARTITION_KEY_SCANS
+  OPTIMIZE_PARTITION_KEY_SCANS,
+
+  // Prefered memory distance of replicas. This parameter determines the pool of replicas
+  // among which scans will be scheduled in terms of the distance of the replica storage
+  // from the impalad.
+  REPLICA_PREFERENCE,
+
+  // Determines tie breaking policy when picking locations.
+  RANDOM_REPLICA,
 }
 
 // The summary of an insert.

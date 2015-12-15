@@ -16,6 +16,7 @@
 #ifndef SCHEDULING_SIMPLE_SCHEDULER_H
 #define SCHEDULING_SIMPLE_SCHEDULER_H
 
+#include <gtest/gtest_prod.h>  // for FRIEND_TEST
 #include <vector>
 #include <string>
 #include <list>
@@ -255,6 +256,9 @@ class SimpleScheduler : public Scheduler {
   /// to the given exchange in the given fragment index.
   int FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
       const TQueryExecRequest& exec_request);
+
+  FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);
+  FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomNonCached);
 };
 
 }

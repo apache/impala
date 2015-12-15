@@ -42,6 +42,15 @@ const i32 INVALID_PLAN_NODE_ID = -1
 // Constant default partition ID, must be < 0 to avoid collisions
 const i64 DEFAULT_PARTITION_ID = -1;
 
+// Preference for replica selection
+enum TReplicaPreference {
+  CACHE_LOCAL,
+  CACHE_RACK,
+  DISK_LOCAL,
+  DISK_RACK,
+  REMOTE
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions,
 // with their respective defaults
 struct TQueryOptions {
@@ -116,6 +125,18 @@ struct TQueryOptions {
   // scans whenever possible. This option is opt-in by default as this optimization may
   // produce different results than the scan based approach in some edge cases.
   32: optional bool optimize_partition_key_scans = 0
+
+  // Specify the prefered locality level of replicas during scan scheduling.
+  // Replicas with an equal or better locality will be preferred.
+  33: optional TReplicaPreference replica_preference =
+      TReplicaPreference.CACHE_LOCAL
+
+  // Configure whether scheduling of scans over multiple non-cached replicas will break
+  // ties between multiple, otherwise equivalent locations at random or deterministically.
+  // The former will pick a random replica, the latter will use the replica order from the
+  // metastore. This setting will not affect tie-breaking for cached replicas. Instead,
+  // they will always break ties randomly.
+  34: optional bool random_replica = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

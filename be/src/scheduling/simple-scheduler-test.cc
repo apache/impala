@@ -14,6 +14,9 @@
 
 #include <gtest/gtest.h>
 
+#include <set>
+#include <vector>
+
 #include <boost/scoped_ptr.hpp>
 
 #include "common/logging.h"
@@ -65,7 +68,7 @@ class SimpleSchedulerTest : public testing::Test {
   int base_port_;
   int num_backends_;
 
-  // This 2 backends: localhost and 127.0.0.0
+  // This scheduler has 2 backends: localhost and 127.0.0.0
   boost::scoped_ptr<SimpleScheduler> hostname_scheduler_;
 
   // This scheduler has 4 backends; 2 on each ipaddresses and has 4 different ports.
@@ -147,10 +150,77 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
   EXPECT_EQ(backends.at(4).address.port, 1000);
 }
 
+class SimpleAssignmentTest : public SimpleSchedulerTest {
+ protected:
+  SimpleAssignmentTest() : num_runs_(200) {
+    // This test schedules one scan over 2 locations multiple times and ensures that
+    // always the same location is picked.
+    srand(time(0));
+    // Initialize parameters for ComputeScanRangeAssignment().
+    locations_.resize(1);
+    locations_[0].locations.resize(2);
+    locations_[0].locations[0].host_idx = 0;
+    locations_[0].locations[1].host_idx = 1;
+    host_list_.resize(2);
+    host_list_[0].hostname = "127.0.0.0";
+    host_list_[0].port = 1000;
+    host_list_[1].hostname = "127.0.0.1";
+    host_list_[1].port = 1001;
+  }
+
+  // Number of times scheduling is executed.
+  const int num_runs_;
+  vector<TScanRangeLocations> locations_;
+  vector<TNetworkAddress> host_list_;
+};
+
+TEST_F(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached) {
+  TQueryOptions query_options;
+  query_options.random_replica = false;
+  query_options.replica_preference = TReplicaPreference::DISK_LOCAL;
+
+  // Compute a number of schedules and verify that only one location has been picked.
+
+  set<string> picked_hosts;
+  for (int i = 0; i < num_runs_; ++i) {
+    FragmentScanRangeAssignment assignment;
+    local_remote_scheduler_->ComputeScanRangeAssignment(
+        0, locations_, host_list_, false, query_options, &assignment);
+    ASSERT_FALSE(assignment.empty());
+    EXPECT_EQ(assignment.size(), 1U);
+    picked_hosts.insert(assignment.begin()->first.hostname);
+  }
+  EXPECT_EQ(picked_hosts.size(), 1U);
+}
+
+TEST_F(SimpleAssignmentTest, ComputeAssignmentRandomNonCached) {
+  TQueryOptions query_options;
+  query_options.random_replica = true;
+  query_options.replica_preference = TReplicaPreference::DISK_LOCAL;
+
+  // Compute a number of schedules and verify that more than one location has been picked.
+
+  // Number of times scheduling is executed. It needs to be sufficiently large to keep the
+  // chance of a false negative test result low. The probability for this is
+  // 1 / 2^(num_runs_-1): after the first run, each subsequent run independently needs to
+  // pick the same replica with probability 0.5.
+  set<string> picked_hosts;
+  for (int i = 0; i < num_runs_; ++i) {
+    FragmentScanRangeAssignment assignment;
+    local_remote_scheduler_->ComputeScanRangeAssignment(
+        0, locations_, host_list_, false, query_options, &assignment);
+    ASSERT_FALSE(assignment.empty());
+    EXPECT_EQ(assignment.size(), 1U);
+    picked_hosts.insert(assignment.begin()->first.hostname);
+  }
+  EXPECT_GT(picked_hosts.size(), 1U);
+}
+
 }
 
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
+  impala::CpuInfo::Init();
   impala::InitThreading();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
