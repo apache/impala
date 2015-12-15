@@ -23,13 +23,14 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 BUILD_TYPE=latest
 IMPALAD_ARGS=""
 BINARY_BASE_DIR=${IMPALA_HOME}/be/build
-GDB_PREFIX=""
+TOOL_PREFIX=""
 IN_PROCESS_BINARY=testutil/mini-impala-cluster
 IMPALAD_BINARY=service/impalad
 BINARY=${IMPALAD_BINARY}
 JVM_DEBUG_PORT=""
 JVM_SUSPEND="n"
 JVM_ARGS=""
+PERF_ARGS=${PERF_ARGS:-"record -F 99"}
 
 for ARG in $*
 do
@@ -51,7 +52,7 @@ do
       ;;
     -gdb)
       echo "Starting Impala under gdb..."
-      GDB_PREFIX="gdb --args"
+      TOOL_PREFIX="gdb --args"
       ;;
     -jvm_debug_port=*)
       JVM_DEBUG_PORT="${ARG#*=}"
@@ -61,6 +62,10 @@ do
       ;;
     -jvm_args=*)
       JVM_ARGS="${ARG#*=}"
+      ;;
+    -perf)
+      echo "Starting Impala with 'perf' tracing. Set \$PERF_ARGS to customize use."
+      TOOL_PREFIX="perf ${PERF_ARGS}"
       ;;
     # Pass all other options as an Impalad argument
     *)
@@ -94,4 +99,4 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
-exec ${GDB_PREFIX} ${IMPALA_CMD} ${IMPALAD_ARGS}
+exec ${TOOL_PREFIX} ${IMPALA_CMD} ${IMPALAD_ARGS}
