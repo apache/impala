@@ -254,11 +254,6 @@ class Coordinator {
   /// owned by plan root, which resides in runtime_state_'s pool
   const RowDescriptor* row_desc_;
 
-  /// map from fragment instance id to corresponding exec state stored in
-  /// backend_exec_states_
-  typedef boost::unordered_map<TUniqueId, BackendExecState*> BackendExecStateMap;
-  BackendExecStateMap backend_exec_state_map_;
-
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
 
