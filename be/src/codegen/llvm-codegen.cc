@@ -250,8 +250,8 @@ Status LlvmCodeGen::LoadImpalaIR(
       if (fn_name.find(FN_MAPPINGS[j].fn_name) != string::npos) {
         // TODO: make this a DCHECK when we resolve IMPALA-2439
         CHECK(codegen->loaded_functions_[FN_MAPPINGS[j].fn] == NULL)
-            << "Duplicate definition found for function " << FN_MAPPINGS[j].fn << ": "
-            << fn_name;
+            << "Duplicate definition found for function " << FN_MAPPINGS[j].fn_name
+            << ": " << fn_name;
         functions[i]->addFnAttr(Attribute::AlwaysInline);
         codegen->loaded_functions_[FN_MAPPINGS[j].fn] = functions[i];
         ++parsed_functions;
