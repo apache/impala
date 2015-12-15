@@ -18,7 +18,6 @@
 #include <string>
 #include <time.h>
 
-#include <boost/assign/list_of.hpp>
 #include <boost/date_time/c_local_time_adjustor.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
@@ -56,7 +55,6 @@ DECLARE_bool(disable_optimization_passes);
 DECLARE_bool(use_utc_for_unix_timestamp_conversions);
 
 namespace posix_time = boost::posix_time;
-using boost::assign::list_of;
 using boost::bad_lexical_cast;
 using boost::date_time::c_local_adjustor;
 using boost::posix_time::from_time_t;
@@ -4584,7 +4582,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     exprs.clear();
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
-    expected_offsets[t.GetByteSize()] = list_of(0);
+    expected_offsets[t.GetByteSize()] = set<int>({0});
     exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
     if (t.IsVarLenStringType()) {
       ValidateLayout(exprs, 16, 0, expected_offsets);

@@ -100,8 +100,7 @@ TEST_F(RawValueTest, HashEmptyAndNull) {
 TEST(HashUtil, IntNullSkew) {
   int num_values = 100000;
   int num_buckets = 16;
-  int buckets[num_buckets];
-  memset(buckets, 0, sizeof(buckets));
+  vector<int> buckets(num_buckets, 0);
   for (int32_t i = 0; i < num_values; ++i) {
     uint32_t hash = RawValue::GetHashValueFnv(&i, TYPE_INT, 9999);
     StringValue empty(NULL, 0);
