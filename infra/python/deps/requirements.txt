@@ -4,7 +4,10 @@
 
 allpairs == 2.0.1
 bitarray == 0.8.1  # Needed by impyla
-readline == 6.2.4.1 # Needed by cm_api on Mac
+
+# Needed by cm_api; already available as part of python on Linux.
+readline == 6.2.4.1; sys_platform == 'darwin'
+
 cm-api == 10.0.0
 Fabric == 1.10.2
 impyla == 0.11.2
