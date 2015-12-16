@@ -251,6 +251,11 @@ else
   export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}/
 fi
 
+# ASAN needs a matching version of llvm-symbolizer to symbolize stack traces.
+if [[ -n $IMPALA_TOOLCHAIN ]]; then
+  export ASAN_SYMBOLIZER_PATH=${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer
+fi
+
 export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
 export IMPALA_BUILD_THREADS=`nproc`
