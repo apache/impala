@@ -650,3 +650,25 @@ having a.bool_col is null and a.int_col is not null
    partitions=24/24 files=24 size=478.45KB
    predicates: a.int_col IS NOT NULL
 ====
+# IMPALA-2765: Predicate assignment when outer joins have case expressions as predicates
+select *
+from functional.alltypes a
+left outer join functional.alltypes b
+  on (a.id = b.id)
+where (
+  case when a.id > 100 then
+    a.timestamp_col
+  else
+    a.timestamp_col
+  end) >= cast('2001-01-01 00:00:00' as timestamp);
+---- PLAN
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: b.id = a.id
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: (CASE WHEN a.id > 100 THEN a.timestamp_col ELSE a.timestamp_col END) >= CAST('2001-01-01 00:00:00' AS TIMESTAMP)
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+====

@@ -145,25 +145,11 @@ public class TupleIsNullPredicate extends Predicate {
     // then it must definitely be wrapped again at this level.
     // Do not try to execute expr because a TupleIsNullPredicate is not constant.
     if (expr.contains(TupleIsNullPredicate.class)) return true;
-
-    // Map for substituting SlotRefs with NullLiterals.
-    ExprSubstitutionMap nullSmap = new ExprSubstitutionMap();
-    List<SlotRef> slotRefs = Lists.newArrayList();
-    expr.collect(SlotRef.class, slotRefs);
-    for (SlotRef slotRef: slotRefs) {
-      // The rhs null literal should have the same type as the lhs SlotRef to ensure
-      // exprs resolve to the same signature after applying this smap.
-      nullSmap.put(slotRef, NullLiteral.create(slotRef.getType()));
-    }
-
-    // Replace all SlotRefs in expr with NullLiterals, and wrap the result
-    // with an IS NOT NULL predicate.
-    Expr isNotNullLiteralPred =
-        new IsNullPredicate(expr.substitute(nullSmap, analyzer, false), true);
-    Preconditions.checkState(isNotNullLiteralPred.isConstant());
+    // Wrap expr with an IS NOT NULL predicate.
+    Expr isNotNullLiteralPred = new IsNullPredicate(expr, true);
     // analyze to insert casts, etc.
     isNotNullLiteralPred.analyzeNoThrow(analyzer);
-    return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryCtx());
+    return analyzer.isTrueWithNullSlots(isNotNullLiteralPred);
   }
 
   @Override

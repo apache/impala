@@ -1795,20 +1795,20 @@ public class Analyzer {
    * false otherwise.
    * TODO: Can we avoid dealing with the exceptions thrown by analysis and eval?
    */
-  private boolean isTrueWithNullSlots(Expr p) {
+  public boolean isTrueWithNullSlots(Expr p) {
     // Construct predicate with all SlotRefs substituted by NullLiterals.
     List<SlotRef> slotRefs = Lists.newArrayList();
     p.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
 
-    Expr nullTuplePred = null;
     // Map for substituting SlotRefs with NullLiterals.
     ExprSubstitutionMap nullSmap = new ExprSubstitutionMap();
-    NullLiteral nullLiteral = new NullLiteral();
-    nullLiteral.analyzeNoThrow(this);
     for (SlotRef slotRef: slotRefs) {
-      nullSmap.put(slotRef.clone(), nullLiteral.clone());
+        // Preserve the original SlotRef type to ensure all substituted
+        // subexpressions in the predicate have the same return type and
+        // function signature as in the original predicate.
+        nullSmap.put(slotRef.clone(), NullLiteral.create(slotRef.getType()));
     }
-    nullTuplePred = p.substitute(nullSmap, this, false);
+    Expr nullTuplePred = p.substitute(nullSmap, this, false);
     try {
       return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
     } catch (InternalException e) {
