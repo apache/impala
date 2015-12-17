@@ -280,6 +280,13 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('transient_lastDdlTime'='1405990341')
 ====
 ---- QUERY
+SHOW CREATE VIEW functional.alltypes_view
+---- RESULTS
+CREATE VIEW functional.alltypes_view AS
+SELECT * FROM functional.alltypes
+====
+---- QUERY
+# SHOW CREATE TABLE should also work for views.
 SHOW CREATE TABLE functional.alltypes_view
 ---- RESULTS
 CREATE VIEW functional.alltypes_view AS
@@ -297,14 +304,14 @@ SELECT column_aliases_view.tinyint_col foo, column_aliases_view.id bar, column_a
 ====
 ---- QUERY
 # Test views referencing views.
-SHOW CREATE TABLE functional.view_view;
+SHOW CREATE VIEW functional.view_view;
 ---- RESULTS
 CREATE VIEW functional.view_view AS
 SELECT * FROM functional.alltypes_view
 ====
 ---- QUERY
 # Test complex views with multiple tables and Hive-style column aliases.
-SHOW CREATE TABLE functional.complex_view
+SHOW CREATE VIEW functional.complex_view
 ---- RESULTS
 CREATE VIEW functional.complex_view AS
 SELECT complex_view.`_c0` abc, complex_view.string_col xyz FROM (SELECT count(a.bigint_col), b.string_col FROM functional.alltypesagg a INNER JOIN functional.alltypestiny b ON a.id = b.id WHERE a.bigint_col < 50 GROUP BY b.string_col HAVING count(a.bigint_col) > 1 ORDER BY b.string_col ASC LIMIT 100) complex_view
@@ -317,4 +324,16 @@ FROM functional.alltypes;
 ---- RESULTS
 CREATE VIEW show_create_table_test_db.`_quote_view` AS
 SELECT `_quote_view`.tinyint_col `_foo`, `_quote_view`.`_id` bar FROM (SELECT tinyint_col, id `_id` FROM functional.alltypes) `_quote_view`
+====
+---- QUERY
+# SHOW CREATE VIEW should also work on tables.
+SHOW CREATE VIEW functional_parquet.tinytable;
+---- RESULTS
+CREATE EXTERNAL TABLE functional_parquet.tinytable (
+  a STRING,
+  b STRING
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ()
 ====

@@ -211,7 +211,7 @@ class ShowCreateTableTestCase(object):
           'name %s that is qualified with a database' % (table_type, test_file_name, name)
     self.table_name = test_db_name + '.' + name
     self.create_table_sql = self.create_table_sql.replace(name, self.table_name, 1)
-    self.show_create_table_sql = 'show create table %s' % (self.table_name)
+    self.show_create_table_sql = 'show create %s %s' % (table_type, self.table_name)
     self.drop_table_sql = "drop %s %s" % (table_type, self.table_name)
 
   def __get_table_name(self, create_table_sql, table_type):

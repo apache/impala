@@ -26,6 +26,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.analysis.ColumnDef;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TDescribeOutputStyle;
 import com.cloudera.impala.thrift.THdfsFileFormat;
@@ -297,6 +298,7 @@ nonterminal ShowFilesStmt show_files_stmt;
 nonterminal DescribeDbStmt describe_db_stmt;
 nonterminal DescribeTableStmt describe_table_stmt;
 nonterminal ShowCreateTableStmt show_create_tbl_stmt;
+nonterminal TCatalogObjectType show_create_tbl_object_type;
 nonterminal ShowCreateFunctionStmt show_create_function_stmt;
 nonterminal TDescribeOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
@@ -1726,8 +1728,15 @@ show_pattern ::=
   ;
 
 show_create_tbl_stmt ::=
-  KW_SHOW KW_CREATE KW_TABLE table_name:table
-  {: RESULT = new ShowCreateTableStmt(table); :}
+  KW_SHOW KW_CREATE show_create_tbl_object_type:object_type table_name:table
+  {: RESULT = new ShowCreateTableStmt(table, object_type); :}
+  ;
+
+show_create_tbl_object_type ::=
+  KW_TABLE
+  {: RESULT = TCatalogObjectType.TABLE; :}
+  | KW_VIEW
+  {: RESULT = TCatalogObjectType.VIEW; :}
   ;
 
 show_create_function_stmt ::=

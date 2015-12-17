@@ -18,6 +18,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
@@ -26,18 +27,24 @@ import com.google.common.base.Preconditions;
  * "CREATE TABLE ..." string that re-creates the table or the "CREATE VIEW ..."
  * string that re-creates the view as appropriate.
  *
- * Syntax: SHOW CREATE TABLE <table or view>
+ * Syntax: SHOW CREATE (TABLE|VIEW) <table or view>
  */
 public class ShowCreateTableStmt extends StatementBase {
   private TableName tableName_;
 
-  public ShowCreateTableStmt(TableName table) {
+  // The object type keyword used, e.g. TABLE or VIEW, needed to output matching SQL.
+  private TCatalogObjectType objectType_;
+
+  public ShowCreateTableStmt(TableName table, TCatalogObjectType objectType) {
     Preconditions.checkNotNull(table);
     this.tableName_ = table;
+    this.objectType_ = objectType;
   }
 
   @Override
-  public String toSql() { return "SHOW CREATE TABLE " + tableName_; }
+  public String toSql() {
+    return "SHOW CREATE " + objectType_.name() + " " + tableName_;
+  }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
