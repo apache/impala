@@ -18,7 +18,7 @@
 # as creation of the Hive metastore.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 CREATE_METASTORE=0
 : ${IMPALA_KERBERIZE=}

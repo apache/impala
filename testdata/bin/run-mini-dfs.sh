@@ -2,7 +2,7 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 if [[ $# -eq 1 && "$1" == -format ]]; then
   SHOULD_FORMAT=true

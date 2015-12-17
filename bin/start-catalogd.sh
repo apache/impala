@@ -17,7 +17,7 @@
 # -build_type parameter can be passed to determine the build type to use.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 BUILD_TYPE=debug
 CATALOGD_ARGS=""

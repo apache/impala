@@ -19,7 +19,7 @@
 # built prior to running this script.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 if [ "x${IMPALA_HOME}" == "x" ]; then
   echo "\$IMPALA_HOME must be set"

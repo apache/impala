@@ -2,7 +2,7 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 # Prepare output directory
 mkdir -p $IMPALA_TEST_CLUSTER_LOG_DIR/be_test

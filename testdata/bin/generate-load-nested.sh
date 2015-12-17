@@ -14,7 +14,7 @@
 # limitations under the License.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 SHELL_CMD=${IMPALA_HOME}/bin/impala-shell.sh
 

@@ -2,7 +2,7 @@
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 CLASSES=()
 EXTRA_SHUTDOWN_TIME_SECS=1

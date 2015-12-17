@@ -3,7 +3,7 @@
 # Runs compute table stats over a curated set of Impala test tables.
 #
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 COMPUTE_STATS_SCRIPT="${IMPALA_HOME}/tests/util/compute_table_stats.py"

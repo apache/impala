@@ -2,7 +2,7 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 # Kill HBase, then MiniLlama (which includes a MiniDfs, a Yarn RM several NMs).
 $IMPALA_HOME/testdata/bin/kill-sentry-service.sh
