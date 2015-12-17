@@ -43,7 +43,10 @@ export KUDU_CLIENT_CMAKE_MODULE=${KUDU_CLIENT_CMAKE_MODULE:-"$KUDU_CLIENT_ROOT/u
 export KUDU_BIN_HOME=${KUDU_BIN_HOME:-"$IMPALA_HOME/../kudu-bin"}
 export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
 export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
-export KUDU_JAVA_VERSION=0.1.0-SNAPSHOT
+# TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
+#       to nightly changes from Kudu. The version below is the last released version but
+#       before release this needs to be updated to the version about to be released.
+export KUDU_JAVA_VERSION=0.6.0
 
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}

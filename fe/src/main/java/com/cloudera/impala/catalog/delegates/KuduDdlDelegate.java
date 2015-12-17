@@ -32,7 +32,7 @@ import org.kududb.ColumnSchema;
 import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
 import org.kududb.Type;
-import org.kududb.client.CreateTableBuilder;
+import org.kududb.client.CreateTableOptions;
 import org.kududb.client.KuduClient;
 import org.kududb.client.PartialRow;
 
@@ -119,26 +119,26 @@ public class KuduDdlDelegate extends DdlDelegate {
       }
 
       Schema schema = new Schema(columns);
-      CreateTableBuilder ctb = new CreateTableBuilder();
+      CreateTableOptions cto = new CreateTableOptions();
 
       // Handle auto-partitioning of the Kudu table
       if (distributeParams_ != null) {
         for (TDistributeParam dP : distributeParams_) {
           if (dP.getType() == TDistributeType.HASH) {
-            ctb.addHashPartitions(dP.getBy_hash_param().getColumns(),
+            cto.addHashPartitions(dP.getBy_hash_param().getColumns(),
                 dP.getBy_hash_param().getBuckets());
           } else {
             Preconditions.checkState(dP.getType() == TDistributeType.RANGE);
-            ctb.setRangePartitionColumns(dP.getBy_range_param().getColumns());
+            cto.setRangePartitionColumns(dP.getBy_range_param().getColumns());
             for (PartialRow p : KuduUtil.parseSplits(schema, dP.getBy_range_param())) {
-              ctb.addSplitRow(p);
+              cto.addSplitRow(p);
             }
           }
         }
       }
 
       if (Strings.isNullOrEmpty(replication)) {
-        ctb.setNumReplicas(1);
+        cto.setNumReplicas(1);
       } else {
         int r = Integer.parseInt(replication);
         if (r <= 0) {
@@ -146,10 +146,10 @@ public class KuduDdlDelegate extends DdlDelegate {
               "Number of tablet replicas must be greater than zero. " +
               "Given number of replicas is: " + Integer.toString(r));
         }
-        ctb.setNumReplicas(r);
+        cto.setNumReplicas(r);
       }
 
-      client.createTable(kuduTableName, schema, ctb);
+      client.createTable(kuduTableName, schema, cto);
     } catch (ImpalaRuntimeException e) {
       throw e;
     } catch (Exception e) {
