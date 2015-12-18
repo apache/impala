@@ -212,6 +212,10 @@ export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
 : ${HADOOP_CLASSPATH=}
 export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:"${HADOOP_HOME}/share/hadoop/tools/lib/*"
+# YARN is configured to use LZO so the LZO jar needs to be in the hadoop classpath.
+export LZO_JAR_PATH="$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar"
+HADOOP_CLASSPATH+=":$LZO_JAR_PATH"
+
 export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
@@ -233,7 +237,7 @@ if [[ -z "$JDBC_DRIVER" ]]; then
   return
 fi
 export HIVE_AUX_JARS_PATH="$JDBC_DRIVER"
-export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
+export AUX_CLASSPATH="${LZO_JAR_PATH}"
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
@@ -316,7 +320,7 @@ CLASSPATH="${CLASSPATH-}"
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
-CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar:$CLASSPATH
+CLASSPATH=$LZO_JAR_PATH:$CLASSPATH
 export CLASSPATH
 
 # Setup aliases
