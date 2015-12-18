@@ -196,7 +196,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       Preconditions.checkState(table != null && table instanceof HdfsTable);
 
       HdfsTable hdfsTable = (HdfsTable) table;
-      hdfsTable.load(hdfsTable, client.getHiveClient(), msTbl);
+      hdfsTable.load(true, client.getHiveClient(), msTbl);
       insertStmt_.setTargetTable(table);
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);

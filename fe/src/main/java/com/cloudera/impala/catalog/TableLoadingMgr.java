@@ -214,11 +214,8 @@ public class TableLoadingMgr {
    * the result (a Table). If there is already a load in flight for this table name,
    * the same underlying loading task (Future) will be used, helping to prevent duplicate
    * loads of the same table.
-   * Can also be used to perform an incremental refresh of an existing table, by passing
-   * the previous Table value in previousTbl. This may speedup the loading process, but
-   * may return a stale object.
    */
-  public LoadRequest loadAsync(final TTableName tblName, final Table previousTbl)
+  public LoadRequest loadAsync(final TTableName tblName)
       throws DatabaseNotFoundException {
     final Db parentDb = catalog_.getDb(tblName.getDb_name());
     if (parentDb == null) {
@@ -229,8 +226,7 @@ public class TableLoadingMgr {
     FutureTask<Table> tableLoadTask = new FutureTask<Table>(new Callable<Table>() {
         @Override
         public Table call() throws Exception {
-          return tblLoader_.load(parentDb, tblName.table_name,
-              previousTbl);
+          return tblLoader_.load(parentDb, tblName.table_name);
         }});
 
     FutureTask<Table> existingValue = loadingTables_.putIfAbsent(tblName, tableLoadTask);

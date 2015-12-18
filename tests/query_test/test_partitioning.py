@@ -90,7 +90,7 @@ class TestPartitioning(ImpalaTestSuite):
         "functional.alltypes limit 1" % (db_name, tbl_name)])
 
     # Update the Impala metadata
-    self.execute_query("refresh " + tbl_name)
+    self.execute_query("invalidate metadata " + tbl_name)
 
     # List the partitions. Show table stats returns 1 row for each partition + 1 summary
     # row

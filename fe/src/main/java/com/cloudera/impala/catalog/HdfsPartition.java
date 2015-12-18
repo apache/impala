@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -264,8 +265,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * It's easy to add per-file metadata to FileDescriptor if this changes.
    */
   private final HdfsStorageDescriptor fileFormatDescriptor_;
-
-  private final List<FileDescriptor> fileDescriptors_;
+  private List<FileDescriptor> fileDescriptors_;
   private String location_;
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
   private boolean isDirty_ = false;
@@ -454,6 +454,12 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public List<HdfsPartition.FileDescriptor> getFileDescriptors() {
     return fileDescriptors_;
   }
+  public void setFileDescriptors(List<FileDescriptor> descriptors) {
+    fileDescriptors_ = descriptors;
+  }
+  public long getNumFileDescriptors() {
+    return fileDescriptors_ == null ? 0 : fileDescriptors_.size();
+  }
 
   public boolean hasFileDescriptors() { return !fileDescriptors_.isEmpty(); }
 
@@ -514,6 +520,10 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
   private final CachedHmsPartitionDescriptor cachedMsPartitionDescriptor_;
 
+  public CachedHmsPartitionDescriptor getCachedMsPartitionDescriptor() {
+    return cachedMsPartitionDescriptor_;
+  }
+
   /**
    * Returns a Hive-compatible partition object that may be used in calls to the
    * metastore.
@@ -546,7 +556,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
-      List<HdfsPartition.FileDescriptor> fileDescriptors, long id,
+      Collection<HdfsPartition.FileDescriptor> fileDescriptors, long id,
       String location, TAccessLevel accessLevel) {
     table_ = table;
     if (msPartition == null) {
@@ -584,7 +594,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
-      List<HdfsPartition.FileDescriptor> fileDescriptors, TAccessLevel accessLevel) {
+      Collection<HdfsPartition.FileDescriptor> fileDescriptors,
+      TAccessLevel accessLevel) {
     this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
         partitionIdCounter_.getAndIncrement(), msPartition != null ?
             msPartition.getSd().getLocation() : table.getLocation(), accessLevel);

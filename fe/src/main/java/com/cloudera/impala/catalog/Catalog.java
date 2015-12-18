@@ -386,6 +386,21 @@ public abstract class Catalog {
     return filtered;
   }
 
+  public HdfsPartition getHdfsPartition(String dbName, String tableName,
+      org.apache.hadoop.hive.metastore.api.Partition msPart) throws CatalogException {
+    List<TPartitionKeyValue> partitionSpec = Lists.newArrayList();
+    Table table = getTable(dbName, tableName);
+    if (!(table instanceof HdfsTable)) {
+      throw new PartitionNotFoundException(
+          "Not an HdfsTable: " + dbName + "." + tableName);
+    }
+    for (int i = 0; i < msPart.getValues().size(); ++i) {
+      partitionSpec.add(new TPartitionKeyValue(
+          ((HdfsTable)table).getColumns().get(i).getName(), msPart.getValues().get(i)));
+    }
+    return getHdfsPartition(table.getDb().getName(), table.getName(), partitionSpec);
+  }
+
   /**
    * Returns the HdfsPartition object for the given dbName/tableName and partition spec.
    * This will trigger a metadata load if the table metadata is not yet cached.

@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.EnumSet;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -47,15 +48,10 @@ public class TableLoader {
   /**
    * Creates the Impala representation of Hive/HBase metadata for one table.
    * Calls load() on the appropriate instance of Table subclass.
-   * cachedValue is the existing cache entry and might still contain valid info to
-   * help speed up metadata loading. cachedValue is null if there is no existing
-   * cache entry (i.e. during fresh load).
-   * The catalogVersion parameter specifies what version will be assigned
-   * to the newly loaded object.
    * Returns new instance of Table, If there were any errors loading the table metadata
    * an IncompleteTable will be returned that contains details on the error.
    */
-  public Table load(Db db, String tblName, Table cachedValue) {
+  public Table load(Db db, String tblName) {
     String fullTblName = db.getName() + "." + tblName;
     LOG.info("Loading metadata for: " + fullTblName);
     MetaStoreClient msClient = null;
@@ -81,7 +77,7 @@ public class TableLoader {
         throw new TableLoadingException(
             "Unrecognized table type for table: " + fullTblName);
       }
-      table.load(cachedValue, msClient.getHiveClient(), msTbl);
+      table.load(false, msClient.getHiveClient(), msTbl);
       table.validate();
     } catch (TableLoadingException e) {
       table = IncompleteTable.createFailedMetadataLoadTable(

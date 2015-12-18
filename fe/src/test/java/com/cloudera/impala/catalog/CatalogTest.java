@@ -10,6 +10,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -273,7 +274,7 @@ public class CatalogTest {
   public void TestPartitions() throws CatalogException {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes");
-    List<HdfsPartition> partitions = table.getPartitions();
+    Collection<HdfsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
     // and that we have one file per partition, plus the default partition

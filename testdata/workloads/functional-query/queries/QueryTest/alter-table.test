@@ -291,6 +291,12 @@ select 1 from functional.alltypes limit 1
 j=1/s=2012%2Fwithslash/: 1
 ====
 ---- QUERY
+# Refresh the table to ensure all partitions have up-to-date list of file and block
+# metadata.
+refresh t_part;
+---- RESULTS
+====
+---- QUERY
 select i, j, s from t_part
 ---- RESULTS
 1,1,'2012/withslash'

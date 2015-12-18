@@ -15,12 +15,12 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.slf4j.Logger;
@@ -39,18 +39,10 @@ import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.PrintUtils;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.google.common.base.Objects;
-import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -84,7 +76,6 @@ public class HdfsPartitionPruner {
     tbl_ = (HdfsTable)tupleDesc.getTable();
 
     // Collect all the partitioning columns from TupleDescriptor.
-    List<SlotId> partitionSlots = Lists.newArrayList();
     for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
       if (slotDesc.getColumn() == null) continue;
       if (slotDesc.getColumn().getPosition() < tbl_.getNumClusteringCols()) {
@@ -154,7 +145,7 @@ public class HdfsPartitionPruner {
 
     // Populate the list of valid, non-empty partitions to process
     List<HdfsPartition> results = Lists.newArrayList();
-    HashMap<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
+    Map<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
     for (Long id: matchingPartitionIds) {
       HdfsPartition partition = partitionMap.get(id);
       Preconditions.checkNotNull(partition);
@@ -254,7 +245,7 @@ public class HdfsPartitionPruner {
     if (op == Operator.NOT_DISTINCT) {
       // Case: SlotRef <=> Literal
       if (literal instanceof NullLiteral) {
-        HashSet<Long> ids = tbl_.getNullPartitionIds(partitionPos);
+        Set<Long> ids = tbl_.getNullPartitionIds(partitionPos);
         if (ids != null) matchingIds.addAll(ids);
         return matchingIds;
       }
@@ -271,7 +262,7 @@ public class HdfsPartitionPruner {
       // Case: SlotRef IS DISTINCT FROM Literal
       if (literal instanceof NullLiteral) {
         matchingIds.addAll(tbl_.getPartitionIds());
-        HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
+        Set<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
         matchingIds.removeAll(nullIds);
         return matchingIds;
       } else {
@@ -284,7 +275,7 @@ public class HdfsPartitionPruner {
     if (op == Operator.NE) {
       // Case: SlotRef != Literal
       matchingIds.addAll(tbl_.getPartitionIds());
-      HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
+      Set<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
       matchingIds.removeAll(nullIds);
       HashSet<Long> ids = partitionValueMap.get(literal);
       if (ids != null) matchingIds.removeAll(ids);
@@ -363,7 +354,7 @@ public class HdfsPartitionPruner {
       if (!nullLiterals.isEmpty()) return matchingIds;
       matchingIds.addAll(tbl_.getPartitionIds());
       // Exclude partitions with null partition column values
-      HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
+      Set<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
       matchingIds.removeAll(nullIds);
     }
     // Compute the matching partition ids
@@ -393,7 +384,7 @@ public class HdfsPartitionPruner {
     SlotRef slot = nullPredicate.getBoundSlot();
     Preconditions.checkNotNull(slot);
     int partitionPos = slot.getDesc().getColumn().getPosition();
-    HashSet<Long> nullPartitionIds = tbl_.getNullPartitionIds(partitionPos);
+    Set<Long> nullPartitionIds = tbl_.getNullPartitionIds(partitionPos);
 
     if (nullPredicate.isNotNull()) {
       matchingIds.addAll(tbl_.getPartitionIds());
@@ -442,7 +433,7 @@ public class HdfsPartitionPruner {
    */
   private void evalPartitionFiltersInBe(List<HdfsPartitionFilter> filters,
       HashSet<Long> matchingPartitionIds, Analyzer analyzer) throws InternalException {
-    HashMap<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
+    Map<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
     // Set of partition ids that pass a filter
     HashSet<Long> matchingIds = Sets.newHashSet();
     // Batch of partitions

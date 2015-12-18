@@ -30,6 +30,7 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.util.TAccessLevelUtil;
@@ -196,7 +197,8 @@ public class LoadDataStmt extends StatementBase {
         }
       } else {
         // "default" partition
-        partition = hdfsTable.getPartitions().get(0);
+        partition = hdfsTable.getPartitionMap().get(
+            ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID);
         location = hdfsTable.getLocation();
         if (!hdfsTable.hasWriteAccess()) {
           throw new AnalysisException(noWriteAccessErrorMsg + hdfsTable.getLocation());

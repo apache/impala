@@ -29,6 +29,8 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -37,6 +39,7 @@ import com.cloudera.impala.thrift.TColumnDescriptor;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableStats;
+import com.cloudera.impala.util.HdfsCachingUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -57,7 +60,7 @@ public abstract class Table implements CatalogObject {
   // concurrency bugs. Currently used to serialize calls to "getTable()" due to HIVE-5457.
   private static final Object metastoreAccessLock_ = new Object();
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
-  protected final org.apache.hadoop.hive.metastore.api.Table msTable_;
+  protected org.apache.hadoop.hive.metastore.api.Table msTable_;
 
   protected final TableId id_;
   protected final Db db_;
@@ -104,10 +107,10 @@ public abstract class Table implements CatalogObject {
   public abstract TCatalogObjectType getCatalogObjectType();
 
   /**
-   * Populate members of 'this' from metastore info. Reuse metadata from oldValue if the
-   * metadata is still valid.
+   * Populate members of 'this' from metastore info. If 'reuseMetadata' is true, reuse
+   * valid existing metadata.
    */
-  public abstract void load(Table oldValue, HiveMetaStoreClient client,
+  public abstract void load(boolean reuseMetadata, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
 
   public void addColumn(Column col) {
@@ -422,6 +425,9 @@ public abstract class Table implements CatalogObject {
   public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
     return msTable_;
   }
+  public void setMetaStoreTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    msTable_ = msTbl;
+  }
 
   public int getNumClusteringCols() { return numClusteringCols_; }
   public TableId getId() { return id_; }
@@ -438,4 +444,31 @@ public abstract class Table implements CatalogObject {
 
   @Override
   public boolean isLoaded() { return true; }
+
+  /**
+   * If the table is cached, it returns a <cache pool name, replication factor> pair
+   * and adds the table cached directive ID to 'cacheDirIds'. Otherwise, it
+   * returns a <null, 0> pair.
+   */
+  public Pair<String, Short> getTableCacheInfo(List<Long> cacheDirIds) {
+    String cachePoolName = null;
+    Short cacheReplication = 0;
+    Long cacheDirId = HdfsCachingUtil.getCacheDirectiveId(msTable_.getParameters());
+    if (cacheDirId != null) {
+      try {
+        cachePoolName = HdfsCachingUtil.getCachePool(cacheDirId);
+        cacheReplication = HdfsCachingUtil.getCacheReplication(cacheDirId);
+        Preconditions.checkNotNull(cacheReplication);
+        if (numClusteringCols_ == 0) cacheDirIds.add(cacheDirId);
+      } catch (ImpalaRuntimeException e) {
+        // Catch the error so that the actual update to the catalog can progress,
+        // this resets caching for the table though
+        LOG.error(
+            String.format("Cache directive %d was not found, uncache the table %s " +
+                "to remove this message.", cacheDirId, getFullName()));
+        cacheDirId = null;
+      }
+    }
+    return new Pair<String, Short>(cachePoolName, cacheReplication);
+  }
 }

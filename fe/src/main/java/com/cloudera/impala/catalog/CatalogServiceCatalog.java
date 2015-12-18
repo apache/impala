@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,13 +70,21 @@ import com.google.common.collect.Sets;
  * is incremented and assigned to a CatalogObject whenever it is
  * added/modified/removed from the catalog. This means each CatalogObject will have a
  * unique version and assigned versions are strictly increasing.
- * Table metadata is loaded in the background by the TableLoadingMgr; tables can be
- * prioritized for loading by calling prioritizeLoad(). Background loading can also
- * be enabled for the catalog, in which case missing tables (tables that are not yet
- * loaded) are submitted to the TableLoadingMgr any table metadata is invalidated and
- * on startup.
- * Accessing a table that is not yet loaded (via getTable()), will load the table's
- * metadata on-demand, out-of-band of the table loading thread pool.
+ *
+ * Table metadata for IncompleteTables (not fully loaded tables) are loaded in the
+ * background by the TableLoadingMgr; tables can be prioritized for loading by calling
+ * prioritizeLoad(). Background loading can also be enabled for the catalog, in which
+ * case missing tables (tables that are not yet loaded) are submitted to the
+ * TableLoadingMgr any table metadata is invalidated and on startup. The metadata of
+ * fully loaded tables (e.g. HdfsTable, HBaseTable, etc) are updated in-place and don't
+ * trigger a background metadata load through the TableLoadingMgr. Accessing a table
+ * that is not yet loaded (via getTable()), will load the table's metadata on-demand,
+ * out-of-band of the table loading thread pool.
+ *
+ * See the class comments in CatalogOpExecutor for a description of the locking protocol
+ * that should be employed if both the catalog lock and table locks need to be held at
+ * the same time.
+ *
  * TODO: Consider removing on-demand loading and have everything go through the table
  * loading thread pool.
  */
@@ -89,7 +98,7 @@ public class CatalogServiceCatalog extends Catalog {
   // since catalogVersion_ cannot change externally while the lock is being held.
   // In addition to protecting catalogVersion_, it is currently used for the
   // following bulk operations:
-  // * Building a delta update to send to the statestore in getAllCatalogObjects(),
+  // * Building a delta update to send to the statestore in getCatalogObjects(),
   //   so a snapshot of the catalog can be taken without any version changes.
   // * During a catalog invalidation (call to reset()), which re-reads all dbs and tables
   //   from the metastore.
@@ -101,6 +110,9 @@ public class CatalogServiceCatalog extends Catalog {
   // with each update to the Catalog. Continued across the lifetime of the object.
   // Protected by catalogLock_.
   // TODO: Handle overflow of catalogVersion_ and nextTableId_.
+  // TODO: The name of this variable is misleading and can be interpreted as a property
+  // of the catalog server. Rename into something that indicates its role as a global
+  // sequence number assigned to catalog objects.
   private long catalogVersion_ = INITIAL_CATALOG_VERSION;
 
   protected final AtomicInteger nextTableId_ = new AtomicInteger(0);
@@ -209,15 +221,15 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Returns all known objects in the Catalog (Tables, Views, Databases, and
    * Functions). Some metadata may be skipped for objects that have a catalog
-   * version < the specified "fromVersion".
+   * version < the specified "fromVersion". Takes a lock on the catalog to ensure this
+   * update contains a consistent snapshot of all items in the catalog. While holding the
+   * catalog lock, it locks each accessed table to protect against concurrent
+   * modifications.
    */
   public TGetAllCatalogObjectsResponse getCatalogObjects(long fromVersion) {
     TGetAllCatalogObjectsResponse resp = new TGetAllCatalogObjectsResponse();
     resp.setObjects(new ArrayList<TCatalogObject>());
     resp.setMax_catalog_version(Catalog.INITIAL_CATALOG_VERSION);
-
-    // Take a lock on the catalog to ensure this update contains a consistent snapshot
-    // of all items in the catalog.
     catalogLock_.readLock().lock();
     try {
       for (Db db: getDbs(null)) {
@@ -237,19 +249,22 @@ public class CatalogServiceCatalog extends Catalog {
             continue;
           }
 
-          // Only add the extended metadata if this table's version is >=
-          // the fromVersion.
-          if (tbl.getCatalogVersion() >= fromVersion) {
-            try {
-              catalogTbl.setTable(tbl.toThrift());
-            } catch (Exception e) {
-              LOG.debug(String.format("Error calling toThrift() on table %s.%s: %s",
-                  db.getName(), tblName, e.getMessage()), e);
-              continue;
+          // Protect the table from concurrent modifications.
+          synchronized(tbl) {
+            // Only add the extended metadata if this table's version is >=
+            // the fromVersion.
+            if (tbl.getCatalogVersion() >= fromVersion) {
+              try {
+                catalogTbl.setTable(tbl.toThrift());
+              } catch (Exception e) {
+                LOG.debug(String.format("Error calling toThrift() on table %s.%s: %s",
+                    db.getName(), tblName, e.getMessage()), e);
+                continue;
+              }
+              catalogTbl.setCatalog_version(tbl.getCatalogVersion());
+            } else {
+              catalogTbl.setTable(new TTable(db.getName(), tblName));
             }
-            catalogTbl.setCatalog_version(tbl.getCatalogVersion());
-          } else {
-            catalogTbl.setTable(new TTable(db.getName(), tblName));
           }
           resp.addToObjects(catalogTbl);
         }
@@ -451,7 +466,7 @@ public class CatalogServiceCatalog extends Catalog {
       Table tbl = getTable(dbName, tblName);
       if (tbl == null || tbl.isLoaded()) return tbl;
       previousCatalogVersion = tbl.getCatalogVersion();
-      loadReq = tableLoadingMgr_.loadAsync(tableName, null);
+      loadReq = tableLoadingMgr_.loadAsync(tableName);
     } finally {
       catalogLock_.readLock().unlock();
     }
@@ -595,49 +610,74 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public Table renameTable(TTableName oldTableName, TTableName newTableName)
       throws CatalogException {
-    // Ensure the removal of the old table and addition of the new table happen
-    // atomically.
+    // Remove the old table name from the cache and add the new table.
+    Db db = getDb(oldTableName.getDb_name());
+    if (db != null) db.removeTable(oldTableName.getTable_name());
+    return addTable(newTableName.getDb_name(), newTableName.getTable_name());
+  }
+
+  /**
+   * Reloads metadata for table 'tbl'. If 'tbl' is an IncompleteTable, it makes an
+   * asynchronous request to the table loading manager to create a proper table instance
+   * and load the metadata from Hive Metastore. Otherwise, it updates table metadata
+   * in-place by calling the load() function on the specified table. Returns 'tbl', if it
+   * is a fully loaded table (e.g. HdfsTable, HBaseTable, etc). Otherwise, returns a
+   * newly constructed fully loaded table. Applies proper synchronization to protect the
+   * metadata load from concurrent table modifications and assigns a new catalog version.
+   * Throws a CatalogException if there is an error loading table metadata.
+   */
+  public Table reloadTable(Table tbl) throws CatalogException {
+    LOG.debug(String.format("Refreshing table metadata: %s", tbl.getFullName()));
+    TTableName tblName = new TTableName(tbl.getDb().getName().toLowerCase(),
+        tbl.getName().toLowerCase());
+    Db db = tbl.getDb();
+    if (tbl instanceof IncompleteTable) {
+      TableLoadingMgr.LoadRequest loadReq;
+      long previousCatalogVersion;
+      // Return the table if it is already loaded or submit a new load request.
+      catalogLock_.readLock().lock();
+      try {
+        previousCatalogVersion = tbl.getCatalogVersion();
+        loadReq = tableLoadingMgr_.loadAsync(tblName);
+      } finally {
+        catalogLock_.readLock().unlock();
+      }
+      Preconditions.checkNotNull(loadReq);
+      try {
+        // The table may have been dropped/modified while the load was in progress, so
+        // only apply the update if the existing table hasn't changed.
+        return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
+      } finally {
+        loadReq.close();
+      }
+    }
+
     catalogLock_.writeLock().lock();
-    try {
-      // Remove the old table name from the cache and add the new table.
-      Db db = getDb(oldTableName.getDb_name());
-      if (db != null) db.removeTable(oldTableName.getTable_name());
-      return addTable(newTableName.getDb_name(), newTableName.getTable_name());
-    } finally {
+    synchronized(tbl) {
+      long newCatalogVersion = incrementAndGetCatalogVersion();
       catalogLock_.writeLock().unlock();
+      MetaStoreClient msClient = getMetaStoreClient();
+      org.apache.hadoop.hive.metastore.api.Table msTbl = null;
+      try {
+        msTbl = msClient.getHiveClient().getTable(db.getName(), tblName.getTable_name());
+      } catch (Exception e) {
+        throw new TableLoadingException("Error loading metadata for table: " +
+            db.getName() + "." + tblName.getTable_name(), e);
+      }
+      tbl.load(true, msClient.getHiveClient(), msTbl);
+      tbl.setCatalogVersion(newCatalogVersion);
+      return tbl;
     }
   }
 
   /**
-   * Reloads a table's metadata, reusing any existing cached metadata to speed up
-   * the operation. Returns the updated Table object or null if no table with
-   * this name exists in the catalog.
-   * If the existing table is dropped or modified (indicated by the catalog version
-   * changing) while the reload is in progress, the loaded value will be discarded
-   * and the current cached value will be returned. This may mean that a missing table
-   * (not yet loaded table) will be returned.
+   * Reloads the metadata of a table with name 'tableName'. Returns the table or null if
+   * the table does not exist.
    */
-  public Table reloadTable(TTableName tblName) throws CatalogException {
-    LOG.debug(String.format("Refreshing table metadata: %s.%s",
-        tblName.getDb_name(), tblName.getTable_name()));
-    long previousCatalogVersion;
-    TableLoadingMgr.LoadRequest loadReq;
-    catalogLock_.readLock().lock();
-    try {
-      Table tbl = getTable(tblName.getDb_name(), tblName.getTable_name());
-      if (tbl == null) return null;
-      previousCatalogVersion = tbl.getCatalogVersion();
-      loadReq = tableLoadingMgr_.loadAsync(tblName, tbl);
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
-    Preconditions.checkNotNull(loadReq);
-
-    try {
-      return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
-    } finally {
-      loadReq.close();
-    }
+  public Table reloadTable(TTableName tableName) throws CatalogException {
+    Table table = getTable(tableName.getDb_name(), tableName.getTable_name());
+    if (table == null) return null;
+    return reloadTable(table);
   }
 
   /**
@@ -651,23 +691,14 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkNotNull(partitionSpec);
     Table tbl = getOrLoadTable(tableName.getDb(), tableName.getTbl());
     if (tbl == null) {
-      throw new TableNotFoundException("Table not found: " + tbl.getFullName());
+      throw new TableNotFoundException("Table not found: " + tableName.getTbl());
     }
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an Hdfs table");
     }
     HdfsTable hdfsTable = (HdfsTable) tbl;
-    // Locking the catalog here because this accesses hdfsTable's partition list and
-    // updates its catalog version.
-    // TODO: Fix this locking pattern.
-    catalogLock_.writeLock().lock();
-    try {
-      HdfsPartition hdfsPartition = hdfsTable.dropPartition(partitionSpec);
-      if (hdfsPartition == null) return null;
-      return replaceTableIfUnchanged(hdfsTable, hdfsTable.getCatalogVersion());
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    hdfsTable.dropPartition(partitionSpec);
+    return hdfsTable;
   }
 
   /**
@@ -678,17 +709,7 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkNotNull(partition);
     HdfsTable hdfsTable = partition.getTable();
     Db db = getDb(hdfsTable.getDb().getName());
-    // Locking the catalog here because this accesses the hdfsTable's partition list and
-    // updates its catalog version.
-    // TODO: Fix this locking pattern.
-    catalogLock_.writeLock().lock();
-    try {
-      hdfsTable.addPartition(partition);
-      hdfsTable.setCatalogVersion(incrementAndGetCatalogVersion());
-      db.addTable(hdfsTable);
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    hdfsTable.addPartition(partition);
     return hdfsTable;
   }
 
@@ -935,6 +956,8 @@ public class CatalogServiceCatalog extends Catalog {
       catalogLock_.readLock().unlock();
     }
   }
+
+  public ReentrantReadWriteLock getLock() { return catalogLock_; }
 
   /**
    * Gets the next table ID and increments the table ID counter.

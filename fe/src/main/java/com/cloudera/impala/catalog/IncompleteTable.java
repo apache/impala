@@ -67,7 +67,7 @@ public class IncompleteTable extends Table {
   }
 
   @Override
-  public void load(Table oldValue, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     if (cause_ instanceof TableLoadingException) {
       throw (TableLoadingException) cause_;

@@ -81,8 +81,10 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.client.execute("alter table %s add partition (j=2) location '%s/p'" %
         (self.TEST_TBL, impala_location))
 
-    # Insert some data.
+    # Insert some data. This will only update partition j=1 (IMPALA-1480).
     self.client.execute("insert into table %s partition(j=1) select 1" % self.TEST_TBL)
+    # Refresh to update file metadata of both partitions.
+    self.client.execute("refresh %s" % self.TEST_TBL)
 
     # The data will be read twice because each partition points to the same location.
     data = self.execute_scalar("select sum(i), sum(j) from %s" % self.TEST_TBL)
@@ -90,6 +92,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
 
     self.client.execute("insert into %s partition(j) select 1, 1" % self.TEST_TBL)
     self.client.execute("insert into %s partition(j) select 1, 2" % self.TEST_TBL)
+    self.client.execute("refresh %s" % self.TEST_TBL)
     data = self.execute_scalar("select sum(i), sum(j) from %s" % self.TEST_TBL)
     assert data.split('\t') == ['6', '9']
 

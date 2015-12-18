@@ -156,9 +156,11 @@ public class DataSourceTable extends Table {
   }
 
   @Override
-  public void load(Table oldValue, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     Preconditions.checkNotNull(msTbl);
+    msTable_ = msTbl;
+    clearColumns();
     LOG.debug("load table: " + db_.getName() + "." + name_);
     String dataSourceName = getRequiredTableProperty(msTbl, TBL_PROP_DATA_SRC_NAME, null);
     String location = getRequiredTableProperty(msTbl, TBL_PROP_LOCATION, dataSourceName);

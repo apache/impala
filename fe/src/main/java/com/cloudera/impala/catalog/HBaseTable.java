@@ -322,10 +322,11 @@ public class HBaseTable extends Table {
    * to hdfs tables since we typically need to understand all columns to make sense
    * of the file at all.
    */
-  public void load(Table oldValue, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     Preconditions.checkNotNull(getMetaStoreTable());
     try {
+      msTable_ = msTbl;
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
       // Warm up the connection and verify the table exists.
       getHBaseTable().close();

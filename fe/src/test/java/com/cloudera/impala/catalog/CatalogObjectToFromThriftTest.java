@@ -209,10 +209,15 @@ public class CatalogObjectToFromThriftTest {
 
     table = catalog_.getOrLoadTable("functional", "alltypes");
     HdfsTable hdfsTable = (HdfsTable) table;
-    // Get a partition from the table.
-    HdfsPartition part =
-        hdfsTable.getPartitions().get(hdfsTable.getPartitions().size() - 1);
-
+    // Get any partition with valid HMS parameters to create a
+    // dummy partition.
+    HdfsPartition part = null;
+    for (HdfsPartition partition: hdfsTable.getPartitions()) {
+      if (!partition.isDefaultPartition()) {
+        part = partition;
+        break;
+      }
+    }
     // Create a dummy partition with an invalid decimal type.
     try {
       HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.toHmsPartition(),
