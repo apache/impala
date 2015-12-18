@@ -217,10 +217,19 @@ grant all on uri '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_test_tbl2' to gran
 create table grant_rev_db.test_tbl2(i int) location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_test_tbl2';
 ====
 ---- QUERY
+# Running grant on a URI with upper case letters
+grant all on uri '$FILESYSTEM_PREFIX/test-warehouse/GRANT_REV_TEST_TBL3' to grant_revoke_test_ALL_URI
+====
+---- QUERY
+# Should now have privileges to create the table.
+create table grant_rev_db.test_tbl_uppercase(i int) location '$FILESYSTEM_PREFIX/test-warehouse/GRANT_REV_TEST_TBL3/test';
+====
+---- QUERY
 show tables in grant_rev_db
 ---- RESULTS
 'test_tbl1'
 'test_tbl2'
+'test_tbl_uppercase'
 ---- TYPES
 STRING
 ====
@@ -228,6 +237,7 @@ STRING
 show grant role grant_revoke_test_ALL_URI
 ---- RESULTS
 'URI','','','','$NAMENODE/test-warehouse/grant_rev_test_tbl2','ALL',FALSE,regex:.+
+'URI','','','','$NAMENODE/test-warehouse/GRANT_REV_TEST_TBL3','ALL',FALSE,regex:.+
 ---- LABELS
 scope, database, table, column, uri, privilege, grant_option, create_time
 ---- TYPES

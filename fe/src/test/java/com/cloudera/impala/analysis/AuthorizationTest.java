@@ -189,6 +189,13 @@ public class AuthorizationTest {
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI,
+        false);
+    privilege.setServer_name("server1");
+    privilege.setUri("hdfs://localhost:20500/test-warehouse/UPPER_CASE");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
     // all tpch
     roleName = "all_tpch";
     sentryService.createRole(USER, roleName, true);
@@ -831,6 +838,16 @@ public class AuthorizationTest {
     // source table
     AuthzError("create table tpch_rc.new_tbl as select * from functional.alltypestiny",
         "User '%s' does not have privileges to execute 'CREATE' on: tpch_rc.new_tbl");
+
+    // Try creating an external table on a URI with upper case letters
+    AuthzOk("create external table tpch.upper_case (a int) location " +
+        "'hdfs://localhost:20500/test-warehouse/UPPER_CASE/test'");
+
+    // Try creating table on the same URI in lower case. It should fail
+    AuthzError("create external table tpch.upper_case (a int) location " +
+        "'hdfs://localhost:20500/test-warehouse/upper_case/test'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/upper_case/test");
   }
 
   @Test

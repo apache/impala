@@ -101,7 +101,7 @@ public class RolePrivilege implements CatalogObject {
         authorizable.add(KV_JOINER.join("action",
             privilege.getPrivilege_level().toString()));
       }
-      return AUTHORIZABLE_JOINER.join(authorizable).toLowerCase();
+      return AUTHORIZABLE_JOINER.join(authorizable);
     } catch (Exception e) {
       // Should never make it here unless the privilege is malformed.
       LOG.error("ERROR: ", e);

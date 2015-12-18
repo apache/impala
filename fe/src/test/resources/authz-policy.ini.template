@@ -6,7 +6,8 @@
 ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
           select_functional_alltypesagg, insert_functional_alltypes,\
           select_functional_complex_view, select_functional_view_view,\
-          insert_parquet, new_table_uri, tpch_data_uri, select_column_level_functional
+          insert_parquet, new_table_uri, tpch_data_uri, select_column_level_functional,\
+          upper_case_uri
 server_admin = all_server
 
 # The [roles] section defines privileges for objects in the authorizeable hierarchy.
@@ -50,6 +51,7 @@ select_column_level_functional =\
     server=server1->db=functional->table=allcomplextypes->column=int_map_col->action=select
 new_table_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/new_table
 tpch_data_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/tpch.lineitem
+upper_case_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/UPPER_CASE
 
 # This section allows for an admin specified mapping of users -> groups rather than using
 # the built-in hadoop group mapping. This section is only applicable if using the
