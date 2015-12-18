@@ -186,7 +186,7 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
 
     null_probe_rows_ = new BufferedTupleStream(
         state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
-        true /* use small buffers */, true /* delete on read */ );
+        true /* use_initial_small_buffers */, false /* read_write */ );
     RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
   }
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
@@ -264,11 +264,12 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
     is_spilled_(false),
     level_(level) {
   build_rows_ = new BufferedTupleStream(state, parent_->child(1)->row_desc(),
-      state->block_mgr(), parent_->block_mgr_client_);
+      state->block_mgr(), parent_->block_mgr_client_,
+      true /* use_initial_small_buffers */, false /* read_write */);
   DCHECK(build_rows_ != NULL);
   probe_rows_ = new BufferedTupleStream(state, parent_->child(0)->row_desc(),
       state->block_mgr(), parent_->block_mgr_client_,
-      true /* use_initial_small_buffers*/, true /* delete_on_read */ );
+      true /* use_initial_small_buffers */, false /* read_write */ );
   DCHECK(probe_rows_ != NULL);
 }
 
@@ -376,7 +377,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   // We got the buffers we think we will need, try to build the hash table.
   RETURN_IF_ERROR(build_rows_->PinStream(false, built));
   if (!*built) return Status::OK();
-  RETURN_IF_ERROR(build_rows_->PrepareForRead());
+  RETURN_IF_ERROR(build_rows_->PrepareForRead(false));
 
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
       parent_->mem_tracker());
@@ -594,7 +595,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   if (input_partition_ != NULL) {
     DCHECK(input_partition_->build_rows() != NULL);
     DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << NodeDebugString();
-    RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead());
+    RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead(true));
   }
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
@@ -759,7 +760,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   DCHECK(input_partition_->is_spilled());
 
   // Reserve one buffer to read the probe side.
-  RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead());
+  RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead(true));
   ht_ctx_->set_level(input_partition_->level_);
 
   int64_t mem_limit = mem_tracker()->SpareCapacity();
@@ -784,8 +785,6 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
     DCHECK(input_partition_->is_spilled());
     input_partition_->Spill(false);
     ht_ctx_->set_level(input_partition_->level_ + 1);
-    // We are copying rows into the new partitions, so we can delete blocks as we go.
-    input_partition_->build_rows()->set_delete_on_read(true);
     int64_t num_input_rows = input_partition_->build_rows()->num_rows();
     RETURN_IF_ERROR(ProcessBuildInput(state, input_partition_->level_ + 1));
 
@@ -1021,7 +1020,7 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
 
 Status PartitionedHashJoinNode::PrepareNullAwareNullProbe() {
   DCHECK_EQ(null_probe_output_idx_, -1);
-  RETURN_IF_ERROR(null_probe_rows_->PrepareForRead());
+  RETURN_IF_ERROR(null_probe_rows_->PrepareForRead(true));
   DCHECK_EQ(probe_batch_->num_rows(), 0);
   probe_batch_pos_ = 0;
   null_probe_output_idx_ = 0;
@@ -1096,7 +1095,7 @@ Status PartitionedHashJoinNode::PrepareNullAwarePartition() {
   if (!got_rows) return NullAwareAntiJoinError(true);
 
   // Initialize the streams for read.
-  RETURN_IF_ERROR(probe_stream->PrepareForRead());
+  RETURN_IF_ERROR(probe_stream->PrepareForRead(true));
   probe_batch_pos_ = 0;
   return Status::OK();
 }

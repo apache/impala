@@ -181,11 +181,10 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   DCHECK(client_ != NULL);
   DCHECK(input_stream_ == NULL);
   input_stream_ = new BufferedTupleStream(state, child(0)->row_desc(),
-      state->block_mgr(), client_,
-      false /* initial_small_buffers */,
-      true /* delete_on_read */,
+      state->block_mgr(), client_, false /* use_initial_small_buffers */,
       true /* read_write */);
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
+  RETURN_IF_ERROR(input_stream_->PrepareForRead(true));
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {

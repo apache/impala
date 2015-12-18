@@ -45,9 +45,9 @@ string BufferedTupleStream::RowIdx::DebugString() const {
 BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const RowDescriptor& row_desc, BufferedBlockMgr* block_mgr,
     BufferedBlockMgr::Client* client, bool use_initial_small_buffers,
-    bool delete_on_read, bool read_write)
+    bool read_write)
   : use_small_buffers_(use_initial_small_buffers),
-    delete_on_read_(delete_on_read),
+    delete_on_read_(false),
     read_write_(read_write),
     state_(state),
     desc_(row_desc),
@@ -134,7 +134,6 @@ Status BufferedTupleStream::Init(int node_id, RuntimeProfile* profile, bool pinn
   RETURN_IF_ERROR(NewBlockForWrite(fixed_tuple_row_size_, &got_block));
   if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_, node_id);
   DCHECK(write_block_ != NULL);
-  if (read_write_) RETURN_IF_ERROR(PrepareForRead());
   if (!pinned) RETURN_IF_ERROR(UnpinStream());
   return Status::OK();
 }
@@ -323,7 +322,7 @@ Status BufferedTupleStream::NextBlockForRead() {
   return Status::OK();
 }
 
-Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
+Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_buffer) {
   DCHECK(!closed_);
   if (blocks_.empty()) return Status::OK();
 
@@ -362,6 +361,7 @@ Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
   read_bytes_ = 0;
   rows_returned_ = 0;
   read_block_idx_ = 0;
+  delete_on_read_ = delete_on_read;
   if (got_buffer != NULL) *got_buffer = true;
   return Status::OK();
 }
@@ -445,7 +445,7 @@ int BufferedTupleStream::ComputeNumNullIndicatorBytes(int block_size) const {
 Status BufferedTupleStream::GetRows(scoped_ptr<RowBatch>* batch, bool* got_rows) {
   RETURN_IF_ERROR(PinStream(false, got_rows));
   if (!*got_rows) return Status::OK();
-  RETURN_IF_ERROR(PrepareForRead());
+  RETURN_IF_ERROR(PrepareForRead(false));
   batch->reset(
       new RowBatch(desc_, num_rows(), block_mgr_->get_tracker(block_mgr_client_)));
   bool eos = false;

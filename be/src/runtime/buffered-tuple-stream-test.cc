@@ -263,7 +263,7 @@ class SimpleTupleStreamTest : public testing::Test {
   template <typename T>
   void TestValues(int num_batches, RowDescriptor* desc, bool gen_null) {
     BufferedTupleStream stream(runtime_state_, *desc, runtime_state_->block_mgr(),
-        client_);
+        client_, true, false);
     Status status = stream.Init(-1, NULL, true);
     ASSERT_TRUE(status.ok()) << status.GetDetail();
     status = stream.UnpinStream();
@@ -299,7 +299,7 @@ class SimpleTupleStreamTest : public testing::Test {
       batch->Reset();
     }
 
-    status = stream.PrepareForRead();
+    status = stream.PrepareForRead(false);
     ASSERT_TRUE(status.ok());
 
     // Read all the rows back
@@ -316,9 +316,10 @@ class SimpleTupleStreamTest : public testing::Test {
     for (int small_buffers = 0; small_buffers < 2; ++small_buffers) {
       BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
           client_, small_buffers == 0,  // initial small buffers
-          true,  // delete_on_read
           true); // read_write
       Status status = stream.Init(-1, NULL, true);
+      ASSERT_TRUE(status.ok());
+      status = stream.PrepareForRead(true);
       ASSERT_TRUE(status.ok());
       status = stream.UnpinStream();
       ASSERT_TRUE(status.ok());
@@ -519,7 +520,7 @@ TEST_F(SimpleTupleStreamTest, UnpinPin) {
   InitBlockMgr(3 * buffer_size, buffer_size);
 
   BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
-      client_);
+      client_, true, false);
   Status status = stream.Init(-1, NULL, true);
   ASSERT_TRUE(status.ok());
 
@@ -546,16 +547,27 @@ TEST_F(SimpleTupleStreamTest, UnpinPin) {
 
   vector<int> results;
 
-  // Read and verify result a few times. We should be able to reread the stream.
-  for (int i = 0; i < 3; ++i) {
-    status = stream.PrepareForRead();
+  // Read and verify result a few times. We should be able to reread the stream if
+  // we don't use delete on read mode.
+  int read_iters = 3;
+  for (int i = 0; i < read_iters; ++i) {
+    bool delete_on_read = i == read_iters - 1;
+    status = stream.PrepareForRead(delete_on_read);
     ASSERT_TRUE(status.ok());
     results.clear();
     ReadValues(&stream, int_desc_, &results);
     VerifyResults(results, offset, false);
   }
 
+  // After delete_on_read, all blocks aside from the last should be deleted.
+  // Note: this should really be 0, but the BufferedTupleStream returns eos before
+  // deleting the last block, rather than after, so the last block isn't deleted
+  // until the stream is closed.
+  DCHECK_EQ(stream.bytes_in_mem(false), buffer_size);
+
   stream.Close();
+
+  DCHECK_EQ(stream.bytes_in_mem(false), 0);
 }
 
 TEST_F(SimpleTupleStreamTest, SmallBuffers) {
@@ -563,7 +575,7 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   InitBlockMgr(2 * buffer_size, buffer_size);
 
   BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
-      client_);
+      client_, true, false);
   Status status = stream.Init(-1, NULL, false);
   ASSERT_TRUE(status.ok());
 
@@ -702,7 +714,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   InitBlockMgr(-1, 8 * 1024 * 1024);
   const int NUM_ROWS = 4000;
   BufferedTupleStream stream(runtime_state_, *array_desc_, runtime_state_->block_mgr(),
-      client_, false);
+      client_, false, false);
   const vector<TupleDescriptor*>& tuple_descs = array_desc_->tuple_descriptors();
   // Write out a predictable pattern of data by iterating over arrays of constants.
   int strings_index = 0; // we take the mod of this as index into STRINGS.
@@ -756,7 +768,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   }
 
   // Read back and verify data.
-  stream.PrepareForRead();
+  stream.PrepareForRead(false);
   strings_index = 0;
   array_len_index = 0;
   bool eos = false;

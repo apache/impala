@@ -51,8 +51,8 @@ class TupleRow;
 ///
 /// Buffer management:
 /// The stream is either pinned or unpinned, set via PinStream() and UnpinStream().
-/// Blocks are optionally deleted as they are read, set with the delete_on_read c'tor
-/// parameter.
+/// Blocks are optionally deleted as they are read, set with the delete_on_read argument
+/// to PrepareForRead().
 ///
 /// Block layout:
 /// At the header of each block, starting at position 0, there is a bitstring with null
@@ -157,15 +157,13 @@ class BufferedTupleStream {
   /// row_desc: description of rows stored in the stream. This is the desc for rows
   /// that are added and the rows being returned.
   /// block_mgr: Underlying block mgr that owns the data blocks.
-  /// delete_on_read: Blocks are deleted after they are read.
   /// use_initial_small_buffers: If true, the initial N buffers allocated for the
   /// tuple stream use smaller than IO-sized buffers.
   /// read_write: Stream allows interchanging read and write operations. Requires at
   /// least two blocks may be pinned.
   BufferedTupleStream(RuntimeState* state, const RowDescriptor& row_desc,
       BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
-      bool use_initial_small_buffers = true,
-      bool delete_on_read = false, bool read_write = false);
+      bool use_initial_small_buffers, bool read_write);
 
   /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
   /// once before any of the other APIs.
@@ -194,13 +192,14 @@ class BufferedTupleStream {
   /// been allocated with the stream's row desc.
   void GetTupleRow(const RowIdx& idx, TupleRow* row) const;
 
-  /// Prepares the stream for reading. If read_write_, this does not need to be called in
-  /// order to begin reading, otherwise this must be called after the last AddRow() and
+  /// Prepares the stream for reading. If read_write_, this can be called at any time to
+  /// begin reading. Otherwise this must be called after the last AddRow() and
   /// before GetNext().
+  /// delete_on_read: Blocks are deleted after they are read.
   /// If got_buffer is NULL, this function will fail (with a bad status) if no buffer
   /// is available. If got_buffer is non-null, this function will not fail on OOM and
   /// *got_buffer is true if a buffer was pinned.
-  Status PrepareForRead(bool* got_buffer = NULL);
+  Status PrepareForRead(bool delete_on_read, bool* got_buffer = NULL);
 
   /// Pins all blocks in this stream and switches to pinned mode.
   /// If there is not enough memory, *pinned is set to false and the stream is unmodified.
@@ -247,12 +246,6 @@ class BufferedTupleStream {
   bool using_small_buffers() const { return use_small_buffers_; }
   bool has_tuple_footprint() const {
     return fixed_tuple_row_size_ > 0 || !string_slots_.empty() || nullable_tuple_;
-  }
-
-  /// Switch to delete_on_read mode. Only valid if PrepareForRead() has not been called.
-  void set_delete_on_read(bool delete_on_read) {
-    DCHECK_EQ(read_block_idx_, -1);
-    delete_on_read_ = delete_on_read;
   }
 
   std::string DebugString() const;
@@ -307,8 +300,8 @@ class BufferedTupleStream {
   /// Total size of blocks_, including small blocks.
   int64_t total_byte_size_;
 
-  /// Iterator pointing to the current block for read. If read_write_, this is always a
-  /// valid block, otherwise equal to list.end() until PrepareForRead() is called.
+  /// Iterator pointing to the current block for read. Equal to list.end() until
+  /// PrepareForRead() is called.
   std::list<BufferedBlockMgr::Block*>::iterator read_block_;
 
   /// For each block in the stream, the buffer of the start of the block. This is only

@@ -200,9 +200,8 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   // be able to create this stream lazily and only whenever we need to spill.
   if (needs_serialize_ && block_mgr_client_ != NULL) {
     serialize_stream_.reset(new BufferedTupleStream(state, *intermediate_row_desc_,
-        state->block_mgr(), block_mgr_client_,
-        false, /* use initial small buffers */
-        true  /* delete on read */));
+        state->block_mgr(), block_mgr_client_, false /* use_initial_small_buffers */,
+        false /* read_write */));
     RETURN_IF_ERROR(serialize_stream_->Init(id(), runtime_profile(), false));
     DCHECK(serialize_stream_->has_write_block());
   }
@@ -447,17 +446,15 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
 
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-      parent->block_mgr_client_,
-      true, /* use small buffers */
-      false /* delete on read */));
+      parent->block_mgr_client_, true /* use_initial_small_buffers */,
+      false /* read_write */));
   RETURN_IF_ERROR(
       aggregated_row_stream->Init(parent->id(), parent->runtime_profile(), true));
 
   unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       parent->child(0)->row_desc(), parent->state_->block_mgr(),
-      parent->block_mgr_client_,
-      true, /* use small buffers */
-      true /* delete on read */));
+      parent->block_mgr_client_, true /* use_initial_small_buffers */,
+      false /* read_write */));
   // This stream is only used to spill, no need to ever have this pinned.
   RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id(), parent->runtime_profile(),
       false));
@@ -534,9 +531,8 @@ Status PartitionedAggregationNode::Partition::CleanUp() {
     // freed at least one buffer from this partition's (old) aggregated_row_stream.
     parent->serialize_stream_.reset(new BufferedTupleStream(parent->state_,
         *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-        parent->block_mgr_client_,
-        false, /* use small buffers */
-        true   /* delete on read */));
+        parent->block_mgr_client_, false /* use_initial_small_buffers */,
+        false /* read_write */));
     status = parent->serialize_stream_->Init(parent->id(), parent->runtime_profile(),
         false);
     if (!status.ok()) {
@@ -881,9 +877,6 @@ Status PartitionedAggregationNode::NextPartition() {
       RETURN_IF_ERROR(CreateHashPartitions(partition->level + 1));
       COUNTER_ADD(num_repartitions_, 1);
 
-      // We are copying rows into the new partitions, so we can delete blocks as we go.
-      partition->aggregated_row_stream.get()->set_delete_on_read(true);
-
       // Rows in this partition could have been spilled into two streams, depending
       // on if it is an aggregated intermediate, or an unaggregated row.
       // Note: we must process the aggregated rows first to save a hash table lookup
@@ -934,7 +927,7 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
   if (input_stream->num_rows() > 0) {
     while (true) {
       bool got_buffer = false;
-      RETURN_IF_ERROR(input_stream->PrepareForRead(&got_buffer));
+      RETURN_IF_ERROR(input_stream->PrepareForRead(true, &got_buffer));
       if (got_buffer) break;
       // Did not have a buffer to read the input stream. Spill and try again.
       RETURN_IF_ERROR(SpillPartition());
