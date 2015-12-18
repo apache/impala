@@ -202,14 +202,17 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
 
   int idx = row_batch->AddRow();
   TupleRow* row = row_batch->GetRow(idx);
-  (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
   row->SetTuple(0, *tuple_mem);
 
   // Now iterate through the Kudu rows.
   for (int krow_idx = rows_scanned_current_block_; krow_idx < cur_rows_.size();
        ++krow_idx) {
-    // Transform a Kudu row into an Impala row.
     const KuduRowResult& krow = cur_rows_[krow_idx];
+
+    // Clear any NULL indicators set by a previous iteration.
+    (*tuple_mem)->Init(tuple_num_null_bytes_);
+
+    // Transform a Kudu row into an Impala row.
     RETURN_IF_ERROR(KuduRowToImpalaTuple(krow, row_batch, *tuple_mem));
     ++rows_scanned_current_block_;
 
@@ -235,7 +238,6 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
 
       // Move to the next tuple in the tuple buffer.
       *tuple_mem = next_tuple(*tuple_mem);
-      (*tuple_mem)->Init(tuple_num_null_bytes_);
 
       // Make 'row' point to the new row.
       row = row_batch->GetRow(idx);

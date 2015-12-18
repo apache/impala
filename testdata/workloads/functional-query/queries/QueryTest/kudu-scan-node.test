@@ -17,3 +17,21 @@ select zip, id from dimtbl where id >= 1000 and 1002 >= id and 94611 = zip and
 ---- TYPES
 INT, BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-2740, a NULL value from a previously filtered row would
+# carry over into the next unfiltered row (the result below would incorrectly be 2,NULL).
+USE kududb_test;
+DROP TABLE IF EXISTS impala_2740;
+CREATE TABLE impala_2740 (key INT, value INT)
+    TBLPROPERTIES(
+        'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+        'kudu.table_name' = 'impala_2740',
+        'kudu.master_addresses' = '127.0.0.1',
+        'kudu.key_columns' = 'key');
+INSERT INTO impala_2740 VALUES (1, NULL), (2, -2);
+SELECT * FROM impala_2740 WHERE key != 1;
+---- RESULTS
+2,-2
+---- TYPES
+INT, INT
+====

@@ -37,13 +37,11 @@ class TestKuduOperations(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(cls.file_format_constraint)
 
   def setup_method(self, method):
-    if method.__name__ not in ("test_kudu_scan_node", ):
-      self.cleanup_db("kududb_test")
-      self.client.execute("create database kududb_test")
+    self.cleanup_db("kududb_test")
+    self.client.execute("create database kududb_test")
 
   def teardown_method(self, method):
-    if method.__name__ not in ("test_kudu_scan_node", ):
-      self.cleanup_db("kududb_test")
+    self.cleanup_db("kududb_test")
 
   def test_kudu_scan_node(self, vector):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db="functional_kudu")
