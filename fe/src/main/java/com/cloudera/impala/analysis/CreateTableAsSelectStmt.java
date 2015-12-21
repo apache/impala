@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
 import java.util.EnumSet;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -27,12 +28,26 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.service.CatalogOpExecutor;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Represents a CREATE TABLE AS SELECT (CTAS) statement
+ *
+ * The statement supports an optional PARTITIONED BY clause. Its syntax and semantics
+ * follow the PARTITION feature of INSERT FROM SELECT statements: inside the PARTITIONED
+ * BY (...) column list the user must specify names of the columns to partition by. These
+ * column names must appear in the specified order at the end of the select statement. A
+ * remapping between columns of the source and destination tables is not possible, because
+ * the destination table does not yet exist. Specifying static values for the partition
+ * columns is also not possible, as their type needs to be deduced from columns in the
+ * select statement.
  */
 public class CreateTableAsSelectStmt extends StatementBase {
   private final CreateTableStmt createStmt_;
+
+  // List of partition columns from the PARTITIONED BY (...) clause. Set to null if no
+  // partition was given.
+  private final List<String> partitionKeys_;
 
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
@@ -48,19 +63,28 @@ public class CreateTableAsSelectStmt extends StatementBase {
   /**
    * Builds a CREATE TABLE AS SELECT statement
    */
-  public CreateTableAsSelectStmt(CreateTableStmt createStmt, QueryStmt queryStmt) {
+  public CreateTableAsSelectStmt(CreateTableStmt createStmt, QueryStmt queryStmt,
+      List<String> partitionKeys) {
     Preconditions.checkNotNull(queryStmt);
     Preconditions.checkNotNull(createStmt);
     createStmt_ = createStmt;
-    insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
-        null, null, queryStmt, null);
+    partitionKeys_ = partitionKeys;
+    List<PartitionKeyValue> pkvs = null;
+    if (partitionKeys != null) {
+      pkvs = Lists.newArrayList();
+      for (String key: partitionKeys) {
+        pkvs.add(new PartitionKeyValue(key, null));
+      }
+    }
+    insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false, pkvs,
+        null, queryStmt, null);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }
   public InsertStmt getInsertStmt() { return insertStmt_; }
   public CreateTableStmt getCreateStmt() { return createStmt_; }
   @Override
-  public String toSql() { return createStmt_.toSql() + " AS " + getQueryStmt().toSql(); }
+  public String toSql() { return ToSqlUtils.getCreateTableSql(this); }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -84,6 +108,35 @@ public class CreateTableAsSelectStmt extends StatementBase {
     } finally {
       // Record missing tables in the original analyzer.
       analyzer.getMissingTbls().addAll(dummyRootAnalyzer.getMissingTbls());
+    }
+
+    // Add the columns from the partition clause to the create statement.
+    if (partitionKeys_ != null) {
+      int colCnt = tmpQueryStmt.getColLabels().size();
+      int partColCnt = partitionKeys_.size();
+      if (partColCnt >= colCnt) {
+        throw new AnalysisException(String.format("Number of partition columns (%s) " +
+            "must be smaller than the number of columns in the select statement (%s).",
+            partColCnt, colCnt));
+      }
+      int firstCol = colCnt - partColCnt;
+      for (int i = firstCol, j = 0; i < colCnt; ++i, ++j) {
+        String partitionLabel = partitionKeys_.get(j);
+        String colLabel = tmpQueryStmt.getColLabels().get(i);
+
+        // Ensure that partition columns are named and positioned at end of
+        // input column list.
+        if (!partitionLabel.equals(colLabel)) {
+          throw new AnalysisException(String.format("Partition column name " +
+              "mismatch: %s != %s", partitionLabel, colLabel));
+        }
+
+        ColumnDef colDef = new ColumnDef(colLabel, null, null);
+        colDef.setType(tmpQueryStmt.getBaseTblResultExprs().get(i).getType());
+        createStmt_.getPartitionColumnDefs().add(colDef);
+      }
+      // Remove partition columns from table column list.
+      tmpQueryStmt.getColLabels().subList(firstCol, colCnt).clear();
     }
 
     // Add the columns from the select statement to the create statement.

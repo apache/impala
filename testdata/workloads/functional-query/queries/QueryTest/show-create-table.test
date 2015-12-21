@@ -226,6 +226,19 @@ CREATE TABLE show_create_table_test_db.test_as_select (
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
 ====
+---- CREATE_TABLE
+create table i_1687_p partitioned by (int_col) as
+  select bigint_col, int_col from functional.alltypessmall;
+---- RESULTS
+CREATE TABLE show_create_table_test_db.i_1687_p (
+  bigint_col BIGINT
+)
+PARTITIONED BY (
+  int_col INT
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
 ---- QUERY
 SHOW CREATE TABLE functional_text_lzo.tinytable
 ---- RESULTS

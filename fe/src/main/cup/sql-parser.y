@@ -877,7 +877,27 @@ create_tbl_as_select_stmt ::=
     CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDef>(),
         new ArrayList<ColumnDef>(), external, comment, row_format,
         file_format, location, cache_op, if_not_exists, tbl_props, serde_props);
-    RESULT = new CreateTableAsSelectStmt(create_stmt, query);
+    RESULT = new CreateTableAsSelectStmt(create_stmt, query, null);
+  :}
+  // Create partitioned tables with CTAS statement. We need an own production
+  // here, combining both into one causes an unresolvable reduce/reduce
+  // conflicts due to the optional clauses.
+  // follow the PARTITION feature of insert from select statements.
+  | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+  table_name:table
+  KW_PARTITIONED KW_BY LPAREN ident_list:partition_cols RPAREN
+  comment_val:comment row_format_val:row_format
+  serde_properties:serde_props file_format_create_table_val:file_format
+  location_val:location cache_op_val:cache_op tbl_properties:tbl_props
+  KW_AS query_stmt:query
+  {:
+    // Initialize with empty List of columns and partition columns. The
+    // columns will be added by the query statement during analysis.
+    CreateTableStmt create_stmt = new CreateTableStmt(table,
+        new ArrayList<ColumnDef>(), new ArrayList<ColumnDef>(), external,
+        comment, row_format, file_format, location, cache_op, if_not_exists,
+        tbl_props, serde_props);
+    RESULT = new CreateTableAsSelectStmt(create_stmt, query, partition_cols);
   :}
   ;
 

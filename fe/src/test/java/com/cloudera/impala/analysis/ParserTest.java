@@ -2384,6 +2384,16 @@ public class ParserTest {
     // Column and partition definitions not allowed
     ParserError("CREATE TABLE Foo(i int) AS SELECT 1");
     ParserError("CREATE TABLE Foo PARTITIONED BY(i int) AS SELECT 1");
+
+    // Partitioned by syntax following insert into syntax
+    ParsesOk("CREATE TABLE Foo PARTITIONED BY (a) AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo PARTITIONED BY (a) ROW FORMAT DELIMITED STORED AS " +
+        "PARQUETFILE AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo PARTITIONED BY (a) AS SELECT 1, 2");
+    ParsesOk("CREATE TABLE Foo PARTITIONED BY (a) AS SELECT * from Bar");
+    ParsesOk("CREATE TABLE Foo PARTITIONED BY (a, b) AS SELECT * from Bar");
+    ParserError("CREATE TABLE Foo PARTITIONED BY (a=2, b) AS SELECT * from Bar");
+    ParserError("CREATE TABLE Foo PARTITIONED BY (a, b=2) AS SELECT * from Bar");
   }
 
   @Test

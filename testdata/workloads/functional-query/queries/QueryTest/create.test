@@ -939,3 +939,20 @@ drop database if exists test_property_length_db
 show databases like 'test_property_length_db'
 ---- RESULTS
 ====
+---- QUERY
+drop table if exists i_1687_t;
+drop table if exists i_1687_p;
+create table i_1687_t (a int, b int);
+insert into i_1687_t values (1, 2), (3, 4);
+create table i_1687_p partitioned by (a) as select b, a from i_1687_t;
+---- RESULTS
+'Inserted 2 row(s)'
+====
+---- QUERY
+select * from i_1687_p;
+---- RESULTS
+2,1
+4,3
+---- TYPES
+INT,INT
+====

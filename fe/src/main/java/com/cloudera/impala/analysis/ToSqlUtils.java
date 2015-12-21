@@ -114,7 +114,7 @@ public class ToSqlUtils {
   }
 
   /**
-   * Returns the "CREATE TABLE" SQL string corresponding to the given CreateTableStmt.
+   * Returns the "CREATE TABLE" SQL string corresponding to the given CreateTableStmt
    * statement.
    */
   public static String getCreateTableSql(CreateTableStmt stmt) {
@@ -126,12 +126,35 @@ public class ToSqlUtils {
     for (ColumnDef col: stmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.toString());
     }
+    String location = stmt.getLocation() == null ? null : stmt.getLocation().toString();
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
         partitionColsSql, stmt.getTblProperties(), stmt.getSerdeProperties(),
         stmt.isExternal(), stmt.getIfNotExists(), stmt.getRowFormat(),
         HdfsFileFormat.fromThrift(stmt.getFileFormat()), HdfsCompression.NONE, null,
-        stmt.getLocation().toString());
+        location);
+  }
+
+  /**
+   * Returns the "CREATE TABLE" SQL string corresponding to the given
+   * CreateTableAsSelectStmt statement.
+   */
+  public static String getCreateTableSql(CreateTableAsSelectStmt stmt) {
+    CreateTableStmt innerStmt = stmt.getCreateStmt();
+    // Only add partition column labels to output. Table columns must not be specified as
+    // they are deduced from the select statement.
+    ArrayList<String> partitionColsSql = Lists.newArrayList();
+    for (ColumnDef col: innerStmt.getPartitionColumnDefs()) {
+      partitionColsSql.add(col.getColName());
+    }
+    // TODO: Pass the correct compression, if applicable.
+    String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
+        innerStmt.getComment(), null, partitionColsSql, innerStmt.getTblProperties(),
+        innerStmt.getSerdeProperties(), innerStmt.isExternal(),
+        innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
+        HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
+        innerStmt.getLocation().toString());
+    return createTableSql + " AS " + stmt.getQueryStmt().toSql();
   }
 
   /**
@@ -188,8 +211,9 @@ public class ToSqlUtils {
     sb.append("TABLE ");
     if (ifNotExists) sb.append("IF NOT EXISTS ");
     if (dbName != null) sb.append(dbName + ".");
+    sb.append(tableName);
     if (columnsSql != null) {
-      sb.append(tableName + " (\n  ");
+      sb.append(" (\n  ");
       sb.append(Joiner.on(", \n  ").join(columnsSql));
       sb.append("\n)");
     }

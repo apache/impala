@@ -84,10 +84,19 @@ public class ToSqlTest extends AnalyzerTest {
   }
 
   private void testToSql(String query, String defaultDb, String expected) {
+    testToSql(query, defaultDb, expected, false);
+  }
+
+  private void testToSql(String query, String defaultDb, String expected,
+      boolean ignore_whitespace) {
     String actual = null;
     try {
       ParseNode node = AnalyzesOk(query, createAnalyzer(defaultDb));
       actual = node.toSql();
+      if (ignore_whitespace) {
+        // Transform whitespace to single space.
+        actual = actual.replace('\n', ' ').replaceAll(" +", " ").trim();
+      }
       if (!actual.equals(expected)) {
         String msg = "Expected: " + expected + "\n  Actual: " + actual + "\n";
         System.err.println(msg);
@@ -279,6 +288,24 @@ public class ToSqlTest extends AnalyzerTest {
             childColumn, childTable), tbl,
         String.format("SELECT %s FROM %s.%s, functional.allcomplextypes",
             childColumn, tbl.toSql(), childTable));
+  }
+
+  @Test
+  public void TestCreateTable() throws AnalysisException {
+    testToSql("create table p (a int)",
+        "default",
+        "CREATE TABLE default.p ( a INT ) STORED AS TEXTFILE", true);
+  }
+
+  @Test
+  public void TestCreateTableAsSelect() throws AnalysisException {
+    // Partitioned table.
+    testToSql("create table p partitioned by (int_col) as " +
+        "select double_col, int_col from functional.alltypes",
+        "default",
+        "CREATE TABLE default.p PARTITIONED BY ( int_col ) STORED AS " +
+        "TEXTFILE LOCATION 'hdfs://localhost:20500/test-warehouse/p' " +
+        "AS SELECT double_col, int_col FROM functional.alltypes", true);
   }
 
   @Test

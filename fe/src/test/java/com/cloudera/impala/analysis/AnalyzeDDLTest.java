@@ -1155,6 +1155,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'b.int_array_col' correlated with an outer block as well as an " +
         "uncorrelated one 'functional.alltypes':\n" +
         "SELECT item FROM b.int_array_col, functional.alltypes");
+
+    // CTAS into partitioned table.
+    AnalyzesOk("create table p partitioned by (int_col) as " +
+        "select double_col, int_col from functional.alltypes");
+    AnalyzesOk("create table p partitioned by (int_col) as " +
+        "select sum(double_col), int_col from functional.alltypes group by int_col");
+    // At least one non-partition column must be specified.
+    AnalysisError("create table p partitioned by (int_col, tinyint_col) as " +
+        "select int_col, tinyint_col from functional.alltypes",
+        "Number of partition columns (2) must be smaller than the number of columns in " +
+        "the select statement (2).");
+    // Order of the columns is important and not automatically corrected.
+    AnalysisError("create table p partitioned by (int_col) as " +
+        "select double_col, int_col, tinyint_col from functional.alltypes",
+        "Partition column name mismatch: int_col != tinyint_col");
+    AnalysisError("create table p partitioned by (tinyint_col, int_col) as " +
+        "select double_col, int_col, tinyint_col from functional.alltypes",
+        "Partition column name mismatch: tinyint_col != int_col");
   }
 
   @Test

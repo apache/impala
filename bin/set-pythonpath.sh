@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # set the python path for test modules and beeswax
-PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$IMPALA_HOME/testdata/
+PYTHONPATH=${IMPALA_HOME}:${IMPALA_HOME}/shell/gen-py:${IMPALA_HOME}/testdata/
 
 # There should be just a single version of python that created the
 # site-packages directory. We find it by performing shell independent expansion
@@ -23,17 +23,23 @@ PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$IMPALA_HOME/testdata/
 # Python to build Thrift on this machine, and the first version is not
 # compatible with the second.
 for PYTHON_DIR in ${THRIFT_HOME}/python/lib{64,}; do
-    [[ -d $PYTHON_DIR ]] || continue
-    for PKG_DIR in $PYTHON_DIR/python*/site-packages; do
-      PYTHONPATH=$PYTHONPATH:${PKG_DIR}/
+    [[ -d ${PYTHON_DIR} ]] || continue
+    for PKG_DIR in ${PYTHON_DIR}/python*/site-packages; do
+      PYTHONPATH=${PYTHONPATH}:${PKG_DIR}/
     done
 done
 
 # Add Hive after Thrift because Hive supplies its own Thrift modules
-PYTHONPATH=$PYTHONPATH:$HIVE_HOME/lib/py
+PYTHONPATH=${PYTHONPATH}:${HIVE_HOME}/lib/py
 
 # Add all the built eggs to the python path
 for EGG in ${IMPALA_HOME}/shell/ext-py/*/dist/*.egg; do
   PYTHONPATH=${PYTHONPATH}:${EGG}
 done
+
+# Add path to generated thrift modules
+for PKG_DIR in ${IMPALA_HOME}/infra/python/env/lib/python*/site-packages; do
+  PYTHONPATH=${PYTHONPATH}:${PKG_DIR}
+done
+
 export PYTHONPATH
