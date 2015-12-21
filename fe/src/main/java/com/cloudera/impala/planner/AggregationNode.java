@@ -227,10 +227,10 @@ public class AggregationNode extends PlanNode {
     output.append("\n");
 
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
-      if (aggInfo_.getAggregateExprs() != null &&
-          aggInfo_.getAggregateExprs().size() > 0) {
+      ArrayList<FunctionCallExpr> aggExprs = aggInfo_.getMaterializedAggregateExprs();
+      if (!aggExprs.isEmpty()) {
         output.append(detailPrefix + "output: ")
-        .append(getExplainString(aggInfo_.getAggregateExprs()) + "\n");
+            .append(getExplainString(aggExprs) + "\n");
       }
       // TODO: is this the best way to display this. It currently would
       // have DISTINCT_PC(DISTINCT_PC(col)) for the merge phase but not
@@ -239,11 +239,11 @@ public class AggregationNode extends PlanNode {
       // TODO: group by can be very long. Break it into multiple lines
       if (!aggInfo_.getGroupingExprs().isEmpty()) {
         output.append(detailPrefix + "group by: ")
-        .append(getExplainString(aggInfo_.getGroupingExprs()) + "\n");
+            .append(getExplainString(aggInfo_.getGroupingExprs()) + "\n");
       }
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix + "having: ")
-        .append(getExplainString(conjuncts_) + "\n");
+            .append(getExplainString(conjuncts_) + "\n");
       }
     }
     return output.toString();

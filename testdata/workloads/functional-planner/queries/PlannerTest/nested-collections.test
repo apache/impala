@@ -1014,13 +1014,13 @@ where id not in (select b.item from a.int_array_col b where a.year < b.item)
    partitions=0/0 files=0 size=0B
 ====
 # Test subplans: Bushy plan with multiple subplans.
-select a.id, c.item, d.key, d.value
+select a.id, c.item, d.key, d.value, v.cnt
 from functional.allcomplextypes a
 inner join functional.allcomplextypes b on a.id = b.id
 cross join a.int_array_col c
 cross join b.int_map_col d
 cross join
-  (select count(*)
+  (select count(*) cnt
    from a.struct_array_col x inner join b.struct_map_col y
    on x.f1 = y.f1) v
 ---- PLAN
@@ -1066,13 +1066,13 @@ cross join
    partitions=0/0 files=0 size=0B
 ====
 # Test subplans: Same as above but with an INNER JOIN between c and d.
-select a.id, c.item, d.key, d.value
+select a.id, c.item, d.key, d.value, v.cnt
 from functional.allcomplextypes a
 inner join functional.allcomplextypes b on a.id = b.id
 cross join a.int_array_col c
 inner join b.int_map_col d on (c.item = d.value)
 cross join
-  (select count(*)
+  (select count(*) cnt
    from a.struct_array_col x inner join b.struct_map_col y
    on x.f1 = y.f1) v
 where b.id = d.value
@@ -1123,13 +1123,13 @@ where b.id = d.value
 # Test subplans: Same as above but with a LEFT OUTER JOIN between c and d.
 # The outer join needs to be moved after the join between a and b to
 # correctly evaluate the On-clause.
-select a.id, c.item, d.key, d.value
+select a.id, c.item, d.key, d.value, v.cnt
 from functional.allcomplextypes a
 inner join functional.allcomplextypes b on a.id = b.id
 cross join a.int_array_col c
 left outer join b.int_map_col d on (c.item = d.value)
 cross join
-  (select count(*)
+  (select count(*) cnt
    from a.struct_array_col x inner join b.struct_map_col y
    on x.f1 = y.f1) v
 ---- PLAN
@@ -1228,11 +1228,11 @@ cross join
 ====
 # Test subplans: straight_join should place the Subplan in FROM-clause order
 # while coalescing adjacent ones.
-select /* +straight_join */ a.id
+select /* +straight_join */ a.id, v1.c, v2.a
 from functional.allcomplextypes a
 inner join functional.allcomplextypes b on (a.id = b.id)
-cross join (select count(*) from a.int_map_col) v1
-cross join (select avg(item) from b.int_array_col) v2
+cross join (select count(*) c from a.int_map_col) v1
+cross join (select avg(item) a from b.int_array_col) v2
 ---- PLAN
 10:SUBPLAN
 |
@@ -1589,7 +1589,7 @@ where c.c_custkey in
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
-=======
+====
 # IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
 # the ON clause and there are predicates in the WHERE clause that can be assigned to
 # the join node.

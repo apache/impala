@@ -959,7 +959,7 @@ and t2.y + t2.z > 30
 |  hash predicates: max(smallint_col) = max(smallint_col), min(int_col) = min(int_col)
 |
 |--04:AGGREGATE [FINALIZE]
-|  |  output: count(tinyint_col), max(smallint_col), min(int_col)
+|  |  output: max(smallint_col), min(int_col)
 |  |  having: max(smallint_col) + min(int_col) > 30
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
