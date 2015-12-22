@@ -39,7 +39,7 @@
 using kudu::client::KuduClient;
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduPredicate;
-using kudu::client::KuduRowResult;
+using kudu::client::KuduScanBatch;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
 using strings::Substitute;
@@ -195,7 +195,7 @@ void KuduScanner::CloseCurrentScanner() {
 }
 
 Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch, bool* batch_done) {
-  int rem_in_block = cur_rows_.size() - rows_scanned_current_block_;
+  int rem_in_block = cur_kudu_batch_.NumRows() - rows_scanned_current_block_;
   int rows_to_add = std::min(row_batch->capacity() - row_batch->num_rows(),
       rem_in_block);
   rows_scanned_current_block_ += rows_to_add;
@@ -218,14 +218,15 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
   row->SetTuple(0, *tuple_mem);
 
   // Now iterate through the Kudu rows.
-  for (int krow_idx = rows_scanned_current_block_; krow_idx < cur_rows_.size();
+  for (int krow_idx = rows_scanned_current_block_,
+           num_rows = cur_kudu_batch_.NumRows();
+       krow_idx < num_rows;
        ++krow_idx) {
-    const KuduRowResult& krow = cur_rows_[krow_idx];
-
     // Clear any NULL indicators set by a previous iteration.
     (*tuple_mem)->Init(tuple_num_null_bytes_);
 
     // Transform a Kudu row into an Impala row.
+    KuduScanBatch::RowPtr krow = cur_kudu_batch_.Row(krow_idx);
     RETURN_IF_ERROR(KuduRowToImpalaTuple(krow, row_batch, *tuple_mem));
     ++rows_scanned_current_block_;
 
@@ -296,7 +297,7 @@ Status KuduScanner::RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool) {
 }
 
 
-Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
+Status KuduScanner::KuduRowToImpalaTuple(const KuduScanBatch::RowPtr& row,
     RowBatch* row_batch, Tuple* tuple) {
   for (int i = 0; i < materialized_slots_.size(); ++i) {
     const SlotDescriptor* info = materialized_slots_[i];
@@ -358,11 +359,10 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
 Status KuduScanner::GetNextBlock() {
   SCOPED_TIMER(scan_node_->kudu_read_timer());
   int64_t now = MonotonicMicros();
-  cur_rows_.clear();
-  KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_rows_), "Unable to advance iterator");
+  KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_), "Unable to advance iterator");
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);
   rows_scanned_current_block_ = 0;
-  COUNTER_ADD(scan_node_->rows_read_counter(), cur_rows_.size());
+  COUNTER_ADD(scan_node_->rows_read_counter(), cur_kudu_batch_.NumRows());
   last_alive_time_micros_ = now;
   return Status::OK();
 }
