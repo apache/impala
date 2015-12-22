@@ -1007,8 +1007,8 @@ public class Frontend {
       queryExecRequest.addToFragments(thriftFragment);
     }
 
-    // Use VERBOSE by default for all non-explain statements.
-    TExplainLevel explainLevel = TExplainLevel.VERBOSE;
+    // Use EXTENDED by default for all non-explain statements.
+    TExplainLevel explainLevel = TExplainLevel.EXTENDED;
     // Use the query option for explain stmts and tests (e.g., planner tests).
     if (analysisResult.isExplainStmt() || RuntimeEnv.INSTANCE.isTestEnv()) {
       explainLevel = queryCtx.request.query_options.getExplain_level();
