@@ -65,10 +65,10 @@ class KuduScanner {
 
   /// Returns true if the current block hasn't been fully scanned.
   bool CurrentBlockHasMoreRows() {
-    return rows_scanned_current_block_ < cur_rows_.size();
+    return rows_scanned_current_block_ < cur_kudu_batch_.NumRows();
   }
 
-  /// Decodes rows previously fetched from kudu, now in 'cur_rows_' into a RowBatch.
+  /// Decodes rows previously fetched from kudu, now in 'cur_kudu_batch_' into a RowBatch.
   ///  - 'batch' is the batch that will point to the new tuples.
   ///  - *tuple_mem should be the location to output tuples.
   ///  - 'batch_done' on return, indicates whether the batch was filled to capacity.
@@ -92,8 +92,8 @@ class KuduScanner {
 
   /// Transforms a kudu row into an Impala row. Columns that don't require auxiliary
   /// memory are copied to the tuple directly. String columns are stored as a reference to
-  /// the memory of the KuduRowResult and need to be relocated later.
-  Status KuduRowToImpalaTuple(const kudu::client::KuduRowResult& row,
+  /// the memory of the RowPtr and need to be relocated later.
+  Status KuduRowToImpalaTuple(const kudu::client::KuduScanBatch::RowPtr& row,
       RowBatch* row_batch, Tuple* tuple);
 
   inline Tuple* next_tuple(Tuple* t) const {
@@ -114,8 +114,8 @@ class KuduScanner {
   /// The current Kudu scanner.
   boost::scoped_ptr<kudu::client::KuduScanner> scanner_;
 
-  /// The current set of retrieved rows.
-  std::vector<kudu::client::KuduRowResult> cur_rows_;
+  /// The current batch of retrieved rows.
+  kudu::client::KuduScanBatch cur_kudu_batch_;
   int rows_scanned_current_block_;
 
   /// The last time a keepalive request or successful RPC was sent.
