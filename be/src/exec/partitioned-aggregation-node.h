@@ -173,15 +173,16 @@ class PartitionedAggregationNode : public ExecNode {
   boost::scoped_ptr<MemPool> agg_fn_pool_;
 
   /// Exprs used to evaluate input rows
-  std::vector<ExprContext*> probe_expr_ctxs_;
+  std::vector<ExprContext*> grouping_expr_ctxs_;
 
   /// Exprs used to insert constructed aggregation tuple into the hash table.
   /// All the exprs are simply SlotRefs for the intermediate tuple.
   std::vector<ExprContext*> build_expr_ctxs_;
 
-  /// True if the resulting tuple contains var-len agg/grouping values. This
-  /// means we need to do more work when allocating and spilling these rows.
-  bool contains_var_len_grouping_exprs_;
+  /// Indices of grouping exprs with var-len string types in grouping_expr_ctxs_. We need
+  /// to do more work for var-len expressions when allocating and spilling rows. All
+  /// var-len grouping exprs have type string.
+  std::vector<int> string_grouping_exprs_;
 
   RuntimeState* state_;
   BufferedBlockMgr::Client* block_mgr_client_;
@@ -331,17 +332,35 @@ class PartitionedAggregationNode : public ExecNode {
   /// a temporary buffer.
   boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
 
-  /// Allocates a new aggregation intermediate tuple.
-  /// Initialized to grouping values computed over 'current_row_' using 'agg_fn_ctxs'.
-  /// Aggregation expr slots are set to their initial values.
-  /// Pool/Stream specify where the memory (tuple and var len slots) should be allocated
-  /// from. Only one can be set.
+  /// Constructs singleton output tuple, allocating memory from pool.
+  Tuple* ConstructSingletonOutputTuple(
+      const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs, MemPool* pool);
+
+  /// Copies grouping values stored in 'ht_ctx_' that were computed over 'current_row_'
+  /// using 'grouping_expr_ctxs_'. Aggregation expr slots are set to their initial values.
   /// Returns NULL if there was not enough memory to allocate the tuple or an error
-  /// occurred. When returning NULL, sets *status. If 'stream' is set and its small
-  /// buffers get full, it will attempt to switch to IO-buffers.
+  /// occurred. When returning NULL, sets *status.  Allocates tuple and var-len data for
+  /// grouping exprs from stream. Var-len data for aggregate exprs is allocated from the
+  /// FunctionContexts, so is stored outside the stream. If stream's small buffers get
+  /// full, it will attempt to switch to IO-buffers.
   Tuple* ConstructIntermediateTuple(
       const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-      MemPool* pool, BufferedTupleStream* stream, Status* status);
+      BufferedTupleStream* stream, Status* status);
+
+  /// Returns the number of bytes of variable-length data for the grouping values stored
+  /// in 'ht_ctx_'.
+  int GroupingExprsVarlenSize();
+
+  /// Initializes intermediate tuple by copying grouping values stored in 'ht_ctx_' that
+  /// that were computed over 'current_row_' using 'grouping_expr_ctxs_'. Writes the
+  /// var-len data into buffer. 'buffer' points to the start of a buffer of at least the
+  /// size of the variable-length data: 'varlen_size'.
+  void CopyGroupingValues(Tuple* intermediate_tuple, uint8_t* buffer, int varlen_size);
+
+  /// Initializes the aggregate function slots of an intermediate tuple.
+  /// Any var-len data is allocated from the FunctionContexts.
+  void InitAggSlots(const vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
+      Tuple* intermediate_tuple);
 
   /// Updates the given aggregation intermediate tuple with aggregation values computed
   /// over 'row' using 'agg_fn_ctxs'. Whether the agg fn evaluator calls Update() or
@@ -350,7 +369,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// belonging to the same partition independent of whether the agg fn evaluators have
   /// is_merge() == true.
   /// This function is replaced by codegen (which is why we don't use a vector argument
-  /// for agg_fn_ctxs).
+  /// for agg_fn_ctxs). Any var-len data is allocated from the FunctionContexts.
   void UpdateTuple(impala_udf::FunctionContext** agg_fn_ctxs, Tuple* tuple, TupleRow* row,
                    bool is_merge = false);
 

@@ -409,7 +409,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   // slots). If the tuples occupy no space, this implies all rows will be duplicates, so
   // create a small hash table, IMPALA-2256.
   // We always start with small pages in the hash table.
-  int64_t estimated_num_buckets = build_rows()->has_tuple_footprint() ?
+  int64_t estimated_num_buckets = build_rows()->RowConsumesMemory() ?
       HashTable::EstimateNumBuckets(build_rows()->num_rows()) : state->batch_size() * 2;
   hash_tbl_.reset(HashTable::Create(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
@@ -421,7 +421,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
     int num_rows = batch.num_rows();
-    DCHECK_LE(num_rows, hash_tbl_->EmptyBuckets()) << build_rows()->has_tuple_footprint();
+    DCHECK_LE(num_rows, hash_tbl_->EmptyBuckets()) << build_rows()->RowConsumesMemory();
     SCOPED_TIMER(parent_->build_timer_);
     for (int i = 0; i < num_rows; ++i) {
       TupleRow* row = batch.GetRow(i);

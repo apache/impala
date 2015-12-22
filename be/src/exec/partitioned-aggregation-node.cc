@@ -15,6 +15,7 @@
 #include "exec/partitioned-aggregation-node.h"
 
 #include <math.h>
+#include <set>
 #include <sstream>
 #include <gutil/strings/substitute.h>
 #include <thrift/protocol/TDebugProtocol.h>
@@ -82,7 +83,7 @@ PartitionedAggregationNode::PartitionedAggregationNode(
 Status PartitionedAggregationNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_expr_ctxs_));
+      Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &grouping_expr_ctxs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
     AggFnEvaluator* evaluator;
     RETURN_IF_ERROR(AggFnEvaluator::Create(
@@ -133,24 +134,24 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(),
         output_tuple_desc_->slots().size());
 
-  RETURN_IF_ERROR(
-      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(probe_expr_ctxs_);
-
-  contains_var_len_grouping_exprs_ = false;
+  RETURN_IF_ERROR(Expr::Prepare(grouping_expr_ctxs_, state, child(0)->row_desc(),
+      expr_mem_tracker()));
+  AddExprCtxsToFree(grouping_expr_ctxs_);
 
   // Construct build exprs from intermediate_agg_tuple_desc_
-  for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
+  for (int i = 0; i < grouping_expr_ctxs_.size(); ++i) {
     SlotDescriptor* desc = intermediate_tuple_desc_->slots()[i];
     DCHECK(desc->type().type == TYPE_NULL ||
-        desc->type() == probe_expr_ctxs_[i]->root()->type());
+        desc->type() == grouping_expr_ctxs_[i]->root()->type());
     // Hack to avoid TYPE_NULL SlotRefs.
     Expr* expr = desc->type().type != TYPE_NULL ?
         new SlotRef(desc) : new SlotRef(desc, TYPE_BOOLEAN);
     state->obj_pool()->Add(expr);
     build_expr_ctxs_.push_back(new ExprContext(expr));
     state->obj_pool()->Add(build_expr_ctxs_.back());
-    contains_var_len_grouping_exprs_ |= expr->type().IsVarLenStringType();
+    if (expr->type().IsVarLenStringType()) {
+      string_grouping_exprs_.push_back(i);
+    }
   }
   // Construct a new row desc for preparing the build exprs because neither the child's
   // nor this node's output row desc may contain the intermediate tuple, e.g.,
@@ -161,7 +162,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
                     expr_mem_tracker()));
   AddExprCtxsToFree(build_expr_ctxs_);
 
-  int j = probe_expr_ctxs_.size();
+  int j = grouping_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
@@ -173,16 +174,16 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     needs_serialize_ |= aggregate_evaluators_[i]->SupportsSerialize();
   }
 
-  if (probe_expr_ctxs_.empty()) {
+  if (grouping_expr_ctxs_.empty()) {
     // Create single output tuple now; we need to output something
     // even if our input is empty.
     singleton_output_tuple_ =
-        ConstructIntermediateTuple(agg_fn_ctxs_, mem_pool_.get(), NULL, NULL);
+        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
     // Check for failures during AggFnEvaluator::Init().
     RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
   } else {
-    ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true,
+    ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, grouping_expr_ctxs_, true,
         std::vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
         MAX_PARTITION_DEPTH, 1));
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
@@ -219,7 +220,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
 
-  RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
+  RETURN_IF_ERROR(Expr::Open(grouping_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
 
   DCHECK_EQ(aggregate_evaluators_.size(), agg_fn_ctxs_.size());
@@ -246,7 +247,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
     SCOPED_TIMER(build_timer_);
     if (process_row_batch_fn_ != NULL) {
       RETURN_IF_ERROR(process_row_batch_fn_(this, &batch, ht_ctx_.get()));
-    } else if (probe_expr_ctxs_.empty()) {
+    } else if (grouping_expr_ctxs_.empty()) {
       RETURN_IF_ERROR(ProcessBatchNoGrouping(&batch));
     } else {
       // There is grouping, so we will do partitioned aggregation.
@@ -263,7 +264,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   // Done consuming child(0)'s input. Move all the partitions in hash_partitions_
   // to spilled_partitions_/aggregated_partitions_. We'll finish the processing in
   // GetNext().
-  if (!probe_expr_ctxs_.empty()) {
+  if (!grouping_expr_ctxs_.empty()) {
     RETURN_IF_ERROR(MoveHashPartitions(child(0)->rows_returned()));
   }
   return Status::OK();
@@ -283,8 +284,8 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
 
   ExprContext** ctxs = &conjunct_ctxs_[0];
   int num_ctxs = conjunct_ctxs_.size();
-  if (probe_expr_ctxs_.empty()) {
-    // There was grouping, so evaluate the conjuncts and return the single result row.
+  if (grouping_expr_ctxs_.empty()) {
+    // There was no grouping, so evaluate the conjuncts and return the single result row.
     // We allow calling GetNext() after eos, so don't return this row again.
     if (!singleton_output_tuple_returned_) {
       int row_idx = row_batch->AddRow();
@@ -379,10 +380,10 @@ void PartitionedAggregationNode::CleanupHashTbl(
 }
 
 Status PartitionedAggregationNode::Reset(RuntimeState* state) {
-  if (probe_expr_ctxs_.empty()) {
+  if (grouping_expr_ctxs_.empty()) {
     // Re-create the single output tuple for this non-grouping agg.
     singleton_output_tuple_ =
-        ConstructIntermediateTuple(agg_fn_ctxs_, mem_pool_.get(), NULL, NULL);
+        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
     // Check for failures during AggFnEvaluator::Init().
     RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
@@ -427,7 +428,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
     state->block_mgr()->ClearReservations(block_mgr_client_);
   }
 
-  Expr::Close(probe_expr_ctxs_, state);
+  Expr::Close(grouping_expr_ctxs_, state);
   Expr::Close(build_expr_ctxs_, state);
   ExecNode::Close(state);
 }
@@ -444,10 +445,21 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
     parent->partition_pool_->Add(agg_fn_ctxs[i]);
   }
 
+  // Varlen aggregate function results are stored outside of aggregated_row_stream because
+  // BufferedTupleStream doesn't support relocating varlen data stored in the stream.
+  auto agg_slot = parent->intermediate_tuple_desc_->slots().begin() +
+      parent->grouping_expr_ctxs_.size();
+  set<SlotId> external_varlen_slots;
+  for (; agg_slot != parent->intermediate_tuple_desc_->slots().end(); ++agg_slot) {
+    if ((*agg_slot)->type().IsVarLenStringType()) {
+      external_varlen_slots.insert((*agg_slot)->id());
+    }
+  }
+
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       *parent->intermediate_row_desc_, parent->state_->block_mgr(),
       parent->block_mgr_client_, true /* use_initial_small_buffers */,
-      false /* read_write */));
+      false /* read_write */, external_varlen_slots));
   RETURN_IF_ERROR(
       aggregated_row_stream->Init(parent->id(), parent->runtime_profile(), true));
 
@@ -617,68 +629,88 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
   if (agg_fn_pool.get() != NULL) agg_fn_pool->FreeAll();
 }
 
-Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
-    const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool,
-    BufferedTupleStream* stream, Status* status) {
-  Tuple* intermediate_tuple = NULL;
-  uint8_t* buffer = NULL;
-  if (pool != NULL) {
-    DCHECK(stream == NULL && status == NULL);
-    intermediate_tuple = Tuple::Create(intermediate_tuple_desc_->byte_size(), pool);
-  } else {
-    DCHECK(stream != NULL && status != NULL);
-    // Figure out how big it will be to copy the entire tuple. We need the tuple to end
-    // up in one block in the stream.
-    int size = intermediate_tuple_desc_->byte_size();
-    if (contains_var_len_grouping_exprs_) {
-      // TODO: This is likely to be too slow. The hash table could maintain this as
-      // it hashes.
-      for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
-        if (!probe_expr_ctxs_[i]->root()->type().IsVarLenStringType()) continue;
-        if (ht_ctx_->last_expr_value_null(i)) continue;
-        StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->last_expr_value(i));
-        size += sv->len;
-      }
-    }
+Tuple* PartitionedAggregationNode::ConstructSingletonOutputTuple(
+    const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool) {
+  DCHECK(grouping_expr_ctxs_.empty());
+  Tuple* output_tuple = Tuple::Create(intermediate_tuple_desc_->byte_size(), pool);
+  InitAggSlots(agg_fn_ctxs, output_tuple);
+  return output_tuple;
+}
 
-    // Now that we know the size of the row, allocate space for it in the stream.
-    buffer = stream->AllocateRow(size, status);
-    if (buffer == NULL) {
-      if (!status->ok() || !stream->using_small_buffers()) return NULL;
-      // IMPALA-2352: Make a best effort to switch to IO buffers and re-allocate.
-      // If SwitchToIoBuffers() fails the caller of this function can try to free
-      // some space, e.g. through spilling, and re-attempt to allocate space for
-      // this row.
-      bool got_buffer;
-      *status = stream->SwitchToIoBuffers(&got_buffer);
-      if (!status->ok() || !got_buffer) return NULL;
-      buffer = stream->AllocateRow(size, status);
-      if (buffer == NULL) return NULL;
-    }
-    intermediate_tuple = reinterpret_cast<Tuple*>(buffer);
-    // TODO: remove this. we shouldn't need to zero the entire tuple.
-    intermediate_tuple->Init(size);
-    buffer += intermediate_tuple_desc_->byte_size();
+Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
+    const vector<FunctionContext*>& agg_fn_ctxs,
+    BufferedTupleStream* stream, Status* status) {
+  DCHECK(stream != NULL && status != NULL);
+  // Allocate space for the entire tuple in the stream.
+  int fixed_size = intermediate_tuple_desc_->byte_size();
+  int varlen_size = GroupingExprsVarlenSize();
+  uint8_t* varlen_buffer;
+  uint8_t* fixed_buffer = stream->AllocateRow(fixed_size, varlen_size, &varlen_buffer,
+      status);
+  if (UNLIKELY(fixed_buffer == NULL)) {
+    if (!status->ok() || !stream->using_small_buffers()) return NULL;
+    // IMPALA-2352: Make a best effort to switch to IO buffers and re-allocate.
+    // If SwitchToIoBuffers() fails the caller of this function can try to free
+    // some space, e.g. through spilling, and re-attempt to allocate space for
+    // this row.
+    bool got_buffer;
+    *status = stream->SwitchToIoBuffers(&got_buffer);
+    if (!status->ok() || !got_buffer) return NULL;
+    fixed_buffer = stream->AllocateRow(fixed_size, varlen_size, &varlen_buffer, status);
+    if (fixed_buffer == NULL) return NULL;
   }
 
-  // Copy grouping values.
-  vector<SlotDescriptor*>::const_iterator slot_desc =
-      intermediate_tuple_desc_->slots().begin();
-  for (int i = 0; i < probe_expr_ctxs_.size(); ++i, ++slot_desc) {
+  Tuple* intermediate_tuple = reinterpret_cast<Tuple*>(fixed_buffer);
+  intermediate_tuple->Init(fixed_size);
+  CopyGroupingValues(intermediate_tuple, varlen_buffer, varlen_size);
+  InitAggSlots(agg_fn_ctxs, intermediate_tuple);
+  return intermediate_tuple;
+}
+
+int PartitionedAggregationNode::GroupingExprsVarlenSize() {
+  int varlen_size = 0;
+  // TODO: The hash table could compute this as it hashes.
+  for (int expr_idx: string_grouping_exprs_) {
+    StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->last_expr_value(expr_idx));
+    // Avoid branching by multiplying length by null bit.
+    varlen_size += sv->len * !ht_ctx_->last_expr_value_null(expr_idx);
+  }
+  return varlen_size;
+}
+
+// TODO: codegen this function.
+void PartitionedAggregationNode::CopyGroupingValues(Tuple* intermediate_tuple,
+    uint8_t* buffer, int varlen_size) {
+  // Copy over all grouping slots (the variable length data is copied below).
+  for (int i = 0; i < grouping_expr_ctxs_.size(); ++i) {
+    SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[i];
     if (ht_ctx_->last_expr_value_null(i)) {
-      intermediate_tuple->SetNull((*slot_desc)->null_indicator_offset());
+      intermediate_tuple->SetNull(slot_desc->null_indicator_offset());
     } else {
       void* src = ht_ctx_->last_expr_value(i);
-      void* dst = intermediate_tuple->GetSlot((*slot_desc)->tuple_offset());
-      if (stream == NULL) {
-        RawValue::Write(src, dst, (*slot_desc)->type(), pool);
-      } else {
-        RawValue::Write(src, (*slot_desc)->type(), dst, &buffer);
-      }
+      void* dst = intermediate_tuple->GetSlot(slot_desc->tuple_offset());
+      memcpy(dst, src, slot_desc->slot_size());
     }
   }
 
-  // Initialize aggregate output.
+  for (int expr_idx: string_grouping_exprs_) {
+    if (ht_ctx_->last_expr_value_null(expr_idx)) continue;
+
+    SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[expr_idx];
+    // ptr and len were already copied to the fixed-len part of string value
+    StringValue* sv = reinterpret_cast<StringValue*>(
+        intermediate_tuple->GetSlot(slot_desc->tuple_offset()));
+    memcpy(buffer, sv->ptr, sv->len);
+    sv->ptr = reinterpret_cast<char*>(buffer);
+    buffer += sv->len;
+  }
+}
+
+// TODO: codegen this function.
+void PartitionedAggregationNode::InitAggSlots(
+    const vector<FunctionContext*>& agg_fn_ctxs, Tuple* intermediate_tuple) {
+  vector<SlotDescriptor*>::const_iterator slot_desc =
+      intermediate_tuple_desc_->slots().begin() + grouping_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++slot_desc) {
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
     evaluator->Init(agg_fn_ctxs[i], intermediate_tuple);
@@ -710,7 +742,6 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
       }
     }
   }
-  return intermediate_tuple;
 }
 
 void PartitionedAggregationNode::UpdateTuple(FunctionContext** agg_fn_ctxs,
@@ -740,7 +771,7 @@ Tuple* PartitionedAggregationNode::GetOutputTuple(
   // Copy grouping values from tuple to dst.
   // TODO: Codegen this.
   if (dst != tuple) {
-    int num_grouping_slots = probe_expr_ctxs_.size();
+    int num_grouping_slots = grouping_expr_ctxs_.size();
     for (int i = 0; i < num_grouping_slots; ++i) {
       SlotDescriptor* src_slot_desc = intermediate_tuple_desc_->slots()[i];
       SlotDescriptor* dst_slot_desc = output_tuple_desc_->slots()[i];
@@ -782,7 +813,7 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
        << "intermediate_tuple_id=" << intermediate_tuple_id_
        << " output_tuple_id=" << output_tuple_id_
        << " needs_finalize=" << needs_finalize_
-       << " probe_exprs=" << Expr::DebugString(probe_expr_ctxs_)
+       << " probe_exprs=" << Expr::DebugString(grouping_expr_ctxs_)
        << " agg_exprs=" << AggFnEvaluator::DebugString(aggregate_evaluators_);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
@@ -1315,7 +1346,7 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
   if (!state_->GetCodegen(&codegen).ok()) return NULL;
   SCOPED_TIMER(codegen->codegen_timer());
 
-  int j = probe_expr_ctxs_.size();
+  int j = grouping_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
@@ -1388,7 +1419,7 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
 
   // Loop over each expr and generate the IR for that slot.  If the expr is not
   // count(*), generate a helper IR function to update the slot and call that.
-  j = probe_expr_ctxs_.size();
+  j = grouping_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
@@ -1424,14 +1455,14 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
   if (update_tuple_fn == NULL) return NULL;
 
   // Get the cross compiled update row batch function
-  IRFunction::Type ir_fn = (!probe_expr_ctxs_.empty() ?
+  IRFunction::Type ir_fn = (!grouping_expr_ctxs_.empty() ?
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_FALSE :
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_NO_GROUPING);
   Function* process_batch_fn = codegen->GetFunction(ir_fn);
   DCHECK(process_batch_fn != NULL);
 
   int replaced = 0;
-  if (!probe_expr_ctxs_.empty()) {
+  if (!grouping_expr_ctxs_.empty()) {
     // Aggregation w/o grouping does not use a hash table.
 
     // Codegen for hash

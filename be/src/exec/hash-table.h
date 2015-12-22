@@ -99,6 +99,7 @@ class HashTable;
 /// growing).
 /// TODO: Batched interface for inserts and finds.
 /// TODO: Do we need to check mem limit exceeded so often. Check once per batch?
+/// TODO: as an optimization, compute variable-length data size for the agg node.
 
 /// Control block for a hash table. This class contains the logic as well as the variables
 /// needed by a thread to operate on a hash table.

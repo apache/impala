@@ -15,6 +15,9 @@
 #ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_H
 #define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_H
 
+#include <vector>
+#include <set>
+
 #include "common/status.h"
 #include "runtime/buffered-block-mgr.h"
 
@@ -55,18 +58,53 @@ class TupleRow;
 /// to PrepareForRead().
 ///
 /// Block layout:
-/// At the header of each block, starting at position 0, there is a bitstring with null
-/// indicators for all the tuples in each row in the block. Then there are the tuple rows.
-/// We further optimize the codepaths when we know that no tuple is nullable, indicated
-/// by 'nullable_tuple_'.
+/// If the stream's tuples are nullable (i.e. has_nullable_tuple_ is true), there is a
+/// bitstring at the start of each block with null indicators for all tuples in each row
+/// in the block. The length of the  bitstring is a function of the block size. Row data
+/// is stored after the null indicators if present, or at the start of the block
+/// otherwise. Rows are stored back to back in the stream, with no interleaving of data
+/// from different rows. There is no padding or alignment between rows.
+///
+/// Null tuples:
+/// The order of bits in the null indicators bitstring corresponds to the order of
+/// tuples in the block. The NULL tuples are not stored in the row iself, only as set
+/// bits in the null indicators bitstring.
 ///
 /// Tuple row layout:
-/// Tuples are stored back to back. Each tuple starts with the fixed length portion,
-/// directly followed by the var len portion. (Fixed len and var len are interleaved).
-/// If any tuple in the row is nullable, then there is a bitstring of null tuple
-/// indicators at the header of the block. The order of bits in the null indicators
-/// bitstring corresponds to the order of tuples in the block. The NULL tuples are not
-/// stored in the body of the block, only as set bits in the null indicators bitsting.
+/// The fixed length parts of the row's tuples are stored first, followed by var len data
+/// for inlined_string_slots_ and inlined_coll_slots_. Other "external" var len slots can
+/// point to var len data outside the stream. When reading the stream, the length of each
+/// row's var len data in the stream must be computed to find the next row's start.
+///
+/// The tuple stream supports reading from the stream into RowBatches without copying
+/// out any data: the RowBatches' Tuple pointers will point directly into the stream's
+/// blocks. The fixed length parts follow Impala's internal tuple format, so for the
+/// tuple to be valid, we only need to update pointers to point to the var len data
+/// in the stream. These pointers need to be updated by the stream because a spilled
+/// block may be relocated to a different location in memory. The pointers are updated
+/// lazily upon reading the stream via GetNext() or GetRows().
+///
+/// Example layout for a row with two tuples ((1, "hello"), (2, "world")) with all var
+/// len data stored in the stream:
+///  <---- tuple 1 -----> <------ tuple 2 ------> <- var len -> <- next row ...
+/// +--------+-----------+-----------+-----------+-------------+
+/// | IntVal | StringVal | BigIntVal | StringVal |             | ...
+/// +--------+-----------+-----------+-----------++------------+
+/// | val: 1 | len: 5    | val: 2    | len: 5    | helloworld  | ...
+/// |        | ptr: 0x.. |           | ptr: 0x.. |             | ...
+/// +--------+-----------+-----------+-----------+-------------+
+///  <--4b--> <---12b---> <----8b---> <---12b---> <----10b---->
+//
+/// Example layout for a row with a single tuple (("hello", "world")) with the second
+/// string slot stored externally to the stream:
+///  <------ tuple 1 ------> <- var len ->  <- next row ...
+/// +-----------+-----------+-------------+
+/// | StringVal | StringVal |             | ...
+/// +-----------+-----------+-------------+
+/// | len: 5    | len: 5    |  hello      | ...
+/// | ptr: 0x.. | ptr: 0x.. |             | ...
+/// +-----------+-----------+-------------+
+///  <---12b---> <---12b---> <-----5b---->
 ///
 /// The behavior of reads and writes is as follows:
 /// Read:
@@ -84,6 +122,20 @@ class TupleRow;
 ///   2. Pinned: Blocks are left pinned. If we run out of blocks, the write will fail and
 ///   the caller needs to free memory from the underlying block mgr.
 ///
+/// Memory lifetime of rows read from stream:
+/// If the stream is pinned, it is valid to access any tuples returned via
+/// GetNext() or GetRows() until the stream is unpinned. If the stream is unpinned, and
+/// the batch returned from GetNext() has the need_to_return flag set, any tuple memory
+/// returned so far from the stream may be freed on the next call to GetNext().
+///
+/// Manual construction of rows with AllocateRow():
+/// The BufferedTupleStream supports allocation of uninitialized rows with AllocateRow().
+/// The caller of AllocateRow() is responsible for writing the row with exactly the
+/// layout described above.
+///
+/// If a caller constructs a tuple in this way, the caller can set the pointers and they
+/// will not be modified until the stream is read via GetNext() or GetRows().
+///
 /// TODO: we need to be able to do read ahead in the BufferedBlockMgr. It currently
 /// only has PinAllBlocks() which is blocking. We need a non-blocking version of this or
 /// some way to indicate a block will need to be pinned soon.
@@ -93,8 +145,6 @@ class TupleRow;
 /// TODO: we could compact the small buffers when we need to spill but they use very
 /// little memory so ths might not be very useful.
 /// TODO: improvements:
-///   - Think about how to layout for the var len data more, possibly filling in them
-///     from the end of the same block. Don't interleave fixed and var len data.
 ///   - It would be good to allocate the null indicators at the end of each block and grow
 ///     this array as new rows are inserted in the block. If we do so, then there will be
 ///     fewer gaps in case of many rows with NULL tuples.
@@ -105,7 +155,6 @@ class TupleRow;
 ///     small streams (a common case) will use very little memory. This small blocks
 ///     are always in memory since spilling them frees up negligible memory.
 ///   - Return row batches in GetNext() instead of filling one in
-///   - Should we 32-bit align the start of the tuple rows? Now it is byte-aligned.
 class BufferedTupleStream {
  public:
   /// Ordinal index into the stream to retrieve a row in O(1) time. This index can
@@ -161,9 +210,11 @@ class BufferedTupleStream {
   /// tuple stream use smaller than IO-sized buffers.
   /// read_write: Stream allows interchanging read and write operations. Requires at
   /// least two blocks may be pinned.
+  /// ext_varlen_slots: set of varlen slots with data stored externally to the stream
   BufferedTupleStream(RuntimeState* state, const RowDescriptor& row_desc,
       BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
-      bool use_initial_small_buffers, bool read_write);
+      bool use_initial_small_buffers, bool read_write,
+      const std::set<SlotId>& ext_varlen_slots = std::set<SlotId>());
 
   ~BufferedTupleStream();
 
@@ -181,14 +232,21 @@ class BufferedTupleStream {
   Status SwitchToIoBuffers(bool* got_buffer);
 
   /// Adds a single row to the stream. Returns false and sets *status if an error
-  /// occurred.  BufferedTupleStream will do a deep copy of the memory in the row.
+  /// occurred. BufferedTupleStream will do a deep copy of the memory in the row.
+  /// After AddRow returns false, it should not be called again, unless
+  /// using_small_buffers_ is true, in which case it is valid to call SwitchToIoBuffers()
+  /// then AddRow() again.
   bool AddRow(TupleRow* row, Status* status);
 
-  /// Allocates space to store a row of size 'size' and returns a pointer to the memory
-  /// when successful. Returns NULL if there is not enough memory or an error occurred.
-  /// When returning NULL, sets *status. The returned memory is guaranteed to fit on one
-  /// block.
-  uint8_t* AllocateRow(int size, Status* status);
+  /// Allocates space to store a row of with fixed length 'fixed_size' and variable
+  /// length data 'varlen_size'. If successful, returns the pointer where fixed length
+  /// data should be stored and assigns 'varlen_data' to where var-len data should
+  /// be stored. Returns NULL if there is not enough memory or an error occurred.
+  /// Sets *status if an error occurred. The returned memory is guaranteed to all
+  /// be allocated in the same block. AllocateRow does not currently support nullable
+  /// tuples.
+  uint8_t* AllocateRow(int fixed_size, int varlen_size, uint8_t** varlen_data,
+      Status* status);
 
   /// Populates 'row' with the row at 'idx'. The stream must be pinned. The row must have
   /// been allocated with the stream's row desc.
@@ -215,12 +273,13 @@ class BufferedTupleStream {
 
   /// Get the next batch of output rows. Memory is still owned by the BufferedTupleStream
   /// and must be copied out by the caller.
-  /// If 'indices' is non-NULL, that is also populated for each returned row with the
-  /// index for that row.
-  Status GetNext(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices = NULL);
+  Status GetNext(RowBatch* batch, bool* eos);
 
-  /// Returns all the rows in the stream in batch. This pins the entire stream
-  /// in the process.
+  /// Same as above, but also populate 'indices' with the index of each returned row.
+  Status GetNext(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
+
+  /// Returns all the rows in the stream in batch. This pins the entire stream in the
+  /// process.
   /// *got_rows is false if the stream could not be pinned.
   Status GetRows(boost::scoped_ptr<RowBatch>* batch, bool* got_rows);
 
@@ -246,14 +305,19 @@ class BufferedTupleStream {
   bool has_read_block() const { return read_block_ != blocks_.end(); }
   bool has_write_block() const { return write_block_ != NULL; }
   bool using_small_buffers() const { return use_small_buffers_; }
-  bool has_tuple_footprint() const {
-    return fixed_tuple_row_size_ > 0 || !string_slots_.empty() || nullable_tuple_;
+
+  /// Returns true if the row consumes any memory. If false, the stream only needs to
+  /// store the count of rows.
+  bool RowConsumesMemory() const {
+    return fixed_tuple_row_size_ > 0 || has_nullable_tuple_;
   }
 
   std::string DebugString() const;
 
  private:
+  friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
   friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
+  friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
 
   /// If true, this stream is still using small buffers.
   bool use_small_buffers_;
@@ -273,24 +337,29 @@ class BufferedTupleStream {
   const RowDescriptor& desc_;
 
   /// Whether any tuple in the rows is nullable.
-  const bool nullable_tuple_;
+  const bool has_nullable_tuple_;
 
   /// Sum of the fixed length portion of all the tuples in desc_.
   int fixed_tuple_row_size_;
+
+  /// The size of the fixed length portion for each tuple in the row.
+  std::vector<int> fixed_tuple_sizes_;
 
   /// Max size (in bytes) of null indicators bitstring in the current read and write
   /// blocks. If 0, it means that there is no need to store null indicators for this
   /// RowDesc. We calculate this value based on the block's size and the
   /// fixed_tuple_row_size_. When not 0, this value is also an upper bound for the number
   /// of (rows * tuples_per_row) in this block.
-  uint32_t null_indicators_read_block_;
-  uint32_t null_indicators_write_block_;
+  uint32_t read_block_null_indicators_size_;
+  uint32_t write_block_null_indicators_size_;
 
-  /// Vector of all the strings slots grouped by tuple_idx.
-  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > string_slots_;
+  /// Vectors of all the strings slots that have their varlen data stored in stream
+  /// grouped by tuple_idx.
+  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > inlined_string_slots_;
 
-  /// Vector of all the collection slots grouped by tuple_idx.
-  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > collection_slots_;
+  /// Vectors of all the collection slots that have their varlen data stored in the
+  /// stream, grouped by tuple_idx.
+  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > inlined_coll_slots_;
 
   /// Block manager and client used to allocate, pin and release blocks. Not owned.
   BufferedBlockMgr* block_mgr_;
@@ -311,25 +380,33 @@ class BufferedTupleStream {
   /// This is not maintained for delete_on_read_.
   std::vector<uint8_t*> block_start_idx_;
 
-  /// Current ptr offset in read_block_'s buffer.
-  uint8_t* read_ptr_;
-
   /// Current idx of the tuple read from the read_block_ buffer.
   uint32_t read_tuple_idx_;
+
+  /// Current offset in read_block_ of the end of the last data read.
+  uint8_t* read_ptr_;
+
+  /// Pointer to one byte past the end of read_block_.
+  uint8_t* read_end_ptr_;
 
   /// Current idx of the tuple written at the write_block_ buffer.
   uint32_t write_tuple_idx_;
 
-  /// Bytes read in read_block_.
-  int64_t read_bytes_;
+  /// Pointer into write_block_ of the end of the last data written.
+  uint8_t*  write_ptr_;
+
+  /// Pointer to one byte past the end of write_block_.
+  uint8_t* write_end_ptr_;
 
   /// Number of rows returned to the caller from GetNext().
   int64_t rows_returned_;
 
-  /// The block index of the current read block.
+  /// The block index of the current read block in blocks_.
   int read_block_idx_;
 
   /// The current block for writing. NULL if there is no available block to write to.
+  /// The entire write_block_ buffer is marked as allocated, so any data written into
+  /// the buffer will be spilled without having to allocate additional space.
   BufferedBlockMgr::Block* write_block_;
 
   /// Number of pinned blocks in blocks_, stored to avoid iterating over the list
@@ -357,55 +434,82 @@ class BufferedTupleStream {
   RuntimeProfile::Counter* get_new_block_timer_;
 
   /// Copies 'row' into write_block_. Returns false if there is not enough space in
-  /// 'write_block_'.
-  template <bool HasNullableTuple>
+  /// 'write_block_'. After returning false, write_ptr_ may be left pointing to the
+  /// partially-written row, and no more data can be written to write_block_.
+  template <bool HAS_NULLABLE_TUPLE>
   bool DeepCopyInternal(TupleRow* row);
 
-  // Helper function to copy strings from tuple into write_block_. Increments
-  // bytes_allocated by the number of bytes allocated from write_block_.
-  bool CopyStrings(const Tuple* tuple, const std::vector<SlotDescriptor*>& string_slots,
-      int* bytes_allocated);
+  /// Helper function to copy strings in string_slots from tuple into write_block_.
+  /// Updates write_ptr_ to the end of the string data added. Returns false if the data
+  /// does not fit in the current write block. After returning false, write_ptr_ is left
+  /// pointing to the partially-written row, and no more data can be written to
+  /// write_block_.
+  bool CopyStrings(const Tuple* tuple, const std::vector<SlotDescriptor*>& string_slots);
 
-  // Helper function to deep copy collections from tuple into write_block_. Increments
-  // bytes_allocated by the number of bytes allocated from write_block_.
+  /// Helper function to deep copy collections in collection_slots from tuple into
+  /// write_block_. Updates write_ptr_ to the end of the collection data added. Returns
+  /// false if the data does not fit in the current write block.. After returning false,
+  /// write_ptr_ is left pointing to the partially-written row, and no more data can be
+  /// written to write_block_.
   bool CopyCollections(const Tuple* tuple,
-      const std::vector<SlotDescriptor*>& collection_slots, int* bytes_allocated);
+      const std::vector<SlotDescriptor*>& collection_slots);
 
   /// Wrapper of the templated DeepCopyInternal() function.
   bool DeepCopy(TupleRow* row);
 
-  /// Gets a new block from the block_mgr_, updating write_block_ and write_tuple_idx_,
-  /// and setting *got_block. If there are no blocks available, *got_block is set to
+  /// Gets a new block from the block_mgr_, updating write_block_, write_tuple_idx_,
+  /// write_ptr_ and write_end_ptr_. *got_block is set to true if a block was
+  /// successfully acquired. If there are no blocks available, *got_block is set to
   /// false and write_block_ is unchanged.
   /// 'min_size' is the minimum number of bytes required for this block.
   Status NewBlockForWrite(int64_t min_size, bool* got_block);
 
   /// Reads the next block from the block_mgr_. This blocks if necessary.
-  /// Updates read_block_, read_ptr_, read_tuple_idx_ and read_bytes_.
+  /// Updates read_block_, read_ptr_, read_tuple_idx_ and read_end_ptr_.
   Status NextBlockForRead();
 
-  /// Returns the byte size of this row when encoded in a block.
+  /// Returns the total additional bytes that this row will consume in write_block_ if
+  /// appended to the block. This includes the fixed length part of the row and the
+  /// data for inlined_string_slots_ and inlined_coll_slots_.
   int64_t ComputeRowSize(TupleRow* row) const;
 
   /// Unpins block if it is an IO-sized block and updates tracking stats.
   Status UnpinBlock(BufferedBlockMgr::Block* block);
 
-  /// Templated GetNext implementation.
-  template <bool HasNullableTuple>
+  /// Templated GetNext implementations.
+  template <bool FILL_INDICES>
+  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
+  template <bool FILL_INDICES, bool HAS_NULLABLE_TUPLE>
   Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
 
-  /// Read strings from stream by converting pointers and updating read_ptr_ and
-  /// read_bytes_.
-  void ReadStrings(const vector<SlotDescriptor*>& string_slots, int data_len,
-      Tuple* tuple);
+  /// Helper function for GetNextInternal(). For each string slot in string_slots,
+  /// update StringValue's ptr field to point to the corresponding string data stored
+  /// inline in the stream (at the current value of read_ptr_) advance read_ptr_ by the
+  /// StringValue's length field.
+  void FixUpStringsForRead(const vector<SlotDescriptor*>& string_slots, Tuple* tuple);
 
-  /// Read collections from stream by converting pointers and updating read_ptr_ and
-  /// read_bytes_.
-  void ReadCollections(const vector<SlotDescriptor*>& collection_slots, int data_len,
+  /// Helper function for GetNextInternal(). For each collection slot in collection_slots,
+  /// recursively update any pointers in the CollectionValue to point to the corresponding
+  /// var len data stored inline in the stream, advancing read_ptr_ as data is read.
+  /// Assumes that the collection was serialized to the stream in DeepCopy()'s format.
+  void FixUpCollectionsForRead(const vector<SlotDescriptor*>& collection_slots,
       Tuple* tuple);
 
   /// Computes the number of bytes needed for null indicators for a block of 'block_size'
   int ComputeNumNullIndicatorBytes(int block_size) const;
+
+  uint32_t read_block_bytes_remaining() const {
+    DCHECK_GE(read_end_ptr_, read_ptr_);
+    DCHECK_LE(read_end_ptr_ - read_ptr_, (*read_block_)->buffer_len());
+    return read_end_ptr_ - read_ptr_;
+  }
+
+  uint32_t write_block_bytes_remaining() const {
+    DCHECK_GE(write_end_ptr_, write_ptr_);
+    DCHECK_LE(write_end_ptr_ - write_ptr_, write_block_->buffer_len());
+    return write_end_ptr_ - write_ptr_;
+  }
+
 };
 
 }

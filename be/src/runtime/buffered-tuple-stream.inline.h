@@ -32,19 +32,27 @@ inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) {
   return DeepCopy(row);
 }
 
-inline uint8_t* BufferedTupleStream::AllocateRow(int size, Status *status) {
+inline uint8_t* BufferedTupleStream::AllocateRow(int fixed_size, int varlen_size,
+    uint8_t** varlen_data, Status* status) {
   DCHECK(!closed_);
-  if (UNLIKELY(write_block_ == NULL || write_block_->BytesRemaining() < size)) {
+  DCHECK(!has_nullable_tuple_) << "AllocateRow does not support nullable tuples";
+  const int total_size = fixed_size + varlen_size;
+  if (UNLIKELY(write_block_ == NULL || write_block_bytes_remaining() < total_size)) {
     bool got_block;
-    *status = NewBlockForWrite(size, &got_block);
+    *status = NewBlockForWrite(total_size, &got_block);
     if (!status->ok() || !got_block) return NULL;
   }
   DCHECK(write_block_ != NULL);
   DCHECK(write_block_->is_pinned());
-  DCHECK_GE(write_block_->BytesRemaining(), size);
+  DCHECK_GE(write_block_bytes_remaining(), total_size);
   ++num_rows_;
   write_block_->AddRow();
-  return write_block_->Allocate<uint8_t>(size);
+
+  uint8_t* fixed_data = write_ptr_;
+  write_ptr_ += fixed_size;
+  *varlen_data = write_ptr_;
+  write_ptr_ += varlen_size;
+  return fixed_data;
 }
 
 inline void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) const {
@@ -56,7 +64,7 @@ inline void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) c
   DCHECK_LT(idx.block(), blocks_.size());
 
   uint8_t* data = block_start_idx_[idx.block()] + idx.offset();
-  if (nullable_tuple_) {
+  if (has_nullable_tuple_) {
     // Stitch together the tuples from the block and the NULL ones.
     const int tuples_per_row = desc_.tuple_descriptors().size();
     uint32_t tuple_idx = idx.idx() * tuples_per_row;

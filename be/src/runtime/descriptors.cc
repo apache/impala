@@ -62,7 +62,7 @@ SlotDescriptor::SlotDescriptor(
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
-    slot_size_(type_.GetByteSize()),
+    slot_size_(type_.GetSlotSize()),
     field_idx_(-1),
     is_null_fn_(NULL),
     set_not_null_fn_(NULL),

@@ -97,7 +97,7 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
   while (true) {
     DCHECK(partition->aggregated_row_stream->is_pinned());
     Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_ctxs,
-        NULL, partition->aggregated_row_stream.get(), &process_batch_status_);
+        partition->aggregated_row_stream.get(), &process_batch_status_);
 
     if (LIKELY(intermediate_tuple != NULL)) {
       UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, row, AGGREGATED_ROWS);
