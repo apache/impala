@@ -59,6 +59,7 @@
 #include "codegen/instruction-counter.h"
 #include "codegen/mcjit-mem-mgr.h"
 #include "impala-ir/impala-ir-names.h"
+#include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-pool.h"
@@ -1208,6 +1209,16 @@ void LlvmCodeGen::CodegenMemset(LlvmBuilder* builder, Value* dst, int value, int
   if (size == 0) return;
   Value* value_const = GetIntConstant(TYPE_TINYINT, value);
   builder->CreateMemSet(dst, value_const, size, /* no alignment */ 0);
+}
+
+void LlvmCodeGen::CodegenClearNullBits(LlvmBuilder* builder, Value* tuple_ptr,
+    const TupleDescriptor& tuple_desc) {
+  Value* int8_ptr = builder->CreateBitCast(tuple_ptr, ptr_type(), "int8_ptr");
+  Value* null_bytes_offset =
+      ConstantInt::get(int_type(), tuple_desc.null_bytes_offset());
+  Value* null_bytes_ptr =
+      builder->CreateInBoundsGEP(int8_ptr, null_bytes_offset, "null_bytes_ptr");
+  CodegenMemset(builder, null_bytes_ptr, 0, tuple_desc.num_null_bytes());
 }
 
 Value* LlvmCodeGen::CodegenAllocate(LlvmBuilder* builder, MemPool* pool, Value* size,

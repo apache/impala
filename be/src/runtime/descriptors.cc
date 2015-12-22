@@ -286,6 +286,7 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     table_desc_(NULL),
     byte_size_(tdesc.byteSize),
     num_null_bytes_(tdesc.numNullBytes),
+    null_bytes_offset_(tdesc.byteSize - tdesc.numNullBytes),
     slots_(),
     has_varlen_slots_(false),
     tuple_path_(tdesc.tuplePath),
@@ -591,14 +592,18 @@ Function* SlotDescriptor::GetUpdateNullFn(LlvmCodeGen* codegen, bool set_null) c
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
-  Value* tuple_ptr;
-  Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
+  Value* tuple_arg;
+  Function* fn = prototype.GeneratePrototype(&builder, &tuple_arg);
 
-  Value* null_byte_ptr = builder.CreateStructGEP(NULL,
-          tuple_ptr, null_indicator_offset_.byte_offset, "null_byte_ptr");
+  Value* tuple_int8_ptr =
+      builder.CreateBitCast(tuple_arg, codegen->ptr_type(), "tuple_int8_ptr");
+  Value* null_byte_offset =
+      ConstantInt::get(codegen->int_type(), null_indicator_offset_.byte_offset);
+  Value* null_byte_ptr =
+      builder.CreateInBoundsGEP(tuple_int8_ptr, null_byte_offset, "null_byte_ptr");
   Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
-  Value* result = NULL;
 
+  Value* result = NULL;
   if (set_null) {
     Value* null_set = codegen->GetIntConstant(
         TYPE_TINYINT, null_indicator_offset_.bit_mask);
@@ -627,45 +632,38 @@ StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
 
   // Sort slots in the order they will appear in LLVM struct.
   vector<SlotDescriptor*> sorted_slots(slots_.size());
-  for (SlotDescriptor* slot: slots_) {
-    sorted_slots[slot->slot_idx_] = slot;
-  }
-
-  // For each null byte, add a byte to the struct
-  vector<Type*> struct_fields;
-  for (int i = 0; i < num_null_bytes_; ++i) {
-    struct_fields.push_back(codegen->GetType(TYPE_TINYINT));
-  }
-  int curr_struct_offset = num_null_bytes_;
+  for (SlotDescriptor* slot: slots_) sorted_slots[slot->slot_idx_] = slot;
 
   // Add the slot types to the struct description.
+  vector<Type*> struct_fields;
+  int curr_struct_offset = 0;
   for (SlotDescriptor* slot: sorted_slots) {
     // IMPALA-3207: Codegen for CHAR is not yet implemented: bail out of codegen here.
     if (slot->type().type == TYPE_CHAR) return NULL;
-    DCHECK_LE(curr_struct_offset, slot->tuple_offset());
-    if (curr_struct_offset < slot->tuple_offset()) {
-      // Need to add padding to ensure slots are aligned correctly. Clang likes to
-      // sometimes pad structs in its own way. When it does this, it sets the 'packed'
-      // flag, which means that at the LLVM level the struct type has no alignment
-      // requirements, even if it does at the C language level.
-      struct_fields.push_back(ArrayType::get(codegen->GetType(TYPE_TINYINT),
-          slot->tuple_offset() - curr_struct_offset));
-    }
+    DCHECK_EQ(curr_struct_offset, slot->tuple_offset());
     slot->llvm_field_idx_ = struct_fields.size();
     struct_fields.push_back(codegen->GetType(slot->type()));
     curr_struct_offset = slot->tuple_offset() + slot->slot_size();
   }
+  // For each null byte, add a byte to the struct
+  for (int i = 0; i < num_null_bytes_; ++i) {
+    struct_fields.push_back(codegen->GetType(TYPE_TINYINT));
+    ++curr_struct_offset;
+  }
+
   DCHECK_LE(curr_struct_offset, byte_size_);
   if (curr_struct_offset < byte_size_) {
     struct_fields.push_back(ArrayType::get(codegen->GetType(TYPE_TINYINT),
         byte_size_ - curr_struct_offset));
   }
 
-  // Construct the struct type.
-  // We don't mark the struct as packed but it shouldn't matter either way: LLVM should
-  // not insert any additional padding since the contents are already aligned.
+  // Construct the struct type. Use the packed layout although not strictly necessary
+  // because the fields are already aligned, so LLVM should not add any padding. The
+  // fields are already aligned because we order the slots by descending size and only
+  // have powers-of-two slot sizes. Note that STRING and TIMESTAMP slots both occupy
+  // 16 bytes although their useful payload is only 12 bytes.
   StructType* tuple_struct = StructType::get(codegen->context(),
-      ArrayRef<Type*>(struct_fields));
+      ArrayRef<Type*>(struct_fields), true);
   const DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
   const StructLayout* layout = data_layout.getStructLayout(tuple_struct);
   for (SlotDescriptor* slot: slots()) {

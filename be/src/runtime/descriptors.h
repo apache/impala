@@ -160,7 +160,7 @@ class SlotDescriptor {
 
   /// The idx of the slot in the llvm codegen'd tuple struct
   /// This is set by TupleDescriptor during codegen and takes into account
-  /// leading null bytes and any padding bytes.
+  /// any padding bytes.
   int llvm_field_idx_;
 
   /// Cached codegen'd functions
@@ -363,6 +363,7 @@ class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
   int num_null_bytes() const { return num_null_bytes_; }
+  int null_bytes_offset() const { return null_bytes_offset_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
   const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
   const std::vector<SlotDescriptor*>& collection_slots() const {
@@ -401,6 +402,7 @@ class TupleDescriptor {
   TableDescriptor* table_desc_;
   const int byte_size_;
   const int num_null_bytes_;
+  const int null_bytes_offset_;
 
   /// Contains all slots.
   std::vector<SlotDescriptor*> slots_;

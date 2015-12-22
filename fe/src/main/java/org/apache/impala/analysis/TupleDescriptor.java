@@ -24,13 +24,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
-
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.View;
 import org.apache.impala.thrift.TTupleDescriptor;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -56,6 +56,15 @@ import com.google.common.collect.Lists;
  * A tuple descriptor may be materialized or non-materialized. A non-materialized tuple
  * descriptor acts as a placeholder for 'virtual' table references such as inline views,
  * and must not be materialized at runtime.
+ *
+ * Memory Layout
+ * Slots are placed in descending order by size with trailing bytes to store null flags.
+ * Null flags are omitted for non-nullable slots. There is no padding between tuples when
+ * stored back-to-back in a row batch.
+ *
+ * Example: select bool_col, int_col, string_col, smallint_col from functional.alltypes
+ * Slots:   string_col|int_col|smallint_col|bool_col|null_byte
+ * Offsets: 0          16      20           22       23
  */
 public class TupleDescriptor {
   private final TupleId id_;
@@ -211,12 +220,13 @@ public class TupleDescriptor {
     if (hasMemLayout_) return;
     hasMemLayout_ = true;
 
-    // sort slots by size
+    // maps from slot size to slot descriptors with that size
     Map<Integer, List<SlotDescriptor>> slotsBySize =
         new HashMap<Integer, List<SlotDescriptor>>();
 
-    // populate slotsBySize; also compute avgSerializedSize
+    // populate slotsBySize
     int numNullableSlots = 0;
+    int totalSlotSize = 0;
     for (SlotDescriptor d: slots_) {
       if (!d.isMaterialized()) continue;
       ColumnStats stats = d.getStats();
@@ -229,6 +239,7 @@ public class TupleDescriptor {
       if (!slotsBySize.containsKey(d.getType().getSlotSize())) {
         slotsBySize.put(d.getType().getSlotSize(), new ArrayList<SlotDescriptor>());
       }
+      totalSlotSize += d.getType().getSlotSize();
       slotsBySize.get(d.getType().getSlotSize()).add(d);
       if (d.getIsNullable()) ++numNullableSlots;
     }
@@ -236,30 +247,25 @@ public class TupleDescriptor {
     Preconditions.checkState(!slotsBySize.containsKey(0));
     Preconditions.checkState(!slotsBySize.containsKey(-1));
 
-    // assign offsets to slots in order of ascending size
+    // assign offsets to slots in order of descending size
     numNullBytes_ = (numNullableSlots + 7) / 8;
-    int offset = numNullBytes_;
-    int nullIndicatorByte = 0;
+    int slotOffset = 0;
+    int nullIndicatorByte = totalSlotSize;
     int nullIndicatorBit = 0;
-    // slotIdx is the index into the resulting tuple struct.  The first (smallest) field
+    // slotIdx is the index into the resulting tuple struct.  The first (largest) field
     // is 0, next is 1, etc.
     int slotIdx = 0;
+    // sort slots in descending order of size
     List<Integer> sortedSizes = new ArrayList<Integer>(slotsBySize.keySet());
-    Collections.sort(sortedSizes);
+    Collections.sort(sortedSizes, Collections.reverseOrder());
     for (int slotSize: sortedSizes) {
       if (slotsBySize.get(slotSize).isEmpty()) continue;
-      if (slotSize > 1) {
-        // insert padding
-        int alignTo = Math.min(slotSize, 8);
-        offset = (offset + alignTo - 1) / alignTo * alignTo;
-      }
-
       for (SlotDescriptor d: slotsBySize.get(slotSize)) {
         Preconditions.checkState(d.isMaterialized());
         d.setByteSize(slotSize);
-        d.setByteOffset(offset);
+        d.setByteOffset(slotOffset);
         d.setSlotIdx(slotIdx++);
-        offset += slotSize;
+        slotOffset += slotSize;
 
         // assign null indicator
         if (d.getIsNullable()) {
@@ -268,14 +274,15 @@ public class TupleDescriptor {
           nullIndicatorBit = (nullIndicatorBit + 1) % 8;
           if (nullIndicatorBit == 0) ++nullIndicatorByte;
         } else {
-          // Non-nullable slots will have 0 for the byte offset and -1 for the bit mask
+          // non-nullable slots will have 0 for the byte offset and -1 for the bit mask
           d.setNullIndicatorBit(-1);
           d.setNullIndicatorByte(0);
         }
       }
     }
+    Preconditions.checkState(slotOffset == totalSlotSize);
 
-    this.byteSize_ = offset;
+    byteSize_ = totalSlotSize + numNullBytes_;
   }
 
   /**

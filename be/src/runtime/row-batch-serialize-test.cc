@@ -24,10 +24,14 @@
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
+#include "service/fe-support.h"
+#include "service/frontend.h"
 #include "util/stopwatch.h"
 #include "testutil/desc-tbl-builder.h"
 
 #include "common/names.h"
+
+using namespace impala;
 
 namespace impala {
 
@@ -41,13 +45,18 @@ class RowBatchSerializeTest : public testing::Test {
   ObjectPool pool_;
   scoped_ptr<MemTracker> tracker_;
 
+  // For computing tuple mem layouts.
+  scoped_ptr<Frontend> fe_;
+
   virtual void SetUp() {
+    fe_.reset(new Frontend());
     tracker_.reset(new MemTracker());
   }
 
   virtual void TearDown() {
     pool_.Clear();
     tracker_.reset();
+    fe_.reset();
   }
 
   // Serializes and deserializes 'batch', then checks that the deserialized batch is valid
@@ -291,7 +300,7 @@ class RowBatchSerializeTest : public testing::Test {
 
 TEST_F(RowBatchSerializeTest, Basic) {
   // tuple: (int)
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -306,7 +315,7 @@ TEST_F(RowBatchSerializeTest, Basic) {
 
 TEST_F(RowBatchSerializeTest, String) {
   // tuple: (int, string)
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -325,7 +334,7 @@ TEST_F(RowBatchSerializeTest, BasicArray) {
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(TYPE_INT);
 
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING << array_type;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -353,7 +362,7 @@ TEST_F(RowBatchSerializeTest, StringArray) {
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(struct_type);
 
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING << array_type;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -394,7 +403,7 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(struct_type);
 
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << array_type;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -418,7 +427,7 @@ TEST_F(RowBatchSerializeTest, DupCorrectnessFull) {
 
 void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   // tuples: (int), (string)
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_STRING;
   DescriptorTbl* desc_tbl = builder.Build();
@@ -459,7 +468,7 @@ TEST_F(RowBatchSerializeTest, DupRemovalFull) {
 // Test that tuple deduplication results in the expected reduction in serialized size.
 void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   // tuples: (int, string)
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -498,7 +507,7 @@ TEST_F(RowBatchSerializeTest, ConsecutiveNullsFull) {
 // Test that deduplication handles NULL tuples correctly.
 void RowBatchSerializeTest::TestConsecutiveNulls(bool full_dedup) {
   // tuples: (int)
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   DescriptorTbl* desc_tbl = builder.Build();
   vector<bool> nullable_tuples(1, true);
@@ -526,7 +535,7 @@ TEST_F(RowBatchSerializeTest, ZeroLengthTuplesDedup) {
 
 void RowBatchSerializeTest::TestZeroLengthTuple(bool full_dedup) {
   // tuples: (int), (string), ()
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_STRING;
   builder.DeclareTuple();
@@ -553,7 +562,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   ColumnType array_type;
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(TYPE_STRING);
-  DescriptorTblBuilder builder(&pool_);
+  DescriptorTblBuilder builder(fe_.get(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << array_type;
@@ -647,7 +656,8 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  InitFeSupport();
   uint32_t seed = time(NULL);
   cout << "seed = " << seed << endl;
   srand(seed);

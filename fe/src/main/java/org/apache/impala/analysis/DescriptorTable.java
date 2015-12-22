@@ -17,17 +17,22 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import org.apache.commons.lang.StringUtils;
-
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.IdGenerator;
+import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TDescriptorTable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -142,13 +147,13 @@ public class DescriptorTable {
     return result;
   }
 
-  // Computes physical layout parameters of all descriptors.
-  // Call this only after the last descriptor was added.
-  // Test-only.
+  /**
+   * Computes physical layout parameters of all descriptors.
+   * Call this only after the last descriptor was added.
+   * Test-only.
+   */
   public void computeMemLayout() {
-    for (TupleDescriptor d: tupleDescs_.values()) {
-      d.computeMemLayout();
-    }
+    for (TupleDescriptor d: tupleDescs_.values()) d.computeMemLayout();
   }
 
   public TDescriptorTable toThrift() {
@@ -194,5 +199,56 @@ public class DescriptorTable {
       out.append(desc.debugString() + "\n");
     }
     return out.toString();
+  }
+
+  /**
+   * Creates a thrift descriptor table for testing. Each entry in 'slotTypes' is a list
+   * of slot types for one tuple.
+   */
+  public static TDescriptorTable buildTestDescriptorTable(
+      List<List<TColumnType>> slotTypes) {
+    DescriptorTable descTbl = new DescriptorTable();
+    for (List<TColumnType> ttupleSlots: slotTypes) {
+      ArrayList<StructField> fields = Lists.newArrayListWithCapacity(ttupleSlots.size());
+      for (TColumnType ttype: ttupleSlots) {
+        fields.add(new StructField("testField", Type.fromThrift(ttype)));
+      }
+      StructType tupleType = new StructType(fields);
+      createTupleDesc(tupleType, descTbl);
+    }
+    descTbl.computeMemLayout();
+    return descTbl.toThrift();
+  }
+
+  /**
+   * Recursive helper for buildTestDescriptorTable(). Returns a TupleDescriptor
+   * corresponding to the given struct. The struct may contain scalar and array fields.
+   */
+  private static TupleDescriptor createTupleDesc(StructType tupleType,
+      DescriptorTable descTbl) {
+    TupleDescriptor tupleDesc = descTbl.createTupleDescriptor("testDescTbl");
+    for (StructField field: tupleType.getFields()) {
+      Type type = field.getType();
+      SlotDescriptor slotDesc = descTbl.addSlotDescriptor(tupleDesc);
+      slotDesc.setIsMaterialized(true);
+      slotDesc.setType(type);
+      if (!type.isCollectionType()) continue;
+
+      // Set item tuple descriptor for the collection.
+      Preconditions.checkState(type.isArrayType());
+      ArrayType arrayType = (ArrayType) type;
+      Type itemType = arrayType.getItemType();
+      StructType itemStruct = null;
+      if (itemType.isStructType()) {
+        itemStruct = (StructType) itemType;
+      } else {
+        ArrayList<StructField> itemFields = Lists.newArrayListWithCapacity(1);
+        itemFields.add(new StructField("item", itemType));
+        itemStruct = new StructType(itemFields);
+      }
+      TupleDescriptor itemTuple = createTupleDesc(itemStruct, descTbl);
+      slotDesc.setItemTupleDesc(itemTuple);
+    }
+    return tupleDesc;
   }
 }

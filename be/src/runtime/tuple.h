@@ -71,6 +71,11 @@ class Tuple {
 
   void Init(int size) { memset(this, 0, size); }
 
+  void ClearNullBits(const TupleDescriptor& tuple_desc) {
+    memset(reinterpret_cast<uint8_t*>(this) + tuple_desc.null_bytes_offset(),
+        0, tuple_desc.num_null_bytes());
+  }
+
   /// The total size of all data represented in this tuple (tuple data and referenced
   /// string and collection data).
   int64_t TotalByteSize(const TupleDescriptor& desc) const;
@@ -167,7 +172,7 @@ class Tuple {
       MemPool* pool, llvm::Function** fn);
 
   /// Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
-  /// this is a no-op (but we don't have to branch to check is slots are nulalble).
+  /// this is a no-op (but we don't have to branch to check is slots are nullable).
   void SetNull(const NullIndicatorOffset& offset) {
     char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
     *null_indicator_byte |= offset.bit_mask;

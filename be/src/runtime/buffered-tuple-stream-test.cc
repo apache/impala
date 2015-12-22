@@ -79,12 +79,12 @@ class SimpleTupleStreamTest : public testing::Test {
     vector<bool> nullable_tuples(1, false);
     vector<TTupleId> tuple_ids(1, static_cast<TTupleId>(0));
 
-    DescriptorTblBuilder int_builder(&pool_);
+    DescriptorTblBuilder int_builder(test_env_->exec_env()->frontend(), &pool_);
     int_builder.DeclareTuple() << TYPE_INT;
     int_desc_ = pool_.Add(new RowDescriptor(
         *int_builder.Build(), tuple_ids, nullable_tuples));
 
-    DescriptorTblBuilder string_builder(&pool_);
+    DescriptorTblBuilder string_builder(test_env_->exec_env()->frontend(), &pool_);
     string_builder.DeclareTuple() << TYPE_STRING;
     string_desc_ = pool_.Add(new RowDescriptor(
         *string_builder.Build(), tuple_ids, nullable_tuples));
@@ -145,23 +145,21 @@ class SimpleTupleStreamTest : public testing::Test {
       for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
         TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
         Tuple* tuple = Tuple::Create(tuple_desc->byte_size(), batch->tuple_data_pool());
-        // Skip over the null indicators at the beginning of the tuple.
-        uint8_t* ptr = reinterpret_cast<uint8_t*>(tuple) + tuple_desc->num_null_bytes();
         bool is_null = gen_null && !GenBoolValue(idx);
         for (int slot_idx = 0; slot_idx < tuple_desc->slots().size(); ++slot_idx, ++idx) {
           SlotDescriptor* slot_desc = tuple_desc->slots()[slot_idx];
+          void* slot = tuple->GetSlot(slot_desc->tuple_offset());
           switch (slot_desc->type().type) {
             case TYPE_INT:
-              *reinterpret_cast<int*>(ptr) = GenIntValue(idx);
+              *reinterpret_cast<int*>(slot) = GenIntValue(idx);
               break;
             case TYPE_STRING:
-              *reinterpret_cast<StringValue*>(ptr) = STRINGS[idx % NUM_STRINGS];
+              *reinterpret_cast<StringValue*>(slot) = STRINGS[idx % NUM_STRINGS];
               break;
             default:
               // The memory has been zero'ed out already by Tuple::Create().
               break;
           }
-          ptr += slot_desc->slot_size();
         }
         if (is_null) {
           row->SetTuple(tuple_idx, NULL);
@@ -212,14 +210,13 @@ class SimpleTupleStreamTest : public testing::Test {
       TupleDescriptor* tuple_desc = row_desc->tuple_descriptors()[tuple_idx];
       Tuple* tuple = row->GetTuple(tuple_idx);
       const int num_slots = tuple_desc->slots().size();
-      uint8_t* ptr = reinterpret_cast<uint8_t*>(tuple) + tuple_desc->num_null_bytes();
       for (int slot_idx = 0; slot_idx < num_slots; ++slot_idx) {
         SlotDescriptor* slot_desc = tuple_desc->slots()[slot_idx];
         if (tuple == NULL) {
           AppendValue(NULL, results);
         } else {
-          AppendValue(ptr, results);
-          ptr += slot_desc->slot_size();
+          void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+          AppendValue(reinterpret_cast<uint8_t*>(slot), results);
         }
       }
     }
@@ -270,7 +267,7 @@ class SimpleTupleStreamTest : public testing::Test {
         for (int slot_idx = 0; slot_idx < num_slots; ++slot_idx, ++idx) {
           T expected_val;
           GetExpectedValue(idx, is_null, &expected_val);
-          ASSERT_TRUE(results[idx] == expected_val)
+          ASSERT_EQ(results[idx], expected_val)
               << "results[" << idx << "] " << results[idx] << " != "
               << expected_val << " row_idx=" << row_idx
               << " tuple_idx=" << tuple_idx << " slot_idx=" << slot_idx
@@ -400,12 +397,12 @@ class SimpleNullStreamTest : public SimpleTupleStreamTest {
     vector<bool> nullable_tuples(1, true);
     vector<TTupleId> tuple_ids(1, static_cast<TTupleId>(0));
 
-    DescriptorTblBuilder int_builder(&pool_);
+    DescriptorTblBuilder int_builder(test_env_->exec_env()->frontend(), &pool_);
     int_builder.DeclareTuple() << TYPE_INT;
     int_desc_ = pool_.Add(new RowDescriptor(
         *int_builder.Build(), tuple_ids, nullable_tuples));
 
-    DescriptorTblBuilder string_builder(&pool_);
+    DescriptorTblBuilder string_builder(test_env_->exec_env()->frontend(), &pool_);
     string_builder.DeclareTuple() << TYPE_STRING;
     string_desc_ = pool_.Add(new RowDescriptor(
         *string_builder.Build(), tuple_ids, nullable_tuples));
@@ -426,14 +423,14 @@ class MultiTupleStreamTest : public SimpleTupleStreamTest {
     tuple_ids.push_back(static_cast<TTupleId>(1));
     tuple_ids.push_back(static_cast<TTupleId>(2));
 
-    DescriptorTblBuilder int_builder(&pool_);
+    DescriptorTblBuilder int_builder(test_env_->exec_env()->frontend(), &pool_);
     int_builder.DeclareTuple() << TYPE_INT;
     int_builder.DeclareTuple() << TYPE_INT;
     int_builder.DeclareTuple() << TYPE_INT;
     int_desc_ = pool_.Add(new RowDescriptor(
         *int_builder.Build(), tuple_ids, nullable_tuples));
 
-    DescriptorTblBuilder string_builder(&pool_);
+    DescriptorTblBuilder string_builder(test_env_->exec_env()->frontend(), &pool_);
     string_builder.DeclareTuple() << TYPE_STRING;
     string_builder.DeclareTuple() << TYPE_STRING;
     string_builder.DeclareTuple() << TYPE_STRING;
@@ -456,14 +453,14 @@ class MultiNullableTupleStreamTest : public SimpleTupleStreamTest {
     tuple_ids.push_back(static_cast<TTupleId>(1));
     tuple_ids.push_back(static_cast<TTupleId>(2));
 
-    DescriptorTblBuilder int_builder(&pool_);
+    DescriptorTblBuilder int_builder(test_env_->exec_env()->frontend(), &pool_);
     int_builder.DeclareTuple() << TYPE_INT;
     int_builder.DeclareTuple() << TYPE_INT;
     int_builder.DeclareTuple() << TYPE_INT;
     int_desc_ = pool_.Add(new RowDescriptor(
         *int_builder.Build(), tuple_ids, nullable_tuples));
 
-    DescriptorTblBuilder string_builder(&pool_);
+    DescriptorTblBuilder string_builder(test_env_->exec_env()->frontend(), &pool_);
     string_builder.DeclareTuple() << TYPE_STRING;
     string_builder.DeclareTuple() << TYPE_STRING;
     string_builder.DeclareTuple() << TYPE_STRING;
@@ -495,7 +492,7 @@ class ArrayTupleStreamTest : public SimpleTupleStreamTest {
     nested_array_type.type = TYPE_ARRAY;
     nested_array_type.children.push_back(int_array_type);
 
-    DescriptorTblBuilder builder(&pool_);
+    DescriptorTblBuilder builder(test_env_->exec_env()->frontend(), &pool_);
     builder.DeclareTuple() << string_array_type << nested_array_type;
     builder.DeclareTuple() << int_array_type;
     array_desc_ = pool_.Add(new RowDescriptor(
@@ -735,7 +732,7 @@ TEST_F(SimpleTupleStreamTest, BigRow) {
   vector<bool> nullable_tuples;
   vector<bool> non_nullable_tuples;
 
-  DescriptorTblBuilder big_row_builder(&pool_);
+  DescriptorTblBuilder big_row_builder(test_env_->exec_env()->frontend(), &pool_);
   // Each tuple contains 8 slots of TYPE_INT and a single byte for null indicator.
   const int num_tuples = IO_BLOCK_SIZE / (8 * sizeof(int) + 1);
   for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {

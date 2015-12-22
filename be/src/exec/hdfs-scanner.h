@@ -32,6 +32,7 @@
 #include "exec/scanner-context.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/row-batch.h"
+#include "runtime/tuple.h"
 
 namespace impala {
 
@@ -44,7 +45,6 @@ class MemPool;
 class SlotDescriptor;
 class Status;
 class TextConverter;
-class Tuple;
 class TupleDescriptor;
 class TPlanNode;
 class TScanRange;
@@ -233,9 +233,6 @@ class HdfsScanner {
 
   /// Fixed size of each top-level tuple, in bytes
   const int32_t tuple_byte_size_;
-
-  /// Number of null bytes in the top-level tuple.
-  const int32_t num_null_bytes_;
 
   /// Current tuple pointer into tuple_mem_.
   Tuple* tuple_;
@@ -443,18 +440,14 @@ class HdfsScanner {
     if (template_tuple != NULL) {
       memcpy(tuple, template_tuple, desc->byte_size());
     } else {
-      memset(tuple, 0, sizeof(uint8_t) * desc->num_null_bytes());
+      tuple->ClearNullBits(*desc);
     }
   }
 
   // TODO: replace this function with above once we can inline constants from
   // scan_node_->tuple_desc() via codegen
   void InitTuple(Tuple* template_tuple, Tuple* tuple) {
-    if (template_tuple != NULL) {
-      memcpy(tuple, template_tuple, tuple_byte_size_);
-    } else {
-      memset(tuple, 0, sizeof(uint8_t) * num_null_bytes_);
-    }
+    InitTuple(scan_node_->tuple_desc(), template_tuple, tuple);
   }
 
   inline Tuple* next_tuple(int tuple_byte_size, Tuple* t) const {

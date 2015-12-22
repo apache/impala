@@ -17,11 +17,15 @@
 
 #include <iostream>
 #include <sstream>
+#include <boost/scoped_ptr.hpp>
 
+#include "common/init.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
+#include "service/fe-support.h"
+#include "service/frontend.h"
 #include "testutil/desc-tbl-builder.h"
 #include "util/benchmark.h"
 #include "util/compress.h"
@@ -88,6 +92,10 @@ const int NUM_ROWS = 1024;
 const int MAX_STRING_LEN = 10;
 
 namespace impala {
+
+// For computing tuple mem layouts.
+static scoped_ptr<Frontend> fe;
+
 // Friend class with access to RowBatch internals
 class RowBatchSerializeBaseline {
  public:
@@ -318,7 +326,7 @@ class RowBatchSerializeBenchmark {
     MemTracker tracker;
     MemPool mem_pool(&tracker);
     ObjectPool obj_pool;
-    DescriptorTblBuilder builder(&obj_pool);
+    DescriptorTblBuilder builder(fe.get(), &obj_pool);
     builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
     DescriptorTbl* desc_tbl = builder.Build();
 
@@ -398,6 +406,9 @@ class RowBatchSerializeBenchmark {
 }
 
 int main(int argc, char** argv) {
+  impala::InitCommonRuntime(argc, argv, true);
+  InitFeSupport();
+  fe.reset(new Frontend());
   RowBatchSerializeBenchmark::Run();
   return 0;
 }

@@ -17,6 +17,8 @@
 
 #include "runtime/collection-value-builder.h"
 #include "runtime/mem-tracker.h"
+#include "service/fe-support.h"
+#include "service/frontend.h"
 #include "testutil/desc-tbl-builder.h"
 #include "testutil/gtest-util.h"
 
@@ -24,9 +26,12 @@
 
 using namespace impala;
 
+// For computing tuple mem layouts.
+static scoped_ptr<Frontend> fe;
+
 TEST(CollectionValueBuilderTest, MaxBufferSize) {
   ObjectPool obj_pool;
-  DescriptorTblBuilder builder(&obj_pool);
+  DescriptorTblBuilder builder(fe.get(), &obj_pool);
   builder.DeclareTuple() << TYPE_TINYINT << TYPE_TINYINT << TYPE_TINYINT;
   DescriptorTbl* desc_tbl = builder.Build();
   vector<TupleDescriptor*> descs;
@@ -66,4 +71,10 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
   pool.FreeAll();
 }
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  InitFeSupport();
+  fe.reset(new Frontend());
+  return RUN_ALL_TESTS();
+}

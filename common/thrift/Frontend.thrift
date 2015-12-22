@@ -749,3 +749,10 @@ struct TGetAllHadoopConfigsResponse {
 struct TStartupOptions {
   1: optional bool compute_lineage
 }
+
+// For creating a test descriptor table. The tuples and their memory layout are computed
+// in the FE.
+struct TBuildTestDescriptorTableParams {
+  // Every entry describes the slot types of one tuple.
+  1: required list<list<Types.TColumnType>> slot_types
+}

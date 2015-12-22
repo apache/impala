@@ -19,20 +19,29 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
+#include <boost/scoped_ptr.hpp>
 
+#include "common/init.h"
 #include "exec/row-batch-list.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
+#include "service/fe-support.h"
+#include "service/frontend.h"
 #include "util/runtime-profile-counters.h"
 #include "testutil/desc-tbl-builder.h"
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
+using namespace impala;
+
 namespace impala {
+
+// For computing tuple mem layouts.
+scoped_ptr<Frontend> fe;
 
 class RowBatchListTest : public testing::Test {
  public:
@@ -44,7 +53,7 @@ class RowBatchListTest : public testing::Test {
   RowDescriptor* desc_;
 
   virtual void SetUp() {
-    DescriptorTblBuilder builder(&pool_);
+    DescriptorTblBuilder builder(fe.get(), &pool_);
     builder.DeclareTuple() << TYPE_INT;
     DescriptorTbl* desc_tbl = builder.Build();
     vector<bool> nullable_tuples(1, false);
@@ -139,5 +148,10 @@ TEST_F(RowBatchListTest, MultipleRowBatchesTest) {
 
 }
 
-IMPALA_TEST_MAIN();
-
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  InitFeSupport();
+  fe.reset(new Frontend());
+  return RUN_ALL_TESTS();
+}

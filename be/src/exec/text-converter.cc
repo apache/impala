@@ -126,7 +126,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
   StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == NULL) return NULL;
-  PointerType* tuple_ptr_type = PointerType::get(tuple_type, 0);
+  PointerType* tuple_ptr_type = tuple_type->getPointerTo();
 
   Function* set_null_fn = slot_desc->GetUpdateNullFn(codegen, true);
   if (set_null_fn == NULL) {

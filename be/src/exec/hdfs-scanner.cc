@@ -67,7 +67,6 @@ HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       template_tuple_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
-      num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
       tuple_(NULL),
       batch_(NULL),
       tuple_mem_(NULL),
@@ -88,7 +87,6 @@ HdfsScanner::HdfsScanner()
       template_tuple_pool_(NULL),
       template_tuple_(NULL),
       tuple_byte_size_(-1),
-      num_null_bytes_(-1),
       tuple_(NULL),
       batch_(NULL),
       tuple_mem_(NULL),
@@ -302,50 +300,54 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
   return EvalConjuncts(tuple_row);
 }
 
-// Codegen for WriteTuple(above).  The signature matches WriteTuple (except for the
-// this* first argument).  For writing out and evaluating a single string slot:
+// Codegen for WriteTuple(above) for writing out single nullable string slot and
+// evaluating a <slot> = <constantexpr> conjunct. The signature matches WriteTuple()
+// except for the first this* argument.
 // define i1 @WriteCompleteTuple(%"class.impala::HdfsScanner"* %this,
 //                               %"class.impala::MemPool"* %pool,
 //                               %"struct.impala::FieldLocation"* %fields,
 //                               %"class.impala::Tuple"* %tuple,
 //                               %"class.impala::TupleRow"* %tuple_row,
 //                               %"class.impala::Tuple"* %template,
-//                               i8* %error_fields, i8* %error_in_row) #20 {
+//                               i8* %error_fields, i8* %error_in_row) {
 // entry:
 //   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple
-//                to { i8, %"struct.impala::StringValue" }*
+//                to <{ %"struct.impala::StringValue", i8 }>*
 //   %tuple_ptr1 = bitcast %"class.impala::Tuple"* %template
-//                 to { i8, %"struct.impala::StringValue" }*
-//   %null_byte = getelementptr inbounds
-//                { i8, %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 0
-//   store i8 0, i8* %null_byte
+//                 to <{ %"struct.impala::StringValue", i8 }>*
+//   %int8_ptr = bitcast <{ %"struct.impala::StringValue", i8 }>* %tuple_ptr to i8*
+//   %null_bytes_ptr = getelementptr i8, i8* %int8_ptr, i32 16
+//   call void @llvm.memset.p0i8.i64(i8* %null_bytes_ptr, i8 0, i64 1, i32 0, i1 false)
 //   %0 = bitcast %"class.impala::TupleRow"* %tuple_row
-//        to { i8, %"struct.impala::StringValue" }**
-//   %1 = getelementptr { i8, %"struct.impala::StringValue" }** %0, i32 0
-//   store { i8, %"struct.impala::StringValue" }* %tuple_ptr,
-//         { i8, %"struct.impala::StringValue" }** %1
+//        to <{ %"struct.impala::StringValue", i8 }>**
+//   %1 = getelementptr <{ %"struct.impala::StringValue", i8 }>*,
+//                      <{ %"struct.impala::StringValue", i8 }>** %0, i32 0
+//   store <{ %"struct.impala::StringValue", i8 }>* %tuple_ptr,
+//         <{ %"struct.impala::StringValue", i8 }>** %1
 //   br label %parse
 //
 // parse:                                            ; preds = %entry
-//   %data_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 0
-//   %len_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 1
-//   %slot_error_ptr = getelementptr i8* %error_fields, i32 0
-//   %data = load i8** %data_ptr
-//   %len = load i32* %len_ptr
-//   %2 = call i1 @WriteSlot({ i8, %"struct.impala::StringValue" }* %tuple_ptr,
-//                           i8* %data, i32 %len)
-//   %slot_parse_error = xor i1 %2, true
-//   %error_in_row2 = or i1 false, %slot_parse_error
-//   %3 = zext i1 %slot_parse_error to i8
-//   store i8 %3, i8* %slot_error_ptr
-//   %4 = call %"class.impala::ExprContext"* @GetConjunctCtx(
-//       %"class.impala::HdfsScanner"* %this, i32 0)
-//   %conjunct_eval = call i16 @Eq_StringVal_StringValWrapper1(
-//       %"class.impala::ExprContext"* %4, %"class.impala::TupleRow"* %tuple_row)
-//   %5 = ashr i16 %conjunct_eval, 8
-//   %6 = trunc i16 %5 to i8
-//   %val = trunc i8 %6 to i1
-//   br i1 %val, label %parse3, label %eval_fail
+//  %data_ptr = getelementptr %"struct.impala::FieldLocation",
+//                            %"struct.impala::FieldLocation"* %fields, i32 0, i32 0
+//  %len_ptr = getelementptr %"struct.impala::FieldLocation",
+//                           %"struct.impala::FieldLocation"* %fields, i32 0, i32 1
+//  %slot_error_ptr = getelementptr i8, i8* %error_fields, i32 0
+//  %data = load i8*, i8** %data_ptr
+//  %len = load i32, i32* %len_ptr
+//  %2 = call i1 @WriteSlot(<{ %"struct.impala::StringValue", i8 }>* %tuple_ptr,
+//                          i8* %data, i32 %len)
+//  %slot_parse_error = xor i1 %2, true
+//  %error_in_row2 = or i1 false, %slot_parse_error
+//  %3 = zext i1 %slot_parse_error to i8
+//  store i8 %3, i8* %slot_error_ptr
+//  %4 = call %"class.impala::ExprContext"* @GetConjunctCtx(
+//    %"class.impala::HdfsScanner"* %this, i32 0)
+//  %conjunct_eval = call i16 @"impala::Operators::Eq_StringVal_StringValWrapper"(
+//    %"class.impala::ExprContext"* %4, %"class.impala::TupleRow"* %tuple_row)
+//  %5 = ashr i16 %conjunct_eval, 8
+//  %6 = trunc i16 %5 to i8
+//  %val = trunc i8 %6 to i1
+//  br i1 %val, label %parse3, label %eval_fail
 //
 // parse3:                                           ; preds = %parse
 //   %7 = zext i1 %error_in_row2 to i8
@@ -451,10 +453,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   // Initialize tuple
   if (node->num_materialized_partition_keys() == 0) {
     // No partition key slots, just zero the NULL bytes.
-    for (int i = 0; i < tuple_desc->num_null_bytes(); ++i) {
-      Value* null_byte = builder.CreateStructGEP(NULL, tuple_arg, i, "null_byte");
-      builder.CreateStore(codegen->GetIntConstant(TYPE_TINYINT, 0), null_byte);
-    }
+    codegen->CodegenClearNullBits(&builder, tuple_arg, *tuple_desc);
   } else {
     // Copy template tuple.
     // TODO: only copy what's necessary from the template tuple.

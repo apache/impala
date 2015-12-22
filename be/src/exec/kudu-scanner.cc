@@ -59,7 +59,6 @@ KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
     state_(state),
     cur_kudu_batch_num_read_(0),
     last_alive_time_micros_(0),
-    tuple_num_null_bytes_(scan_node_->tuple_desc()->num_null_bytes()),
     num_string_slots_(0) {
 }
 
@@ -185,14 +184,14 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
   // that happens inside the loop.
   int idx = row_batch->AddRow();
   TupleRow* row = row_batch->GetRow(idx);
-  (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
+  (*tuple_mem)->ClearNullBits(*scan_node_->tuple_desc());
   row->SetTuple(tuple_idx(), *tuple_mem);
 
   int num_rows = cur_kudu_batch_.NumRows();
   // Now iterate through the Kudu rows.
   for (int krow_idx = cur_kudu_batch_num_read_; krow_idx < num_rows; ++krow_idx) {
     // Clear any NULL indicators set by a previous iteration.
-    (*tuple_mem)->Init(tuple_num_null_bytes_);
+    (*tuple_mem)->ClearNullBits(*scan_node_->tuple_desc());
 
     // Transform a Kudu row into an Impala row.
     KuduScanBatch::RowPtr krow = cur_kudu_batch_.Row(krow_idx);
@@ -216,7 +215,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
 
       // Move to the next tuple in the tuple buffer.
       *tuple_mem = next_tuple(*tuple_mem);
-      (*tuple_mem)->Init(tuple_num_null_bytes_);
+      (*tuple_mem)->ClearNullBits(*scan_node_->tuple_desc());
       // Make 'row' point to the new row.
       row = row_batch->GetRow(idx);
       row->SetTuple(tuple_idx(), *tuple_mem);

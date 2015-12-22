@@ -22,18 +22,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.thrift.TExpr;
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 
 public class AnalyzerTest extends FrontendTestBase {
@@ -173,27 +172,24 @@ public class AnalyzerTest extends FrontendTestBase {
     SelectStmt stmt = (SelectStmt) AnalyzesOk("select * from functional.AllTypes");
     Analyzer analyzer = stmt.getAnalyzer();
     DescriptorTable descTbl = analyzer.getDescTbl();
-    TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
-    for (SlotDescriptor slotD: tupleD.getSlots()) {
-      slotD.setIsMaterialized(true);
-    }
+    TupleDescriptor tupleDesc = descTbl.getTupleDesc(new TupleId(0));
+    tupleDesc.materializeSlots();
     descTbl.computeMemLayout();
-    Assert.assertEquals(97.0f, tupleD.getAvgSerializedSize(), 0.0);
-    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0, analyzer);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1, analyzer);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2, analyzer);
-    checkLayoutParams("functional.alltypes.id", 4, 8, 0, 3, analyzer);
-    checkLayoutParams("functional.alltypes.int_col", 4, 12, 0, 4, analyzer);
-    checkLayoutParams("functional.alltypes.float_col", 4, 16, 0, 5, analyzer);
-    checkLayoutParams("functional.alltypes.year", 4, 20, 0, 6, analyzer);
-    checkLayoutParams("functional.alltypes.month", 4, 24, 0, 7, analyzer);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 32, 1, 0, analyzer);
-    checkLayoutParams("functional.alltypes.double_col", 8, 40, 1, 1, analyzer);
-    int strSlotSize = PrimitiveType.STRING.getSlotSize();
-    checkLayoutParams("functional.alltypes.date_string_col",
-        strSlotSize, 48, 1, 2, analyzer);
-    checkLayoutParams("functional.alltypes.string_col",
-        strSlotSize, 48 + strSlotSize, 1, 3, analyzer);
+
+    Assert.assertEquals(97.0f, tupleDesc.getAvgSerializedSize(), 0.0);
+    checkLayoutParams("functional.alltypes.date_string_col", 16, 0, 88, 0, analyzer);
+    checkLayoutParams("functional.alltypes.string_col", 16, 16, 88, 1, analyzer);
+    checkLayoutParams("functional.alltypes.timestamp_col", 16, 32, 88, 2, analyzer);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 48, 88, 3, analyzer);
+    checkLayoutParams("functional.alltypes.double_col", 8, 56, 88, 4, analyzer);
+    checkLayoutParams("functional.alltypes.id", 4, 64, 88, 5, analyzer);
+    checkLayoutParams("functional.alltypes.int_col", 4, 68, 88, 6, analyzer);
+    checkLayoutParams("functional.alltypes.float_col", 4, 72, 88, 7, analyzer);
+    checkLayoutParams("functional.alltypes.year", 4, 76, 89, 0, analyzer);
+    checkLayoutParams("functional.alltypes.month", 4, 80, 89, 1, analyzer);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 84, 89, 2, analyzer);
+    checkLayoutParams("functional.alltypes.bool_col", 1, 86, 89, 3, analyzer);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 87, 89, 4, analyzer);
   }
 
   private void testNonNullable() throws AnalysisException {
@@ -205,9 +201,7 @@ public class AnalyzerTest extends FrontendTestBase {
         "select count(int_col), count(*) from functional.AllTypes");
     DescriptorTable descTbl = stmt.getAnalyzer().getDescTbl();
     TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
-    for (SlotDescriptor slotD: aggDesc.getSlots()) {
-      slotD.setIsMaterialized(true);
-    }
+    aggDesc.materializeSlots();
     descTbl.computeMemLayout();
     Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
     Assert.assertEquals(16, aggDesc.getByteSize());
@@ -218,22 +212,19 @@ public class AnalyzerTest extends FrontendTestBase {
   private void testMixedNullable() throws AnalysisException {
     // one slot is nullable, one is not. The layout should look like:
     // (byte range : data)
-    // 0 : 1 nullable-byte (only 1 bit used)
-    // 1 - 7: padded bytes
-    // 8 - 15: sum(int_col)
-    // 16 - 23: count(*)
+    // 0 - 7: sum(int_col)
+    // 8 - 15: count(*)
+    // 16 - 17: nullable-byte (only 1 bit used)
     SelectStmt stmt = (SelectStmt) AnalyzesOk(
         "select sum(int_col), count(*) from functional.AllTypes");
     DescriptorTable descTbl = stmt.getAnalyzer().getDescTbl();
     TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
-    for (SlotDescriptor slotD: aggDesc.getSlots()) {
-      slotD.setIsMaterialized(true);
-    }
+    aggDesc.materializeSlots();
     descTbl.computeMemLayout();
     Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
-    Assert.assertEquals(24, aggDesc.getByteSize());
-    checkLayoutParams(aggDesc.getSlots().get(0), 8, 8, 0, 0);
-    checkLayoutParams(aggDesc.getSlots().get(1), 8, 16, 0, -1);
+    Assert.assertEquals(17, aggDesc.getByteSize());
+    checkLayoutParams(aggDesc.getSlots().get(0), 8, 0, 16, 0);
+    checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
   }
 
   /**
@@ -243,34 +234,31 @@ public class AnalyzerTest extends FrontendTestBase {
     SelectStmt stmt = (SelectStmt) AnalyzesOk("select * from functional.alltypes");
     Analyzer analyzer = stmt.getAnalyzer();
     DescriptorTable descTbl = analyzer.getDescTbl();
-    TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
-    ArrayList<SlotDescriptor> slots = tupleD.getSlots();
-    for (SlotDescriptor slotD: slots) {
-      slotD.setIsMaterialized(true);
-    }
+    TupleDescriptor tupleDesc = descTbl.getTupleDesc(new TupleId(0));
+    tupleDesc.materializeSlots();
     // Mark slots 0 (id), 7 (double_col), 9 (string_col) as non-materialized.
+    ArrayList<SlotDescriptor> slots = tupleDesc.getSlots();
     slots.get(0).setIsMaterialized(false);
     slots.get(7).setIsMaterialized(false);
     slots.get(9).setIsMaterialized(false);
-
     descTbl.computeMemLayout();
-    Assert.assertEquals(68.0f, tupleD.getAvgSerializedSize(), 0.0);
+
+    Assert.assertEquals(68.0f, tupleDesc.getAvgSerializedSize(), 0.0);
     // Check non-materialized slots.
     checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0, analyzer);
     checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0, analyzer);
     checkLayoutParams("functional.alltypes.string_col", 0, -1, 0, 0, analyzer);
     // Check materialized slots.
-    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0, analyzer);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1, analyzer);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2, analyzer);
-    checkLayoutParams("functional.alltypes.int_col", 4, 8, 0, 3, analyzer);
-    checkLayoutParams("functional.alltypes.float_col", 4, 12, 0, 4, analyzer);
-    checkLayoutParams("functional.alltypes.year", 4, 16, 0, 5, analyzer);
-    checkLayoutParams("functional.alltypes.month", 4, 20, 0, 6, analyzer);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 24, 0, 7, analyzer);
-    int strSlotSize = PrimitiveType.STRING.getSlotSize();
-    checkLayoutParams("functional.alltypes.date_string_col",
-        strSlotSize, 32, 1, 0, analyzer);
+    checkLayoutParams("functional.alltypes.date_string_col", 16, 0, 60, 0, analyzer);
+    checkLayoutParams("functional.alltypes.timestamp_col", 16, 16, 60, 1, analyzer);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 32, 60, 2, analyzer);
+    checkLayoutParams("functional.alltypes.int_col", 4, 40, 60, 3, analyzer);
+    checkLayoutParams("functional.alltypes.float_col", 4, 44, 60, 4, analyzer);
+    checkLayoutParams("functional.alltypes.year", 4, 48, 60, 5, analyzer);
+    checkLayoutParams("functional.alltypes.month", 4, 52, 60, 6, analyzer);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 56, 60, 7, analyzer);
+    checkLayoutParams("functional.alltypes.bool_col", 1, 58, 61, 0, analyzer);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 59, 61, 1, analyzer);
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,

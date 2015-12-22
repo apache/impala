@@ -74,6 +74,7 @@ namespace impala {
 class CodegenAnyVal;
 class CodegenSymbolEmitter;
 class SubExprElimination;
+class TupleDescriptor;
 
 /// LLVM code generator.  This is the top level object to generate jitted code.
 //
@@ -418,6 +419,10 @@ class LlvmCodeGen {
   /// Codegen to call llvm memset intrinsic at the current builder location. 'dst' should
   /// be a pointer. No-op if size is zero.
   void CodegenMemset(LlvmBuilder* builder, llvm::Value* dst, int value, int size);
+
+  /// Codegen to set all null bytes of the given tuple to 0.
+  void CodegenClearNullBits(LlvmBuilder* builder, llvm::Value* tuple_ptr,
+      const TupleDescriptor& tuple_desc);
 
   /// Codegen to call pool->Allocate(size).
   llvm::Value* CodegenAllocate(LlvmBuilder* builder, MemPool* pool, llvm::Value* size,

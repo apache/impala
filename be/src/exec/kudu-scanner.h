@@ -121,9 +121,6 @@ class KuduScanner {
   /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
 
-  /// Number of bytes needed to represent the null bits in the tuple.
-  int tuple_num_null_bytes_;
-
   /// List of string slots that need relocation for their auxiliary memory.
   std::vector<SlotDescriptor*> string_slots_;
 

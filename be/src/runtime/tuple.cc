@@ -207,7 +207,7 @@ void Tuple::MaterializeExprs(
     TupleRow* row, const TupleDescriptor& desc, ExprContext* const* materialize_expr_ctxs,
     MemPool* pool, StringValue** non_null_string_values, int* total_string_lengths,
     int* num_non_null_string_values) {
-  memset(this, 0, desc.num_null_bytes());
+  ClearNullBits(desc);
   // Evaluate the materialize_expr_ctxs and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
@@ -368,8 +368,8 @@ Status Tuple::CodegenMaterializeExprs(RuntimeState* state, bool collect_string_v
   PointerType* tuple_type = codegen->GetPtrType(tuple_struct_type);
   Value* tuple = builder.CreateBitCast(opaque_tuple_arg, tuple_type, "tuple");
 
-  // Memset tuple's null bytes
-  codegen->CodegenMemset(&builder, tuple, 0, desc.num_null_bytes());
+  // Clear tuple's null bytes
+  codegen->CodegenClearNullBits(&builder, tuple, desc);
 
   // Evaluate the materialize_expr_ctxs and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {

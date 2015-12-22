@@ -168,6 +168,10 @@ class Frontend {
   /// Call FE to get files info for a table or partition.
   Status GetTableFiles(const TShowFilesParams& params, TResultSet* result);
 
+  /// Creates a thrift descriptor table for testing.
+  Status BuildTestDescriptorTable(const TBuildTestDescriptorTableParams& params,
+      TDescriptorTable* result);
+
  private:
   /// Descriptor of Java Frontend class itself, used to create a new instance.
   jclass fe_class_;
@@ -196,6 +200,10 @@ class Frontend {
   jmethodID set_catalog_initialized_id_; // JniFrontend.setCatalogInitialized
   jmethodID get_table_files_id_; // JniFrontend.getTableFiles
   jmethodID show_create_function_id_; // JniFrontend.showCreateFunction
+
+  // Only used for testing.
+  jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()
+
   jmethodID fe_ctor_;
 };
 

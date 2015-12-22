@@ -30,17 +30,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.log4j.Appender;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.log4j.FileAppender;
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -53,12 +46,13 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
-import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDescribeDbParams;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TDescribeTableParams;
+import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TGetAllHadoopConfigsResponse;
@@ -90,6 +84,14 @@ import org.apache.impala.thrift.TUpdateMembershipRequest;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TSessionStateUtil;
+import org.apache.log4j.Appender;
+import org.apache.log4j.FileAppender;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -474,6 +476,25 @@ public class JniFrontend {
         params.category == TFunctionCategory.AGGREGATE);
     return ToSqlUtils.getCreateFunctionSql(frontend_.getFunctions(
         params.category, params.db, params.pattern, true));
+  }
+
+  /**
+   * Creates a thrift descriptor table for testing.
+   */
+  public byte[] buildTestDescriptorTable(byte[] buildTestDescTblParams)
+      throws ImpalaException {
+    TBuildTestDescriptorTableParams params = new TBuildTestDescriptorTableParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, buildTestDescTblParams);
+    Preconditions.checkNotNull(params.slot_types);
+    TDescriptorTable result =
+        DescriptorTable.buildTestDescriptorTable(params.slot_types);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      byte[] ret = serializer.serialize(result);
+      return ret;
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   /**

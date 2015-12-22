@@ -58,6 +58,7 @@ DEFINE_string(authorized_proxy_user_config, "",
     "users. For example: hue=user1,user2;admin=*");
 DEFINE_string(authorized_proxy_user_config_delimiter, ",",
     "Specifies the delimiter used in authorized_proxy_user_config. ");
+
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;"
@@ -85,6 +86,7 @@ Frontend::Frontend() {
     {"loadTableData", "([B)[B", &load_table_data_id_},
     {"getTableFiles", "([B)[B", &get_table_files_id_},
     {"showCreateFunction", "([B)Ljava/lang/String;", &show_create_function_id_},
+    {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
 };
 
   JNIEnv* jni_env = getJNIEnv();
@@ -263,4 +265,9 @@ Status Frontend::SetCatalogInitialized() {
 
 Status Frontend::GetTableFiles(const TShowFilesParams& params, TResultSet* result) {
   return JniUtil::CallJniMethod(fe_, get_table_files_id_, params, result);
+}
+
+Status Frontend::BuildTestDescriptorTable(const TBuildTestDescriptorTableParams& params,
+    TDescriptorTable* result) {
+  return JniUtil::CallJniMethod(fe_, build_test_descriptor_table_id_, params, result);
 }

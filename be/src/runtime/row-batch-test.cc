@@ -15,23 +15,30 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <boost/scoped_ptr.hpp>
+
 #include "testutil/death-test-util.h"
 #include "testutil/gtest-util.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
+#include "service/fe-support.h"
+#include "service/frontend.h"
 #include "testutil/desc-tbl-builder.h"
 
 #include <gtest/gtest.h>
 
 #include "common/names.h"
 
-namespace impala {
+using namespace impala;
+
+// For computing tuple mem layouts.
+static scoped_ptr<Frontend> fe;
 
 TEST(RowBatchTest, AcquireStateWithMarkAtCapacity) {
   // Test that AcquireState() can be correctly called with MarkAtCapacity() on the
   // source batch.
   ObjectPool pool;
-  DescriptorTblBuilder builder(&pool);
+  DescriptorTblBuilder builder(fe.get(), &pool);
   builder.DeclareTuple() << TYPE_INT;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -61,9 +68,10 @@ TEST(RowBatchTest, AcquireStateWithMarkAtCapacity) {
   }
 }
 
-}
-
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  InitFeSupport();
+  fe.reset(new Frontend());
   return RUN_ALL_TESTS();
 }
