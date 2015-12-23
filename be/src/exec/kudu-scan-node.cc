@@ -42,9 +42,6 @@
 
 DEFINE_int32(kudu_max_row_batches, 0, "The maximum size of the row batch queue, "
     " for Kudu scanners.");
-DEFINE_int32(kudu_scanner_keep_alive_period_us, 15 * 1000L * 1000L,
-    "The period at which Kudu Scanners should send keep-alive requests to the tablet "
-    "server to ensure that scanners do not time out.");
 
 using boost::algorithm::to_lower_copy;
 using kudu::client::KuduClient;
@@ -440,12 +437,16 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_ra
           mem_tracker()));
       status = scanner.GetNext(row_batch.get(), &eos);
       bool added_to_queue = false;
-      while(status.ok() && !done_ &&
-          !(added_to_queue = row_batch_queue->AddBatchWithTimeout(row_batch.get(),
-          FLAGS_kudu_scanner_keep_alive_period_us))) {
+      // We try to push the batches onto the queue with a 1-second timeout,
+      // so that if the queue is full, we can still periodically send keepalive
+      // messages for the Kudu scanner.
+      while (status.ok() && !done_ &&
+             !(added_to_queue = row_batch_queue->AddBatchWithTimeout(
+                   row_batch.get(), 1000000))) {
         status = scanner.KeepKuduScannerAlive();
       }
       if (added_to_queue) row_batch.release();
+      if (status.ok()) status = scanner.KeepKuduScannerAlive();
       if (!status.ok() || done_) goto done;
     }
     // Mark the current scan range as complete.

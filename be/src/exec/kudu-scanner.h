@@ -118,6 +118,9 @@ class KuduScanner {
   std::vector<kudu::client::KuduRowResult> cur_rows_;
   int rows_scanned_current_block_;
 
+  /// The last time a keepalive request or successful RPC was sent.
+  int64_t last_alive_time_micros_;
+
   /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
 

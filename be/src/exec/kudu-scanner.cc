@@ -32,6 +32,7 @@
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile.h"
+#include "util/time.h"
 
 #include "common/names.h"
 
@@ -45,6 +46,9 @@ using strings::Substitute;
 
 DEFINE_bool(pick_only_leaders_for_tests, false,
             "Whether to pick only leader replicas, for tests purposes only.");
+DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
+    "The period at which Kudu Scanners should send keep-alive requests to the tablet "
+    "server to ensure that scanners do not time out.");
 
 namespace impala {
 
@@ -75,7 +79,9 @@ Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
 KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
     state_(state),
-    rows_scanned_current_block_(0) {}
+    rows_scanned_current_block_(0),
+    last_alive_time_micros_(0) {
+}
 
 Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
     const std::tr1::shared_ptr<KuduTable>& table) {
@@ -99,8 +105,14 @@ Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
 
 Status KuduScanner::KeepKuduScannerAlive() {
   if (!scanner_) return Status::OK();
+  int64_t now = MonotonicMicros();
+  int64_t keepalive_us = FLAGS_kudu_scanner_keep_alive_period_sec * 1e6;
+  if (now < last_alive_time_micros_ + keepalive_us) {
+    return Status::OK();
+  }
   KUDU_RETURN_IF_ERROR(scanner_->KeepAlive(), "Unable to keep the "
       "Kudu scanner alive.");
+  last_alive_time_micros_ = now;
   return Status::OK();
 }
 
@@ -345,11 +357,13 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
 
 Status KuduScanner::GetNextBlock() {
   SCOPED_TIMER(scan_node_->kudu_read_timer());
+  int64_t now = MonotonicMicros();
   cur_rows_.clear();
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_rows_), "Unable to advance iterator");
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);
   rows_scanned_current_block_ = 0;
   COUNTER_ADD(scan_node_->rows_read_counter(), cur_rows_.size());
+  last_alive_time_micros_ = now;
   return Status::OK();
 }
 
