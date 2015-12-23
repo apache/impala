@@ -74,7 +74,8 @@ Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
 
 KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
-    state_(state) {}
+    state_(state),
+    rows_scanned_current_block_(0) {}
 
 Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
     const std::tr1::shared_ptr<KuduTable>& table) {
