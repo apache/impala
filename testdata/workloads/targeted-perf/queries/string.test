@@ -47,8 +47,8 @@ WHERE l_comment LIKE 'egular courts above th%e'
 ---- TYPES
 BIGINT
 ====
-# Make sure we free local expr allocations
 ---- QUERY: PERF_STRING-Q7
+-- Make sure we free local expr allocations
 SELECT count(*) FROM lineitem
 WHERE lower(l_comment) =     'egular courts above the'
 ---- RESULTS

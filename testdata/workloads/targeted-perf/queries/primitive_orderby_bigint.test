@@ -1,8 +1,8 @@
 ====
 ---- QUERY: primitive_orderby_bigint
----- Description : Scan a fact table and sort 50Million rows.
----- Target test case : Order by bigint column without returning all
-----   rows to the client.
+-- Description : Scan a fact table and sort 50Million rows.
+-- Target test case : Order by bigint column without returning all
+--   rows to the client.
 SELECT *
 FROM   (SELECT Rank()
                  OVER(
@@ -13,4 +13,3 @@ WHERE  rank < 10;
 ---- RESULTS
 ---- TYPES
 ====
-

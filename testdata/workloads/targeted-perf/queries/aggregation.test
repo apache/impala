@@ -1,6 +1,6 @@
 ====
 ---- QUERY: PERF_AGG-Q1
-# Simple aggregations across a few different data types
+-- Simple aggregations across a few different data types
 SELECT count(*), min(l_linenumber), max(l_quantity), round(sum(l_tax), 2)
 FROM lineitem
 ---- RESULTS
@@ -9,7 +9,7 @@ FROM lineitem
 BIGINT, INT, DOUBLE, DOUBLE
 ====
 ---- QUERY: PERF_AGG-Q2
-# Group by l_shipmode - 7 groups
+-- Group by l_shipmode - 7 groups
 SELECT l_shipmode, count(*)
 FROM lineitem
 GROUP BY l_shipmode
@@ -25,7 +25,7 @@ GROUP BY l_shipmode
 STRING, BIGINT
 ====
 ---- QUERY: PERF_AGG-Q3
-# Group by l_receiptdate ~ 2500 groups
+-- Group by l_receiptdate ~ 2500 groups
 SELECT  l_receiptdate, count(*)
 FROM lineitem
 GROUP BY l_receiptdate
@@ -2587,11 +2587,11 @@ GROUP BY l_receiptdate
 ---- TYPES
 STRING, BIGINT
 ====
-# This is interesting for looking at partitioned aggregation.
-# Ideally, we'd like to have a column with more distinct values
-# but there are intermittent slow downs. l_suppkey is good enough
-# for now.
 ---- QUERY: PERF_AGG-Q4
+-- This is interesting for looking at partitioned aggregation.
+-- Ideally, we would like to have a column with more distinct values
+-- but there are intermittent slow downs. l_suppkey is good enough
+-- for now.
 SELECT l_suppkey, count(*) as cnt
 FROM lineitem
 GROUP BY l_suppkey
@@ -2612,9 +2612,9 @@ LIMIT 10
 BIGINT, BIGINT
 ====
 ---- QUERY: PERF_AGG-Q5
-# This is a perf regression test for IMPALA-288. The goal of the query is to
-# be very selective - the filter will select only 2 rows from lineitem
-# across all scale factors.
+-- This is a perf regression test for IMPALA-288. The goal of the query is to
+-- be very selective - the filter will select only 2 rows from lineitem
+-- across all scale factors.
 select min(l_comment), count(*) from lineitem
 where
   l_shipmode = 'AIR' and l_linenumber = 3 and
@@ -2625,9 +2625,9 @@ STRING,BIGINT
 'ffily even deposits. pending packages aff',2
 ====
 ---- QUERY: PERF_AGG-Q6
-# The planner should recognize that only c1 and c2 are being materialized from
-# the inline-view. This will provide a significant performance improvement on
-# Parquet format tables.
+-- The planner should recognize that only c1 and c2 are being materialized from
+-- the inline-view. This will provide a significant performance improvement on
+-- Parquet format tables.
 SELECT v1.c1, v1.c2
 FROM (SELECT
   sum(l_orderkey) as c1,
@@ -2647,8 +2647,8 @@ C1, C2
 BIGINT, BIGINT
 ====
 ---- QUERY: PERF_AGG-Q7
-# Similar to PERF_AGG-Q6, but with a more complicated query that contains a
-# WITH clause and an inline-view.
+-- Similar to PERF_AGG-Q6, but with a more complicated query that contains a
+-- WITH clause and an inline-view.
 WITH v2 as (SELECT v1.c1, v1.c2
   FROM (SELECT
     sum(l_orderkey) as c1,

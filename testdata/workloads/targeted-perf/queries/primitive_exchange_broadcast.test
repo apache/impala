@@ -1,8 +1,8 @@
 ====
 ---- QUERY: primitive_exchange_broadcast
----- Description : Large broadcast join with no rows qualifying from the probe side.
----- Target test case : Broadcast large amounts of data over the network while stressing the
-----   exchange operator along with HashTable build.
+-- Description : Large broadcast join with no rows qualifying from the probe side.
+-- Target test case : Broadcast large amounts of data over the network while stressing the
+--   exchange operator along with HashTable build.
 SELECT /* +straight_join */ count(*)
 FROM nation
 JOIN /* +broadcast */ lineitem ON l_orderkey = n_nationkey

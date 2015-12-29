@@ -1,8 +1,8 @@
 ====
 ---- QUERY: primitive_top-n_all
----- Description : Scan a fact table and select the top-n 1Million rows.
----- Target test case : Order by all columns in the table without returning all
-----      rows to the client.
+-- Description : Scan a fact table and select the top-n 1Million rows.
+-- Target test case : Order by all columns in the table without returning all
+--      rows to the client.
 SELECT count(*)
 FROM
   (SELECT l_orderkey

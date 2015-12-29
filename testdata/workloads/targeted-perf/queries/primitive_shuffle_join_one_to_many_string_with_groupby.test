@@ -1,8 +1,8 @@
 ====
 ---- QUERY: primitive_shuffle_join_one_to_many_string_with_groupby
----- Description : Fact to fact shuffle join on string column followed by group by.
----- Target test case : Large Joins and aggregations done against string column
-----   done as part of ETL.
+-- Description : Fact to fact shuffle join on string column followed by group by.
+-- Target test case : Large Joins and aggregations done against string column
+--   done as part of ETL.
 SELECT Count(*) AS cnt
 FROM
   ( SELECT Upper(Concat(Cast(l_orderkey AS STRING),'bla')) AS l_orderkey_string

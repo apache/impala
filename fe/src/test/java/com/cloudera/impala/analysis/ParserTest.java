@@ -231,6 +231,7 @@ public class ParserTest {
     ParsesOk("select 1--");
     ParsesOk("select 1 --foo");
     ParsesOk("select 1 --\ncol_name");
+    ParsesOk("--foo's \nselect 1 --bar");
     ParsesOk("--foo\nselect 1 --bar");
     ParsesOk("--foo\r\nselect 1 --bar");
     ParsesOk("--/* foo */\n select 1");

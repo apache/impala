@@ -1,7 +1,7 @@
 ====
 ---- QUERY: primitive_filter_string_selective
----- Description : Scan fact table while applying selective filter on string column.
----- Target test case : Basic scan and filter.
+-- Description : Scan fact table while applying selective filter on string column.
+-- Target test case : Basic scan and filter.
 SELECT count(*)
 FROM lineitem
 WHERE l_shipdate < '1992-01-03';
