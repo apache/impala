@@ -177,7 +177,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_TIMER(materialize_tuple_timer());
 
-  if (ReachedLimit()) {
+  if (ReachedLimit() || scan_ranges_.empty()) {
     *eos = true;
     return Status::OK();
   }
