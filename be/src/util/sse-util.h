@@ -88,11 +88,17 @@ namespace SSEUtil {
 
 template<int MODE>
 static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int len2) {
+#ifdef __clang__
   /// Use asm reg rather than Yz output constraint to workaround LLVM bug 13199 -
   /// clang doesn't support Y-prefixed asm constraints.
-  register volatile __m128i result asm("xmm0");
+  register volatile __m128i result asm ("xmm0");
   __asm__ volatile ("pcmpestrm %5, %2, %1"
       : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
+#else
+  __m128i result;
+  __asm__ volatile ("pcmpestrm %5, %2, %1"
+      : "=Yz"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
+#endif
   return result;
 }
 
