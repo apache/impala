@@ -1156,37 +1156,6 @@ TBLPROPERTIES("serialization.null.format" = "xyz");
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-escapechartesttable
----- PARTITION_COLUMNS
-id int
----- COLUMNS
-bool_col boolean
----- ROW_FORMAT
-delimited fields terminated by ',' escaped by '\n'
----- ALTER
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=0);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=1);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=2);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=3);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=4);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=5);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=6);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=7);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=8);
-ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(id=9);
-----  DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (id)
-select distinct bool_col,id FROM {db_name}.alltypesagg where id < 10 order by id;
----- LOAD
-SET hive.exec.dynamic.partition.mode=nonstrict;
-SET hive.exec.dynamic.partition=true;
-  SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (id)
-select distinct bool_col,id FROM {db_name}.alltypesagg where id < 10 order by id;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 TblWithRaggedColumns
 ---- COLUMNS
 str_col string
