@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -37,9 +38,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.ColumnLineageGraph;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.service.Frontend;
@@ -286,7 +285,7 @@ public class PlannerTestBase {
    * expected error message was given.
    */
   private String getExpectedErrorMessage(ArrayList<String> expectedPlan) {
-    if (expectedPlan.isEmpty()) return null;
+    if (expectedPlan == null || expectedPlan.isEmpty()) return null;
     if (!expectedPlan.get(0).toLowerCase().startsWith("not implemented")) return null;
     // Find first ':' and extract string on right hand side as error message.
     int ix = expectedPlan.get(0).indexOf(":");
@@ -363,73 +362,108 @@ public class PlannerTestBase {
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         dbName, System.getProperty("user.name"));
     queryCtx.request.query_options = options;
-    // single-node plan and scan range locations
-    testSingleNodePlan(testCase, queryCtx, errorLog, actualOutput);
-    testDistributedPlan(testCase, queryCtx, errorLog, actualOutput);
-    testColumnLineageOutput(testCase, queryCtx, errorLog, actualOutput);
+    // Test single node plan, scan range locations, and column lineage.
+    TExecRequest singleNodeExecRequest =
+        testPlan(testCase, true, queryCtx, errorLog, actualOutput);
+    checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
+    checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
+    // Test distributed plan.
+    testPlan(testCase, false, queryCtx, errorLog, actualOutput);
   }
 
   /**
-   * Produces single-node plan for testCase and compares actual plan with expected plan,
-   * as well as the scan range locations.
-   * If testCase contains no expected single-node plan then this function is a no-op.
+   * Produces the single-node or distributed plan for testCase and compares the
+   * actual/expected plans if the corresponding test section exists in testCase.
+   *
+   * Returns the produced exec request or null if there was an error generating
+   * the plan.
    */
-  private void testSingleNodePlan(TestCase testCase, TQueryCtx queryCtx,
-      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
-    ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
-    // Test case has no expected single-node plan. Do not test it.
-    if (expectedPlan == null || expectedPlan.isEmpty()) return;
+  private TExecRequest testPlan(TestCase testCase, boolean singleNodePlan,
+      TQueryCtx queryCtx, StringBuilder errorLog, StringBuilder actualOutput) {
+    Section section = (singleNodePlan) ? Section.PLAN : Section.DISTRIBUTEDPLAN;
     String query = testCase.getQuery();
-    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-    queryCtx.request.getQuery_options().setNum_nodes(1);
     queryCtx.request.setStmt(query);
-    boolean isImplemented = expectedErrorMsg == null;
-    StringBuilder explainBuilder = new StringBuilder();
+    if (section == Section.PLAN) {
+      queryCtx.request.getQuery_options().setNum_nodes(1);
+    } else {
+      queryCtx.request.getQuery_options().setNum_nodes(
+          ImpalaInternalServiceConstants.NUM_NODES_ALL);
+    }
+    ArrayList<String> expectedPlan = testCase.getSectionContents(section);
+    boolean sectionExists = expectedPlan != null && !expectedPlan.isEmpty();
+    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
 
+    StringBuilder explainBuilder = new StringBuilder();
     TExecRequest execRequest = null;
-    String locationsStr = null;
-    actualOutput.append(Section.PLAN.getHeader() + "\n");
+    actualOutput.append(section.getHeader() + "\n");
     try {
       execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
-      buildMaps(execRequest.query_exec_request);
-      String explainStr = removeExplainHeader(explainBuilder.toString());
-      actualOutput.append(explainStr);
-      if (!isImplemented) {
-        errorLog.append(
-            "query produced PLAN\nquery=" + query + "\nplan=\n" + explainStr);
-      } else {
-        LOG.info("single-node plan: " + explainStr);
-        String result = TestUtils.compareOutput(
-            Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
-        if (!result.isEmpty()) {
-          errorLog.append("section " + Section.PLAN.toString() + " of query:\n" + query
-              + "\n" + result);
-        }
-        // Query exec request may not be set for DDL, e.g., CTAS.
-        if (execRequest.isSetQuery_exec_request()) {
-          testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
-          locationsStr =
-              PrintScanRangeLocations(execRequest.query_exec_request).toString();
-        }
+    } catch (NotImplementedException e) {
+      if (!sectionExists) return null;
+      handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
+    } catch (Exception e) {
+      errorLog.append(String.format("Query:\n%s\nError Stack:\n%s\n", query,
+          ExceptionUtils.getStackTrace(e)));
+    }
+    // No expected plan was specified for section. Skip expected/actual comparison.
+    if (!sectionExists) return execRequest;
+    // Failed to produce an exec request.
+    if (execRequest == null) return null;
+
+    String explainStr = removeExplainHeader(explainBuilder.toString());
+    actualOutput.append(explainStr);
+    LOG.info(section.toString() + ":" + explainStr);
+    if (expectedErrorMsg != null) {
+      errorLog.append(String.format(
+          "\nExpected failure, but query produced %s.\nQuery:\n%s\n\n%s:\n%s",
+          section, query, section, explainStr));
+    } else {
+      String planDiff = TestUtils.compareOutput(
+          Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
+      if (!planDiff.isEmpty()) {
+        errorLog.append(String.format(
+            "\nSection %s of query:\n%s\n\n%s", section, query, planDiff));
+        // Append the VERBOSE explain plan because it contains details about
+        // tuples/sizes/cardinality for easier debugging.
+        String verbosePlan = getVerboseExplainPlan(queryCtx);
+        errorLog.append("\nVerbose plan:\n" + verbosePlan);
       }
+    }
+    return execRequest;
+  }
+
+  /**
+   * Returns the VERBOSE explain plan for the given queryCtx, or a stack trace
+   * if an error occurred while creating the plan.
+   */
+  private String getVerboseExplainPlan(TQueryCtx queryCtx) {
+    StringBuilder explainBuilder = new StringBuilder();
+    TExecRequest execRequest = null;
+    TExplainLevel origExplainLevel =
+        queryCtx.request.getQuery_options().getExplain_level();
+    try {
+      queryCtx.request.getQuery_options().setExplain_level(TExplainLevel.VERBOSE);
+      execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
     } catch (ImpalaException e) {
-      if (e instanceof AnalysisException) {
-        errorLog.append(
-            "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
-        return;
-      } else if (e instanceof InternalException) {
-        errorLog.append(
-            "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
-        return;
-      } if (e instanceof NotImplementedException) {
-        handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
-      } else if (e instanceof CatalogException) {
-        // TODO: do we need to rethrow?
-        throw (CatalogException) e;
-      } else {
-        errorLog.append(
-            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
-      }
+      return ExceptionUtils.getStackTrace(e);
+    } finally {
+      queryCtx.request.getQuery_options().setExplain_level(origExplainLevel);
+    }
+    Preconditions.checkNotNull(execRequest);
+    String explainStr = removeExplainHeader(explainBuilder.toString());
+    return explainStr;
+  }
+
+  private void checkScanRangeLocations(TestCase testCase, TExecRequest execRequest,
+      StringBuilder errorLog, StringBuilder actualOutput) {
+    String query = testCase.getQuery();
+    // Query exec request may not be set for DDL, e.g., CTAS.
+    String locationsStr = null;
+    if (execRequest != null && execRequest.isSetQuery_exec_request()) {
+      buildMaps(execRequest.query_exec_request);
+      testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
+      locationsStr =
+          PrintScanRangeLocations(execRequest.query_exec_request).toString();
     }
 
     // compare scan range locations
@@ -474,40 +508,16 @@ public class PlannerTestBase {
     }
   }
 
-  private void testColumnLineageOutput(TestCase testCase, TQueryCtx queryCtx,
-      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
+  private void checkColumnLineage(TestCase testCase, TExecRequest execRequest,
+      StringBuilder errorLog, StringBuilder actualOutput) {
+    String query = testCase.getQuery();
     ArrayList<String> expectedLineage = testCase.getSectionContents(Section.LINEAGE);
     if (expectedLineage == null || expectedLineage.isEmpty()) return;
-    String query = testCase.getQuery();
-    queryCtx.request.getQuery_options().setNum_nodes(1);
-    queryCtx.request.setStmt(query);
-    StringBuilder explainBuilder = new StringBuilder();
-    TExecRequest execRequest = null;
     TLineageGraph lineageGraph = null;
-    try {
-      execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
-      if (execRequest.isSetQuery_exec_request()) {
-        lineageGraph = execRequest.query_exec_request.lineage_graph;
-      } else if (execRequest.isSetCatalog_op_request()) {
-        lineageGraph = execRequest.catalog_op_request.lineage_graph;
-      }
-    } catch (ImpalaException e) {
-      if (e instanceof AnalysisException) {
-        errorLog.append(
-            "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
-        return;
-      } else if (e instanceof InternalException) {
-        errorLog.append(
-            "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
-        return;
-      } if (e instanceof NotImplementedException) {
-        handleNotImplException(query, "", errorLog, actualOutput, e);
-      } else if (e instanceof CatalogException) {
-        throw (CatalogException) e;
-      } else {
-        errorLog.append(
-            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
-      }
+    if (execRequest != null && execRequest.isSetQuery_exec_request()) {
+      lineageGraph = execRequest.query_exec_request.lineage_graph;
+    } else if (execRequest.isSetCatalog_op_request()) {
+      lineageGraph = execRequest.catalog_op_request.lineage_graph;
     }
     ArrayList<String> expected =
       testCase.getSectionContents(Section.LINEAGE);
@@ -532,67 +542,6 @@ public class PlannerTestBase {
       actualOutput.append(TestUtils.prettyPrintJson(outputGraph.toJson()));
       actualOutput.append("\n");
     }
-  }
-
-  /**
-  * Produces distributed plan for testCase and compares actual plan with expected plan.
-  * If testCase contains no expected distributed plan then this function is a no-op.
-  */
- private void testDistributedPlan(TestCase testCase, TQueryCtx queryCtx,
-     StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
-   ArrayList<String> expectedPlan =
-       testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
-   // Test case has no expected distributed plan. Do not test it.
-   if (expectedPlan == null || expectedPlan.isEmpty()) return;
-
-   String query = testCase.getQuery();
-   String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-   queryCtx.request.getQuery_options().setNum_nodes(
-       ImpalaInternalServiceConstants.NUM_NODES_ALL);
-   queryCtx.request.setStmt(query);
-   boolean isImplemented = expectedErrorMsg == null;
-   StringBuilder explainBuilder = new StringBuilder();
-   actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
-   TExecRequest execRequest = null;
-   try {
-     // distributed plan
-     execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
-     String explainStr = removeExplainHeader(explainBuilder.toString());
-     actualOutput.append(explainStr);
-     if (!isImplemented) {
-       errorLog.append(
-           "query produced DISTRIBUTEDPLAN\nquery=" + query + "\nplan=\n"
-           + explainStr);
-     } else {
-       LOG.info("distributed plan: " + explainStr);
-       String result = TestUtils.compareOutput(
-           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
-       if (!result.isEmpty()) {
-         errorLog.append("section " + Section.DISTRIBUTEDPLAN.toString()
-             + " of query:\n" + query + "\n" + result);
-       }
-     }
-   } catch (ImpalaException e) {
-     if (e instanceof AnalysisException) {
-       errorLog.append(
-           "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
-       return;
-     } else if (e instanceof InternalException) {
-       errorLog.append(
-           "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
-       return;
-     } if (e instanceof NotImplementedException) {
-       handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
-     } else if (e instanceof CatalogException) {
-       throw (CatalogException) e;
-     } else {
-       errorLog.append(
-           "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
-     }
-   } catch (IllegalStateException e) {
-       errorLog.append(
-           "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
-   }
   }
 
   /**

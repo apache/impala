@@ -131,11 +131,11 @@ public class TestUtils {
     if (mismatch == -1 && actual.size() < expected.size()) {
       // actual is a prefix of expected
       StringBuilder output =
-          new StringBuilder("actual result is missing lines:\n");
+          new StringBuilder("Actual result is missing lines:\n");
       for (int i = 0; i < actual.size(); ++i) {
         output.append(actual.get(i)).append("\n");
       }
-      output.append("missing:\n");
+      output.append("Missing:\n");
       for (int i = actual.size(); i < expected.size(); ++i) {
         output.append(expected.get(i)).append("\n");
       }
@@ -145,7 +145,7 @@ public class TestUtils {
     if (mismatch != -1) {
       // print actual and expected, highlighting mismatch
       StringBuilder output =
-          new StringBuilder("actual result doesn't match expected result:\n");
+          new StringBuilder("Actual does not match expected result:\n");
       for (int i = 0; i <= mismatch; ++i) {
         output.append(actual.get(i)).append("\n");
       }
@@ -157,7 +157,7 @@ public class TestUtils {
       for (int i = mismatch + 1; i < actual.size(); ++i) {
         output.append(actual.get(i)).append("\n");
       }
-      output.append("\nexpected:\n");
+      output.append("\nExpected:\n");
       for (String str : expected) {
         output.append(str).append("\n");
       }
@@ -167,11 +167,11 @@ public class TestUtils {
     if (actual.size() > expected.size()) {
       // print actual and expected
       StringBuilder output =
-          new StringBuilder("actual result contains extra output:\n");
+          new StringBuilder("Actual result contains extra output:\n");
       for (String str : actual) {
         output.append(str).append("\n");
       }
-      output.append("\nexpected:\n");
+      output.append("\nExpected:\n");
       for (String str : expected) {
         output.append(str).append("\n");
       }
