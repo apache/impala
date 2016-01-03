@@ -24,3 +24,49 @@ int, boolean, int, int, int, bigint, float, double, string, string, string, int,
 2430,true,0,0,0,0,0,0,'09/01/09','0','2009-09-01 00:00:00',2009,9
 6380,true,0,0,0,0,0,0,'10/01/10','0','2010-10-01 00:00:00',2010,10
 ====
+---- QUERY
+select count(*) from functional_avro_snap.avro_coldef
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+select count(*) from functional_avro_snap.avro_extra_coldef
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+select tinyint_col, string_col from functional_avro_snap.avro_coldef order by int_col
+---- TYPES
+int, string
+---- RESULTS
+0,'0'
+0,'0'
+1,'1'
+1,'1'
+2,'2'
+2,'2'
+3,'3'
+3,'3'
+4,'4'
+4,'4'
+====
+---- QUERY
+select tinyint_col, string_col from functional_avro_snap.avro_extra_coldef order by int_col
+---- TYPES
+int, string
+---- RESULTS
+0,'0'
+0,'0'
+1,'1'
+1,'1'
+2,'2'
+2,'2'
+3,'3'
+3,'3'
+4,'4'
+4,'4'
+====

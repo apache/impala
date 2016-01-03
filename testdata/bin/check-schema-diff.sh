@@ -34,3 +34,4 @@ if ! git show $GIT_HASH &>/dev/null; then
 fi
 # Check whether a non-empty diff exists.
 git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets/$DATASET
+git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/avro_schema_resolution

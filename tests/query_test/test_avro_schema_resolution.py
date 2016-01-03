@@ -1,6 +1,7 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 import pytest
+from subprocess import call
 from subprocess import check_call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
@@ -34,3 +35,9 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
     assert len(comparison.data) == len(result.data)
     for x in range(len(result.data)):
       assert comparison.data[x] == result.data[x]
+
+  def test_avro_codegen_decoder(self, vector):
+    """Test for IMPALA-2798, verify if Impala returns correct result if table schema
+    doesn't match file schema.
+    """
+    self.run_test_case('QueryTest/avro-schema-resolution', vector)

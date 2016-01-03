@@ -153,7 +153,7 @@ export IMPALA_ZLIB_VERSION=1.2.8
 
 # Some of the variables need to be overwritten to explicitely mark the patch level
 if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
-  IMPALA_AVRO_VERSION+=-p3
+  IMPALA_AVRO_VERSION+=-p4
   IMPALA_BZIP2_VERSION+=-p1
   IMPALA_GLOG_VERSION+=-p1
   IMPALA_GPERFTOOLS_VERSION+=-p1

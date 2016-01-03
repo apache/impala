@@ -106,3 +106,84 @@ INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
 LOCATION '/test-warehouse/alltypes_avro_snap'
 TBLPROPERTIES ('avro.schema.url'='hdfs://${hiveconf:hive.metastore.warehouse.dir}/avro_schemas/functional/alltypes.json');
+
+-- IMPALA-2798, create two avro tables with same underlying data location, one table
+-- has an extra column at the end. Validate Impala doesn't use codegen decoding function
+-- if table schema is not the same as file schema.
+DROP TABLE IF EXISTS avro_coldef;
+CREATE EXTERNAL TABLE IF NOT EXISTS avro_coldef (
+bool_col boolean,
+tinyint_col int,
+smallint_col int,
+int_col int,
+bigint_col bigint,
+float_col float,
+double_col double,
+date_string_col string,
+string_col string,
+timestamp_col timestamp)
+PARTITIONED BY (year int, month int)
+STORED AS avro
+LOCATION '/test-warehouse/avro_coldef_snap'
+TBLPROPERTIES ('avro.schema.literal'='{
+"name": "a",
+"type": "record",
+"fields": [
+  {"name":"bool_col", "type":"boolean"},
+  {"name":"tinyint_col",     "type":"int"},
+  {"name":"smallint_col",    "type":"int"},
+  {"name":"int_col",   "type":"int"},
+  {"name":"bigint_col",  "type":"long"},
+  {"name":"float_col",  "type":"float"},
+  {"name":"double_col",  "type": "double"},
+  {"name":"date_string_col",  "type": "string"},
+  {"name":"string_col",  "type": "string"},
+  {"name":"timestamp_col",  "type": "long"}
+]}');
+
+INSERT OVERWRITE TABLE avro_coldef PARTITION(year=2014, month=1)
+SELECT bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+FROM (select * from functional.alltypes order by id limit 5) a;
+
+DROP TABLE IF EXISTS avro_extra_coldef;
+CREATE EXTERNAL TABLE IF NOT EXISTS avro_extra_coldef (
+bool_col boolean,
+tinyint_col int,
+smallint_col int,
+int_col int,
+bigint_col bigint,
+float_col float,
+double_col double,
+date_string_col string,
+string_col string,
+timestamp_col timestamp,
+extra_col string)
+PARTITIONED BY (year int, month int)
+STORED AS avro
+LOCATION '/test-warehouse/avro_coldef_snap'
+TBLPROPERTIES ('avro.schema.literal'='{
+"name": "a",
+"type": "record",
+"fields": [
+  {"name":"bool_col", "type":"boolean"},
+  {"name":"tinyint_col",     "type":"int"},
+  {"name":"smallint_col",    "type":"int"},
+  {"name":"int_col",   "type":"int"},
+  {"name":"bigint_col",  "type":"long"},
+  {"name":"float_col",  "type":"float"},
+  {"name":"double_col",  "type": "double"},
+  {"name":"date_string_col",  "type": "string"},
+  {"name":"string_col",  "type": "string"},
+  {"name":"timestamp_col",  "type": "long"},
+  {"name":"extra_col",  "type": "string", "default": "null"}
+]}');
+
+INSERT OVERWRITE TABLE avro_extra_coldef PARTITION(year=2014, month=2)
+SELECT bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col,
+timestamp_col, "avro" AS extra_col FROM
+(select * from functional.alltypes order by id limit 5) a;
+
+MSCK REPAIR TABLE avro_coldef;
+MSCK REPAIR TABLE avro_extra_coldef;
