@@ -137,9 +137,7 @@ public class KuduDdlDelegate extends DdlDelegate {
         }
       }
 
-      if (Strings.isNullOrEmpty(replication)) {
-        cto.setNumReplicas(1);
-      } else {
+      if (!Strings.isNullOrEmpty(replication)) {
         int r = Integer.parseInt(replication);
         if (r <= 0) {
           throw new ImpalaRuntimeException(
