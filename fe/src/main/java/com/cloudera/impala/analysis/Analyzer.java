@@ -1056,12 +1056,13 @@ public class Analyzer {
   }
 
   /**
-   * Creates an analyzed equality predicate between the given slots.
+   * Creates an inferred equality predicate between the given slots.
    */
-  public BinaryPredicate createEqPredicate(SlotId lhsSlotId, SlotId rhsSlotId) {
+  public BinaryPredicate createInferredEqPred(SlotId lhsSlotId, SlotId rhsSlotId) {
     BinaryPredicate pred = new BinaryPredicate(BinaryPredicate.Operator.EQ,
         new SlotRef(globalState_.descTbl.getSlotDesc(lhsSlotId)),
         new SlotRef(globalState_.descTbl.getSlotDesc(rhsSlotId)));
+    pred.setIsInferred();
     // create casts if needed
     pred.analyzeNoThrow(this);
     return pred;
@@ -1431,13 +1432,14 @@ public class Analyzer {
           }
           try {
             p = srcConjunct.trySubstitute(smap, this, false);
-            // Unset the id because this bound predicate itself is not registered, and
-            // to prevent callers from inadvertently marking the srcConjunct as assigned.
-            p.setId(null);
           } catch (ImpalaException exc) {
             // not an executable predicate; ignore
             continue;
           }
+          // Unset the id because this bound predicate itself is not registered, and
+          // to prevent callers from inadvertently marking the srcConjunct as assigned.
+          p.setId(null);
+          if (p instanceof BinaryPredicate) ((BinaryPredicate) p).setIsInferred();
           LOG.trace("new pred: " + p.toSql() + " " + p.debugString());
         }
 
@@ -1613,8 +1615,7 @@ public class Analyzer {
       if (isFullOuterJoined(lhsSlots.get(0)) || isFullOuterJoined(rhsSlots.get(0))) {
         continue;
       }
-      T newEqPred = (T) createEqPredicate(lhsSlots.get(0), rhsSlots.get(0));
-      newEqPred.analyzeNoThrow(this);
+      T newEqPred = (T) createInferredEqPred(lhsSlots.get(0), rhsSlots.get(0));
       if (!hasMutualValueTransfer(lhsSlots.get(0), rhsSlots.get(0))) continue;
       conjuncts.add(newEqPred);
     }
@@ -1687,7 +1688,7 @@ public class Analyzer {
           SlotId lhs = slotIds.get(j);
           if (!partialEquivSlots.union(lhs, rhs)) continue;
           if (!hasMutualValueTransfer(lhs, rhs)) continue;
-          conjuncts.add((T) createEqPredicate(lhs, rhs));
+          conjuncts.add((T) createInferredEqPred(lhs, rhs));
           // Check for early termination.
           if (partialEquivSlots.get(lhs).size() == slotIds.size()) {
             done = true;

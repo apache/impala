@@ -1085,3 +1085,53 @@ on (t1.id = v.id and v.int_col is null and v.int_col < 10 and v.id < 10)
    partitions=24/24 files=24 size=478.45KB
    predicates: a.id < 10
 ====
+# IMPALA-2643: Test inline views with duplicate exprs in their select list.
+# Inferred predicate referencing the same expr gets filtered out.
+select * from
+  (select * from
+    (select bigint_col, bigint_col as bigint_col2
+     from functional.alltypestiny) iv
+  ) ivv
+---- PLAN
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-2643: Explicit predicates remain unafftected.
+select * from
+  (select * from
+    (select bigint_col, bigint_col as bigint_col2
+     from functional.alltypestiny) iv
+  ) ivv where bigint_col = bigint_col2
+---- PLAN
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   predicates: bigint_col = bigint_col
+====
+# IMPALA-2643: Test aggregation.
+# Inferred predicate referencing the same expr gets filtered out.
+select * from
+  (select * from
+    (select sum(bigint_col) as s1, sum(bigint_col) as s2
+     from functional.alltypestiny) iv
+  ) ivv
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: sum(bigint_col)
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-2643: Explicit predicates remain unafftected.
+select * from
+  (select * from
+    (select sum(bigint_col) as s1, sum(bigint_col) as s2
+     from functional.alltypestiny) iv
+  ) ivv where s1 = s2
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: sum(bigint_col)
+|  having: sum(bigint_col) = sum(bigint_col)
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
