@@ -129,3 +129,12 @@ describe allcomplextypes.nested_struct_col
 ---- TYPES
 string,string,string
 ====
+---- QUERY
+describe impala_test_desc_db1.complex_types_tbl
+---- RESULTS
+'map_array_struct_col','map<string,array<struct<\n  f1:int,\n  f2:string\n>>>',''
+'struct_array_struct_col','struct<\n  f1:int,\n  f2:array<struct<\n    f11:bigint,\n    f12:string\n  >>\n>',''
+'map_array_map_struct_col','map<string,array<map<string,struct<\n  f1:string,\n  f2:int\n>>>>',''
+---- TYPES
+string,string,string
+====

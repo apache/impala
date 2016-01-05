@@ -42,7 +42,7 @@ public class MapType extends Type {
   @Override
   protected String prettyPrint(int lpad) {
     String leftPadding = StringUtils.repeat(' ', lpad);
-    if (!valueType_.isStructType()) return leftPadding + toSql();
+    if (valueType_.isScalarType()) return leftPadding + toSql();
     // Pass in the padding to make sure nested fields are aligned properly,
     // even if we then strip the top-level padding.
     String structStr = valueType_.prettyPrint(lpad);

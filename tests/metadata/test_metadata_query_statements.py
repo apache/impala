@@ -73,6 +73,14 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         "create database if not exists impala_test_desc_db4 "
         "comment \"test comment\" location \"" + get_fs_path("/test2.db") + "\"")
 
+    self.client.execute(
+        "create table if not exists impala_test_desc_db1.complex_types_tbl ("
+        "map_array_struct_col map<string, array<struct<f1:int, f2:string>>>, "
+        "struct_array_struct_col "
+        "struct<f1:int, f2:array<struct<f11:bigint, f12:string>>>, "
+        "map_array_map_struct_col "
+        "map<string, array<map<string, struct<f1:string, f2:int>>>>)")
+
   def teardown_method(self, method):
     self.cleanup_db('impala_test_desc_db1')
     self.cleanup_db('impala_test_desc_db2')
