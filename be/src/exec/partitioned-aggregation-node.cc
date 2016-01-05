@@ -192,7 +192,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
         state->fragment_hash_seed(), MAX_PARTITION_DEPTH, 1));
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
-        MinRequiredBuffers(), mem_tracker(), state, &block_mgr_client_));
+        MinRequiredBuffers(), true, mem_tracker(), state, &block_mgr_client_));
     RETURN_IF_ERROR(CreateHashPartitions(0));
   }
 

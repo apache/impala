@@ -168,7 +168,8 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     }
   }
 
-  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, mem_tracker(), state, &client_));
+  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, false, mem_tracker(), state,
+      &client_));
   return Status::OK();
 }
 

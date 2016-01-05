@@ -996,8 +996,8 @@ Status Sorter::Init() {
   if (output_row_desc_->tuple_descriptors()[0]->HasVarlenSlots()) {
     min_blocks_required *= 2;
   }
-  RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state_,
-      &block_mgr_client_));
+  RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, false, mem_tracker_,
+      state_, &block_mgr_client_));
 
   DCHECK(unsorted_run_ != NULL);
   RETURN_IF_ERROR(unsorted_run_->Init());

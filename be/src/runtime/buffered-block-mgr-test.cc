@@ -148,21 +148,25 @@ class BufferedBlockMgrTest : public ::testing::Test {
   }
 
   BufferedBlockMgr* CreateMgrAndClient(int64_t query_id, int max_buffers, int block_size,
-      int reserved_blocks, MemTracker* tracker, BufferedBlockMgr::Client** client) {
+      int reserved_blocks, bool tolerates_oversubscription, MemTracker* tracker,
+      BufferedBlockMgr::Client** client) {
     RuntimeState* state;
     BufferedBlockMgr* mgr = CreateMgr(query_id, max_buffers, block_size, &state);
-    EXPECT_TRUE(mgr->RegisterClient(reserved_blocks, tracker, state, client).ok());
+    EXPECT_TRUE(mgr->RegisterClient(reserved_blocks, tolerates_oversubscription, tracker,
+        state, client).ok());
     EXPECT_TRUE(client != NULL);
     return mgr;
   }
 
   void CreateMgrsAndClients(int64_t start_query_id, int num_mgrs, int buffers_per_mgr,
-      int block_size, int reserved_blocks_per_client, MemTracker* tracker,
-      vector<BufferedBlockMgr*>* mgrs, vector<BufferedBlockMgr::Client*>* clients) {
+      int block_size, int reserved_blocks_per_client, bool tolerates_oversubscription,
+      MemTracker* tracker, vector<BufferedBlockMgr*>* mgrs,
+      vector<BufferedBlockMgr::Client*>* clients) {
     for (int i = 0; i < num_mgrs; ++i) {
       BufferedBlockMgr::Client* client;
       BufferedBlockMgr* mgr = CreateMgrAndClient(start_query_id + i, buffers_per_mgr,
-          block_size_, reserved_blocks_per_client, tracker, &client);
+          block_size_, reserved_blocks_per_client, tolerates_oversubscription,
+          tracker, &client);
       mgrs->push_back(mgr);
       clients->push_back(client);
     }
@@ -260,7 +264,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     int max_num_blocks = 5;
     BufferedBlockMgr* block_mgr;
     BufferedBlockMgr::Client* client;
-    block_mgr = CreateMgrAndClient(0, max_num_blocks, block_size, 0,
+    block_mgr = CreateMgrAndClient(0, max_num_blocks, block_size, 0, false,
         client_tracker_.get(), &client);
     EXPECT_EQ(test_env_->block_mgr_parent_tracker()->consumption(), 0);
 
@@ -303,7 +307,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     int max_num_buffers = 5;
     BufferedBlockMgr* block_mgr;
     BufferedBlockMgr::Client* client;
-    block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0,
+    block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0, false,
         client_tracker_.get(), &client);
 
     // Check counters.
@@ -368,7 +372,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
     ApiFunction api_function;
 
     BufferedBlockMgr::Client* client;
-    Status status = block_mgr->RegisterClient(0, client_tracker_.get(), state, &client);
+    Status status = block_mgr->RegisterClient(0, false, client_tracker_.get(), state,
+        &client);
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(client != NULL);
 
@@ -546,8 +551,8 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   int max_num_blocks = 3;
   BufferedBlockMgr* block_mgr;
   BufferedBlockMgr::Client* client;
-  block_mgr = CreateMgrAndClient(0, max_num_blocks, block_size, 0, client_tracker_.get(),
-      &client);
+  block_mgr = CreateMgrAndClient(0, max_num_blocks, block_size, 0, false,
+      client_tracker_.get(), &client);
   EXPECT_EQ(0, test_env_->block_mgr_parent_tracker()->consumption());
 
   vector<BufferedBlockMgr::Block*> blocks;
@@ -609,8 +614,8 @@ TEST_F(BufferedBlockMgrTest, Pin) {
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
   BufferedBlockMgr::Client* client;
-  block_mgr = CreateMgrAndClient(0, max_num_blocks, block_size, 0, client_tracker_.get(),
-      &client);
+  block_mgr = CreateMgrAndClient(0, max_num_blocks, block_size, 0, false,
+      client_tracker_.get(), &client);
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_blocks, &blocks);
@@ -664,7 +669,7 @@ TEST_F(BufferedBlockMgrTest, Deletion) {
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
   BufferedBlockMgr::Client* client;
-  block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0,
+  block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0, false,
       client_tracker_.get(), &client);
 
   // Check counters.
@@ -692,7 +697,7 @@ TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
   int max_num_buffers = 16;
   BufferedBlockMgr::Client* client;
   BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
-      0, client_tracker_.get(), &client);
+      0, false, client_tracker_.get(), &client);
 
   // Pinned I/O block.
   BufferedBlockMgr::Block* new_block;
@@ -743,7 +748,7 @@ TEST_F(BufferedBlockMgrTest, Close) {
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
   BufferedBlockMgr::Client* client;
-  block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0,
+  block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0, false,
       client_tracker_.get(), &client);
 
   vector<BufferedBlockMgr::Block*> blocks;
@@ -785,7 +790,7 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
   BufferedBlockMgr::Client* client;
-  block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0,
+  block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0, false,
       client_tracker_.get(), &client);
 
   vector<BufferedBlockMgr::Block*> blocks;
@@ -830,7 +835,7 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   int max_num_buffers = 2;
   BufferedBlockMgr::Client* client;
   BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_, 0,
-      client_tracker_.get(), &client);
+      false, client_tracker_.get(), &client);
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
@@ -863,7 +868,7 @@ TEST_F(BufferedBlockMgrTest, DISABLED_WriteErrorBlacklist) {
   int blocks_per_mgr = MAX_NUM_BLOCKS / NUM_BLOCK_MGRS;
   vector<BufferedBlockMgr*> block_mgrs;
   vector<BufferedBlockMgr::Client*> clients;
-  CreateMgrsAndClients(0, NUM_BLOCK_MGRS, blocks_per_mgr, block_size_, 0,
+  CreateMgrsAndClients(0, NUM_BLOCK_MGRS, blocks_per_mgr, block_size_, 0, false,
       client_tracker_.get(), &block_mgrs, &clients);
 
   // Allocate files for all 2x2 combinations by unpinning blocks.
@@ -923,7 +928,7 @@ TEST_F(BufferedBlockMgrTest, DISABLED_WriteErrorBlacklist) {
   // A new block manager should only use the good dir for backing storage.
   BufferedBlockMgr::Client* new_client;
   BufferedBlockMgr* new_block_mgr = CreateMgrAndClient(9999, blocks_per_mgr, block_size_,
-      0, client_tracker_.get(), &new_client);
+      0, false, client_tracker_.get(), &new_client);
   vector<BufferedBlockMgr::Block*> new_mgr_blocks;
   AllocateBlocks(new_block_mgr, new_client, blocks_per_mgr, &new_mgr_blocks);
   UnpinBlocks(new_mgr_blocks);
@@ -947,7 +952,7 @@ TEST_F(BufferedBlockMgrTest, AllocationErrorHandling) {
   vector<BufferedBlockMgr*> block_mgrs;
   vector<BufferedBlockMgr::Client*> clients;
   CreateMgrsAndClients(0, num_block_mgrs, blocks_per_mgr, block_size_, 0,
-      client_tracker_.get(), &block_mgrs, &clients);
+      false, client_tracker_.get(), &block_mgrs, &clients);
 
   // Allocate files for all 2x2 combinations by unpinning blocks.
   vector<vector<BufferedBlockMgr::Block*> > blocks;
@@ -985,7 +990,7 @@ TEST_F(BufferedBlockMgrTest, NoDirsAllocationError) {
   int max_num_buffers = 2;
   BufferedBlockMgr::Client* client;
   BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
-      0, client_tracker_.get(), &client);
+      0, false, client_tracker_.get(), &client);
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   for (int i = 0; i < tmp_dirs.size(); ++i) {
@@ -1009,11 +1014,11 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
-  status = block_mgr->RegisterClient(client1_buffers, client_tracker_.get(),
+  status = block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
       runtime_state, &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, client_tracker_.get(),
+  status = block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
       runtime_state, &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
@@ -1122,11 +1127,11 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
   BufferedBlockMgr::Block* block = NULL;
-  status = block_mgr->RegisterClient(client1_buffers, client_tracker_.get(),
+  status = block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
       runtime_state, &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, client_tracker_.get(),
+  status = block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
       runtime_state, &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
@@ -1158,11 +1163,12 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   TearDownMgrs();
 }
 
-// Create two clients causing oversubscription.
+// Create multiple clients causing oversubscription.
 TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   Status status;
   int client1_buffers = 1;
   int client2_buffers = 2;
+  int client3_buffers = 2;
   int max_num_buffers = 2;
   const int block_size = 1024;
   RuntimeState* runtime_state;
@@ -1170,14 +1176,20 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
 
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
+  BufferedBlockMgr::Client* client3 = NULL;
   BufferedBlockMgr::Block* block = NULL;
-  status = block_mgr->RegisterClient(client1_buffers, client_tracker_.get(),
+  status = block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
       runtime_state, &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, client_tracker_.get(), runtime_state, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+      runtime_state, &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
+  status = block_mgr->RegisterClient(client3_buffers, true, client_tracker_.get(),
+      runtime_state, &client3);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(client3 != NULL);
 
   // Client one allocates first block, should work.
   status = block_mgr->GetNewBlock(client1, NULL, &block);
@@ -1199,6 +1211,12 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   // with MEM_LIMIT_EXCEEDED.
   status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.IsMemLimitExceeded());
+
+  // Allocate with client three. Since client three can tolerate oversubscription,
+  // this should fail with no error even though it was a reserved request.
+  status = block_mgr->GetNewBlock(client3, NULL, &block);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(block == NULL);
 
   TearDownMgrs();
 }

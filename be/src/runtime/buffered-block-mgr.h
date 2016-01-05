@@ -314,10 +314,13 @@ class BufferedBlockMgr {
   /// The min reserved buffers is often independent of data size and we still want
   /// to run small queries with very small limits.
   /// Buffers used by this client are reflected in tracker.
+  /// tolerates_oversubscription determines how oversubscription is handled. If true,
+  /// failure to allocate a reserved buffer is not an error. If false, failure to
+  /// allocate a reserved buffer is a MEM_LIMIT_EXCEEDED error.
   /// TODO: The fact that we allow oversubscription is problematic.
-  /// as the code expects the reservations to always be granted (currently not the case).
-  Status RegisterClient(int num_reserved_buffers, MemTracker* tracker,
-      RuntimeState* state, Client** client);
+  /// as some code expects the reservations to always be granted (currently not the case).
+  Status RegisterClient(int num_reserved_buffers, bool tolerates_oversubscription,
+      MemTracker* tracker, RuntimeState* state, Client** client);
 
   /// Clears all reservations for this client.
   void ClearReservations(Client* client);

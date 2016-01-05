@@ -99,8 +99,8 @@ class SimpleTupleStreamTest : public testing::Test {
   void InitBlockMgr(int64_t limit, int block_size) {
     Status status = test_env_->CreateQueryState(0, limit, block_size, &runtime_state_);
     ASSERT_TRUE(status.ok());
-    status = runtime_state_->block_mgr()->RegisterClient(0, &tracker_, runtime_state_,
-        &client_);
+    status = runtime_state_->block_mgr()->RegisterClient(0, false, &tracker_,
+        runtime_state_, &client_);
     ASSERT_TRUE(status.ok());
   }
 

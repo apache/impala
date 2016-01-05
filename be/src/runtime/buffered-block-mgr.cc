@@ -44,13 +44,15 @@ SpinLock BufferedBlockMgr::static_block_mgrs_lock_;
 
 
 struct BufferedBlockMgr::Client {
-  Client(BufferedBlockMgr* mgr, int num_reserved_buffers, MemTracker* tracker,
+  Client(BufferedBlockMgr* mgr, int num_reserved_buffers,
+      bool tolerates_oversubscription, MemTracker* tracker,
          RuntimeState* state)
       : mgr_(mgr),
         state_(state),
         tracker_(tracker),
         query_tracker_(mgr_->mem_tracker_->parent()),
         num_reserved_buffers_(num_reserved_buffers),
+        tolerates_oversubscription_(tolerates_oversubscription),
         num_tmp_reserved_buffers_(0),
         num_pinned_buffers_(0) {
     DCHECK(tracker != NULL);
@@ -77,6 +79,10 @@ struct BufferedBlockMgr::Client {
 
   /// Number of buffers reserved by this client.
   int num_reserved_buffers_;
+
+  /// If false, return MEM_LIMIT_EXCEEDED when a reserved buffer cannot be allocated.
+  /// If true, return Status::OK() as with a non-reserved buffer.
+  bool tolerates_oversubscription_;
 
   /// Number of buffers temporarily reserved.
   int num_tmp_reserved_buffers_;
@@ -243,10 +249,12 @@ int64_t BufferedBlockMgr::remaining_unreserved_buffers() const {
   return num_buffers;
 }
 
-Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, MemTracker* tracker,
-    RuntimeState* state, Client** client) {
+Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers,
+    bool tolerates_oversubscription, MemTracker* tracker, RuntimeState* state,
+    Client** client) {
   DCHECK_GE(num_reserved_buffers, 0);
-  Client* aClient = new Client(this, num_reserved_buffers, tracker, state);
+  Client* aClient = new Client(this, num_reserved_buffers, tolerates_oversubscription,
+      tracker, state);
   lock_guard<mutex> lock(lock_);
   *client = obj_pool_.Add(aClient);
   unfullfilled_reserved_buffers_ += num_reserved_buffers;
@@ -972,7 +980,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     if (buffer_desc == NULL) {
       // There are no free buffers or blocks we can evict. We need to fail this request.
       // If this is an optional request, return OK. If it is required, return OOM.
-      if (!is_reserved_request) return Status::OK();
+      if (!is_reserved_request || client->tolerates_oversubscription_) return Status::OK();
 
       if (VLOG_QUERY_IS_ON) {
         stringstream ss;
