@@ -28,8 +28,10 @@
   </property>
 
   <property>
+  <!-- Trash is enabled since some tests (in metadata/test_ddl.py) depend on it.
+       It is set to 24 hours to avoid checkpointing between the test runs -->
     <name>fs.trash.interval</name>
-    <value>30</value>
+    <value>1440</value>
   </property>
 
   <property>
