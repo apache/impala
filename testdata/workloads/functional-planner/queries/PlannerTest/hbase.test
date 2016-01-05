@@ -480,29 +480,29 @@ where bigint_col = 10 and day = 1
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col = 10, day = 1
 ====
-# Simple Joins to make sure cardinality estimates are right (IMPALA-1141)
+# IMPALA-1141: Simple joins to make sure cardinality estimates are right.
 select a.id, b.id, c.id
 from
-  functional_hbase.alltypes b,
-  functional_hbase.alltypes a,
-  functional_hbase.alltypes c
+  functional_hbase.alltypessmall b,
+  functional_hbase.alltypessmall a,
+  functional_hbase.alltypessmall c
 where
   b.bool_col = false and
   c.month = 4 and
   a.int_col = b.int_col and
-  c.int_col = b.int_col;
+  c.int_col = b.int_col
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = b.int_col
 |
-|--00:SCAN HBASE [functional_hbase.alltypes b]
+|--00:SCAN HBASE [functional_hbase.alltypessmall b]
 |     predicates: b.bool_col = FALSE
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = c.int_col
 |
-|--02:SCAN HBASE [functional_hbase.alltypes c]
+|--02:SCAN HBASE [functional_hbase.alltypessmall c]
 |     predicates: c.month = 4
 |
-01:SCAN HBASE [functional_hbase.alltypes a]
+01:SCAN HBASE [functional_hbase.alltypessmall a]
 ====
