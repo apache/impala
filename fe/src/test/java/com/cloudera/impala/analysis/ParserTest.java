@@ -27,6 +27,7 @@ import java.util.List;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
