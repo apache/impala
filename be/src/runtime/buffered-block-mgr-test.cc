@@ -1002,6 +1002,17 @@ TEST_F(BufferedBlockMgrTest, NoDirsAllocationError) {
   }
 }
 
+// Test that block manager can still allocate buffers when spilling is disabled.
+TEST_F(BufferedBlockMgrTest, NoTmpDirs) {
+  InitMultipleTmpDirs(0);
+  int max_num_buffers = 3;
+  BufferedBlockMgr::Client* client;
+  BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
+      0, false, client_tracker_.get(), &client);
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
+}
+
 // Create two clients with different number of reserved buffers.
 TEST_F(BufferedBlockMgrTest, MultipleClients) {
   Status status;

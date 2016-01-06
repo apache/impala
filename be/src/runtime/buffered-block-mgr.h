@@ -510,7 +510,7 @@ class BufferedBlockMgr {
   const int64_t max_block_size_;
 
   /// Unpinned blocks are written when the number of free buffers is below this threshold.
-  /// Equal to the number of disks.
+  /// Equal to two times the number of disks.
   const int block_write_threshold_;
 
   /// If true, spilling is disabled. The client calls will fail if there is not enough

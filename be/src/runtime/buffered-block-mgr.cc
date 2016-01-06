@@ -198,7 +198,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr
   : max_block_size_(block_size),
     // Keep two writes in flight per scratch disk so the disks can stay busy.
     block_write_threshold_(tmp_file_mgr->num_active_tmp_devices() * 2),
-    disable_spill_(state->query_ctx().disable_spilling),
+    disable_spill_(state->query_ctx().disable_spilling || block_write_threshold_ == 0),
     query_id_(state->query_id()),
     tmp_file_mgr_(tmp_file_mgr),
     initialized_(false),
@@ -697,7 +697,7 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
 
   // Assumes block manager lock is already taken.
   while (non_local_outstanding_writes_ + free_io_buffers_.size() < block_write_threshold_
-         && !unpinned_blocks_.empty()) {
+      && !unpinned_blocks_.empty()) {
     // Pop a block from the back of the list (LIFO).
     Block* write_block = unpinned_blocks_.PopBack();
     write_block->client_local_ = false;
@@ -1015,15 +1015,15 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
 
   DCHECK(block->Validate()) << endl << block->DebugString();
   // The number of free buffers has decreased. Write unpinned blocks if the number
-  // of free buffers below the threshold is reached.
+  // of free buffers is less than the threshold.
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
   DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK();
 }
 
 // We need to find a new buffer. We prefer getting this buffer in this order:
-//  1. Allocate a new block if the number of free blocks is less than the write
-//     threshold, until we run out of memory.
+//  1. Allocate a new block if the number of free blocks is less than the write threshold
+//     or if we are running without spilling, until we run out of memory.
 //  2. Pick a buffer from the free list.
 //  3. Wait and evict an unpinned buffer.
 Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
@@ -1031,7 +1031,8 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
   *buffer_desc = NULL;
 
   // First, try to allocate a new buffer.
-  if (free_io_buffers_.size() < block_write_threshold_ &&
+  DCHECK(block_write_threshold_ > 0 || disable_spill_);
+  if ((free_io_buffers_.size() < block_write_threshold_ || disable_spill_) &&
       mem_tracker_->TryConsume(max_block_size_)) {
     uint8_t* new_buffer = new uint8_t[max_block_size_];
     *buffer_desc = obj_pool_.Add(new BufferDescriptor(new_buffer, max_block_size_));
@@ -1045,10 +1046,16 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
     // There are no free buffers. If spills are disabled or there no unpinned blocks we
     // can write, return. We can't get a buffer.
     if (disable_spill_) {
-      return Status("Spilling has been disabled for plans that do not have stats and "
-          "are not hinted to prevent potentially bad plans from using too many cluster "
-          "resources. Compute stats on these tables, hint the plan or disable this "
-          "behavior via query options to enable spilling.");
+      if (block_write_threshold_ == 0) {
+        return Status("Spilling has been disabled due to no usable scratch space. "
+            "Please specify a usable scratch space location via the scratch_dirs "
+            "impalad flag.");
+      } else {
+        return Status("Spilling has been disabled for plans that do not have stats and "
+            "are not hinted to prevent potentially bad plans from using too many cluster "
+            "resources. Please run COMPUTE STATS on these tables, hint the plan or "
+            "disable this behavior via the DISABLE_UNSAFE_SPILLS query option.");
+      }
     }
 
     // Third, this block needs to use a buffer that was unpinned from another block.
@@ -1165,8 +1172,8 @@ bool BufferedBlockMgr::Validate() const {
     block = block->Next();
   }
 
-  // Check if we're writing blocks when the number of free buffers falls below
-  // threshold. We don't write blocks after cancellation.
+  // Check if we're writing blocks when the number of free buffers is less than
+  // the write threshold. We don't write blocks after cancellation.
   if (!is_cancelled_ && !unpinned_blocks_.empty() && !disable_spill_ &&
       (free_io_buffers_.size() + non_local_outstanding_writes_ <
        block_write_threshold_)) {

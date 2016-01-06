@@ -47,9 +47,12 @@ Status FileSystemUtil::CreateDirectory(const string& directory) {
   }
   if (exists) {
     // Attempt to remove the directory and its contents so that we can create a fresh
-    // empty directory that we will have permissions for.
+    // empty directory that we will have permissions for. There is an open window between
+    // the check for existence above and the removal here. If the directory is removed in
+    // this window, we may get "no_such_file_or_directory" error which is fine.
     filesystem::remove_all(directory, errcode);
-    if (errcode != errc::success) {
+    if (errcode != errc::success &&
+        errcode != errc::no_such_file_or_directory) {
       return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute("Encountered error "
           "removing directory '$0': $1", directory, errcode.message())));
     }
