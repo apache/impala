@@ -501,19 +501,6 @@ public class CatalogTest {
         "is not supported.", incompleteTable.getCause().getCause().getMessage());
   }
 
-  // This table has metadata set so the escape is \n, which is also the tuple delim. This
-  // test validates that our representation of the catalog fixes this and removes the
-  // escape char.
-  @Test public void TestTableWithBadEscapeChar() throws CatalogException {
-    HdfsTable table =
-        (HdfsTable) catalog_.getOrLoadTable("functional", "escapechartesttable");
-    List<HdfsPartition> partitions = table.getPartitions();
-    for (HdfsPartition p: partitions) {
-      HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
-      assertEquals(desc.getEscapeChar(), HdfsStorageDescriptor.DEFAULT_ESCAPE_CHAR);
-    }
-  }
-
   private List<String> getFunctionSignatures(String db) throws DatabaseNotFoundException {
     List<Function> fns = catalog_.getFunctions(db);
     List<String> names = Lists.newArrayList();
