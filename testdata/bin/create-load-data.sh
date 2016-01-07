@@ -28,14 +28,15 @@ set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
+. ${IMPALA_HOME}/testdata/bin/run-step.sh
 
 SKIP_METADATA_LOAD=0
 SKIP_SNAPSHOT_LOAD=0
 SNAPSHOT_FILE=""
 LOAD_DATA_ARGS=""
 JDBC_URL="jdbc:hive2://localhost:11050/default;"
-DATA_LOADING_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/data_loading
-mkdir -p ${DATA_LOADING_LOG_DIR}
+LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/data_loading
+mkdir -p ${LOG_DIR}
 
 while [ -n "$*" ]
 do
@@ -66,15 +67,16 @@ do
 done
 
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
-  echo "Loading Hive Builtins"
-  ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
-  echo "Generating HBase data"
-  ${IMPALA_HOME}/testdata/bin/create-hbase.sh &> ${DATA_LOADING_LOG_DIR}/create-hbase.log
-  echo "Creating /test-warehouse HDFS directory"
-  hadoop fs -mkdir /test-warehouse
+  run-step "Loading Hive Builtins" load-hive-builtins.log \
+      ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
+  run-step "Generating HBase data" create-hbase.log \
+      ${IMPALA_HOME}/testdata/bin/create-hbase.sh
+  run-step "Creating /test-warehouse HDFS directory" create-test-warehouse-dir.log \
+      hadoop fs -mkdir /test-warehouse
 elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
-  echo Loading hdfs data from snapshot: $SNAPSHOT_FILE
-  ${IMPALA_HOME}/testdata/bin/load-test-warehouse-snapshot.sh "$SNAPSHOT_FILE"
+  run-step "Loading HDFS data from snapshot: $SNAPSHOT_FILE" \
+      load-test-warehouse-snapshot.log \
+      ${IMPALA_HOME}/testdata/bin/load-test-warehouse-snapshot.sh "$SNAPSHOT_FILE"
   # Don't skip the metadata load if a schema change is detected.
   if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh; then
     echo "Schema change detected, metadata will be loaded."
@@ -86,7 +88,6 @@ else
 fi
 
 function load-custom-schemas {
-  echo LOADING CUSTOM SCHEMAS
   SCHEMA_SRC_DIR=${IMPALA_HOME}/testdata/data/schemas
   SCHEMA_DEST_DIR=/test-warehouse/schemas
   # clean the old schemas directory.
@@ -136,7 +137,7 @@ function load-data {
     ARGS+=("--force")
     echo "Force loading $WORKLOAD because a schema change was detected"
   fi
-  LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
+  LOG_FILE=${LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with -u
   if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
@@ -157,7 +158,7 @@ function cache-test-tables {
 }
 
 function load-aux-workloads {
-  LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-auxiliary-workloads-core.log
+  LOG_FILE=${LOG_DIR}/data-load-auxiliary-workloads-core.log
   rm -f $LOG_FILE
   # Load all the auxiliary workloads (if any exist)
   if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
@@ -176,7 +177,6 @@ function load-aux-workloads {
 }
 
 function copy-auth-policy {
-  echo COPYING AUTHORIZATION POLICY FILE
   hadoop fs -rm -f ${FILESYSTEM_PREFIX}/test-warehouse/authz-policy.ini
   hadoop fs -put ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini \
       ${FILESYSTEM_PREFIX}/test-warehouse/
@@ -210,7 +210,6 @@ function copy-and-load-dependent-tables {
 }
 
 function create-internal-hbase-table {
-  echo CREATING INTERNAL HBASE TABLE
   # TODO: For some reason DROP TABLE IF EXISTS sometimes fails on HBase if the table does
   # not exist. To work around this, disable exit on error before executing this command.
   # Need to investigate this more, but this works around the problem to unblock automation.
@@ -234,7 +233,6 @@ EOF
 }
 
 function load-custom-data {
-  echo LOADING CUSTOM DATA
   # Load the index files for corrupted lzo data.
   hadoop fs -rm -f /test-warehouse/bad_text_lzo_text_lzo/bad_text.lzo.index
   hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
@@ -288,6 +286,22 @@ function build-and-copy-hive-udfs {
   ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh -build
 }
 
+# Additional data loading actions that must be executed after the main data is loaded.
+function custom-post-load-steps {
+  # Configure alltypes_seq as a read-only table. This is required for fe tests.
+  # Set both read and execute permissions because accessing the contents of a directory on
+  # the local filesystem requires the x permission (while on HDFS it requires the r
+  # permission).
+  hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
+  hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+
+  #IMPALA-1881: data file produced by hive with multiple blocks.
+  hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
+  hadoop fs -Ddfs.block.size=1048576 -put -f \
+    ${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 \
+    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
+}
+
 function copy-and-load-ext-data-source {
   # Copy the test data source library into HDFS
   ${IMPALA_HOME}/testdata/bin/copy-data-sources.sh
@@ -308,61 +322,61 @@ if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
 else
   START_CLUSTER_ARGS="-s 3 ${START_CLUSTER_ARGS}"
 fi
-${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${DATA_LOADING_LOG_DIR} \
+run-step "Starting Impala cluster" start-impala-cluster.log \
+    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} \
     ${START_CLUSTER_ARGS}
 # The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
 # On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
 # needed.
 if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
-  ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
+  run-step "Setting up HDFS environment" setup-hdfs-env.log \
+      ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
 fi
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then
-  # load custom schems
-  load-custom-schemas
-  # load functional/tpcds/tpch
-  load-data "functional-query" "exhaustive"
-  load-data "tpch" "core"
+  run-step "Loading custom schemas" load-custom-schemas.log load-custom-schemas
+  run-step "Loading functional-query data" load-functional-query.log \
+      load-data "functional-query" "exhaustive"
+  run-step "Loading TPC-H data" load-tpch.log load-data "tpch" "core"
   # Load tpch nested data.
   # TODO: Hacky and introduces more complexity into the system, but it is expedient.
-  ${IMPALA_HOME}/testdata/bin/load_nested.sh
-  load-data "tpcds" "core"
-  load-aux-workloads
-  copy-and-load-dependent-tables
-  load-custom-data
-  ${IMPALA_HOME}/testdata/bin/create-table-many-blocks.sh -p 1234 -b 1
+  run-step "Loading nested data" load-nested.log ${IMPALA_HOME}/testdata/bin/load_nested.sh
+  run-step "Loading TPC-DS data" load-tpcds.log load-data "tpcds" "core"
+  run-step "Loading auxiliary workloads" load-aux-workloads.log load-aux-workloads
+  run-step "Loading dependent tables" copy-and-load-dependent-tables.log \
+      copy-and-load-dependent-tables
+  run-step "Loading custom data" load-custom-data.log load-custom-data
+  run-step "Creating many block table" create-table-many-blocks.log \
+      ${IMPALA_HOME}/testdata/bin/create-table-many-blocks.sh -p 1234 -b 1
 elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
-  echo "Skipped loading the metadata. Loading HBase."
-  load-data "functional-query" "core" "hbase/none"
+  echo "Skipped loading the metadata."
+  run-step "Loading HBase data only" load-hbase-only.log \
+      load-data "functional-query" "core" "hbase/none"
 fi
 
-build-and-copy-hive-udfs
-# Configure alltypes_seq as a read-only table. This is required for fe tests.
-# Set both read and execute permissions because accessing the contents of a directory on
-# the local filesystem requires the x permission (while on HDFS it requires the r
-# permission).
-hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
-hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
-
-#IMPALA-1881: data file produced by hive with multiple blocks.
-hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
-hadoop fs -Ddfs.block.size=1048576 -put -f \
-  ${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 \
-  ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
+run-step "Loading Hive UDFs" build-and-copy-hive-udfs.log \
+    build-and-copy-hive-udfs
+run-step "Running custom post-load steps" custom-post-load-steps.log \
+    custom-post-load-steps
 
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   # Caching tables in s3 returns an IllegalArgumentException, see IMPALA-1714
-  cache-test-tables
+  run-step "Caching test tables" cache-test-tables.log cache-test-tables
+
   # TODO: Modify the .sql file that creates the table to take an alternative location into
   # account.
-  copy-and-load-ext-data-source
-  if ! OUTPUT=$(${IMPALA_HOME}/testdata/bin/split-hbase.sh 2>&1); then
-    echo -e Failed to split Hbase:\\n"$OUTPUT" >&2
-    exit 1
-  fi
-  create-internal-hbase-table
+  run-step "Loading external data sources" load-ext-data-source.log \
+      copy-and-load-ext-data-source
+
+  run-step "Splitting HBase" create-hbase.log ${IMPALA_HOME}/testdata/bin/split-hbase.sh
+
+  run-step "Creating internal HBase table" create-internal-hbase-table.log \
+      create-internal-hbase-table
 fi
+
 # TODO: Investigate why all stats are not preserved. Theorectically, we only need to
 # recompute stats for HBase.
-${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
-copy-auth-policy
+run-step "Computing HBase stats" compute-hbase-stats.log \
+    ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
+
+run-step "Copying auth policy file" copy-auth-policy.log copy-auth-policy
