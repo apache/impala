@@ -13,6 +13,10 @@ from tests.util.filesystem_utils import get_fs_path
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
 
+# Execute all tests serially to avoid the following concurrency conflicts:
+# 1. In setup/teardown when dropping/creating databases and tables (IMPALA-2537)
+# 2. Avoid running "invalidate metadata" concurrently with other pytests (IMPALA-2687)
+@pytest.mark.execute_serially
 class TestMetadataQueryStatements(ImpalaTestSuite):
 
   CREATE_DATA_SRC_STMT = ("CREATE DATA SOURCE %s LOCATION '" +
@@ -58,12 +62,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.cleanup_db('hive_test_desc_db')
     self.cleanup_db('hive_test_db')
 
-    call(["hive", "-e", "drop database if exists hive_test_desc_db cascade"])
-    call([
-        "hive", "-e", "create database hive_test_desc_db comment 'test comment' "
-        "with dbproperties('pi' = '3.14', 'e' = '2.82')"])
-    call(["hive", "-e", "alter database hive_test_desc_db set owner user test"])
-
     self.client.execute("create database if not exists impala_test_desc_db1")
     self.client.execute(
         "create database if not exists impala_test_desc_db2 "
@@ -74,7 +72,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.client.execute(
         "create database if not exists impala_test_desc_db4 "
         "comment \"test comment\" location \"" + get_fs_path("/test2.db") + "\"")
-    self.client.execute("invalidate metadata")
 
   def teardown_method(self, method):
     self.cleanup_db('impala_test_desc_db1')
@@ -87,14 +84,17 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_show(self, vector):
     self.run_test_case('QueryTest/show', vector)
 
-  @pytest.mark.execute_serially
   @SkipIfS3.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   def test_describe_db(self, vector):
+    call([
+        "hive", "-e", "create database hive_test_desc_db comment 'test comment' "
+        "with dbproperties('pi' = '3.14', 'e' = '2.82')"])
+    call(["hive", "-e", "alter database hive_test_desc_db set owner user test"])
+    self.client.execute("invalidate metadata")
     self.run_test_case('QueryTest/describedb', vector)
 
-  @pytest.mark.execute_serially
   def test_show_data_sources(self, vector):
     try:
       self.__create_data_sources()
@@ -108,7 +108,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_describe_table(self, vector):
     self.run_test_case('QueryTest/describe', vector)
 
-  @pytest.mark.execute_serially
   # Missing Coverage: Describe formatted compatibility between Impala and Hive when the
   # data doesn't reside in hdfs.
   @SkipIfIsilon.hive
@@ -150,7 +149,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_use_table(self, vector):
     self.run_test_case('QueryTest/use', vector)
 
-  @pytest.mark.execute_serially
   # Missing Coverage: ddl by hive being visible to Impala for data not residing in hdfs.
   @SkipIfIsilon.hive
   @SkipIfS3.hive
