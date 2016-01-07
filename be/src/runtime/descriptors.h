@@ -132,12 +132,12 @@ class SlotDescriptor {
   std::string DebugString() const;
 
   /// Codegen for: bool IsNull(Tuple* tuple)
-  /// The codegen function is cached.
-  llvm::Function* CodegenIsNull(LlvmCodeGen*, llvm::StructType* tuple);
+  /// The codegen'd IR function is cached.
+  llvm::Function* GetIsNullFn(LlvmCodeGen*) const;
 
-  /// Codegen for: void SetNull(Tuple* tuple) / SetNotNull
-  /// The codegen function is cached.
-  llvm::Function* CodegenUpdateNull(LlvmCodeGen*, llvm::StructType* tuple, bool set_null);
+  /// Codegen for: void SetNull(Tuple* tuple) / void SetNotNull(Tuple* tuple)
+  /// The codegen'd IR function is cached.
+  llvm::Function* GetUpdateNullFn(LlvmCodeGen*, bool set_null) const;
 
  private:
   friend class DescriptorTbl;
@@ -166,9 +166,9 @@ class SlotDescriptor {
   int field_idx_;
 
   /// Cached codegen'd functions
-  llvm::Function* is_null_fn_;
-  llvm::Function* set_not_null_fn_;
-  llvm::Function* set_null_fn_;
+  mutable llvm::Function* is_null_fn_;
+  mutable llvm::Function* set_not_null_fn_;
+  mutable llvm::Function* set_null_fn_;
 
   /// collection_item_descriptor should be non-NULL iff this is a collection slot
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
@@ -372,7 +372,7 @@ class TupleDescriptor {
   ///   int64_t  count_val;
   /// };
   /// The resulting struct definition is cached.
-  llvm::StructType* GenerateLlvmStruct(LlvmCodeGen* codegen);
+  llvm::StructType* GetLlvmStruct(LlvmCodeGen* codegen) const;
 
  protected:
   friend class DescriptorTbl;
@@ -400,7 +400,8 @@ class TupleDescriptor {
   /// collection, empty otherwise.
   SchemaPath tuple_path_;
 
-  llvm::StructType* llvm_struct_; /// cache for the llvm struct type for this tuple desc
+  /// Cached codegen'd struct type for this tuple desc
+  mutable llvm::StructType* llvm_struct_;
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);

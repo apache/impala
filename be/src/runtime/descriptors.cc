@@ -545,9 +545,10 @@ void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
 //   %is_null = icmp ne i8 %null_mask, 0
 //   ret i1 %is_null
 // }
-Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple) {
+Function* SlotDescriptor::GetIsNullFn(LlvmCodeGen* codegen) const {
   if (is_null_fn_ != NULL) return is_null_fn_;
-  PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
+  StructType* tuple_type = parent()->GetLlvmStruct(codegen);
+  PointerType* tuple_ptr_type = tuple_type->getPointerTo();
   LlvmCodeGen::FnPrototype prototype(codegen, "IsNull", codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
 
@@ -579,12 +580,12 @@ Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple)
 //   store i8 %0, i8* %null_byte_ptr
 //   ret void
 // }
-Function* SlotDescriptor::CodegenUpdateNull(LlvmCodeGen* codegen,
-    StructType* tuple, bool set_null) {
+Function* SlotDescriptor::GetUpdateNullFn(LlvmCodeGen* codegen, bool set_null) const {
   if (set_null && set_null_fn_ != NULL) return set_null_fn_;
   if (!set_null && set_not_null_fn_ != NULL) return set_not_null_fn_;
 
-  PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
+  StructType* tuple_type = parent()->GetLlvmStruct(codegen);
+  PointerType* tuple_ptr_type = tuple_type->getPointerTo();
   LlvmCodeGen::FnPrototype prototype(codegen, (set_null) ? "SetNull" :"SetNotNull",
       codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
@@ -625,7 +626,7 @@ Function* SlotDescriptor::CodegenUpdateNull(LlvmCodeGen* codegen,
 // to begin on the size for that type.
 // TODO: Understand llvm::SetTargetData which allows you to explicitly define the packing
 // rules.
-StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
+StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   // If we already generated the llvm type, just return it.
   if (llvm_struct_ != NULL) return llvm_struct_;
 

@@ -386,7 +386,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   PointerType* hdfs_scanner_ptr_type = PointerType::get(hdfs_scanner_type, 0);
 
   // Generate the typed llvm struct for the output tuple
-  StructType* tuple_type = tuple_desc->GenerateLlvmStruct(codegen);
+  StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == NULL) return NULL;
   PointerType* tuple_ptr_type = PointerType::get(tuple_type, 0);
 

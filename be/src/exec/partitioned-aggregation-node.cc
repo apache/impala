@@ -1180,7 +1180,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 
   PointerType* fn_ctx_type =
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
-  StructType* tuple_struct = intermediate_tuple_desc_->GenerateLlvmStruct(codegen);
+  StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
   if (tuple_struct == NULL) return NULL; // Could not generate tuple struct
   PointerType* tuple_ptr_type = PointerType::get(tuple_struct, 0);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
@@ -1220,7 +1220,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 
   if (slot_desc->is_nullable()) {
     // Dst is NULL, just update dst slot to src slot and clear null bit
-    Function* clear_null_fn = slot_desc->CodegenUpdateNull(codegen, tuple_struct, false);
+    Function* clear_null_fn = slot_desc->GetUpdateNullFn(codegen, false);
     builder.CreateCall(clear_null_fn, agg_tuple_arg);
   }
 
@@ -1379,7 +1379,7 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
     }
   }
 
-  if (intermediate_tuple_desc_->GenerateLlvmStruct(codegen) == NULL) {
+  if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == NULL) {
     VLOG_QUERY << "Could not codegen UpdateTuple because we could"
                << "not generate a matching llvm struct for the intermediate tuple.";
     return NULL;
@@ -1396,7 +1396,7 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
   PointerType* tuple_ptr_type = tuple_type->getPointerTo();
   PointerType* tuple_row_ptr_type = tuple_row_type->getPointerTo();
 
-  StructType* tuple_struct = intermediate_tuple_desc_->GenerateLlvmStruct(codegen);
+  StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
   PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateTuple", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", agg_node_ptr_type));

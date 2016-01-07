@@ -115,11 +115,11 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   }
   if (is_null_string_fn == NULL) return NULL;
 
-  StructType* tuple_type = tuple_desc->GenerateLlvmStruct(codegen);
+  StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == NULL) return NULL;
   PointerType* tuple_ptr_type = PointerType::get(tuple_type, 0);
 
-  Function* set_null_fn = slot_desc->CodegenUpdateNull(codegen, tuple_type, true);
+  Function* set_null_fn = slot_desc->GetUpdateNullFn(codegen, true);
   if (set_null_fn == NULL) {
     LOG(ERROR) << "Could not codegen WriteSlot because slot update codegen failed.";
     return NULL;

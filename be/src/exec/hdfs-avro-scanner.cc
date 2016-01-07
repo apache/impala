@@ -633,7 +633,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(
   PointerType* this_ptr_type = PointerType::get(this_type, 0);
 
   TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc());
-  StructType* tuple_type = tuple_desc->GenerateLlvmStruct(codegen);
+  StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == NULL) return NULL; // Could not generate tuple struct
   Type* tuple_ptr_type = PointerType::get(tuple_type, 0);
 
@@ -725,9 +725,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
       // Write null field IR
       builder->SetInsertPoint(null_block);
       if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
-        StructType* tuple_type =
-            cast<StructType>(tuple_val->getType()->getPointerElementType());
-        Function* set_null_fn = slot_desc->CodegenUpdateNull(codegen, tuple_type, true);
+        Function* set_null_fn = slot_desc->GetUpdateNullFn(codegen, true);
         DCHECK(set_null_fn != NULL);
         builder->CreateCall(set_null_fn, tuple_val);
       }
