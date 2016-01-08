@@ -21,6 +21,7 @@
   <properties>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <dependencies>

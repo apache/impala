@@ -35,5 +35,6 @@
   <properties>
     <thrift.version>0.9.0</thrift.version>
     <guava.version>11.0.2</guava.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 </project>

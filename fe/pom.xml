@@ -39,6 +39,7 @@
     <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
     <!-- Impala does not currently support the Hive .13 JDBC driver -->
     <hive-jdbc.version>0.13.1-cdh5.2.0-SNAPSHOT</hive-jdbc.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <dependencies>
