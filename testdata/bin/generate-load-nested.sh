@@ -122,7 +122,7 @@ do
   done
 
   if $FLATTEN; then
-    dropdb --if-exists -U postgres random_nested_db_flat_${NUM}
+    dropdb -U postgres random_nested_db_flat_${NUM} 2> /dev/null || true
     ${IMPALA_HOME}/tests/comparison/data_generator.py --use-postgresql \
       --db-name=random_nested_db_flat_${NUM} migrate
   fi

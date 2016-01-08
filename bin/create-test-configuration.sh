@@ -86,9 +86,7 @@ rm -f authz-provider.ini
 
 if [ $CREATE_METASTORE -eq 1 ]; then
   echo "Creating postgresql database for Hive metastore"
-  set +o errexit
-  dropdb -U hiveuser hive_$METASTORE_DB
-  set -e
+  dropdb -U hiveuser hive_$METASTORE_DB 2> /dev/null || true
   createdb -U hiveuser hive_$METASTORE_DB
 
   psql -U hiveuser -d hive_$METASTORE_DB \
@@ -99,11 +97,9 @@ if [ $CREATE_METASTORE -eq 1 ]; then
       | psql -U hiveuser -d hive_$METASTORE_DB
 fi
 
-set +e
 echo "Creating Sentry Policy Server DB"
-dropdb -U hiveuser sentry_policy
+dropdb -U hiveuser sentry_policy 2> /dev/null || true
 createdb -U hiveuser sentry_policy
-set -e
 
 # Perform search-replace on $1, output to $2.
 # Search $1 ($GCIN) for strings that look like "${FOO}".  If FOO is defined in
