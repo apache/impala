@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <string>
+#include <boost/bind.hpp>
 #include <gtest/gtest.h>
 
 #include "runtime/mem-tracker.h"

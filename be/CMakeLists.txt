@@ -128,8 +128,11 @@ add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 # Note that we don't enable any optimization. We want unoptimized IR since we will be
 # modifying it at runtime, then re-compiling (and optimizing) the modified code. The final
 # optimizations will be less effective if the initial code is also optimized.
+#  -Wno-deprecated: gutil contains deprecated headers
+#  -Wno-c++11-extensions: c++11 extensions are ok as long as clang supports them
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-DIR_COMPILE" "-DNDEBUG"
-  "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+  "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG"
+  "-Wno-deprecated" "-Wno-c++11-extensions")
 
 # setup doc generation with Doxygen
 find_package(Doxygen)

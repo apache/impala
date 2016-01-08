@@ -26,7 +26,6 @@
 #include "common/atomic.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
-#include "util/thread.h"
 #include "util/stopwatch.h"
 #include "util/streaming-sampler.h"
 #include "gen-cpp/RuntimeProfile_types.h"

@@ -15,7 +15,6 @@
 #ifndef IMPALA_RUNTIME_COLLECTION_VALUE_H
 #define IMPALA_RUNTIME_COLLECTION_VALUE_H
 
-#include "runtime/mem-pool.h"
 #include "runtime/descriptors.h"
 
 namespace impala {

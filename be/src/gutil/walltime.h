@@ -16,7 +16,6 @@
 
 #include <sys/time.h>
 
-#include <glog/logging.h>
 #include <string>
 using std::string;
 
@@ -28,6 +27,7 @@ using std::string;
 #include "gutil/once.h"
 #endif  // defined(__APPLE__)
 
+#include "common/logging.h"
 #include "gutil/integral_types.h"
 
 typedef double WallTime;

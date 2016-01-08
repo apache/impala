@@ -21,6 +21,9 @@
 /// issues when we try to dynamically link the codegen'd functions.
 #ifdef IR_COMPILE
 #include <iostream>
+  #ifdef DCHECK
+  #error "glog header was included from IR code"
+  #endif
   #define DCHECK(condition) while(false) std::cout
   #define DCHECK_EQ(a, b) while(false) std::cout
   #define DCHECK_NE(a, b) while(false) std::cout

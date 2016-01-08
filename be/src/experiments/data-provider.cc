@@ -1,4 +1,6 @@
 #include "experiments/data-provider.h"
+
+#include <algorithm>
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
@@ -9,6 +11,7 @@ using boost::minstd_rand;
 using boost::uniform_real;
 using boost::variate_generator;
 using namespace impala;
+using std::min;
 
 DataProvider::DataProvider(MemPool* pool, RuntimeProfile* profile) :
   pool_(pool),

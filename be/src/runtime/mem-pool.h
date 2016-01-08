@@ -22,6 +22,7 @@
 #include <string>
 
 #include "common/logging.h"
+#include "util/bit-util.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
