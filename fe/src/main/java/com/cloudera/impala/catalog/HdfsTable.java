@@ -1560,23 +1560,26 @@ public class HdfsTable extends Table {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
-    resultSchema.addToColumns(new TColumn("path", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("size", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("partition", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Path", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
     result.setRows(Lists.<TResultRow>newArrayList());
 
-    List<HdfsPartition> partitions = null;
+    List<HdfsPartition> orderedPartitions = null;
     if (partitionSpec == null) {
-      partitions = partitions_;
+      orderedPartitions = Lists.newArrayList(partitions_);
+      Collections.sort(orderedPartitions);
     } else {
       // Get the HdfsPartition object for the given partition spec.
       HdfsPartition partition = getPartitionFromThriftPartitionSpec(partitionSpec);
       Preconditions.checkState(partition != null);
-      partitions = Lists.newArrayList(partition);
+      orderedPartitions = Lists.newArrayList(partition);
     }
 
-    for (HdfsPartition p: partitions) {
-      for (FileDescriptor fd: p.getFileDescriptors()) {
+    for (HdfsPartition p: orderedPartitions) {
+      List<FileDescriptor> orderedFds = Lists.newArrayList(p.getFileDescriptors());
+      Collections.sort(orderedFds);
+      for (FileDescriptor fd: orderedFds) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();
         rowBuilder.add(p.getLocation() + "/" + fd.getFileName());
         rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));

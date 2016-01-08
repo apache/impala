@@ -65,7 +65,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * Metadata for a single file in this partition.
    * TODO: Do we even need this class? Just get rid of it and use the Thrift version?
    */
-  static public class FileDescriptor {
+  static public class FileDescriptor implements Comparable<FileDescriptor> {
     private final THdfsFileDesc fileDescriptor_;
 
     public String getFileName() { return fileDescriptor_.getFile_name(); }
@@ -115,6 +115,14 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       return Objects.toStringHelper(this)
           .add("FileName", getFileName())
           .add("Length", getFileLength()).toString();
+    }
+
+    /**
+     * Orders file descriptors lexicographically by file name.
+     */
+    @Override
+    public int compareTo(FileDescriptor otherFd) {
+      return getFileName().compareTo(otherFd.getFileName());
     }
   }
 

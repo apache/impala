@@ -213,32 +213,49 @@ show databases like 'def*'
 STRING,STRING
 ====
 ---- QUERY
-show files in insert_string_partitioned
+show files in alltypesagg
+---- LABELS
+Path,Size,Partition
 ---- RESULTS
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt',regex:.*,'year=2010/month=1/day=1'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt',regex:.*,'year=2010/month=1/day=2'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt',regex:.*,'year=2010/month=1/day=3'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt',regex:.*,'year=2010/month=1/day=4'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt',regex:.*,'year=2010/month=1/day=5'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt',regex:.*,'year=2010/month=1/day=6'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt',regex:.*,'year=2010/month=1/day=7'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt',regex:.*,'year=2010/month=1/day=8'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt',regex:.*,'year=2010/month=1/day=9'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt',regex:.*,'year=2010/month=1/day=10'
 ---- TYPES
 STRING,STRING,STRING
 ====
 ---- QUERY
-show files in functional.insert_string_partitioned
+show files in functional.alltypesagg
+---- LABELS
+Path,Size,Partition
 ---- RESULTS
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt',regex:.*,'year=2010/month=1/day=1'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt',regex:.*,'year=2010/month=1/day=2'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt',regex:.*,'year=2010/month=1/day=3'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt',regex:.*,'year=2010/month=1/day=4'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt',regex:.*,'year=2010/month=1/day=5'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt',regex:.*,'year=2010/month=1/day=6'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt',regex:.*,'year=2010/month=1/day=7'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt',regex:.*,'year=2010/month=1/day=8'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt',regex:.*,'year=2010/month=1/day=9'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt',regex:.*,'year=2010/month=1/day=10'
 ---- TYPES
 STRING,STRING,STRING
 ====
 ---- QUERY
-show files in insert_string_partitioned partition(s2='__HIVE_DEFAULT_PARTITION__')
+show files in alltypesagg partition(year=2010,month=1,day=NULL)
+---- LABELS
+Path,Size,Partition
 ---- RESULTS
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
-row_regex: '$NAMENODE/test-warehouse/functional.db/insert_string_partitioned/s2=__HIVE_DEFAULT_PARTITION__/[a-z0-9]+\-[a-z0-9]+_\d+_data\.\d+\..*','7B','s2=__HIVE_DEFAULT_PARTITION__'
+'hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0',regex:.*,'year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__'
 ---- TYPES
 STRING,STRING,STRING
 ====
