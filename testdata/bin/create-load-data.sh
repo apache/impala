@@ -281,13 +281,8 @@ function load-custom-data {
 function build-and-copy-hive-udfs {
   # Build the test Hive UDFs
   pushd ${IMPALA_HOME}/tests/test-hive-udfs
-  mvn clean
-  # quietly resolve dependencies to avoid log spew in jenkins runs
-  if [ "${USER}" == "jenkins" ]; then
-    echo "Quietly resolving test UDF dependencies."
-    mvn -q dependency:resolve
-  fi
-  mvn package
+  ${IMPALA_HOME}/bin/mvn-quiet.sh clean
+  ${IMPALA_HOME}/bin/mvn-quiet.sh package
   popd
   # Copy the test UDF/UDA libraries into HDFS
   ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh -build

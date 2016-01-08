@@ -83,11 +83,12 @@ mkdir -p ${LOG_DIR}
 ulimit -c unlimited
 
 if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
-  echo "Split and assign HBase regions"
+  SPLIT_HBASE_LOG=${LOG_DIR}/split-hbase.log
+  echo "Split and assign HBase regions (logging to ${SPLIT_HBASE_LOG})"
   # To properly test HBase integeration, HBase regions are split and assigned by this
   # script. Restarting HBase will change the region server assignment. Run split-hbase.sh
   # before running any test.
-  ${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
+  ${IMPALA_HOME}/testdata/bin/split-hbase.sh &> ${SPLIT_HBASE_LOG}
 fi
 
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
@@ -126,12 +127,7 @@ do
       # When running against S3, only run the S3 frontend tests.
       MVN_ARGS="-Dtest=S3*"
     fi
-    # quietly resolve dependencies to avoid log spew in jenkins runs
-    if [[ "${USER}" == "jenkins" ]]; then
-      echo "Quietly resolving FE dependencies."
-      mvn -q dependency:resolve
-    fi
-    if ! mvn -fae test ${MVN_ARGS}; then
+    if ! ${IMPALA_HOME}/bin/mvn-quiet.sh -fae test ${MVN_ARGS}; then
       TEST_RET_CODE=1
     fi
     popd
@@ -163,12 +159,7 @@ do
         --catalogd_args=--load_catalog_in_background=false \
         ${TEST_START_CLUSTER_ARGS}
     pushd ${IMPALA_FE_DIR}
-    # quietly resolve dependencies to avoid log spew in jenkins runs
-    if [[ "${USER}" == "jenkins" ]]; then
-      echo "Quietly resolving FE dependencies."
-      mvn -q dependency:resolve
-    fi
-    if ! mvn test -Dtest=JdbcTest; then
+    if ! ${IMPALA_HOME}/bin/mvn-quiet.sh test -Dtest=JdbcTest; then
       TEST_RET_CODE=1
     fi
     popd

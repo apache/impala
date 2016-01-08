@@ -13,13 +13,8 @@ DATALOC=$IMPALA_HOME/testdata/target
 
 # regenerate the test data generator
 cd $IMPALA_HOME/testdata
-mvn clean
-# on jenkins runs, resolve dependencies quietly to avoid log spew
-if [ "${USER}" == "jenkins" ]; then
-  echo "Quietly resolving testdata dependencies."
-  mvn -q dependency:resolve
-fi
-mvn package
+${IMPALA_HOME}/bin/mvn-quiet.sh clean
+${IMPALA_HOME}/bin/mvn-quiet.sh package
 
 # find jars
 CP=""

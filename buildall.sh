@@ -282,17 +282,12 @@ fi
 
 # build the external data source API
 pushd ${IMPALA_HOME}/ext-data-source
-mvn install -DskipTests
+${IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
 popd
 
 # build frontend and copy dependencies
 pushd ${IMPALA_FE_DIR}
-# on jenkins runs, resolve dependencies quietly to avoid log spew
-if [ "${USER}" == "jenkins" ]; then
-  echo "Quietly resolving FE dependencies."
-  mvn -q dependency:resolve
-fi
-mvn package -DskipTests=true
+${IMPALA_HOME}/bin/mvn-quiet.sh package -DskipTests
 popd
 
 
