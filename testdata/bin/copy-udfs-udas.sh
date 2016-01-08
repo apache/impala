@@ -35,7 +35,7 @@ then
   make -j$CORES \
       TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
   cd $IMPALA_HOME/tests/test-hive-udfs
-  mvn package
+  ${IMPALA_HOME}/bin/mvn-quiet.sh package
   popd
 fi
 

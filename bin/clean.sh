@@ -32,7 +32,7 @@ fi
 # clean the external data source project
 pushd ${IMPALA_HOME}/ext-data-source
 rm -rf api/generated-sources/*
-mvn clean
+${IMPALA_HOME}/bin/mvn-quiet.sh clean
 popd
 
 # clean fe
@@ -47,13 +47,13 @@ popd
 # clean be
 pushd $IMPALA_HOME/be
 # remove everything listed in .gitignore
-git clean -Xdf
+git clean -Xdfq
 popd
 
 # clean shell build artifacts
 pushd $IMPALA_HOME/shell
 # remove everything listed in .gitignore
-git clean -Xdf
+git clean -Xdfq
 popd
 
 # Clean stale .pyc, .pyo files and __pycache__ directories.
