@@ -1546,6 +1546,26 @@ select id, rank() over(order by id) from functional.alltypesagg limit 10
 INT, BIGINT
 ====
 ---- QUERY
+# Regression test for IMPALA-2829: MemPool mem transfer to the output rowbatch
+# may result in a crash when the mem transfer occurs right before eos. This
+# repro was crafted to hit the crash by playing with the window and row sizes
+# so that memory allocated within the analytic node is just large enough (>8mb)
+# to be transfered to the output row batch immediately before eos.
+select max(t3.c1), max(t3.c2)
+from (
+  select
+  avg( t1.timestamp_col )
+    over (order by t1.id, t2.id rows between 5000 following and 50000 following) c1,
+  avg( t2.timestamp_col )
+    over (order by t1.id, t2.id rows between 5000 following and 50000 following) c2
+  from alltypesagg t1 join alltypesagg t2 where t1.int_col = t2.int_col
+) t3
+---- RESULTS
+2010-01-10 18:02:05.234931468,2010-01-10 18:02:05.215156078
+---- TYPES
+TIMESTAMP, TIMESTAMP
+====
+---- QUERY
 # IMPALA-2457 - PERCENT_RANK() returns NaN for row group with 1 row.
 select id, rank() over (partition by id order by tinyint_col),
 count() over (partition by id), percent_rank() over (partition by id order by tinyint_col)
