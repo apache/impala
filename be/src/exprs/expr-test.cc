@@ -4209,6 +4209,13 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestError("from_timestamp(cast('2012-02-28 11:10:11+0530' as timestamp), 'yyyy-MM-dd HH:mm:ss+hhdd')");
   TestError("from_timestamp(cast('2012-02-28+0530' as timestamp), 'yyyy-MM-dd+hhmm')");
   TestError("from_timestamp(cast('10:00:00+0530 2010-01-01' as timestamp), 'HH:mm:ss+hhmm yyyy-MM-dd')");
+
+  // Regression test for IMPALA-2732, can't parse custom date formats with non-zero-padded
+  // values
+  TestValue("unix_timestamp('12/2/2015', 'MM/d/yyyy')", TYPE_BIGINT, 1449014400);
+  TestIsNull("unix_timestamp('12/2/2015', 'MM/dd/yyyy')", TYPE_BIGINT);
+  TestValue("unix_timestamp('12/31/2015', 'MM/d/yyyy')", TYPE_BIGINT, 1451520000);
+  TestValue("unix_timestamp('12/31/2015', 'MM/dd/yyyy')", TYPE_BIGINT, 1451520000);
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

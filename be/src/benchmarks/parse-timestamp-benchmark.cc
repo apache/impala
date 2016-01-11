@@ -35,23 +35,23 @@ using boost::posix_time::to_simple_string;
 using namespace impala;
 
 // Benchmark for parsing timestamps.
-// Machine Info: Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+// Machine Info: Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz
 // ParseDate:            Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                BoostStringDate               0.204                  1X
-//                      BoostDate              0.1983             0.9716X
-//                         Impala                 3.9              19.11X
+//                BoostStringDate               1.277                  1X
+//                      BoostDate               1.229              0.962X
+//                         Impala               16.83              13.17X
 //
 // ParseTimestamp:       Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                      BoostTime              0.1529                  1X
-//                         Impala               3.802              24.87X
+//                      BoostTime              0.9074                  1X
+//                         Impala               15.01              16.54X
 //
 // ParseTimestampWithFormat:Function  Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                  BoostDateTime             0.08337                  1X
-//                ImpalaTimeStamp               7.579              90.91X
-//              ImpalaTZTimeStamp               7.571              90.82X
+//                  BoostDateTime              0.4488                  1X
+//                ImpalaTimeStamp               37.41              83.35X
+//              ImpalaTZTimeStamp               37.39               83.3X
 
 #define VALIDATE 0
 

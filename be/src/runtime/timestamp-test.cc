@@ -416,8 +416,6 @@ TEST(TimestampTest, Basic) {
   }
   // Test parsing/formatting of complex date/time formats
   vector<TimestampTC> test_cases = boost::assign::list_of
-    // Test tiny date/time
-    (TimestampTC("Myyd", "4139", true, true, false, 2013, 4, 9))
     // Test case on literal short months
     (TimestampTC("yyyy-MMM-dd", "2013-OCT-01", false, true, false, 2013, 10, 1))
     // Test case on literal short months
@@ -430,6 +428,8 @@ TEST(TimestampTest, Basic) {
     (TimestampTC("yyyy MM dd ddMMMyyyy (HH:mm:ss.SSSS)",
         "2013 05 12 16Apr1952 (16:53:21.1234)", false, true, true, 1952, 4, 16, 16,
         53, 21, 123400000))
+    // Test missing separator on short date format
+    (TimestampTC("Myyd", "4139", true, true))
     // Test bad year format
     (TimestampTC("YYYYmmdd", "20131001"))
     // Test unknown formatting character
@@ -454,14 +454,40 @@ TEST(TimestampTest, Basic) {
     (TimestampTC("HH:mm:ss", "23:60:01", false, true))
     // Test out of range second
     (TimestampTC("HH:mm:ss", "23:01:60", false, true))
-    // Test characters were numbers should be
+    // Test characters where numbers should be
     (TimestampTC("HH:mm:ss", "aa:01:01", false, true))
     // Test missing year
     (TimestampTC("MMdd", "1201", false, true))
     // Test missing month
     (TimestampTC("yyyydd", "201301", false, true))
     // Test missing month
-    (TimestampTC("yyyymm", "201301", false, true));
+    (TimestampTC("yyyymm", "201301", false, true))
+    // Test short year token
+    (TimestampTC("y-MM-dd", "2013-11-13", false, true, false, 2013, 11, 13))
+    (TimestampTC("y-MM-dd", "13-11-13", false, true, false, 2013, 11, 13))
+    // Test short month token
+    (TimestampTC("yyyy-M-dd", "2013-11-13", false, true, false, 2013, 11, 13))
+    (TimestampTC("yyyy-M-dd", "2013-1-13", false, true, false, 2013, 1, 13))
+    // Test short day token
+    (TimestampTC("yyyy-MM-d", "2013-11-13", false, true, false, 2013, 11, 13))
+    (TimestampTC("yyyy-MM-d", "2013-11-3", false, true, false, 2013, 11, 3))
+    // Test short all date tokens
+    (TimestampTC("y-M-d", "2013-11-13", false, true, false, 2013, 11, 13))
+    (TimestampTC("y-M-d", "13-1-3", false, true, false, 2013, 1, 3))
+    // Test short hour token
+    (TimestampTC("H:mm:ss", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
+    (TimestampTC("H:mm:ss", "4:24:34", false, false, true, 0, 0, 0, 4, 24, 34))
+    // Test short minute token
+    (TimestampTC("HH:m:ss", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
+    (TimestampTC("HH:m:ss", "1:24:34", false, true))
+    // Test short second token
+    (TimestampTC("HH:mm:s", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
+    // Test short all time tokens
+    (TimestampTC("H:m:s", "11:22:33", false, false, true, 0, 0, 0, 11, 22, 33))
+    (TimestampTC("H:m:s", "1:2:3", false, false, true, 0, 0, 0, 1, 2, 3))
+    // Test short fraction token
+    (TimestampTC("HH:mm:ss:S", "14:24:34:1234", false, false, true, 0, 0, 0, 14, 24, 34,
+        123400000));
   // Loop through custom parse/format test cases and execute each one. Each test case
   // will be explicitly set with a pass/fail expectation related to either the format
   // or literal value.

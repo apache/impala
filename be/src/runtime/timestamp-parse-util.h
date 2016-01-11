@@ -39,11 +39,20 @@ namespace impala {
 ///   +/-hh:mm
 ///   +/-hhmm
 ///   +/-hh
-/// The token names and usage have been modeled on the SimpleDateFormat class used
-/// in Java. This allows the use of repeating tokens to indicate zero padding for an
-/// output scenario (TS -> String) and a guide for reading data to a given length in
-/// a parsing scenario. Representing literal month is achieved by specifying three
-/// repeating tokens e.g. yyyy-MMM-dd -> 2013-Nov-21.
+///
+///
+/// The token names and usage have been modeled after the SimpleDateFormat class used in
+/// Java, with only the above list of tokens being supported. All fields will consume
+/// variable length inputs when parsing an input string and must therefore use separators
+/// to specify the boundaries of the fields, with the exception of TimeZone values, which
+/// have to be of fixed width. Repeating tokens can be used to specify fields of exact
+/// witdh, e.g. in yy-MM both fields must be of exactly length two. When using fixed width
+/// fields values must be zero-padded and output values will be zero padded during
+/// formatting. There is one exception to this: a month field of length 3 will specify
+/// literal month names instead of zero padding, i.e., yyyy-MMM-dd will parse from and
+/// format to strings like 2013-Nov-21. When using fields of fixed width the separators
+/// can be omitted.
+///
 ///
 /// Formatting character groups can appear in any order along with any separators
 /// except TimeZone offset.
@@ -191,6 +200,12 @@ class TimestampParser {
         dt_ctx->toks.push_back(DateTimeFormatToken(SEPARATOR, str - str_begin, 1, str));
         ++str;
         continue;
+      }
+      // Not a separator, verify that the previous token is either a separator or has
+      // length >1, i.e., it is not a variable length token.
+      if (!dt_ctx->toks.empty()) {
+        const DateTimeFormatToken& prev = dt_ctx->toks.back();
+        if (UNLIKELY(prev.type != SEPARATOR && prev.len == 1)) return false;
       }
       DateTimeFormatTokenType tok_type = UNKNOWN;
       switch (*str) {
@@ -482,22 +497,34 @@ class TimestampParser {
     DCHECK(dt_result != NULL);
     if (str_len <= 0 || str_len < dt_ctx.fmt_len || str == NULL) return false;
     StringParser::ParseResult status;
+    // Keep track of the number of characters we need to shift token positions by.
+    // Variable-length tokens will result in values > 0;
+    int shift_len = 0;
     BOOST_FOREACH(const DateTimeFormatToken& tok, dt_ctx.toks) {
-      const char* tok_val = str + tok.pos;
+      const char* tok_val = str + tok.pos + shift_len;
       if (tok.type == SEPARATOR) {
         if (UNLIKELY(*tok_val != *tok.val)) return false;
         continue;
       }
+      int tok_len = tok.len;
+      const char* str_end = str + str_len;
+      // In case of single-character tokens we scan ahead to the next separator.
+      if (UNLIKELY(tok_len == 1)) {
+        while ((tok_val + tok_len < str_end) && isdigit(*(tok_val + tok_len))) {
+          ++tok_len;
+          ++shift_len;
+        }
+      }
       switch (tok.type) {
         case YEAR: {
-          dt_result->year = StringParser::StringToInt<int>(tok_val, tok.len, &status);
+          dt_result->year = StringParser::StringToInt<int>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           if (UNLIKELY(dt_result->year < 1 || dt_result->year > 9999)) return false;
-          if (tok.len < 4 && dt_result->year < 99) dt_result->year += 2000;
+          if (tok_len < 4 && dt_result->year < 99) dt_result->year += 2000;
           break;
         }
         case MONTH_IN_YEAR: {
-          dt_result->month = StringParser::StringToInt<int>(tok_val, tok.len, &status);
+          dt_result->month = StringParser::StringToInt<int>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           if (UNLIKELY(dt_result->month < 1 || dt_result->month > 12)) return false;
           break;
@@ -513,38 +540,38 @@ class TimestampParser {
           break;
         }
         case DAY_IN_MONTH: {
-          dt_result->day = StringParser::StringToInt<int>(tok_val, tok.len, &status);
+          dt_result->day = StringParser::StringToInt<int>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           // TODO: Validate that the value of day is correct for the given month.
           if (UNLIKELY(dt_result->day < 1 || dt_result->day > 31)) return false;
           break;
         }
         case HOUR_IN_DAY: {
-          dt_result->hour = StringParser::StringToInt<int>(tok_val, tok.len, &status);
+          dt_result->hour = StringParser::StringToInt<int>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           if (UNLIKELY(dt_result->hour < 0 || dt_result->hour > 23)) return false;
           break;
         }
         case MINUTE_IN_HOUR: {
-          dt_result->minute = StringParser::StringToInt<int>(tok_val, tok.len, &status);
+          dt_result->minute = StringParser::StringToInt<int>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           if (UNLIKELY(dt_result->minute < 0 || dt_result->minute > 59)) return false;
           break;
         }
         case SECOND_IN_MINUTE: {
-          dt_result->second = StringParser::StringToInt<int>(tok_val, tok.len, &status);
+          dt_result->second = StringParser::StringToInt<int>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           if (UNLIKELY(dt_result->second < 0 || dt_result->second > 59)) return false;
           break;
         }
         case FRACTION: {
           dt_result->fraction =
-              StringParser::StringToInt<int32_t>(tok_val, tok.len, &status);
+              StringParser::StringToInt<int32_t>(tok_val, tok_len, &status);
           if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
           // A user may specify a time of 04:30:22.1238, the parser will return 1238 for
           // the fractional portion. This does not represent the intended value of
           // 123800000, therefore the number must be scaled up.
-          for (int i = tok.len; i < 9; ++i) dt_result->fraction *= 10;
+          for (int i = tok_len; i < 9; ++i) dt_result->fraction *= 10;
           break;
         }
         case TZ_OFFSET: {
@@ -556,7 +583,7 @@ class TimestampParser {
               hour < 0 || hour > 23)) {
             return false;
           }
-          switch (tok.len) {
+          switch (tok_len) {
             case 6: {
               // +hh:mm
               minute = StringParser::StringToInt<int>(tok_val + 4, 2, &status);
