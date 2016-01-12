@@ -307,11 +307,11 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 # Start Impala
-START_CLUSTER_ARGS=""
+: ${START_CLUSTER_ARGS=""}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
-  START_CLUSTER_ARGS="--impalad_args=--abort_on_config_error=false -s 1"
+  START_CLUSTER_ARGS="--impalad_args=--abort_on_config_error=false -s 1 ${START_CLUSTER_ARGS}"
 else
-  START_CLUSTER_ARGS="-s 3"
+  START_CLUSTER_ARGS="-s 3 ${START_CLUSTER_ARGS}"
 fi
 ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${DATA_LOADING_LOG_DIR} \
     ${START_CLUSTER_ARGS}
