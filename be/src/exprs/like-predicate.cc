@@ -54,6 +54,18 @@ LikePredicate::~LikePredicate() {
 
 void LikePredicate::LikePrepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
+  LikePrepareInternal(context, scope, true);
+}
+
+void LikePredicate::ILikePrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  LikePrepareInternal(context, scope, false);
+}
+
+// TODO: make class StringValue and StringSearch accept a case-sensitive flag and
+// switch back to using the cheaper Constant<>() functions.
+void LikePredicate::LikePrepareInternal(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope, bool case_sensitive) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
   LikePredicateState* state = new LikePredicateState();
   state->function_ = LikeFn;
@@ -68,16 +80,19 @@ void LikePredicate::LikePrepare(FunctionContext* context,
     re2::RE2 equals_re("([^%_]*)");
     string pattern_str(pattern.ptr, pattern.len);
     string search_string;
-    if (RE2::FullMatch(pattern_str, substring_re, &search_string)) {
+    if (case_sensitive && RE2::FullMatch(pattern_str, substring_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantSubstringFn;
-    } else if (RE2::FullMatch(pattern_str, starts_with_re, &search_string)) {
+    } else if (case_sensitive &&
+        RE2::FullMatch(pattern_str, starts_with_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantStartsWithFn;
-    } else if (RE2::FullMatch(pattern_str, ends_with_re, &search_string)) {
+    } else if (case_sensitive &&
+        RE2::FullMatch(pattern_str, ends_with_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantEndsWithFn;
-    } else if (RE2::FullMatch(pattern_str, equals_re, &search_string)) {
+    } else if (case_sensitive &&
+        RE2::FullMatch(pattern_str, equals_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantEqualsFn;
     } else {
@@ -87,6 +102,7 @@ void LikePredicate::LikePrepare(FunctionContext* context,
       RE2::Options opts;
       opts.set_never_nl(false);
       opts.set_dot_nl(true);
+      opts.set_case_sensitive(case_sensitive);
       state->regex_.reset(new RE2(re_pattern, opts));
       if (!state->regex_->ok()) {
         context->SetError(
@@ -114,6 +130,16 @@ void LikePredicate::LikeClose(FunctionContext* context,
 
 void LikePredicate::RegexPrepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
+  RegexPrepareInternal(context, scope, true);
+}
+
+void LikePredicate::IRegexPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  RegexPrepareInternal(context, scope, false);
+}
+
+void LikePredicate::RegexPrepareInternal(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope, bool case_sensitive) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
   LikePredicateState* state = new LikePredicateState();
   context->SetFunctionState(scope, state);
@@ -129,20 +155,25 @@ void LikePredicate::RegexPrepare(FunctionContext* context,
     // has a constant substring surrounded on both sides by any number of wildcard
     // characters. In any of these conditions, we can search for the pattern more
     // efficiently by using our own string match functions rather than regex matching.
-    if (RE2::FullMatch(pattern_str, EQUALS_RE, &search_string)) {
+    if (case_sensitive && RE2::FullMatch(pattern_str, EQUALS_RE, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantEqualsFn;
-    } else if (RE2::FullMatch(pattern_str, STARTS_WITH_RE, &search_string)) {
+    } else if (case_sensitive &&
+        RE2::FullMatch(pattern_str, STARTS_WITH_RE, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantStartsWithFn;
-    } else if (RE2::FullMatch(pattern_str, ENDS_WITH_RE, &search_string)) {
+    } else if (case_sensitive &&
+        RE2::FullMatch(pattern_str, ENDS_WITH_RE, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantEndsWithFn;
-    } else if (RE2::FullMatch(pattern_str, SUBSTRING_RE, &search_string)) {
+    } else if (case_sensitive &&
+        RE2::FullMatch(pattern_str, SUBSTRING_RE, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantSubstringFn;
     } else {
-      state->regex_.reset(new RE2(pattern_str));
+      RE2::Options opts;
+      opts.set_case_sensitive(case_sensitive);
+      state->regex_.reset(new RE2(pattern_str, opts));
       if (!state->regex_->ok()) {
         stringstream error;
         error << "Invalid regex expression" << pattern->ptr;

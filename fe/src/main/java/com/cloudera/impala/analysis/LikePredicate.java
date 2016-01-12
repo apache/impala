@@ -30,8 +30,10 @@ import com.google.common.collect.Lists;
 public class LikePredicate extends Predicate {
   enum Operator {
     LIKE("LIKE"),
+    ILIKE("ILIKE"),
     RLIKE("RLIKE"),
-    REGEXP("REGEXP");
+    REGEXP("REGEXP"),
+    IREGEXP("IREGEXP");
 
     private final String description_;
 
@@ -48,15 +50,28 @@ public class LikePredicate extends Predicate {
   public static void initBuiltins(Db db) {
     db.addBuiltin(ScalarFunction.createBuiltin(
         Operator.LIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
-        false, Type.BOOLEAN, "_ZN6impala13LikePredicate4LikeEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate11LikePrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate4LikeEPN10impala_udf15FunctionContextERKNS1_9StringValES6_",
+        "_ZN6impala13LikePredicate11LikePrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        "_ZN6impala13LikePredicate9LikeCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
+    db.addBuiltin(ScalarFunction.createBuiltin(
+        Operator.ILIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate4LikeEPN10impala_udf15FunctionContextERKNS1_9StringValES6_",
+        "_ZN6impala13LikePredicate12ILikePrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
         "_ZN6impala13LikePredicate9LikeCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
     db.addBuiltin(ScalarFunction.createBuiltin(
         Operator.RLIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
-        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_",
+        "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
         "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
     db.addBuiltin(ScalarFunction.createBuiltin(
         Operator.REGEXP.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
-        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_",
+        "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
+    db.addBuiltin(ScalarFunction.createBuiltin(
+        Operator.IREGEXP.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_",
+        "_ZN6impala13LikePredicate13IRegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
         "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
   }
 
@@ -116,7 +131,7 @@ public class LikePredicate extends Predicate {
     Preconditions.checkState(fn_.getReturnType().isBoolean());
 
     if (getChild(1).isLiteral() && !getChild(1).isNullLiteral()
-        && (op_ == Operator.RLIKE || op_ == Operator.REGEXP)) {
+        && (op_ == Operator.RLIKE || op_ == Operator.REGEXP || op_ == Operator.IREGEXP)) {
       // let's make sure the pattern works
       // TODO: this checks that it's a Java-supported regex, but the syntax supported
       // by the backend is Posix; add a call to the backend to check the re syntax

@@ -79,7 +79,7 @@ class LikePredicate: public Predicate {
 
     void SetSearchString(const std::string& search_string) {
       search_string_ = search_string;
-      search_string_sv_ = StringValue(search_string);
+      search_string_sv_ = StringValue(search_string_);
       substring_pattern_ = StringSearch(&search_string_sv_);
     }
   };
@@ -89,6 +89,12 @@ class LikePredicate: public Predicate {
   static void LikePrepare(impala_udf::FunctionContext* context,
       impala_udf::FunctionContext::FunctionStateScope scope);
 
+  static void ILikePrepare(impala_udf::FunctionContext* context,
+      impala_udf::FunctionContext::FunctionStateScope scope);
+
+  static void LikePrepareInternal(impala_udf::FunctionContext* context,
+      impala_udf::FunctionContext::FunctionStateScope scope, bool case_sensitive);
+
   static impala_udf::BooleanVal Like(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
@@ -97,6 +103,12 @@ class LikePredicate: public Predicate {
 
   static void RegexPrepare(impala_udf::FunctionContext* context,
       impala_udf::FunctionContext::FunctionStateScope scope);
+
+  static void IRegexPrepare(impala_udf::FunctionContext* context,
+      impala_udf::FunctionContext::FunctionStateScope scope);
+
+  static void RegexPrepareInternal(impala_udf::FunctionContext* context,
+      impala_udf::FunctionContext::FunctionStateScope scope, bool case_sensitive);
 
   static impala_udf::BooleanVal Regex(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);

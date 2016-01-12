@@ -1049,11 +1049,15 @@ public class ToSqlTest extends AnalyzerTest {
         "SELECT 5 IS NULL, (5 IS NULL), 10 IS NOT NULL, (10 IS NOT NULL)");
     // LikePredicate.
     testToSql("select 'a' LIKE '%b.', ('a' LIKE '%b.'), " +
+        "'a' ILIKE '%b.', ('a' ILIKE '%b.'), " +
         "'b' RLIKE '.c%', ('b' RLIKE '.c%')," +
+        "'d' IREGEXP '.e%', ('d' IREGEXP '.e%')," +
         "'d' REGEXP '.e%', ('d' REGEXP '.e%')",
         "SELECT 'a' LIKE '%b.', ('a' LIKE '%b.'), " +
-         "'b' RLIKE '.c%', ('b' RLIKE '.c%'), " +
-        "'d' REGEXP '.e%', ('d' REGEXP '.e%')");
+        "'a' ILIKE '%b.', ('a' ILIKE '%b.'), " +
+        "'b' RLIKE '.c%', ('b' RLIKE '.c%'), " +
+        "'d' IREGEXP '.e%', ('d' IREGEXP '.e%'), " +
+        "'d' REGEXP '.e%', ('d' REGEXP '.e%')" );
     // SlotRef.
     testToSql("select bool_col, (bool_col), int_col, (int_col) " +
         "string_col, (string_col), timestamp_col, (timestamp_col) " +

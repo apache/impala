@@ -466,19 +466,30 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   public void TestLikePredicates() throws AnalysisException {
     AnalyzesOk("select * from functional.alltypes where string_col like  'test%'");
     AnalyzesOk("select * from functional.alltypes where string_col like string_col");
+    AnalyzesOk("select * from functional.alltypes where string_col ilike  'test%'");
+    AnalyzesOk("select * from functional.alltypes where string_col ilike string_col");
     AnalyzesOk("select * from functional.alltypes where 'test' like string_col");
     AnalyzesOk("select * from functional.alltypes where string_col rlike 'test%'");
     AnalyzesOk("select * from functional.alltypes where string_col regexp 'test.*'");
+    AnalyzesOk("select * from functional.alltypes where string_col iregexp 'test.*'");
     AnalysisError("select * from functional.alltypes where string_col like 5",
         "right operand of LIKE must be of type STRING");
+    AnalysisError("select * from functional.alltypes where string_col ilike 5",
+        "right operand of ILIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where 'test' like 5",
         "right operand of LIKE must be of type STRING");
+    AnalysisError("select * from functional.alltypes where 'test' ilike 5",
+        "right operand of ILIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where int_col like 'test%'",
         "left operand of LIKE must be of type STRING");
+    AnalysisError("select * from functional.alltypes where int_col ilike 'test%'",
+        "left operand of ILIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where string_col regexp 'test]['",
         "invalid regular expression in 'string_col REGEXP 'test][''");
+    AnalysisError("select * from functional.alltypes where string_col iregexp 'test]['",
+        "invalid regular expression in 'string_col IREGEXP 'test][''");
     // Test NULLs.
-    String[] likePreds = new String[] {"LIKE", "RLIKE", "REGEXP"};
+    String[] likePreds = new String[] {"LIKE", "RLIKE", "REGEXP", "ILIKE", "IREGEXP"};
     for (String likePred: likePreds) {
       AnalyzesOk(String.format("select * from functional.alltypes " +
           "where string_col %s NULL", likePred));

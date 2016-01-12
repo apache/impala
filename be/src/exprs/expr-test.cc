@@ -1547,6 +1547,35 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'abc\n123' LIKE 'abc%'", TYPE_BOOLEAN, true);
   TestValue("'123\nabc' LIKE '%abc'", TYPE_BOOLEAN, true);
   TestValue("'123\nabc\n123' LIKE '%abc%'", TYPE_BOOLEAN, true);
+  // Test case-insensitivity.
+  TestValue("'aBcde' ILIKE '%%bC%%'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE '%%Cb%%'", TYPE_BOOLEAN, false);
+  TestValue("'aBcde' ILIKE 'abC%%'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE 'cbA%%'", TYPE_BOOLEAN, false);
+  TestValue("'aBcde' ILIKE '%%bCde'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE '%%cBde'", TYPE_BOOLEAN, false);
+  TestValue("'aBcde' ILIKE '%%abCde%%'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE '%%eDcba%%'", TYPE_BOOLEAN, false);
+  TestValue("'aBcde' ILIKE 'A%%Cd%%'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE 'A%%Dc%%'", TYPE_BOOLEAN, false);
+  TestValue("'aBcde' ILIKE 'AbCde'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE 'AbDCe'", TYPE_BOOLEAN, false);
+  TestValue("'Abc\n123' ILIKE 'aBc%123'", TYPE_BOOLEAN, true);
+  TestValue("'Abc\n\n123' ILIKE 'aBc%123'", TYPE_BOOLEAN, true);
+  TestValue("'\nAbc\n123' ILIKE '%aBc_123'", TYPE_BOOLEAN, true);
+  TestValue("'Abc\n123\nedf' ILIKE 'aBc%edf'", TYPE_BOOLEAN, true);
+  TestValue("'.[]{}()x\\\\*+?|^$' ILIKE '.[]{}()_\\\\\\\\*+?|^$'", TYPE_BOOLEAN, true);
+  TestValue("'.[]{}()xA\\\\*+?|^$' ILIKE '.[]{}()_a\\\\\\\\*+?|^$'", TYPE_BOOLEAN, true);
+  TestValue("'abxcY1234a' IREGEXP 'a.X.y.*a'", TYPE_BOOLEAN, true);
+  TestValue("'a.x.Y.*a' IREGEXP 'a\\\\.X\\\\.y\\\\.\\\\*a'", TYPE_BOOLEAN, true);
+  TestValue("'abxcY1234a' IREGEXP '\\a\\.X\\\\.y\\\\.\\\\*a'", TYPE_BOOLEAN, false);
+  TestValue("'Abxcy1234a' IREGEXP 'a.x.y.*a'", TYPE_BOOLEAN, true);
+  TestValue("'English' IREGEXP 'en'", TYPE_BOOLEAN, true);
+  TestValue("'engLish' IREGEXP 'lIs'", TYPE_BOOLEAN, true);
+  TestValue("'English' IREGEXP 'englIsh'", TYPE_BOOLEAN, true);
+  TestValue("'eNglish' IREGEXP '^enGlish$'", TYPE_BOOLEAN, true);
+  TestValue("'enGlish' IREGEXP '^eNg'", TYPE_BOOLEAN, true);
+  TestValue("'engLish' IREGEXP 'lIsh$'", TYPE_BOOLEAN, true);
 }
 
 TEST_F(ExprTest, BetweenPredicate) {

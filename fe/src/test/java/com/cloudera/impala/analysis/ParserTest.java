@@ -1279,8 +1279,10 @@ public class ParserTest {
       operations.add(op.toString());
     }
     operations.add("like");
+    operations.add("ilike");
     operations.add("rlike");
     operations.add("regexp");
+    operations.add("iregexp");
 
     for (String lop: operands_) {
       for (String rop: operands_) {
@@ -2636,7 +2638,7 @@ public class ParserTest {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AND, AS, BETWEEN, DIV, FROM, IN, IS, LIKE, LIMIT, NOT, OR, " +
+        "Expected: AND, AS, BETWEEN, DIV, FROM, ILIKE, IN, IREGEXP, IS, LIKE, LIMIT, NOT, OR, " +
         "ORDER, REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
 
     // missing table list

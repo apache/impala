@@ -240,9 +240,10 @@ terminal
   KW_EXISTS, KW_EXPLAIN, KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
   KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
-  KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
-  KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
+  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_ILIKE, KW_IN,
+  KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE,
+  KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS, KW_JOIN, KW_LAST, KW_LEFT,
+  KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS,
   KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET,
   KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING,
@@ -459,7 +460,7 @@ precedence left KW_OR;
 precedence left KW_AND;
 precedence right KW_NOT, NOT;
 precedence left KW_BETWEEN, KW_IN, KW_IS, KW_EXISTS;
-precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
+precedence left KW_LIKE, KW_RLIKE, KW_ILIKE, KW_REGEXP, KW_IREGEXP;
 precedence left EQUAL, NOTEQUAL, LESSTHAN, GREATERTHAN, KW_FROM, KW_DISTINCT;
 precedence left ADD, SUBTRACT;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
@@ -2446,19 +2447,29 @@ comparison_predicate ::=
 like_predicate ::=
   expr:e1 KW_LIKE expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.LIKE, e1, e2); :}
+  | expr:e1 KW_ILIKE expr:e2
+  {: RESULT = new LikePredicate(LikePredicate.Operator.ILIKE, e1, e2); :}
   | expr:e1 KW_RLIKE expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.RLIKE, e1, e2); :}
   | expr:e1 KW_REGEXP expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2); :}
+  | expr:e1 KW_IREGEXP expr:e2
+  {: RESULT = new LikePredicate(LikePredicate.Operator.IREGEXP, e1, e2); :}
   | expr:e1 KW_NOT KW_LIKE expr:e2
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.LIKE, e1, e2), null); :}
+  | expr:e1 KW_NOT KW_ILIKE expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
+    new LikePredicate(LikePredicate.Operator.ILIKE, e1, e2), null); :}
   | expr:e1 KW_NOT KW_RLIKE expr:e2
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.RLIKE, e1, e2), null); :}
   | expr:e1 KW_NOT KW_REGEXP expr:e2
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2), null); :}
+  | expr:e1 KW_NOT KW_IREGEXP expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
+    new LikePredicate(LikePredicate.Operator.IREGEXP, e1, e2), null); :}
   ;
 
 // Avoid a reduce/reduce conflict with compound_predicate by explicitly
