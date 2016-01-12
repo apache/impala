@@ -33,4 +33,6 @@ class TestSet(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_set(self, vector):
+    # Please note that query options modified during the test will be reset
+    # at the end of each test.
     self.run_test_case('QueryTest/set', vector)

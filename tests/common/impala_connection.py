@@ -129,7 +129,10 @@ class BeeswaxConnection(ImpalaConnection):
       self.__beeswax_client.set_query_option(name, value)
 
   def get_configuration(self):
-    return self.__beeswax_client.get_query_options
+    return self.__beeswax_client.get_query_options()
+
+  def get_default_configuration(self):
+    return self.__beeswax_client.get_default_configuration()
 
   def set_configuration(self, config_option_dict):
     assert config_option_dict is not None, "config_option_dict cannot be None"

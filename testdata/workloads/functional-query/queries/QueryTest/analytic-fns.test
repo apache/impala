@@ -1591,6 +1591,4 @@ FROM functional_parquet.alltypes t1 CROSS JOIN functional_parquet.alltypes t2 LI
 ---- CATCH
 Memory limit exceeded
 ====
----- QUERY
-set mem_limit=0
-====
+

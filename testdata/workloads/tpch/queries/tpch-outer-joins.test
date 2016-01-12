@@ -45,6 +45,3 @@ ON cast(t1.o_comment as char(120)) = cast(t2.o_comment as char(120))
 ---- TYPES
 BIGINT
 ====
----- QUERY
-set mem_limit=0
-====

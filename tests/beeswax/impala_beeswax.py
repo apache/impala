@@ -141,6 +141,7 @@ class ImpalaBeeswaxClient(object):
     """Close the transport if it's still open"""
     if self.transport:
       self.transport.close()
+    self.connected = False
 
   def __get_transport(self):
     """Creates the proper transport type based environment (secure vs unsecure)"""

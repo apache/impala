@@ -31,10 +31,8 @@ set
 STRING, STRING
 ====
 ---- QUERY
-set explain_level=3
-====
----- QUERY
-set
+set explain_level=3;
+set;
 ---- RESULTS: VERIFY_IS_SUBSET
 'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
 'ABORT_ON_ERROR','0'
@@ -65,10 +63,8 @@ set
 STRING, STRING
 ====
 ---- QUERY
-set explain_level='0'
-====
----- QUERY
-set
+set explain_level='0';
+set;
 ---- RESULTS: VERIFY_IS_SUBSET
 'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
 'ABORT_ON_ERROR','0'
@@ -100,10 +96,8 @@ STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1906: Test that SET changes PARQUET_FILE_SIZE only if it's less than 2GB.
-set parquet_file_size='1.5g'
-====
----- QUERY
-set
+set parquet_file_size='1.5g';
+set;
 ---- RESULTS: VERIFY_IS_SUBSET
 'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
 'ABORT_ON_ERROR','0'
@@ -114,7 +108,7 @@ set
 'DISABLE_CACHED_READS','0'
 'DISABLE_CODEGEN','0'
 'DISABLE_OUTERMOST_TOPN','0'
-'EXPLAIN_LEVEL','0'
+'EXPLAIN_LEVEL','1'
 'HBASE_CACHE_BLOCKS','0'
 'HBASE_CACHING','0'
 'MAX_ERRORS','0'
@@ -157,18 +151,14 @@ select 1
 ====
 ---- QUERY
 # Set mem_limit really small so that queries will fail.
-set mem_limit=1
-====
----- QUERY
+set mem_limit=1;
 select count(string_col) from functional.alltypestiny
 ---- CATCH
 Memory limit exceeded
 ====
 ---- QUERY
 # Set mem_limit back to unlimited and query should succeed again.
-set mem_limit=0
-====
----- QUERY
+set mem_limit=0;
 select count(string_col) from functional.alltypestiny
 ---- RESULTS
 8

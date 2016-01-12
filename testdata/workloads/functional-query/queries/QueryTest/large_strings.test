@@ -112,6 +112,3 @@ select l_comment from tpch_parquet.lineitem) a
 ---- CATCH
 Memory limit exceeded
 ====
----- QUERY
-set mem_limit=0
-====

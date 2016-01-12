@@ -536,13 +536,6 @@ where c_custkey = 67974;
 bigint,bigint
 ====
 ---- QUERY
-# Set the num_nodes query option back to its default value.
-set num_nodes=0
----- RESULTS
----- TYPES
-string,string
-====
----- QUERY
 # IMPALA-2289: Test nested-loop join with right anti join mode inside a subplan.
 select count(*) from customer c left anti join c.c_orders
 where c_custkey between 8000 and 10000

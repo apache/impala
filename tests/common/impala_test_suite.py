@@ -20,8 +20,11 @@ import pprint
 import pwd
 import pytest
 import grp
+import re
+import string
 from getpass import getuser
 from functools import wraps
+from impala._thrift_gen.ImpalaService.ttypes import TImpalaQueryOptions
 from random import choice
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_connection import ImpalaConnection, create_connection
@@ -65,6 +68,9 @@ FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX")
 # this will be the same as fs.defaultFS.  When running against a secondary filesystem,
 # this will be the same as FILESYSTEM_PREFIX.
 NAMENODE = FILESYSTEM_PREFIX or CORE_CONF.get('fs.defaultFS')
+# Match any SET statement. Assume that query options' names
+# only contain alphabets and underscores.
+SET_PATTERN = re.compile(r'set\s*([a-zA-Z_]+)=*', re.I)
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -101,6 +107,9 @@ class ImpalaTestSuite(BaseTestSuite):
 
     # Create a connection to Impala.
     cls.client = cls.create_impala_client(IMPALAD)
+
+    # Default query options are populated on demand.
+    cls.default_query_options = {}
 
     cls.impalad_test_service = cls.create_impala_service()
     cls.hdfs_client = cls.create_hdfs_client()
@@ -146,6 +155,32 @@ class ImpalaTestSuite(BaseTestSuite):
     self.client.execute("use default")
     self.client.set_configuration({'sync_ddl': sync_ddl})
     self.client.execute("drop database if exists `" + db_name + "` cascade")
+
+  @classmethod
+  def restore_query_options(self, query_options_changed):
+    """
+    Restore the list of modified query options to their default values.
+    """
+    # Populate the default query option if it's empty.
+    if not self.default_query_options:
+      try:
+        query_options = self.client.get_default_configuration()
+        for query_option in query_options:
+          self.default_query_options[query_option.key.upper()] = query_option.value
+      except Exception as e:
+        LOG.info('Unexpected exception when getting default query options: ' + str(e))
+        return
+    # Restore all the changed query options.
+    for query_option in query_options_changed:
+      query_option = query_option.upper()
+      if not query_option in self.default_query_options:
+        continue
+      default_val = self.default_query_options[query_option]
+      query_str = 'SET '+ query_option + '=' + default_val + ';'
+      try:
+        self.client.execute(query_str)
+      except Exception as e:
+        LOG.info('Unexpected exception when executing ' + query_str + ' : ' + str(e))
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
       encoding=None):
@@ -206,6 +241,7 @@ class ImpalaTestSuite(BaseTestSuite):
       # TODO: consider supporting result verification of all queries in the future
       result = None
       target_impalad_client = choice(target_impalad_clients)
+      query_options_changed = []
       try:
         user = None
         if 'USER' in test_section:
@@ -213,6 +249,9 @@ class ImpalaTestSuite(BaseTestSuite):
           user = test_section['USER'].strip()
           target_impalad_client = self.create_impala_client()
         for query in query.split(';'):
+          set_pattern_match = SET_PATTERN.match(query)
+          if set_pattern_match != None:
+            query_options_changed.append(set_pattern_match.groups()[0])
           result = self.__execute_query(target_impalad_client, query, user=user)
       except Exception as e:
         if 'CATCH' in test_section:
@@ -225,6 +264,9 @@ class ImpalaTestSuite(BaseTestSuite):
           assert expected_str in str(e)
           continue
         raise
+      finally:
+        if len(query_options_changed) > 0:
+          self.restore_query_options(query_options_changed)
 
       if 'CATCH' in test_section:
         assert test_section['CATCH'].strip() == ''

@@ -1,9 +1,7 @@
 ====
 ---- QUERY
-set mem_limit=200m
-====
----- QUERY
 # IMPALA-2207: Analytic eval node feeding into build side of nested loop join.
+set mem_limit=200m;
 select straight_join * from (values(1 id), (2), (3)) v1,
 (select *, count(*) over() from tpch.lineitem where l_orderkey < 100000) v2
 order by id, l_orderkey, l_partkey, l_suppkey, l_linenumber

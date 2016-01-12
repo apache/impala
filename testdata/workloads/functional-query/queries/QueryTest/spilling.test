@@ -350,7 +350,3 @@ from lineitem
 ---- TYPES
 BIGINT
 ====
----- QUERY
-set mem_limit=0;
-set num_nodes=0;
-====

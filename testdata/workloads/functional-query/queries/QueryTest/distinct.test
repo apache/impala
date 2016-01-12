@@ -360,13 +360,6 @@ from alltypesagg
 bigint, bigint, bigint
 ====
 ---- QUERY
-# Unset the query option from the previous test.
-set appx_count_distinct=false
----- RESULTS
----- TYPES
-string, string
-====
----- QUERY
 # Large (more than 1 regular batches) distinct with multiple group by keys.
 SELECT COUNT(*) FROM
 (SELECT COUNT(DISTINCT p_partkey)
