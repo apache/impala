@@ -58,8 +58,8 @@ class ImpalaCluster(object):
     Note: Currently we expectly a single statestore process, in the future this might
     change in which case this should return the "active" statestore.
     """
-    # If no statestored process exists, return an empty list.
-    return self.__statestoreds[0] if len(self.__statestoreds) > 0 else list()
+    # If no statestored process exists, return None.
+    return self.__statestoreds[0] if len(self.__statestoreds) > 0 else None
 
   @property
   def impalads(self):

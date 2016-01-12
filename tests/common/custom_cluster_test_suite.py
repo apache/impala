@@ -18,7 +18,7 @@
 import os
 import os.path
 import re
-from subprocess import call
+from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfLocal
@@ -91,20 +91,25 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # TODO: Figure out a better way to handle case where processes are just starting
     # / cleaning up so that sleeps are not needed.
     sleep(2)
-    call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'), '--kill_only'])
+    check_call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'), '--kill_only'])
     sleep(2)
 
   @classmethod
   def _start_impala_cluster(cls, options, log_dir=os.getenv('LOG_DIR', "/tmp/"),
       cluster_size=CLUSTER_SIZE, log_level=1):
+    cls.impala_log_dir = log_dir
     cmd = [os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
            '--cluster_size=%d' % cluster_size,
            '--log_dir=%s' % log_dir,
            '--log_level=%s' % log_level]
-    call(cmd + options)
-    cls.impala_log_dir = log_dir
-    cls.cluster = ImpalaCluster()
+    try:
+      check_call(cmd + options)
+    finally:
+      # Failure tests expect cluster to be initialised even if start-impala-cluster fails.
+      cls.cluster = ImpalaCluster()
     statestored = cls.cluster.statestored
+    if statestored is None:
+      raise Exception("statestored was not found")
     statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
     for impalad in cls.cluster.impalads:
       impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=60)
