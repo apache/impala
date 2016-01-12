@@ -201,10 +201,6 @@ error_codes = (
   ("AVRO_BAD_VERSION_HEADER", 64, "File '$0' has an invalid version header: $1\\n"
    "Make sure the file is an Avro data file."),
 
-  ("IMPALA_2598_KERBEROS_SSL_DISALLOWED", 65, "Enabling server-to-server SSL connections "
-  "in conjunction with Kerberos authentication is not supported at the same time. "
-  "Disable server-to-server SSL by unsetting --ssl_client_ca_certificate."),
-
   ("UDF_MEM_LIMIT_EXCEEDED", 66, "$0's allocations exceeded memory limits.")
 )
 

@@ -109,16 +109,16 @@ TEST(Auth, LdapKerbAuth) {
   ASSERT_EQ(FLAGS_principal, sa->principal());
 }
 
-// Test for workaround for IMPALA-2598: SSL and Kerberos do not mix on server<->server
-// connections. Tests that Impala will fail to start if so configured.
-TEST(Auth, KerbAndSslDisabled) {
+// Test for IMPALA-2598: SSL and Kerberos do not mix on server<->server connections.
+// Tests that Impala will successfully start if so configured.
+TEST(Auth, KerbAndSslEnabled) {
   string hostname;
   ASSERT_TRUE(GetHostname(&hostname).ok());
   FLAGS_ssl_client_ca_certificate = "some_path";
   FLAGS_ssl_server_certificate = "some_path";
   ASSERT_TRUE(EnableInternalSslConnections());
   SaslAuthProvider sa_internal(true);
-  ASSERT_FALSE(
+  ASSERT_TRUE(
       sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
   SaslAuthProvider sa_external(false);
   ASSERT_TRUE(
