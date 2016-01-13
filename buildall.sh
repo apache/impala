@@ -41,6 +41,7 @@ TESTDATA_ACTION=0
 TESTS_ACTION=1
 FORMAT_CLUSTER=0
 FORMAT_METASTORE=0
+FORMAT_SENTRY_POLICY_DB=0
 IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
 METASTORE_SNAPSHOT_FILE=
@@ -77,12 +78,16 @@ do
     -format)
       FORMAT_CLUSTER=1
       FORMAT_METASTORE=1
+      FORMAT_SENTRY_POLICY_DB=1
       ;;
     -format_cluster)
       FORMAT_CLUSTER=1
       ;;
     -format_metastore)
       FORMAT_METASTORE=1
+      ;;
+    -format_sentry_policy_db)
+      FORMAT_SENTRY_POLICY_DB=1
       ;;
     -codecoverage_debug)
       TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
@@ -139,9 +144,11 @@ do
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
            "running Hadoop services unless any -format* is True"
-      echo "[-format] : Format the minicluster and metastore db [Default: False]"
+      echo "[-format] : Format the minicluster, metastore db, and sentry policy db"\
+           " [Default: False]"
       echo "[-format_cluster] : Format the minicluster [Default: False]"
       echo "[-format_metastore] : Format the metastore db [Default: False]"
+      echo "[-format_sentry_policy_db] : Format the Sentry policy db [Default: False]"
       echo "[-codecoverage_release] : Release code coverage build"
       echo "[-codecoverage_debug] : Debug code coverage build"
       echo "[-asan] : Build with address sanitizer"
@@ -224,7 +231,7 @@ fi
 ${IMPALA_HOME}/bin/start-impala-cluster.py --kill --force
 
 if [[ $CLEAN_ACTION -eq 1 || $FORMAT_METASTORE -eq 1 || $FORMAT_CLUSTER -eq 1 ||
-      -n $METASTORE_SNAPSHOT_FILE ]]
+       $FORMAT_SENTRY_POLICY_DB -eq 1 || -n $METASTORE_SNAPSHOT_FILE ]]
 then
   # Kill any processes that may be accessing postgres metastore. To be safe, this is done
   # before we make any changes to the config files.
@@ -238,12 +245,17 @@ if [ $CLEAN_ACTION -eq 1 ]; then
     $IMPALA_HOME/bin/clean.sh
 fi
 
-# Generate the Hadoop configs needed by Impala
-if [[ $FORMAT_METASTORE -eq 1 && -z $METASTORE_SNAPSHOT_FILE ]]; then
-  ${IMPALA_HOME}/bin/create-test-configuration.sh -create_metastore
-else
-  ${IMPALA_HOME}/bin/create-test-configuration.sh
+CREATE_TEST_CONFIG_ARGS=""
+if [[ $FORMAT_SENTRY_POLICY_DB -eq 1 ]]; then
+  CREATE_TEST_CONFIG_ARGS+=" -create_sentry_policy_db"
 fi
+
+if [[ $FORMAT_METASTORE -eq 1 && -z $METASTORE_SNAPSHOT_FILE ]]; then
+  CREATE_TEST_CONFIG_ARGS+=" -create_metastore"
+fi
+
+# Generate the Hadoop configs needed by Impala
+${IMPALA_HOME}/bin/create-test-configuration.sh ${CREATE_TEST_CONFIG_ARGS}
 
 # If a metastore snapshot exists, load it.
 if [ $METASTORE_SNAPSHOT_FILE ]; then

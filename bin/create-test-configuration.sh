@@ -21,6 +21,7 @@ set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 CREATE_METASTORE=0
+CREATE_SENTRY_POLICY_DB=0
 : ${IMPALA_KERBERIZE=}
 
 # parse command line options
@@ -30,12 +31,16 @@ do
     -create_metastore)
       CREATE_METASTORE=1
       ;;
+    -create_sentry_policy_db)
+      CREATE_SENTRY_POLICY_DB=1
+      ;;
     -k|-kerberize|-kerberos|-kerb)
       # This could also come in through the environment...
       export IMPALA_KERBERIZE=1
       ;;
     -help|*)
       echo "[-create_metastore] : If true, creates a new metastore."
+      echo "[-create_sentry_policy_db] : If true, creates a new sentry policy db."
       echo "[-kerberize] : Enable kerberos on the cluster"
       exit 1
       ;;
@@ -97,9 +102,11 @@ if [ $CREATE_METASTORE -eq 1 ]; then
       | psql -U hiveuser -d hive_$METASTORE_DB
 fi
 
-echo "Creating Sentry Policy Server DB"
-dropdb -U hiveuser sentry_policy 2> /dev/null || true
-createdb -U hiveuser sentry_policy
+if [ $CREATE_SENTRY_POLICY_DB -eq 1 ]; then
+  echo "Creating Sentry Policy Server DB"
+  dropdb -U hiveuser sentry_policy 2> /dev/null || true
+  createdb -U hiveuser sentry_policy
+fi
 
 # Perform search-replace on $1, output to $2.
 # Search $1 ($GCIN) for strings that look like "${FOO}".  If FOO is defined in
