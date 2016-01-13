@@ -16,6 +16,8 @@
 #include "gutil/utf/utf.h"
 #include "gutil/utf/utfdef.h"
 
+extern "C" {
+
 enum
 {
 	Bit1	= 7,
@@ -23,7 +25,7 @@ enum
 	Bit2	= 5,
 	Bit3	= 4,
 	Bit4	= 3,
-	Bit5	= 2, 
+	Bit5	= 2,
 
 	T1	= ((1<<(Bit1+1))-1) ^ 0xFF,	/* 0000 0000 */
 	Tx	= ((1<<(Bitx+1))-1) ^ 0xFF,	/* 1000 0000 */
@@ -46,9 +48,9 @@ enum
 
 /*
  * Modified by Wei-Hwa Huang, Google Inc., on 2004-09-24
- * This is a slower but "safe" version of the old chartorune 
+ * This is a slower but "safe" version of the old chartorune
  * that works on strings that are not necessarily null-terminated.
- * 
+ *
  * If you know for sure that your string is null-terminated,
  * chartorune will be a bit faster.
  *
@@ -160,7 +162,7 @@ badlen:
 
 
 /*
- * This is the older "unsafe" version, which works fine on 
+ * This is the older "unsafe" version, which works fine on
  * null-terminated strings.
  */
 int
@@ -244,7 +246,7 @@ isvalidcharntorune(const char* str, int length, Rune* rune, int* consumed) {
 	*consumed = charntorune(rune, str, length);
 	return *rune != Runeerror || *consumed == 3;
 }
-    
+
 int
 runetochar(char *str, const Rune *rune)
 {
@@ -324,7 +326,7 @@ runenlen(const Rune *r, int nrune)
 			nb += 2;
 		else if (c <= Rune3)
 			nb += 3;
-		else /* assert(c <= Rune4) */ 
+		else /* assert(c <= Rune4) */
 			nb += 4;
 	}
 	return nb;
@@ -347,4 +349,6 @@ fullrune(const char *str, int n)
 		}
 	}
 	return 0;
+}
+
 }

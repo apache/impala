@@ -64,7 +64,7 @@ ADD_LIBRARY(gutil
 ./hash/hash.cc
 ./hash/jenkins.cc
 ./hash/city.cc
-./utf/rune.c
+./utf/rune.cc
 )
 
 
