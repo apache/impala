@@ -136,14 +136,14 @@ if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # Basic error checking
   if [[ "${AWS_ACCESS_KEY_ID}" = "DummyAccessKeyId" ||\
         "${AWS_SECRET_ACCESS_KEY}" = "DummySecretAccessKey" ]]; then
-    echo "Both AWS_ACCESS_KEY_ID and AWS_SECRET_KEY_ID
+    echo "Both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
       need to be assigned valid values and belong to the owner of the s3
       bucket in order to access the file system"
     return 1
   fi
   # Check if the s3 bucket is NULL.
   if [[ "${S3_BUCKET}" = "" ]]; then
-    echo "The ${S3_BUCKET} cannot be an empty string for s3"
+    echo "S3_BUCKET cannot be an empty string for s3"
     return 1
   fi
   aws s3 ls "s3://${S3_BUCKET}/" 1>/dev/null
@@ -151,10 +151,8 @@ if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     echo "Access to ${S3_BUCKET} failed."
     return 1
   fi
-  # At this point, we've verified that:
-  #   - All the required environment variables are set.
-  #   - We are able to talk to the s3 bucket with the credentials provided.
-  export FILESYSTEM_PREFIX="s3a://${S3_BUCKET}"
+  DEFAULT_FS="s3a://${S3_BUCKET}"
+  export DEFAULT_FS
 elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   if [ "${ISILON_NAMENODE}" = "" ]; then
     echo "In order to access the Isilon filesystem, ISILON_NAMENODE"

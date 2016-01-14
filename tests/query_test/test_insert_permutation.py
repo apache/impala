@@ -6,6 +6,7 @@ import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.skip import SkipIfS3
 
 class TestInsertQueriesWithPermutation(ImpalaTestSuite):
   """
@@ -29,6 +30,7 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
+  @SkipIfS3.insert
   def test_insert_permutation(self, vector):
     map(self.cleanup_db, ["insert_permutation_test"])
     self.run_test_case('QueryTest/insert_permutation', vector)

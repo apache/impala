@@ -77,6 +77,7 @@ WORKLOAD_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'workloads')
 DATASET_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'datasets')
 SQL_OUTPUT_DIR = os.environ['IMPALA_DATA_LOADING_SQL_DIR']
 AVRO_SCHEMA_DIR = "avro_schemas"
+DEFAULT_FS=os.environ['DEFAULT_FS']
 IMPALA_SUPPORTED_INSERT_FORMATS = ['parquet', 'hbase', 'text', 'kudu']
 
 COMPRESSION_TYPE = "SET mapred.output.compression.type=%s;"
@@ -194,8 +195,13 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   external = "EXTERNAL"
 
   if file_format == 'avro':
-    tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
-      % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
+    # TODO Is this flag ever used?
+    if options.hdfs_namenode is None:
+      tblproperties["avro.schema.url"] = "%s/%s/%s/{table_name}.json" \
+        % (DEFAULT_FS, options.hive_warehouse_dir, avro_schema_dir)
+    else:
+      tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
+        % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
   elif file_format == 'parquet':
     row_format_stmt = str()
   elif file_format == 'kudu':

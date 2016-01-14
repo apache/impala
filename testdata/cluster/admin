@@ -49,8 +49,7 @@ TEMPLATE_SUFFIX=".tmpl"
 # Each process should be marked with this so a "pkill -f" can be done to nuke everything.
 export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 
-if [[ "$TARGET_FILESYSTEM" == "hdfs" || "$TARGET_FILESYSTEM" == "s3" ]]; then
-  #TODO: Remove S3 from this condition once IMPALA-1850 goes in.
+if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
   # The check above indicates that the regular mini-cluster is in use.
   SUPPORTED_SERVICES=(hdfs yarn llama kms)
 else

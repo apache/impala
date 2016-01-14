@@ -27,7 +27,7 @@ from tests.common.skip import SkipIfS3
 from tests.util.shell_util import exec_process
 
 
-
+@SkipIfS3.caching
 class TestHdfsFdCaching(ImpalaTestSuite):
   """
   This test suite tests the behavior of HDFS file descriptor caching by evaluating the

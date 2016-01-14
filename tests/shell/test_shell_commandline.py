@@ -24,6 +24,7 @@ from subprocess import Popen, PIPE, call
 from tests.common.impala_service import ImpaladService
 from time import sleep
 from test_shell_common import assert_var_substitution
+from tests.common.skip import SkipIfS3
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
@@ -34,6 +35,7 @@ TEST_DB = "tmp_shell"
 TEST_TBL = "tbl1"
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
+@SkipIfS3.insert
 class TestImpalaShell(object):
   """A set of sanity tests for the Impala shell commandline parameters.
 

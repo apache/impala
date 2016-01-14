@@ -122,6 +122,9 @@ class ExecEnv {
   /// resource locations.
   bool is_pseudo_distributed_llama() { return is_pseudo_distributed_llama_; }
 
+  /// Returns the configured defaultFs set in core-site.xml
+  string default_fs() { return default_fs_; }
+
  protected:
   /// Leave protected so that subclasses can override
   boost::scoped_ptr<MetricGroup> metrics_;
@@ -161,6 +164,9 @@ class ExecEnv {
   /// indicating that this cluster is pseudo-distributed. Should not be true in real
   /// deployments.
   bool is_pseudo_distributed_llama_;
+
+  /// fs.defaultFs value set in core-site.xml
+  std::string default_fs_;
 
   /// Initialise cgroups manager, detect test RM environment and init resource broker.
   void InitRm();

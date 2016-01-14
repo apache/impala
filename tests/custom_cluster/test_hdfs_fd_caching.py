@@ -20,7 +20,9 @@ from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (TestDimension,
     create_single_exec_option_dimension,
     create_parquet_dimension)
+from tests.common.skip import SkipIfS3
 
+@SkipIfS3.caching
 class TestHdfsFdCaching(CustomClusterTestSuite):
   """Tests that if HDFS file handle caching is enabled, file handles are actually cached
   and the associated metrics return valid results. In addition, tests that the upper bound

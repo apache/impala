@@ -46,5 +46,6 @@ bool IsDfsPath(const char* path);
 
 /// Returns true iff the path refers to a location on an S3A filesystem.
 bool IsS3APath(const char* path);
+
 }
 #endif // IMPALA_UTIL_HDFS_UTIL_H

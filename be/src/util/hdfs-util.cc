@@ -20,6 +20,7 @@
 #include "util/error-util.h"
 
 #include "common/names.h"
+#include "runtime/exec-env.h"
 
 namespace impala {
 
@@ -64,12 +65,16 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const string& src_path,
 }
 
 bool IsDfsPath(const char* path) {
-  // TODO: currently, we require defaultFS to be HDFS, but when that is relaxed, we
-  // should fix this to not assume unqualified paths are DFS.
-  return strncmp(path, "hdfs://", 7) == 0 || strstr(path, ":/") == NULL;
+  if (strstr(path, ":/") == NULL) {
+    return ExecEnv::GetInstance()->default_fs().compare(0, 7, "hdfs://") == 0;
+  }
+  return strncmp(path, "hdfs://", 7) == 0;
 }
 
 bool IsS3APath(const char* path) {
+  if (strstr(path, ":/") == NULL) {
+    return ExecEnv::GetInstance()->default_fs().compare(0, 6, "s3a://") == 0;
+  }
   return strncmp(path, "s3a://", 6) == 0;
 }
 

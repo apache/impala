@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.log4j.Appender;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.log4j.FileAppender;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -683,13 +684,12 @@ public class JniFrontend {
   private String checkFileSystem(Configuration conf) {
     try {
       FileSystem fs = FileSystem.get(CONF);
-      if (!(fs instanceof DistributedFileSystem)) {
-        return "Unsupported default filesystem. The default filesystem must be " +
-            "a DistributedFileSystem but the configured default filesystem is " +
+      if (!(fs instanceof DistributedFileSystem || fs instanceof S3AFileSystem)) {
+        return "Currently configured default filesystem: " +
             fs.getClass().getSimpleName() + ". " +
             CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
             " (" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
-            " might be set incorrectly.";
+            " is not supported.";
       }
     } catch (IOException e) {
       return "couldn't retrieve FileSystem:\n" + e.getMessage();
@@ -698,7 +698,7 @@ public class JniFrontend {
     try {
       FileSystemUtil.getTotalNumVisibleFiles(new Path("/"));
     } catch (IOException e) {
-      return "Could not read the HDFS root directory at " +
+      return "Could not read the root directory at " +
           CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) +
           ". Error was: \n" + e.getMessage();
     }
