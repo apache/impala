@@ -29,8 +29,8 @@ from multiprocessing.pool import ThreadPool
 parser = OptionParser()
 parser.add_option("-s", "--cluster_size", type="int", dest="cluster_size", default=3,
                   help="Size of the cluster (number of impalad instances to start).")
-parser.add_option("--build_type", dest="build_type", default= 'debug',
-                  help="Build type to use - debug / release")
+parser.add_option("--build_type", dest="build_type", default= 'latest',
+                  help="Build type to use - debug / release / latest")
 parser.add_option("--impalad_args", dest="impalad_args", action="append", type="string",
                   default=[],
                   help="Additional arguments to pass to each Impalad during startup")
@@ -67,7 +67,7 @@ parser.add_option("--jvm_args", dest="jvm_args", default="",
 options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
-KNOWN_BUILD_TYPES = ['debug', 'release']
+KNOWN_BUILD_TYPES = ['debug', 'release', 'latest']
 IMPALAD_PATH = os.path.join(IMPALA_HOME,
     'bin/start-impalad.sh -build_type=%s' % options.build_type)
 STATE_STORE_PATH = os.path.join(IMPALA_HOME,

@@ -19,7 +19,7 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
-BUILD_TYPE=debug
+BUILD_TYPE=latest
 CATALOGD_ARGS=""
 BINARY_BASE_DIR=${IMPALA_HOME}/be/build
 JVM_DEBUG_PORT=""
@@ -35,6 +35,8 @@ do
       ;;
     -build_type=release)
       BUILD_TYPE=release
+      ;;
+    -build_type=latest)
       ;;
     -build_type=*)
       echo "Invalid build type. Valid values are: debug, release"
