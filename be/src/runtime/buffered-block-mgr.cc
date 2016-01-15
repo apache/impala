@@ -408,6 +408,7 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
   DCHECK_NE(len, 0) << "Cannot request block of zero size";
   *block = NULL;
   Block* new_block = NULL;
+  Status status;
 
   {
     lock_guard<mutex> lock(lock_);
@@ -415,6 +416,7 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
     new_block = GetUnusedBlock(client);
     DCHECK(new_block->Validate()) << endl << new_block->DebugString();
     DCHECK_EQ(new_block->client_, client);
+    DCHECK_NE(new_block, unpin_block);
 
     if (len > 0 && len < max_block_size_) {
       DCHECK(unpin_block == NULL);
@@ -428,16 +430,17 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
         client->PinBuffer(new_block->buffer_desc_);
         ++total_pinned_buffers_;
         *block = new_block;
+        return Status::OK();
       } else {
-        new_block->is_deleted_ = true;
-        ReturnUnusedBlock(new_block);
+        status = Status::OK();
+        goto no_buffer_avail;
       }
-      return Status::OK();
     }
   }
 
   bool in_mem;
-  RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
+  status = FindBufferForBlock(new_block, &in_mem);
+  if (!status.ok()) goto no_buffer_avail;
   DCHECK(!in_mem) << "A new block cannot start in mem.";
   DCHECK(!new_block->is_pinned() || new_block->buffer_desc_ != NULL)
       << new_block->DebugString();
@@ -446,27 +449,34 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
     if (unpin_block == NULL) {
       // We couldn't get a new block and no unpin block was provided. Can't return
       // a block.
-      new_block->is_deleted_ = true;
-      ReturnUnusedBlock(new_block);
-      new_block = NULL;
+      status = Status::OK();
+      goto no_buffer_avail;
     } else {
       // We need to transfer the buffer from unpin_block to new_block.
-      RETURN_IF_ERROR(TransferBuffer(new_block, unpin_block, true));
+      status = TransferBuffer(new_block, unpin_block, true);
+      if (!status.ok()) goto no_buffer_avail;
     }
   } else if (unpin_block != NULL) {
     // Got a new block without needing to transfer. Just unpin this block.
-    RETURN_IF_ERROR(unpin_block->Unpin());
+    status = unpin_block->Unpin();
+    if (!status.ok()) goto no_buffer_avail;
   }
 
-  DCHECK(new_block == NULL || new_block->is_pinned());
+  DCHECK(new_block->is_pinned());
   *block = new_block;
   return Status::OK();
+
+no_buffer_avail:
+  DCHECK(new_block != NULL);
+  DeleteBlock(new_block);
+  return status;
 }
 
 Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   Status status = Status::OK();
   DCHECK(dst != NULL);
   DCHECK(src != NULL);
+  unique_lock<mutex> lock(lock_);
 
   // First write out the src block.
   DCHECK(src->is_pinned_);
@@ -476,7 +486,6 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   src->is_pinned_ = false;
 
   if (unpin) {
-    unique_lock<mutex> lock(lock_);
     src->client_local_ = true;
     status = WriteUnpinnedBlock(src);
     if (!status.ok()) {
@@ -500,10 +509,7 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   dst->buffer_desc_->block = dst;
   src->buffer_desc_ = NULL;
   dst->is_pinned_ = true;
-  if (!unpin) {
-    src->is_deleted_ = true;
-    ReturnUnusedBlock(src);
-  }
+  if (!unpin) DeleteBlockLocked(lock, src);
   return Status::OK();
 }
 
@@ -542,6 +548,14 @@ BufferedBlockMgr::~BufferedBlockMgr() {
     file.Remove();
   }
   tmp_files_.clear();
+
+  // Validate that clients deleted all of their blocks. Since all writes have
+  // completed at this point, any deleted blocks should be in unused_blocks_.
+  for (auto it = all_blocks_.begin(); it != all_blocks_.end(); ++it) {
+    Block* block = *it;
+    DCHECK(block->Validate()) << block->DebugString();
+    DCHECK(unused_blocks_.Contains(block)) << block->DebugString();
+  }
 
   // Free memory resources.
   BOOST_FOREACH(BufferDescriptor* buffer, all_io_buffers_) {
@@ -805,10 +819,13 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   // hang around needlessly.
   if (encryption_) EncryptDone(block);
 
-  // ReturnUnusedBlock() will clear the block, so save the client pointer.
-  // We have to be careful while touching the state because it may have been cleaned up by
-  // another thread.
-  RuntimeState* state = block->client_->state_;
+  // ReturnUnusedBlock() will clear the block, so save required state in local vars.
+  // state is not valid if the block was deleted because the state may be torn down
+  // after deleting its blocks.
+  TmpFileMgr::File* tmp_file = block->tmp_file_;
+  RuntimeState* state = block->is_deleted_ || block->client_->state_->is_cancelled() ?
+      NULL : block->client_->state_;
+
   // If the block was re-pinned when it was in the IOMgr queue, don't free it.
   if (block->is_pinned_) {
     // The number of outstanding writes has decreased but the number of free buffers
@@ -831,6 +848,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
       block->buffer_desc_->block = NULL;
       block->buffer_desc_ = NULL;
       ReturnUnusedBlock(block);
+      block = NULL;
     }
     // Multiple threads may be waiting for the same block in FindBuffer().  Wake them
     // all up.  One thread will get this block, and the others will re-evaluate whether
@@ -845,18 +863,16 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
         << ". is_cancelled_=" << is_cancelled_;
 
     // If the instance is already cancelled, don't confuse things with these errors.
-    if (!write_status.IsCancelled() && !state->is_cancelled()) {
-      if (!write_status.ok()) {
-        // Report but do not attempt to recover from write error.
-        DCHECK(block->tmp_file_ != NULL);
-        block->tmp_file_->ReportIOError(write_status.msg());
-        VLOG_QUERY << "Query: " << query_id_ << " write complete callback with error.";
-        state->LogError(write_status.msg());
-      }
-      if (!status.ok()) {
-        VLOG_QUERY << "Query: " << query_id_ << " error while writing unpinned blocks.";
-        state->LogError(status.msg());
-      }
+    if (!write_status.ok() && !write_status.IsCancelled()) {
+      // Report but do not attempt to recover from write error.
+      DCHECK(tmp_file != NULL);
+      if (!write_status.IsMemLimitExceeded()) tmp_file->ReportIOError(write_status.msg());
+      VLOG_QUERY << "Query: " << query_id_ << " write complete callback with error.";
+      if (state != NULL) state->LogError(write_status.msg());
+    }
+    if (!status.ok()) {
+      VLOG_QUERY << "Query: " << query_id_ << " error while writing unpinned blocks.";
+      if (state != NULL) state->LogError(status.msg());
     }
     // Set cancelled and wake up waiting threads if an error occurred.  Note that in
     // the case of client_local_, that thread was woken up above.
@@ -866,10 +882,14 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
 }
 
 void BufferedBlockMgr::DeleteBlock(Block* block) {
-  DCHECK(!block->is_deleted_);
+  unique_lock<mutex> lock(lock_);
+  DeleteBlockLocked(lock, block);
+}
 
-  lock_guard<mutex> lock(lock_);
+void BufferedBlockMgr::DeleteBlockLocked(const unique_lock<mutex>& lock, Block* block) {
+  DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
   DCHECK(block->Validate()) << endl << DebugInternal();
+  DCHECK(!block->is_deleted_);
   block->is_deleted_ = true;
 
   if (block->is_pinned_) {
@@ -1028,6 +1048,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
 //  3. Wait and evict an unpinned buffer.
 Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
     BufferDescriptor** buffer_desc) {
+  DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
   *buffer_desc = NULL;
 
   // First, try to allocate a new buffer.
@@ -1081,6 +1102,7 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
   Block* new_block = NULL;
   if (unused_blocks_.empty()) {
     new_block = obj_pool_.Add(new Block(this));
+    all_blocks_.push_back(new_block);
     new_block->Init();
     created_block_counter_->Add(1);
   } else {

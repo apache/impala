@@ -85,6 +85,10 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
   }
 }
 
+BufferedTupleStream::~BufferedTupleStream() {
+  DCHECK(closed_);
+}
+
 // Returns the number of pinned blocks in the list. Only called in DCHECKs to validate
 // num_pinned_.
 int NumPinned(const list<BufferedBlockMgr::Block*>& blocks) {

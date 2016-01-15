@@ -432,6 +432,10 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   ExecNode::Close(state);
 }
 
+PartitionedAggregationNode::Partition::~Partition() {
+  DCHECK(is_closed);
+}
+
 Status PartitionedAggregationNode::Partition::InitStreams() {
   agg_fn_pool.reset(new MemPool(parent->expr_mem_tracker()));
   DCHECK_EQ(agg_fn_ctxs.size(), 0);

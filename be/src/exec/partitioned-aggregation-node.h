@@ -272,6 +272,8 @@ class PartitionedAggregationNode : public ExecNode {
     Partition(PartitionedAggregationNode* parent, int level)
       : parent(parent), is_closed(false), level(level) {}
 
+    ~Partition();
+
     /// Initializes aggregated_row_stream and unaggregated_row_stream, reserving
     /// one buffer for each. The buffers backing these streams are reserved, so this
     /// function will not fail with a continuable OOM. If we fail to init these buffers,

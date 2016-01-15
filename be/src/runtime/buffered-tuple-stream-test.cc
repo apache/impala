@@ -804,6 +804,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     rows_read += batch.num_rows();
   } while (!eos);
   ASSERT_EQ(NUM_ROWS, rows_read);
+  stream.Close();
 }
 
 // TODO: more tests.

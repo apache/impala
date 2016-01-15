@@ -165,6 +165,8 @@ class BufferedTupleStream {
       BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
       bool use_initial_small_buffers, bool read_write);
 
+  ~BufferedTupleStream();
+
   /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
   /// once before any of the other APIs.
   /// If 'pinned' is true, the tuple stream starts of pinned, otherwise it is unpinned.

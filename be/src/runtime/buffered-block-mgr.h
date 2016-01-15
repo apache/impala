@@ -73,8 +73,9 @@ class RuntimeState;
 ///   list of unpinned blocks. Unpinned blocks are only written when the number of free
 ///   blocks falls below the 'block_write_threshold'.
 ///  Delete(): Invoked to deallocate a block. The buffer associated with the block is
-///   immediately released and its on-disk location (if any) reused.
-//
+///   immediately released and its on-disk location (if any) reused. All blocks must be
+///   deleted before the block manager is torn down.
+///
 /// The block manager is thread-safe with the following caveat: A single block cannot be
 /// used simultaneously by multiple clients in any capacity.
 /// However, the block manager client is not thread-safe. That is, the block manager
@@ -430,10 +431,12 @@ class BufferedBlockMgr {
   Status InitTmpFiles();
 
   /// PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
-  /// Unpin() and Delete(). Must be called with the lock_ taken.
+  /// Unpin() and Delete(). DeleteBlock() must be called without the lock_ taken and
+  /// DeleteBlockLocked() must be called with the lock_ taken.
   Status PinBlock(Block* block, bool* pinned, Block* src, bool unpin);
   Status UnpinBlock(Block* block);
   void DeleteBlock(Block* block);
+  void DeleteBlockLocked(const boost::unique_lock<boost::mutex>& lock, Block* block);
 
   /// If the 'block' is NULL, checks if cancelled and returns. Otherwise, depending on
   /// 'unpin' calls either  DeleteBlock() or UnpinBlock(), which both first check for
@@ -469,8 +472,7 @@ class BufferedBlockMgr {
   ///   2. Using a buffer from the free list (which is populated by moving blocks from
   ///      the unpinned list by writing them out).
   /// Must be called with the lock_ already taken. This function can block.
-  Status FindBuffer(boost::unique_lock<boost::mutex>& lock,
-      BufferDescriptor** buffer);
+  Status FindBuffer(boost::unique_lock<boost::mutex>& lock, BufferDescriptor** buffer);
 
   /// Writes unpinned blocks via DiskIoMgr until one of the following is true:
   ///   1. The number of outstanding writes >= (block_write_threshold_ - num free buffers)
@@ -549,6 +551,9 @@ class BufferedBlockMgr {
 
   /// Signal availability of free buffers.
   boost::condition_variable buffer_available_cv_;
+
+  /// All used or unused blocks allocated by the BufferedBlockMgr.
+  vector<Block*> all_blocks_;
 
   /// List of blocks is_pinned_ = false AND are not on DiskIoMgr's write queue.
   /// Blocks are added to and removed from the back of the list. (i.e. in LIFO order).
