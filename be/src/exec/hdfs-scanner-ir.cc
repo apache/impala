@@ -40,7 +40,7 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
 
   uint8_t error[slots_per_tuple];
-  memset(error, 0, sizeof(error));
+  memset(error, 0, slots_per_tuple);
 
   int tuples_returned = 0;
 

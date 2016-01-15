@@ -76,11 +76,6 @@ class DataSourceScanNode : public ScanNode {
   /// Current tuple.
   Tuple* tuple_;
 
-  /// Vector containing slot descriptors for all materialized slots. These
-  /// descriptors are sorted in order of increasing col_pos.
-  /// TODO: Refactor to base class. HdfsScanNode has this and other nodes could use it.
-  std::vector<SlotDescriptor*> materialized_slots_;
-
   /// The opaque handle returned by the data source for the scan.
   std::string scan_handle_;
 
@@ -97,7 +92,7 @@ class DataSourceScanNode : public ScanNode {
   size_t next_row_idx_;
 
   /// The indexes of the next non-null value in the row batch, per column. Should always
-  /// contain materialized_slots_.size() integers. All values are reset to 0 when getting
+  /// contain tuple_desc_->slots().size() integers. All values are reset to 0 when getting
   /// the next row batch.
   std::vector<int> cols_next_val_idx_;
 

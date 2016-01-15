@@ -81,12 +81,7 @@ Status DataSourceScanNode::Prepare(RuntimeState* state) {
       data_src_node_.data_source.class_name, data_src_node_.data_source.api_version,
       data_src_node_.init_string));
 
-  // Initialize materialized_slots_ and cols_next_val_idx_.
-  BOOST_FOREACH(SlotDescriptor* slot, tuple_desc_->slots()) {
-    if (!slot->is_materialized()) continue;
-    materialized_slots_.push_back(slot);
-    cols_next_val_idx_.push_back(0);
-  }
+  cols_next_val_idx_.resize(tuple_desc_->slots().size(), 0);
   return Status::OK();
 }
 
@@ -97,7 +92,7 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
 
   // Prepare the schema for TOpenParams.row_schema
   vector<extdatasource::TColumnDesc> cols;
-  BOOST_FOREACH(const SlotDescriptor* slot, materialized_slots_) {
+  BOOST_FOREACH(const SlotDescriptor* slot, tuple_desc_->slots()) {
     extdatasource::TColumnDesc col;
     int col_idx = slot->col_pos();
     col.__set_name(tuple_desc_->table_desc()->col_descs()[col_idx].name());
@@ -125,8 +120,9 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
 Status DataSourceScanNode::ValidateRowBatchSize() {
   if (!input_batch_->__isset.rows) return Status::OK();
   const vector<TColumnData>& cols = input_batch_->rows.cols;
-  if (materialized_slots_.size() != cols.size()) {
-    return Status(Substitute(ERROR_NUM_COLUMNS, materialized_slots_.size(), cols.size()));
+  if (tuple_desc_->slots().size() != cols.size()) {
+    return Status(
+        Substitute(ERROR_NUM_COLUMNS, tuple_desc_->slots().size(), cols.size()));
   }
 
   num_rows_ = -1;
@@ -134,7 +130,7 @@ Status DataSourceScanNode::ValidateRowBatchSize() {
   // the first TColumnData and then ensure the number of rows in other columns are
   // consistent.
   if (input_batch_->rows.__isset.num_rows) num_rows_ = input_batch_->rows.num_rows;
-  for (int i = 0; i < materialized_slots_.size(); ++i) {
+  for (int i = 0; i < tuple_desc_->slots().size(); ++i) {
     const TColumnData& col_data = cols[i];
     if (num_rows_ < 0) num_rows_ = col_data.is_null.size();
     if (num_rows_ != col_data.is_null.size()) return Status(ERROR_MISMATCHED_COL_SIZES);
@@ -195,8 +191,8 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool) {
   const vector<TColumnData>& cols = input_batch_->rows.cols;
   tuple_->Init(tuple_desc_->byte_size());
 
-  for (int i = 0; i < materialized_slots_.size(); ++i) {
-    const SlotDescriptor* slot_desc = materialized_slots_[i];
+  for (int i = 0; i < tuple_desc_->slots().size(); ++i) {
+    const SlotDescriptor* slot_desc = tuple_desc_->slots()[i];
     void* slot = tuple_->GetSlot(slot_desc->tuple_offset());
     const TColumnData& col = cols[i];
 

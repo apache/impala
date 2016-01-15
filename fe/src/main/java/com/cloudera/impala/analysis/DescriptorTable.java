@@ -163,7 +163,8 @@ public class DescriptorTable {
         result.addToTupleDescriptors(tupleDesc.toThrift());
         Table table = tupleDesc.getTable();
         if (table != null && !(table instanceof View)) referencedTbls.add(table);
-        for (SlotDescriptor slotD: tupleDesc.getSlots()) {
+        // Only serialize materialized slots
+        for (SlotDescriptor slotD: tupleDesc.getMaterializedSlots()) {
           result.addToSlotDescriptors(slotD.toThrift());
         }
       }

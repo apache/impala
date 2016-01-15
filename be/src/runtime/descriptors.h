@@ -118,7 +118,6 @@ class SlotDescriptor {
   const NullIndicatorOffset& null_indicator_offset() const {
     return null_indicator_offset_;
   }
-  bool is_materialized() const { return is_materialized_; }
   bool is_nullable() const { return null_indicator_offset_.bit_mask != 0; }
   int slot_size() const { return slot_size_; }
 
@@ -165,8 +164,6 @@ class SlotDescriptor {
   /// this is set by TupleDescriptor during codegen and takes into account
   /// leading null bytes.
   int field_idx_;
-
-  const bool is_materialized_;
 
   /// Cached codegen'd functions
   llvm::Function* is_null_fn_;
@@ -384,7 +381,6 @@ class TupleDescriptor {
   TableDescriptor* table_desc_;
   const int byte_size_;
   const int num_null_bytes_;
-  int num_materialized_slots_;
 
   /// Contains all slots.
   std::vector<SlotDescriptor*> slots_;

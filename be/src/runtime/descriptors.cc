@@ -64,7 +64,6 @@ SlotDescriptor::SlotDescriptor(
     slot_idx_(tdesc.slotIdx),
     slot_size_(type_.GetByteSize()),
     field_idx_(-1),
-    is_materialized_(tdesc.isMaterialized),
     is_null_fn_(NULL),
     set_not_null_fn_(NULL),
     set_null_fn_(NULL) {
@@ -271,7 +270,6 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     table_desc_(NULL),
     byte_size_(tdesc.byteSize),
     num_null_bytes_(tdesc.numNullBytes),
-    num_materialized_slots_(0),
     slots_(),
     has_varlen_slots_(false),
     tuple_path_(tdesc.tuplePath),
@@ -280,16 +278,13 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
-  if (slot->is_materialized()) {
-    ++num_materialized_slots_;
-    if (slot->type().IsVarLenStringType()) {
-      string_slots_.push_back(slot);
-      has_varlen_slots_ = true;
-    }
-    if (slot->type().IsCollectionType()) {
-      collection_slots_.push_back(slot);
-      has_varlen_slots_ = true;
-    }
+  if (slot->type().IsVarLenStringType()) {
+    string_slots_.push_back(slot);
+    has_varlen_slots_ = true;
+  }
+  if (slot->type().IsCollectionType()) {
+    collection_slots_.push_back(slot);
+    has_varlen_slots_ = true;
   }
 }
 
@@ -490,18 +485,13 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
     // Tuple descriptors are already populated in tbl
     TupleDescriptor* parent = (*tbl)->GetTupleDescriptor(tdesc.parent);
+    DCHECK(parent != NULL);
     TupleDescriptor* collection_item_descriptor = tdesc.__isset.itemTupleId ?
         (*tbl)->GetTupleDescriptor(tdesc.itemTupleId) : NULL;
     SlotDescriptor* slot_d = pool->Add(
         new SlotDescriptor(tdesc, parent, collection_item_descriptor));
     (*tbl)->slot_desc_map_[tdesc.id] = slot_d;
-
-    // link to parent
-    TupleDescriptorMap::iterator entry = (*tbl)->tuple_desc_map_.find(tdesc.parent);
-    if (entry == (*tbl)->tuple_desc_map_.end()) {
-      return Status("unknown tid in slot descriptor msg");
-    }
-    entry->second->AddSlot(slot_d);
+    parent->AddSlot(slot_d);
   }
   return Status::OK();
 }
@@ -641,7 +631,7 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
 
   // For each null byte, add a byte to the struct
   vector<Type*> struct_fields;
-  struct_fields.resize(num_null_bytes_ + num_materialized_slots_);
+  struct_fields.resize(num_null_bytes_ + slots_.size());
   for (int i = 0; i < num_null_bytes_; ++i) {
     struct_fields[i] = codegen->GetType(TYPE_TINYINT);
   }
@@ -650,11 +640,9 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
   for (int i = 0; i < slots().size(); ++i) {
     SlotDescriptor* slot_desc = slots()[i];
     if (slot_desc->type().type == TYPE_CHAR) return NULL;
-    if (slot_desc->is_materialized()) {
-      slot_desc->field_idx_ = slot_desc->slot_idx_ + num_null_bytes_;
-      DCHECK_LT(slot_desc->field_idx(), struct_fields.size());
-      struct_fields[slot_desc->field_idx()] = codegen->GetType(slot_desc->type());
-    }
+    slot_desc->field_idx_ = slot_desc->slot_idx_ + num_null_bytes_;
+    DCHECK_LT(slot_desc->field_idx(), struct_fields.size());
+    struct_fields[slot_desc->field_idx()] = codegen->GetType(slot_desc->type());
   }
 
   // Construct the struct type.
@@ -673,14 +661,12 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
   }
   for (int i = 0; i < slots().size(); ++i) {
     SlotDescriptor* slot_desc = slots()[i];
-    if (slot_desc->is_materialized()) {
-      int field_idx = slot_desc->field_idx();
-      // Verify that the byte offset in the llvm struct matches the tuple offset
-      // computed in the FE
-      if (layout->getElementOffset(field_idx) != slot_desc->tuple_offset()) {
-        DCHECK_EQ(layout->getElementOffset(field_idx), slot_desc->tuple_offset());
-        return NULL;
-      }
+    int field_idx = slot_desc->field_idx();
+    // Verify that the byte offset in the llvm struct matches the tuple offset
+    // computed in the FE
+    if (layout->getElementOffset(field_idx) != slot_desc->tuple_offset()) {
+      DCHECK_EQ(layout->getElementOffset(field_idx), slot_desc->tuple_offset());
+      return NULL;
     }
   }
   llvm_struct_ = tuple_struct;

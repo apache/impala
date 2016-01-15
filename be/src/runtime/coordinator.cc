@@ -921,7 +921,6 @@ void Coordinator::ValidateCollectionSlots(RowBatch* batch) {
       if (tuple_desc->collection_slots().empty()) continue;
       for (int k = 0; k < tuple_desc->collection_slots().size(); ++k) {
         const SlotDescriptor* slot_desc = tuple_desc->collection_slots()[k];
-        if (!slot_desc->is_materialized()) continue;
         int tuple_idx = row_desc.GetTupleIdx(slot_desc->parent()->id());
         const Tuple* tuple = row->GetTuple(tuple_idx);
         if (tuple == NULL) continue;

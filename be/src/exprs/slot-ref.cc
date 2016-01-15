@@ -74,11 +74,6 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
     LOG(INFO) << error.str();
     return Status(error.str());
   }
-  if (!slot_desc->is_materialized()) {
-    stringstream error;
-    error << "reference to non-materialized slot " << slot_id_;
-    return Status(error.str());
-  }
   tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
   if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
     TupleDescriptor* d = state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());

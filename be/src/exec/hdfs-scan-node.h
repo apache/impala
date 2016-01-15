@@ -131,10 +131,10 @@ class HdfsScanNode : public ScanNode {
   /// Currently this is always 0.
   int tuple_idx() const { return 0; }
 
-  /// Returns number of partition keys in the table, including non-materialized slots
+  /// Returns number of partition keys in the table.
   int num_partition_keys() const { return hdfs_table_->num_clustering_cols(); }
 
-  /// Returns number of materialized partition key slots
+  /// Returns number of partition key slots.
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
@@ -164,8 +164,8 @@ class HdfsScanNode : public ScanNode {
     return result->second;
   }
 
-  /// The result array is of length num_cols(). The i-th element is true iff column i
-  /// should be materialized.
+  /// The result array is of length hdfs_table_->num_cols(). The i-th element is true iff
+  /// column i should be materialized.
   const bool* is_materialized_col() {
     return reinterpret_cast<const bool*>(&is_materialized_col_[0]);
   }
@@ -215,16 +215,16 @@ class HdfsScanNode : public ScanNode {
     return AddDiskIoRanges(file_desc->splits, 1);
   }
 
-  /// Allocates and initialises template_tuple_ with any values from
-  /// the partition columns for the current scan range
-  /// Returns NULL if there are no materialized partition keys.
+  /// Allocates and initialises template_tuple_ with any values from the partition columns
+  /// for the current scan range
+  /// Returns NULL if there are no partition keys slots.
   /// TODO: cache the tuple template in the partition object.
   Tuple* InitTemplateTuple(RuntimeState* state,
                            const std::vector<ExprContext*>& value_ctxs);
 
   /// Allocates and return an empty template tuple (i.e. with no values filled in).
   /// Scanners can use this method to initialize a template tuple even if there are no
-  /// materialized partition keys (e.g. to hold Avro default values).
+  /// partition keys slots (e.g. to hold Avro default values).
   Tuple* InitEmptyTemplateTuple(const TupleDescriptor& tuple_desc);
 
   /// Acquires all allocations from pool into scan_node_pool_. Thread-safe.
@@ -253,7 +253,7 @@ class HdfsScanNode : public ScanNode {
   void RangeComplete(const THdfsFileFormat::type& file_type,
       const std::vector<THdfsCompression::type>& compression_type);
 
-  /// Utility function to compute the order in which to materialize slots to allow  for
+  /// Utility function to compute the order in which to materialize slots to allow for
   /// computing conjuncts as slots get materialized (on partial tuples).
   /// 'order' will contain for each slot, the first conjunct it is associated with.
   /// e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
@@ -349,19 +349,17 @@ class HdfsScanNode : public ScanNode {
   PathToSlotIdxMap path_to_materialized_slot_idx_;
 
   /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
-  /// for 0 <= i < total # columns
+  /// for 0 <= i < total # columns in table
   //
   /// This should be a vector<bool>, but bool vectors are special-cased and not stored
   /// internally as arrays, so instead we store as chars and cast to bools as needed
   std::vector<char> is_materialized_col_;
 
-  /// Vector containing slot descriptors for all materialized non-partition key
-  /// slots.  These descriptors are sorted in order of increasing col_pos
-  /// TODO: Put this (with associated fields and logic) on ScanNode or ExecNode
+  /// Vector containing slot descriptors for all non-partition key slots.  These
+  /// descriptors are sorted in order of increasing col_pos.
   std::vector<SlotDescriptor*> materialized_slots_;
 
-  /// Vector containing slot descriptors for all materialized partition key slots
-  /// These descriptors are sorted in order of increasing col_pos
+  /// Vector containing slot descriptors for all partition key slots.
   std::vector<SlotDescriptor*> partition_key_slots_;
 
   /// Keeps track of total splits and the number finished.

@@ -85,7 +85,6 @@ class RowBatchSerializeTest : public testing::Test {
 
     for (int slot_idx = 0; slot_idx < tuple_desc.slots().size(); ++slot_idx) {
       SlotDescriptor* slot_desc = tuple_desc.slots()[slot_idx];
-      if (!slot_desc->is_materialized()) continue;
 
       if (tuple->IsNull(slot_desc->null_indicator_offset())) {
         EXPECT_TRUE(deserialized_tuple->IsNull(slot_desc->null_indicator_offset()));
@@ -168,7 +167,6 @@ class RowBatchSerializeTest : public testing::Test {
         for (int i = 0; i < array_len; ++i) {
           for (int slot_idx = 0; slot_idx < item_desc->slots().size(); ++slot_idx) {
             SlotDescriptor* item_slot_desc = item_desc->slots()[slot_idx];
-            if (!item_slot_desc->is_materialized()) continue;
             WriteValue(tuple_mem, *item_slot_desc, pool);
           }
           tuple_mem += item_desc->byte_size();
@@ -201,8 +199,6 @@ class RowBatchSerializeTest : public testing::Test {
 
         for (int slot_idx = 0; slot_idx < tuple_desc->slots().size(); ++slot_idx) {
           SlotDescriptor* slot_desc = tuple_desc->slots()[slot_idx];
-          if (!slot_desc->is_materialized()) continue;
-
           if (rand() % 100 < NULL_VALUE_PERCENT) {
             tuple->SetNull(slot_desc->null_indicator_offset());
           } else {
@@ -232,7 +228,6 @@ class RowBatchSerializeTest : public testing::Test {
       Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
       for (int slot_idx = 0; slot_idx < tuple_desc.slots().size(); ++slot_idx) {
         SlotDescriptor* slot_desc = tuple_desc.slots()[slot_idx];
-        if (!slot_desc->is_materialized()) continue;
         if (null_value_percent > 0 && rand() % 100 < null_value_percent) {
           tuple->SetNull(slot_desc->null_indicator_offset());
         } else {

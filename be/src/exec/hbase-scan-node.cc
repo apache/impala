@@ -73,7 +73,6 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   sorted_non_key_slots_.reserve(slots.size());
   for (int i = 0; i < slots.size(); ++i) {
-    if (!slots[i]->is_materialized()) continue;
     if (slots[i]->col_pos() == ROW_KEY) {
       row_key_slot_ = slots[i];
     } else {

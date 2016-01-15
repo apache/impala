@@ -46,7 +46,6 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnTyp
   slot_desc.__set_nullIndicatorByte(null_byte);
   slot_desc.__set_nullIndicatorBit(null_bit);
   slot_desc.__set_slotIdx(slot_idx);
-  slot_desc.__set_isMaterialized(true);
   if (item_id != -1) slot_desc.__set_itemTupleId(item_id);
   return slot_desc;
 }

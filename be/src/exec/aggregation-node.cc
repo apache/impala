@@ -129,13 +129,6 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
-    // skip non-materialized slots; we don't have evaluators instantiated for those
-    while (!intermediate_tuple_desc_->slots()[j]->is_materialized()) {
-      DCHECK_LT(j, intermediate_tuple_desc_->slots().size() - 1)
-          << "#eval= " << aggregate_evaluators_.size()
-          << " #probe=" << probe_expr_ctxs_.size();
-      ++j;
-    }
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
@@ -336,7 +329,6 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
 
   // Initialize aggregate output.
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++slot_desc) {
-    while (!(*slot_desc)->is_materialized()) ++slot_desc;
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
     evaluator->Init(agg_fn_ctxs_[i], intermediate_tuple);
     // Codegen specific path.
@@ -513,7 +505,6 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 // }
 llvm::Function* AggregationNode::CodegenUpdateSlot(
     RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
-  DCHECK(slot_desc->is_materialized());
   LlvmCodeGen* codegen;
   if (!state->GetCodegen(&codegen).ok()) return NULL;
 
@@ -690,11 +681,6 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
 
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
-    // skip non-materialized slots; we don't have evaluators instantiated for those
-    while (!intermediate_tuple_desc_->slots()[j]->is_materialized()) {
-      DCHECK_LT(j, intermediate_tuple_desc_->slots().size() - 1);
-      ++j;
-    }
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
 
@@ -756,11 +742,6 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
   // count(*), generate a helper IR function to update the slot and call that.
   j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
-    // skip non-materialized slots; we don't have evaluators instantiated for those
-    while (!intermediate_tuple_desc_->slots()[j]->is_materialized()) {
-      DCHECK_LT(j, intermediate_tuple_desc_->slots().size() - 1);
-      ++j;
-    }
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
     if (evaluator->is_count_star()) {

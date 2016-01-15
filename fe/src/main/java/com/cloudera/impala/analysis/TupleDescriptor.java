@@ -97,6 +97,15 @@ public class TupleDescriptor {
 
   public TupleId getId() { return id_; }
   public ArrayList<SlotDescriptor> getSlots() { return slots_; }
+
+  public ArrayList<SlotDescriptor> getMaterializedSlots() {
+    ArrayList<SlotDescriptor> result = Lists.newArrayList();
+    for (SlotDescriptor slot: slots_) {
+      if (slot.isMaterialized()) result.add(slot);
+    }
+    return result;
+  }
+
   public Table getTable() {
     if (path_ == null) return null;
     return path_.getRootTable();

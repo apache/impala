@@ -261,7 +261,6 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_nullIndicatorByte(0);
     slot_desc.__set_nullIndicatorBit(-1);
     slot_desc.__set_slotIdx(0);
-    slot_desc.__set_isMaterialized(true);
     thrift_desc_tbl.slotDescriptors.push_back(slot_desc);
     EXPECT_TRUE(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_).ok());
     runtime_state_.set_desc_tbl(desc_tbl_);

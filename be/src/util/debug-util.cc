@@ -172,7 +172,6 @@ string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
   bool first_value = true;
   for (int i = 0; i < d.slots().size(); ++i) {
     SlotDescriptor* slot_d = d.slots()[i];
-    if (!slot_d->is_materialized()) continue;
     if (first_value) {
       first_value = false;
     } else {

@@ -212,11 +212,12 @@ public class SlotDescriptor {
   }
 
   public TSlotDescriptor toThrift() {
+    Preconditions.checkState(isMaterialized_);
     List<Integer> materializedPath = getMaterializedPath();
     TSlotDescriptor result = new TSlotDescriptor(
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
         materializedPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
-        slotIdx_, isMaterialized_);
+        slotIdx_);
     if (itemTupleDesc_ != null) {
       // Check for recursive or otherwise invalid item tuple descriptors. Since we assign
       // tuple ids globally in increasing order, the id of an item tuple descriptor must

@@ -378,7 +378,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // Gather materialized partition-key slots and non-partition slots.
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); ++i) {
-    if (!slots[i]->is_materialized()) continue;
     if (hdfs_table_->IsClusteringCol(slots[i])) {
       partition_key_slots_.push_back(slots[i]);
     } else {

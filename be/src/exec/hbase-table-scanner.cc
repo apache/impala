@@ -321,7 +321,6 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
   const vector<SlotDescriptor*>& slots = tuple_desc->slots();
   // Restrict scan to materialized families/qualifiers.
   for (int i = 0; i < slots.size(); ++i) {
-    if (!slots[i]->is_materialized()) continue;
     const string& family = hbase_table->cols()[slots[i]->col_pos()].family;
     const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].qualifier;
     // The row key has an empty qualifier.
@@ -345,7 +344,6 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
        ++it) {
     bool requested = false;
     for (int i = 0; i < slots.size(); ++i) {
-      if (!slots[i]->is_materialized()) continue;
       const string& family = hbase_table->cols()[slots[i]->col_pos()].family;
       const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].qualifier;
       if (family == it->family && qualifier == it->qualifier) {

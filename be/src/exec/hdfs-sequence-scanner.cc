@@ -310,7 +310,7 @@ Status HdfsSequenceScanner::ProcessRange() {
       DCHECK(num_tuples == 1);
 
       uint8_t errors[num_fields];
-      memset(errors, 0, sizeof(errors));
+      memset(errors, 0, num_fields);
 
       add_row = WriteCompleteTuple(pool, &field_locations_[0], tuple_, tuple_row_mem,
           template_tuple_, &errors[0], &error_in_row);

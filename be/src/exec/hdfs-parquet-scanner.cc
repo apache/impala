@@ -2108,7 +2108,6 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
   SlotDescriptor* pos_slot_desc = NULL;
 
   BOOST_FOREACH(SlotDescriptor* slot_desc, tuple_desc.slots()) {
-    if (!slot_desc->is_materialized()) continue;
     // Skip partition columns
     if (&tuple_desc == scan_node_->tuple_desc() &&
         slot_desc->col_pos() < scan_node_->num_partition_keys()) continue;

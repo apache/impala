@@ -50,9 +50,6 @@ class UnionNode : public ExecNode {
   /// Descriptor for tuples this union node constructs.
   const TupleDescriptor* tuple_desc_;
 
-  /// those tuple_desc_->slots() which are materialized, in the same order
-  std::vector<SlotDescriptor*> materialized_slots_;
-
   /// Const exprs materialized by this node. These exprs don't refer to any children.
   std::vector<std::vector<ExprContext*> > const_result_expr_ctx_lists_;
 

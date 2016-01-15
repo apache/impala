@@ -615,7 +615,9 @@ public class SingleNodePlanner {
     // create a plan that feeds the aggregation of selectStmt with an empty set.
     // Make sure the slots of the aggregation exprs and the tuples that they reference
     // are materialized (see IMPALA-1960). Marks all collection-typed slots referenced
-    // in this select stmt as non-materialized because they are never unnested.
+    // in this select stmt as non-materialized because they are never unnested. Note that
+    // this creates extra unused space in the tuple since the mem layout has already been
+    // computed.
     if (analyzer.hasEmptySpjResultSet()) {
       unmarkCollectionSlots(selectStmt);
       PlanNode emptySetNode = new EmptySetNode(ctx_.getNextNodeId(), rowTuples);

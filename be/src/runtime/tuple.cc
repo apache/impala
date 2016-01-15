@@ -194,22 +194,21 @@ void Tuple::MaterializeExprs(
     TupleRow* row, const TupleDescriptor& desc,
     const vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
     vector<StringValue*>* non_null_string_values, int* total_string) {
+  DCHECK_EQ(materialize_expr_ctxs.size(), desc.slots().size());
   if (collect_string_vals) {
     non_null_string_values->clear();
     *total_string = 0;
   }
   memset(this, 0, desc.num_null_bytes());
   // Evaluate the output_slot_exprs and place the results in the tuples.
-  int mat_expr_index = 0;
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
-    if (!slot_desc->is_materialized()) continue;
     // The FE ensures we don't get any TYPE_NULL expressions by picking an arbitrary type
     // when necessary, but does not do this for slot descs.
     // TODO: revisit this logic in the FE
     DCHECK(slot_desc->type().type == TYPE_NULL ||
-           slot_desc->type() == materialize_expr_ctxs[mat_expr_index]->root()->type());
-    void* src = materialize_expr_ctxs[mat_expr_index]->GetValue(row);
+           slot_desc->type() == materialize_expr_ctxs[i]->root()->type());
+    void* src = materialize_expr_ctxs[i]->GetValue(row);
     if (src != NULL) {
       void* dst = GetSlot(slot_desc->tuple_offset());
       RawValue::Write(src, dst, slot_desc->type(), pool);
@@ -221,10 +220,7 @@ void Tuple::MaterializeExprs(
     } else {
       SetNull(slot_desc->null_indicator_offset());
     }
-    ++mat_expr_index;
   }
-
-  DCHECK_EQ(mat_expr_index, materialize_expr_ctxs.size());
 }
 
 template void Tuple::MaterializeExprs<false>(TupleRow* row, const TupleDescriptor& desc,

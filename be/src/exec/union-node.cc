@@ -62,18 +62,12 @@ Status UnionNode::Prepare(RuntimeState* state) {
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
 
-  // prepare materialized_slots_
-  for (int i = 0; i < tuple_desc_->slots().size(); ++i) {
-    SlotDescriptor* desc = tuple_desc_->slots()[i];
-    if (desc->is_materialized()) materialized_slots_.push_back(desc);
-  }
-
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_ctx_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(
         const_result_expr_ctx_lists_[i], state, row_desc(), expr_mem_tracker()));
     AddExprCtxsToFree(const_result_expr_ctx_lists_[i]);
-    DCHECK_EQ(const_result_expr_ctx_lists_[i].size(), materialized_slots_.size());
+    DCHECK_EQ(const_result_expr_ctx_lists_[i].size(), tuple_desc_->slots().size());
   }
 
   // Prepare result expr lists.
@@ -81,7 +75,7 @@ Status UnionNode::Prepare(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Prepare(
         result_expr_ctx_lists_[i], state, child(i)->row_desc(), expr_mem_tracker()));
     AddExprCtxsToFree(result_expr_ctx_lists_[i]);
-    DCHECK_EQ(result_expr_ctx_lists_[i].size(), materialized_slots_.size());
+    DCHECK_EQ(result_expr_ctx_lists_[i].size(), tuple_desc_->slots().size());
   }
   return Status::OK();
 }
@@ -231,10 +225,10 @@ Status UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs,
     row->SetTuple(0, *tuple);
 
     // Materialize expr results into tuple.
-    DCHECK_EQ(ctxs.size(), materialized_slots_.size());
+    DCHECK_EQ(ctxs.size(), tuple_desc_->slots().size());
     for (int i = 0; i < ctxs.size(); ++i) {
       // our exprs correspond to materialized slots
-      SlotDescriptor* slot_desc = materialized_slots_[i];
+      SlotDescriptor* slot_desc = tuple_desc_->slots()[i];
       const void* value = ctxs[i]->GetValue(child_row);
       RETURN_IF_ERROR(ctxs[i]->root()->GetFnContextError(ctxs[i]));
       RawValue::Write(value, *tuple, slot_desc, row_batch->tuple_data_pool());
