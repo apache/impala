@@ -1,0 +1,11 @@
+# Define some default values that can be overridden by system properties
+# Don't use hadoop.root.logger because Hadoop's config scripts override it
+impala.hadoop.root.logger=INFO,console
+
+# Define the root logger to the system property "impala.hadoop.root.logger".
+log4j.rootLogger=${impala.hadoop.root.logger}
+
+log4j.appender.console=org.apache.log4j.ConsoleAppender
+log4j.appender.console.target=System.err
+log4j.appender.console.layout=org.apache.log4j.PatternLayout
+log4j.appender.console.layout.ConversionPattern=%d{yy/MM/dd HH:mm:ss} %p %c{2}: %m%n

@@ -158,6 +158,7 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 generate_config postgresql-hive-site.xml.template hive-site.xml
+generate_config log4j.properties.template log4j.properties
 generate_config hive-log4j.properties.template hive-log4j.properties
 generate_config hbase-site.xml.template hbase-site.xml
 generate_config authz-policy.ini.template authz-policy.ini
