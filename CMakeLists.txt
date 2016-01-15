@@ -36,6 +36,14 @@ IF (DEFINED ENV{BOOST_ROOT})
     set(Boost_INCLUDE_DIR ${BOOST_INCLUDEDIR})
 ENDIF (DEFINED ENV{BOOST_ROOT})
 
+# Prevent boost from using boost-cmake (i.e. /usr/lib64/boost/BoostConfig.cmake).
+#
+# Old versions of boost-cmake (that is, old versions of boost) ignore BOOST_ROOT,
+# plus we need to work around other odd issues [1].
+#
+# http://stackoverflow.com/questions/9948375/cmake-find-package-succeeds-but-returns-wrong-path
+set(Boost_NO_BOOST_CMAKE ON)
+
 set(Boost_DEBUG TRUE)
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost REQUIRED COMPONENTS thread regex-mt system-mt filesystem-mt date_time)
