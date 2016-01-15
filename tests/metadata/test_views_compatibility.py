@@ -53,6 +53,10 @@ class TestViewCompatibility(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestViewCompatibility, cls).add_test_dimensions()
+
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("Should only run in exhaustive due to long execution time.")
+
     # don't use any exec options, running exactly once is fine
     cls.TestMatrix.clear_dimension('exec_option')
     # There is no reason to run these tests using all dimensions.

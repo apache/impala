@@ -45,6 +45,10 @@ class TestHmsIntegration(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHmsIntegration, cls).add_test_dimensions()
+
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("Should only run in exhaustive due to long execution time.")
+
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
     cls.TestMatrix.add_dimension(

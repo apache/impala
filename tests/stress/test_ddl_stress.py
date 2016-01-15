@@ -37,6 +37,10 @@ class TestDdlStress(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDdlStress, cls).add_test_dimensions()
+
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("Should only run in exhaustive due to long execution time.")
+
     cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
 
