@@ -27,8 +27,7 @@ include "TCLIService.thrift"
 // The valid keys are listed in this enum. They map to TQueryOptions.
 // Note: If you add an option or change the default, you also need to update:
 // - ImpalaInternalService.thrift: TQueryOptions
-// - ImpaladClientExecutor.getBeeswaxQueryConfigurations()
-// - SetQueryOption()
+// - SetQueryOption(), SetQueryOptions()
 // - TQueryOptionsToMap()
 enum TImpalaQueryOptions {
   // if true, abort execution on the first error

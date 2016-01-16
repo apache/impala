@@ -20,154 +20,154 @@
     "key": "external-data-source.class-cache.hits"
   },
   {
-    "description": "Resource Pool $0 Cluster In Queue",
+    "description": "Resource Pool $0 Aggregate Queue Size",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Cluster In Queue",
+    "label": "Resource Pool $0 Aggregate Queue Size",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.cluster-in-queue"
+    "key": "admission-controller.agg-num-queued.$0"
   },
   {
-    "description": "Resource Pool $0 Cluster Mem Estimate",
+    "description": "Resource Pool $0 Aggregate Mem Reserved",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Cluster Mem Estimate",
+    "label": "Resource Pool $0 Aggregate Mem Reserved",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.cluster-mem-estimate"
+    "key": "admission-controller.agg-mem-reserved.$0"
   },
   {
-    "description": "Resource Pool $0 Cluster Mem Usage",
+    "description": "Resource Pool $0 Aggregate Mem Admitted",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Cluster Mem Usage",
+    "label": "Resource Pool $0 Aggregate Mem Admitted",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.cluster-mem-usage"
+    "key": "admission-controller.agg-mem-admitted.$0"
   },
   {
-    "description": "Resource Pool $0 Cluster Num Running",
+    "description": "Resource Pool $0 Aggregate Num Running",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Cluster Num Running",
+    "label": "Resource Pool $0 Aggregate Num Running",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.cluster-num-running"
+    "key": "admission-controller.agg-num-running.$0"
   },
   {
-    "description": "Resource Pool $0 Local Admitted",
+    "description": "Total number of requests admitted to pool $0",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Admitted",
+    "label": "Resource Pool $0 Total Admitted",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-admitted"
+    "key": "admission-controller.total-admitted.$0"
   },
   {
-    "description": "Resource Pool $0 Local Completed",
+    "description": "Total number of requests that have completed and released resources in pool $0",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Completed",
+    "label": "Resource Pool $0 Total Released",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-completed"
+    "key": "admission-controller.total-released.$0"
   },
   {
-    "description": "Resource Pool $0 Local Dequeued",
+    "description": "Total number of requests dequeued in pool $0",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Dequeued",
+    "label": "Resource Pool $0 Total Dequeued",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-dequeued"
+    "key": "admission-controller.total-dequeued.$0"
   },
   {
-    "description": "Resource Pool $0 Local In Queue",
+    "description": "Resource Pool $0 Queue Size on the coordinator",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local In Queue",
+    "label": "Resource Pool $0 Coordinator Backend Queue Size",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.local-in-queue"
+    "key": "admission-controller.local-num-queued.$0"
   },
   {
-    "description": "Resource Pool $0 Local Mem Estimate",
+    "description": "Resource Pool $0 Mem Reserved by the backend coordinator",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Mem Estimate",
+    "label": "Resource Pool $0 Coordinator Backend Mem Reserved",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.local-mem-estimate"
+    "key": "admission-controller.local-backend-mem-reserved.$0"
   },
   {
-    "description": "Resource Pool $0 Local Mem Usage",
+    "description": "Resource Pool $0 Coordinator Backend Mem Usage",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Mem Usage",
+    "label": "Resource Pool $0 Coordinator Backend Mem Usage",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.local-mem-usage"
+    "key": "admission-controller.local-backend-mem-usage.$0"
   },
   {
-    "description": "Resource Pool $0 Local Num Running",
+    "description": "Resource Pool $0 Coordinator Backend Num Running",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Num Running",
+    "label": "Resource Pool $0 Coordinator Backend Num Running",
     "units": "NONE",
     "kind": "GAUGE",
-    "key": "admission-controller.$0.local-num-running"
+    "key": "admission-controller.local-num-admitted-running.$0"
   },
   {
-    "description": "Resource Pool $0 Local Queued",
+    "description": "Total number of requests queued in pool $0",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Queued",
+    "label": "Resource Pool $0 Total Queued",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-queued"
+    "key": "admission-controller.total-queued.$0"
   },
   {
-    "description": "Resource Pool $0 Local Rejected",
+    "description": "Total number of requests rejected in pool $0",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Rejected",
+    "label": "Resource Pool $0 Total Rejected",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-rejected"
+    "key": "admission-controller.total-rejected.$0"
   },
   {
-    "description": "Resource Pool $0 Local Time In Queue Ms",
+    "description": "Resource Pool $0 Time in Queue",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Time In Queue Ms",
-    "units": "UNIT",
+    "label": "Resource Pool $0 Time in Queue",
+    "units": "TIME_MS",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-time-in-queue-ms"
+    "key": "admission-controller.time-in-queue-ms.$0"
   },
   {
-    "description": "Resource Pool $0 Local Timed Out",
+    "description": "Total number of requests timed out waiting while queued in pool $0",
     "contexts": [
       "RESOURCE_POOL"
     ],
-    "label": "Resource Pool $0 Local Timed Out",
+    "label": "Resource Pool $0 Total Timed Out",
     "units": "UNIT",
     "kind": "COUNTER",
-    "key": "admission-controller.$0.local-timed-out"
+    "key": "admission-controller.total-timed-out.$0"
   },
   {
     "description": "Catalog Server Topic Processing Time",
@@ -668,6 +668,16 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "mem-tracker.process.bytes-freed-by-last-gc"
+  },
+  {
+    "description": "The process memory tracker limit.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Process Tracker Limit",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "mem-tracker.process.limit"
   },
   {
     "description": "The amount of memory by which the process was over its memory limit the last time the memory limit was encountered.",

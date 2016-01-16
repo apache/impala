@@ -28,7 +28,7 @@ import org.junit.rules.TemporaryFolder;
 
 import com.cloudera.impala.common.ByteUnits;
 import com.cloudera.impala.thrift.TErrorCode;
-import com.cloudera.impala.thrift.TPoolConfigResult;
+import com.cloudera.impala.thrift.TPoolConfig;
 import com.cloudera.impala.thrift.TResolveRequestPoolParams;
 import com.cloudera.impala.thrift.TResolveRequestPoolResult;
 import com.google.common.collect.Iterables;
@@ -168,9 +168,10 @@ public class TestRequestPoolService {
   @Test
   public void testPoolLimitConfigs() throws Exception {
     createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
-    checkPoolConfigResult("root", 15, 50, -1);
-    checkPoolConfigResult("root.queueA", 10, 30, 1024 * ByteUnits.MEGABYTE);
-    checkPoolConfigResult("root.queueB", 5, 10, -1);
+    checkPoolConfigResult("root", 15, 50, -1, 30000L, "mem_limit=1024m");
+    checkPoolConfigResult("root.queueA", 10, 30, 1024 * ByteUnits.MEGABYTE,
+        10000L, "mem_limit=1024m,query_timeout_s=10");
+    checkPoolConfigResult("root.queueB", 5, 10, -1, 30000L, "mem_limit=1024m");
   }
 
   @Test
@@ -246,22 +247,37 @@ public class TestRequestPoolService {
     Assert.assertTrue(poolService_.hasAccess("root.queueC", "root"));
 
     // Test pool limit changes
-    checkPoolConfigResult("root", 15, 100, -1);
-    checkPoolConfigResult("root.queueA", 10, 30, 100000 * ByteUnits.MEGABYTE);
-    checkPoolConfigResult("root.queueB", 5, 10, -1);
-    checkPoolConfigResult("root.queueC", 10, 30, 128 * ByteUnits.MEGABYTE);
+    checkPoolConfigResult("root", 15, 100, -1, 30000L, "");
+    checkPoolConfigResult("root.queueA", 1, 30, 100000 * ByteUnits.MEGABYTE,
+        50L, "mem_limit=128m,query_timeout_s=5");
+    checkPoolConfigResult("root.queueB", 5, 10, -1, 60000L, "");
+    checkPoolConfigResult("root.queueC", 10, 30, 128 * ByteUnits.MEGABYTE,
+        30000L, "mem_limit=2048m,query_timeout_s=60");
   }
 
   /**
    * Helper method to verify the per-pool limits.
    */
   private void checkPoolConfigResult(String pool, long expectedMaxRequests,
-      long expectedMaxQueued, long expectedMaxMemUsage) {
-    TPoolConfigResult expectedResult = new TPoolConfigResult();
+      long expectedMaxQueued, long expectedMaxMem, Long expectedQueueTimeoutMs,
+      String expectedQueryOptions) {
+    TPoolConfig expectedResult = new TPoolConfig();
     expectedResult.setMax_requests(expectedMaxRequests);
     expectedResult.setMax_queued(expectedMaxQueued);
-    expectedResult.setMem_limit(expectedMaxMemUsage);
+    expectedResult.setMax_mem_resources(expectedMaxMem);
+    if (expectedQueueTimeoutMs != null) {
+      expectedResult.setQueue_timeout_ms(expectedQueueTimeoutMs);
+    }
+    if (expectedQueryOptions != null) {
+      expectedResult.setDefault_query_options(expectedQueryOptions);
+    }
     Assert.assertEquals("Unexpected config values for pool " + pool,
         expectedResult, poolService_.getPoolConfig(pool));
+  }
+
+  private void checkPoolConfigResult(String pool, long expectedMaxRequests,
+      long expectedMaxQueued, long expectedMaxMemUsage) {
+    checkPoolConfigResult(pool, expectedMaxRequests, expectedMaxQueued,
+        expectedMaxMemUsage, null, "");
   }
 }

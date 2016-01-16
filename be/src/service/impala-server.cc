@@ -55,7 +55,6 @@
 #include "service/fragment-exec-state.h"
 #include "service/impala-internal-service.h"
 #include "service/query-exec-state.h"
-#include "service/query-options.h"
 #include "scheduling/simple-scheduler.h"
 #include "util/bit-util.h"
 #include "util/cgroups-mgr.h"
@@ -708,11 +707,51 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
 
 ImpalaServer::~ImpalaServer() {}
 
+void ImpalaServer::AddPoolQueryOptions(TQueryCtx* ctx,
+    const QueryOptionsMask& override_options_mask) {
+  // Errors are not returned and are only logged (at level 2) because some incoming
+  // requests are not expected to be mapped to a pool and will not have query options,
+  // e.g. 'use [db];'. For requests that do need to be mapped to a pool successfully, the
+  // pool is resolved again during scheduling and errors are handled at that point.
+  string resolved_pool;
+  Status status = exec_env_->request_pool_service()->ResolveRequestPool(*ctx,
+      &resolved_pool);
+  if (!status.ok()) {
+    VLOG_RPC << "Not adding pool query options for query=" << ctx->query_id
+             << " ResolveRequestPool status: " << status.GetDetail();
+    return;
+  }
+
+  TPoolConfig config;
+  status = exec_env_->request_pool_service()->GetPoolConfig(resolved_pool, &config);
+  if (!status.ok()) {
+    VLOG_RPC << "Not adding pool query options for query=" << ctx->query_id
+             << " GetConfigPool status: " << status.GetDetail();
+    return;
+  }
+
+  TQueryOptions pool_options;
+  QueryOptionsMask set_pool_options_mask;
+  status = ParseQueryOptions(config.default_query_options, &pool_options,
+      &set_pool_options_mask);
+  if (!status.ok()) {
+    VLOG_RPC << "Not adding pool query options for query=" << ctx->query_id
+             << " ParseQueryOptions status: " << status.GetDetail();
+    return;
+  }
+
+  QueryOptionsMask overlay_mask = override_options_mask & set_pool_options_mask;
+  VLOG_RPC << "Parsed pool options: " << DebugQueryOptions(pool_options)
+           << " override_options_mask=" << override_options_mask.to_string()
+           << " set_pool_mask=" << set_pool_options_mask.to_string()
+           << " overlay_mask=" << overlay_mask.to_string();
+  OverlayQueryOptions(pool_options, overlay_mask, &ctx->request.query_options);
+}
+
 Status ImpalaServer::Execute(TQueryCtx* query_ctx,
     shared_ptr<SessionState> session_state,
     shared_ptr<QueryExecState>* exec_state) {
   PrepareQueryContext(query_ctx);
-  bool registered_exec_state;
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
 
   // Redact the SQL stmt and update the query context
@@ -720,6 +759,7 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   Redact(&stmt);
   query_ctx->request.__set_redacted_stmt((const string) stmt);
 
+  bool registered_exec_state;
   Status status = ExecuteInternal(*query_ctx, session_state, &registered_exec_state,
       exec_state);
   if (!status.ok() && registered_exec_state) {
@@ -1098,7 +1138,9 @@ void ImpalaServer::TransmitData(
 }
 
 void ImpalaServer::InitializeConfigVariables() {
-  Status status = ParseQueryOptions(FLAGS_default_query_options, &default_query_options_);
+  QueryOptionsMask set_query_options; // unused
+  Status status = ParseQueryOptions(FLAGS_default_query_options, &default_query_options_,
+      &set_query_options);
   if (!status.ok()) {
     // Log error and exit if the default query options are invalid.
     LOG(ERROR) << "Invalid default query options. Please check -default_query_options.\n"

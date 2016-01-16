@@ -48,35 +48,35 @@ const char TOPIC_KEY_DELIMITER = '!';
 // Define metric key format strings for metrics in PoolMetrics
 // '$0' is replaced with the pool name by strings::Substitute
 const string LOCAL_ADMITTED_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-admitted";
+  "admission-controller.total-admitted.$0";
 const string LOCAL_QUEUED_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-queued";
+  "admission-controller.total-queued.$0";
 const string LOCAL_DEQUEUED_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-dequeued";
+  "admission-controller.total-dequeued.$0";
 const string LOCAL_REJECTED_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-rejected";
+  "admission-controller.total-rejected.$0";
 const string LOCAL_TIMED_OUT_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-timed-out";
+  "admission-controller.total-timed-out.$0";
 const string LOCAL_COMPLETED_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-completed";
+  "admission-controller.total-released.$0";
 const string LOCAL_TIME_IN_QUEUE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-time-in-queue-ms";
+  "admission-controller.time-in-queue-ms.$0";
 const string CLUSTER_NUM_RUNNING_METRIC_KEY_FORMAT =
-  "admission-controller.$0.cluster-num-running";
+  "admission-controller.agg-num-running.$0";
 const string CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.cluster-in-queue";
-const string CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.cluster-mem-usage";
+  "admission-controller.agg-num-queued.$0";
+const string CLUSTER_MEM_RESERVED_METRIC_KEY_FORMAT =
+  "admission-controller.agg-mem-reserved.$0";
 const string CLUSTER_MEM_ESTIMATE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.cluster-mem-estimate";
+  "admission-controller.agg-mem-admitted.$0";
 const string LOCAL_NUM_RUNNING_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-num-running";
+  "admission-controller.local-num-admitted-running.$0";
 const string LOCAL_IN_QUEUE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-in-queue";
+  "admission-controller.local-num-queued.$0";
 const string LOCAL_MEM_USAGE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-mem-usage";
+  "admission-controller.local-backend-mem-usage.$0";
 const string LOCAL_MEM_ESTIMATE_METRIC_KEY_FORMAT =
-  "admission-controller.$0.local-mem-estimate";
+  "admission-controller.local-backend-mem-reserved.$0";
 
 // Profile query events
 const string QUERY_EVENT_SUBMIT_FOR_ADMISSION = "Submit for admission";
@@ -264,11 +264,11 @@ Status AdmissionController::RejectRequest(const string& pool_name,
 
 Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   const string& pool_name = schedule->request_pool();
-  TPoolConfigResult pool_config;
+  TPoolConfig pool_config;
   RETURN_IF_ERROR(request_pool_service_->GetPoolConfig(pool_name, &pool_config));
   const int64_t max_requests = pool_config.max_requests;
   const int64_t max_queued = pool_config.max_queued;
-  const int64_t mem_limit = pool_config.mem_limit;
+  const int64_t mem_limit = pool_config.max_mem_resources;
 
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(*schedule);
@@ -338,8 +338,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     if (pool_metrics != NULL) pool_metrics->local_queued->Increment(1L);
   }
 
+  int64_t queue_wait_timeout_ms = FLAGS_queue_wait_timeout_ms;
+  if (pool_config.__isset.queue_timeout_ms) {
+    queue_wait_timeout_ms = pool_config.queue_timeout_ms;
+  }
+  queue_wait_timeout_ms = max<int64_t>(0, queue_wait_timeout_ms);
   int64_t wait_start_ms = MonotonicMillis();
-  int64_t queue_wait_timeout_ms = max<int64_t>(0, FLAGS_queue_wait_timeout_ms);
+
   // We just call Get() to block until the result is set or it times out. Note that we
   // don't hold the admission_ctrl_lock_ while we wait on this promise so we need to
   // check the state after acquiring the lock in order to avoid any races because it is
@@ -539,7 +544,6 @@ void AdmissionController::UpdateClusterAggregates(const string& pool_name) {
   if (pool_metrics != NULL) {
     pool_metrics->cluster_num_running->set_value(total_stats.num_running);
     pool_metrics->cluster_in_queue->set_value(total_stats.num_queued);
-    pool_metrics->cluster_mem_usage->set_value(total_stats.mem_usage);
     pool_metrics->cluster_mem_estimate->set_value(total_stats.mem_estimate);
   }
 
@@ -604,10 +608,10 @@ void AdmissionController::DequeueLoop() {
 
       PoolConfigMap::iterator it = pool_config_cache_.find(pool_name);
       if (it == pool_config_cache_.end()) continue; // No local requests in this pool
-      const TPoolConfigResult& pool_config = it->second;
+      const TPoolConfig& pool_config = it->second;
 
       const int64_t max_requests = pool_config.max_requests;
-      const int64_t mem_limit = pool_config.mem_limit;
+      const int64_t mem_limit = pool_config.max_mem_resources;
 
       // We should never have queued any requests in pools where either limit is 0 as no
       // requests should ever be admitted or when both limits are less than 0, i.e.
@@ -710,8 +714,9 @@ AdmissionController::GetPoolMetrics(const string& pool_name) {
 
   pool_metrics->cluster_in_queue = metrics_->AddGauge<int64_t>(
       CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT, 0, pool_name);
-  pool_metrics->cluster_mem_usage = metrics_->AddGauge<int64_t>(
-      CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT, 0, pool_name);
+  // TODO: Store and update mem_reserved metric. Added without usage so it is visible in
+  // the metrics output.
+  metrics_->AddGauge<int64_t>(CLUSTER_MEM_RESERVED_METRIC_KEY_FORMAT, 0, pool_name);
   pool_metrics->cluster_mem_estimate = metrics_->AddGauge<int64_t>(
       CLUSTER_MEM_ESTIMATE_METRIC_KEY_FORMAT, 0, pool_name);
 

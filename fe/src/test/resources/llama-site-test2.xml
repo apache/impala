@@ -10,6 +10,10 @@
     <name>llama.am.throttling.maximum.queued.reservations</name>
     <value>10</value>
   </property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms</name>
+    <value>30000</value>
+  </property>
 
   <property>
     <name>llama.am.throttling.maximum.placed.reservations.root</name>
@@ -21,18 +25,34 @@
   </property>
   <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.queueA</name>
-    <value>10</value>
+    <value>1</value>
   </property>
   <property>
     <name>llama.am.throttling.maximum.queued.reservations.root.queueA</name>
     <value>30</value>
   </property>
-    <property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.root.queueA</name>
+    <value>50</value>
+  </property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.root.queueB</name>
+    <value>60000</value>
+  </property>
+  <property>
+    <name>impala.admission-control.pool-default-query-options.root.queueA</name>
+    <value>mem_limit=128m,query_timeout_s=5</value>
+  </property>
+  <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.queueC</name>
     <value>10</value>
   </property>
   <property>
     <name>llama.am.throttling.maximum.queued.reservations.root.queueC</name>
     <value>30</value>
+  </property>
+  <property>
+    <name>impala.admission-control.pool-default-query-options.root.queueC</name>
+    <value>mem_limit=2048m,query_timeout_s=60</value>
   </property>
 </configuration>

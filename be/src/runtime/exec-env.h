@@ -95,6 +95,7 @@ class ExecEnv {
   }
   ImpalaServer* impala_server() { return impala_server_; }
   Frontend* frontend() { return frontend_.get(); };
+  RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 

@@ -513,6 +513,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
     TQueryCtx* query_ctx) {
   query_ctx->request.stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
+  QueryOptionsMask set_query_options_mask;
   {
     shared_ptr<SessionState> session;
     const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
@@ -525,6 +526,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
       lock_guard<mutex> l(session->lock);
       if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
       query_ctx->request.query_options = session->default_query_options;
+      set_query_options_mask = session->set_query_options_mask;
     }
     session->ToThrift(session_id, &query_ctx->session);
   }
@@ -532,12 +534,16 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
     BOOST_FOREACH(const string& option, query.configuration) {
-      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->request.query_options));
+      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->request.query_options,
+          &set_query_options_mask));
     }
-    VLOG_QUERY << "TClientRequest.queryOptions: "
-               << ThriftDebugString(query_ctx->request.query_options);
   }
 
+  // Only query options not set in the session or confOverlay can be overridden by the
+  // pool options.
+  AddPoolQueryOptions(query_ctx, ~set_query_options_mask);
+  VLOG_QUERY << "TClientRequest.queryOptions: "
+             << ThriftDebugString(query_ctx->request.query_options);
   return Status::OK();
 }
 

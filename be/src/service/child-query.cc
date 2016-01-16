@@ -15,6 +15,7 @@
 #include "service/child-query.h"
 #include "service/impala-server.inline.h"
 #include "service/query-exec-state.h"
+#include "service/query-options.h"
 #include "util/debug-util.h"
 
 #include "common/names.h"
@@ -98,64 +99,21 @@ Status ChildQuery::ExecAndFetch() {
   return status;
 }
 
-template <typename T>
-void SetQueryOption(TImpalaQueryOptions::type opt, const T& opt_val,
-    TExecuteStatementReq* exec_stmt_req) {
-  stringstream opt_val_ss;
-  opt_val_ss << opt_val;
-  map<int, const char*>::const_iterator it =
-      _TImpalaQueryOptions_VALUES_TO_NAMES.find(opt);
-  if (it == _TImpalaQueryOptions_VALUES_TO_NAMES.end()) return;
-  exec_stmt_req->confOverlay[it->second] = opt_val_ss.str();
-  exec_stmt_req->__isset.confOverlay = true;
-}
-
-#define SET_QUERY_OPTION(NAME, ENUM)\
-  if (parent_options.__isset.NAME) {\
-    SetQueryOption(TImpalaQueryOptions::ENUM,\
-        parent_options.NAME, exec_stmt_req);\
-  }
-
 void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     TExecuteStatementReq* exec_stmt_req) {
-  // If this DCHECK is hit then handle the missing query option below.
-  DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),
-      TImpalaQueryOptions::RANDOM_REPLICA + 1);
-  SET_QUERY_OPTION(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED);
-  SET_QUERY_OPTION(abort_on_error, ABORT_ON_ERROR);
-  SET_QUERY_OPTION(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS);
-  SET_QUERY_OPTION(batch_size, BATCH_SIZE);
+  map<string, string> conf;
+#define QUERY_OPT_FN(NAME, ENUM)\
+  if (parent_options.__isset.NAME) {\
+    stringstream val;\
+    val << parent_options.NAME;\
+    conf[#ENUM] = val.str();\
+  }
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
   // Ignore debug actions on child queries because they may cause deadlock.
-  SET_QUERY_OPTION(default_order_by_limit, DEFAULT_ORDER_BY_LIMIT);
-  SET_QUERY_OPTION(disable_cached_reads, DISABLE_CACHED_READS);
-  SET_QUERY_OPTION(disable_outermost_topn, DISABLE_OUTERMOST_TOPN);
-  SET_QUERY_OPTION(disable_codegen, DISABLE_CODEGEN);
-  SET_QUERY_OPTION(explain_level, EXPLAIN_LEVEL);
-  SET_QUERY_OPTION(hbase_cache_blocks, HBASE_CACHE_BLOCKS);
-  SET_QUERY_OPTION(hbase_caching, HBASE_CACHING);
-  SET_QUERY_OPTION(max_errors, MAX_ERRORS);
-  SET_QUERY_OPTION(max_io_buffers, MAX_IO_BUFFERS);
-  SET_QUERY_OPTION(max_scan_range_length, MAX_SCAN_RANGE_LENGTH);
-  SET_QUERY_OPTION(mem_limit, MEM_LIMIT);
-  SET_QUERY_OPTION(num_nodes, NUM_NODES);
-  SET_QUERY_OPTION(num_scanner_threads, NUM_SCANNER_THREADS);
-  SET_QUERY_OPTION(compression_codec, COMPRESSION_CODEC);
-  SET_QUERY_OPTION(parquet_file_size, PARQUET_FILE_SIZE);
-  SET_QUERY_OPTION(request_pool, REQUEST_POOL);
-  SET_QUERY_OPTION(reservation_request_timeout, RESERVATION_REQUEST_TIMEOUT);
-  SET_QUERY_OPTION(sync_ddl, SYNC_DDL);
-  SET_QUERY_OPTION(v_cpu_cores, V_CPU_CORES);
-  SET_QUERY_OPTION(rm_initial_mem, RM_INITIAL_MEM);
-  SET_QUERY_OPTION(query_timeout_s, QUERY_TIMEOUT_S);
-  SET_QUERY_OPTION(max_block_mgr_memory, MAX_BLOCK_MGR_MEMORY);
-  SET_QUERY_OPTION(appx_count_distinct, APPX_COUNT_DISTINCT);
-  SET_QUERY_OPTION(disable_unsafe_spills, DISABLE_UNSAFE_SPILLS);
-  SET_QUERY_OPTION(seq_compression_mode, SEQ_COMPRESSION_MODE);
-  SET_QUERY_OPTION(exec_single_node_rows_threshold,
-      EXEC_SINGLE_NODE_ROWS_THRESHOLD);
-  SET_QUERY_OPTION(optimize_partition_key_scans, OPTIMIZE_PARTITION_KEY_SCANS);
-  SET_QUERY_OPTION(replica_preference, REPLICA_PREFERENCE);
-  SET_QUERY_OPTION(random_replica, RANDOM_REPLICA);
+  map<string, string>::iterator it = conf.find("DEBUG_ACTION");
+  if (it != conf.end()) conf.erase(it);
+  exec_stmt_req->__set_confOverlay(conf);
 }
 
 void ChildQuery::Cancel() {

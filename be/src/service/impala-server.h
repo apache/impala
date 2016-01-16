@@ -31,6 +31,7 @@
 #include "rpc/thrift-server.h"
 #include "common/status.h"
 #include "service/frontend.h"
+#include "service/query-options.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
 #include "util/simple-logger.h"
@@ -681,6 +682,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CancelFromThreadPool(uint32_t thread_id,
       const CancellationWork& cancellation_work);
 
+  /// Helper method to add any pool query options to the query_ctx. Must be called before
+  /// ExecuteInternal() at which point the TQueryCtx is const and cannot be mutated.
+  /// override_options_mask indicates which query options can be overridden by the pool
+  /// default query options.
+  void AddPoolQueryOptions(TQueryCtx* query_ctx,
+      const QueryOptionsMask& override_options_mask);
+
   /// Processes a CatalogUpdateResult returned from the CatalogServer and ensures
   /// the update has been applied to the local impalad's catalog cache. If
   /// wait_for_all_subscribers is true, this function will also wait until all
@@ -794,8 +802,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// run as children of Beeswax sessions) get results back in the expected format -
     /// child queries inherit the HS2 version from their parents, and a Beeswax session
     /// will never update the HS2 version from the default.
-    SessionState() : closed(false), expired(false), hs2_version(
-        apache::hive::service::cli::thrift::
+    SessionState() : closed(false), expired(false),
+        hs2_version(apache::hive::service::cli::thrift::
         TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1), total_queries(0), ref_count(0) {
     }
 
@@ -829,8 +837,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// The default database (changed as a result of 'use' query execution).
     std::string database;
 
-    /// The default query options of this session.
+    /// The default query options of this session. When the session is created, the
+    /// session inherits the global defaults from ImpalaServer::default_query_options_.
     TQueryOptions default_query_options;
+
+    /// BitSet indicating which query options in default_query_options have been
+    /// explicitly set in the session. Updated when a query option is specified using a
+    /// SET command: the bit corresponding to the TImpalaQueryOptions enum is set.
+    QueryOptionsMask set_query_options_mask;
 
     /// For HS2 only, the protocol version this session is expecting.
     apache::hive::service::cli::thrift::TProtocolVersion::type hs2_version;

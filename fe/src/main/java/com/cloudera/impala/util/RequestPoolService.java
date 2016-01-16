@@ -41,7 +41,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TPoolConfigParams;
-import com.cloudera.impala.thrift.TPoolConfigResult;
+import com.cloudera.impala.thrift.TPoolConfig;
 import com.cloudera.impala.thrift.TResolveRequestPoolParams;
 import com.cloudera.impala.thrift.TResolveRequestPoolResult;
 import com.cloudera.impala.thrift.TStatus;
@@ -82,7 +82,7 @@ public class RequestPoolService {
 
   // Key for the default maximum number of running queries ("placed reservations")
   // property. The per-pool key name is this key with the pool name appended, e.g.
-  // "{key}.{pool}".
+  // "{key}.{pool}". This is a llama-site.xml configuration.
   final static String LLAMA_MAX_PLACED_RESERVATIONS_KEY =
       "llama.am.throttling.maximum.placed.reservations";
 
@@ -92,13 +92,26 @@ public class RequestPoolService {
 
   // Key for the default maximum number of queued requests ("queued reservations")
   // property. The per-pool key name is this key with the pool name appended, e.g.
-  // "{key}.{pool}".
+  // "{key}.{pool}". This is a llama-site.xml configuration.
   final static String LLAMA_MAX_QUEUED_RESERVATIONS_KEY =
       "llama.am.throttling.maximum.queued.reservations";
 
   // Default value for the maximum.queued.reservations property. Note that this value
   // differs from the current Llama default of 0 which disables queuing.
   final static int LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT = 200;
+
+  // Key for the pool queue timeout (milliseconds). This is be specified in the
+  // llama-site.xml but is Impala-specific and Llama does not use this.
+  final static String QUEUE_TIMEOUT_KEY = "impala.admission-control.pool-queue-timeout-ms";
+
+  // Default value of the pool queue timeout (ms).
+  final static int QUEUE_TIMEOUT_MS_DEFAULT = 60 * 1000;
+
+  // Key for the pool default query options. Query options are specified as a
+  // comma delimited string of 'key=value' pairs, e.g. 'key1=val1,key2=val2'.
+  // This is specified in the llama-site.xml but is Impala-specific and Llama does not
+  // use this.
+  final static String QUERY_OPTIONS_KEY = "impala.admission-control.pool-default-query-options";
 
   // String format for a per-pool configuration key. First parameter is the key for the
   // default, e.g. LLAMA_MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
@@ -258,7 +271,7 @@ public class RequestPoolService {
     JniUtil.deserializeThrift(protocolFactory_, resolvePoolParams,
         thriftResolvePoolParams);
     TResolveRequestPoolResult result = resolveRequestPool(resolvePoolParams);
-    LOG.trace("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
+    LOG.info("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
         new Object[] { resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
                        result.resolved_pool, result.has_access });
     try {
@@ -314,14 +327,14 @@ public class RequestPoolService {
    * Gets the pool configuration values for the specified pool.
    *
    * @param thriftPoolConfigParams Serialized {@link TPoolConfigParams}
-   * @return serialized {@link TPoolConfigResult}
+   * @return serialized {@link TPoolConfig}
    */
   public byte[] getPoolConfig(byte[] thriftPoolConfigParams) throws ImpalaException {
     Preconditions.checkState(running_.get());
     TPoolConfigParams poolConfigParams = new TPoolConfigParams();
     JniUtil.deserializeThrift(protocolFactory_, poolConfigParams,
         thriftPoolConfigParams);
-    TPoolConfigResult result = getPoolConfig(poolConfigParams.getPool());
+    TPoolConfig result = getPoolConfig(poolConfigParams.getPool());
     try {
       return new TSerializer(protocolFactory_).serialize(result);
     } catch (TException e) {
@@ -330,14 +343,15 @@ public class RequestPoolService {
   }
 
   @VisibleForTesting
-  TPoolConfigResult getPoolConfig(String pool) {
-    TPoolConfigResult result = new TPoolConfigResult();
-    int maxMemoryMb = allocationConf_.get().getMaxResources(pool).getMemory();
-    result.setMem_limit(
+  TPoolConfig getPoolConfig(String pool) {
+    TPoolConfig result = new TPoolConfig();
+    long maxMemoryMb = allocationConf_.get().getMaxResources(pool).getMemory();
+    result.setMax_mem_resources(
         maxMemoryMb == Integer.MAX_VALUE ? -1 : (long) maxMemoryMb * ByteUnits.MEGABYTE);
     if (llamaConf_ == null) {
       result.setMax_requests(LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT);
       result.setMax_queued(LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT);
+      result.setDefault_query_options("");
     } else {
       // Capture the current llamaConf_ in case it changes while we're using it.
       Configuration currentLlamaConf = llamaConf_;
@@ -347,15 +361,25 @@ public class RequestPoolService {
       result.setMax_queued(getLlamaPoolConfigValue(currentLlamaConf, pool,
           LLAMA_MAX_QUEUED_RESERVATIONS_KEY,
           LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT));
+
+      // Only return positive values. Admission control has a default from gflags.
+      int queueTimeoutMs = getLlamaPoolConfigValue(currentLlamaConf, pool,
+          QUEUE_TIMEOUT_KEY, -1);
+      if (queueTimeoutMs > 0) result.setQueue_timeout_ms(queueTimeoutMs);
+      result.setDefault_query_options(getLlamaPoolConfigValue(currentLlamaConf, pool,
+          QUERY_OPTIONS_KEY, ""));
     }
-    LOG.trace("getPoolConfig(pool={}): mem_limit={}, max_requests={}, max_queued={}",
-        new Object[] { pool, result.mem_limit, result.max_requests, result.max_queued });
+    LOG.info("getPoolConfig(pool={}): max_mem_resources={}, max_requests={}, " +
+        "max_queued={},  queue_timeout_ms={}, default_query_options={}",
+        new Object[] { pool, result.max_mem_resources, result.max_requests,
+            result.max_queued, result.queue_timeout_ms, result.default_query_options });
     return result;
   }
 
   /**
-   * Looks up the per-pool Llama config, first checking for a per-pool value, then a
-   * default set in the config, and lastly to the specified 'defaultValue'.
+   * Looks up the per-pool integer config from the llama Configuration. First checks for
+   * a per-pool value, then a default set in the config, and lastly to the specified
+   * 'defaultValue'.
    *
    * @param conf The Configuration to use, provided so the caller can ensure the same
    *        Configuration is used to look up multiple properties.
@@ -364,6 +388,15 @@ public class RequestPoolService {
       int defaultValue) {
     return conf.getInt(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
         conf.getInt(key, defaultValue));
+  }
+
+  /**
+   * Looks up the per-pool String config from the llama Configuration. See above.
+   */
+  private String getLlamaPoolConfigValue(Configuration conf, String pool, String key,
+      String defaultValue) {
+    return conf.get(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+        conf.get(key, defaultValue));
   }
 
   /**

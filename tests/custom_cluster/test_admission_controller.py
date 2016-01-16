@@ -13,6 +13,9 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.test_vector import TestDimension
+from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+from ImpalaService import ImpalaHiveServer2Service
+from TCLIService import TCLIService
 
 import logging
 import os
@@ -56,6 +59,9 @@ MEM_TEST_LIMIT = 100000 * 1024 * 1024
 
 _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTBEAT_MS)
 
+# Key in the query profile for the query options.
+PROFILE_QUERY_OPTIONS_KEY = "Query Options (non default): "
+
 def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
   return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
       "-default_pool_max_queued %s -default_pool_mem_limit %s "
@@ -63,19 +69,19 @@ def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
       (max_requests, max_queued, mem_limit))
 
 
-def impalad_admission_ctrl_config_args():
+def impalad_admission_ctrl_config_args(additional_args=""):
   impalad_home = os.environ['IMPALA_HOME']
   resources_dir = os.path.join(impalad_home, "fe", "src", "test", "resources")
   fs_allocation_path = os.path.join(resources_dir, "fair-scheduler-test2.xml")
   llama_site_path = os.path.join(resources_dir, "llama-site-test2.xml")
   return ("-vmodule admission-controller=3 -fair_scheduler_allocation_path %s "
-        "-llama_site_path %s -disable_admission_control=false" %\
-        (fs_allocation_path, llama_site_path))
+        "-llama_site_path %s -disable_admission_control=false %s" %\
+        (fs_allocation_path, llama_site_path, additional_args))
 
 def log_metrics(log_prefix, metrics, log_level=logging.DEBUG):
   LOG.log(log_level, "%sadmitted=%s, queued=%s, dequeued=%s, rejected=%s, "\
-      "completed=%s, timed-out=%s", log_prefix, metrics['admitted'], metrics['queued'],
-      metrics['dequeued'], metrics['rejected'], metrics['completed'],
+      "released=%s, timed-out=%s", log_prefix, metrics['admitted'], metrics['queued'],
+      metrics['dequeued'], metrics['rejected'], metrics['released'],
       metrics['timed-out'])
 
 def compute_metric_deltas(m2, m1, metric_names):
@@ -84,20 +90,21 @@ def compute_metric_deltas(m2, m1, metric_names):
 
 def metric_key(pool_name, metric_name):
   """Helper method to construct the admission controller metric keys"""
-  return "admission-controller.%s.%s" % (pool_name, metric_name)
+  return "admission-controller.%s.%s" % (metric_name, pool_name)
 
-class TestAdmissionController(CustomClusterTestSuite):
+class TestAdmissionControllerBase(CustomClusterTestSuite):
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestAdmissionController, cls).add_test_dimensions()
+    super(TestAdmissionControllerBase, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
     # There's no reason to test this on other file formats/compression codecs right now
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
+class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def __check_pool_rejected(self, client, pool, expected_error_re):
     try:
       client.set_configuration({'request_pool': pool})
@@ -106,15 +113,64 @@ class TestAdmissionController(CustomClusterTestSuite):
     except ImpalaBeeswaxException as e:
       assert re.search(expected_error_re, str(e))
 
+  def __check_query_options(self, profile, expected_query_options):
+    """Validate that the per-pool query options were set on the specified profile.
+    expected_query_options is a list of "KEY=VALUE" strings, e.g. ["MEM_LIMIT=1", ...]"""
+    confs = []
+    for line in profile.split("\n"):
+      if PROFILE_QUERY_OPTIONS_KEY in line:
+        rhs = re.split(": ", line)[1]
+        confs = re.split(",", rhs)
+        break
+    assert len(confs) == len(expected_query_options)
+    confs = map(str.lower, confs)
+    for expected in expected_query_options:
+      assert expected.lower() in confs,\
+          "Expected query options '%s' to be set" % (",".join(expected_query_options))
+
+  def __check_hs2_query_opts(self, pool_name, mem_limit=None, expected_options=None):
+    """ Submits a query via HS2 (optionally with a mem_limit in the confOverlay)
+        into pool_name and checks that the expected_query_options are set in the
+        profile."""
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.confOverlay = {'request_pool': pool_name}
+    if mem_limit is not None: execute_statement_req.confOverlay['mem_limit'] = mem_limit
+    execute_statement_req.statement = "select 1";
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 1
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    HS2TestSuite.check_response(fetch_results_resp)
+
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = execute_statement_resp.operationHandle
+    HS2TestSuite.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+    get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
+    get_profile_req.operationHandle = execute_statement_resp.operationHandle
+    get_profile_req.sessionHandle = self.session_handle
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+    HS2TestSuite.check_response(get_profile_resp)
+    self.__check_query_options(get_profile_resp.profile, expected_options)
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_config_args(),
+      impalad_args=impalad_admission_ctrl_config_args(\
+          "-default_query_options=mem_limit=200000000"),
       statestored_args=_STATESTORED_ARGS)
-  def test_set_request_pool(self, vector):
+  @needs_session(conf_overlay={'batch_size': '100'})
+  def test_set_request_pool(self):
     """Tests setting the REQUEST_POOL with the pool placement policy configured
-    to require a specific pool (IMPALA-1050)."""
+    to require a specific pool, and validate that the per-pool configurations were
+    applied."""
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_beeswax_client()
+    # Expected default mem limit for queueA, used in several tests below
+    queueA_mem_limit = "MEM_LIMIT=%s" % (128*1024*1024)
     try:
       for pool in ['', 'not_a_pool_name']:
         expected_error =\
@@ -129,11 +185,63 @@ class TestAdmissionController(CustomClusterTestSuite):
 
       # Also try setting a valid pool
       client.set_configuration({'request_pool': 'root.queueB'})
-      client.execute("select 1") # Query should execute in queueB
+      result = client.execute("select 1")
+      # Query should execute in queueB which doesn't have a default mem limit set in the
+      # llama-site.xml, so it should inherit the value from the default process query
+      # options.
+      self.__check_query_options(result.runtime_profile,\
+          ['MEM_LIMIT=200000000', 'REQUEST_POOL=root.queueB'])
+
+      # Try setting the pool for a queue with a very low queue timeout.
+      # queueA allows only 1 running query and has a queue timeout of 50ms, so the
+      # second concurrent query should time out quickly.
+      client.set_configuration({'request_pool': 'root.queueA'})
+      handle = client.execute_async("select sleep(1000)")
+      self.__check_pool_rejected(client, 'root.queueA', "exceeded timeout")
+      assert client.get_state(handle) == client.QUERY_STATES['FINISHED']
+      # queueA has default query options mem_limit=128m,query_timeout_s=5
+      self.__check_query_options(client.get_runtime_profile(handle),\
+          [queueA_mem_limit, 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA'])
+      client.close_query(handle)
+
+      # Should be able to set query options via the set command (overriding defaults if
+      # applicable). mem_limit overrides the pool default. abort_on_error has no
+      # proc/pool default.
+      client.execute("set mem_limit=31337")
+      client.execute("set abort_on_error=1")
+      result = client.execute("select 1")
+      self.__check_query_options(result.runtime_profile,\
+          ['MEM_LIMIT=31337', 'ABORT_ON_ERROR=1', 'QUERY_TIMEOUT_S=5',\
+           'REQUEST_POOL=root.queueA'])
+
+      # Should be able to set query options (overriding defaults if applicable) with the
+      # config overlay sent with the query RPC. mem_limit is a pool-level override and
+      # max_io_buffers has no proc/pool default.
+      client.set_configuration({'request_pool': 'root.queueA', 'mem_limit': '12345',
+                                'max_io_buffers': '100'})
+      result = client.execute("select 1")
+      self.__check_query_options(result.runtime_profile,\
+          ['MEM_LIMIT=12345', 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA',\
+           'ABORT_ON_ERROR=1', 'MAX_IO_BUFFERS=100'])
     finally:
       client.close()
 
-class TestAdmissionControllerStress(TestAdmissionController):
+    # HS2 tests:
+    # batch_size is set in the HS2 OpenSession() call via the requires_session() test
+    # decorator, so that is included in all test cases below.
+    batch_size = "BATCH_SIZE=100"
+
+    # Check HS2 query in queueA gets the correct query options for the pool.
+    self.__check_hs2_query_opts("root.queueA", None,\
+        [queueA_mem_limit, 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA', batch_size])
+    # Check overriding the mem limit sent in the confOverlay with the query.
+    self.__check_hs2_query_opts("root.queueA", '12345',\
+        ['MEM_LIMIT=12345', 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA', batch_size])
+    # Check HS2 query in queueB gets the process-wide default query options
+    self.__check_hs2_query_opts("root.queueB", None,\
+        ['MEM_LIMIT=200000000', 'REQUEST_POOL=root.queueB', batch_size])
+
+class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
   (parameterized) and the ability to submit to one impalad or many in a round-robin
   fashion. The queries are set with the WAIT debug action so that we have more control
@@ -161,11 +269,6 @@ class TestAdmissionControllerStress(TestAdmissionController):
       submitting to a single impalad, we know exactly what the values should be,
       otherwise we just check that they are within reasonable bounds.
   """
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestAdmissionControllerStress, cls).add_test_dimensions()
@@ -216,14 +319,14 @@ class TestAdmissionControllerStress(TestAdmissionController):
     Returns a map of the admission metrics, aggregated across all of the impalads.
 
     The metrics names are shortened for brevity: 'admitted', 'queued', 'dequeued',
-    'rejected', 'completed', and 'timed-out'.
+    'rejected', 'released', and 'timed-out'.
     """
     metrics = {'admitted': 0, 'queued': 0, 'dequeued': 0, 'rejected' : 0,
-        'completed': 0, 'timed-out': 0}
+        'released': 0, 'timed-out': 0}
     for impalad in self.impalads:
       for short_name in metrics.keys():
         metrics[short_name] += impalad.service.get_metric_value(\
-            metric_key(self.pool_name, 'local-%s' % short_name), 0)
+            metric_key(self.pool_name, 'total-%s' % short_name), 0)
     return metrics
 
   def wait_for_metric_changes(self, metric_names, initial, expected_delta, timeout=30):
@@ -469,7 +572,7 @@ class TestAdmissionControllerStress(TestAdmissionController):
       num_to_cancel = len(self.executing_threads)
       LOG.debug("Main loop, will cancel %s queries", num_to_cancel)
       self.cancel_admitted_queries(num_to_cancel)
-      self.wait_for_metric_changes(['completed'], curr_metrics, num_to_cancel)
+      self.wait_for_metric_changes(['released'], curr_metrics, num_to_cancel)
 
       num_queued_remaining =\
           curr_metrics['queued'] - curr_metrics['dequeued'] - curr_metrics['timed-out']

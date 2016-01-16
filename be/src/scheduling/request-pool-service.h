@@ -23,12 +23,14 @@
 
 namespace impala {
 
-/// Used by the SimpleScheduler and AdmissionController to resolve users to pools and to
-/// get per-pool configurations for admission control. If fair scheduler allocation and
-/// Llama configuration files are available, then they are used via the Java-side
-/// RequestPoolService class. Otherwise, a default pool is always returned with pool
-/// limits configurable via gflags. A single instance of RequestPoolService is created and
-/// it lives the lifetime of the process.
+/// Service to resolve incoming requests to resource pools and to provide the pool
+/// configurations. A single instance of RequestPoolService is created and it lives the
+/// lifetime of the process.
+///
+/// The resource pools are specified via fair-scheduler.xml and llama-site.xml files if
+/// they are available, otherwise all requests are mapped to a single 'default-pool'
+/// which is configurable via gflags. The xml files are managed by the Java class
+/// RequestPoolService, called via JNI.
 class RequestPoolService {
  public:
   /// Initializes the JNI method stubs if configuration files are specified. If any
@@ -36,22 +38,18 @@ class RequestPoolService {
   /// terminate the process.
   RequestPoolService(MetricGroup* metrics);
 
-  /// Resolves the user and user-provided pool name to the pool returned by the placement
-  /// policy and whether or not the user is authorized. If default_pool_only_ is true,
-  /// then this will always return the default pool and will always be authorized, i.e.
-  /// pool and user are ignored.
-  Status ResolveRequestPool(const std::string& requested_pool_name,
-      const std::string& user, TResolveRequestPoolResult* resolved_pool);
+  /// Resolves the request to a resource pool as determined by the policy. Returns an
+  /// error if the request cannot be resolved to a pool or if the user does not have
+  /// access to submit requests in the resolved pool. If default_pool_only_ is true,
+  /// then this will always return the default pool.
+  Status ResolveRequestPool(const TQueryCtx& ctx, std::string* resolved_pool);
 
   /// Gets the pool configuration values for the specified pool. If default_pool_only_ is
-  /// true, then the returned values are always the default pool values, i.e. pool is
-  /// ignored.
-  Status GetPoolConfig(const std::string& pool_name, TPoolConfigResult* pool_config);
+  /// true, then the returned values are always the default pool values, i.e. pool_name
+  /// is ignored.
+  Status GetPoolConfig(const std::string& pool_name, TPoolConfig* pool_config);
 
  private:
-  /// Metrics subsystem access
-  MetricGroup* metrics_;
-
   /// Metric measuring the time ResolveRequestPool() takes, in milliseconds.
   StatsMetric<double>* resolve_pool_ms_metric_;
 

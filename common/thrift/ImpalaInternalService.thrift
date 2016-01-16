@@ -42,7 +42,6 @@ const i32 INVALID_PLAN_NODE_ID = -1
 // Constant default partition ID, must be < 0 to avoid collisions
 const i64 DEFAULT_PARTITION_ID = -1;
 
-// Preference for replica selection
 enum TReplicaPreference {
   CACHE_LOCAL,
   CACHE_RACK,
@@ -51,8 +50,19 @@ enum TReplicaPreference {
   REMOTE
 }
 
-// Query options that correspond to ImpalaService.ImpalaQueryOptions,
-// with their respective defaults
+// Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
+// respective defaults. Query options can be set in the following ways:
+//
+// 1) Process-wide defaults (via the impalad arg --default_query_options)
+// 2) Resource pool defaults (via resource pool configuration)
+// 3) Session settings (via the SET command or the HS2 OpenSession RPC)
+// 4) HS2/Beeswax configuration 'overlay' in the request metadata
+//
+// (1) and (2) are set by administrators and provide the default query options for a
+// session, in that order, so options set in (2) override those in (1). The user
+// can specify query options with (3) to override the defaults, which are stored in the
+// SessionState. Finally, the client can pass a config 'overlay' (4) in the request
+// metadata which overrides everything else.
 struct TQueryOptions {
   1: optional bool abort_on_error = 0
   2: optional i32 max_errors = 0
@@ -484,16 +494,23 @@ struct TPoolConfigParams {
 }
 
 // Returned by RequestPoolService.getPoolConfig()
-struct TPoolConfigResult {
+struct TPoolConfig {
   // Maximum number of placed requests before incoming requests are queued.
   1: required i64 max_requests
 
   // Maximum number of queued requests before incoming requests are rejected.
   2: required i64 max_queued
 
-  // Memory limit of the pool before incoming requests are queued.
-  // -1 indicates no limit.
-  3: required i64 mem_limit
+  // Maximum memory resources of the pool in bytes. -1 indicates no limit.
+  3: required i64 max_mem_resources
+
+  // Maximum amount of time (in milliseconds) that a request will wait to be admitted
+  // before timing out. Optional, if not set then the process default (set via gflags) is
+  // used.
+  4: optional i64 queue_timeout_ms;
+
+  // Default query options that are applied to requests mapped to this pool.
+  5: required string default_query_options;
 }
 
 service ImpalaInternalService {

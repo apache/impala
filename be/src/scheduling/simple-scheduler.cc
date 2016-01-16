@@ -58,30 +58,17 @@ DECLARE_string(rm_default_memory);
 
 DEFINE_bool(disable_admission_control, true, "Disables admission control.");
 
-DEFINE_bool(require_username, false, "Requires that a user be provided in order to "
-    "schedule requests. If enabled and a user is not provided, requests will be "
-    "rejected, otherwise requests without a username will be submitted with the "
-    "username 'default'.");
-
 namespace impala {
 
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
-static const string DEFAULT_USER("default");
 
 static const string BACKENDS_WEB_PAGE = "/backends";
 static const string BACKENDS_TEMPLATE = "backends.tmpl";
 
 const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
-
-static const string ERROR_USER_TO_POOL_MAPPING_NOT_FOUND(
-    "No mapping found for request from user '$0' with requested pool '$1'");
-static const string ERROR_USER_NOT_ALLOWED_IN_POOL("Request from user '$0' with "
-    "requested pool '$1' denied access to assigned pool '$2'");
-static const string ERROR_USER_NOT_SPECIFIED("User must be specified because "
-    "-require_username=true.");
 
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
@@ -862,39 +849,11 @@ int SimpleScheduler::FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
   return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
-Status SimpleScheduler::GetRequestPool(const string& user,
-    const TQueryOptions& query_options, string* pool) const {
-  TResolveRequestPoolResult resolve_pool_result;
-  const string& configured_pool = query_options.request_pool;
-  RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(configured_pool, user,
-        &resolve_pool_result));
-  if (resolve_pool_result.status.status_code != TErrorCode::OK) {
-    return Status(join(resolve_pool_result.status.error_msgs, "; "));
-  }
-  if (resolve_pool_result.resolved_pool.empty()) {
-    return Status(Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND, user,
-          configured_pool));
-  }
-  if (!resolve_pool_result.has_access) {
-    return Status(Substitute(ERROR_USER_NOT_ALLOWED_IN_POOL, user,
-          configured_pool, resolve_pool_result.resolved_pool));
-  }
-  *pool = resolve_pool_result.resolved_pool;
-  return Status::OK();
-}
-
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
-  if (schedule->effective_user().empty()) {
-    if (FLAGS_require_username) return Status(ERROR_USER_NOT_SPECIFIED);
-    // Fall back to a 'default' user if not set so that queries can still run.
-    VLOG(2) << "No user specified: using user=default";
-  }
-  const string& user =
-    schedule->effective_user().empty() ? DEFAULT_USER : schedule->effective_user();
-  VLOG(3) << "user='" << user << "'";
-  string pool;
-  RETURN_IF_ERROR(GetRequestPool(user, schedule->query_options(), &pool));
-  schedule->set_request_pool(pool);
+  string resolved_pool;
+  RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
+      schedule->request().query_ctx, &resolved_pool));
+  schedule->set_request_pool(resolved_pool);
   // Statestore topic may not have been updated yet if this is soon after startup, but
   // there is always at least this backend.
   schedule->set_num_hosts(max<int64_t>(num_fragment_instances_metric_->value(), 1));
@@ -910,7 +869,9 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
   if (!FLAGS_enable_rm) return Status::OK();
-  schedule->PrepareReservationRequest(pool, user);
+  string user = coord->runtime_state()->effective_user();
+  if (user.empty()) user = "default";
+  schedule->PrepareReservationRequest(resolved_pool, user);
   const TResourceBrokerReservationRequest& reservation_request =
       schedule->reservation_request();
   if (!reservation_request.resources.empty()) {

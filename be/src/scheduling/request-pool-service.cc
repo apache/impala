@@ -14,11 +14,16 @@
 
 #include "scheduling/request-pool-service.h"
 
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <list>
 #include <string>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "rpc/jni-thrift-util.h"
+#include "service/query-options.h"
+#include "util/auth-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/time.h"
@@ -26,6 +31,12 @@
 #include "common/names.h"
 
 using namespace impala;
+
+DEFINE_bool(require_username, false, "Requires that a user be provided in order to "
+    "schedule requests. If enabled and a user is not provided, requests will be "
+    "rejected, otherwise requests without a username will be submitted with the "
+    "username 'default'.");
+static const string DEFAULT_USER = "default";
 
 DEFINE_string(fair_scheduler_allocation_path, "", "Path to the fair scheduler "
     "allocation file (fair-scheduler.xml).");
@@ -36,6 +47,7 @@ DEFINE_string(llama_site_path, "", "Path to the Llama configuration file "
 // configuration files are not provided. The default values for this 'default pool'
 // are the same as the default values for pools defined via the fair scheduler
 // allocation file and Llama configurations.
+// TODO: Remove?
 DEFINE_int64(default_pool_max_requests, 200, "Maximum number of concurrent outstanding "
     "requests allowed to run before queueing incoming requests. A negative value "
     "indicates no limit. 0 indicates no requests will be admitted. Ignored if "
@@ -53,6 +65,7 @@ DEFINE_int64(default_pool_max_queued, 200, "Maximum number of requests allowed t
     "llama_site_path are set.");
 
 // Flags to disable the pool limits for all pools.
+// TODO: Remove?
 DEFINE_bool(disable_pool_mem_limits, false, "Disables all per-pool mem limits.");
 DEFINE_bool(disable_pool_max_requests, false, "Disables all per-pool limits on the "
     "maximum number of running requests.");
@@ -60,15 +73,22 @@ DEFINE_bool(disable_pool_max_requests, false, "Disables all per-pool limits on t
 DECLARE_bool(enable_rm);
 
 // Pool name used when the configuration files are not specified.
-const string DEFAULT_POOL_NAME = "default-pool";
+static const string DEFAULT_POOL_NAME = "default-pool";
 
-const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-duration-ms";
+static const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-duration-ms";
+
+static const string ERROR_USER_TO_POOL_MAPPING_NOT_FOUND =
+    "No mapping found for request from user '$0' with requested pool '$1'";
+static const string ERROR_USER_NOT_ALLOWED_IN_POOL = "Request from user '$0' with "
+    "requested pool '$1' denied access to assigned pool '$2'";
+static const string ERROR_USER_NOT_SPECIFIED = "User must be specified because "
+    "-require_username=true.";
 
 RequestPoolService::RequestPoolService(MetricGroup* metrics) :
-    metrics_(metrics), resolve_pool_ms_metric_(NULL) {
-  DCHECK(metrics_ != NULL);
+    resolve_pool_ms_metric_(NULL) {
+  DCHECK(metrics != NULL);
   resolve_pool_ms_metric_ =
-      StatsMetric<double>::CreateAndRegister(metrics_, RESOLVE_POOL_METRIC_NAME);
+      StatsMetric<double>::CreateAndRegister(metrics, RESOLVE_POOL_METRIC_NAME);
 
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
@@ -130,33 +150,54 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   EXIT_IF_EXC(jni_env);
 }
 
-Status RequestPoolService::ResolveRequestPool(const string& requested_pool_name,
-    const string& user, TResolveRequestPoolResult* resolved_pool) {
+Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,
+    string* resolved_pool) {
   if (default_pool_only_) {
-    resolved_pool->__set_resolved_pool(DEFAULT_POOL_NAME);
-    resolved_pool->__set_has_access(true);
+    *resolved_pool = DEFAULT_POOL_NAME;
     return Status::OK();
   }
+  string user = GetEffectiveUser(ctx.session);
+  if (user.empty()) {
+    if (FLAGS_require_username) return Status(ERROR_USER_NOT_SPECIFIED);
+    // Fall back to a 'default' user if not set so that queries can still run.
+    VLOG_RPC << "No user specified: using user=default";
+    user = DEFAULT_USER;
+  }
 
+  const string& requested_pool = ctx.request.query_options.request_pool;
   TResolveRequestPoolParams params;
   params.__set_user(user);
-  params.__set_requested_pool(requested_pool_name);
-
+  params.__set_requested_pool(requested_pool);
+  TResolveRequestPoolResult result;
   int64_t start_time = MonotonicMillis();
   Status status = JniUtil::CallJniMethod(request_pool_service_, resolve_request_pool_id_,
-      params, resolved_pool);
+      params, &result);
   resolve_pool_ms_metric_->Update(MonotonicMillis() - start_time);
-  return status;
+
+  if (result.status.status_code != TErrorCode::OK) {
+    return Status(boost::algorithm::join(result.status.error_msgs, "; "));
+  }
+  if (result.resolved_pool.empty()) {
+    return Status(strings::Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND,
+        user, requested_pool));
+  }
+  if (!result.has_access) {
+    return Status(strings::Substitute(ERROR_USER_NOT_ALLOWED_IN_POOL, user,
+        requested_pool, result.resolved_pool));
+  }
+  *resolved_pool = result.resolved_pool;
+  return Status::OK();
 }
 
 Status RequestPoolService::GetPoolConfig(const string& pool_name,
-    TPoolConfigResult* pool_config) {
+    TPoolConfig* pool_config) {
   if (default_pool_only_) {
     pool_config->__set_max_requests(
         FLAGS_disable_pool_max_requests ? -1 : FLAGS_default_pool_max_requests);
-    pool_config->__set_mem_limit(
+    pool_config->__set_max_mem_resources(
         FLAGS_disable_pool_mem_limits ? -1 : default_pool_mem_limit_);
     pool_config->__set_max_queued(FLAGS_default_pool_max_queued);
+    pool_config->__set_default_query_options("");
     return Status::OK();
   }
 
@@ -165,6 +206,6 @@ Status RequestPoolService::GetPoolConfig(const string& pool_name,
   RETURN_IF_ERROR(JniUtil::CallJniMethod(
         request_pool_service_, get_pool_config_id_, params, pool_config));
   if (FLAGS_disable_pool_max_requests) pool_config->__set_max_requests(-1);
-  if (FLAGS_disable_pool_mem_limits) pool_config->__set_mem_limit(-1);
+  if (FLAGS_disable_pool_mem_limits) pool_config->__set_max_mem_resources(-1);
   return Status::OK();
 }

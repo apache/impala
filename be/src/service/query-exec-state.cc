@@ -133,6 +133,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   profile_.AddChild(&server_profile_);
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_.AddInfoString("Query Options (non default)",
+      DebugQueryOptions(query_ctx_.request.query_options));
 
   switch (exec_request->stmt_type) {
     case TStmtType::QUERY:
@@ -181,7 +183,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         RETURN_IF_ERROR(SetQueryOption(
             exec_request_.set_query_option_request.key,
             exec_request_.set_query_option_request.value,
-            &session_->default_query_options));
+            &session_->default_query_options,
+            &session_->set_query_options_mask));
       } else {
         // "SET" returns a table of all query options.
         map<string, string> config;
@@ -422,7 +425,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     DCHECK(exec_env_->resource_broker() != NULL);
   }
   schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
-      exec_request_.query_options, effective_user(), &summary_profile_, query_events_));
+      exec_request_.query_options, &summary_profile_, query_events_));
   coord_.reset(new Coordinator(exec_env_, query_events_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
   summary_profile_.AddInfoString("Request Pool", schedule_->request_pool());

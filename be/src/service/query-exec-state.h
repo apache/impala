@@ -24,6 +24,7 @@
 #include "gen-cpp/Frontend_types.h"
 #include "service/impala-server.h"
 #include "gen-cpp/Frontend_types.h"
+#include "util/auth-util.h"
 
 #include <boost/thread.hpp>
 #include <boost/unordered_set.hpp>
@@ -132,16 +133,13 @@ class ImpalaServer::QueryExecState {
   Status SetResultCache(QueryResultSet* cache, int64_t max_size);
 
   ImpalaServer::SessionState* session() const { return session_.get(); }
+
   /// Queries are run and authorized on behalf of the effective_user.
-  /// When a do_as_user is specified (is not empty), the effective_user is set to the
-  /// do_as_user. This is because the connected_user is acting as a "proxy user" for the
-  /// do_as_user. When do_as_user is empty, the effective_user is always set to the
-  /// connected_user.
   const std::string& effective_user() const {
-    return do_as_user().empty() ? connected_user() : do_as_user();
+      return GetEffectiveUser(query_ctx_.session);
   }
   const std::string& connected_user() const { return query_ctx_.session.connected_user; }
-  const std::string& do_as_user() const { return session_->do_as_user; }
+  const std::string& do_as_user() const { return query_ctx_.session.delegated_user; }
   TSessionType::type session_type() const { return query_ctx_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
   const std::string& default_db() const { return query_ctx_.session.database; }

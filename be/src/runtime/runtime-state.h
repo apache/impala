@@ -35,6 +35,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryOptions
+#include "util/auth-util.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
@@ -109,11 +110,7 @@ class RuntimeState {
   }
   const TExecPlanFragmentParams& fragment_params() const { return fragment_params_; }
   const std::string& effective_user() const {
-    if (query_ctx().session.__isset.delegated_user &&
-        !query_ctx().session.delegated_user.empty()) {
-      return do_as_user();
-    }
-    return connected_user();
+    return GetEffectiveUser(query_ctx().session);
   }
   const std::string& do_as_user() const { return query_ctx().session.delegated_user; }
   const std::string& connected_user() const {

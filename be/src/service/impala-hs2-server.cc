@@ -527,6 +527,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     const TExecuteStatementReq execute_request, TQueryCtx* query_ctx) {
   query_ctx->request.stmt = execute_request.statement;
   VLOG_QUERY << "TExecuteStatementReq: " << ThriftDebugString(execute_request);
+  QueryOptionsMask set_query_options_mask;
   {
     shared_ptr<SessionState> session_state;
     TUniqueId session_id;
@@ -538,6 +539,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     session_state->ToThrift(session_id, &query_ctx->session);
     lock_guard<mutex> l(session_state->lock);
     query_ctx->request.query_options = session_state->default_query_options;
+    set_query_options_mask = session_state->set_query_options_mask;
   }
 
   if (execute_request.__isset.confOverlay) {
@@ -551,11 +553,14 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
         continue;
       }
       RETURN_IF_ERROR(SetQueryOption(conf_itr->first, conf_itr->second,
-          &query_ctx->request.query_options));
+          &query_ctx->request.query_options, &set_query_options_mask));
     }
-    VLOG_QUERY << "TClientRequest.queryOptions: "
-               << ThriftDebugString(query_ctx->request.query_options);
   }
+  // Only query options not set in the session or confOverlay can be overridden by the
+  // pool options.
+  AddPoolQueryOptions(query_ctx, ~set_query_options_mask);
+  VLOG_QUERY << "TClientRequest.queryOptions: "
+             << ThriftDebugString(query_ctx->request.query_options);
   return Status::OK();
 }
 
@@ -637,7 +642,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
         continue;
       }
       // Ignore failure to set query options (will be logged)
-      SetQueryOption(conf_itr->first, conf_itr->second, &state->default_query_options);
+      SetQueryOption(conf_itr->first, conf_itr->second, &state->default_query_options,
+          &state->set_query_options_mask);
     }
   }
   TQueryOptionsToMap(state->default_query_options, &return_val.configuration);

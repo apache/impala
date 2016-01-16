@@ -58,12 +58,10 @@ const int64_t DEFAULT_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     const TQueryExecRequest& request, const TQueryOptions& query_options,
-    const string& effective_user, RuntimeProfile* summary_profile,
-    RuntimeProfile::EventSequence* query_events)
+    RuntimeProfile* summary_profile, RuntimeProfile::EventSequence* query_events)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
-    effective_user_(effective_user),
     summary_profile_(summary_profile),
     query_events_(query_events),
     num_fragment_instances_(0),

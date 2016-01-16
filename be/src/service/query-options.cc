@@ -48,6 +48,43 @@ static Status ParseMemValue(const string& value, const string& key, int64_t* res
   return Status::OK();
 }
 
+void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMask& mask,
+    TQueryOptions* dst) {
+  DCHECK_GT(mask.size(), _TImpalaQueryOptions_VALUES_TO_NAMES.size()) <<
+      "Size of QueryOptionsMask must be increased.";
+#define QUERY_OPT_FN(NAME, ENUM)\
+  if (src.__isset.NAME && mask[TImpalaQueryOptions::ENUM]) dst->NAME = src.NAME;
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+}
+
+void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
+    map<string, string>* configuration) {
+#define QUERY_OPT_FN(NAME, ENUM)\
+  {\
+    stringstream val;\
+    val << query_options.NAME;\
+    (*configuration)[#ENUM] = val.str();\
+  }
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+}
+
+string impala::DebugQueryOptions(const TQueryOptions& query_options) {
+  const static TQueryOptions defaults;
+  int i = 0;
+  stringstream ss;
+#define QUERY_OPT_FN(NAME, ENUM)\
+  if (query_options.__isset.NAME &&\
+      (!defaults.__isset.NAME || query_options.NAME != defaults.NAME)) {\
+    if (i++ > 0) ss << ",";\
+    ss << #ENUM << "=" << query_options.NAME;\
+  }
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+  return ss.str();
+}
+
 // Returns the TImpalaQueryOptions enum for the given "key". Input is case insensitive.
 // Return -1 if the input is an invalid option.
 int GetQueryOptionForKey(const string& key) {
@@ -61,126 +98,8 @@ int GetQueryOptionForKey(const string& key) {
   return -1;
 }
 
-void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
-    map<string, string>* configuration) {
-  map<int, const char*>::const_iterator itr =
-      _TImpalaQueryOptions_VALUES_TO_NAMES.begin();
-  for (; itr != _TImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
-    stringstream val;
-    switch (itr->first) {
-      case TImpalaQueryOptions::ABORT_ON_ERROR:
-        val << query_options.abort_on_error;
-        break;
-      case TImpalaQueryOptions::MAX_ERRORS:
-        val << query_options.max_errors;
-        break;
-      case TImpalaQueryOptions::DISABLE_CODEGEN:
-        val << query_options.disable_codegen;
-        break;
-      case TImpalaQueryOptions::BATCH_SIZE:
-        val << query_options.batch_size;
-        break;
-      case TImpalaQueryOptions::MEM_LIMIT:
-        val << query_options.mem_limit;
-        break;
-      case TImpalaQueryOptions::NUM_NODES:
-        val << query_options.num_nodes;
-        break;
-      case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
-        val << query_options.max_scan_range_length;
-        break;
-      case TImpalaQueryOptions::MAX_IO_BUFFERS:
-        val << query_options.max_io_buffers;
-        break;
-      case TImpalaQueryOptions::NUM_SCANNER_THREADS:
-        val << query_options.num_scanner_threads;
-        break;
-      case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-        val << query_options.allow_unsupported_formats;
-        break;
-      case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
-        val << query_options.default_order_by_limit;
-        break;
-      case TImpalaQueryOptions::DEBUG_ACTION:
-        val << query_options.debug_action;
-        break;
-      case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
-        val << query_options.abort_on_default_limit_exceeded;
-        break;
-      case TImpalaQueryOptions::COMPRESSION_CODEC:
-        val << query_options.compression_codec;
-        break;
-      case TImpalaQueryOptions::SEQ_COMPRESSION_MODE:
-        val << query_options.seq_compression_mode;
-        break;
-      case TImpalaQueryOptions::HBASE_CACHING:
-        val << query_options.hbase_caching;
-        break;
-      case TImpalaQueryOptions::HBASE_CACHE_BLOCKS:
-        val << query_options.hbase_cache_blocks;
-        break;
-      case TImpalaQueryOptions::PARQUET_FILE_SIZE:
-        val << query_options.parquet_file_size;
-        break;
-      case TImpalaQueryOptions::EXPLAIN_LEVEL:
-        val << query_options.explain_level;
-        break;
-      case TImpalaQueryOptions::SYNC_DDL:
-        val << query_options.sync_ddl;
-        break;
-      case TImpalaQueryOptions::REQUEST_POOL:
-        val << query_options.request_pool;
-        break;
-      case TImpalaQueryOptions::V_CPU_CORES:
-        val << query_options.v_cpu_cores;
-        break;
-      case TImpalaQueryOptions::RESERVATION_REQUEST_TIMEOUT:
-        val << query_options.reservation_request_timeout;
-        break;
-      case TImpalaQueryOptions::DISABLE_CACHED_READS:
-        val << query_options.disable_cached_reads;
-        break;
-      case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
-        val << query_options.disable_outermost_topn;
-        break;
-      case TImpalaQueryOptions::RM_INITIAL_MEM:
-        val << query_options.rm_initial_mem;
-        break;
-      case TImpalaQueryOptions::QUERY_TIMEOUT_S:
-        val << query_options.query_timeout_s;
-        break;
-      case TImpalaQueryOptions::MAX_BLOCK_MGR_MEMORY:
-        val << query_options.max_block_mgr_memory;
-        break;
-      case TImpalaQueryOptions::APPX_COUNT_DISTINCT:
-        val << query_options.appx_count_distinct;
-        break;
-      case TImpalaQueryOptions::DISABLE_UNSAFE_SPILLS:
-        val << query_options.disable_unsafe_spills;
-        break;
-      case TImpalaQueryOptions::EXEC_SINGLE_NODE_ROWS_THRESHOLD:
-        val << query_options.exec_single_node_rows_threshold;
-        break;
-      case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
-        val << query_options.optimize_partition_key_scans;
-      case TImpalaQueryOptions::REPLICA_PREFERENCE:
-        val << query_options.replica_preference;
-        break;
-      case TImpalaQueryOptions::RANDOM_REPLICA:
-        val << query_options.random_replica;
-        break;
-      default:
-        // We hit this DCHECK(false) if we forgot to add the corresponding entry here
-        // when we add a new query option.
-        LOG(ERROR) << "Missing exec option implementation: " << itr->second;
-        DCHECK(false);
-    }
-    (*configuration)[itr->second] = val.str();
-  }
-}
-
 Status impala::SetQueryOption(const string& key, const string& value,
-    TQueryOptions* query_options) {
+    TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask) {
   int option = GetQueryOptionForKey(key);
   if (option < 0) {
     return Status(Substitute("Ignoring invalid configuration option: $0", key));
@@ -396,11 +315,16 @@ Status impala::SetQueryOption(const string& key, const string& value,
         DCHECK(false);
         break;
     }
+    if (set_query_options_mask != NULL) {
+      DCHECK_LT(option, set_query_options_mask->size());
+      set_query_options_mask->set(option);
+    }
   }
   return Status::OK();
 }
 
-Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_options) {
+Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_options,
+    QueryOptionsMask* set_query_options_mask) {
   if (options.length() == 0) return Status::OK();
   vector<string> kv_pairs;
   split(kv_pairs, options, is_any_of(","), token_compress_on);
@@ -413,7 +337,8 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
       return Status(Substitute("Ignoring invalid configuration option $0: bad format "
           "(expected 'key=value')", kv_string));
     }
-    RETURN_IF_ERROR(SetQueryOption(key_value[0], key_value[1], query_options));
+    RETURN_IF_ERROR(SetQueryOption(key_value[0], key_value[1], query_options,
+        set_query_options_mask));
   }
   return Status::OK();
 }

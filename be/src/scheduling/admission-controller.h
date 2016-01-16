@@ -235,7 +235,7 @@ class AdmissionController {
   /// Map of pool names to the most recent pool configs returned by request_pool_service_.
   /// Stored so that the dequeue thread does not need to access the configs via the
   /// request pool service again (which involves a JNI call and error checking).
-  typedef boost::unordered_map<std::string, TPoolConfigResult> PoolConfigMap;
+  typedef boost::unordered_map<std::string, TPoolConfig> PoolConfigMap;
   PoolConfigMap pool_config_cache_;
 
   /// Notifies the dequeuing thread that pool stats have changed and it may be
