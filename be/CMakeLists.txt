@@ -33,12 +33,13 @@ PROJECT(ASSEMBLER)
 #       is unsafe to do if the code uses casts (which we obviously do).
 #  -Wno-unknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
 #  -Wno-deprecated: gutil contains deprecated headers
+#  -Wno-vla: we use C99-style variable-length arrays
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++14")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 
 # On Apple we build with clang and need libstdc++ instead of libc++
