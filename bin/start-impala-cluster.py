@@ -51,7 +51,7 @@ parser.add_option("-r", "--restart_impalad_only", dest="restart_impalad_only",
                   help="Restarts only the impalad processes")
 parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,
                   help="Start all Impala backends and state store in a single process.")
-parser.add_option("--log_dir", dest="log_dir", default="/tmp",
+parser.add_option("--log_dir", dest="log_dir", default=os.environ['IMPALA_CLUSTER_LOGS_DIR'],
                   help="Directory to store output logs to.")
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
                   help="Prints all output to stderr/stdout.")
@@ -325,6 +325,10 @@ if __name__ == "__main__":
 
   if options.cluster_size < 0:
     print 'Please specify a cluster size >= 0'
+    sys.exit(1)
+
+  if not os.path.isdir(options.log_dir):
+    print 'Log dir does not exist or is not a directory: %s' % options.log_dir
     sys.exit(1)
 
   # Kill existing cluster processes based on the current configuration.

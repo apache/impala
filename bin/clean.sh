@@ -41,7 +41,8 @@ pushd $IMPALA_FE_DIR
 rm -rf target
 rm -f src/test/resources/{core,hbase,hive}-site.xml
 rm -rf generated-sources/*
-rm -rf ${IMPALA_TEST_CLUSTER_LOG_DIR}/*
+rm -rf ${IMPALA_LOGS_DIR}/*
+mkdir -p $IMPALA_ALL_LOGS_DIRS
 popd
 
 # clean be

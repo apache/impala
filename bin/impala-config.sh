@@ -183,8 +183,34 @@ elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
   return 1
 fi
 
-# Directory where local cluster logs will go when running tests or loading data
-export IMPALA_TEST_CLUSTER_LOG_DIR=${IMPALA_HOME}/cluster_logs
+# Directories where local cluster logs will go when running tests or loading data
+export IMPALA_LOGS_DIR=${IMPALA_HOME}/logs
+export IMPALA_CLUSTER_LOGS_DIR=${IMPALA_LOGS_DIR}/cluster
+export IMPALA_DATA_LOADING_LOGS_DIR=${IMPALA_LOGS_DIR}/data_loading
+export IMPALA_DATA_LOADING_SQL_DIR=${IMPALA_DATA_LOADING_LOGS_DIR}/sql
+export IMPALA_FE_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/fe_tests
+export IMPALA_BE_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/be_tests
+export IMPALA_EE_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/ee_tests
+export IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/custom_cluster_tests
+# List of all Impala log dirs and create them.
+export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
+  ${IMPALA_DATA_LOADING_LOGS_DIR} ${IMPALA_DATA_LOADING_SQL_DIR}
+  ${IMPALA_EE_TEST_LOGS_DIR} ${IMPALA_BE_TEST_LOGS_DIR}
+  ${IMPALA_EE_TEST_LOGS_DIR} ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
+mkdir -p $IMPALA_ALL_LOGS_DIRS
+
+# Create symlinks Testing/Temporary and be/Testing/Temporary that point to the BE test
+# log dir to capture the all logs of BE unit tests. Gtest has Testing/Temporary
+# hardwired in its code, so we cannot change the output dir by configuration.
+# We create two symlinks to capture the logs when running ctest either from
+# ${IMPALA_HOME} or ${IMPALA_HOME}/be.
+rm -rf ${IMPALA_HOME}/Testing
+mkdir -p ${IMPALA_HOME}/Testing
+ln -fs ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_HOME}/Testing/Temporary
+rm -rf ${IMPALA_HOME}/be/Testing
+mkdir -p ${IMPALA_HOME}/be/Testing
+ln -fs ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_HOME}/be/Testing/Temporary
+
 # Reduce the concurrency for local tests to half the number of cores in the system.
 # Note than nproc may not be available on older distributions (centos5.5)
 if type nproc >/dev/null 2>&1; then

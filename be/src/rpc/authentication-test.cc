@@ -174,8 +174,8 @@ TEST(Auth, KerbAndSslEnabled) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
 
   env_keytab = getenv("KRB5_KTNAME");
   env_princ = getenv("MINIKDC_PRINC_IMPALA");

@@ -26,6 +26,7 @@
   <name>Cloudera Impala Query Engine Frontend</name>
 
   <properties>
+    <surefire.reports.dir>${env.IMPALA_LOGS_DIR}/fe_tests</surefire.reports.dir>
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
     <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
     <beeswax_port>21000</beeswax_port>
@@ -459,6 +460,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.18</version>
         <configuration>
+          <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>-Djava.library.path=${java.library.path}:${backend.library.path}</argLine>
           <systemProperties>

@@ -51,7 +51,7 @@ export MINIKDC_PRINC_USER=${USER}/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_LLAM=llama/localhost@${MINIKDC_REALM}
 
 # Basic directory setup:
-MINIKDC_SCRATCH_ROOT=${MINIKDC_SCRATCH_ROOT-${IMPALA_TEST_CLUSTER_LOG_DIR}}
+MINIKDC_SCRATCH_ROOT=${MINIKDC_SCRATCH_ROOT-${IMPALA_CLUSTER_LOGS_DIR}}
 export MINIKDC_WD=${MINIKDC_SCRATCH_ROOT}/minikdc-workdir
 
 # The one big keytab created by the minikdc

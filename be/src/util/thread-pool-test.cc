@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include "common/init.h"
 #include "common/logging.h"
 #include "util/thread-pool.h"
 
@@ -67,9 +68,7 @@ TEST(ThreadPoolTest, BasicTest) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitGoogleLoggingSafe(argv[0]);
-  impala::InitThreading();
-  impala::OsInfo::Init();
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

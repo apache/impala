@@ -73,9 +73,9 @@ if options.workload is None:
   parser.print_help()
   sys.exit(1)
 
-DATA_LOAD_DIR = '/tmp/data-load-files'
 WORKLOAD_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'workloads')
 DATASET_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata', 'datasets')
+SQL_OUTPUT_DIR = os.environ['IMPALA_DATA_LOADING_SQL_DIR']
 AVRO_SCHEMA_DIR = "avro_schemas"
 IMPALA_SUPPORTED_INSERT_FORMATS = ['parquet', 'hbase', 'text', 'kudu']
 
@@ -690,7 +690,7 @@ if __name__ == "__main__":
 
   target_dataset = test_vectors[0].dataset
   print 'Target Dataset: ' + target_dataset
-  dataset_load_dir = os.path.join(DATA_LOAD_DIR, target_dataset)
+  dataset_load_dir = os.path.join(SQL_OUTPUT_DIR, target_dataset)
   # If the directory containing the sql files does not exist, create it. Else nuke all the
   # files corresponding to the current workload.
   try:

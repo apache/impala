@@ -23,17 +23,14 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 # TODO: Combine with run-process-failure-tests.sh
 export HEAPCHECK=
 
-RESULTS_DIR=${IMPALA_HOME}/tests/custom_cluster/results
-mkdir -p ${RESULTS_DIR}
-LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/custom_cluster/
-mkdir -p ${LOG_DIR}
-
 AUX_CUSTOM_DIR=""
 if [ -n ${IMPALA_AUX_TEST_HOME} ]; then
     AUX_CUSTOM_DIR=${IMPALA_AUX_TEST_HOME}/tests/aux_custom_cluster_tests/
 fi
 
-export LOG_DIR
+export LOG_DIR=${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}
+RESULTS_DIR=${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}/results
+mkdir -p ${RESULTS_DIR}
 
 # KERBEROS TODO We'll want to pass kerberos status in here.
 cd ${IMPALA_HOME}/tests

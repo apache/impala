@@ -82,7 +82,7 @@ if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
   EMPTY_NODE_DIRS+=" /var/log/llama"
 fi
 
-EASY_ACCESS_LOG_DIR="$IMPALA_HOME/cluster_logs"
+EASY_ACCESS_LOG_DIR="$IMPALA_CLUSTER_LOGS_DIR"
 MINIKDC_INIT=${IMPALA_HOME}/testdata/bin/minikdc.sh
 
 if $IS_OSX; then
@@ -246,7 +246,7 @@ function create_cluster {
     if [[ ! -e "$EASY_ACCESS_LOG_LINK" ]]; then
       mkdir -p "$EASY_ACCESS_LOG_DIR"
       ln -s "$NODE_DIR/var/log" "$EASY_ACCESS_LOG_DIR"
-      mv "$IMPALA_HOME/cluster_logs/log" "$EASY_ACCESS_LOG_LINK"
+      mv "$IMPALA_CLUSTER_LOGS_DIR/log" "$EASY_ACCESS_LOG_LINK"
     fi
 
     # Template population

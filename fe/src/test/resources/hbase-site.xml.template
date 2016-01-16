@@ -53,7 +53,7 @@
 
   <property>
     <name>hbase.zookeeper.property.dataDir</name>
-    <value>${IMPALA_TEST_CLUSTER_LOG_DIR}/zoo</value>
+    <value>${IMPALA_CLUSTER_LOGS_DIR}/zoo</value>
   </property>
 
   <!-- BEGIN Kerberos settings -->

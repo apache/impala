@@ -7,7 +7,7 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 CLUSTER_BIN=${IMPALA_HOME}/testdata/bin
 HBASE_JAAS_CLIENT=${HBASE_CONF_DIR}/hbase-jaas-client.conf
 HBASE_JAAS_SERVER=${HBASE_CONF_DIR}/hbase-jaas-server.conf
-HBASE_LOGDIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/hbase
+HBASE_LOGDIR=${IMPALA_CLUSTER_LOGS_DIR}/hbase
 
 # Kill and clean data for a clean start.
 ${CLUSTER_BIN}/kill-hbase.sh > /dev/null 2>&1
@@ -22,10 +22,10 @@ export HBASE_LOG_DIR=${HBASE_LOGDIR}
 export HBASE_PID_DIR=${HBASE_LOGDIR}
 EOF
 
-# Put zookeeper things in the cluster_logs/zoo directory.
+# Put zookeeper things in the logs/cluster/zoo directory.
 # (See hbase.zookeeper.property.dataDir in hbase-site.xml)
-rm -rf ${IMPALA_TEST_CLUSTER_LOG_DIR}/zoo
-mkdir -p ${IMPALA_TEST_CLUSTER_LOG_DIR}/zoo
+rm -rf ${IMPALA_CLUSTER_LOGS_DIR}/zoo
+mkdir -p ${IMPALA_CLUSTER_LOGS_DIR}/zoo
 mkdir -p ${HBASE_LOGDIR}
 
 if ${CLUSTER_DIR}/admin is_kerberized; then

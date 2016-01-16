@@ -60,7 +60,7 @@ parser.add_option("--principal", default=None, dest="principal",
 
 options, args = parser.parse_args()
 
-DATA_LOAD_DIR = '/tmp/data-load-files'
+SQL_OUTPUT_DIR = os.environ['IMPALA_DATA_LOADING_SQL_DIR']
 WORKLOAD_DIR = options.workload_dir
 DATASET_DIR = options.dataset_dir
 TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
@@ -257,9 +257,11 @@ if __name__ == "__main__":
     start_time = time.time()
     dataset = get_dataset_for_workload(workload)
     generate_schema_statements(workload)
-    assert os.path.isdir(os.path.join(DATA_LOAD_DIR, dataset)), ("Data loading files "
-        "do not exist for (%s)" % dataset)
-    os.chdir(os.path.join(DATA_LOAD_DIR, dataset))
+    sql_dir = os.path.join(SQL_OUTPUT_DIR, dataset)
+    assert os.path.isdir(sql_dir),\
+      ("Could not find the generated SQL files for loading dataset '%s'.\
+        \nExpected to find the SQL files in: %s" % (dataset, sql_dir))
+    os.chdir(os.path.join(SQL_OUTPUT_DIR, dataset))
     copy_avro_schemas_to_hdfs(AVRO_SCHEMA_DIR)
     dataset_dir_contents = os.listdir(os.getcwd())
     load_file_substr = "%s-%s" % (workload, options.exploration_strategy)

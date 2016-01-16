@@ -4,9 +4,7 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
-# Prepare output directory
-mkdir -p $IMPALA_TEST_CLUSTER_LOG_DIR/be_test
-export GTEST_OUTPUT="xml:$IMPALA_TEST_CLUSTER_LOG_DIR/be_test/"
+export GTEST_OUTPUT="xml:$IMPALA_BE_TEST_LOGS_DIR/"
 
 : ${SKIP_BE_TEST_PATTERN:=}
 

@@ -77,8 +77,8 @@ do
   esac
 done
 
-LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/query_tests
-mkdir -p ${LOG_DIR}
+# For logging when using run-step.
+LOG_DIR=${IMPALA_EE_TEST_LOGS_DIR}
 
 # Enable core dumps
 ulimit -c unlimited
@@ -96,7 +96,7 @@ do
   TEST_RET_CODE=0
 
   run-step "Starting Impala cluster" start-impala-cluster.log \
-      ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} \
+      ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_EE_TEST_LOGS_DIR} \
       ${TEST_START_CLUSTER_ARGS}
 
   if [[ "$BE_TEST" == true ]]; then
@@ -157,7 +157,7 @@ do
   if [[ "$JDBC_TEST" == true ]]; then
     # Run the JDBC tests with background loading disabled. This is interesting because
     # it requires loading missing table metadata.
-    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} \
+    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_EE_TEST_LOGS_DIR} \
         --catalogd_args=--load_catalog_in_background=false \
         ${TEST_START_CLUSTER_ARGS}
     pushd ${IMPALA_FE_DIR}

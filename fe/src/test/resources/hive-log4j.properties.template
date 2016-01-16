@@ -1,6 +1,6 @@
 # Define some default values that can be overridden by system properties
 hive.root.logger=INFO,DRFA
-hive.log.dir=${IMPALA_TEST_CLUSTER_LOG_DIR}/hive
+hive.log.dir=${IMPALA_CLUSTER_LOGS_DIR}/hive
 hive.log.file=hive.log
 
 # Define the root logger to the system property "hadoop.root.logger".

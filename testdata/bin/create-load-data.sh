@@ -35,8 +35,8 @@ SKIP_SNAPSHOT_LOAD=0
 SNAPSHOT_FILE=""
 LOAD_DATA_ARGS=""
 JDBC_URL="jdbc:hive2://localhost:11050/default;"
-LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/data_loading
-mkdir -p ${LOG_DIR}
+# For logging when using run-step.
+LOG_DIR=${IMPALA_DATA_LOADING_LOGS_DIR}
 
 while [ -n "$*" ]
 do
@@ -141,7 +141,7 @@ function load-data {
     ARGS+=("--force")
     echo "Force loading."
   fi
-  LOG_FILE=${LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
+  LOG_FILE=${IMPALA_DATA_LOADING_LOGS_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with -u
   if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
@@ -162,7 +162,7 @@ function cache-test-tables {
 }
 
 function load-aux-workloads {
-  LOG_FILE=${LOG_DIR}/data-load-auxiliary-workloads-core.log
+  LOG_FILE=${IMPALA_DATA_LOADING_LOGS_DIR}/data-load-auxiliary-workloads-core.log
   rm -f $LOG_FILE
   # Load all the auxiliary workloads (if any exist)
   if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
@@ -339,8 +339,8 @@ else
   START_CLUSTER_ARGS="-s 3 ${START_CLUSTER_ARGS}"
 fi
 run-step "Starting Impala cluster" start-impala-cluster.log \
-    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} \
-    ${START_CLUSTER_ARGS}
+    ${IMPALA_HOME}/bin/start-impala-cluster.py \
+      --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} ${START_CLUSTER_ARGS}
 # The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
 # On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
 # needed.
