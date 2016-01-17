@@ -209,4 +209,13 @@ void Status::ToThrift(TStatus* status) const {
   }
 }
 
+void Status::FreeMessage() {
+  delete msg_;
+}
+
+void Status::CopyMessageFrom(const Status& status) {
+  delete msg_;
+  msg_ = status.msg_ == NULL ? NULL : new ErrorMsg(*status.msg_);
+}
+
 }

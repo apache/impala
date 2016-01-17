@@ -82,7 +82,7 @@ class Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
 
-  Status(): msg_(NULL) {}
+  inline Status(): msg_(NULL) {}
 
   // Return a default constructed Status instance in the OK case.
   inline static Status OK() { return Status(); }
@@ -94,8 +94,9 @@ class Status {
   static const Status DEPRECATED_RPC;
 
   /// Copy c'tor makes copy of error detail so Status can be returned by value.
-  Status(const Status& status)
-    : msg_(status.msg_ != NULL ? new ErrorMsg(*status.msg_) : NULL) { }
+  inline Status(const Status& status) : msg_(NULL) {
+    if (UNLIKELY(status.msg_ != NULL)) CopyMessageFrom(status);
+  }
 
   /// Status using only the error code as a parameter. This can be used for error messages
   /// that don't take format parameters.
@@ -143,19 +144,20 @@ class Status {
   static Status Expected(const ErrorMsg& e);
   static Status Expected(const std::string& error_msg);
 
-  ~Status() {
-    if (msg_ != NULL) delete msg_;
+  /// same as copy c'tor
+  inline Status& operator=(const Status& status) {
+    // Take the slow path if either Status objects have non-NULL messages (unless they
+    // are aliases).
+    if (UNLIKELY(msg_ != status.msg_)) CopyMessageFrom(status);
+    return *this;
   }
 
-  /// same as copy c'tor
-  Status& operator=(const Status& status) {
-    delete msg_;
-    if (LIKELY(status.msg_ == NULL)) {
-      msg_ = NULL;
-    } else {
-      msg_ = new ErrorMsg(*status.msg_);
-    }
-    return *this;
+  inline ~Status() {
+    // The UNLIKELY and inlining here are important hints for the compiler to
+    // streamline the common case of Status::OK(). Use FreeMessage() which is
+    // not inlined to free the message. This avoids potential code bloat due
+    // to duplicated code from the delete statement.
+    if (UNLIKELY(msg_ != NULL)) FreeMessage();
   }
 
   /// "Copy" c'tor from TStatus.
@@ -237,6 +239,12 @@ class Status {
   // Status constructors that can suppress logging via 'silent' parameter
   Status(const ErrorMsg& error_msg, bool silent);
   Status(const std::string& error_msg, bool silent);
+
+  // A non-inline function for copying status' message.
+  void CopyMessageFrom(const Status& status);
+
+  // A non-inline function for freeing status' message.
+  void FreeMessage();
 
   /// Status uses a naked pointer to ensure the size of an instance on the stack is only
   /// the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.
