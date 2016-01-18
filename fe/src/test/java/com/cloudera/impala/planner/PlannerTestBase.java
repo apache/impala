@@ -419,7 +419,7 @@ public class PlannerTestBase {
           section, query, section, explainStr));
     } else {
       String planDiff = TestUtils.compareOutput(
-          Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
+          Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, true);
       if (!planDiff.isEmpty()) {
         errorLog.append(String.format(
             "\nSection %s of query:\n%s\n\n%s", section, query, planDiff));
@@ -474,7 +474,7 @@ public class PlannerTestBase {
     if (expectedLocations.size() > 0 && locationsStr != null) {
       // Locations' order does not matter.
       String result = TestUtils.compareOutput(
-          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, false);
+          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, false, false);
       if (!result.isEmpty()) {
         errorLog.append("section " + Section.SCANRANGELOCATIONS + " of query:\n"
             + query + "\n" + result);

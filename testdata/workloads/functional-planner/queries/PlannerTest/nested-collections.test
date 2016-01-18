@@ -74,10 +74,10 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |  |  03:UNNEST [r.r_nations n]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.region r]
-regex:\|\s+partitions=1/1\s+files=1\s+size=\d+\.\d+KB
+|     partitions=1/1 files=1 size=4.18KB
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
-regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # Test subplans: Cross join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a cross join a.int_array_col b
@@ -1195,7 +1195,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: c_custkey < 10
    predicates on o: o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
@@ -1290,7 +1290,7 @@ where c.c_custkey = o.o_orderkey and c.c_custkey = o.o_shippriority
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-regex:\s+partitions=1/1\s+files=4\s+size=\d+\.\d+MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: c.c_custkey = c.c_nationkey
    predicates on o: o.o_orderkey = o.o_shippriority
    predicates on l: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
