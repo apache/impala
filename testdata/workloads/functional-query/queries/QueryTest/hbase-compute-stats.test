@@ -16,13 +16,13 @@ show table stats compute_stats_db_hbase.alltypessmall_hbase
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS: VERIFY_IS_EQUAL
-regex:.+,'',regex:.+,regex:.+KB
-regex:.+,'1',regex:.+,regex:.+KB
-regex:.+,'3',regex:.+,regex:.+KB
-regex:.+,'5',regex:.+,regex:.+KB
-regex:.+,'7',regex:.+,regex:.+KB
-regex:.+,'9',regex:.+,regex:.+KB
-'Total','',regex:.+,regex:.+KB
+regex:.+,'',regex:.+,regex:.+B
+regex:.+,'1',regex:.+,regex:.+B
+regex:.+,'3',regex:.+,regex:.+B
+regex:.+,'5',regex:.+,regex:.+B
+regex:.+,'7',regex:.+,regex:.+B
+regex:.+,'9',regex:.+,regex:.+B
+'Total','',regex:.+,regex:.+B
 ---- TYPES
 STRING, STRING, BIGINT, STRING
 ====

@@ -145,7 +145,7 @@ class ResultColumn(object):
     # should be matched against instead of self.value.
     self.regex = None
     if COLUMN_REGEX_PREFIX.match(value):
-      pattern = self.value[len(COLUMN_REGEX_PREFIX_PATTERN)].strip()
+      pattern = self.value[len(COLUMN_REGEX_PREFIX_PATTERN):].strip()
       self.regex = re.compile(pattern)
       if self.regex is None:
         assert False, "Invalid column regex specification: %s" % self.value
