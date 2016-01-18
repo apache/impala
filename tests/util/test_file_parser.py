@@ -170,9 +170,9 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
 
       if subsection_name == 'RESULTS' and subsection_comment:
         for comment in subsection_comment.split(','):
-          if subsection_comment == 'MULTI_LINE':
+          if comment == 'MULTI_LINE':
             parsed_sections['MULTI_LINE'] = comment
-          elif subsection_comment.startswith('VERIFY'):
+          elif comment.startswith('VERIFY'):
             parsed_sections['VERIFIER'] = comment
           else:
             raise RuntimeError, 'Unknown subsection comment: %s' % comment
