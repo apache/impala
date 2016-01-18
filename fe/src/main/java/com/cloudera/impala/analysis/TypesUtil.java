@@ -103,6 +103,13 @@ public class TypesUtil {
       if (t1.isNull()) return t2;
       if (t2.isNull()) return t1;
 
+      // For multiplications involving at least one floating point type we cast decimal to
+      // double in order to prevent decimals from overflowing.
+      if (op == ArithmeticExpr.Operator.MULTIPLY &&
+          (t1.isFloatingPointType() || t2.isFloatingPointType())) {
+        return Type.DOUBLE;
+      }
+
       t1 = ((ScalarType) t1).getMinResolutionDecimal();
       t2 = ((ScalarType) t2).getMinResolutionDecimal();
       Preconditions.checkState(t1.isDecimal());

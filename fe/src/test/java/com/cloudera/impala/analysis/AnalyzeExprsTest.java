@@ -1277,7 +1277,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     checkReturnType("select 1.0 + 2.0 + d1 from functional.decimal_tbl",
         ScalarType.createDecimalType(11,1));
     checkReturnType("select 1.0 + 2.0 + pi()*d1 from functional.decimal_tbl",
-        ScalarType.createDecimalType(38,17));
+        Type.DOUBLE);
 
     // Test with multiple cols
     checkReturnType("select double_col + 1.23 + float_col + 1.0 " +

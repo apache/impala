@@ -70,3 +70,32 @@ select * from values_test_decimal_tbl;
 ---- TYPES
 decimal
 ====
+---- QUERY
+# IMPALA-2749: Test that multiplying a DOUBLE and a DECIMAL results in a double
+# value and do not overflow.
+drop table if exists i_2749;
+create table i_2749 (dbl1 double, dec decimal(9,4), dbl2 double);
+insert overwrite table i_2749 values
+    (0.0017,90,1.0113),
+    (0.0342,90,1.0113),
+    (0.0128,90,1.0113),
+    (0.0163,90,1.0113);
+====
+---- QUERY
+select dbl1 * dec * dbl2, dbl1 + dec, dbl1 - dec, dbl1 / dec from i_2749;
+---- RESULTS
+0.1547289,90.00170000000000000,-89.99830000000000000,0.00001888888888888
+3.112781400000001,90.03420000000000000,-89.96580000000000000,0.00038000000000000
+1.1650176,90.01280000000000000,-89.98720000000000000,0.00014222222222222
+1.4835771,90.01629999999999999,-89.98370000000000001,0.00018111111111111
+---- TYPES
+DOUBLE,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select dbl1 * dbl2 * dec from i_2749;
+---- RESULTS
+0.1547289
+3.112781400000001
+1.1650176
+1.4835771
+====
