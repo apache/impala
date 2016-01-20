@@ -23,7 +23,6 @@ from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser
 from testdata.common import cgroups
-from multiprocessing.pool import ThreadPool
 
 # Options
 parser = OptionParser()
@@ -85,25 +84,31 @@ BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5"
 RM_ARGS = ("-enable_rm=true -llama_addresses=%s -cgroup_hierarchy_path=%s "
            "-fair_scheduler_allocation_path=%s")
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
+KILL_TIMEOUT_IN_SECONDS = 10
+
+def find_user_processes(binaries):
+  """Returns an iterator over all processes owned by the current user with a matching
+  binary name from the provided list."""
+  for pid in psutil.get_pid_list():
+    try:
+      process = psutil.Process(pid)
+      if process.username == getuser() and process.name in binaries: yield process
+    except KeyError, e:
+      if "uid not found" not in str(e):
+        raise
+    except psutil.NoSuchProcess, e:
+      # Ignore the case when a process no longer exists.
+      pass
 
 def check_process_exists(binary, attempts=1):
   """Checks if a process exists given the binary name. The `attempts` count allows us to
   control the time a process needs to settle until it becomes available. After each try
   the script will sleep for one second and retry. Returns True if it exists and False
   otherwise.
-  TODO: The conditional import will go away once we start using virtualenv.
   """
   for _ in range(attempts):
-    for pid in psutil.get_pid_list():
-      try:
-        process = psutil.Process(pid)
-        if process.username == getuser() and process.name == binary: return True
-      except KeyError, e:
-        if "uid not found" not in str(e):
-          raise
-      except psutil.NoSuchProcess, e:
-        # Ignore the case when a process is no longer exists
-        pass
+    for proc in find_user_processes([binary]):
+      return True
     sleep(1)
   return False
 
@@ -118,20 +123,27 @@ def exec_impala_process(cmd, args, stderr_log_file_path):
 
 def kill_cluster_processes(force=False):
   binaries = ['catalogd', 'impalad', 'statestored', 'mini-impala-cluster']
-  arglists = [(binary, force) for binary in binaries]
-  pool = ThreadPool(len(arglists))
-  pool.map(lambda arglist: kill_matching_processes(*arglist), arglists, 1)
-  pool.close()
+  kill_matching_processes(binaries, force)
 
-def kill_matching_processes(binary_name, force=False):
-  """Kills all processes with the given binary name"""
-  # -w = Wait for processes to die.
-  kill_cmd = "killall -w -u $USER"
-  if force: kill_cmd += " -9"
-  os.system("%s %s" % (kill_cmd, binary_name))
+def kill_matching_processes(binary_names, force=False):
+  """Kills all processes with the given binary name, waiting for them to exit"""
+  # Send all the signals before waiting so that processes can clean up in parallel.
+  processes = list(find_user_processes(binary_names))
+  for process in processes:
+    try:
+      if force:
+        process.kill()
+      else:
+        process.terminate()
+    except psutil.NoSuchProcess:
+      pass
 
-  if check_process_exists(binary_name):
-    raise RuntimeError("Unable to kill %s. Check process permissions." % (binary_name, ))
+  for process in processes:
+    try:
+      process.wait(KILL_TIMEOUT_IN_SECONDS)
+    except psutil.TimeoutExpired:
+      raise RuntimeError("Unable to kill %s (pid %d) after %d seconds." % (process.name,
+          process.pid, KILL_TIMEOUT_IN_SECONDS))
 
 def start_statestore():
   print "Starting State Store logging to %s/statestored.INFO" % options.log_dir
@@ -311,7 +323,7 @@ if __name__ == "__main__":
     if options.inprocess:
       print 'Cannot perform individual component restarts using an in-process cluster'
       sys.exit(1)
-    kill_matching_processes('impalad', force=options.force_kill)
+    kill_matching_processes(['impalad'], force=options.force_kill)
   else:
     kill_cluster_processes(force=options.force_kill)
 
