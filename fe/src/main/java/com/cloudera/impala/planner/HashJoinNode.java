@@ -61,7 +61,7 @@ public class HashJoinNode extends JoinNode {
   }
 
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
-  public void setAddProbeFilters(boolean b) { addProbeFilters_ = true; }
+  public void setAddProbeFilters(boolean b) { addProbeFilters_ = b; }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {

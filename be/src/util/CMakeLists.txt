@@ -28,6 +28,7 @@ add_library(Util
   avro-util.cc
   benchmark.cc
   bitmap.cc
+  bloom-filter.cc
   cgroups-mgr.cc
   codec.cc
   compress.cc
@@ -132,3 +133,4 @@ ADD_BE_TEST(lru-cache-test)
 ADD_BE_TEST(filesystem-util-test)
 ADD_BE_TEST(bitmap-test)
 ADD_BE_TEST(fixed-size-hash-table-test)
+ADD_BE_TEST(bloom-filter-test)
