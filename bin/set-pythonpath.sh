@@ -37,9 +37,4 @@ for EGG in ${IMPALA_HOME}/shell/ext-py/*/dist/*.egg; do
   PYTHONPATH=${PYTHONPATH}:${EGG}
 done
 
-# Add path to generated thrift modules
-for PKG_DIR in ${IMPALA_HOME}/infra/python/env/lib/python*/site-packages; do
-  PYTHONPATH=${PYTHONPATH}:${PKG_DIR}
-done
-
 export PYTHONPATH
