@@ -177,7 +177,7 @@ public class PrivilegeSpec implements ParseNode {
         } catch (AnalysisException e) {
           throw new AnalysisException(String.format("Error setting privileges for " +
               "database '%s'. Verify that the database exists and that you have " +
-              "permissions to issue a GRANT/REVOKE statement."));
+              "permissions to issue a GRANT/REVOKE statement.", dbName_));
         }
         break;
       case URI:
