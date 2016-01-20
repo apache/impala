@@ -59,8 +59,6 @@ import com.google.common.collect.Maps;
  */
 public class Db implements CatalogObject {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
-  private static TSerializer serializer =
-      new TSerializer(new TCompactProtocol.Factory());
   private final Catalog parentCatalog_;
   private final TDatabase thriftDb_;
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
@@ -315,6 +313,8 @@ public class Db implements CatalogObject {
         fn.getBinaryType() != TFunctionBinaryType.BUILTIN &&
         fn.getBinaryType() != TFunctionBinaryType.HIVE);
     try {
+      TSerializer serializer =
+          new TSerializer(new TCompactProtocol.Factory());
       byte[] serializedFn = serializer.serialize(fn.toThrift());
       String base64Fn = Base64.encodeBase64String(serializedFn);
       String fnKey = FUNCTION_INDEX_PREFIX + fn.signatureString();
