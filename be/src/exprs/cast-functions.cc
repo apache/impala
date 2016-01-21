@@ -199,8 +199,9 @@ StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) 
       FunctionContext* ctx, const TimestampVal& val) { \
     if (val.is_null) return to_type::null(); \
     TimestampValue tv = TimestampValue::FromTimestampVal(val); \
-    if (!tv.HasDate()) return to_type::null(); \
-    return to_type(tv.ToUnixTime()); \
+    time_t result; \
+    if (!tv.ToUnixTime(&result)) return to_type::null(); \
+    return to_type(result); \
   }
 
 CAST_FROM_TIMESTAMP(BooleanVal);
@@ -214,8 +215,9 @@ CAST_FROM_TIMESTAMP(BigIntVal);
       FunctionContext* ctx, const TimestampVal& val) { \
     if (val.is_null) return to_type::null(); \
     TimestampValue tv = TimestampValue::FromTimestampVal(val); \
-    if (!tv.HasDate()) return to_type::null(); \
-    return to_type(tv.ToSubsecondUnixTime()); \
+    double result; \
+    if (!tv.ToSubsecondUnixTime(&result)) return to_type::null(); \
+    return to_type(result);\
   }
 
 CAST_FROM_SUBSECOND_TIMESTAMP(FloatVal);
@@ -226,7 +228,6 @@ CAST_FROM_SUBSECOND_TIMESTAMP(DoubleVal);
                                                  const from_type& val) { \
     if (val.is_null) return TimestampVal::null(); \
     TimestampValue timestamp_value(val.val); \
-    if (!timestamp_value.HasDate()) return TimestampVal::null(); \
     TimestampVal result; \
     timestamp_value.ToTimestampVal(&result); \
     return result; \
@@ -245,7 +246,6 @@ TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx,
   if (val.is_null) return TimestampVal::null();
   TimestampValue timestamp_value(reinterpret_cast<char*>(val.ptr), val.len);
   // Return null if 'val' did not parse
-  if (!timestamp_value.HasDateOrTime()) return TimestampVal::null();
   TimestampVal result;
   timestamp_value.ToTimestampVal(&result);
   return result;

@@ -293,9 +293,12 @@ void AggregateFunctions::TimestampAvgUpdate(FunctionContext* ctx,
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(AvgState), dst->len);
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
-  double val = TimestampValue::FromTimestampVal(src).ToSubsecondUnixTime();
-  avg->sum += val;
-  ++avg->count;
+  TimestampValue tm_src = TimestampValue::FromTimestampVal(src);
+  double val;
+  if (tm_src.ToSubsecondUnixTime(&val)) {
+    avg->sum += val;
+    ++avg->count;
+  }
 }
 
 void AggregateFunctions::TimestampAvgRemove(FunctionContext* ctx,
@@ -304,10 +307,13 @@ void AggregateFunctions::TimestampAvgRemove(FunctionContext* ctx,
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(AvgState), dst->len);
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
-  double val = TimestampValue::FromTimestampVal(src).ToSubsecondUnixTime();
-  avg->sum -= val;
-  --avg->count;
-  DCHECK_GE(avg->count, 0);
+  TimestampValue tm_src = TimestampValue::FromTimestampVal(src);
+  double val;
+  if (tm_src.ToSubsecondUnixTime(&val)) {
+    avg->sum -= val;
+    --avg->count;
+    DCHECK_GE(avg->count, 0);
+  }
 }
 
 TimestampVal AggregateFunctions::TimestampAvgGetValue(FunctionContext* ctx,
@@ -315,9 +321,13 @@ TimestampVal AggregateFunctions::TimestampAvgGetValue(FunctionContext* ctx,
   AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
   if (val_struct->count == 0) return TimestampVal::null();
   TimestampValue tv(val_struct->sum / val_struct->count);
-  TimestampVal result;
-  tv.ToTimestampVal(&result);
-  return result;
+  if (tv.HasDate()) {
+    TimestampVal result;
+    tv.ToTimestampVal(&result);
+    return result;
+  } else {
+    return TimestampVal::null();
+  }
 }
 
 TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,

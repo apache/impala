@@ -168,7 +168,6 @@ class TestAggregationQueries(ImpalaTestSuite):
     result = self.execute_query(query, exec_option, table_format=table_format)
     assert(set((result.data)[0].split(" ")) == set(['1','2','3','4','5','6','7','8','9']))
 
-
 class TestTPCHAggregationQueries(ImpalaTestSuite):
   # Uses the TPC-H dataset in order to have larger aggregations.
 

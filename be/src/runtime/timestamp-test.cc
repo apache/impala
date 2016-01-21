@@ -585,7 +585,9 @@ TEST(TimestampTest, Basic) {
   TimestampValue min_date = TimestampValue("1400-01-01", 10);
   EXPECT_TRUE(min_date.HasDate());
   EXPECT_TRUE(min_date.HasTime());
-  EXPECT_EQ(-17987443200, min_date.ToUnixTime());
+  time_t tm_min;
+  EXPECT_TRUE(min_date.ToUnixTime(&tm_min));
+  EXPECT_EQ(-17987443200, tm_min);
   EXPECT_EQ("1400-01-01 00:00:00", TimestampValue(-17987443200).DebugString());
   TimestampValue too_early(-17987443201);
   EXPECT_FALSE(too_early.HasDate());
@@ -597,7 +599,9 @@ TEST(TimestampTest, Basic) {
       TimestampValue(date(10000, Dec, 31), time_duration(23, 59, 59));
   EXPECT_TRUE(max_date.HasDate());
   EXPECT_TRUE(max_date.HasTime());
-  EXPECT_EQ(253433923199, max_date.ToUnixTime());
+  time_t tm_max;
+  EXPECT_TRUE(max_date.ToUnixTime(&tm_max));
+  EXPECT_EQ(253433923199, tm_max);
   EXPECT_EQ("10000-12-31 23:59:59", TimestampValue(253433923199).DebugString());
   TimestampValue too_late(253433923200);
   EXPECT_FALSE(too_late.HasDate());
@@ -608,8 +612,9 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ("2038-01-19 03:14:09", TimestampValue(2147483649).DebugString());
 
   // Test Unix time as a float
-  EXPECT_EQ(1382337792.07,
-      TimestampValue("2013-10-21 06:43:12.07", 22).ToSubsecondUnixTime());
+  double result;
+  EXPECT_TRUE(TimestampValue("2013-10-21 06:43:12.07", 22).ToSubsecondUnixTime(&result));
+  EXPECT_EQ(1382337792.07, result);
   EXPECT_EQ("1970-01-01 00:00:00.008000000", TimestampValue(0.008).DebugString());
 }
 

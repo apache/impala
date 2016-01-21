@@ -235,8 +235,12 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
 
   const TimestampValue& end_timestamp =
       record.end_time.HasDate() ? record.end_time : TimestampValue::LocalTime();
-  double duration =
-      end_timestamp.ToSubsecondUnixTime() - record.start_time.ToSubsecondUnixTime();
+  double ut_end_time, ut_start_time;
+  double duration = 0.0;
+  if (LIKELY(end_timestamp.ToSubsecondUnixTime(&ut_end_time))
+      && LIKELY(record.start_time.ToSubsecondUnixTime(&ut_start_time))) {
+    duration = ut_end_time - ut_start_time;
+  }
   const string& printed_duration = PrettyPrinter::Print(duration, TUnit::TIME_S);
   Value val_duration(printed_duration.c_str(), document->GetAllocator());
   value->AddMember("duration", val_duration, document->GetAllocator());

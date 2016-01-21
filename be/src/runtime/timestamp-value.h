@@ -116,10 +116,13 @@ class TimestampValue {
     return value;
   }
 
-  /// Returns a TimestampVal representation in the output variable. The caller must ensure
-  /// the TimestampValue instance has a valid date or time before calling.
+  /// Returns a TimestampVal representation in the output variable.
+  /// Returns null if the TimestampValue instance doesn't have a valid date or time.
   void ToTimestampVal(impala_udf::TimestampVal* tv) const {
-    DCHECK(HasDateOrTime());
+    if (!HasDateOrTime()) {
+      tv->is_null = true;
+      return;
+    }
     memcpy(&tv->date, &date_, sizeof(date_));
     memcpy(&tv->time_of_day, &time_, sizeof(time_));
     tv->is_null = false;
@@ -155,39 +158,49 @@ class TimestampValue {
   /// Returns the number of characters copied in to the buffer (minus the terminator)
   int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff);
 
-  /// Returns the Unix time (seconds since the Unix epoch) representation. The time
+  /// Converts to Unix time (seconds since the Unix epoch) representation. The time
   /// zone interpretation of the TimestampValue instance is determined by
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the
   /// instance is interpreted as a local value. If the flag is false, UTC is assumed.
-  /// In either case, the caller should ensure that the TimestampValue instance is a
-  /// valid date before the call.
-  time_t ToUnixTime() const {
-    DCHECK(HasDate());
+  /// Returns false if the conversion failed (unix_time will be undefined), otherwise
+  /// true.
+  bool ToUnixTime(time_t* unix_time) const {
+    DCHECK(unix_time != NULL);
+    if (UNLIKELY(!HasDateAndTime())) return false;
     const boost::posix_time::ptime temp(date_, time_);
     tm temp_tm = boost::posix_time::to_tm(temp);
     if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
-      return mktime(&temp_tm);
+      *unix_time = mktime(&temp_tm);
     } else {
-      return timegm(&temp_tm);
+      *unix_time = timegm(&temp_tm);
     }
+    return true;
   }
 
-  /// Returns the Unix time (seconds since the Unix epoch) in UTC corresponding to this
-  /// Timestamp instance. Caller should ensure that the TimestampValue instance is a valid
-  /// date before the call.
-  time_t ToUnixTimeInUTC() const {
-    DCHECK(HasDate());
+  /// Converts to Unix time (seconds since the Unix epoch) in UTC corresponding to this
+  /// Timestamp instance.
+  /// Returns false if the conversion failed (utc_time will be undefined), otherwise
+  /// true.
+  bool ToUnixTimeInUTC(time_t* utc_time) const {
+    DCHECK(utc_time != NULL);
+    if (UNLIKELY(!HasDateAndTime())) return false;
     const boost::posix_time::ptime temp(date_, time_);
     tm temp_tm = boost::posix_time::to_tm(temp);
-    return mktime(&temp_tm);
+    *utc_time = mktime(&temp_tm);
+    return true;
   }
 
-  double ToSubsecondUnixTime() const {
-    double temp = ToUnixTime();
-    if (LIKELY(HasTime())) {
-      temp += time_.fractional_seconds() * ONE_BILLIONTH;
-    }
-    return temp;
+  /// Converts to Unix time with fractional seconds.
+  /// Returns false if the conversion failed (unix_time will be undefined), otherwise
+  /// true.
+  bool ToSubsecondUnixTime(double* unix_time) const {
+    DCHECK(unix_time != NULL);
+    time_t temp;
+    if (UNLIKELY(!ToUnixTime(&temp))) return false;
+    *unix_time = static_cast<double>(temp);
+    DCHECK(HasTime());
+    *unix_time += time_.fractional_seconds() * ONE_BILLIONTH;
+    return true;
   }
 
   /// Converts from UTC to local time in-place. The caller must ensure the TimestampValue

@@ -379,7 +379,9 @@ Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
     return Status::OK();
   }
   // Set the query end time in TLineageGraph
-  lineage_graph.__set_ended(query_exec_state.end_time().ToUnixTimeInUTC());
+  time_t utc_end_time;
+  query_exec_state.end_time().ToUnixTimeInUTC(&utc_end_time);
+  lineage_graph.__set_ended(utc_end_time);
   string lineage_record;
   LineageUtil::TLineageToJSON(lineage_graph, &lineage_record);
   const Status& status = lineage_logger_->AppendEntry(lineage_record);
@@ -928,8 +930,12 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 
   exec_state->Done();
 
-  double duration_ms = 1000 * (exec_state->end_time().ToSubsecondUnixTime() -
-      exec_state->start_time().ToSubsecondUnixTime());
+  double ut_end_time, ut_start_time;
+  double duration_ms = 0.0;
+  if (LIKELY(exec_state->end_time().ToSubsecondUnixTime(&ut_end_time))
+      && LIKELY(exec_state->start_time().ToSubsecondUnixTime(&ut_start_time))) {
+    duration_ms = 1000 * (ut_end_time - ut_start_time);
+  }
 
   // duration_ms can be negative when the local timezone changes during query execution.
   if (duration_ms >= 0) {
