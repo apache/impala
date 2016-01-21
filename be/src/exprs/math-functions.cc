@@ -148,7 +148,7 @@ void MathFunctions::RandPrepare(
       DCHECK_EQ(ctx->GetArgType(0)->type, FunctionContext::TYPE_BIGINT);
       BigIntVal* seed_arg = static_cast<BigIntVal*>(ctx->GetConstantArg(0));
       if (seed_arg->is_null) {
-        seed = NULL;
+        *seed = 0;
       } else {
         *seed = seed_arg->val;
       }
@@ -172,6 +172,15 @@ DoubleVal MathFunctions::Rand(FunctionContext* ctx) {
 DoubleVal MathFunctions::RandSeed(FunctionContext* ctx, const BigIntVal& seed) {
   if (seed.is_null) return DoubleVal::null();
   return Rand(ctx);
+}
+
+void MathFunctions::RandClose(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    uint8_t* seed = reinterpret_cast<uint8_t*>(
+        ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
+    ctx->Free(seed);
+  }
 }
 
 StringVal MathFunctions::Bin(FunctionContext* ctx, const BigIntVal& v) {

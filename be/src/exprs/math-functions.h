@@ -65,11 +65,12 @@ class MathFunctions {
   static DoubleVal Log2(FunctionContext*, const DoubleVal&);
   static DoubleVal Log(FunctionContext*, const DoubleVal& base, const DoubleVal& val);
   static DoubleVal Pow(FunctionContext*, const DoubleVal& base, const DoubleVal& val);
-  
+
   /// Used for both Rand() and RandSeed()
   static void RandPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
   static DoubleVal Rand(FunctionContext*);
   static DoubleVal RandSeed(FunctionContext*, const BigIntVal& seed);
+  static void RandClose(FunctionContext*, FunctionContext::FunctionStateScope);
 
   static StringVal Bin(FunctionContext*, const BigIntVal&);
   static StringVal HexInt(FunctionContext*, const BigIntVal&);
