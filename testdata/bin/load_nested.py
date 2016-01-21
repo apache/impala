@@ -276,8 +276,8 @@ if __name__ == "__main__":
   parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
   cli_options.add_logging_options(parser)
   cli_options.add_cluster_options(parser)
-  parser.add_argument("-s", "--source-db")
-  parser.add_argument("-t", "--target-db")
+  parser.add_argument("-s", "--source-db", default="tpch_parquet")
+  parser.add_argument("-t", "--target-db", default="tpch_nested_parquet")
   parser.add_argument("-c", "-p", "--chunks", type=int, default=1)
   args = parser.parse_args()
 

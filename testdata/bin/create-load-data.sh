@@ -340,7 +340,8 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   run-step "Loading TPC-H data" load-tpch.log load-data "tpch" "core"
   # Load tpch nested data.
   # TODO: Hacky and introduces more complexity into the system, but it is expedient.
-  run-step "Loading nested data" load-nested.log ${IMPALA_HOME}/testdata/bin/load_nested.sh
+  run-step "Loading nested data" load-nested.log \
+      ${IMPALA_HOME}/testdata/bin/load_nested.py
   run-step "Loading TPC-DS data" load-tpcds.log load-data "tpcds" "core"
   run-step "Loading auxiliary workloads" load-aux-workloads.log load-aux-workloads
   run-step "Loading dependent tables" copy-and-load-dependent-tables.log \

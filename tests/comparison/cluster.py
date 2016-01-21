@@ -56,7 +56,7 @@ class Cluster(object):
      the same set of methods so any cluster implementation can be chosen at runtime.
   """
 
-  __metaclass__ == ABCMeta
+  __metaclass__ = ABCMeta
 
   def __init__(self):
     self._hadoop_configs = None
