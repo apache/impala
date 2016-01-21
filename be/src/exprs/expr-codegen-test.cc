@@ -239,7 +239,7 @@ TEST_F(ExprCodegenTest, TestInlineConstants) {
 
   // Get TestGetConstant() IR function
   stringstream test_udf_file;
-  test_udf_file << getenv("IMPALA_HOME") << "/be/build/debug/exprs/expr-codegen-test.ll";
+  test_udf_file << getenv("IMPALA_HOME") << "/be/build/latest/exprs/expr-codegen-test.ll";
   scoped_ptr<LlvmCodeGen> codegen;
   status = LlvmCodeGen::LoadFromFile(&pool, test_udf_file.str(), "test", &codegen);
   ASSERT_TRUE(status.ok());
