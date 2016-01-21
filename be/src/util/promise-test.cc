@@ -81,7 +81,7 @@ TEST(PromiseDeathTest, RepeatedSetTest) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   Promise<int64_t> promise;
   promise.Set(100);
-  ASSERT_DEATH(promise.Set(150), "Called Set\\(\\.\\.\\) twice on the same Promise");
+  ASSERT_DEBUG_DEATH(promise.Set(150), "Called Set\\(\\.\\.\\) twice on the same Promise");
 }
 
 }
