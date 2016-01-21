@@ -231,38 +231,40 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
 
 void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
                         FunctionContext::FunctionStateScope scope) {
-  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
-  JniContext* jni_ctx = reinterpret_cast<JniContext*>(
-      fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  if (fn_context_index_ != -1) {
+    FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+    JniContext* jni_ctx = reinterpret_cast<JniContext*>(
+        fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
 
-  if (jni_ctx != NULL) {
-    JNIEnv* env = getJNIEnv();
-    if (jni_ctx->executor != NULL) {
-      env->CallNonvirtualVoidMethodA(
-          jni_ctx->executor, jni_ctx->cl, jni_ctx->close_id, NULL);
-      env->DeleteGlobalRef(jni_ctx->executor);
-      // Clear any exceptions. Not much we can do about them here.
-      Status status = JniUtil::GetJniExceptionMsg(env);
-      if (!status.ok()) VLOG_QUERY << status.GetDetail();
+    if (jni_ctx != NULL) {
+      JNIEnv* env = getJNIEnv();
+      if (jni_ctx->executor != NULL) {
+        env->CallNonvirtualVoidMethodA(
+            jni_ctx->executor, jni_ctx->cl, jni_ctx->close_id, NULL);
+        env->DeleteGlobalRef(jni_ctx->executor);
+        // Clear any exceptions. Not much we can do about them here.
+        Status status = JniUtil::GetJniExceptionMsg(env);
+        if (!status.ok()) VLOG_QUERY << status.GetDetail();
+      }
+      if (jni_ctx->input_values_buffer != NULL) {
+        delete[] jni_ctx->input_values_buffer;
+        jni_ctx->input_values_buffer = NULL;
+      }
+      if (jni_ctx->input_nulls_buffer != NULL) {
+        delete[] jni_ctx->input_nulls_buffer;
+        jni_ctx->input_nulls_buffer = NULL;
+      }
+      if (jni_ctx->output_value_buffer != NULL) {
+        delete[] jni_ctx->output_value_buffer;
+        jni_ctx->output_value_buffer = NULL;
+      }
+      if (jni_ctx->output_anyval != NULL) {
+        delete jni_ctx->output_anyval;
+        jni_ctx->output_anyval = NULL;
+      }
+    } else {
+      DCHECK(!ctx->opened_);
     }
-    if (jni_ctx->input_values_buffer != NULL) {
-      delete[] jni_ctx->input_values_buffer;
-      jni_ctx->input_values_buffer = NULL;
-    }
-    if (jni_ctx->input_nulls_buffer != NULL) {
-      delete[] jni_ctx->input_nulls_buffer;
-      jni_ctx->input_nulls_buffer = NULL;
-    }
-    if (jni_ctx->output_value_buffer != NULL) {
-      delete[] jni_ctx->output_value_buffer;
-      jni_ctx->output_value_buffer = NULL;
-    }
-    if (jni_ctx->output_anyval != NULL) {
-      delete jni_ctx->output_anyval;
-      jni_ctx->output_anyval = NULL;
-    }
-  } else {
-    DCHECK(!ctx->opened_);
   }
 
   Expr::Close(state, ctx, scope);

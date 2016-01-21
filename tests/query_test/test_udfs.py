@@ -6,6 +6,7 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfS3
+from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, IS_S3
 from subprocess import call
 
@@ -79,6 +80,41 @@ class TestUdfs(ImpalaTestSuite):
     #self.client.execute('create database if not exists uda_test')
     self.run_test_case('QueryTest/load-hive-udfs', vector)
     self.run_test_case('QueryTest/hive-udf', vector)
+
+  def test_hive_udfs_missing_jar(self, vector):
+    """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present
+    on HDFS"""
+    # Copy hive-exec.jar to a temporary file
+    jar_path = "tmp/" + get_random_id(5) + ".jar"
+    self.hdfs_client.copy('test-warehouse/hive-exec.jar', jar_path)
+    drop_fn_stmt = "drop function if exists default.pi_missing_jar()"
+    create_fn_stmt = "create function default.pi_missing_jar() returns double \
+        location '/%s' symbol='org.apache.hadoop.hive.ql.udf.UDFPI'" % jar_path
+
+    cluster = ImpalaCluster()
+    impalad = cluster.get_any_impalad()
+    client = impalad.service.create_beeswax_client()
+    # Create and drop functions with sync_ddl to make sure they are reflected
+    # in every impalad.
+    exec_option = vector.get_value('exec_option')
+    exec_option['sync_ddl'] = 1
+
+    self.execute_query_expect_success(client, drop_fn_stmt, exec_option)
+    self.execute_query_expect_success(client, create_fn_stmt, exec_option)
+    # Delete the udf jar
+    self.hdfs_client.delete_file_dir(jar_path)
+
+    different_impalad = cluster.get_different_impalad(impalad)
+    client = different_impalad.service.create_beeswax_client()
+    # Run a query using the udf from an impalad other than the one
+    # we used to create the function. This is to bypass loading from
+    # the cache
+    try:
+      self.execute_query_using_client(client,
+          "select default.pi_missing_jar()", vector)
+      assert False, "Query expected to fail"
+    except ImpalaBeeswaxException, e:
+      assert "Failed to get file info" in str(e)
 
   def test_libs_with_same_filenames(self, vector):
     self.run_test_case('QueryTest/libs_with_same_filenames', vector)
