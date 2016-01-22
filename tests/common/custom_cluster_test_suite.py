@@ -103,7 +103,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
            '--log_dir=%s' % log_dir,
            '--log_level=%s' % log_level]
     try:
-      check_call(cmd + options)
+      check_call(cmd + options, close_fds=True)
     finally:
       # Failure tests expect cluster to be initialised even if start-impala-cluster fails.
       cls.cluster = ImpalaCluster()

@@ -17,7 +17,7 @@
 import logging
 import pytest
 import os
-from subprocess import call
+from subprocess import check_call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import *
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -45,7 +45,10 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
 
   @classmethod
   def teardown_class(cls):
-    call([os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')])
+    # Make sure the metastore is running even if the test aborts somewhere unexpected
+    # before restarting the metastore itself.
+    run_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')
+    check_call([run_cmd], close_fds=True)
     cls.client.execute("invalidate metadata")
     super(TestHiveMetaStoreFailure, cls).teardown_class()
 
@@ -56,7 +59,8 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
     # Force all the tables to be reloaded and then kill the hive metastore.
     tbl_name = "functional.alltypes"
     self.client.execute("invalidate metadata")
-    call([os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/kill-hive-server.sh')])
+    kill_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/kill-hive-server.sh')
+    check_call([kill_cmd], close_fds=True)
 
     try:
       self.client.execute("describe %s" % tbl_name)
@@ -69,7 +73,8 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
       assert "Failed to load metadata for table: %s. Running 'invalidate metadata %s' "\
           "may resolve this problem." % (tbl_name, tbl_name) in str(e)
 
-    call([os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')])
+    run_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')
+    check_call([run_cmd], close_fds=True)
 
     self.client.execute("invalidate metadata %s" % tbl_name)
     self.client.execute("describe %s" % tbl_name)
