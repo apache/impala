@@ -807,19 +807,6 @@ drop table if exists non_existent_db.tbl
 ---- RESULTS
 ====
 ---- QUERY
-# Need to switch databases before dropping
-use default;
-drop database ddl_test_db
----- RESULTS
-====
----- QUERY
-# Should be gone now
-show databases like 'ddl_test_db'
----- RESULTS
----- TYPES
-STRING,STRING
-====
----- QUERY
 # Test DROP DATABASE ... [CASCADE | RESTRICT]
 create database if not exists test_drop_cascade_db
 ====
@@ -940,16 +927,16 @@ show databases like 'test_property_length_db'
 ---- RESULTS
 ====
 ---- QUERY
-drop table if exists i_1687_t;
-drop table if exists i_1687_p;
-create table i_1687_t (a int, b int);
-insert into i_1687_t values (1, 2), (3, 4);
-create table i_1687_p partitioned by (a) as select b, a from i_1687_t;
+drop table if exists ddl_test_db.i_1687_t;
+drop table if exists ddl_test_db.i_1687_p;
+create table ddl_test_db.i_1687_t (a int, b int);
+insert into ddl_test_db.i_1687_t values (1, 2), (3, 4);
+create table ddl_test_db.i_1687_p partitioned by (a) as select b, a from ddl_test_db.i_1687_t;
 ---- RESULTS
 'Inserted 2 row(s)'
 ====
 ---- QUERY
-select * from i_1687_p;
+select * from ddl_test_db.i_1687_p;
 ---- RESULTS
 2,1
 4,3
@@ -958,13 +945,13 @@ INT,INT
 ====
 ---- QUERY
 # IMPALA-2711: Make sure no memory leak from Rand().
-drop table if exists rand_ctas_t;
-create table rand_ctas_t as select rand() from functional.alltypes;
+drop table if exists ddl_test_db.rand_ctas_t;
+create table ddl_test_db.rand_ctas_t as select rand() from functional.alltypes;
 ---- RESULTS
 'Inserted 7300 row(s)'
 ---- ERRORS
 ====
 ---- QUERY
-drop table if exists rand_ctas_t;
+drop table if exists ddl_test_db.rand_ctas_t;
 ---- RESULTS
 ====
