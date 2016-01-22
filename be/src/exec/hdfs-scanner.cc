@@ -220,9 +220,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
 
     for (int n = 0; n < num_tuples; ++n) {
       DCHECK(!row_batch->AtCapacity());
-      row_idx = row_batch->AddRow();
-      DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
-      TupleRow* current_row = row_batch->GetRow(row_idx);
+      TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
       current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
       row_batch->CommitLastRow();
     }

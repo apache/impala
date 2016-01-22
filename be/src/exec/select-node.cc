@@ -95,7 +95,6 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
   for (; child_row_idx_ < child_row_batch_->num_rows(); ++child_row_idx_) {
     // Add a new row to output_batch
     int dst_row_idx = output_batch->AddRow();
-    if (dst_row_idx == RowBatch::INVALID_ROW_INDEX) return true;
     TupleRow* dst_row = output_batch->GetRow(dst_row_idx);
     TupleRow* src_row = child_row_batch_->GetRow(child_row_idx_);
 
@@ -104,7 +103,7 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
       output_batch->CommitLastRow();
       ++num_rows_returned_;
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-      if (ReachedLimit()) return true;
+      if (ReachedLimit() || output_batch->AtCapacity()) return true;
     }
   }
   return output_batch->AtCapacity();

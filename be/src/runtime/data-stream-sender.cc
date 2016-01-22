@@ -225,16 +225,12 @@ void DataStreamSender::Channel::WaitForRpc() {
 }
 
 Status DataStreamSender::Channel::AddRow(TupleRow* row) {
-  int row_num = batch_->AddRow();
-  if (row_num == RowBatch::INVALID_ROW_INDEX) {
+  if (batch_->AtCapacity()) {
     // batch_ is full, let's send it; but first wait for an ongoing
     // transmission to finish before modifying thrift_batch_
     RETURN_IF_ERROR(SendCurrentBatch());
-    row_num = batch_->AddRow();
-    DCHECK_NE(row_num, RowBatch::INVALID_ROW_INDEX);
   }
-
-  TupleRow* dest = batch_->GetRow(row_num);
+  TupleRow* dest = batch_->GetRow(batch_->AddRow());
   batch_->CopyRow(row, dest);
   const vector<TupleDescriptor*>& descs = row_desc_.tuple_descriptors();
   for (int i = 0; i < descs.size(); ++i) {

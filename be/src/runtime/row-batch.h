@@ -90,16 +90,14 @@ class RowBatch {
   ///  - buffer handles from the io mgr
   ~RowBatch();
 
-  static const int INVALID_ROW_INDEX = -1;
-
-  /// Add n rows of tuple pointers after the last committed row and return its index.
-  /// The rows are uninitialized and each tuple of the row must be set.
-  /// Returns INVALID_ROW_INDEX if the row batch cannot fit n rows.
-  /// Two consecutive AddRow() calls without a CommitLastRow() between them
-  /// have the same effect as a single call.
+  /// AddRows() is called before adding rows to the batch. Returns the index of the next
+  /// row to be added. The caller is responsible for ensuring there is enough remaining
+  /// capacity: it is invalid to call AddRows when num_rows_ + n > capacity_. The rows
+  /// are uninitialized and each tuple of the row must be set, after which CommitRows()
+  /// can be called to update num_rows_. Two consecutive AddRow() calls without a
+  /// CommitRows() call between them have the same effect as a single call.
   int AddRows(int n) {
-    if (num_rows_ + n > capacity_) return INVALID_ROW_INDEX;
-    has_in_flight_row_ = true;
+    DCHECK_LE(num_rows_ + n, capacity_);
     return num_rows_;
   }
 
@@ -109,7 +107,6 @@ class RowBatch {
     DCHECK_GE(n, 0);
     DCHECK_LE(num_rows_ + n, capacity_);
     num_rows_ += n;
-    has_in_flight_row_ = false;
   }
 
   void CommitLastRow() { CommitRows(1); }
@@ -138,7 +135,7 @@ class RowBatch {
   TupleRow* GetRow(int row_idx) {
     DCHECK(tuple_ptrs_ != NULL);
     DCHECK_GE(row_idx, 0);
-    DCHECK_LT(row_idx, num_rows_ + (has_in_flight_row_ ? 1 : 0));
+    DCHECK_LT(row_idx, capacity_);
     return reinterpret_cast<TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);
   }
 
@@ -273,8 +270,6 @@ class RowBatch {
 
   int num_rows_;  // # of committed rows
   int capacity_; // the value of num_rows_ at which batch is considered full.
-
-  bool has_in_flight_row_;  // if true, last row hasn't been committed yet
 
   /// If true, this batch references unowned memory that will be cleaned up soon.
   /// See MarkNeedToReturn().

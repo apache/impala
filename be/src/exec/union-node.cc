@@ -227,7 +227,6 @@ Status UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs,
 
     // Add a new row to the batch.
     int row_idx = row_batch->AddRow();
-    DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, *tuple);
 

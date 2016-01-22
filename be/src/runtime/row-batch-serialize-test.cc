@@ -191,9 +191,7 @@ class RowBatchSerializeTest : public testing::Test {
     memset(tuple_mem, 0, len);
 
     for (int i = 0; i < NUM_ROWS; ++i) {
-      int idx = batch->AddRow();
-      EXPECT_TRUE(idx != RowBatch::INVALID_ROW_INDEX);
-      TupleRow* row = batch->GetRow(idx);
+      TupleRow* row = batch->GetRow(batch->AddRow());
 
       for (int tuple_idx = 0; tuple_idx < row_desc.tuple_descriptors().size(); ++tuple_idx) {
         TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];

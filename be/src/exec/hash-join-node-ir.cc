@@ -43,7 +43,6 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   DCHECK(!match_all_build_);
 
   int row_idx = out_batch->AddRows(max_added_rows);
-  DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
   uint8_t* out_row_mem = reinterpret_cast<uint8_t*>(out_batch->GetRow(row_idx));
   TupleRow* out_row = reinterpret_cast<TupleRow*>(out_row_mem);
 

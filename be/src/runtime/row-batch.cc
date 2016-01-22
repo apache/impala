@@ -38,7 +38,6 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     MemTracker* mem_tracker)
   : num_rows_(0),
     capacity_(capacity),
-    has_in_flight_row_(false),
     need_to_return_(false),
     num_tuples_per_row_(row_desc.tuple_descriptors().size()),
     auxiliary_mem_usage_(0),
@@ -69,7 +68,6 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     MemTracker* mem_tracker)
   : num_rows_(input_batch.num_rows),
     capacity_(input_batch.num_rows),
-    has_in_flight_row_(false),
     need_to_return_(false),
     num_tuples_per_row_(input_batch.row_tuples.size()),
     auxiliary_mem_usage_(0),
@@ -309,7 +307,6 @@ void RowBatch::AddBlock(BufferedBlockMgr::Block* block) {
 void RowBatch::Reset() {
   num_rows_ = 0;
   capacity_ = tuple_ptrs_size_ / (num_tuples_per_row_ * sizeof(Tuple*));
-  has_in_flight_row_ = false;
   // TODO: Change this to Clear() and investigate the repercussions.
   tuple_data_pool_.FreeAll();
   for (int i = 0; i < io_buffers_.size(); ++i) {
@@ -371,12 +368,10 @@ void RowBatch::AcquireState(RowBatch* src) {
   DCHECK_EQ(tuple_ptrs_size_, src->tuple_ptrs_size_);
 
   // The destination row batch should be empty.
-  DCHECK(!has_in_flight_row_);
   DCHECK(!need_to_return_);
   DCHECK_EQ(num_rows_, 0);
   DCHECK_EQ(auxiliary_mem_usage_, 0);
 
-  has_in_flight_row_ = src->has_in_flight_row_;
   num_rows_ = src->num_rows_;
   capacity_ = src->capacity_;
   if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
