@@ -69,11 +69,11 @@ dropdb -U hiveuser hive_impala 2> /dev/null || true
 createdb -U hiveuser hive_impala
 
 # Copy the contents of the SNAPSHOT_FILE
-psql -U hiveuser hive_impala < ${TMP_SNAPSHOT_FILE} > /dev/null 2>&1
+psql -q -U hiveuser hive_impala < ${TMP_SNAPSHOT_FILE}
 # Two tables (tpch.nation and functional.alltypestiny) have cache_directive_id set in
 # their metadata. These directives are now stale, and will cause any query that attempts
 # to cache the data in the tables to fail.
-psql -U hiveuser -d hive_impala -c \
-  "delete from \"TABLE_PARAMS\" where \"PARAM_KEY\"='cache_directive_id'" > /dev/null
-psql -U hiveuser -d hive_impala -c \
-  "delete from \"PARTITION_PARAMS\" where \"PARAM_KEY\"='cache_directive_id'" > /dev/null
+psql -q -U hiveuser -d hive_impala -c \
+  "delete from \"TABLE_PARAMS\" where \"PARAM_KEY\"='cache_directive_id'"
+psql -q -U hiveuser -d hive_impala -c \
+  "delete from \"PARTITION_PARAMS\" where \"PARAM_KEY\"='cache_directive_id'"
