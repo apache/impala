@@ -90,8 +90,8 @@ public class AuthorizationTest {
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
   //   INSERT permissions on all tables in 'functional_parquet' database
   //   No permissions on database 'functional_rc'
-  private final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
-  private final static User USER = new User(System.getProperty("user.name"));
+  public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
+  public final static User USER = new User(System.getProperty("user.name"));
 
   // Tables in functional that the current user and 'test_user' have table- or
   // column-level SELECT or INSERT permission. I.e. that should be returned by
@@ -100,42 +100,89 @@ public class AuthorizationTest {
       "allcomplextypes", "alltypes", "alltypesagg", "alltypessmall", "alltypestiny",
       "complex_view", "view_view");
 
-  // The admin_user has ALL privileges on the server.
-  private final static User ADMIN_USER = new User("admin_user");
+  /**
+   * Test context whose instances are used to parameterize this test.
+   */
+  private static class TestContext {
+    public final AuthorizationConfig authzConfig;
+    public final ImpaladTestCatalog catalog;
+    public TestContext(AuthorizationConfig authzConfig, ImpaladTestCatalog catalog) {
+      this.authzConfig = authzConfig;
+      this.catalog = catalog;
+    }
+  }
 
-  private final AuthorizationConfig authzConfig_;
-  private final ImpaladCatalog catalog_;
+  private final TestContext ctx_;
   private final TQueryCtx queryCtx_;
   private final AnalysisContext analysisContext_;
   private final Frontend fe_;
-  protected static final String SERVER_HOST = "localhost";
-  private static boolean isSetup_ = false;
 
-  // Parameterize the test suite to run all tests using a file based
-  // authorization policy policy using metadata pulled from the Sentry Policy
-  // service.
+  // Parameterize the test suite to run all tests using:
+  // - a file based authorization policy
+  // - a sentry service based authorization policy
+  // These test contexts are statically initialized.
+  private static final List<TestContext> testCtxs_;
+
   @Parameters
-  public static Collection testVectors() {
-    return Arrays.asList(new Object[][] {{null}, {AUTHZ_POLICY_FILE}});
-  }
+  public static Collection testVectors() { return testCtxs_; }
 
-  public AuthorizationTest(String policyFile) throws Exception {
-    authzConfig_ = AuthorizationConfig.createHadoopGroupAuthConfig("server1", policyFile,
-        System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-    authzConfig_.validateConfig();
-    if (!isSetup_ && policyFile == null) {
-      setup();
-      isSetup_ = true;
+  /**
+   * Create test contexts used for parameterizing this test. We create these statically
+   * so that we do not have to re-create and initialize the auth policy and the catalog
+   * for every test. Reloading the policy and the table metadata is very expensive
+   * relative to the work done in the tests.
+   */
+  static {
+    testCtxs_ = Lists.newArrayList();
+    // Create and init file based auth config.
+    AuthorizationConfig filePolicyAuthzConfig = createPolicyFileAuthzConfig();
+    filePolicyAuthzConfig.validateConfig();
+    ImpaladTestCatalog filePolicyCatalog = new ImpaladTestCatalog(filePolicyAuthzConfig);
+    testCtxs_.add(new TestContext(filePolicyAuthzConfig, filePolicyCatalog));
+
+    // Create and init sentry service based auth config.
+    AuthorizationConfig sentryServiceAuthzConfig;
+    try {
+      sentryServiceAuthzConfig = createSentryServiceAuthzConfig();
+    } catch (ImpalaException e) {
+      // Convert the checked exception into an unchecked one because we have
+      // no control of the initialization process, so there is no good place to
+      // handle a checked exception thrown from a static block.
+      throw new RuntimeException(e);
     }
-    catalog_ = new ImpaladTestCatalog(authzConfig_);
-    queryCtx_ = TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
-    analysisContext_ = new AnalysisContext(catalog_, queryCtx_, authzConfig_);
-    fe_ = new Frontend(authzConfig_, catalog_);
+    ImpaladTestCatalog sentryServiceCatalog =
+        new ImpaladTestCatalog(sentryServiceAuthzConfig);
+    testCtxs_.add(new TestContext(sentryServiceAuthzConfig, sentryServiceCatalog));
   }
 
-  private void setup() throws Exception {
+  public AuthorizationTest(TestContext ctx) throws Exception {
+    ctx_ = ctx;
+    queryCtx_ = TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
+    analysisContext_ = new AnalysisContext(ctx_.catalog, queryCtx_, ctx_.authzConfig);
+    fe_ = new Frontend(ctx_.authzConfig, ctx_.catalog);
+  }
+
+  public static AuthorizationConfig createPolicyFileAuthzConfig() {
+    AuthorizationConfig result =
+        AuthorizationConfig.createHadoopGroupAuthConfig("server1", AUTHZ_POLICY_FILE,
+        System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
+    result.validateConfig();
+    return result;
+  }
+
+  public static AuthorizationConfig createSentryServiceAuthzConfig()
+      throws ImpalaException {
+    AuthorizationConfig result =
+        AuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
+        System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
+    setupSentryService(result);
+    return result;
+  }
+
+  private static void setupSentryService(AuthorizationConfig authzConfig)
+      throws ImpalaException {
     SentryPolicyService sentryService = new SentryPolicyService(
-        authzConfig_.getSentryConfig());
+        authzConfig.getSentryConfig());
     // Server admin. Don't grant to any groups, that is done within
     // the test cases.
     String roleName = "admin";
@@ -328,7 +375,7 @@ public class AuthorizationTest {
   @Test
   public void TestSentryService() throws ImpalaException {
     SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig());
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
     String roleName = "testRoleName";
     roleName = roleName.toLowerCase();
 
@@ -368,7 +415,7 @@ public class AuthorizationTest {
     // Failure to cleanup TPCH can cause:
     // TestDropDatabase(com.cloudera.impala.analysis.AuthorizationTest):
     // Cannot drop non-empty database: tpch
-    if (catalog_.getDb("tpch").numFunctions() != 0) {
+    if (ctx_.catalog.getDb("tpch").numFunctions() != 0) {
       fail("Failed to clean up functions in tpch.");
     }
   }
@@ -743,16 +790,16 @@ public class AuthorizationTest {
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.
-    if (authzConfig_.isFileBasedPolicy()) return;
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
     SentryPolicyService sentryService = createSentryService();
 
     try {
       sentryService.grantRoleToGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) catalog_).reset();
+      ((ImpaladTestCatalog) ctx_.catalog).reset();
       AuthzOk("invalidate metadata");
     } finally {
       sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) catalog_).reset();
+      ((ImpaladTestCatalog) ctx_.catalog).reset();
     }
   }
 
@@ -928,13 +975,13 @@ public class AuthorizationTest {
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.
-    if (authzConfig_.isFileBasedPolicy()) return;
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
 
     SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig());
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
     try {
       sentryService.grantRoleToGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) catalog_).reset();
+      ctx_.catalog.reset();
 
       // User has permissions to create database.
       AuthzOk("create database newdb");
@@ -947,7 +994,7 @@ public class AuthorizationTest {
           "'hdfs://localhost:20500/test-warehouse/new_table'");
     } finally {
       sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) catalog_).reset();
+      ctx_.catalog.reset();
     }
   }
 
@@ -1614,9 +1661,9 @@ public class AuthorizationTest {
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
-      AnalysisContext context = new AnalysisContext(catalog_,
+      AnalysisContext context = new AnalysisContext(ctx_.catalog,
           TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()),
-          authzConfig_);
+          ctx_.authzConfig);
 
       // Can select from table that user has privileges on.
       AuthzOk(context, "select * from functional.alltypesagg");
@@ -1636,9 +1683,9 @@ public class AuthorizationTest {
   public void TestFunction() throws ImpalaException {
     // First try with the less privileged user.
     User currentUser = USER;
-    AnalysisContext context = new AnalysisContext(catalog_,
+    AnalysisContext context = new AnalysisContext(ctx_.catalog,
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, currentUser.getName()),
-        authzConfig_);
+        ctx_.authzConfig);
     AuthzError(context, "show functions",
         "User '%s' does not have privileges to access: default", currentUser);
     AuthzOk(context, "show functions in tpch");
@@ -1663,14 +1710,14 @@ public class AuthorizationTest {
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.
-    if (authzConfig_.isFileBasedPolicy()) return;
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
 
     // Admin should be able to do everything
     SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig());
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
     try {
       sentryService.grantRoleToGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) catalog_).reset();
+      ctx_.catalog.reset();
 
       AuthzOk("show functions");
       AuthzOk("show functions in tpch");
@@ -1689,17 +1736,17 @@ public class AuthorizationTest {
           "Cannot modify system database.");
 
       // Add default.f(), tpch.f()
-      catalog_.addFunction(ScalarFunction.createForTesting("default", "f",
+      ctx_.catalog.addFunction(ScalarFunction.createForTesting("default", "f",
           new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
           null, TFunctionBinaryType.NATIVE));
-      catalog_.addFunction(ScalarFunction.createForTesting("tpch", "f",
+      ctx_.catalog.addFunction(ScalarFunction.createForTesting("tpch", "f",
           new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
           null, TFunctionBinaryType.NATIVE));
 
       AuthzOk("drop function tpch.f()");
     } finally {
       sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) catalog_).reset();
+      ctx_.catalog.reset();
 
       AuthzError(context, "create function tpch.f() returns int location " +
           "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
@@ -1710,10 +1757,10 @@ public class AuthorizationTest {
 
       //Other tests don't expect tpch to contain functions
       //Specifically, if these functions are not cleaned up, TestDropDatabase() will fail
-      catalog_.removeFunction(ScalarFunction.createForTesting("default", "f",
+      ctx_.catalog.removeFunction(ScalarFunction.createForTesting("default", "f",
           new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
           null, TFunctionBinaryType.NATIVE));
-      catalog_.removeFunction(ScalarFunction.createForTesting("tpch", "f",
+      ctx_.catalog.removeFunction(ScalarFunction.createForTesting("tpch", "f",
           new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
           null, TFunctionBinaryType.NATIVE));
     }
@@ -1721,7 +1768,7 @@ public class AuthorizationTest {
 
   @Test
   public void TestServerNameAuthorized() throws AnalysisException {
-    if (authzConfig_.isFileBasedPolicy()) {
+    if (ctx_.authzConfig.isFileBasedPolicy()) {
       // Authorization config that has a different server name from policy file.
       TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig(
           "differentServerName", AUTHZ_POLICY_FILE, ""),
@@ -1732,7 +1779,7 @@ public class AuthorizationTest {
   @Test
   public void TestNoPermissionsWhenPolicyFileDoesNotExist() throws AnalysisException {
     // Test doesn't make sense except for file based policies.
-    if (!authzConfig_.isFileBasedPolicy()) return;
+    if (!ctx_.authzConfig.isFileBasedPolicy()) return;
 
     // Validate a non-existent policy file.
     // Use a HadoopGroupProvider in this case so the user -> group mappings can still be
@@ -1744,7 +1791,7 @@ public class AuthorizationTest {
 
   @Test
   public void TestConfigValidation() throws InternalException {
-    String sentryConfig = authzConfig_.getSentryConfig().getConfigFile();
+    String sentryConfig = ctx_.authzConfig.getSentryConfig().getConfigFile();
     // Valid configs pass validation.
     AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
         "server1", AUTHZ_POLICY_FILE, sentryConfig);
@@ -1845,7 +1892,7 @@ public class AuthorizationTest {
   @Test
   public void TestLocalGroupPolicyProvider() throws AnalysisException,
       AuthorizationException {
-    if (!authzConfig_.isFileBasedPolicy()) return;
+    if (!ctx_.authzConfig.isFileBasedPolicy()) return;
     // Use an authorization configuration that uses the
     // LocalGroupResourceAuthorizationProvider.
     AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
@@ -1880,7 +1927,7 @@ public class AuthorizationTest {
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws AnalysisException {
-    Frontend fe = new Frontend(authzConfig, catalog_);
+    Frontend fe = new Frontend(authzConfig, ctx_.catalog);
     AnalysisContext ac = new AnalysisContext(new ImpaladTestCatalog(),
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()), authzConfig);
     AuthzError(fe, ac, "select * from functional.alltypesagg",
@@ -1953,6 +2000,6 @@ public class AuthorizationTest {
   }
 
   private SentryPolicyService createSentryService() {
-    return new SentryPolicyService(authzConfig_.getSentryConfig());
+    return new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
   }
 }

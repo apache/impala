@@ -1181,21 +1181,9 @@ public class Analyzer {
     return null;
   }
 
-  public DescriptorTable getDescTbl() {
-    return globalState_.descTbl;
-  }
-
-  public ImpaladCatalog getCatalog() throws AnalysisException {
-    if (!globalState_.catalog.isReady()) {
-      throw new AnalysisException("This Impala daemon is not ready to accept user " +
-          "requests. Status: Waiting for catalog update from the StateStore.");
-    }
-    return globalState_.catalog;
-  }
-
-  public Set<String> getAliases() {
-    return aliasMap_.keySet();
-  }
+  public DescriptorTable getDescTbl() { return globalState_.descTbl; }
+  public ImpaladCatalog getCatalog() { return globalState_.catalog; }
+  public Set<String> getAliases() { return aliasMap_.keySet(); }
 
   /**
    * Returns list of candidate equi-join conjuncts to be evaluated by the join node

@@ -49,7 +49,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     }
     authPolicy_ = ((CatalogServiceTestCatalog) catalogServerCatalog).getAuthPolicy();
     srcCatalog_ = catalogServerCatalog;
-    setIsReady();
+    setIsReady(true);
   }
 
   @Override

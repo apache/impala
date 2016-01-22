@@ -9,6 +9,7 @@ import static org.junit.Assert.fail;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hive.service.cli.thrift.TGetCatalogsReq;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
@@ -17,7 +18,9 @@ import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.AuthorizationTest;
 import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
@@ -28,6 +31,7 @@ import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -44,22 +48,66 @@ public class FrontendTest {
       AuthorizationConfig.createAuthDisabledConfig(), new ImpaladTestCatalog());
 
   @Test
-  public void TestCatalogNotReady() throws ImpalaException {
-    Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig());
-    TQueryCtx queryCtx = TestUtils.createQueryContext("default", "fake_user");
+  public void TestCatalogReadiness() throws ImpalaException {
+    // Test different authorization configurations.
+    List<AuthorizationConfig> authzConfigs = Lists.newArrayList();
+    authzConfigs.add(AuthorizationConfig.createAuthDisabledConfig());
+    authzConfigs.add(AuthorizationTest.createPolicyFileAuthzConfig());
+    authzConfigs.add(AuthorizationTest.createSentryServiceAuthzConfig());
+    // Test the behavior with different stmt types.
+    List<String> testStmts = Lists.newArrayList();
+    testStmts.add("select * from functional.alltypesagg");
+    testStmts.add("select 1");
+    testStmts.add("show tables in tpch");
+    testStmts.add("create table tpch.ready_test (i int)");
+    testStmts.add("insert into functional.alltypes partition (year, month) " +
+        "select * from functional.alltypestiny");
+    for (AuthorizationConfig authzConfig: authzConfigs) {
+      ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzConfig);
+      Frontend fe = new Frontend(authzConfig, catalog);
 
-    // Queries that do not touch catalog objects should succeed.
-    queryCtx.request.setStmt("select 1");
-    fe.createExecRequest(queryCtx, new StringBuilder());
+      // When the catalog is ready, all stmts should pass analysis.
+      Preconditions.checkState(catalog.isReady());
+      for (String stmt: testStmts) testCatalogIsReady(stmt, fe);
 
-    // A query that touches a catalog object should fail.
-    queryCtx.request.setStmt("show tables");
+      // When the catalog is not ready, all stmts should fail analysis.
+      catalog.setIsReady(false);
+      for (String stmt: testStmts) testCatalogIsNotReady(stmt, fe);
+    }
+  }
+
+  /**
+   * Creates an exec request from 'stmt' using the given 'fe'.
+   * Expects that no exception is thrown.
+   */
+  private void testCatalogIsReady(String stmt, Frontend fe) {
+    System.out.println(stmt);
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        Catalog.DEFAULT_DB, AuthorizationTest.USER.getName());
+    queryCtx.request.setStmt(stmt);
+    try {
+      fe.createExecRequest(queryCtx, new StringBuilder());
+    } catch (Exception e) {
+      fail("Failed to create exec request due to: " + ExceptionUtils.getStackTrace(e));
+    }
+  }
+
+  /**
+   * Creates an exec request from 'stmt' using the given 'fe'.
+   * Expects that the stmt fails to analyze because the catalog is not ready.
+   */
+  private void testCatalogIsNotReady(String stmt, Frontend fe) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        Catalog.DEFAULT_DB, AuthorizationTest.USER.getName());
+    queryCtx.request.setStmt(stmt);
     try {
       fe.createExecRequest(queryCtx, new StringBuilder());
       fail("Expected failure to due uninitialized catalog.");
     } catch (AnalysisException e) {
       assertEquals("This Impala daemon is not ready to accept user requests. " +
           "Status: Waiting for catalog update from the StateStore.", e.getMessage());
+    } catch (Exception e) {
+      fail("Failed to create exec request due to: " + ExceptionUtils.getStackTrace(e));
     }
   }
 

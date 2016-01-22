@@ -854,6 +854,11 @@ public class Frontend {
    */
   private AnalysisContext.AnalysisResult analyzeStmt(TQueryCtx queryCtx)
       throws AnalysisException, InternalException, AuthorizationException {
+    if (!impaladCatalog_.isReady()) {
+      throw new AnalysisException("This Impala daemon is not ready to accept user " +
+          "requests. Status: Waiting for catalog update from the StateStore.");
+    }
+
     AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx,
         authzConfig_);
     LOG.debug("analyze query " + queryCtx.request.stmt);

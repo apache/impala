@@ -443,6 +443,6 @@ public class ImpaladCatalog extends Catalog {
   public boolean isReady() { return isReady_.get(); }
 
   // Only used for testing.
-  public void setIsReady() { isReady_.set(true); }
+  public void setIsReady(boolean isReady) { isReady_.set(isReady); }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
 }
