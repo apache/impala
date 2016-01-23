@@ -84,7 +84,9 @@ BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5"
 RM_ARGS = ("-enable_rm=true -llama_addresses=%s -cgroup_hierarchy_path=%s "
            "-fair_scheduler_allocation_path=%s")
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
-KILL_TIMEOUT_IN_SECONDS = 10
+# Kills have a timeout to prevent automated scripts from hanging indefinitely.
+# It is set to a high value to avoid failing if processes are slow to shut down.
+KILL_TIMEOUT_IN_SECONDS = 120
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching
