@@ -50,7 +50,14 @@ Status FileSystemUtil::CreateDirectory(const string& directory) {
     // empty directory that we will have permissions for. There is an open window between
     // the check for existence above and the removal here. If the directory is removed in
     // this window, we may get "no_such_file_or_directory" error which is fine.
-    filesystem::remove_all(directory, errcode);
+    //
+    // There is a bug in boost library (as of version 1.6) which may lead to unexpected
+    // exceptions even though we are using the no-exceptions interface. See IMPALA-2846.
+    try {
+      filesystem::remove_all(directory, errcode);
+    } catch (filesystem::filesystem_error& e) {
+      errcode = e.code();
+    }
     if (errcode != errc::success &&
         errcode != errc::no_such_file_or_directory) {
       return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute("Encountered error "
@@ -68,7 +75,13 @@ Status FileSystemUtil::CreateDirectory(const string& directory) {
 Status FileSystemUtil::RemovePaths(const vector<string>& directories) {
   for (int i = 0; i < directories.size(); ++i) {
     error_code errcode;
-    filesystem::remove_all(directories[i], errcode);
+    // There is a bug in boost library (as of version 1.6) which may lead to unexpected
+    // exceptions even though we are using the no-exceptions interface. See IMPALA-2846.
+    try {
+      filesystem::remove_all(directories[i], errcode);
+    } catch (filesystem::filesystem_error& e) {
+      errcode = e.code();
+    }
     if (errcode != errc::success) {
       return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
           "Encountered error removing directory $0: $1", directories[i],
