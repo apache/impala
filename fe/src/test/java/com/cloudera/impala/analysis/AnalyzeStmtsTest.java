@@ -2766,7 +2766,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",
           "/test-warehouse/", overwrite),
           "INPATH location 'hdfs://localhost:20500/test-warehouse' cannot " +
-          "contain subdirectories.");
+          "contain non-hidden subdirectories.");
 
       // Source directory cannot be empty.
       AnalysisError(String.format("load data inpath '%s' %s into table tpch.lineitem",

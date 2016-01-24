@@ -52,8 +52,11 @@ class TestLoadData(ImpalaTestSuite):
     #   - Sub Directories 1-4 have single files copied from alltypes/
     #   - Sub Directories 5-6 have multiple files (4) copied from alltypesaggmultifiles
     #   - Sub Directory 3 also has hidden files, in both supported formats.
+    #   - All sub-dirs contain a hidden directory
     for i in xrange(1, 6):
-      self.hdfs_client.make_dir('{0}/{1}'.format(STAGING_PATH, i), permission=777)
+      stagingDir = '{0}/{1}'.format(STAGING_PATH, i)
+      self.hdfs_client.make_dir(stagingDir, permission=777)
+      self.hdfs_client.make_dir('{0}/_hidden_dir'.format(stagingDir), permission=777)
 
     # Copy single file partitions from alltypes.
     for i in xrange(1, 4):

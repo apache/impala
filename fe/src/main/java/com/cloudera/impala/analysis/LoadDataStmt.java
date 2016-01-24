@@ -151,9 +151,9 @@ public class LoadDataStmt extends StatementBase {
           throw new AnalysisException(String.format(
               "INPATH location '%s' contains no visible files.", sourceDataPath_));
         }
-        if (FileSystemUtil.containsSubdirectory(source)) {
+        if (FileSystemUtil.containsVisibleSubdirectory(source)) {
           throw new AnalysisException(String.format(
-              "INPATH location '%s' cannot contain subdirectories.", sourceDataPath_));
+              "INPATH location '%s' cannot contain non-hidden subdirectories.", sourceDataPath_));
         }
         if (!checker.getPermissions(fs, source).checkPermissions(
             FsAction.READ_WRITE)) {

@@ -210,14 +210,15 @@ public class FileSystemUtil {
   }
 
   /**
-   * Returns true if the given Path contains any sub directories, otherwise false.
+   * Returns true if the given Path contains any visible sub directories, otherwise false.
    */
-  public static boolean containsSubdirectory(Path directory)
+  public static boolean containsVisibleSubdirectory(Path directory)
       throws FileNotFoundException, IOException {
     FileSystem fs = directory.getFileSystem(CONF);
     // Enumerate all the files in the source
     for (FileStatus fStatus: fs.listStatus(directory)) {
-      if (fStatus.isDirectory()) {
+      String pathName = fStatus.getPath().getName();
+      if (fStatus.isDirectory() && !isHiddenFile(pathName)) {
         return true;
       }
     }
