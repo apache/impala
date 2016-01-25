@@ -52,6 +52,8 @@ if __name__ == "__main__":
                     help="Impala daemon <host:port> to connect to.")
   parser.add_option("--use_kerberos", action="store_true", default=False,
                     help="Compute stats on a kerberized cluster.")
+  parser.add_option("--use_ssl", action="store_true", default=False,
+                    help="Compute stats on a cluster with SSL enabled.")
   parser.add_option("--db_names", dest="db_names", default=None,
                     help="Comma-separated list of database names for which to compute "\
                     "stats. Can be used in conjunction with the --table_names flag. "\
@@ -70,7 +72,8 @@ if __name__ == "__main__":
   if options.db_names is not None:
     db_names = [name.lower().strip() for name in options.db_names.split(',')]
 
-  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
+  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos,
+      use_ssl=options.use_ssl)
   impala_client.connect()
   try:
     compute_stats(impala_client, db_names=db_names,
