@@ -27,7 +27,7 @@ inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) {
   if (LIKELY(DeepCopy(row))) return true;
   bool got_block;
   int64_t row_size = ComputeRowSize(row);
-  *status = NewBlockForWrite(row_size, &got_block);
+  *status = NewWriteBlockForRow(row_size, &got_block);
   if (!status->ok() || !got_block) return false;
   return DeepCopy(row);
 }
@@ -39,7 +39,7 @@ inline uint8_t* BufferedTupleStream::AllocateRow(int fixed_size, int varlen_size
   const int total_size = fixed_size + varlen_size;
   if (UNLIKELY(write_block_ == NULL || write_block_bytes_remaining() < total_size)) {
     bool got_block;
-    *status = NewBlockForWrite(total_size, &got_block);
+    *status = NewWriteBlockForRow(total_size, &got_block);
     if (!status->ok() || !got_block) return NULL;
   }
   DCHECK(write_block_ != NULL);

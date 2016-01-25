@@ -43,6 +43,7 @@
 using base::FreeDeleter;
 
 static const int BATCH_SIZE = 250;
+static const int IO_BLOCK_SIZE = 8 * 1024 * 1024;
 static const uint32_t PRIME = 479001599;
 
 namespace impala {
@@ -114,93 +115,108 @@ class SimpleTupleStreamTest : public testing::Test {
     return ((GenIntValue(i) >> 8) & 0x1) != 0;
   }
 
-  virtual RowBatch* CreateIntBatch(int offset, int num_rows, bool gen_null) {
-    RowBatch* batch = pool_.Add(new RowBatch(*int_desc_, num_rows, &tracker_));
-    const int int_tuples = int_desc_->tuple_descriptors().size();
-    int tuple_size = int_desc_->tuple_descriptors()[0]->byte_size();
-    int total_tuple_mem = tuple_size * num_rows * int_tuples;
-    uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(
-        batch->tuple_data_pool()->Allocate(total_tuple_mem));
-    memset(tuple_mem, 0, total_tuple_mem);
+  /// Count the total number of slots per row based on the given row descriptor.
+  int CountSlotsPerRow(const RowDescriptor& row_desc) {
+    int slots_per_row = 0;
+    for (int i = 0; i < row_desc.tuple_descriptors().size(); ++i) {
+      TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[i];
+      slots_per_row += tuple_desc->slots().size();
+    }
+    return slots_per_row;
+  }
 
-    for (int i = 0; i < num_rows; ++i) {
-      int row_idx = batch->AddRow();
+  /// Allocate a row batch with 'num_rows' of rows with layout described by 'row_desc'.
+  /// 'offset' is used to account for rows occupied by any previous row batches. This is
+  /// needed to match the values generated in VerifyResults(). If 'gen_null' is true,
+  /// some tuples will be set to NULL.
+  virtual RowBatch* CreateBatch(const RowDescriptor& row_desc, int offset,
+      int num_rows, bool gen_null) {
+    RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, &tracker_));
+    int num_tuples = row_desc.tuple_descriptors().size();
+
+    int idx = offset * CountSlotsPerRow(row_desc);
+    for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
       TupleRow* row = batch->GetRow(row_idx);
-      for (int j = 0; j < int_tuples; ++j) {
-        int idx = (i + offset) * int_tuples + j;
-        Tuple* int_tuple = reinterpret_cast<Tuple*>(tuple_mem +
-            (i * int_tuples + j) * tuple_size);
-        *reinterpret_cast<int*>(int_tuple + 1) = GenIntValue(idx);
-        if (!gen_null || GenBoolValue(idx)) {
-          row->SetTuple(j, int_tuple);
+      for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
+        TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
+        Tuple* tuple = Tuple::Create(tuple_desc->byte_size(), batch->tuple_data_pool());
+        // Skip over the null indicators at the beginning of the tuple.
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(tuple) + tuple_desc->num_null_bytes();
+        bool is_null = gen_null && !GenBoolValue(idx);
+        for (int slot_idx = 0; slot_idx < tuple_desc->slots().size(); ++slot_idx, ++idx) {
+          SlotDescriptor* slot_desc = tuple_desc->slots()[slot_idx];
+          switch (slot_desc->type().type) {
+            case TYPE_INT:
+              *reinterpret_cast<int*>(ptr) = GenIntValue(idx);
+              break;
+            case TYPE_STRING:
+              *reinterpret_cast<StringValue*>(ptr) = STRINGS[idx % NUM_STRINGS];
+              break;
+            default:
+              // The memory has been zero'ed out already by Tuple::Create().
+              break;
+          }
+          ptr += slot_desc->slot_size();
+        }
+        if (is_null) {
+          row->SetTuple(tuple_idx, NULL);
         } else {
-          row->SetTuple(j, NULL);
+          row->SetTuple(tuple_idx, tuple);
         }
       }
       batch->CommitLastRow();
     }
     return batch;
+  }
+
+  virtual RowBatch* CreateIntBatch(int offset, int num_rows, bool gen_null) {
+    return CreateBatch(*int_desc_, offset, num_rows, gen_null);
   }
 
   virtual RowBatch* CreateStringBatch(int offset, int num_rows, bool gen_null) {
-    int tuple_size = sizeof(StringValue) + 1;
-    RowBatch* batch = pool_.Add(new RowBatch(*string_desc_, num_rows, &tracker_));
-    const int string_tuples = string_desc_->tuple_descriptors().size();
-    int total_tuple_mem = tuple_size * num_rows * string_tuples;
-    uint8_t* tuple_mem = batch->tuple_data_pool()->Allocate(total_tuple_mem);
-    memset(tuple_mem, 0, total_tuple_mem);
-    for (int i = 0; i < num_rows; ++i) {
-      TupleRow* row = batch->GetRow(batch->AddRow());
-      for (int j = 0; j < string_tuples; ++j) {
-        int idx = (i + offset) * string_tuples + j;
-        *reinterpret_cast<StringValue*>(tuple_mem + 1) = STRINGS[idx % NUM_STRINGS];
-        if (!gen_null || GenBoolValue(idx)) {
-          row->SetTuple(j, reinterpret_cast<Tuple*>(tuple_mem));
-        } else {
-          row->SetTuple(j, NULL);
-        }
-        tuple_mem += tuple_size;
-      }
-      batch->CommitLastRow();
-    }
-    return batch;
+    return CreateBatch(*string_desc_, offset, num_rows, gen_null);
   }
 
-  void AppendRowTuples(TupleRow* row, vector<int>* results) {
-    ASSERT_TRUE(row != NULL);
-    const int int_tuples = int_desc_->tuple_descriptors().size();
-    for (int i = 0; i < int_tuples; ++i) {
-      AppendValue(row->GetTuple(i), results);
-    }
-  }
-
-  void AppendRowTuples(TupleRow* row, vector<StringValue>* results) {
-    ASSERT_TRUE(row != NULL);
-    const int string_tuples = string_desc_->tuple_descriptors().size();
-    for (int i = 0; i < string_tuples; ++i) {
-      AppendValue(row->GetTuple(i), results);
-    }
-  }
-
-  void AppendValue(Tuple* t, vector<int>* results) {
-    if (t == NULL) {
+  void AppendValue(uint8_t* ptr, vector<int>* results) {
+    if (ptr == NULL) {
       // For the tests indicate null-ability using the max int value
       results->push_back(std::numeric_limits<int>::max());
     } else {
-      results->push_back(*reinterpret_cast<int*>(reinterpret_cast<uint8_t*>(t) + 1));
+      results->push_back(*reinterpret_cast<int*>(ptr));
     }
   }
 
-  void AppendValue(Tuple* t, vector<StringValue>* results) {
-    if (t == NULL) {
+  void AppendValue(uint8_t* ptr, vector<StringValue>* results) {
+    if (ptr == NULL) {
       results->push_back(StringValue());
     } else {
-      uint8_t* mem = reinterpret_cast<uint8_t*>(t);
-      StringValue sv = *reinterpret_cast<StringValue*>(mem + 1);
+      StringValue sv = *reinterpret_cast<StringValue*>(ptr);
       uint8_t* copy = mem_pool_->Allocate(sv.len);
       memcpy(copy, sv.ptr, sv.len);
       sv.ptr = reinterpret_cast<char*>(copy);
       results->push_back(sv);
+    }
+  }
+
+  template <typename T>
+  void AppendRowTuples(TupleRow* row, RowDescriptor* row_desc, vector<T>* results) {
+    DCHECK(row != NULL);
+    const int num_tuples = row_desc->tuple_descriptors().size();
+
+    for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
+      TupleDescriptor* tuple_desc = row_desc->tuple_descriptors()[tuple_idx];
+      Tuple* tuple = row->GetTuple(tuple_idx);
+      const int num_slots = tuple_desc->slots().size();
+      uint8_t* ptr = reinterpret_cast<uint8_t*>(tuple) + tuple_desc->num_null_bytes();
+      for (int slot_idx = 0; slot_idx < num_slots; ++slot_idx) {
+        SlotDescriptor* slot_desc = tuple_desc->slots()[slot_idx];
+        if (tuple == NULL) {
+          AppendValue(NULL, results);
+        } else {
+          AppendValue(ptr, results);
+          ptr += slot_desc->slot_size();
+        }
+      }
     }
   }
 
@@ -215,48 +231,49 @@ class SimpleTupleStreamTest : public testing::Test {
       EXPECT_OK(stream->GetNext(&batch, &eos));
       ++batches_read;
       for (int i = 0; i < batch.num_rows(); ++i) {
-        AppendRowTuples(batch.GetRow(i), results);
+        AppendRowTuples(batch.GetRow(i), desc, results);
       }
     } while (!eos && (num_batches < 0 || batches_read <= num_batches));
   }
 
-  virtual void VerifyResults(const vector<int>& results, int exp_rows, bool gen_null) {
-    const int int_tuples = int_desc_->tuple_descriptors().size();
-    EXPECT_EQ(results.size(), exp_rows * int_tuples);
-    for (int i = 0; i < exp_rows; ++i) {
-      for (int j = 0; j < int_tuples; ++j) {
-        int idx = i * int_tuples + j;
-        if (!gen_null || GenBoolValue(idx)) {
-          ASSERT_EQ(results[idx], GenIntValue(idx))
-              << " results[" << idx << "]: " << results[idx]
-              << " != " << GenIntValue(idx) << " gen_null=" << gen_null;
-        } else {
-          ASSERT_TRUE(results[idx] == std::numeric_limits<int>::max())
-              << "i: " << i << " j: " << j << " results[" << idx << "]: "
-              << results[idx] << " != " << std::numeric_limits<int>::max();
-        }
-      }
+  void GetExpectedValue(int idx, bool is_null, int* val) {
+    if (is_null) {
+      *val = std::numeric_limits<int>::max();
+    } else {
+      *val = GenIntValue(idx);
     }
   }
 
-  virtual void VerifyResults(const vector<StringValue>& results, int exp_rows,
-      bool gen_null) {
-    const int string_tuples = string_desc_->tuple_descriptors().size();
-    EXPECT_EQ(results.size(), exp_rows * string_tuples);
-    for (int i = 0; i < exp_rows; ++i) {
-      for (int j = 0; j < string_tuples; ++j) {
-        int idx = i * string_tuples + j;
-        if (!gen_null || GenBoolValue(idx)) {
-          ASSERT_TRUE(results[idx] == STRINGS[idx % NUM_STRINGS])
-              << "results[" << idx << "] " << results[idx]
-              << " != " << STRINGS[idx % NUM_STRINGS] << " i=" << i << " j=" << j
+  void GetExpectedValue(int idx, bool is_null, StringValue* val) {
+    if (is_null) {
+      *val = StringValue();
+    } else {
+      *val = STRINGS[idx % NUM_STRINGS];
+    }
+  }
+
+  template <typename T>
+  void VerifyResults(const RowDescriptor& row_desc, const vector<T>& results,
+      int num_rows, bool gen_null) {
+    int idx = 0;
+    for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
+      const int num_tuples = row_desc.tuple_descriptors().size();
+      for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
+        const TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
+        const int num_slots = tuple_desc->slots().size();
+        bool is_null = gen_null && !GenBoolValue(idx);
+        for (int slot_idx = 0; slot_idx < num_slots; ++slot_idx, ++idx) {
+          T expected_val;
+          GetExpectedValue(idx, is_null, &expected_val);
+          ASSERT_TRUE(results[idx] == expected_val)
+              << "results[" << idx << "] " << results[idx] << " != "
+              << expected_val << " row_idx=" << row_idx
+              << " tuple_idx=" << tuple_idx << " slot_idx=" << slot_idx
               << " gen_null=" << gen_null;
-        } else {
-          ASSERT_TRUE(results[idx] == StringValue())
-              << "results[" << idx << "] " << results[idx] << " not NULL";
         }
       }
     }
+    DCHECK_EQ(results.size(), idx);
   }
 
   // Test adding num_batches of ints to the stream and reading them back.
@@ -264,9 +281,9 @@ class SimpleTupleStreamTest : public testing::Test {
   // Assumes that enough buffers are available to read and write the stream.
   template <typename T>
   void TestValues(int num_batches, RowDescriptor* desc, bool gen_null,
-      bool unpin_stream) {
+      bool unpin_stream, int num_rows = BATCH_SIZE, bool use_small_buffers = true) {
     BufferedTupleStream stream(runtime_state_, *desc, runtime_state_->block_mgr(),
-        client_, true, false);
+        client_, use_small_buffers, false);
     ASSERT_OK(stream.Init(-1, NULL, true));
 
     if (unpin_stream) ASSERT_OK(stream.UnpinStream());
@@ -274,14 +291,10 @@ class SimpleTupleStreamTest : public testing::Test {
     int offset = 0;
     for (int i = 0; i < num_batches; ++i) {
       RowBatch* batch = NULL;
-      if (sizeof(T) == sizeof(int)) {
-        batch = CreateIntBatch(offset, BATCH_SIZE, gen_null);
-      } else if (sizeof(T) == sizeof(StringValue)) {
-        batch = CreateStringBatch(offset, BATCH_SIZE, gen_null);
-      } else {
-        ASSERT_TRUE(false);
-      }
+
       Status status;
+      ASSERT_TRUE(sizeof(T) == sizeof(int) || sizeof(T) == sizeof(StringValue));
+      batch = CreateBatch(*desc, offset, num_rows, gen_null);
       for (int j = 0; j < batch->num_rows(); ++j) {
         bool b = stream.AddRow(batch->GetRow(j), &status);
         ASSERT_OK(status)
@@ -307,7 +320,7 @@ class SimpleTupleStreamTest : public testing::Test {
     ReadValues(&stream, desc, &results);
 
     // Verify result
-    VerifyResults(results, BATCH_SIZE * num_batches, gen_null);
+    VerifyResults<T>(*desc, results, num_rows * num_batches, gen_null);
 
     stream.Close();
   }
@@ -341,7 +354,7 @@ class SimpleTupleStreamTest : public testing::Test {
       }
       ReadValues(&stream, int_desc_, &results);
 
-      VerifyResults(results, BATCH_SIZE * num_batches, false);
+      VerifyResults<int>(*int_desc_, results, BATCH_SIZE * num_batches, false);
 
       stream.Close();
     }
@@ -473,7 +486,7 @@ class ArrayTupleStreamTest : public SimpleTupleStreamTest {
 
 // Basic API test. No data should be going to disk.
 TEST_F(SimpleTupleStreamTest, Basic) {
-  InitBlockMgr(-1, 8 * 1024 * 1024);
+  InitBlockMgr(-1, IO_BLOCK_SIZE);
   TestValues<int>(1, int_desc_, false, true);
   TestValues<int>(10, int_desc_, false, true);
   TestValues<int>(100, int_desc_, false, true);
@@ -566,11 +579,11 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
     if (varlen_data) {
       vector<StringValue> results;
       ReadValues(&stream, row_desc, &results);
-      VerifyResults(results, offset, false);
+      VerifyResults<StringValue>(*string_desc_, results, offset, false);
     } else {
       vector<int> results;
       ReadValues(&stream, row_desc, &results);
-      VerifyResults(results, offset, false);
+      VerifyResults<int>(*int_desc_, results, offset, false);
     }
   }
 
@@ -594,7 +607,7 @@ TEST_F(SimpleTupleStreamTest, UnpinPinVarlen) {
 }
 
 TEST_F(SimpleTupleStreamTest, SmallBuffers) {
-  int buffer_size = 8 * 1024 * 1024;
+  int buffer_size = IO_BLOCK_SIZE;
   InitBlockMgr(2 * buffer_size, buffer_size);
 
   BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
@@ -678,15 +691,56 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
     vector<StringValue> results;
     stream.PrepareForRead(delete_on_read);
     ReadValues(&stream, string_desc_, &results);
-    VerifyResults(results, rows_added, false);
+    VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
   }
 
   stream.Close();
 }
 
+// Construct a big row by stiching together many tuples so the total row size
+// will be close to the IO block size. With null indicators, stream will fail to
+// be initialized; Without null indicators, things should work fine.
+TEST_F(SimpleTupleStreamTest, BigRow) {
+  InitBlockMgr(2 * IO_BLOCK_SIZE, IO_BLOCK_SIZE);
+  vector<TupleId> tuple_ids;
+  vector<bool> nullable_tuples;
+  vector<bool> non_nullable_tuples;
+
+  DescriptorTblBuilder big_row_builder(&pool_);
+  // Each tuple contains 8 slots of TYPE_INT and a single byte for null indicator.
+  const int num_tuples = IO_BLOCK_SIZE / (8 * sizeof(int) + 1);
+  for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
+    big_row_builder.DeclareTuple() << TYPE_INT << TYPE_INT << TYPE_INT << TYPE_INT
+        << TYPE_INT << TYPE_INT << TYPE_INT << TYPE_INT;
+    tuple_ids.push_back(static_cast<TTupleId>(tuple_idx));
+    nullable_tuples.push_back(true);
+    non_nullable_tuples.push_back(false);
+  }
+  DescriptorTbl *desc = big_row_builder.Build();
+
+  // Construct a big row with all non-nullable tuples.
+  RowDescriptor* row_desc = pool_.Add(new RowDescriptor(
+      *desc, tuple_ids, non_nullable_tuples));
+  ASSERT_FALSE(row_desc->IsAnyTupleNullable());
+  // Test writing this row into the stream and then reading it back.
+  TestValues<int>(1, row_desc, false, false, 1, false);
+  TestValues<int>(1, row_desc, false, true, 1, false);
+
+  // Construct a big row with nullable tuples. This requires space for null indicators
+  // in the stream which, as a result, will fail to initialize.
+  RowDescriptor* nullable_row_desc = pool_.Add(new RowDescriptor(
+      *desc, tuple_ids, nullable_tuples));
+  ASSERT_TRUE(nullable_row_desc->IsAnyTupleNullable());
+  BufferedTupleStream nullable_stream(runtime_state_, *nullable_row_desc,
+      runtime_state_->block_mgr(), client_, false, false);
+  Status status = nullable_stream.Init(-1, NULL, true);
+  ASSERT_FALSE(status.ok());
+  nullable_stream.Close();
+}
+
 // Basic API test. No data should be going to disk.
 TEST_F(SimpleNullStreamTest, Basic) {
-  InitBlockMgr(-1, 8 * 1024 * 1024);
+  InitBlockMgr(-1, IO_BLOCK_SIZE);
   TestValues<int>(1, int_desc_, false, true);
   TestValues<int>(10, int_desc_, false, true);
   TestValues<int>(100, int_desc_, false, true);
@@ -763,6 +817,7 @@ TEST_F(MultiTupleStreamTest, MultiTupleAllocateRow) {
   int rows_added = 0;
   BufferedTupleStream stream(runtime_state_, *string_desc_, runtime_state_->block_mgr(),
       client_, false, false);
+  ASSERT_OK(stream.Init(-1, NULL, false));
 
   for (int i = 0; i < num_batches; ++i) {
     RowBatch* batch = CreateStringBatch(rows_added, 1, false);
@@ -806,7 +861,7 @@ TEST_F(MultiTupleStreamTest, MultiTupleAllocateRow) {
     vector<StringValue> results;
     stream.PrepareForRead(delete_on_read);
     ReadValues(&stream, string_desc_, &results);
-    VerifyResults(results, rows_added, false);
+    VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
   }
 
   stream.Close();
@@ -906,7 +961,7 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
 /// the original rows, then reading back the rows and verifying the contents.
 TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   Status status;
-  InitBlockMgr(-1, 8 * 1024 * 1024);
+  InitBlockMgr(-1, IO_BLOCK_SIZE);
   const int NUM_ROWS = 4000;
   BufferedTupleStream stream(runtime_state_, *array_desc_, runtime_state_->block_mgr(),
       client_, false, false);
@@ -916,6 +971,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   int array_lens[] = { 0, 1, 5, 10, 1000, 2, 49, 20 };
   int num_array_lens = sizeof(array_lens) / sizeof(array_lens[0]);
   int array_len_index = 0;
+  ASSERT_OK(stream.Init(-1, NULL, false));
   for (int i = 0; i < NUM_ROWS; ++i) {
     int expected_row_size = tuple_descs[0]->byte_size() + tuple_descs[1]->byte_size();
     gscoped_ptr<TupleRow, FreeDeleter> row(reinterpret_cast<TupleRow*>(

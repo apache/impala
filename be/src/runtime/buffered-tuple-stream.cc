@@ -72,7 +72,9 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     pin_timer_(NULL),
     unpin_timer_(NULL),
     get_new_block_timer_(NULL) {
-  read_block_null_indicators_size_ = write_block_null_indicators_size_ = -1;
+  read_block_null_indicators_size_ = -1;
+  write_block_null_indicators_size_ = -1;
+  max_null_indicators_size_ = -1;
   read_block_ = blocks_.end();
   fixed_tuple_row_size_ = 0;
   for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
@@ -150,12 +152,21 @@ Status BufferedTupleStream::Init(int node_id, RuntimeProfile* profile, bool pinn
     get_new_block_timer_ = ADD_TIMER(profile, "GetNewBlockTime");
   }
 
+  max_null_indicators_size_ = ComputeNumNullIndicatorBytes(block_mgr_->max_block_size());
+  if (UNLIKELY(max_null_indicators_size_ < 0)) {
+    // The block cannot even fit in a row of tuples so just assume there is one row.
+    int null_indicators_size = BitUtil::RoundUpNumi64(desc_.tuple_descriptors().size()) * 8;
+    return Status(TErrorCode::BTS_BLOCK_OVERFLOW,
+        PrettyPrinter::Print(fixed_tuple_row_size_, TUnit::BYTES),
+        PrettyPrinter::Print(null_indicators_size,  TUnit::BYTES));
+  }
+
   if (block_mgr_->max_block_size() < INITIAL_BLOCK_SIZES[0]) {
     use_small_buffers_ = false;
   }
 
   bool got_block;
-  RETURN_IF_ERROR(NewBlockForWrite(fixed_tuple_row_size_, &got_block));
+  RETURN_IF_ERROR(NewWriteBlockForRow(fixed_tuple_row_size_, &got_block));
   if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_, node_id);
   DCHECK(write_block_ != NULL);
   if (!pinned) RETURN_IF_ERROR(UnpinStream());
@@ -168,7 +179,8 @@ Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
     return Status::OK();
   }
   use_small_buffers_ = false;
-  Status status = NewBlockForWrite(block_mgr_->max_block_size(), got_buffer);
+  Status status =
+      NewWriteBlock(block_mgr_->max_block_size(), max_null_indicators_size_, got_buffer);
   // IMPALA-2330: Set the flag using small buffers back to false in case it failed to
   // got a buffer.
   DCHECK(status.ok() || !*got_buffer) << status.ok() << " " << *got_buffer;
@@ -209,14 +221,11 @@ Status BufferedTupleStream::UnpinBlock(BufferedBlockMgr::Block* block) {
   return Status::OK();
 }
 
-Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) {
+Status BufferedTupleStream::NewWriteBlock(int64_t block_len, int64_t null_indicators_size,
+    bool* got_block) {
   DCHECK(!closed_);
+  DCHECK_GE(null_indicators_size, 0);
   *got_block = false;
-  if (min_size > block_mgr_->max_block_size()) {
-    return Status(Substitute("Cannot process row that is bigger than the IO size "
-        "(row_size=$0). To run this query, increase the IO size (--read_size option).",
-        PrettyPrinter::Print(min_size, TUnit::BYTES)));
-  }
 
   BufferedBlockMgr::Block* unpin_block = write_block_;
   if (write_block_ != NULL) {
@@ -227,26 +236,13 @@ Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) 
     }
   }
 
-  int64_t block_len = block_mgr_->max_block_size();
-  if (use_small_buffers_) {
-    if (blocks_.size() < NUM_SMALL_BLOCKS) {
-      block_len = min(block_len, INITIAL_BLOCK_SIZES[blocks_.size()]);
-      if (block_len < min_size) block_len = block_mgr_->max_block_size();
-    }
-    if (block_len == block_mgr_->max_block_size()) {
-      // Do not switch to IO-buffers automatically. Do not get a buffer.
-      *got_block = false;
-      return Status::OK();
-    }
-  }
-
   BufferedBlockMgr::Block* new_block = NULL;
   {
     SCOPED_TIMER(get_new_block_timer_);
     RETURN_IF_ERROR(block_mgr_->GetNewBlock(
         block_mgr_client_, unpin_block, &new_block, block_len));
   }
-  *got_block = (new_block != NULL);
+  *got_block = new_block != NULL;
 
   if (!*got_block) {
     DCHECK(unpin_block == NULL);
@@ -263,8 +259,9 @@ Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) 
   // Mark the entire block as containing valid data to avoid updating it as we go.
   new_block->Allocate<uint8_t>(block_len);
 
-  // Compute and allocate the block header with the null indicators
-  write_block_null_indicators_size_ = ComputeNumNullIndicatorBytes(block_len);
+  // Compute and allocate the block header with the null indicators.
+  DCHECK_EQ(null_indicators_size, ComputeNumNullIndicatorBytes(block_len));
+  write_block_null_indicators_size_ = null_indicators_size;
   write_tuple_idx_ = 0;
   write_ptr_ = new_block->buffer() + write_block_null_indicators_size_;
   write_end_ptr_ = new_block->buffer() + block_len;
@@ -284,7 +281,40 @@ Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) 
   return Status::OK();
 }
 
-Status BufferedTupleStream::NextBlockForRead() {
+Status BufferedTupleStream::NewWriteBlockForRow(int64_t row_size, bool* got_block) {
+  int64_t block_len;
+  int64_t null_indicators_size;
+  if (use_small_buffers_) {
+    *got_block = false;
+    if (blocks_.size() < NUM_SMALL_BLOCKS) {
+      block_len = INITIAL_BLOCK_SIZES[blocks_.size()];
+      null_indicators_size = ComputeNumNullIndicatorBytes(block_len);
+      // Use small buffer only if:
+      // 1. the small buffer's size is smaller than the configured max block size.
+      // 2. a single row of tuples and null indicators (if any) fit in the small buffer.
+      //
+      // If condition 2 above is not met, we will bail. An alternative would be
+      // to try the next larger small buffer.
+      *got_block = block_len < block_mgr_->max_block_size() &&
+          null_indicators_size >= 0 && row_size + null_indicators_size <= block_len;
+    }
+    // Do not switch to IO-buffers automatically. Do not get a buffer.
+    if (!*got_block) return Status::OK();
+  } else {
+    DCHECK_GE(max_null_indicators_size_, 0);
+    block_len = block_mgr_->max_block_size();
+    null_indicators_size = max_null_indicators_size_;
+    // Check if the size of row and null indicators exceeds the IO block size.
+    if (UNLIKELY(row_size + null_indicators_size > block_len)) {
+      return Status(TErrorCode::BTS_BLOCK_OVERFLOW,
+          PrettyPrinter::Print(row_size, TUnit::BYTES),
+          PrettyPrinter::Print(null_indicators_size, TUnit::BYTES));
+    }
+  }
+  return NewWriteBlock(block_len, null_indicators_size, got_block);
+}
+
+Status BufferedTupleStream::NextReadBlock() {
   DCHECK(!closed_);
   DCHECK(read_block_ != blocks_.end());
   DCHECK_EQ(num_pinned_, NumPinned(blocks_)) << pinned_;
@@ -338,6 +368,7 @@ Status BufferedTupleStream::NextBlockForRead() {
   if (read_block_ != blocks_.end() && (*read_block_)->is_pinned()) {
     read_block_null_indicators_size_ =
         ComputeNumNullIndicatorBytes((*read_block_)->buffer_len());
+    DCHECK_GE(read_block_null_indicators_size_, 0);
     read_tuple_idx_ = 0;
     read_ptr_ = (*read_block_)->buffer() + read_block_null_indicators_size_;
     read_end_ptr_ = (*read_block_)->buffer() + (*read_block_)->buffer_len();
@@ -380,6 +411,7 @@ Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_buffer
   DCHECK(read_block_ != blocks_.end());
   read_block_null_indicators_size_ =
       ComputeNumNullIndicatorBytes((*read_block_)->buffer_len());
+  DCHECK_GE(read_block_null_indicators_size_, 0);
   read_tuple_idx_ = 0;
   read_ptr_ = (*read_block_)->buffer() + read_block_null_indicators_size_;
   read_end_ptr_ = (*read_block_)->buffer() + (*read_block_)->buffer_len();
@@ -458,8 +490,8 @@ int BufferedTupleStream::ComputeNumNullIndicatorBytes(int block_size) const {
     const uint32_t min_row_size_in_bits = 8 * fixed_tuple_row_size_ + tuples_per_row;
     const uint32_t block_size_in_bits = 8 * block_size;
     const uint32_t max_num_rows = block_size_in_bits / min_row_size_in_bits;
-    return
-        BitUtil::RoundUpNumi64(max_num_rows * tuples_per_row) * 8;
+    if (UNLIKELY(max_num_rows == 0)) return -1;
+    return BitUtil::RoundUpNumi64(max_num_rows * tuples_per_row) * 8;
   } else {
     // If there are no nullable tuples then no need to waste space for null indicators.
     return 0;
@@ -517,10 +549,10 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
 
   if (UNLIKELY(rows_returned_curr_block == (*read_block_)->num_rows())) {
     // Get the next block in the stream. We need to do this at the beginning of
-    // the GetNext() call to ensure the buffer management semantics. NextBlockForRead()
+    // the GetNext() call to ensure the buffer management semantics. NextReadBlock()
     // will recycle the memory for the rows returned from the *previous* call to
     // GetNext().
-    RETURN_IF_ERROR(NextBlockForRead());
+    RETURN_IF_ERROR(NextReadBlock());
     DCHECK(read_block_ != blocks_.end()) << DebugString();
     DCHECK_GE(read_block_null_indicators_size_, 0);
     rows_returned_curr_block = 0;

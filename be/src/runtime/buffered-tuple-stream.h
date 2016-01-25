@@ -345,13 +345,17 @@ class BufferedTupleStream {
   /// The size of the fixed length portion for each tuple in the row.
   std::vector<int> fixed_tuple_sizes_;
 
-  /// Max size (in bytes) of null indicators bitstring in the current read and write
+  /// Max size (in bytes) of null indicators bitmap in the current read and write
   /// blocks. If 0, it means that there is no need to store null indicators for this
   /// RowDesc. We calculate this value based on the block's size and the
   /// fixed_tuple_row_size_. When not 0, this value is also an upper bound for the number
   /// of (rows * tuples_per_row) in this block.
-  uint32_t read_block_null_indicators_size_;
-  uint32_t write_block_null_indicators_size_;
+  int read_block_null_indicators_size_;
+  int write_block_null_indicators_size_;
+
+  /// Size (in bytes) of the null indicators bitmap reserved in a block of maximum
+  /// size (i.e. IO block size). 0 if no tuple is nullable.
+  int max_null_indicators_size_;
 
   /// Vectors of all the strings slots that have their varlen data stored in stream
   /// grouped by tuple_idx.
@@ -457,16 +461,22 @@ class BufferedTupleStream {
   /// Wrapper of the templated DeepCopyInternal() function.
   bool DeepCopy(TupleRow* row);
 
-  /// Gets a new block from the block_mgr_, updating write_block_, write_tuple_idx_,
-  /// write_ptr_ and write_end_ptr_. *got_block is set to true if a block was
-  /// successfully acquired. If there are no blocks available, *got_block is set to
-  /// false and write_block_ is unchanged.
-  /// 'min_size' is the minimum number of bytes required for this block.
-  Status NewBlockForWrite(int64_t min_size, bool* got_block);
+  /// Gets a new block of 'block_len' bytes from the block_mgr_, updating write_block_,
+  /// write_tuple_idx_, write_ptr_ and write_end_ptr_. 'null_indicators_size' is the
+  /// number of bytes that will be reserved in the block for the null indicators bitmap.
+  /// *got_block is set to true if a block was successfully acquired. Null indicators
+  /// (if any) will also be reserved and initialized. If there are no blocks available,
+  /// *got_block is set to false and write_block_ is unchanged.
+  Status NewWriteBlock(int64_t block_len, int64_t null_indicators_size, bool* got_block);
+
+  /// A wrapper around NewWriteBlock(). 'row_size' is the size of the tuple row to be
+  /// appended to this block. This function determines the block size required in order
+  /// to fit the row and null indicators.
+  Status NewWriteBlockForRow(int64_t row_size, bool* got_block);
 
   /// Reads the next block from the block_mgr_. This blocks if necessary.
   /// Updates read_block_, read_ptr_, read_tuple_idx_ and read_end_ptr_.
-  Status NextBlockForRead();
+  Status NextReadBlock();
 
   /// Returns the total additional bytes that this row will consume in write_block_ if
   /// appended to the block. This includes the fixed length part of the row and the
@@ -495,7 +505,9 @@ class BufferedTupleStream {
   void FixUpCollectionsForRead(const vector<SlotDescriptor*>& collection_slots,
       Tuple* tuple);
 
-  /// Computes the number of bytes needed for null indicators for a block of 'block_size'
+  /// Computes the number of bytes needed for null indicators for a block of 'block_size'.
+  /// Return 0 if no tuple is nullable. Return -1 if a single row of fixed-size tuples
+  /// plus its null indicator (if any) cannot fit in the block.
   int ComputeNumNullIndicatorBytes(int block_size) const;
 
   uint32_t read_block_bytes_remaining() const {

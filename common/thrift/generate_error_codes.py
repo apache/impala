@@ -203,7 +203,11 @@ error_codes = (
   ("AVRO_BAD_VERSION_HEADER", 64, "File '$0' has an invalid version header: $1\\n"
    "Make sure the file is an Avro data file."),
 
-  ("UDF_MEM_LIMIT_EXCEEDED", 65, "$0's allocations exceeded memory limits.")
+  ("UDF_MEM_LIMIT_EXCEEDED", 65, "$0's allocations exceeded memory limits."),
+
+  ("BTS_BLOCK_OVERFLOW", 66, "Cannot process row that is bigger than the IO size "
+   "(row_size=$0, null_indicators_size=$1). To run this query, increase the IO size "
+   "(--read_size option).")
 )
 
 import sys
