@@ -438,3 +438,35 @@ where c_custkey < 10
    partitions=1/1 files=4 size=554.13MB
    predicates: c_custkey < 10
 ====
+# IMPALA-2539: Test empty union operands containing relative table refs.
+select c_custkey, o_orderkey
+from tpch_nested_parquet.customer c,
+ (select o_orderkey from c.c_orders o1
+  union distinct
+  select o_orderkey from c.c_orders o2
+  where false
+  union all
+  select o_orderkey from c.c_orders o3
+  where false
+ ) v1
+where c_custkey = 1
+---- PLAN
+01:SUBPLAN
+|
+|--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  06:UNION
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: o_orderkey
+|  |
+|  03:UNION
+|  |
+|  04:UNNEST [c.c_orders o1]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
+   predicates: c_custkey = 1
+====

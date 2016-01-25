@@ -1474,7 +1474,10 @@ public class SingleNodePlanner {
       throws ImpalaException {
     UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), unionStmt.getTupleId());
     for (UnionOperand op: unionOperands) {
-      if (op.getAnalyzer().hasEmptyResultSet()) continue;
+      if (op.getAnalyzer().hasEmptyResultSet()) {
+        unmarkCollectionSlots(op.getQueryStmt());
+        continue;
+      }
       QueryStmt queryStmt = op.getQueryStmt();
       if (queryStmt instanceof SelectStmt) {
         SelectStmt selectStmt = (SelectStmt) queryStmt;
