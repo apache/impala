@@ -201,7 +201,7 @@ error_codes = (
   ("AVRO_BAD_VERSION_HEADER", 64, "File '$0' has an invalid version header: $1\\n"
    "Make sure the file is an Avro data file."),
 
-  ("UDF_MEM_LIMIT_EXCEEDED", 66, "$0's allocations exceeded memory limits.")
+  ("UDF_MEM_LIMIT_EXCEEDED", 65, "$0's allocations exceeded memory limits.")
 )
 
 import sys
