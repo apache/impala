@@ -292,7 +292,7 @@ class StatestoreSubscriber(object):
     finally:
       self.update_event.release()
 
-  def wait_for_failure(self, timeout=20):
+  def wait_for_failure(self, timeout=40):
     """Waits until this subscriber no longer appears in the statestore's subscriber
     list. If 'timeout' seconds pass, throws an exception."""
     start = time.time()
