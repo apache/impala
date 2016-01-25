@@ -208,10 +208,14 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
+  @pytest.mark.execute_serially
   def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # we verify if each impalad reads one block by checking if each impalad reads at
     # least one row group.
+    # It needs to execute serially because if there is at a time more, than one query
+    # being scheduled, the simple scheduler round robins colocated impalads across
+    # all running queries. See IMPALA-2479 for more details.
     DB_NAME = 'functional_parquet'
     TABLE_NAME = 'lineitem_multiblock'
     query = 'select count(l_orderkey) from %s.%s' % (DB_NAME, TABLE_NAME)
