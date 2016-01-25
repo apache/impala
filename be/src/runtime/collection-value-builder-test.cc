@@ -28,9 +28,9 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
   DescriptorTbl* desc_tbl = builder.Build();
   vector<TupleDescriptor*> descs;
   desc_tbl->GetTupleDescs(&descs);
-  DCHECK_EQ(descs.size(), 1);
+  ASSERT_EQ(descs.size(), 1);
   const TupleDescriptor& tuple_desc = *descs[0];
-  DCHECK_EQ(tuple_desc.byte_size(), 2);
+  ASSERT_EQ(tuple_desc.byte_size(), 2);
 
   // Create CollectionValue with buffer size of slightly more than INT_MAX / 2
   CollectionValue coll_value;
@@ -43,7 +43,7 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
 
   // Attempt to double the buffer. This should fail due to the new buffer size exceeding
   // INT_MAX.
-  DCHECK_GT(tracker.consumption(), INT_MAX / 2);
+  ASSERT_GT(tracker.consumption(), INT_MAX / 2);
   coll_value_builder.CommitTuples(initial_capacity);
   Tuple* tuple_mem;
   int num_tuples = coll_value_builder.GetFreeMemory(&tuple_mem);

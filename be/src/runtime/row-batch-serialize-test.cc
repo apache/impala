@@ -163,7 +163,7 @@ class RowBatchSerializeTest : public testing::Test {
         CollectionValueBuilder builder(&cv, *item_desc, pool, array_len);
         Tuple* tuple_mem;
         int n = builder.GetFreeMemory(&tuple_mem);
-        DCHECK_GE(n, array_len);
+        ASSERT_GE(n, array_len);
         memset(tuple_mem, 0, item_desc->byte_size() * array_len);
         for (int i = 0; i < array_len; ++i) {
           for (int slot_idx = 0; slot_idx < item_desc->slots().size(); ++slot_idx) {
@@ -179,7 +179,7 @@ class RowBatchSerializeTest : public testing::Test {
         break;
       }
       default:
-        DCHECK(false) << "NYI: " << slot_desc.type().DebugString();
+        ASSERT_TRUE(false) << "NYI: " << slot_desc.type().DebugString();
     }
   }
 
@@ -192,7 +192,7 @@ class RowBatchSerializeTest : public testing::Test {
 
     for (int i = 0; i < NUM_ROWS; ++i) {
       int idx = batch->AddRow();
-      DCHECK(idx != RowBatch::INVALID_ROW_INDEX);
+      EXPECT_TRUE(idx != RowBatch::INVALID_ROW_INDEX);
       TupleRow* row = batch->GetRow(idx);
 
       for (int tuple_idx = 0; tuple_idx < row_desc.tuple_descriptors().size(); ++tuple_idx) {
@@ -252,15 +252,15 @@ class RowBatchSerializeTest : public testing::Test {
   void AddTuplesToRowBatch(int num_rows, const vector<vector<Tuple*> >& tuples,
       const vector<int>& repeats, RowBatch* batch) {
     int tuples_per_row = batch->row_desc().tuple_descriptors().size();
-    DCHECK_EQ(tuples_per_row, tuples.size());
-    DCHECK_EQ(tuples_per_row, repeats.size());
+    ASSERT_EQ(tuples_per_row, tuples.size());
+    ASSERT_EQ(tuples_per_row, repeats.size());
     vector<int> next_tuple(tuples_per_row, 0);
     for (int i = 0; i < num_rows; ++i) {
       int idx = batch->AddRow();
       TupleRow* row = batch->GetRow(idx);
       for (int tuple_idx = 0; tuple_idx < tuples_per_row; ++tuple_idx) {
         int curr_tuple = next_tuple[tuple_idx];
-        DCHECK(tuples[tuple_idx].size() > 0);
+        ASSERT_GT(tuples[tuple_idx].size(), 0);
         row->SetTuple(tuple_idx, tuples[tuple_idx][curr_tuple]);
         if ((i + 1) % repeats[tuple_idx] == 0) {
           next_tuple[tuple_idx] = (curr_tuple + 1) % tuples[tuple_idx].size();
@@ -299,7 +299,7 @@ TEST_F(RowBatchSerializeTest, Basic) {
   vector<bool> nullable_tuples(1, false);
   vector<TTupleId> tuple_id(1, (TTupleId) 0);
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-  DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
+  ASSERT_EQ(row_desc.tuple_descriptors().size(), 1);
 
   RowBatch* batch = CreateRowBatch(row_desc);
   TestRowBatch(row_desc, batch, true);
@@ -314,7 +314,7 @@ TEST_F(RowBatchSerializeTest, String) {
   vector<bool> nullable_tuples(1, false);
   vector<TTupleId> tuple_id(1, (TTupleId) 0);
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-  DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
+  ASSERT_EQ(row_desc.tuple_descriptors().size(), 1);
 
   RowBatch* batch = CreateRowBatch(row_desc);
   TestRowBatch(row_desc, batch, true);
@@ -333,7 +333,7 @@ TEST_F(RowBatchSerializeTest, BasicArray) {
   vector<bool> nullable_tuples(1, false);
   vector<TTupleId> tuple_id(1, (TTupleId) 0);
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-  DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
+  ASSERT_EQ(row_desc.tuple_descriptors().size(), 1);
 
   RowBatch* batch = CreateRowBatch(row_desc);
   TestRowBatch(row_desc, batch, true);
@@ -361,7 +361,7 @@ TEST_F(RowBatchSerializeTest, StringArray) {
   vector<bool> nullable_tuples(1, false);
   vector<TTupleId> tuple_id(1, (TTupleId) 0);
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-  DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
+  ASSERT_EQ(row_desc.tuple_descriptors().size(), 1);
 
   RowBatch* batch = CreateRowBatch(row_desc);
   TestRowBatch(row_desc, batch, true);
@@ -402,7 +402,7 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   vector<bool> nullable_tuples(1, false);
   vector<TTupleId> tuple_id(1, (TTupleId) 0);
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-  DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
+  ASSERT_EQ(row_desc.tuple_descriptors().size(), 1);
 
   RowBatch* batch = CreateRowBatch(row_desc);
   TestRowBatch(row_desc, batch, true);
@@ -429,7 +429,7 @@ void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   tuple_id.push_back((TTupleId) 0);
   tuple_id.push_back((TTupleId) 1);
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-  DCHECK_EQ(row_desc.tuple_descriptors().size(), 2);
+  ASSERT_EQ(row_desc.tuple_descriptors().size(), 2);
 
   int num_rows = 1000;
   int distinct_int_tuples = 100;

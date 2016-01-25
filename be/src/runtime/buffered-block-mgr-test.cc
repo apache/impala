@@ -303,7 +303,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   void TestEvictionImpl(int block_size) {
     Status status;
-    DCHECK_GT(block_size, 0);
+    ASSERT_GT(block_size, 0);
     int max_num_buffers = 5;
     BufferedBlockMgr* block_mgr;
     BufferedBlockMgr::Client* client;
@@ -359,7 +359,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   static const int SINGLE_THREADED_TID = -1;
   void TestRandomInternalImpl(RuntimeState* state, BufferedBlockMgr* block_mgr,
       int num_buffers, int tid) {
-    DCHECK(block_mgr != NULL);
+    ASSERT_TRUE(block_mgr != NULL);
     const int num_iterations = 100000;
     const int iters_before_close = num_iterations - 5000;
     bool close_called = false;
@@ -478,8 +478,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   // Single-threaded execution of the TestRandomInternalImpl.
   void TestRandomInternalSingle(int block_size) {
-    DCHECK_GT(block_size, 0);
-    DCHECK(test_env_.get() != NULL);
+    ASSERT_GT(block_size, 0);
+    ASSERT_TRUE(test_env_.get() != NULL);
     const int max_num_buffers = 100;
     RuntimeState* state;
     BufferedBlockMgr* block_mgr = CreateMgr(0, max_num_buffers, block_size, &state);
@@ -489,9 +489,9 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   // Multi-threaded execution of the TestRandomInternalImpl.
   void TestRandomInternalMulti(int num_threads, int block_size) {
-    DCHECK_GT(num_threads, 0);
-    DCHECK_GT(block_size, 0);
-    DCHECK(test_env_.get() != NULL);
+    ASSERT_GT(num_threads, 0);
+    ASSERT_GT(block_size, 0);
+    ASSERT_TRUE(test_env_.get() != NULL);
     const int max_num_buffers = 100;
     RuntimeState* state;
     BufferedBlockMgr* block_mgr = CreateMgr(0, num_threads * max_num_buffers, block_size,

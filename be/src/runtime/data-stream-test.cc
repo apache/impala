@@ -56,6 +56,17 @@ using namespace apache::thrift::protocol;
 DEFINE_int32(port, 20001, "port on which to run Impala test backend");
 DECLARE_string(principal);
 
+// We reserve contiguous memory for senders in SetUp. If a test uses more
+// senders, a DCHECK will fail and you should increase this value.
+static const int MAX_SENDERS = 16;
+static const int MAX_RECEIVERS = 16;
+static const PlanNodeId DEST_NODE_ID = 1;
+static const int BATCH_CAPACITY = 100;  // rows
+static const int PER_ROW_DATA = 8;
+static const int TOTAL_DATA_SIZE = 8 * 1024;
+static const int NUM_BATCHES = TOTAL_DATA_SIZE / BATCH_CAPACITY / PER_ROW_DATA;
+
+
 namespace impala {
 
 class ImpalaTestBackend : public ImpalaInternalServiceIf {
@@ -140,7 +151,7 @@ class DataStreamTest : public testing::Test {
       case TPartitionType::UNPARTITIONED: return broadcast_sink_;
       case TPartitionType::RANDOM: return random_sink_;
       case TPartitionType::HASH_PARTITIONED: return hash_sink_;
-      default: DCHECK(false) << "Unhandled sink type: " << partition_type;
+      default: EXPECT_TRUE(false) << "Unhandled sink type: " << partition_type;
     }
     // Should never reach this.
     return broadcast_sink_;
@@ -158,16 +169,6 @@ class DataStreamTest : public testing::Test {
     receiver_info_.clear();
     dest_.clear();
   }
-
-  // We reserve contiguous memory for senders in SetUp. If a test uses more
-  // senders, a DCHECK will fail and you should increase this value.
-  static const int MAX_SENDERS = 16;
-  static const int MAX_RECEIVERS = 16;
-  static const PlanNodeId DEST_NODE_ID = 1;
-  static const int BATCH_CAPACITY = 100;  // rows
-  static const int PER_ROW_DATA = 8;
-  static const int TOTAL_DATA_SIZE = 8 * 1024;
-  static const int NUM_BATCHES = TOTAL_DATA_SIZE / BATCH_CAPACITY / PER_ROW_DATA;
 
   ObjectPool obj_pool_;
   MemTracker tracker_;
@@ -389,8 +390,8 @@ class DataStreamTest : public testing::Test {
       ReceiverInfo& info = receiver_info_[i];
       EXPECT_TRUE(info.status.ok());
       total += info.data_values.size();
-      DCHECK_EQ(info.stream_type, stream_type);
-      DCHECK_EQ(info.num_senders, num_senders);
+      ASSERT_EQ(info.stream_type, stream_type);
+      ASSERT_EQ(info.num_senders, num_senders);
       if (stream_type == TPartitionType::UNPARTITIONED) {
         EXPECT_EQ(
             NUM_BATCHES * BATCH_CAPACITY * num_senders, info.data_values.size());
@@ -452,7 +453,7 @@ class DataStreamTest : public testing::Test {
                    int channel_buffer_size = 1024) {
     VLOG_QUERY << "start sender";
     int num_senders = sender_info_.size();
-    DCHECK_LT(num_senders, MAX_SENDERS);
+    ASSERT_LT(num_senders, MAX_SENDERS);
     sender_info_.push_back(SenderInfo());
     SenderInfo& info = sender_info_.back();
     info.thread_handle =

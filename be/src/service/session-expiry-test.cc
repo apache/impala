@@ -45,7 +45,7 @@ TEST(SessionTest, TestExpiry) {
   IntCounter* expired_metric =
       impala->metrics()->FindMetricForTesting<IntCounter>(
           ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);
-  DCHECK(expired_metric != NULL);
+  ASSERT_TRUE(expired_metric != NULL);
   IntGauge* beeswax_session_metric =
       impala->metrics()->FindMetricForTesting<IntGauge>(
           ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS);

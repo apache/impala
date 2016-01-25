@@ -236,19 +236,19 @@ TEST(MemPoolTest, Limits) {
   p2->FreeAll();
   EXPECT_FALSE(limit2.LimitExceeded());
   uint8_t* result = p2->TryAllocate(160);
-  DCHECK(result != NULL);
-  DCHECK(MemPoolTest::CheckIntegrity(p2, false));
+  ASSERT_TRUE(result != NULL);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(p2, false));
 
   // Try To allocate another 160 bytes, this should fail.
   result = p2->TryAllocate(160);
-  DCHECK(result == NULL);
-  DCHECK(MemPoolTest::CheckIntegrity(p2, false));
+  ASSERT_TRUE(result == NULL);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(p2, false));
 
   // Try To allocate 20 bytes, this should succeed. TryAllocate() should leave the
   // pool in a functional state..
   result = p2->TryAllocate(20);
-  DCHECK(result != NULL);
-  DCHECK(MemPoolTest::CheckIntegrity(p2, false));
+  ASSERT_TRUE(result != NULL);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(p2, false));
 
 
   p2->FreeAll();

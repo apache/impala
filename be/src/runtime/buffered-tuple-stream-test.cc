@@ -166,7 +166,7 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   void AppendRowTuples(TupleRow* row, vector<int>* results) {
-    DCHECK(row != NULL);
+    ASSERT_TRUE(row != NULL);
     const int int_tuples = int_desc_->tuple_descriptors().size();
     for (int i = 0; i < int_tuples; ++i) {
       AppendValue(row->GetTuple(i), results);
@@ -174,7 +174,7 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   void AppendRowTuples(TupleRow* row, vector<StringValue>* results) {
-    DCHECK(row != NULL);
+    ASSERT_TRUE(row != NULL);
     const int string_tuples = string_desc_->tuple_descriptors().size();
     for (int i = 0; i < string_tuples; ++i) {
       AppendValue(row->GetTuple(i), results);
@@ -278,7 +278,7 @@ class SimpleTupleStreamTest : public testing::Test {
       } else if (sizeof(T) == sizeof(StringValue)) {
         batch = CreateStringBatch(offset, BATCH_SIZE, gen_null);
       } else {
-        DCHECK(false);
+        ASSERT_TRUE(false);
       }
       for (int j = 0; j < batch->num_rows(); ++j) {
         bool b = stream.AddRow(batch->GetRow(j), &status);
@@ -563,11 +563,11 @@ TEST_F(SimpleTupleStreamTest, UnpinPin) {
   // Note: this should really be 0, but the BufferedTupleStream returns eos before
   // deleting the last block, rather than after, so the last block isn't deleted
   // until the stream is closed.
-  DCHECK_EQ(stream.bytes_in_mem(false), buffer_size);
+  ASSERT_EQ(stream.bytes_in_mem(false), buffer_size);
 
   stream.Close();
 
-  DCHECK_EQ(stream.bytes_in_mem(false), 0);
+  ASSERT_EQ(stream.bytes_in_mem(false), 0);
 }
 
 TEST_F(SimpleTupleStreamTest, SmallBuffers) {

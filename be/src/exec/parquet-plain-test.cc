@@ -109,16 +109,16 @@ TEST(PlainEncoding, DecimalBigEndian) {
   memcpy(&d16, buffer, sizeof(d16));
 
   int size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d4), d4);
-  DCHECK_EQ(size, sizeof(d4));
-  DCHECK_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d4), sizeof(d4)), 0);
+  ASSERT_EQ(size, sizeof(d4));
+  ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d4), sizeof(d4)), 0);
 
   size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d8), d8);
-  DCHECK_EQ(size, sizeof(d8));
-  DCHECK_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d8), sizeof(d8)), 0);
+  ASSERT_EQ(size, sizeof(d8));
+  ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d8), sizeof(d8)), 0);
 
   size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d16), d16);
-  DCHECK_EQ(size, sizeof(d16));
-  DCHECK_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d16), sizeof(d16)), 0);
+  ASSERT_EQ(size, sizeof(d16));
+  ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d16), sizeof(d16)), 0);
 }
 
 }

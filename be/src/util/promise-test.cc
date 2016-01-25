@@ -49,7 +49,7 @@ TEST(PromiseTest, BasicTest) {
   Promise<int64_t> promise;
   thread promise_setter(RunThread, &promise);
 
-  DCHECK_EQ(promise.Get(), 100);
+  ASSERT_EQ(promise.Get(), 100);
 }
 
 TEST(PromiseTest, TimeoutTest) {
@@ -57,8 +57,8 @@ TEST(PromiseTest, TimeoutTest) {
   bool timed_out = true;
   Promise<int64_t> fulfilled_promise;
   thread promise_setter(RunThread, &fulfilled_promise);
-  DCHECK_EQ(fulfilled_promise.Get(10000, &timed_out), 100);
-  DCHECK_EQ(timed_out, false);
+  ASSERT_EQ(fulfilled_promise.Get(10000, &timed_out), 100);
+  ASSERT_EQ(timed_out, false);
 
   // Test that the promise times out properly.
   int64_t start_time, end_time;
@@ -66,9 +66,9 @@ TEST(PromiseTest, TimeoutTest) {
   timed_out = false;
   Promise<int64_t> timedout_promise;
   timedout_promise.Get(1000, &timed_out);
-  DCHECK_EQ(timed_out, true);
+  ASSERT_EQ(timed_out, true);
   end_time = MonotonicMillis();
-  DCHECK_GE(end_time - start_time, 1000);
+  ASSERT_GE(end_time - start_time, 1000);
 }
 
 TEST(PromiseDeathTest, RepeatedSetTest) {

@@ -602,7 +602,7 @@ ColumnType GetResultType(const ColumnType& t1, const ColumnType& t2, Op op) {
           min(t1.precision - t1.scale, t2.precision - t2.scale) + max(t1.scale, t2.scale),
           max(t1.scale, t2.scale));
     default:
-      DCHECK(false);
+      EXPECT_TRUE(false);
       return ColumnType();
   }
 }

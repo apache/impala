@@ -197,7 +197,7 @@ TEST_F(MetricsTest, MemMetric) {
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.
   UIntGauge* bytes_in_use =
       metrics.FindMetricForTesting<UIntGauge>("tcmalloc.bytes-in-use");
-  DCHECK(bytes_in_use != NULL);
+  ASSERT_TRUE(bytes_in_use != NULL);
 
   uint64_t cur_in_use = bytes_in_use->value();
   EXPECT_GT(cur_in_use, 0);
@@ -210,12 +210,12 @@ TEST_F(MetricsTest, MemMetric) {
 
   UIntGauge* total_bytes_reserved =
       metrics.FindMetricForTesting<UIntGauge>("tcmalloc.total-bytes-reserved");
-  DCHECK(total_bytes_reserved != NULL);
-  DCHECK_GT(total_bytes_reserved->value(), 0);
+  ASSERT_TRUE(total_bytes_reserved != NULL);
+  ASSERT_GT(total_bytes_reserved->value(), 0);
 
   UIntGauge* pageheap_free_bytes =
       metrics.FindMetricForTesting<UIntGauge>("tcmalloc.pageheap-free-bytes");
-  DCHECK(pageheap_free_bytes != NULL);
+  ASSERT_TRUE(pageheap_free_bytes != NULL);
 
   UIntGauge* pageheap_unmapped_bytes =
       metrics.FindMetricForTesting<UIntGauge>("tcmalloc.pageheap-unmapped-bytes");

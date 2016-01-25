@@ -29,8 +29,8 @@ class NotifiedCounter {
   }
 
   void Notify(ThreadResourceMgr::ResourcePool* consumer) {
-    DCHECK(consumer != NULL);
-    DCHECK_LT(consumer->num_threads(), consumer->quota());
+    ASSERT_TRUE(consumer != NULL);
+    ASSERT_LT(consumer->num_threads(), consumer->quota());
     ++counter_;
   }
 

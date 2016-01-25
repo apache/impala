@@ -30,14 +30,14 @@ TEST(FreePoolTest, Basic) {
 
   // Start off with some corner cases.
   uint8_t* p1 = pool.Allocate(0);
-  DCHECK(p1 != NULL);
+  ASSERT_TRUE(p1 != NULL);
   pool.Free(p1);
   pool.Free(NULL);
 
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 0);
   p1 = pool.Allocate(1);
   *p1 = 111; // Scribble something to make sure it doesn't mess up the list.
-  DCHECK(p1 != NULL);
+  ASSERT_TRUE(p1 != NULL);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 16);
   pool.Free(p1);
 
@@ -45,7 +45,7 @@ TEST(FreePoolTest, Basic) {
   for (int i = 0; i < 10; ++i) {
     uint8_t* p2 = pool.Allocate(1);
     *p2 = 111;
-    DCHECK(p1 == p2);
+    ASSERT_EQ(p1, p2);
     EXPECT_EQ(mem_pool.total_allocated_bytes(), 16);
     pool.Free(p2);
   }

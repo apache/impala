@@ -282,10 +282,10 @@ class ExprTest : public testing::Test {
                 &value[0], value.size(), type, &result);
             return &expr_value_.decimal16_val;
           default:
-            DCHECK(false) << type;
+            EXPECT_TRUE(false) << type;
         }
       default:
-        DCHECK(false) << type;
+        EXPECT_TRUE(false) << type;
     }
     return NULL;
   }
@@ -4686,7 +4686,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   exprs.push_back(pool.Add(Literal::CreateLiteral(ColumnType::CreateCharType(3), "0")));
   expected_offsets[3].insert(expected_byte_size);
   expected_byte_size += 3 + 3; // 3 byte of padding
-  DCHECK_EQ(expected_byte_size % 4, 0);
+  ASSERT_EQ(expected_byte_size % 4, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_INT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
@@ -4698,7 +4698,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[4].insert(expected_byte_size + 8);
   expected_offsets[4].insert(expected_byte_size + 12);
   expected_byte_size += 4 * 4 + 4;  // 4 bytes of padding
-  DCHECK_EQ(expected_byte_size % 8, 0);
+  ASSERT_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
@@ -4712,7 +4712,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[8].insert(expected_byte_size + 24);
   expected_offsets[8].insert(expected_byte_size + 32);
   expected_byte_size += 5 * 8;      // No more padding
-  DCHECK_EQ(expected_byte_size % 8, 0);
+  ASSERT_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
@@ -4722,7 +4722,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[16].insert(expected_byte_size + 16);
   expected_offsets[16].insert(expected_byte_size + 32);
   expected_byte_size += 3 * 16;
-  DCHECK_EQ(expected_byte_size % 8, 0);
+  ASSERT_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
@@ -4733,7 +4733,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[0].insert(expected_byte_size + 32);
   expected_var_begin = expected_byte_size;
   expected_byte_size += 3 * 16;
-  DCHECK_EQ(expected_byte_size % 8, 0);
+  ASSERT_EQ(expected_byte_size % 8, 0);
 
   // Validate computed layout
   ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);
