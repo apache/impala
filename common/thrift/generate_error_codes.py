@@ -22,7 +22,9 @@
 # TODO Add support for SQL Error Codes
 #      https://msdn.microsoft.com/en-us/library/ms714687%28v=vs.85%29.aspx
 error_codes = (
-  ("OK", 1, ""),
+  ("OK", 0, ""),
+
+  ("UNUSED", 1, "<UNUSED>"),
 
   ("GENERAL", 2, "$0"),
 
@@ -208,20 +210,21 @@ import sys
 import os
 
 # Verifies the uniqueness of the error constants and numeric error codes.
+# Numeric codes must start from 0, be in order and have no gaps
 def check_duplicates(codes):
   constants = {}
-  num_codes = {}
+  next_num_code = 0
   for row in codes:
     if row[0] in constants:
       print("Constant %s already used, please check definition of '%s'!" % \
             (row[0], constants[row[0]]))
       exit(1)
-    if row[1] in num_codes:
-      print("Numeric error code %d already used, please check definition of '%s'!" % \
-            (row[1], num_codes[row[1]]))
+    if row[1] != next_num_code:
+      print("Numeric error codes must start from 0, be in order, and not have any gaps: "
+            "got %d, expected %d" % (row[1], next_num_code))
       exit(1)
+    next_num_code += 1
     constants[row[0]] = row[2]
-    num_codes[row[1]] = row[2]
 
 preamble = """
 // Copyright 2015 Cloudera Inc.
@@ -258,7 +261,7 @@ fid = open(target_file, "w+")
 try:
   fid.write(preamble)
   fid.write("""\nenum TErrorCode {\n""")
-  fid.write(",\n".join(map(lambda x: "  %s" % x[0], error_codes)))
+  fid.write(",\n".join(map(lambda x: "  %s = %d" % (x[0], x[1]), error_codes)))
   fid.write("\n}")
   fid.write("\n")
   fid.write("const list<string> TErrorMessage = [\n")
