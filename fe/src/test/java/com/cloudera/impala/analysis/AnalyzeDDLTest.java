@@ -950,11 +950,17 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   @Test
   public void TestTruncate() throws AnalysisException {
     AnalyzesOk("truncate table functional.alltypes");
+    AnalyzesOk("truncate table if exists functional.alltypes");
     AnalyzesOk("truncate functional.alltypes");
+    AnalyzesOk("truncate if exists functional.alltypes");
 
     // If the database does not exist, an analysis error should be thrown
     AnalysisError("truncate table db_does_not_exist.alltypes",
         "Database does not exist: db_does_not_exist");
+
+    // If the database does not exist, IF EXISTS would run ok
+    AnalyzesOk("truncate table if exists db_does_not_exist.alltypes");
+
     // Invalid name reports non-existence instead of invalidity.
     AnalysisError("truncate table functional.`%^&`",
         "Table does not exist: functional.%^&");
@@ -962,6 +968,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // If the database exists but the table doesn't, an analysis error should be thrown.
     AnalysisError("truncate table functional.badtable",
         "Table does not exist: functional.badtable");
+
+    // If the database exists but the table doesn't, IF EXISTS would run ok
+    AnalyzesOk("truncate if exists functional.badtable");
 
     // Cannot truncate a non hdfs table.
     AnalysisError("truncate table functional.alltypes_view",

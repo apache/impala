@@ -160,3 +160,31 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
+---- QUERY
+# TRUNCATE IF EXISTS does not fail on non existent table
+truncate table if exists non_existent;
+---- RESULTS
+====
+---- QUERY
+# Create an unpartitioned table.
+create table t3 like functional.tinytable;
+insert into t3 select * from functional.tinytable;
+select count(*) from t3;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+# TRUNCATE IF EXISTS base scenario
+truncate table if exists t3;
+---- RESULTS
+====
+---- QUERY
+# Verify that truncate was successful
+select count(*) from t3;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

@@ -515,6 +515,9 @@ struct TDropTableOrViewParams {
 struct TTruncateParams {
   // Fully qualified name of table to truncate
   1: required CatalogObjects.TTableName table_name
+
+  // If true, no error is raised if the target table does not exist
+  2: required bool if_exists
 }
 
 // Parameters of DROP FUNCTION commands

@@ -587,10 +587,10 @@ load_stmt ::=
   ;
 
 truncate_stmt ::=
-  KW_TRUNCATE KW_TABLE table_name:tbl_name
-  {: RESULT = new TruncateStmt(tbl_name); :}
-  | KW_TRUNCATE table_name:tbl_name
-  {: RESULT = new TruncateStmt(tbl_name); :}
+  KW_TRUNCATE KW_TABLE if_exists_val:if_exists table_name:tbl_name
+  {: RESULT = new TruncateStmt(tbl_name, if_exists); :}
+  | KW_TRUNCATE if_exists_val:if_exists table_name:tbl_name
+  {: RESULT = new TruncateStmt(tbl_name, if_exists); :}
   ;
 
 overwrite_val ::=

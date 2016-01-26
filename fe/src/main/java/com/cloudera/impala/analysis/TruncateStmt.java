@@ -32,25 +32,32 @@ import com.google.common.collect.Lists;
  * Representation of a TRUNCATE statement.
  * Acceptable syntax:
  *
- * TRUNCATE [TABLE] [database.]table
+ * TRUNCATE [TABLE] [IF EXISTS] [database.]table
  *
  */
 public class TruncateStmt extends StatementBase {
   private TableName tableName_;
+  private final boolean ifExists_;
 
   // Set in analyze().
   private Table table_;
 
-  public TruncateStmt(TableName tableName) {
+  public TruncateStmt(TableName tableName, boolean ifExists) {
     Preconditions.checkNotNull(tableName);
     tableName_ = tableName;
     table_ = null;
+    ifExists_ = ifExists;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     tableName_ = analyzer.getFqTableName(tableName_);
-    table_ = analyzer.getTable(tableName_, Privilege.INSERT);
+    try {
+      table_ = analyzer.getTable(tableName_, Privilege.INSERT);
+    } catch (AnalysisException e) {
+      if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
+      throw e;
+    }
     // We only support truncating hdfs tables now.
     if (!(table_ instanceof HdfsTable)) {
       throw new AnalysisException(String.format(
@@ -59,11 +66,14 @@ public class TruncateStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() { return "TRUNCATE TABLE " + tableName_; }
+  public String toSql() {
+    return "TRUNCATE TABLE " + (ifExists_ ? " IF EXISTS " : "") + tableName_;
+  }
 
   public TTruncateParams toThrift() {
     TTruncateParams params = new TTruncateParams();
     params.setTable_name(tableName_.toThrift());
+    params.setIf_exists(ifExists_);
     return params;
   }
 }

@@ -1134,8 +1134,14 @@ public class CatalogOpExecutor {
    */
   private void truncateTable(TTruncateParams params, TDdlExecResponse resp)
       throws ImpalaException {
-      TTableName tblName = params.getTable_name();
-    Table table = getExistingTable(tblName.getDb_name(), tblName.getTable_name());
+    TTableName tblName = params.getTable_name();
+    Table table = null;
+    try {
+      table = getExistingTable(tblName.getDb_name(), tblName.getTable_name());
+    } catch (TableNotFoundException e) {
+      if (params.if_exists) return;
+      throw e;
+    }
     Preconditions.checkNotNull(table);
     if (!(table instanceof HdfsTable)) {
       throw new CatalogException(
