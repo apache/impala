@@ -38,7 +38,9 @@ OS_MAPPING = {
   "centos7" : "ec2-package-centos-7",
   "debian6" : "ec2-package-debian-6",
   "debian7" : "ec2-package-debian-7",
+  "debian8" : "ec2-package-debian-8",
   "suselinux11": "ec2-package-sles-11",
+  "suselinux12": "ec2-package-sles-12",
   "ubuntu12.04" : "ec2-package-ubuntu-12-04",
   "ubuntu14.04" : "ec2-package-ubuntu-14-04"
 }
