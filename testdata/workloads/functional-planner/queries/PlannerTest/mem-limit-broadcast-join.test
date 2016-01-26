@@ -1,0 +1,21 @@
+====
+# test to verify that broadcast join hint gets enforced
+# when  mem limit < size of rhs hash table
+---- QUERY
+select * from tpch.nation n1
+join[broadcast]
+tpch.nation n2 on n1.n_regionkey=n2.n_regionkey
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: n1.n_regionkey = n2.n_regionkey
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch.nation n2]
+|     partitions=1/1 files=1 size=2.15KB
+|
+00:SCAN HDFS [tpch.nation n1]
+   partitions=1/1 files=1 size=2.15KB
+====

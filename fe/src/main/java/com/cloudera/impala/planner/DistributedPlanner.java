@@ -379,9 +379,14 @@ public class DistributedPlanner {
         && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
         && node.getJoinOp() != JoinOperator.RIGHT_SEMI_JOIN
         && node.getJoinOp() != JoinOperator.RIGHT_ANTI_JOIN
-        && (perNodeMemLimit == 0
+        // a broadcast join hint overides the check to see if the hash table
+        // size is less than the pernode memlimit
+        && (node.getDistributionModeHint() == DistributionMode.BROADCAST
+            || perNodeMemLimit == 0
             || Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD)
                 <= perNodeMemLimit)
+        // a broadcast join hint overrides the check to see if performing a broadcast
+        // join is more costly than a partitioned join
         && (node.getDistributionModeHint() == DistributionMode.BROADCAST
             || (node.getDistributionModeHint() != DistributionMode.PARTITIONED
                 && broadcastCost <= partitionCost)))
