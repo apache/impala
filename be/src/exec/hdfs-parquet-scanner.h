@@ -543,7 +543,7 @@ class HdfsParquetScanner : public HdfsScanner {
     TWO_LEVEL,
     THREE_LEVEL
   };
-  Status ResolvePathHelper(ArrayEncoding array_encoding, const std::vector<int>& path,
+  Status ResolvePathHelper(ArrayEncoding array_encoding, const SchemaPath& path,
       SchemaNode** node, bool* pos_field, bool* missing_field);
 
   /// Helper functions for ResolvePathHelper().

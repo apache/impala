@@ -58,9 +58,18 @@ class RuntimeState;
 /// array's item, and path [0,1] would refer to the position element, which is the item
 /// count of the array.
 ///
-/// Likewise, maps are represented as having three fields: the key element, the value
-/// element, and the artifical position element.
+/// Maps are also represented as having two fields, the key and the value elements (maps
+/// do not have a position element).
 typedef std::vector<int> SchemaPath;
+class SchemaPathConstants {
+ public:
+  static const int ARRAY_ITEM = 0;
+  static const int ARRAY_POS = 1;
+  static const int MAP_KEY = 0;
+  static const int MAP_VALUE = 1;
+ private:
+  DISALLOW_COPY_AND_ASSIGN(SchemaPathConstants);
+};
 
 struct LlvmTupleStruct {
   llvm::StructType* tuple_struct;

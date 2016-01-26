@@ -2044,7 +2044,7 @@ Status HdfsParquetScanner::ResolveArray(ArrayEncoding array_encoding,
   DCHECK((*node)->is_repeated());
 
   if (idx + 1 < path.size()) {
-    if (path[idx + 1] == 1) {
+    if (path[idx + 1] == SchemaPathConstants::ARRAY_POS) {
       // The next index in 'path' is the artifical position field.
       DCHECK_EQ(path.size(), idx + 2) << "position field cannot have children!";
       *pos_field = true;
@@ -2052,7 +2052,7 @@ Status HdfsParquetScanner::ResolveArray(ArrayEncoding array_encoding,
       return Status::OK();
     } else {
       // The next value in 'path' should be the item index
-      DCHECK_EQ(path[idx + 1], 0);
+      DCHECK_EQ(path[idx + 1], SchemaPathConstants::ARRAY_ITEM);
     }
   }
   return Status::OK();
@@ -2079,9 +2079,11 @@ Status HdfsParquetScanner::ResolveMap(const SchemaPath& path, int idx, SchemaNod
   }
   *node = &(*node)->children[0];
 
-  // The next index in 'path' should be the key or the value. Note that map elements
-  // do not have a synthetic position field.
-  if (idx + 1 < path.size()) DCHECK(path[idx + 1] == 0 || path[idx + 1] == 1);
+  // The next index in 'path' should be the key or the value.
+  if (idx + 1 < path.size()) {
+    DCHECK(path[idx + 1] == SchemaPathConstants::MAP_KEY ||
+           path[idx + 1] == SchemaPathConstants::MAP_VALUE);
+  }
   return Status::OK();
 }
 
