@@ -122,8 +122,7 @@ class MemTracker {
     }
 
     if (consumption_metric_ != NULL) {
-      DCHECK(parent_ == NULL);
-      consumption_->Set(consumption_metric_->value());
+      RefreshConsumptionFromMetric();
       return;
     }
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
@@ -160,7 +159,7 @@ class MemTracker {
   /// are updated.
   /// Returns true if the try succeeded.
   bool TryConsume(int64_t bytes) {
-    if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
+    if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
     if (bytes <= 0) return true;
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     int i = 0;
@@ -284,6 +283,9 @@ class MemTracker {
     return result;
   }
 
+  /// Refresh the value of consumption_. Only valid to call if consumption_metric_ is not
+  /// null.
+  void RefreshConsumptionFromMetric();
 
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }

@@ -212,6 +212,12 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
       Substitute("$0.bytes-over-limit", prefix), -1);
 }
 
+void MemTracker::RefreshConsumptionFromMetric() {
+  DCHECK(consumption_metric_ != NULL);
+  DCHECK(parent_ == NULL);
+  consumption_->Set(consumption_metric_->value());
+}
+
 // Calling this on the query tracker results in output like:
 // Query Limit: memory limit exceeded. Limit=100.00 MB Consumption=106.19 MB
 //   Fragment 5b45e83bbc2d92bd:d3ff8a7df7a2f491:  Consumption=52.00 KB
@@ -275,7 +281,7 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
   // Try to free up some memory
   for (int i = 0; i < gc_functions_.size(); ++i) {
     gc_functions_[i]();
-    if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
+    if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
     if (consumption() <= max_consumption) break;
   }
 

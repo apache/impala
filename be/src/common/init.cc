@@ -108,7 +108,7 @@ static void MaintenanceThread() {
     // be out of sync with the process usage. Update the process tracker periodically.
     impala::ExecEnv* env = impala::ExecEnv::GetInstance();
     if (env != NULL && env->process_mem_tracker() != NULL) {
-      env->process_mem_tracker()->Release(0);
+      env->process_mem_tracker()->RefreshConsumptionFromMetric();
     }
 #endif
     // TODO: we should also update the process mem tracker with the reported JVM
