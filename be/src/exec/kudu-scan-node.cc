@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef USE_KUDU
+
 #include "exec/kudu-scan-node.h"
 
 #include <boost/algorithm/string.hpp>
@@ -461,3 +463,5 @@ done:
 }
 
 }  // namespace impala
+
+#endif

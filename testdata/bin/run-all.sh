@@ -23,7 +23,6 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 if [[ $# -eq 1 && "$1" == "-format" ]]; then
   echo "Formatting cluster"
   HDFS_FORMAT_CLUSTER="-format"
-  KUDU_FORMAT_CLUSTER="--format=True"
 elif [[ $# -ne 0 ]]; then
   echo "Usage: run-all.sh [-format]"
   echo "[-format] : Format the mini-dfs cluster before starting"
@@ -79,7 +78,3 @@ else
   $IMPALA_HOME/testdata/bin/run-sentry-service.sh > \
       ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-sentry-service.log 2>&1
 fi
-
-echo " --> Starting Kudu"
-$IMPALA_HOME/testdata/bin/run-kudu.sh ${KUDU_FORMAT_CLUSTER-} > \
-    ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-kudu.log 2>&1

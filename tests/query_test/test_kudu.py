@@ -15,9 +15,11 @@
 import pytest
 from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.skip import SkipIf
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 
+@SkipIf.kudu_not_supported
 class TestKuduOperations(ImpalaTestSuite):
   """
   This suite tests the different modification operations when using a kudu table.
@@ -87,6 +89,7 @@ class TestKuduOperations(ImpalaTestSuite):
     self.run_test_case('QueryTest/kudu_stats', vector, use_db="kududb_test")
 
 
+@SkipIf.kudu_not_supported
 class TestKuduMemLimits(ImpalaTestSuite):
   QUERIES = ["select * from kudu_mem_limit.lineitem where l_orderkey = -1",
              "select * from kudu_mem_limit.lineitem where l_commitdate like '%cheese'",

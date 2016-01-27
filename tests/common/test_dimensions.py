@@ -13,7 +13,9 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 # of what specific table format to target along with the exec options (num_nodes, etc)
 # to use when running the query.
 class TableFormatInfo(object):
-  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'avro', 'hbase', 'kudu']
+  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'avro', 'hbase']
+  if os.environ['KUDU_IS_SUPPORTED'] == 'true':
+    KNOWN_FILE_FORMATS.append('kudu')
   KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def', 'lzo']
   KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
 

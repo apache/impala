@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef USE_KUDU
+#error Kudu is required
+#endif
+
 #include "exec/kudu-testutil.h"
 
 #include "common/init.h"

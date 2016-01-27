@@ -14,14 +14,19 @@
 
 package com.cloudera.impala.planner;
 
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TQueryOptions;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
  * This class contains all plan generation related tests with Kudu as a storage backend.
  */
 public class KuduPlannerTest extends PlannerTestBase {
+
+  @Before
+  public void checkKuduSupport() { TestUtils.assumeKuduIsSupported(); }
 
   @Test
   public void testKudu() { runPlannerTestFile("kudu"); }
@@ -32,12 +37,10 @@ public class KuduPlannerTest extends PlannerTestBase {
   @Test
   public void testDelete() { runPlannerTestFile("kudu-delete"); }
 
-
   @Test
   public void testSelectivity() {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.VERBOSE);
     runPlannerTestFile("kudu-selectivity", options);
   }
-
 }

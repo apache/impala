@@ -23,7 +23,7 @@ from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal, SkipIfOldAggsJoins
+from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal, SkipIfOldAggsJoins
 from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
 
 # Validates DDL statements (create, drop)
@@ -269,6 +269,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("invalidate metadata test_db.test_tbl")
     assert 'test_tbl' in self.client.execute("show tables in test_db").data
 
+  @SkipIf.kudu_not_supported
   @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_create_kudu(self, vector):

@@ -211,7 +211,9 @@ error_codes = (
 
   ("KUDU_IMPALA_TYPE_MISSING", 67, "Kudu type $0 is not available in Impala."),
 
-  ("IMPALA_KUDU_TYPE_MISSING", 68, "Impala type $0 is not available in Kudu.")
+  ("IMPALA_KUDU_TYPE_MISSING", 68, "Impala type $0 is not available in Kudu."),
+
+  ("KUDU_NOT_SUPPORTED_ON_OS", 69, "Kudu is not supported on this operating system.")
 )
 
 import sys

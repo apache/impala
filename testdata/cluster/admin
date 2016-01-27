@@ -53,14 +53,18 @@ SUPPORTED_SERVICES=(hdfs yarn)
 if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
   SUPPORTED_SERVICES+=(llama kms)
 fi
+if $KUDU_IS_SUPPORTED; then
+  SUPPORTED_SERVICES+=(kudu)
+fi
 
 # All DataNodes and NodeManagers need a unique but fixed address. The IP is fixed at
 # 127.0.0.1, so the only difference is the port. The address must be fixed because it is
 # used as an identifier. If a node were restarted with a different address it would be
 # considered a new node. The values below are arbitrary and may conflict with existing
-# sevices. Fixed ports were preferred to dynamically chosen free ports for consistency.
+# services. Fixed ports were preferred to dynamically chosen free ports for consistency.
 DATANODE_FREE_PORT_START=31000
 NODEMANAGER_FREE_PORT_START=31100
+KUDU_TS_RPC_FREE_PORT_START=31200
 
 # Used to populate config templates later. Any changes made here have no effect on an
 # existing cluster.
@@ -68,10 +72,12 @@ export HDFS_WEBUI_PORT=5070   # changed from 50070 so it is not ephemeral
 export YARN_WEBUI_PORT=8088   # same as default
 export LLAMA_WEBUI_PORT=1501  # same as default
 export KMS_WEBUI_PORT=16000   # same as default
+export KUDU_WEBUI_PORT=8051   # same as default
 
 # Empty dirs that should be included in the templates. Since git ignores empty dirs it is
 # easier to maintain them here.
-EMPTY_NODE_DIRS=$(echo data/dfs/{dn,nn} var/{run,lib/hadoop-hdfs,log})
+EMPTY_NODE_DIRS=$(echo data/dfs/{dn,nn} var/{run,lib/hadoop-hdfs,log} \
+    var/{log,run}/kudu/{master,ts} var/lib/kudu/{master,ts}/{wal,data})
 if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
   EMPTY_NODE_DIRS+=" /var/log/llama"
 fi
@@ -228,7 +234,8 @@ function create_cluster {
     fi
     if [[ $NODE_IDX -gt 1 ]]; then
       # Remove master role scripts from slave nodes
-      rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager,llama-application,kms}
+      rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager} \
+            "$NODE_DIR/etc/init.d/"{llama-application,kms,kudu-master}
     fi
     for EMPTY_NODE_DIR in $EMPTY_NODE_DIRS; do
       mkdir -p "$NODE_DIR/$EMPTY_NODE_DIR"
@@ -245,14 +252,16 @@ function create_cluster {
     # Template population
     DATANODE_PORT=$((DATANODE_FREE_PORT_START++))
     NODEMANAGER_PORT=$((NODEMANAGER_FREE_PORT_START++))
-    echo "$NODE will use ports DATANODE_PORT=$DATANODE_PORT and" \
-        "NODEMANAGER_PORT=$NODEMANAGER_PORT"
+    KUDU_TS_RPC_PORT=$((KUDU_TS_RPC_FREE_PORT_START++))
+    echo "$NODE will use ports DATANODE_PORT=$DATANODE_PORT," \
+        "NODEMANAGER_PORT=$NODEMANAGER_PORT, and KUDU_TS_RPC_PORT=$KUDU_TS_RPC_PORT"
 
     # Escape the first : to workaround https://jira.cloudera.com/browse/CDH-16840
     LLAMA_PORT_MAPPINGS+="$HADOOP_HOSTNAME\\:$DATANODE_PORT="
     LLAMA_PORT_MAPPINGS+="$HADOOP_HOSTNAME:$NODEMANAGER_PORT
 "
     export NODE NODE_DIR DATANODE_PORT NODEMANAGER_PORT LLAMA_PORT_MAPPINGS
+    export KUDU_TS_RPC_PORT
     for TEMPLATE_PATH in $(find "$NODE_DIR" -name "*$TEMPLATE_SUFFIX"); do
       ACTUAL_PATH="${TEMPLATE_PATH%$TEMPLATE_SUFFIX}"
 
@@ -371,12 +380,14 @@ function check_cluster_status {
   ROLE_COUNT=0
   NOT_RUNNING=()
   for NODE_DIR in "$NODES_DIR/$NODE_PREFIX"*; do
-    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/*" $FIND_EXECUTABLE_FILTER \
-        -type f); do
-      ROLE_COUNT=$((ROLE_COUNT + 1))
-      if ! "$SCRIPT" status &>/dev/null; then
-        NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
-      fi
+    for SERVICE in ${SUPPORTED_SERVICES[@]}; do
+      for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/$SERVICE*" $FIND_EXECUTABLE_FILTER \
+          -type f); do
+        ROLE_COUNT=$((ROLE_COUNT + 1))
+        if ! "$SCRIPT" status &>/dev/null; then
+          NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
+        fi
+      done
     done
   done
 

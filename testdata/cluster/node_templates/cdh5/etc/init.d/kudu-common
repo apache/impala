@@ -1,0 +1,14 @@
+# This file is intended to be sourced. After sourcing the KUDU_BIN_DIR variable will be
+# set. KUDU_BUILD_DIR or USE_KUDU_DEBUG_BUILD must be set before this is sourced (default
+# values are set in impala-config.sh).
+
+if [[ -n "$KUDU_BUILD_DIR" ]]; then
+  KUDU_BIN_DIR="$KUDU_BUILD_DIR/bin"
+else
+  KUDU_BIN_DIR="$IMPALA_TOOLCHAIN/kudu-$IMPALA_KUDU_VERSION/lib/kudu/sbin-"
+  if $USE_KUDU_DEBUG_BUILD; then
+    KUDU_BIN_DIR+=debug
+  else
+    KUDU_BIN_DIR+=release
+  fi
+fi

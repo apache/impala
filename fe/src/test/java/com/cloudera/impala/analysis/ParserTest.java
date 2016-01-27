@@ -29,6 +29,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -1617,6 +1618,11 @@ public class ParserTest {
     ParserError("update t where x = 4");
     ParserError("update t a set a = 10  where x = 4");
     ParserError("update t a from t b where set a = 10 x = 4");
+  }
+
+  @Test
+  public void TestKuduUpdate() {
+    TestUtils.assumeKuduIsSupported();
     ParserError("update (select * from functional_kudu.testtbl) a set name = '10'");
   }
 

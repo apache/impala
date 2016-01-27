@@ -17,7 +17,9 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <gtest/gtest.h>
+#ifdef USE_KUDU
 #include <kudu/client/client.h>
+#endif
 
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
@@ -29,6 +31,8 @@ namespace impala {
 
 class KuduScanner;
 class Tuple;
+
+#ifdef USE_KUDU
 
 /// A scan node that scans Kudu TabletServers.
 ///
@@ -53,20 +57,6 @@ class KuduScanNode : public ScanNode {
 
   /// Close connections to Kudu.
   virtual void Close(RuntimeState* state);
-
-  const std::vector<std::string>& projected_columns() const { return projected_columns_; }
-
-  const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
-
-  // Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
-  // have been open previously.
-  Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
-
-  // Clones the set of predicates to be set on scanners.
-  void ClonePredicates(vector<kudu::client::KuduPredicate*>* predicates);
-
-  RuntimeProfile::Counter* kudu_read_timer() const { return kudu_read_timer_; }
-  RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
 
  protected:
   /// Write debug string of this into out.
@@ -180,7 +170,47 @@ class KuduScanNode : public ScanNode {
   /// Returns the next partition key range to read. Thread safe. Returns NULL if there are
   /// no more ranges.
   TKuduKeyRange* GetNextKeyRange();
+
+  const std::vector<std::string>& projected_columns() const { return projected_columns_; }
+
+  const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
+
+  // Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
+  // have been open previously.
+  Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
+
+  // Clones the set of predicates to be set on scanners.
+  void ClonePredicates(vector<kudu::client::KuduPredicate*>* predicates);
+
+  RuntimeProfile::Counter* kudu_read_timer() const { return kudu_read_timer_; }
+  RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
 };
+
+#else // No Kudu
+
+class KuduScanNode : public ScanNode {
+ public:
+  KuduScanNode(ObjectPool *pool, const TPlanNode &tnode, const DescriptorTbl &descs)
+      : ScanNode(pool, tnode, descs) {}
+
+  ~KuduScanNode() {}
+
+  virtual Status Prepare(RuntimeState *state) {
+    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
+  }
+
+  virtual Status Open(RuntimeState *state) {
+    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
+  }
+
+  virtual Status GetNext(RuntimeState *state, RowBatch *row_batch, bool *eos) {
+    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
+  }
+
+  virtual void Close(RuntimeState *state) {}
+};
+
+#endif
 
 }
 

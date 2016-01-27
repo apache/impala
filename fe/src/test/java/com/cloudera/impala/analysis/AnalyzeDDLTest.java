@@ -42,6 +42,7 @@ import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -1511,6 +1512,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestAlterKuduTable() {
+    TestUtils.assumeKuduIsSupported();
     // Alter table is not supported and should fail
     AnalysisError("ALTER TABLE functional_kudu.testtbl ADD COLUMNS (other int)",
         "ALTER TABLE not allowed on Kudu table: functional_kudu.testtbl");
@@ -1524,6 +1526,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestCreateKuduTable() {
+    TestUtils.assumeKuduIsSupported();
     // Create Kudu Table with all required properties
     AnalyzesOk("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +

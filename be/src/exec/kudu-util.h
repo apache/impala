@@ -15,11 +15,16 @@
 #ifndef IMPALA_UTIL_KUDU_UTIL_H_
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
+#ifdef USE_KUDU
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
+#endif
+
 #include <boost/unordered_map.hpp>
 
 namespace impala {
+
+#ifdef USE_KUDU
 
 class TExpr;
 class KuduTableDescriptor;
@@ -65,6 +70,12 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
       return Status(strings::Substitute("$0: $1", prepend, _s.ToString())); \
     } \
   } while (0)
+
+#else  // No Kudu
+
+void InitKuduLogging() {}
+
+#endif
 
 } /// namespace impala
 #endif

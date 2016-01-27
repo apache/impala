@@ -72,6 +72,10 @@ if [ -e $IMPALA_LZO ]; then
 fi
 
 # When switching to and from toolchain, make sure to remove all CMake generated files
-find -iname '*cmake*' -not -name CMakeLists.txt \
-    -not -path '*cmake_modules*' \
-    -not -path '*thirdparty*' | xargs rm -Rf
+FIND_ARGS=("$IMPALA_HOME" -iname '*cmake*' -not -name CMakeLists.txt \
+    -not -path "$IMPALA_HOME/cmake_modules*" \
+    -not -path "$IMPALA_HOME/thirdparty*")
+if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
+  FIND_ARGS+=(-not -path "$IMPALA_TOOLCHAIN/*")
+fi
+find "${FIND_ARGS[@]}" | xargs rm -Rf

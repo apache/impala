@@ -19,6 +19,7 @@ import javax.json.JsonWriterFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.junit.Assume;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.thrift.TClientRequest;
@@ -266,5 +267,9 @@ public class TestUtils {
       if (jsonWriter != null) jsonWriter.close();
     }
     return sw.toString();
+  }
+
+  public static void assumeKuduIsSupported() {
+    Assume.assumeTrue("true".equals(System.getenv("KUDU_IS_SUPPORTED")));
   }
 }
