@@ -62,6 +62,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     last_active_time_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
     exec_env_(exec_env),
+    is_block_on_wait_joining_(false),
     session_(session),
     schedule_(NULL),
     coord_(NULL),
@@ -565,9 +566,24 @@ void ImpalaServer::QueryExecState::WaitAsync() {
 }
 
 void ImpalaServer::QueryExecState::BlockOnWait() {
-  if (wait_thread_.get() != NULL) {
+  unique_lock<mutex> l(lock_);
+  if (wait_thread_.get() == NULL) return;
+  if (!is_block_on_wait_joining_) {
+    // No other thread is already joining on wait_thread_, so this thread needs to do
+    // it.  Other threads will need to block on the cond-var.
+    is_block_on_wait_joining_ = true;
+    l.unlock();
     wait_thread_->Join();
+    l.lock();
+    is_block_on_wait_joining_ = false;
     wait_thread_.reset();
+    block_on_wait_cv_.notify_all();
+  } else {
+    // Another thread is already joining with wait_thread_.  Block on the cond-var
+    // until the Join() executed in the other thread has completed.
+    do {
+      block_on_wait_cv_.wait(l);
+    } while (is_block_on_wait_joining_);
   }
 }
 

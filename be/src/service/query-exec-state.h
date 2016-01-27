@@ -77,9 +77,11 @@ class ImpalaServer::QueryExecState {
   /// Calls Wait() asynchronously in a thread and returns immediately.
   void WaitAsync();
 
-  /// BlockOnWait() may be called after WaitAsync() has been called in order to wait for
-  /// the asynchronous thread to complete. It is safe to call this multiple times (only the
-  /// first call will block). Do not call while holding lock_.
+  /// BlockOnWait() may be called after WaitAsync() has been called in order to wait
+  /// for the asynchronous thread (wait_thread_) to complete. It is safe to call this
+  /// from multiple threads (all threads will block until wait_thread_ has completed)
+  /// and multiple times (non-blocking once wait_thread_ has completed). Do not call
+  /// while holding lock_.
   void BlockOnWait();
 
   /// Return at most max_rows from the current batch. If the entire current batch has
@@ -213,11 +215,18 @@ class ImpalaServer::QueryExecState {
   /// increased, and decreased once that work is completed.
   uint32_t ref_count_;
 
+  boost::mutex lock_;  // protects all following fields
+  ExecEnv* exec_env_;
+
   /// Thread for asynchronously running Wait().
   boost::scoped_ptr<Thread> wait_thread_;
 
-  boost::mutex lock_;  // protects all following fields
-  ExecEnv* exec_env_;
+  /// Condition variable to make BlockOnWait() thread-safe. One thread joins
+  /// wait_thread_, and all other threads block on this cv. Used with lock_.
+  boost::condition_variable block_on_wait_cv_;
+
+  /// Used in conjunction with block_on_wait_cv_ to make BlockOnWait() thread-safe.
+  bool is_block_on_wait_joining_;
 
   /// Session that this query is from
   boost::shared_ptr<SessionState> session_;
