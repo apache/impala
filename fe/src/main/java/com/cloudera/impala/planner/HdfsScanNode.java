@@ -185,9 +185,19 @@ public class HdfsScanNode extends ScanNode {
     }
     if (firstComplexTypedCol == null) return;
 
+    boolean hasMaterializedSlots = false;
+    for (SlotDescriptor slotDesc: desc_.getSlots()) {
+      if (slotDesc.isMaterialized()) {
+        hasMaterializedSlots = true;
+        break;
+      }
+    }
+
     for (HdfsPartition part: partitions_) {
       HdfsFileFormat format = part.getInputFormatDescriptor().getFileFormat();
       if (format.isComplexTypesSupported()) continue;
+      // Allow count(*) and similar queries on RC_FILE with complex types.
+      if (format == HdfsFileFormat.RC_FILE && !hasMaterializedSlots) continue;
       String errSuffix = String.format(
           "Complex types are supported for these file formats: %s",
           Joiner.on(", ").join(HdfsFileFormat.complexTypesFormats()));
