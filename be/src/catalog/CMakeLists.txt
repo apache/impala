@@ -19,11 +19,6 @@ add_library(Catalog
   catalog.cc
   catalog-server.cc
   catalog-util.cc
+  catalogd-main.cc
 )
 add_dependencies(Catalog thrift-deps)
-
-add_executable(catalogd catalogd-main.cc)
-target_link_libraries(catalogd
-  ${JAVA_JSIG_LIBRARY}
-  ${IMPALA_LINK_LIBS}
-)

@@ -51,7 +51,7 @@ DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
 DECLARE_string(principal);
 
-int main(int argc, char** argv) {
+int ImpaladMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
 
   LlvmCodeGen::InitializeLlvm();
@@ -94,4 +94,6 @@ int main(int argc, char** argv) {
   delete be_server;
   delete beeswax_server;
   delete hs2_server;
+
+  return 0;
 }

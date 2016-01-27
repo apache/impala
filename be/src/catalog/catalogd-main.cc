@@ -49,7 +49,7 @@ DECLARE_string(ssl_private_key_password_cmd);
 using namespace impala;
 using namespace apache::thrift;
 
-int main(int argc, char** argv) {
+int CatalogdMain(int argc, char** argv) {
   FLAGS_webserver_port = 25020;
   FLAGS_state_store_subscriber_port = 23020;
   InitCommonRuntime(argc, argv, true);
@@ -91,4 +91,6 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(server->Start());
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();
+
+  return 0;
 }

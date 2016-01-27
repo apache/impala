@@ -44,7 +44,7 @@ DECLARE_string(ssl_private_key_password_cmd);
 using namespace impala;
 using namespace apache::thrift;
 
-int main(int argc, char** argv) {
+int StatestoredMain(int argc, char** argv) {
   // Override default for webserver port
   FLAGS_webserver_port = 25010;
   InitCommonRuntime(argc, argv, false);
@@ -86,4 +86,6 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(server->Start());
 
   statestore.MainLoop();
+
+  return 0;
 }

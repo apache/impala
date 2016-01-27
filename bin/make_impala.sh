@@ -117,11 +117,15 @@ cd $IMPALA_HOME/common/function-registry
 make
 
 cd $IMPALA_HOME
+# With parallelism, make doesn't always make statestored and catalogd correctly if you
+# write make -jX impalad statestored catalogd. So we keep them separate and after impalad,
+# which they link to.
+make -j${IMPALA_BUILD_THREADS:-4} impalad
+make statestored
+make catalogd
 if [ $BUILD_TESTS -eq 1 ]
 then
   make -j${IMPALA_BUILD_THREADS:-4}
 else
-  # TODO: is there a way to get CMake to do this?
-  make -j${IMPALA_BUILD_THREADS:-4} impalad
-  make -j${IMPALA_BUILD_THREADS:-4} statestored catalogd fesupport loggingsupport ImpalaUdf
+  make -j${IMPALA_BUILD_THREADS:-4} fesupport loggingsupport ImpalaUdf
 fi

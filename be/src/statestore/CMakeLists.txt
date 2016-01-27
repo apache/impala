@@ -23,10 +23,8 @@ add_library(Statestore
   failure-detector.cc
   statestore.cc
   statestore-subscriber.cc
+  statestored-main.cc
 )
 add_dependencies(Statestore thrift-deps)
-
-add_executable(statestored statestored-main.cc)
-target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 
 ADD_BE_TEST(statestore-test)
