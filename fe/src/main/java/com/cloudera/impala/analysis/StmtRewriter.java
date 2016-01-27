@@ -23,8 +23,10 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 /**
@@ -348,7 +350,7 @@ public class StmtRewriter {
     // Extract all correlated predicates from the subquery.
     List<Expr> onClauseConjuncts = extractCorrelatedPredicates(subqueryStmt);
     if (!onClauseConjuncts.isEmpty()) {
-      canRewriteCorrelatedSubquery(expr);
+      canRewriteCorrelatedSubquery(expr, onClauseConjuncts);
       // For correlated subqueries that are eligible for rewrite by transforming
       // into a join, a LIMIT clause has no effect on the results, so we can
       // safely remove it.
@@ -357,9 +359,10 @@ public class StmtRewriter {
 
     // Update the subquery's select list and/or its GROUP BY clause by adding
     // exprs from the extracted correlated predicates.
-    boolean updateGroupBy = expr.getSubquery().isScalarSubquery() ||
-        (expr instanceof ExistsPredicate &&
-         subqueryStmt.hasAggInfo() && !subqueryStmt.getSelectList().isDistinct());
+    boolean updateGroupBy = expr.getSubquery().isScalarSubquery()
+        || (expr instanceof ExistsPredicate
+            && !subqueryStmt.getSelectList().isDistinct()
+            && subqueryStmt.hasAggInfo());
     List<Expr> lhsExprs = Lists.newArrayList();
     List<Expr> rhsExprs = Lists.newArrayList();
     for (Expr conjunct: onClauseConjuncts) {
@@ -649,19 +652,20 @@ public class StmtRewriter {
   }
 
   /**
-   * Checks if an expr containing a correlated subquery is eligible for
-   * rewrite by tranforming into a join. Throws an AnalysisException if 'expr'
+   * Checks if an expr containing a correlated subquery is eligible for rewrite by
+   * tranforming into a join. 'correlatedPredicates' contains the correlated
+   * predicates identified in the subquery. Throws an AnalysisException if 'expr'
    * is not eligible for rewrite.
    * TODO: Merge all the rewrite eligibility tests into a single function.
    */
-  private static void canRewriteCorrelatedSubquery(Expr expr)
-        throws AnalysisException {
+  private static void canRewriteCorrelatedSubquery(Expr expr,
+      List<Expr> correlatedPredicates) throws AnalysisException {
     Preconditions.checkNotNull(expr);
+    Preconditions.checkNotNull(correlatedPredicates);
     Preconditions.checkState(expr.contains(Subquery.class));
     SelectStmt stmt = (SelectStmt) expr.getSubquery().getStatement();
     Preconditions.checkNotNull(stmt);
-    // Grouping and/or aggregation (including analytic functions) is only
-    // allowed on correlated EXISTS subqueries
+    // Grouping and/or aggregation is not allowed on correlated scalar and IN subqueries
     if ((expr instanceof BinaryPredicate
           && (stmt.hasGroupByClause() || stmt.hasAnalyticInfo()))
         || (expr instanceof InPredicate
@@ -669,6 +673,25 @@ public class StmtRewriter {
       throw new AnalysisException("Unsupported correlated subquery with grouping " +
           "and/or aggregation: " + stmt.toSql());
     }
+
+    final com.google.common.base.Predicate<Expr> isSingleSlotRef =
+        new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) { return arg.unwrapSlotRef(false) != null; }
+    };
+
+    // A HAVING clause is only allowed on correlated EXISTS subqueries with
+    // correlated binary predicates of the form Slot = Slot (see IMPALA-2734)
+    // TODO Handle binary predicates with IS NOT DISTINCT op
+    if (expr instanceof ExistsPredicate && stmt.hasHavingClause()
+        && !correlatedPredicates.isEmpty()
+        && (!stmt.hasAggInfo()
+            || !Iterables.all(correlatedPredicates,
+                Predicates.or(Expr.IS_EQ_BINARY_PREDICATE, isSingleSlotRef)))) {
+      throw new AnalysisException("Unsupported correlated EXISTS subquery with a " +
+          "HAVING clause: " + stmt.toSql());
+    }
+
     // The following correlated subqueries with a limit clause are supported:
     // 1. EXISTS subqueries
     // 2. Scalar subqueries with aggregation

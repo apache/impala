@@ -129,6 +129,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
+  public final static com.google.common.base.Predicate<Expr> IS_EQ_BINARY_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) { return BinaryPredicate.getEqSlots(arg) != null; }
+      };
+
+  public final static com.google.common.base.Predicate<Expr> IS_BINARY_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) { return arg instanceof BinaryPredicate; }
+      };
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs

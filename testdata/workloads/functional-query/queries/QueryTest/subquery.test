@@ -787,3 +787,25 @@ GROUP BY t1.bigint_col
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Correlated EXISTS subquery with a having clause (IMPALA-2734)
+SELECT 1
+FROM alltypestiny t1
+WHERE EXISTS
+  (SELECT 1
+   FROM alltypestiny t2
+   WHERE t1.id = t2.id AND t1.int_col = t2.int_col
+   GROUP BY t2.id
+   HAVING count(1) = 1)
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+TINYINT
+====

@@ -511,7 +511,39 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       // Correlated EXISTS subquery with a group by and aggregation
       AnalyzesOk(String.format("select 1 from functional.alltypestiny t " +
           "where %s (select id, count(*) from functional.alltypesagg g where " +
-          "t.id = g.id group by id)", op));
+          "t.id = g.id group by id having count(*) > 2)", op));
+      // Correlated EXISTS subquery with a having clause but no grouping or
+      // aggregate exprs
+      AnalysisError(String.format("select 1 from functional.alltypestiny t1 " +
+          "where %s (select 1 from functional.alltypestiny t2 where " +
+          "t1.int_col = t2.int_col having count(*) > 1)", op),
+          "Unsupported correlated EXISTS subquery with a HAVING clause: " +
+          "SELECT 1 FROM functional.alltypestiny t2 WHERE t1.int_col = " +
+          "t2.int_col HAVING count(*) > 1");
+      // Correlated EXISTS subquery with a HAVING clause and non-equality
+      // correlated predicates
+      AnalysisError(String.format("select 1 from functional.alltypestiny t1 " +
+          "where %s (select 1 from functional.alltypestiny t2 where " +
+          "t1.int_col < t2.int_col and t1.id = t2.id group by t2.id " +
+          "having count(1) = 1)", op), "Unsupported correlated " +
+          "EXISTS subquery with a HAVING clause: SELECT 1 FROM " +
+          "functional.alltypestiny t2 WHERE t1.int_col < t2.int_col AND " +
+          "t1.id = t2.id GROUP BY t2.id HAVING count(1) = 1");
+      AnalysisError(String.format("select 1 from functional.alltypestiny t1 " +
+          "where %s (select 1 from functional.alltypestiny t2 where t1.id = t2.id " +
+          "and (t1.string_col like t2.string_col) = true group by t2.id " +
+          "having count(1) = 1)", op), "Unsupported correlated EXISTS subquery " +
+          "with a HAVING clause: SELECT 1 FROM functional.alltypestiny t2 WHERE " +
+          "t1.id = t2.id AND (t1.string_col LIKE t2.string_col) = TRUE GROUP BY " +
+          "t2.id HAVING count(1) = 1");
+      AnalysisError(String.format(
+          "select id from functional.allcomplextypes t where %s " +
+          "(select avg(f1) from t.struct_array_col a where t.int_struct_col.f1 < a.f1 " +
+          "and a.f2 != 'xyz' group by a.f2 having count(*) > 2)", op),
+          "Unsupported correlated EXISTS subquery with a HAVING clause: " +
+          "SELECT avg(f1) FROM t.struct_array_col a WHERE t.int_struct_col.f1 < a.f1 " +
+          "AND a.f2 != 'xyz' GROUP BY a.f2 HAVING count(*) > 2");
+
       // Correlated EXISTS subquery with an analytic function
       AnalyzesOk(String.format("select id, int_col, bool_col from " +
           "functional.alltypestiny t1 where %s (select min(bigint_col) over " +
@@ -527,10 +559,6 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "select id from functional.allcomplextypes t where %s " +
           "(select item from t.int_array_col a where t.id = a.item)", op));
-      AnalyzesOk(String.format(
-          "select id from functional.allcomplextypes t where %s " +
-          "(select avg(f1) from t.struct_array_col a where t.int_struct_col.f1 < a.f1 " +
-          "and a.f2 != 'xyz' group by a.f2 having count(*) > 2)", op));
 
       String nullOps[] = {"is null", "is not null"};
       for (String nullOp: nullOps) {

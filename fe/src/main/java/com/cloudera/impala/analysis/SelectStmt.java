@@ -116,6 +116,7 @@ public class SelectStmt extends QueryStmt {
   public boolean hasAggInfo() { return aggInfo_ != null; }
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
+  public boolean hasHavingClause() { return havingClause_ != null; }
   @Override
   public ArrayList<String> getColLabels() { return colLabels_; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
