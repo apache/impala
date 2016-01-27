@@ -18,6 +18,18 @@ select * from cached_tbl_nopart
 INT
 ====
 ---- QUERY
+# Create a table 'like' cached_tbl_nopart
+create table like_cached_tbl_nopart like cached_tbl_nopart
+====
+---- QUERY
+# like_cached_tbl_nopart shouldn't inhert the caching settings
+show table stats like_cached_tbl_nopart
+---- RESULTS
+-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
 # Unpartitioned table shows correct caching
 show table stats cached_tbl_nopart
 ---- RESULTS

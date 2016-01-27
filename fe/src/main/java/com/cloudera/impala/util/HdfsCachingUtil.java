@@ -43,10 +43,10 @@ public class HdfsCachingUtil {
   private static final Logger LOG = Logger.getLogger(HdfsCachingUtil.class);
 
   // The key name used to save cache directive IDs in table/partition properties.
-  private final static String CACHE_DIR_ID_PROP_NAME = "cache_directive_id";
+  public final static String CACHE_DIR_ID_PROP_NAME = "cache_directive_id";
 
   // The key name used to store the replication factor for cached files
-  private final static String CACHE_DIR_REPLICATION_PROP_NAME = "cache_replication";
+  public final static String CACHE_DIR_REPLICATION_PROP_NAME = "cache_replication";
 
   // The number of caching refresh intervals that can go by when waiting for data to
   // become cached before assuming no more progress is being made.

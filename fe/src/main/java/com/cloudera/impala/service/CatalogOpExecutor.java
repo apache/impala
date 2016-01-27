@@ -1295,6 +1295,18 @@ public class CatalogOpExecutor {
         tbl.getParameters().remove("EXTERNAL");
       }
     }
+
+    // We should not propagate hdfs caching parameters to the new table.
+    if (tbl.getParameters().containsKey(
+        HdfsCachingUtil.CACHE_DIR_ID_PROP_NAME)) {
+      tbl.getParameters().remove(HdfsCachingUtil.CACHE_DIR_ID_PROP_NAME);
+    }
+    if (tbl.getParameters().containsKey(
+        HdfsCachingUtil.CACHE_DIR_REPLICATION_PROP_NAME)) {
+      tbl.getParameters().remove(
+        HdfsCachingUtil.CACHE_DIR_REPLICATION_PROP_NAME);
+    }
+
     // The LOCATION property should not be copied from the old table. If the location
     // is null (the caller didn't specify a custom location) this will clear the value
     // and the table will use the default table location from the parent database.
