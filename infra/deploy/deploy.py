@@ -426,7 +426,10 @@ def clone_existing_service(cluster, new_name, template_service):
 
 def main():
     args = parse_args()
-    api = ApiResource(args.host, username=args.user, password=args.password)
+    api = ApiResource(args.host,
+                      username=args.user,
+                      password=args.password,
+                      version=10)
 
     cluster = find_cluster(api, args.cluster)
     check_new_service_does_not_exist(api, cluster, args.service_name)
