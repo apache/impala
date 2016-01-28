@@ -16,7 +16,9 @@ import logging
 import pytest
 from copy import deepcopy
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfNotDebugBuild
 
+@SkipIfNotDebugBuild.debug_only
 class TestAllocFail(CustomClusterTestSuite):
   """Tests for handling malloc() failure for UDF/UDA"""
 

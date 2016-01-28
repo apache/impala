@@ -104,3 +104,22 @@ class SkipIfLocal:
       reason="Tests rely on HDFS qualified paths")
   root_path = pytest.mark.skipif(IS_LOCAL,
       reason="Tests rely on the root directory")
+
+# Try to derive the build type. Assume it's 'latest' by default.
+impala_home = os.environ.get("IMPALA_HOME", "")
+build_type_regex = re.compile(r'--build_type=(\w+)', re.I)
+build_type_search_result = re.search(build_type_regex, test_start_cluster_args)
+
+if build_type_search_result is not None:
+  build_type = build_type_search_result.groups()[0].lower()
+else:
+  build_type = 'latest'
+
+# Resolve any symlinks in the path.
+impalad_basedir = \
+    os.path.realpath(os.path.join(impala_home, 'be/build', build_type)).rstrip('/')
+debug_build = os.path.basename(impalad_basedir).lower() == 'debug'
+
+class SkipIfNotDebugBuild:
+  debug_only = pytest.mark.skipif(not debug_build,
+      reason="Tests depends on debug build startup option.")
