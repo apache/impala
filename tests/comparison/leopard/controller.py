@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from time import sleep, localtime, strftime
-from tests.comparison.query_profile import PROFILES
+from tests.comparison.query_profile import DefaultProfile, ImpalaNestedTypesProfile
 from schedule_item import ScheduleItem
 from fabric.api import sudo, settings
 from threading import Thread
@@ -27,11 +27,18 @@ PATH_TO_SCHEDULE = '/tmp/query_gen/schedule'
 PATH_TO_REPORTS = '/tmp/query_gen/reports'
 PATH_TO_FINISHED_JOBS = '/tmp/query_gen/completed_jobs'
 PATH_TO_LOG = '/tmp/query_gen/log'
-RUN_TIME_LIMIT = 8 * 3600 #8 hours
-GENERATION_FREQUENCY = 4 * 3600 #Every 2 hours
-MAX_CONCURRENCY = 6
+RUN_TIME_LIMIT = 12 * 3600
+GENERATION_FREQUENCY = RUN_TIME_LIMIT
+MAX_CONCURRENCY = 2
 DEFAULT_RUN_NAME = 'AUTO_RUN'
 SLEEP_LENGTH = 3
+
+NESTED_TYPES_MODE = False
+DELETE_SCHEDULE_ITEMS_ON_STARTUP = True
+SHOULD_BUILD_IMPALA = True
+SHOULD_PULL_DOCKER_IMAGE = False
+DATABASE_NAME = 'functional'
+POSTGRES_DATABASE_NAME = 'functional'
 
 LOG = logging.getLogger('Controller')
 
@@ -68,6 +75,9 @@ class Controller(object):
     '''
     if not os.path.exists(PATH_TO_SCHEDULE):
       os.makedirs(PATH_TO_SCHEDULE)
+    if DELETE_SCHEDULE_ITEMS_ON_STARTUP:
+      for job_id in os.listdir(PATH_TO_SCHEDULE):
+        os.remove(os.path.join(PATH_TO_SCHEDULE, job_id))
     if not os.path.exists(PATH_TO_FINISHED_JOBS):
       os.makedirs(PATH_TO_FINISHED_JOBS)
     if not os.path.exists(PATH_TO_REPORTS):
@@ -117,11 +127,11 @@ class Controller(object):
     hours.
     '''
     if self.should_generate_new_item():
-      default_profile = PROFILES[0]()
+      profile = ImpalaNestedTypesProfile() if NESTED_TYPES_MODE else DefaultProfile()
       schedule_item = ScheduleItem(
           run_name = '{0}-{1}'.format(strftime(
               "%Y-%b-%d-%H:%M:%S", localtime()), DEFAULT_RUN_NAME),
-          query_profile=default_profile,
+          query_profile=profile,
           time_limit_sec=RUN_TIME_LIMIT)
       schedule_item.save_pickle()
       self.time_last_generated = time.time()

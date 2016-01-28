@@ -76,7 +76,7 @@ def show_report(report_id):
           len(result['formatted_stack'].split('\n')))
       content = ('<h4>Impala Query:</h4><pre><code>{0}</code></pre>'
           '<h4>Stack:</h4><pre>{1}</pre>').format(
-              result['test_sql'], result['formatted_stack'])
+              result['test_sql'], result['formatted_stack'][:50000])
       crashes_list.append((inner_id, inner_title, content))
     id = next(gen)
     title = first_impala_frame
@@ -234,6 +234,7 @@ def start_run():
     # Run based on previous run
     schedule_item = ScheduleItem(
         run_name = request.form['run_name'],
+        query_profile = DefaultProfile(),
         time_limit_sec = 24 * 3600, # Default time limit is 24 hours
         git_command = request.form['git_command'],
         parent_job = request.form['report_id'])

@@ -35,6 +35,7 @@ class Query(object):
     self.union_clause = None
     self.order_by_clause = None
     self.limit_clause = None
+    self.execution = 'RAW'
 
   def __deepcopy__(self, memo):
     other = Query()
@@ -49,6 +50,7 @@ class Query(object):
     other.union_clause = deepcopy(self.union_clause, memo)
     other.order_by_clause = deepcopy(self.order_by_clause, memo)
     other.limit_clause = deepcopy(self.limit_clause, memo)
+    other.execution = self.execution
     return other
 
   @property

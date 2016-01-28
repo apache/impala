@@ -55,7 +55,8 @@ class QueryResultComparator(object):
   # The DECIMAL values will be rounded before comparison
   DECIMAL_PLACES = 2
 
-  def __init__(self, query_profile, ref_conn, test_conn, query_timeout_seconds):
+  def __init__(self, query_profile, ref_conn,
+      test_conn, query_timeout_seconds, flatten_dialect=None):
     '''test/ref_conn arguments should be an instance of DbConnection'''
     ref_cursor = ref_conn.cursor()
     test_cursor = test_conn.cursor()
@@ -69,7 +70,8 @@ class QueryResultComparator(object):
     self.query_executor = QueryExecutor(
         [ref_cursor, test_cursor],
         [self.ref_sql_writer, self.test_sql_writer],
-        query_timeout_seconds=query_timeout_seconds)
+        query_timeout_seconds=query_timeout_seconds,
+        flatten_dialect=flatten_dialect)
 
   @property
   def ref_db_type(self):

@@ -13,6 +13,11 @@ cm-api == 10.0.0
 Fabric == 1.10.2
   paramiko == 1.15.2
   pycrypto == 2.6.1
+Flask == 0.10.1
+  Jinja2 == 2.8
+  MarkupSafe == 0.23
+  Werkzeug == 0.11.3
+  itsdangerous == 0.24
 hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0

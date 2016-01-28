@@ -19,6 +19,9 @@ from fabric.api import sudo, run, settings
 from logging import getLogger
 from os.path import join as join_path
 from time import sleep
+from tests.comparison.leopard.controller import (
+    SHOULD_BUILD_IMPALA,
+    SHOULD_PULL_DOCKER_IMAGE)
 import random
 import os
 
@@ -76,18 +79,26 @@ class ImpalaDockerEnv(object):
     '''Starts a container with port forwarding for ssh, impala and postgres. '''
     for _ in range(NUM_START_ATTEMPTS):
       with settings(warn_only = True, host_string = self.host, user = self.host_username):
+        set_core_dump_location_command = \
+            "echo '/tmp/core_files/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern"
+        sudo(set_core_dump_location_command, pty=True)
         port = random.randint(0, 999)
         self.ssh_port = 55000 + port
         self.impala_port = 56000 + port
         self.postgres_port = 57000 + port
-        start_command = (
-            'docker pull {docker_image_name} '
-            '&& docker run -d -t -p {postgres_port}:5432 -p {ssh_port}:22 '
+
+        start_command = ''
+        if SHOULD_PULL_DOCKER_IMAGE:
+          start_command = 'docker pull {docker_image_name} && '.format(
+              docker_image_name = self.docker_image_name)
+        start_command += (
+            'docker run -d -t -p {postgres_port}:5432 -p {ssh_port}:22 '
             '-p {impala_port}:21050 {docker_image_name} /bin/docker-boot-daemon').format(
                 ssh_port = self.ssh_port,
                 impala_port = self.impala_port,
                 postgres_port = self.postgres_port,
                 docker_image_name = self.docker_image_name)
+
         try:
           self.container_id = sudo(start_command, pty=True)
         except:
@@ -112,40 +123,44 @@ class ImpalaDockerEnv(object):
         warn_only = True,
         host_string = '{0}@{1}:{2}'.format(DOCKER_USER_NAME, self.host, self.ssh_port),
         password = os.environ['DOCKER_PASSWORD']):
-      run_all_command = ('source {IMPALA_HOME}/bin/impala-config.sh '
+      run_all_command = (
+          'mkdir -p {CORE_PATH} && chmod 777 {CORE_PATH} && cd {IMPALA_HOME} '
+          '&& source {IMPALA_HOME}/bin/impala-config.sh '
           '&& {IMPALA_HOME}/bin/create-test-configuration.sh '
           '&& {IMPALA_HOME}/testdata/bin/run-all.sh').format(
-              IMPALA_HOME = IMPALA_HOME)
+              IMPALA_HOME = IMPALA_HOME,
+              CORE_PATH=CORE_PATH)
       retry(run)(run_all_command, pty=False)
 
   def build_impala(self):
     '''Fetches and Builds Impala. If git_command is not present the latest version is
     fetched by default. '''
 
+    build_command = None
     if self.git_command:
       build_command = (
-          'mkdir -p {CORE_PATH} && chmod 777 {CORE_PATH} '
           'docker-boot && cd {IMPALA_HOME} && {git_command} '
           '&& source {IMPALA_HOME}/bin/impala-config.sh '
           '&& {IMPALA_HOME}/buildall.sh -notests').format(
               git_command = self.git_command,
               IMPALA_HOME = IMPALA_HOME,
               CORE_PATH = CORE_PATH)
-    else:
+    elif SHOULD_BUILD_IMPALA:
       build_command = (
-          'mkdir -p {CORE_PATH} && chmod 777 {CORE_PATH} '
-          '&& docker-boot && cd {IMPALA_HOME} '
-          '&& source {IMPALA_HOME}/bin/impala-config.sh').format(
+          'docker-boot && cd {IMPALA_HOME} '
+          '&& git fetch --all && git checkout origin/cdh5-trunk '
+          '&& source {IMPALA_HOME}/bin/impala-config.sh '
+          '&& {IMPALA_HOME}/buildall.sh -notests').format(
               IMPALA_HOME = IMPALA_HOME,
               CORE_PATH = CORE_PATH)
 
-    with settings(
-        warn_only = True,
-        host_string = '{0}@{1}:{2}'.format(DOCKER_USER_NAME, self.host, self.ssh_port),
-        password = os.environ['DOCKER_PASSWORD']):
-      result = retry(run)(build_command, pty=False)
-
-    return result
+    if build_command:
+      with settings(
+          warn_only = True,
+          host_string = '{0}@{1}:{2}'.format(DOCKER_USER_NAME, self.host, self.ssh_port),
+          password = os.environ['DOCKER_PASSWORD']):
+        result = retry(run)(build_command, pty=False)
+        LOG.info('Build Complete, Result: {0}'.format(result))
 
   def start_impala(self):
     with settings(
@@ -201,8 +216,7 @@ class ImpalaDockerEnv(object):
     # second. This is simple and reliable. An alternative implementation is to poll with
     # timeout if SSH was started.
     sleep(10)
-    result = self.build_impala()
-    LOG.info('Build Complete, Result: {0}'.format(result))
+    self.build_impala()
     try:
       result = self.run_all()
     except Exception:

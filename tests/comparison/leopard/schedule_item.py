@@ -16,7 +16,7 @@ import random
 import string
 import pickle
 import os
-from tests.comparison.query_profile import PROFILES
+from tests.comparison.query_profile import DefaultProfile, ImpalaNestedTypesProfile
 from threading import Thread
 
 ID_LEN = 16
@@ -49,7 +49,7 @@ class ScheduleItem(object):
       parent_job=None):
     self.run_name = run_name
     self.git_command = git_command
-    self.query_profile = None if parent_job else query_profile or PROFILES[0]()
+    self.query_profile = None
     self.parent_job = parent_job
     # It takes a while to extract the parent job name, so it's done in the save_pickle
     # method in a separate thread.
@@ -64,7 +64,9 @@ class ScheduleItem(object):
       string.ascii_lowercase + string.digits) for _ in range(ID_LEN)])
 
   def save_pickle(self):
-    from controller import PATH_TO_FINISHED_JOBS, PATH_TO_SCHEDULE
+    from tests.comparison.leopard.controller import (
+        PATH_TO_SCHEDULE,
+        PATH_TO_FINISHED_JOBS)
 
     def inner():
       if self.parent_job:

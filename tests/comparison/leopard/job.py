@@ -16,16 +16,22 @@ from __future__ import division
 from os.path import join as join_path
 from tests.comparison.query_generator import QueryGenerator
 from time import time
-from tests.comparison.db_connector import (
-    DbConnector,
+from tests.comparison.db_connection import (
+    DbCursor,
     DbConnection,
+    PostgresqlConnection,
+    ImpalaConnection,
     POSTGRESQL,
     IMPALA)
 from tests.comparison.leopard.controller import (
     PATH_TO_SCHEDULE,
     PATH_TO_REPORTS,
-    PATH_TO_FINISHED_JOBS)
+    PATH_TO_FINISHED_JOBS,
+    NESTED_TYPES_MODE,
+    DATABASE_NAME,
+    POSTGRES_DATABASE_NAME)
 from tests.comparison.discrepancy_searcher import QueryResultComparator
+from tests.comparison.query_profile import DefaultProfile, ImpalaNestedTypesProfile
 from threading import Thread
 from impala_docker_env import ImpalaDockerEnv
 
@@ -34,7 +40,6 @@ import os
 import pickle
 import sys
 
-DATABASE_NAME = 'functional'
 POSTGRES_USER_NAME = 'postgres'
 NUM_UNEXPECTED_ERRORS_THRESHOLD = 200
 LOG = logging.getLogger('Job')
@@ -54,11 +59,11 @@ class Job(object):
       git_command = None,
       parent_job = None):
     self.git_hash = ''
-    self.impala_env = ImpalaDockerEnv(git_command)
     self.job_id = job_id
     self.job_name = run_name
     self.parent_job = parent_job
-    self.query_profile = query_profile
+    self.query_profile = query_profile or (
+        ImpalaNestedTypesProfile() if NESTED_TYPES_MODE else DefaultProfile())
     self.ref_connection = None
     self.result_list = []
     self.start_time = time()
@@ -66,6 +71,9 @@ class Job(object):
     self.target_stop_time = time() + time_limit_sec
     self.test_connection = None
     self.num_queries_executed = 0
+    self.num_queries_returned_correct_data = 0
+    self.flatten_dialect = 'POSTGRESQL' if NESTED_TYPES_MODE else None
+    self.impala_env = ImpalaDockerEnv(git_command)
 
   def __getstate__(self):
     '''For pickling'''
@@ -78,6 +86,7 @@ class Job(object):
     result['start_time'] = self.start_time
     result['stop_time'] = self.stop_time
     result['num_queries_executed'] = self.num_queries_executed
+    result['num_queries_returned_correct_data'] = self.num_queries_returned_correct_data
     return result
 
   def prepare(self):
@@ -88,12 +97,13 @@ class Job(object):
     self.impala_env.prepare()
     LOG.info('Job Preparation Complete')
 
-    self.ref_connection = DbConnector(POSTGRESQL,
+    self.ref_connection = PostgresqlConnection(
         user_name=POSTGRES_USER_NAME,
         password=None,
         host_name=self.impala_env.host,
-        port=self.impala_env.postgres_port).create_connection(DATABASE_NAME)
-    LOG.info('Create Ref Connection')
+        port=self.impala_env.postgres_port,
+        db_name=POSTGRES_DATABASE_NAME)
+    LOG.info('Created ref_connection')
 
     self.start_impala()
 
@@ -105,18 +115,22 @@ class Job(object):
     return stack_trace
 
   def start_impala(self):
-    '''Starts impala and creates a connection to it.
-    '''
+    '''Starts impala and creates a connection to it. '''
     self.impala_env.start_impala()
-    self.test_connection = DbConnector(IMPALA,
-        user_name=None,
-        password=None,
+
+    self.test_connection = ImpalaConnection(
         host_name=self.impala_env.host,
-        port=self.impala_env.impala_port).create_connection(DATABASE_NAME)
+        port=self.impala_env.impala_port,
+        user_name=None,
+        db_name=DATABASE_NAME)
 
     self.test_connection.reconnect()
     self.query_result_comparator = QueryResultComparator(
-        self.ref_connection, self.test_connection)
+        self.query_profile,
+        self.ref_connection,
+        self.test_connection,
+        query_timeout_seconds=4*60,
+        flatten_dialect='POSTGRESQL')
     LOG.info('Created query result comparator')
     LOG.info(str(self.query_result_comparator.__dict__))
 
@@ -124,8 +138,7 @@ class Job(object):
     return self.impala_env.is_impala_running()
 
   def save_pickle(self):
-    '''Saves self as pickle. This is normally done when the job finishes running.
-    '''
+    '''Saves self as pickle. This is normally done when the job finishes running. '''
     with open(join_path(PATH_TO_FINISHED_JOBS, self.job_id), 'w') as f:
       pickle.dump(self, f)
     LOG.info('Saved Completed Job Pickle')
@@ -138,8 +151,7 @@ class Job(object):
       # If parent job is specified, get the queries from the parent job report
       with open(join_path(PATH_TO_REPORTS, self.parent_job), 'r') as f:
         parent_report = pickle.load(f)
-      #for error_type in ['stack', 'row_counts', 'mismatch']:
-      for error_type in ['stack']:
+      for error_type in ['stack', 'row_counts', 'mismatch']:
         for query in parent_report.grouped_results[error_type]:
           yield query['model']
     else:
@@ -148,6 +160,7 @@ class Job(object):
       while num_unexpected_errors < NUM_UNEXPECTED_ERRORS_THRESHOLD:
         query = None
         try:
+          self.query_generator = QueryGenerator(self.query_profile)
           query = self.query_generator.create_query(self.common_tables)
         except IndexError as e:
           # This is a query generator bug that happens extremely rarely
@@ -155,18 +168,16 @@ class Job(object):
           continue
         except Exception as e:
           LOG.info('Unexpected error in queries_to_be_executed, {0}'.format(e))
-          self.query_generator = QueryGenerator(self.query_profile)
           num_unexpected_errors += 1
           if num_unexpected_errors > NUM_UNEXPECTED_ERRORS_THRESHOLD:
             LOG.error('Num Unexpected Errors above threshold')
             raise
           else:
             continue
-        query.execution = 'RAW'
         yield query
 
   def generate_report(self):
-    '''Generate report and save it into the reports directory'''
+    '''Generate report and save it into the reports directory. '''
     from report import Report
     rep = Report(self.job_id)
     rep.save_pickle()
@@ -175,15 +186,19 @@ class Job(object):
     try:
       self.prepare()
       self.query_generator = QueryGenerator(self.query_profile)
-      self.common_tables = DbConnection.describe_common_tables(
-          [self.ref_connection, self.test_connection])
+      if NESTED_TYPES_MODE:
+        self.common_tables = DbCursor.describe_common_tables(
+            [self.test_connection.cursor()])
+      else:
+        self.common_tables = DbCursor.describe_common_tables(
+            [self.test_connection.cursor(), self.ref_connection.cursor()])
 
       for query_model in self.queries_to_be_executed():
         LOG.info('About to execute query.')
         result_dict = self.run_query(query_model)
         LOG.info('Query Executed successfully.')
+        self.num_queries_executed += 1
         if result_dict:
-          self.num_queries_executed += 1
           self.result_list.append(result_dict)
         LOG.info('Time Left: {0}'.format(self.target_stop_time - time()))
         if time() > self.target_stop_time:
@@ -216,8 +231,7 @@ class Job(object):
         return try_num
 
   def run_query(self, query_model):
-    '''Runs a single query.'''
-
+    '''Runs a single query. '''
     if not self.is_impala_running():
       LOG.info('Impala is not running, starting Impala.')
       self.start_impala()
@@ -226,7 +240,6 @@ class Job(object):
       self.comparison_result = self.query_result_comparator.compare_query_results(
           query_model)
 
-    # 10 minute time out to avoid cursor close problem?
     self.comparison_result = None
     internal_thread = Thread(
       target=run_query_internal,
@@ -256,6 +269,8 @@ class Job(object):
       if comparison_result.error:
         result_dict = self.comparison_result_analysis(comparison_result)
         result_dict['model'] = query_model
+      elif comparison_result.query_resulted_in_data:
+        self.num_queries_returned_correct_data += 1
     else:
       LOG.info('CRASH OCCURED')
       result_dict = self.comparison_result_analysis(comparison_result)
@@ -269,7 +284,7 @@ class Job(object):
     return result_dict
 
   def comparison_result_analysis(self, comparison_result):
-    '''Get useful information from the comparison_result.'''
+    '''Get useful information from the comparison_result. '''
     result_dict = {}
     result_dict['error'] = comparison_result.error
     result_dict['mismatch_col'] = comparison_result.mismatch_at_col_number

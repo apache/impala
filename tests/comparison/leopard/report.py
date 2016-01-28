@@ -34,6 +34,7 @@ class Report(object):
     self.git_hash = ''
     self.grouped_results = None
     self.parent_job_name = ''
+    self.num_queries_returned_correct_data = 0
     self.get_results()
 
   @property
@@ -154,9 +155,9 @@ class Report(object):
     self.job_name = job.job_name
     self.git_hash = job.git_hash
     self.num_queries_executed = job.num_queries_executed
+    self.num_queries_returned_correct_data = job.num_queries_returned_correct_data
     if job.parent_job:
-      with open(os.path.join(PATH_TO_FINISHED_JOBS,
-          self.parent_job)) as f:
+      with open(os.path.join(PATH_TO_FINISHED_JOBS, job.parent_job)) as f:
         parent_job = pickle.load(f)
         self.parent_job_name = parent_job.job_name
 
