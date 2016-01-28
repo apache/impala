@@ -284,7 +284,9 @@ public class Frontend {
       ddl.setShow_fns_params(stmt.toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("return type", Type.STRING.toThrift()),
-          new TColumn("signature", Type.STRING.toThrift())));
+          new TColumn("signature", Type.STRING.toThrift()),
+          new TColumn("binary type", Type.STRING.toThrift()),
+          new TColumn("is persistent", Type.STRING.toThrift())));
     } else if (analysis.isShowCreateTableStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_CREATE_TABLE;
       ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());

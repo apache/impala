@@ -323,6 +323,20 @@ public class FileSystemUtil {
   }
 
   /**
+   * Copies the source file to a destination path on the local filesystem and returns true
+   * if successful.
+   */
+   public static boolean copyToLocal(Path source, Path dest) {
+     try {
+       FileSystem fs = source.getFileSystem(CONF);
+       fs.copyToLocalFile(source, dest);
+     } catch (IOException e) {
+       return false;
+     }
+     return true;
+   }
+
+  /**
    * Return true if the path can be reached, false for all other cases
    * File doesn't exist, cannot access the FileSystem, etc.
    */

@@ -30,12 +30,14 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
  * Base class for CREATE [] FUNCTION.
  */
 public abstract class CreateFunctionStmtBase extends StatementBase {
+
   // Enums for valid keys for optional arguments.
   public enum OptArg {
     COMMENT,
@@ -59,12 +61,17 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
   // Result of analysis.
   protected Function fn_;
 
+  // Db object for function fn_. Set in analyze().
+  protected Db db_;
+
   // Set in analyze()
   protected String sqlString_;
 
   protected CreateFunctionStmtBase(FunctionName fnName, FunctionArgs args,
       TypeDef retTypeDef, HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
+    // The return and arg types must either be both null or non-null.
+    Preconditions.checkState(!(args == null ^ retTypeDef == null));
     fnName_ = fnName;
     args_ = args;
     retTypeDef_ = retTypeDef;
@@ -75,6 +82,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
 
   public String getComment() { return optArgs_.get(OptArg.COMMENT); }
   public boolean getIfNotExists() { return ifNotExists_; }
+  public boolean hasSignature() { return args_ != null; }
 
   public TCreateFunctionParams toThrift() {
     TCreateFunctionParams params = new TCreateFunctionParams(fn_.toThrift());
@@ -107,7 +115,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
     if (suffixIndex != -1) {
       String suffix = binaryPath.substring(suffixIndex + 1);
       if (suffix.equalsIgnoreCase("jar")) {
-        binaryType = TFunctionBinaryType.HIVE;
+        binaryType = TFunctionBinaryType.JAVA;
       } else if (suffix.equalsIgnoreCase("so")) {
         binaryType = TFunctionBinaryType.NATIVE;
       } else if (suffix.equalsIgnoreCase("ll")) {
@@ -126,12 +134,15 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
     // Validate function name is legal
     fnName_.analyze(analyzer);
 
-    // Validate function arguments and return type.
-    args_.analyze(analyzer);
-    retTypeDef_.analyze(analyzer);
-
-    fn_ = createFunction(fnName_, args_.getArgTypes(), retTypeDef_.getType(),
-        args_.hasVarArgs());
+    if (hasSignature()) {
+      // Validate function arguments and return type.
+      args_.analyze(analyzer);
+      retTypeDef_.analyze(analyzer);
+      fn_ = createFunction(fnName_, args_.getArgTypes(), retTypeDef_.getType(),
+          args_.hasVarArgs());
+    } else {
+      fn_ = createFunction(fnName_, null, null, false);
+    }
 
     // For now, if authorization is enabled, the user needs ALL on the server
     // to create functions.
@@ -145,18 +156,8 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
           fn_.getFunctionName().getFunction());
     }
 
-    // Forbid unsupported and complex types.
-    List<Type> refdTypes = Lists.newArrayList(fn_.getReturnType());
-    refdTypes.addAll(Lists.newArrayList(fn_.getArgs()));
-    for (Type t: refdTypes) {
-      if (!t.isSupported() || t.isComplexType()) {
-        throw new AnalysisException(
-            String.format("Type '%s' is not supported in UDFs/UDAs.", t.toSql()));
-      }
-    }
-
-    Db db = analyzer.getDb(fn_.dbName(), Privilege.CREATE);
-    Function existingFn = db.getFunction(fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
+    db_ = analyzer.getDb(fn_.dbName(), Privilege.CREATE);
+    Function existingFn = db_.getFunction(fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
     if (existingFn != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.FN_ALREADY_EXISTS_ERROR_MSG +
           existingFn.signatureString());
@@ -167,6 +168,31 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
 
     // Check the file type from the binary type to infer the type of the UDA
     fn_.setBinaryType(getBinaryType());
+
+    // Forbid unsupported and complex types.
+    if (hasSignature()) {
+      List<Type> refdTypes = Lists.newArrayList(fn_.getReturnType());
+      refdTypes.addAll(Lists.newArrayList(fn_.getArgs()));
+      for (Type t: refdTypes) {
+        if (!t.isSupported() || t.isComplexType()) {
+          throw new AnalysisException(
+              String.format("Type '%s' is not supported in UDFs/UDAs.", t.toSql()));
+        }
+      }
+    } else if (fn_.getBinaryType() != TFunctionBinaryType.JAVA) {
+      throw new AnalysisException(
+          String.format("Native functions require a return type and/or " +
+              "argument types: %s", fn_.getFunctionName()));
+    }
+
+    // Check if the function can be persisted. We persist all native/IR functions
+    // and also JAVA functions added without signature. Only JAVA functions added
+    // with signatures aren't persisted.
+    if (getBinaryType() == TFunctionBinaryType.JAVA && hasSignature()) {
+      fn_.setIsPersistent(false);
+    } else {
+      fn_.setIsPersistent(true);
+    }
   }
 
   /**

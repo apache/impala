@@ -27,8 +27,7 @@ drop function if exists udf_test.hive_add(boolean, boolean);
 
 drop function if exists udf_test.throws_exception();
 
-create database if not exists udf_test
-location '$FILESYSTEM_PREFIX/test-warehouse/udf_test.db';
+drop function if exists java_udfs_test.identity;
 
 create function udf_test.hive_pi() returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
@@ -53,6 +52,11 @@ symbol='org.apache.hadoop.hive.ql.udf.UDFBin';
 create function udf_test.hive_lower(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
+
+# Used to test persistent java functions
+create function java_udfs_test.identity
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(boolean) returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'

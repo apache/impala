@@ -1766,6 +1766,10 @@ public class ParserTest {
         "'f.jar' SYMBOL='class.Udf' COMMENT='hi'");
     ParsesOk("CREATE FUNCTION IF NOT EXISTS Foo() RETURNS INT LOCATION 'foo.jar' " +
         "SYMBOL='class.Udf'");
+    ParsesOk("CREATE FUNCTION foo LOCATION 'f.jar' SYMBOL='class.Udf'");
+    ParsesOk("CREATE FUNCTION db.foo LOCATION 'f.jar' SYMBOL='class.Udf'");
+    ParsesOk("CREATE FUNCTION IF NOT EXISTS foo LOCATION 'f.jar' SYMBOL='class.Udf'");
+    ParsesOk("CREATE FUNCTION IF NOT EXISTS db.foo LOCATION 'f.jar' SYMBOL='class.Udf'");
 
     // Try more interesting function names
     ParsesOk("CREATE FUNCTION User.Foo() RETURNS INT LOCATION 'a'");
@@ -1777,6 +1781,7 @@ public class ParserTest {
     ParserError("CREATE FUNCTION User.() RETURNS INT LOCATION 'a'");
     ParserError("CREATE FUNCTION User.Foo.() RETURNS INT LOCATION 'a'");
     ParserError("CREATE FUNCTION User..Foo() RETURNS INT LOCATION 'a'");
+    ParserError("CREATE FUNCTION Foo() LOCATION 'a.jar' SYMBOL='class.Udf");
     // Bad function name that parses but won't analyze.
     ParsesOk("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a'");
 
@@ -1790,6 +1795,8 @@ public class ParserTest {
     ParserError("CREATE FUNCTION Foo() RETURNS INT SYMBOL='1' LOCATION 'a'");
     ParserError("CREATE FUNCTION Foo() RETURNS INT LOCATION 'a' SYMBOL");
     ParserError("CREATE FUNCTION Foo() RETURNS INT LOCATION 'a' SYMBOL='1' SYMBOL='2'");
+    ParserError("CREATE FUNCTION IF NOT EXISTS db.foo LOCATION 'f.jar' SYMBOL='1'" +
+         " SYMBOL='2'");
 
     // Missing arguments
     ParserError("CREATE FUNCTION Foo RETURNS INT LOCATION 'f.jar'");
@@ -2475,6 +2482,8 @@ public class ParserTest {
     ParsesOk("DROP AGGREGATE FUNCTION IF EXISTS Foo()");
     ParsesOk("DROP FUNCTION IF EXISTS Foo(INT)");
     ParsesOk("DROP FUNCTION IF EXISTS Foo(INT...)");
+    ParsesOk("DROP FUNCTION Foo");
+    ParsesOk("DROP FUNCTION IF EXISTS Foo");
 
     ParserError("DROP");
     ParserError("DROP Foo");
@@ -2500,11 +2509,11 @@ public class ParserTest {
     ParserError("DROP VIEW Foo purge");
     ParserError("DROP FUNCTION Foo)");
     ParserError("DROP FUNCTION Foo(");
-    ParserError("DROP FUNCTION Foo");
     ParserError("DROP FUNCTION Foo PURGE");
     ParserError("DROP FUNCTION");
     ParserError("DROP BLAH FUNCTION");
     ParserError("DROP IF EXISTS FUNCTION Foo()");
+    ParserError("DROP FUNCTION Foo RETURNS INT");
     ParserError("DROP FUNCTION Foo(INT) RETURNS INT");
     ParserError("DROP FUNCTION Foo.(INT) RETURNS INT");
     ParserError("DROP FUNCTION Foo..(INT) RETURNS INT");

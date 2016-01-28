@@ -17,10 +17,14 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.authorization.AuthorizeableFn;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropFunctionParams;
+import com.cloudera.impala.thrift.TFunctionCategory;
+
+import java.util.ArrayList;
 
 /**
  * Represents a DROP [IF EXISTS] FUNCTION statement
@@ -47,6 +51,7 @@ public class DropFunctionStmt extends StatementBase {
 
   public FunctionName getFunction() { return desc_.getFunctionName(); }
   public boolean getIfExists() { return ifExists_; }
+  private boolean hasSignature() { return fnArgs_ != null; }
 
   @Override
   public String toSql() {
@@ -62,17 +67,22 @@ public class DropFunctionStmt extends StatementBase {
     params.setFn_name(desc_.getFunctionName().toThrift());
     params.setArg_types(Type.toThrift(desc_.getArgs()));
     params.setIf_exists(getIfExists());
-    params.setSignature(desc_.signatureString());
+    if (hasSignature()) params.setSignature(desc_.signatureString());
     return params;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     fnName_.analyze(analyzer);
-    fnArgs_.analyze(analyzer);
 
-    desc_ = new Function(fnName_, fnArgs_.getArgTypes(), Type.INVALID,
-        fnArgs_.hasVarArgs());
+    if (hasSignature()) {
+      fnArgs_.analyze(analyzer);
+      desc_ = new Function(fnName_, fnArgs_.getArgTypes(), Type.INVALID,
+          fnArgs_.hasVarArgs());
+    } else {
+      desc_ = new Function(fnName_, new ArrayList<Type>(), Type.INVALID,
+          false);
+    }
 
     // For now, if authorization is enabled, the user needs ALL on the server
     // to drop functions.
@@ -80,11 +90,18 @@ public class DropFunctionStmt extends StatementBase {
     analyzer.registerPrivReq(new PrivilegeRequest(
         new AuthorizeableFn(desc_.signatureString()), Privilege.ALL));
 
-    if (analyzer.getDb(desc_.dbName(), Privilege.DROP, false) == null && !ifExists_) {
+    Db db =  analyzer.getDb(desc_.dbName(), Privilege.DROP, false);
+    if (db == null && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + desc_.dbName());
     }
 
-    if (analyzer.getCatalog().getFunction(
+    if (!hasSignature() && db != null && db.getFunctions(
+        desc_.functionName()).isEmpty() && !ifExists_) {
+      throw new AnalysisException(
+          Analyzer.FN_DOES_NOT_EXIST_ERROR_MSG + desc_.functionName());
+    }
+
+    if (hasSignature() && analyzer.getCatalog().getFunction(
         desc_, Function.CompareMode.IS_IDENTICAL) == null && !ifExists_) {
       throw new AnalysisException(
           Analyzer.FN_DOES_NOT_EXIST_ERROR_MSG + desc_.signatureString());

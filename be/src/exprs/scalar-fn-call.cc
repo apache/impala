@@ -46,7 +46,7 @@ ScalarFnCall::ScalarFnCall(const TExprNode& node)
     prepare_fn_(NULL),
     close_fn_(NULL),
     scalar_fn_(NULL) {
-  DCHECK_NE(fn_.binary_type, TFunctionBinaryType::HIVE);
+  DCHECK_NE(fn_.binary_type, TFunctionBinaryType::JAVA);
 }
 
 Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,

@@ -55,7 +55,6 @@ import com.google.common.collect.Maps;
  * db object corresponding to this instance. This map's key is the function signature and
  * value is the base64 representation of the thrift serialized function object.
  *
- * TODO: Implement persistence of java based hive udf/udas.
  */
 public class Db implements CatalogObject {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
@@ -63,7 +62,7 @@ public class Db implements CatalogObject {
   private final TDatabase thriftDb_;
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
-  private static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
+  public static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
 
   // Hive metastore imposes a limit of 4000 bytes on the key and value strings
   // in DB parameters map. We need ensure that this limit isn't crossed
@@ -92,7 +91,6 @@ public class Db implements CatalogObject {
     thriftDb_.setMetastore_db(msDb);
     tableCache_ = new CatalogObjectCache<Table>();
     functions_ = new HashMap<String, List<Function>>();
-    loadFunctionsFromDbParams(msDb);
   }
 
   public void setIsSystemDb(boolean b) { isSystemDb_ = b; }
@@ -102,29 +100,6 @@ public class Db implements CatalogObject {
    */
   public static Db fromTDatabase(TDatabase db, Catalog parentCatalog) {
     return new Db(db.getDb_name(), parentCatalog, db.getMetastore_db());
-  }
-
-  /**
-   * Extracts Impala functions stored in metastore db parameters and adds them to
-   * the catalog cache.
-   */
-  private void loadFunctionsFromDbParams(
-      org.apache.hadoop.hive.metastore.api.Database msDb) {
-    if (msDb == null || msDb.getParameters() == null) return;
-    LOG.info("Loading functions for database :" + getName());
-    TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
-    for (String key: msDb.getParameters().keySet()) {
-      if (!key.startsWith(FUNCTION_INDEX_PREFIX)) continue;
-      try {
-        TFunction fn = new TFunction();
-        JniUtil.deserializeThrift(protocolFactory, fn,
-            Base64.decodeBase64(msDb.getParameters().get(key)));
-        addFunction(Function.fromThrift(fn), false);
-      } catch (ImpalaException e) {
-        LOG.error("Encountered an error during function load: key=" + key
-            + ",continuing", e);
-      }
-    }
   }
 
   /**
@@ -311,7 +286,7 @@ public class Db implements CatalogObject {
   private boolean addFunctionToDbParams(Function fn) {
     Preconditions.checkState(
         fn.getBinaryType() != TFunctionBinaryType.BUILTIN &&
-        fn.getBinaryType() != TFunctionBinaryType.HIVE);
+        fn.getBinaryType() != TFunctionBinaryType.JAVA);
     try {
       TSerializer serializer =
           new TSerializer(new TCompactProtocol.Factory());
@@ -331,9 +306,10 @@ public class Db implements CatalogObject {
   }
 
   public boolean addFunction(Function fn) {
-    // Currently we don't persist java based udfs into the DB params.
-    // TODO: Remove this once hive udf support is ready.
-    boolean addToDbParams = !(fn.getBinaryType() == TFunctionBinaryType.HIVE);
+    // We use the db parameters map to persist native and IR functions.
+    boolean addToDbParams =
+        (fn.getBinaryType() == TFunctionBinaryType.NATIVE ||
+         fn.getBinaryType() == TFunctionBinaryType.IR);
     return addFunction(fn, addToDbParams);
   }
 
@@ -343,7 +319,7 @@ public class Db implements CatalogObject {
    * fn already exists or when a failure is encountered while adding it to
    * the metastore DB params and true otherwise.
    */
-  private boolean addFunction(Function fn, boolean addToDbParams) {
+  public boolean addFunction(Function fn, boolean addToDbParams) {
     Preconditions.checkState(fn.dbName().equals(getName()));
     synchronized (functions_) {
       if (getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
@@ -372,8 +348,7 @@ public class Db implements CatalogObject {
       Preconditions.checkNotNull(fns);
       fns.remove(fn);
       if (fns.isEmpty()) functions_.remove(desc.functionName());
-      // TODO: Remove this once hive udf support is ready
-      if (fn.getBinaryType() == TFunctionBinaryType.HIVE) return fn;
+      if (fn.getBinaryType() == TFunctionBinaryType.JAVA) return fn;
       // Remove the function from the metastore database parameters
       String fnKey = FUNCTION_INDEX_PREFIX + fn.signatureString();
       boolean removeFn = removeFromHmsParameters(fnKey);
@@ -436,41 +411,73 @@ public class Db implements CatalogObject {
   }
 
   /**
+   * Returns a list of transient functions in this Db.
+   */
+  protected List<Function> getTransientFunctions() {
+    List<Function> result = Lists.newArrayList();
+    synchronized (functions_) {
+      for (String fnKey: functions_.keySet()) {
+        for (Function fn: functions_.get(fnKey)) {
+          if (fn.userVisible() && !fn.isPersistent()) {
+            result.add(fn);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
    * Returns all functions that match 'fnPattern'.
    */
   public List<Function> getFunctions(TFunctionCategory category,
       PatternMatcher fnPattern) {
-    List<Function> functionsList = Lists.newArrayList();
+    List<Function> result = Lists.newArrayList();
     synchronized (functions_) {
       for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
         if (!fnPattern.matches(fns.getKey())) continue;
         for (Function fn: fns.getValue()) {
           if (fn.userVisible() &&
               (category == null || Function.categoryMatch(fn, category))) {
-            functionsList.add(fn);
+            result.add(fn);
           }
         }
       }
     }
-    return functionsList;
+    return result;
+  }
+
+  /**
+   * Returns all functions with the given name
+   */
+  public List<Function> getFunctions(String name) {
+    List<Function> result = Lists.newArrayList();
+    Preconditions.checkNotNull(name);
+    synchronized (functions_) {
+      if (!functions_.containsKey(name)) return result;
+      for (Function fn: functions_.get(name)) {
+        if (fn.userVisible()) result.add(fn);
+      }
+    }
+    return result;
   }
 
   /**
    * Returns all functions with the given name and category.
    */
   public List<Function> getFunctions(TFunctionCategory category, String name) {
-    List<Function> functionsList = Lists.newArrayList();
+    List<Function> result = Lists.newArrayList();
     Preconditions.checkNotNull(category);
     Preconditions.checkNotNull(name);
-    synchronized(functions_) {
-      if (!functions_.containsKey(name)) return functionsList;
+    synchronized (functions_) {
+      if (!functions_.containsKey(name)) return result;
       for (Function fn: functions_.get(name)) {
         if (fn.userVisible() && Function.categoryMatch(fn, category)) {
-          functionsList.add(fn);
+          result.add(fn);
         }
       }
     }
-    return functionsList;
+    return result;
   }
 
   @Override

@@ -16,16 +16,20 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
-import jline.internal.Preconditions;
-
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.hive.executor.UdfExecutor.JavaUdfDataType;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TSymbolType;
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a CREATE FUNCTION statement.
@@ -54,47 +58,33 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     Preconditions.checkNotNull(fn_ instanceof ScalarFunction);
     ScalarFunction udf = (ScalarFunction) fn_;
 
-    if (udf.getBinaryType() == TFunctionBinaryType.HIVE) {
-      if (!udf.getReturnType().isScalarType()) {
-        throw new AnalysisException("Non-scalar return types not supported: "
-            + udf.getReturnType().toSql());
-      }
-      if (udf.getReturnType().isTimestamp()) {
-        throw new AnalysisException(
-            "Hive UDFs that use TIMESTAMP are not yet supported.");
-      }
-      if (udf.getReturnType().isDecimal()) {
-        throw new AnalysisException(
-            "Hive UDFs that use DECIMAL are not yet supported.");
-      }
-      for (int i = 0; i < udf.getNumArgs(); ++i) {
-        if (!udf.getArgs()[i].isScalarType()) {
-          throw new AnalysisException("Non-scalar argument types not supported: "
-              + udf.getArgs()[i].toSql());
-        }
-        if (udf.getArgs()[i].isTimestamp()) {
+    if (hasSignature()) {
+      if (udf.getBinaryType() == TFunctionBinaryType.JAVA) {
+        if (!JavaUdfDataType.isSupported(udf.getReturnType())) {
           throw new AnalysisException(
-              "Hive UDFs that use TIMESTAMP are not yet supported.");
+              "Type " + udf.getReturnType().toSql() + " is not supported for Java UDFs.");
         }
-        if (udf.getArgs()[i].isDecimal()) {
-          throw new AnalysisException(
-              "Hive UDFs that use DECIMAL are not yet supported.");
+        for (int i = 0; i < udf.getNumArgs(); ++i) {
+          if (!JavaUdfDataType.isSupported(udf.getArgs()[i])) {
+            throw new AnalysisException(
+                "Type " + udf.getArgs()[i].toSql() + " is not supported for Java UDFs.");
+          }
         }
       }
-    }
 
-    if (udf.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
-      throw new AnalysisException("UDFs that use CHAR are not yet supported.");
-    }
-    if (udf.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
-      throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
-    }
-    for (int i = 0; i < udf.getNumArgs(); ++i) {
-      if (udf.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
+      if (udf.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
         throw new AnalysisException("UDFs that use CHAR are not yet supported.");
       }
-      if (udf.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
+      if (udf.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
         throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
+      }
+      for (int i = 0; i < udf.getNumArgs(); ++i) {
+        if (udf.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
+          throw new AnalysisException("UDFs that use CHAR are not yet supported.");
+        }
+        if (udf.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
+          throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
+        }
       }
     }
 
@@ -121,6 +111,22 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     checkOptArgNotSet(OptArg.FINALIZE_FN);
 
     sqlString_ = udf.toSql(ifNotExists_);
+
+    // Check that there is no function with the same name and isPersistent field not
+    // the same as udf.isPersistent_. For example we don't allow two JAVA udfs with
+    // same name and opposite persistence values set. This only applies for JAVA udfs
+    // as all the native udfs are persisted. Additionally we don't throw exceptions
+    // if "IF NOT EXISTS" is specified in the query.
+    if (udf.getBinaryType() != TFunctionBinaryType.JAVA || ifNotExists_) return;
+
+    Preconditions.checkNotNull(db_);
+    for (Function fn: db_.getFunctions(udf.functionName())) {
+      if (!hasSignature() || (hasSignature() && fn.isPersistent())) {
+        throw new AnalysisException(
+            String.format(Analyzer.FN_ALREADY_EXISTS_ERROR_MSG +
+                fn.signatureString()));
+      }
+    }
   }
 
   @Override

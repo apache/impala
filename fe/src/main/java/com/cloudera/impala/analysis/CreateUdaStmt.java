@@ -91,7 +91,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
       throw new AnalysisException("UDAs must take at least one argument.");
     }
 
-    if (uda.getBinaryType() == TFunctionBinaryType.HIVE) {
+    if (uda.getBinaryType() == TFunctionBinaryType.JAVA) {
       throw new AnalysisException("Java UDAs are not supported.");
     }
 

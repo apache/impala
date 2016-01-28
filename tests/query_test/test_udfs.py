@@ -74,12 +74,17 @@ class TestUdfs(ImpalaTestSuite):
     finally:
       self.client.execute(drop_fn_stmt)
 
-
-  def test_hive_udfs(self, vector):
-    #self.client.execute('create database if not exists udf_test')
-    #self.client.execute('create database if not exists uda_test')
-    self.run_test_case('QueryTest/load-hive-udfs', vector)
-    self.run_test_case('QueryTest/hive-udf', vector)
+  def test_java_udfs(self, vector):
+    self.client.execute("create database if not exists java_udfs_test "\
+        "location '%s'" % get_fs_path('/test-warehouse/java_udf_test.db'))
+    self.client.execute("create database if not exists udf_test "\
+        "location '%s'" % get_fs_path('/test-warehouse/udf_test.db'))
+    try:
+      self.run_test_case('QueryTest/load-java-udfs', vector)
+      self.run_test_case('QueryTest/java-udf', vector)
+    finally:
+      self.client.execute("drop database if exists java_udfs_test cascade")
+      self.client.execute("drop database if exists udf_test cascade")
 
   def test_hive_udfs_missing_jar(self, vector):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present

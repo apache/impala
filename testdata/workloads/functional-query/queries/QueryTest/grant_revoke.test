@@ -136,9 +136,9 @@ LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ---- QUERY
 show functions in grant_rev_db
 ---- RESULTS
-'INT','fn()'
+'INT','fn()','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show create function grant_rev_db.fn

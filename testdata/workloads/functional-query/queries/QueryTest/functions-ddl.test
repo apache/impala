@@ -15,16 +15,18 @@ drop function if exists function_ddl_test.agg_fn(int, string);
 ---- QUERY
 # Verify all the test functions are removed
 show functions in function_ddl_test
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Verify all the test functions are removed
 show aggregate functions in function_ddl_test
 ---- RESULTS
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Add them and test function overloading and scoping.
@@ -69,38 +71,42 @@ LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpd
 ====
 ---- QUERY
 show functions in default
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn()'
+'INT','fn()','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show functions in function_ddl_test
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn_var_arg(INT...)'
-'INT','fn2(INT)'
-'INT','fn2(INT, STRING)'
-'INT','fn()'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn_var_arg(INT...)','NATIVE','true'
+'INT','fn2(INT)','NATIVE','true'
+'INT','fn2(INT, STRING)','NATIVE','true'
+'INT','fn()','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show aggregate functions in function_ddl_test
 ---- RESULTS
-'BIGINT','agg_fn(INT)'
-'INT','agg_fn(INT, STRING)'
+'BIGINT','agg_fn(INT)','NATIVE','true'
+'INT','agg_fn(INT, STRING)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that none of the functions show up as analytic functions.
 show analytic functions in function_ddl_test
 ---- RESULTS
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show create function default.fn
@@ -203,85 +209,99 @@ drop function function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
 show functions
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn_var_arg(INT...)'
-'INT','fn2(INT)'
-'INT','fn()'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn_var_arg(INT...)','NATIVE','true'
+'INT','fn2(INT)','NATIVE','true'
+'INT','fn()','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop function if exists function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
 show functions in function_ddl_test
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn_var_arg(INT...)'
-'INT','fn2(INT)'
-'INT','fn()'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn_var_arg(INT...)','NATIVE','true'
+'INT','fn2(INT)','NATIVE','true'
+'INT','fn()','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show functions in default;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn()'
+'INT','fn()','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop function default.fn()
 ====
 ---- QUERY
 show functions in default;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show functions in function_ddl_test;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn_var_arg(INT...)'
-'INT','fn2(INT)'
-'INT','fn()'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn_var_arg(INT...)','NATIVE','true'
+'INT','fn2(INT)','NATIVE','true'
+'INT','fn()','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop function fn()
 ====
 ---- QUERY
 show functions;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn_var_arg(INT...)'
-'INT','fn2(INT)'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn_var_arg(INT...)','NATIVE','true'
+'INT','fn2(INT)','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop function fn_var_arg(INT...)
 ====
 ---- QUERY
 show functions;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn2(INT)'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn2(INT)','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop function agg_fn(int)
@@ -289,9 +309,9 @@ drop function agg_fn(int)
 ---- QUERY
 show aggregate functions
 ---- RESULTS
-'INT','agg_fn(INT, STRING)'
+'INT','agg_fn(INT, STRING)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Call invalidate metadata and make sure the functions are still there
@@ -301,79 +321,85 @@ invalidate metadata
 ====
 ---- QUERY
 show functions
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS
-'INT','fn2(INT)'
-'DOUBLE','fn(INT)'
-'INT','fn(INT, STRING)'
-'INT','fn(STRING, INT)'
+'INT','fn2(INT)','NATIVE','true'
+'DOUBLE','fn(INT)','NATIVE','true'
+'INT','fn(INT, STRING)','NATIVE','true'
+'INT','fn(STRING, INT)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show aggregate functions
 ---- RESULTS
-'INT','agg_fn(INT, STRING)'
+'INT','agg_fn(INT, STRING)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show analytic functions
 ---- RESULTS
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Negative test for showing builtin scalar functions. The result
 # should not contain aggregate or analytic functions. Note that
 # the result must be non-empty for the test to suceed.
 show functions in _impala_builtins;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS: VERIFY_IS_NOT_IN
-'DOUBLE','avg(BIGINT)'
-'BIGINT','rank()'
+'DOUBLE','avg(BIGINT)','BUILTIN','true'
+'BIGINT','rank()','BUILTIN','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Positive test for showing builtin scalar functions.
 show functions in _impala_builtins;
+---- LABELS
+return type, signature, binary type, is persistent
 ---- RESULTS: VERIFY_IS_SUBSET
-'STRING','upper(STRING)'
+'STRING','upper(STRING)','BUILTIN','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Negative test for showing builtin aggregate fuctions. The result should
 # not contain scalar or analytic functions.
 show aggregate functions in _impala_builtins;
 ---- RESULTS: VERIFY_IS_NOT_IN
-'BIGINT','rank()'
-'STRING','upper(STRING)'
+'BIGINT','rank()','BUILTIN','true'
+'STRING','upper(STRING)','BUILTIN','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Positive test for showing builtin aggregate functions.
 show aggregate functions in _impala_builtins;
 ---- RESULTS: VERIFY_IS_SUBSET
-'STRING','group_concat(STRING)'
+'STRING','group_concat(STRING)','BUILTIN','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Negative test for showing builtin analytic functions. The result should
 # not contain non-analytic aggregate functions or scalar functions.
 show analytic functions in _impala_builtins;
 ---- RESULTS: VERIFY_IS_NOT_IN
-'STRING','group_concat(STRING)'
-'STRING','upper(STRING)'
+'STRING','group_concat(STRING)','BUILTIN','true'
+'STRING','upper(STRING)','BUILTIN','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Positive test for showing builtin analytic functions.
 show analytic functions in _impala_builtins;
 ---- RESULTS: VERIFY_IS_SUBSET
-'BIGINT','rank()'
+'BIGINT','rank()','BUILTIN','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====

@@ -38,6 +38,12 @@ import com.google.common.collect.Lists;
 
 /**
  * Base class for all functions.
+ * Each function can be of the following 4 types.
+ * - Native/IR stored in db params (persisted, visible to Impala)
+ * - Hive UDFs stored in the HMS (visible to Hive + Impala)
+ * - Java UDFs which are not persisted (visible to Impala but not Hive)
+ * - Builtin functions, which are recreated after every restart of the
+ *   catalog. (persisted, visible to Impala)
  */
 public class Function implements CatalogObject {
   // Enum for how to compare function signatures.
@@ -92,6 +98,10 @@ public class Function implements CatalogObject {
   // e.g. /udfs/udfs.jar
   private HdfsUri location_;
   private TFunctionBinaryType binaryType_;
+
+  // Set to true for functions that survive service restarts, including all builtins,
+  // native and IR functions, but only Java functions created without a signature.
+  private boolean isPersistent_;
   private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
   public Function(FunctionName name, Type[] argTypes,
@@ -103,14 +113,18 @@ public class Function implements CatalogObject {
     } else {
       this.argTypes_ = argTypes;
     }
-    this.retType_ = retType;
+    if (retType == null) {
+      this.retType_ = ScalarType.INVALID;
+    } else {
+      this.retType_ = retType;
+    }
     this.userVisible_ = true;
   }
 
   public Function(FunctionName name, List<Type> args,
       Type retType, boolean varArgs) {
     this(name, (Type[])null, retType, varArgs);
-    if (args.size() > 0) {
+    if (args != null && args.size() > 0) {
       argTypes_ = args.toArray(new Type[args.size()]);
     } else {
       argTypes_ = new Type[0];
@@ -138,6 +152,7 @@ public class Function implements CatalogObject {
   public HdfsUri getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
   public boolean hasVarArgs() { return hasVarArgs_; }
+  public boolean isPersistent() { return isPersistent_; }
   public boolean userVisible() { return userVisible_; }
   public Type getVarArgsType() {
     if (!hasVarArgs_) return Type.INVALID;
@@ -149,6 +164,7 @@ public class Function implements CatalogObject {
   public void setLocation(HdfsUri loc) { location_ = loc; }
   public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
   public void setHasVarArgs(boolean v) { hasVarArgs_ = v; }
+  public void setIsPersistent(boolean v) { isPersistent_ = v; }
   public void setUserVisible(boolean b) { userVisible_ = b; }
 
   // Returns a string with the signature in human readable format:
@@ -319,6 +335,7 @@ public class Function implements CatalogObject {
     fn.setArg_types(Type.toThrift(argTypes_));
     fn.setRet_type(getReturnType().toThrift());
     fn.setHas_var_args(hasVarArgs_);
+    fn.setIs_persistent(isPersistent_);
     // TODO: Comment field is missing?
     // fn.setComment(comment_)
     return fn;
@@ -354,6 +371,7 @@ public class Function implements CatalogObject {
     }
     function.setBinaryType(fn.getBinary_type());
     function.setHasVarArgs(fn.isHas_var_args());
+    function.setIsPersistent(fn.isIs_persistent());
     return function;
   }
 

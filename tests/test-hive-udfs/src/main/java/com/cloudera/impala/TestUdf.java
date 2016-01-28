@@ -35,8 +35,8 @@ import org.apache.hadoop.io.Text;
  * on it.
  *
  * The jar for this file can be built by running "mvn clean package" in
- * tests/hive-test-udfs. This is run in testdata/bin/create-load-data.sh, and
- * copied to HDFS in bin/copy-udfs-uda.sh.
+ * tests/test-hive-udfs. This is run in testdata/bin/create-load-data.sh, and
+ * copied to HDFS in testdata/bin/copy-udfs-uda.sh.
  */
 public class TestUdf extends UDF {
   public TestUdf() {

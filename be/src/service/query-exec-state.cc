@@ -272,7 +272,8 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(frontend_->GetFunctions(
           params->category, params->db, fn_pattern, &query_ctx_.session, &functions));
-      SetResultSet(functions.fn_ret_types, functions.fn_signatures);
+      SetResultSet(functions.fn_ret_types, functions.fn_signatures,
+          functions.fn_binary_types, functions.fn_persistence);
       return Status::OK();
     }
     case TCatalogOpType::SHOW_ROLES: {

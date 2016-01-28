@@ -131,6 +131,7 @@ public class AggregateFunction extends Function {
     fn.isAnalyticFn_ = isAnalyticFn;
     fn.isAggregateFn_ = true;
     fn.returnsNonNullOnEmpty_ = returnsNonNullOnEmpty;
+    fn.setIsPersistent(true);
     return fn;
   }
 
@@ -162,6 +163,7 @@ public class AggregateFunction extends Function {
     fn.isAggregateFn_ = false;
     fn.returnsNonNullOnEmpty_ = false;
     fn.setUserVisible(isUserVisible);
+    fn.setIsPersistent(true);
     return fn;
   }
 

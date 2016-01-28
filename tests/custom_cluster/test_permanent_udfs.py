@@ -12,18 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Tests for IMPALA-1748
 
 import os
+import pytest
+import subprocess
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.filesystem_utils import get_fs_path
 
 class TestUdfPersistence(CustomClusterTestSuite):
-  """ Tests the behavior of udfs and udas between catalog restarts With IMPALA-1748, these
+  """ Tests the behavior of UDFs and UDAs between catalog restarts. With IMPALA-1748, these
   functions are persisted to the metastore and are loaded again during catalog startup"""
 
   DATABASE = 'udf_permanent_test'
+  JAVA_FN_TEST_DB = 'java_permanent_test'
+  HIVE_IMPALA_INTEGRATION_DB = 'hive_impala_integration_db'
+  HIVE_UDF_JAR = os.getenv('DEFAULT_FS') + '/test-warehouse/hive-exec.jar';
+  JAVA_UDF_JAR = os.getenv('DEFAULT_FS') + '/test-warehouse/impala-hive-udfs.jar';
 
   @classmethod
   def get_workload(cls):
@@ -55,12 +60,31 @@ class TestUdfPersistence(CustomClusterTestSuite):
         self.CREATE_SAMPLE_UDAS_TEMPLATE.count("create aggregate function") +\
         self.CREATE_TEST_UDAS_TEMPLATE.count("create aggregate function")
     self.udf_count = self.CREATE_UDFS_TEMPLATE.count("create function")
+    self.client.execute("CREATE DATABASE IF NOT EXISTS %s" % self.JAVA_FN_TEST_DB)
+    self.client.execute("CREATE DATABASE IF NOT EXISTS %s" %
+        self.HIVE_IMPALA_INTEGRATION_DB)
 
   def teardown_method(self, method):
     self.__cleanup()
 
   def __cleanup(self):
     self.client.execute("DROP DATABASE IF EXISTS %s CASCADE" % self.DATABASE)
+    self.client.execute("DROP DATABASE IF EXISTS %s CASCADE" % self.JAVA_FN_TEST_DB)
+    self.client.execute("DROP DATABASE IF EXISTS %s CASCADE"
+       % self.HIVE_IMPALA_INTEGRATION_DB)
+
+  def run_stmt_in_hive(self, stmt):
+    """
+    Run a statement in Hive, returning stdout if successful and throwing
+    RuntimeError(stderr) if not.
+    """
+    call = subprocess.Popen(
+        ['hive', '-e', stmt], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdout, stderr) = call.communicate()
+    call.wait()
+    if call.returncode != 0:
+      raise RuntimeError(stderr)
+    return stdout
 
   def __load_drop_functions(self, template, database, location):
     queries = template.format(database=database, location=location)
@@ -80,6 +104,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     result = self.client.execute(query)
     assert result is not None and len(result.data) == count
 
+  @pytest.mark.execute_serially
   def test_permanent_udfs(self):
     # Make sure the pre-calculated count tallies with the number of
     # functions shown using "show [aggregate] functions" statement
@@ -110,6 +135,189 @@ class TestUdfPersistence(CustomClusterTestSuite):
     self.verify_function_count(
             "SHOW AGGREGATE FUNCTIONS in {0}".format(self.DATABASE), 1)
 
+
+  def __verify_udf_in_hive(self, udf):
+    (query, result) = self.SAMPLE_JAVA_UDFS_TEST[udf]
+    stdout = self.run_stmt_in_hive("select " + query.format(
+        db=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert stdout is not None and result in str(stdout)
+
+  def __verify_udf_in_impala(self, udf):
+    (query, result) = self.SAMPLE_JAVA_UDFS_TEST[udf]
+    stdout = self.client.execute("select " + query.format(
+        db=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert stdout is not None and result in str(stdout.data)
+
+  @pytest.mark.execute_serially
+  def test_java_udfs_hive_integration(self):
+    ''' This test checks the integration between Hive and Impala on
+    CREATE FUNCTION and DROP FUNCTION statements for persistent Java UDFs.
+    The main objective of the test is to check the following four cases.
+      - Add Java UDFs from Impala and make sure they are visible in Hive
+      - Drop Java UDFs from Impala and make sure this reflects in Hive.
+      - Add Java UDFs from Hive and make sure they are visitble in Impala
+      - Drop Java UDFs from Hive and make sure this reflects in Impala
+    '''
+    # Add Java UDFs from Impala and check if they are visible in Hive.
+    # Hive has bug that doesn't display the permanent function in show functions
+    # statement. So this test relies on describe function statement which prints
+    # a message if the function is not present.
+    for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+      self.client.execute(self.DROP_JAVA_UDF_TEMPLATE.format(
+          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
+      self.client.execute(self.CREATE_JAVA_UDF_TEMPLATE.format(
+          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn,
+          location=self.HIVE_UDF_JAR, symbol=fn_symbol))
+      hive_stdout = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
+        % (self.HIVE_IMPALA_INTEGRATION_DB, fn))
+      assert "does not exist" not in hive_stdout
+      self.__verify_udf_in_hive(fn)
+      # Drop the function from Impala and check if it reflects in Hive.
+      self.client.execute(self.DROP_JAVA_UDF_TEMPLATE.format(
+          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
+      hive_stdout = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
+        % (self.HIVE_IMPALA_INTEGRATION_DB, fn))
+      assert "does not exist" in hive_stdout
+
+    # Create the same set of functions from Hive and make sure they are visible
+    # in Impala.
+    for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+      self.run_stmt_in_hive(self.CREATE_HIVE_UDF_TEMPLATE.format(
+          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn,
+          location=self.HIVE_UDF_JAR, symbol=fn_symbol))
+    self.client.execute("INVALIDATE METADATA")
+    for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+      result = self.client.execute("SHOW FUNCTIONS IN %s" %
+          self.HIVE_IMPALA_INTEGRATION_DB)
+      assert result is not None and len(result.data) > 0 and\
+          fn in str(result.data)
+      self.__verify_udf_in_impala(fn)
+      # Drop the function in Hive and make sure it reflects in Impala.
+      self.run_stmt_in_hive(self.DROP_JAVA_UDF_TEMPLATE.format(
+          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
+    self.client.execute("INVALIDATE METADATA")
+    self.verify_function_count(
+            "SHOW FUNCTIONS in {0}".format(self.HIVE_IMPALA_INTEGRATION_DB), 0)
+
+  @pytest.mark.execute_serially
+  def test_java_udfs_from_impala(self):
+    """ This tests checks the behavior of permanent Java UDFs in Impala."""
+    self.verify_function_count(
+            "SHOW FUNCTIONS in {0}".format(self.JAVA_FN_TEST_DB), 0);
+    # Create a non persistent Java UDF and make sure we can't create a
+    # persistent Java UDF with same name
+    self.client.execute("create function %s.%s(boolean) returns boolean "\
+        "location '%s' symbol='%s'" % (self.JAVA_FN_TEST_DB, "identity",
+        self.JAVA_UDF_JAR, "com.cloudera.impala.TestUdf"))
+    result = self.execute_query_expect_failure(self.client,
+        self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB,
+        function="identity", location=self.JAVA_UDF_JAR,
+        symbol="com.cloudera.impala.TestUdf"))
+    assert "Function already exists" in str(result)
+    # Test the same with a NATIVE function
+    self.client.execute("create function {database}.identity(int) "\
+        "returns int location '{location}' symbol='Identity'".format(
+        database=self.JAVA_FN_TEST_DB,
+        location="/test-warehouse/libTestUdfs.so"))
+    result = self.execute_query_expect_failure(self.client,
+        self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB,
+        function="identity", location=self.JAVA_UDF_JAR,
+        symbol="com.cloudera.impala.TestUdf"))
+    assert "Function already exists" in str(result)
+
+    # Test the reverse. Add a persistent Java UDF and ensure we cannot
+    # add non persistent Java UDFs or NATIVE functions with the same name.
+    self.client.execute(self.CREATE_JAVA_UDF_TEMPLATE.format(
+        db=self.JAVA_FN_TEST_DB, function="identity_java",
+        location=self.JAVA_UDF_JAR, symbol="com.cloudera.impala.TestUdf"))
+    result = self.execute_query_expect_failure(self.client, "create function "\
+        "%s.%s(boolean) returns boolean location '%s' symbol='%s'" % (
+        self.JAVA_FN_TEST_DB, "identity_java", self.JAVA_UDF_JAR,
+        "com.cloudera.impala.TestUdf"))
+    assert "Function already exists" in str(result)
+    result = self.execute_query_expect_failure(self.client, "create function "\
+        "{database}.identity_java(int) returns int location '{location}' "\
+        "symbol='Identity'".format(database=self.JAVA_FN_TEST_DB,
+        location="/test-warehouse/libTestUdfs.so"))
+    assert "Function already exists" in str(result)
+    # With IF NOT EXISTS, the query shouldn't fail.
+    result = self.execute_query_expect_success(self.client, "create function "\
+        " if not exists {database}.identity_java(int) returns int location "\
+        "'{location}' symbol='Identity'".format(database=self.JAVA_FN_TEST_DB,
+        location="/test-warehouse/libTestUdfs.so"))
+    result = self.client.execute("SHOW FUNCTIONS in %s" % self.JAVA_FN_TEST_DB)
+    self.execute_query_expect_success(self.client,
+        "DROP FUNCTION IF EXISTS {db}.impala_java".format(db=self.JAVA_FN_TEST_DB))
+
+    # Drop the persistent Java function.
+    # Test the same create with IF NOT EXISTS. No exception should be thrown.
+    # Add a Java udf which has a few incompatible 'evaluate' functions in the
+    # symbol class. Catalog should load only the compatible ones. JavaUdfTest
+    # has 8 evaluate signatures out of which only 3 are valid.
+    compatibility_fn_count = 3
+    self.client.execute(self.CREATE_JAVA_UDF_TEMPLATE.format(
+        db=self.JAVA_FN_TEST_DB, function="compatibility",
+        location=self.JAVA_UDF_JAR, symbol="com.cloudera.impala.JavaUdfTest"))
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s like 'compatibility*'" % self.JAVA_FN_TEST_DB,
+        compatibility_fn_count)
+    result = self.client.execute("SHOW FUNCTIONS in %s" % self.JAVA_FN_TEST_DB)
+    function_count = len(result.data)
+    # Invalidating metadata should preserve all the functions
+    self.client.execute("INVALIDATE METADATA")
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s" % self.JAVA_FN_TEST_DB, function_count)
+    # Restarting the cluster should preserve only the persisted functions. In
+    # this case, identity(boolean) should be wiped out.
+    self.__restart_cluster()
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s" % self.JAVA_FN_TEST_DB, function_count-1)
+    # Dropping persisted Java UDFs with old syntax should raise an exception
+    self.execute_query_expect_failure(self.client,
+        "DROP FUNCTION compatibility(smallint)")
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s like 'compatibility*'" % self.JAVA_FN_TEST_DB, 3)
+    # Drop the functions and make sure they don't appear post restart.
+    self.client.execute("DROP FUNCTION %s.compatibility" % self.JAVA_FN_TEST_DB)
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s like 'compatibility*'" % self.JAVA_FN_TEST_DB, 0)
+    self.__restart_cluster()
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s like 'compatibility*'" % self.JAVA_FN_TEST_DB, 0)
+
+    # Try to load a UDF that has no compatible signatures. Make sure it is not added
+    # to Hive and Impala.
+    result = self.execute_query_expect_failure(self.client,
+        self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB, function="badudf",
+        location=self.JAVA_UDF_JAR, symbol="com.cloudera.impala.IncompatibleUdfTest"))
+    assert "No compatible function signatures" in str(result)
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s like 'badudf*'" % self.JAVA_FN_TEST_DB, 0)
+    result = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
+        % (self.JAVA_FN_TEST_DB, "badudf"))
+    assert "does not exist" in str(result)
+    # Create the same function from hive and make sure Impala doesn't load any signatures.
+    self.run_stmt_in_hive(self.CREATE_HIVE_UDF_TEMPLATE.format(
+        db=self.JAVA_FN_TEST_DB, function="badudf",
+        location=self.JAVA_UDF_JAR, symbol="com.cloudera.impala.IncompatibleUdfTest"))
+    result = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
+        % (self.JAVA_FN_TEST_DB, "badudf"))
+    assert "does not exist" not in str(result)
+    self.client.execute("INVALIDATE METADATA")
+    self.verify_function_count(
+        "SHOW FUNCTIONS IN %s like 'badudf*'" % self.JAVA_FN_TEST_DB, 0)
+    # Add a function with the same name from Impala. It should fail.
+    result = self.execute_query_expect_failure(self.client,
+        self.CREATE_JAVA_UDF_TEMPLATE.format(db=self.JAVA_FN_TEST_DB, function="badudf",
+        location=self.JAVA_UDF_JAR, symbol="com.cloudera.impala.TestUdf"))
+    assert "Function badudf already exists" in str(result)
+    # Drop the function and make sure the function if dropped from hive
+    self.client.execute(self.DROP_JAVA_UDF_TEMPLATE.format(
+        db=self.JAVA_FN_TEST_DB, function="badudf"))
+    result = self.run_stmt_in_hive("DESCRIBE FUNCTION %s.%s"
+        % (self.JAVA_FN_TEST_DB, "badudf"))
+    assert "does not exist" in str(result)
+
   # Create sample UDA functions in {database} from library {location}
 
   DROP_SAMPLE_UDAS_TEMPLATE = """
@@ -117,6 +325,42 @@ class TestUdfPersistence(CustomClusterTestSuite):
     drop function if exists {database}.hll(int);
     drop function if exists {database}.sum_small_decimal(decimal(9,2));
   """
+
+  CREATE_JAVA_UDF_TEMPLATE = """
+    CREATE FUNCTION {db}.{function} LOCATION '{location}' symbol='{symbol}'
+  """
+
+  CREATE_HIVE_UDF_TEMPLATE = """
+    CREATE FUNCTION {db}.{function} as '{symbol}' USING JAR '{location}'
+  """
+
+  DROP_JAVA_UDF_TEMPLATE = "DROP FUNCTION IF EXISTS {db}.{function}"
+
+  # Sample java udfs from hive-exec.jar. Function name to symbol class mapping
+  SAMPLE_JAVA_UDFS = [
+      ('udfpi', 'org.apache.hadoop.hive.ql.udf.UDFPI'),
+      ('udfbin', 'org.apache.hadoop.hive.ql.udf.UDFBin'),
+      ('udfhex', 'org.apache.hadoop.hive.ql.udf.UDFHex'),
+      ('udfconv', 'org.apache.hadoop.hive.ql.udf.UDFConv'),
+      ('udfhour', 'org.apache.hadoop.hive.ql.udf.UDFHour'),
+      ('udflike', 'org.apache.hadoop.hive.ql.udf.UDFLike'),
+      ('udfsign', 'org.apache.hadoop.hive.ql.udf.UDFSign'),
+      ('udfyear', 'org.apache.hadoop.hive.ql.udf.UDFYear'),
+      ('udfascii','org.apache.hadoop.hive.ql.udf.UDFAscii')
+  ]
+
+  # Simple tests to verify java udfs in SAMPLE_JAVA_UDFS
+  SAMPLE_JAVA_UDFS_TEST = {
+    'udfpi' : ('{db}.udfpi()', '3.141592653589793'),
+    'udfbin' : ('{db}.udfbin(123)', '1111011'),
+    'udfhex' : ('{db}.udfhex(123)', '7B'),
+    'udfconv'  : ('{db}.udfconv("100", 2, 10)', '4'),
+    'udfhour'  : ('{db}.udfhour("12:55:12")', '12'),
+    'udflike'  : ('{db}.udflike("abc", "def")', 'false'),
+    'udfsign'  : ('{db}.udfsign(0)', '0'),
+    'udfyear' : ('{db}.udfyear("1990-02-06")', '1990'),
+    'udfascii' : ('{db}.udfascii("abc")','97')
+  }
 
   CREATE_SAMPLE_UDAS_TEMPLATE = """
     create database if not exists {database};

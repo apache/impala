@@ -981,6 +981,13 @@ create_udf_stmt ::=
     RESULT = new CreateUdfStmt(fn_name, fn_args, return_type, new HdfsUri(binary_path),
         if_not_exists, arg_map);
   :}
+  | KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists
+    function_name:fn_name KW_LOCATION STRING_LITERAL:binary_path
+    function_def_args_map:arg_map
+  {:
+    RESULT = new CreateUdfStmt(fn_name, null, null, new HdfsUri(binary_path),
+        if_not_exists, arg_map);
+  :}
   ;
 
 create_uda_stmt ::=
@@ -1309,6 +1316,9 @@ drop_function_stmt ::=
       if_exists_val:if_exists function_name:fn_name
   function_def_args:fn_args
   {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists); :}
+  | KW_DROP opt_is_aggregate_fn:is_aggregate KW_FUNCTION
+    if_exists_val:if_exists function_name:fn_name
+  {: RESULT = new DropFunctionStmt(fn_name, null, if_exists); :}
   ;
 
 drop_data_src_stmt ::=

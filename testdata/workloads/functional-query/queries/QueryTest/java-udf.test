@@ -170,3 +170,67 @@ boolean
 ---- RESULTS
 false
 ====
+---- QUERY
+# Testing whether all of persistent Java udfs are accessible.
+select java_udfs_test.identity(true);
+---- TYPES
+boolean
+---- RESULTS
+true
+====
+---- QUERY
+select java_udfs_test.identity(cast(10 as tinyint));
+---- TYPES
+tinyint
+---- RESULTS
+10
+====
+---- QUERY
+select java_udfs_test.identity(cast(10 as smallint));
+---- TYPES
+smallint
+---- RESULTS
+10
+====
+---- QUERY
+select java_udfs_test.identity(cast(10 as int));
+---- TYPES
+int
+---- RESULTS
+10
+====
+---- QUERY
+select java_udfs_test.identity(cast(10 as bigint));
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+select java_udfs_test.identity(cast(10.0 as float));
+---- TYPES
+float
+---- RESULTS
+10
+====
+---- QUERY
+select java_udfs_test.identity(cast(10.0 as double));
+---- TYPES
+double
+---- RESULTS
+10
+====
+---- QUERY
+select java_udfs_test.identity("a", "b");
+---- TYPES
+string
+---- RESULTS
+'ab'
+====
+---- QUERY
+select java_udfs_test.identity("a", "b", "c");
+---- TYPES
+string
+---- RESULTS
+'abc'
+====

@@ -76,6 +76,7 @@ import com.cloudera.impala.catalog.PartitionNotFoundException;
 import com.cloudera.impala.catalog.Role;
 import com.cloudera.impala.catalog.RolePrivilege;
 import com.cloudera.impala.catalog.RowFormat;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
@@ -124,6 +125,8 @@ import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropStatsParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TErrorCode;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
@@ -467,8 +470,10 @@ public class CatalogOpExecutor {
    * version of the serialized table as the version of the catalog update result.
    */
   private static void addTableToCatalogUpdate(Table tbl, TCatalogUpdateResult result) {
-    result.setUpdated_catalog_object(TableToTCatalogObject(tbl));
-    result.setVersion(result.getUpdated_catalog_object().getCatalog_version());
+    List<TCatalogObject> updatedObjectList = Lists.newArrayList(
+        TableToTCatalogObject(tbl));
+    result.setUpdated_catalog_objects(updatedObjectList);
+    result.setVersion(updatedObjectList.get(0).getCatalog_version());
   }
 
   /**
@@ -812,33 +817,82 @@ public class CatalogOpExecutor {
           TCatalogObjectType.DATABASE, Catalog.INITIAL_CATALOG_VERSION);
       thriftDb.setDb(newDb.toThrift());
       thriftDb.setCatalog_version(newDb.getCatalogVersion());
-      resp.result.setUpdated_catalog_object(thriftDb);
+      resp.result.setUpdated_catalog_objects(Lists.newArrayList(thriftDb));
     }
-    resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
+    resp.result.setVersion(
+        resp.result.getUpdated_catalog_objects().get(0).getCatalog_version());
   }
 
-  private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
+  private TCatalogObject buildTCatalogFnObject(Function fn) {
+    TCatalogObject result = new TCatalogObject();
+    result.setType(TCatalogObjectType.FUNCTION);
+    result.setFn(fn.toThrift());
+    result.setCatalog_version(fn.getCatalogVersion());
+    return result;
+  }
+
+ private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
     Function fn = Function.fromThrift(params.getFn());
     LOG.debug(String.format("Adding %s: %s",
         fn.getClass().getSimpleName(), fn.signatureString()));
-    Function existingFn =
-        catalog_.getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE);
-    if (existingFn != null && !params.if_not_exists) {
-      throw new CatalogException("Function " + fn.signatureString() +
-          " already exists.");
+    boolean isPersistentJavaFn =
+        (fn.getBinaryType() == TFunctionBinaryType.JAVA) && fn.isPersistent();
+    synchronized (metastoreDdlLock_) {
+      Db db = catalog_.getDb(fn.dbName());
+      if (db == null) {
+        throw new CatalogException("Database: " + fn.dbName() + " does not exist.");
+      }
+      // Search for existing functions with the same name or signature that would
+      // conflict with the function being added.
+      for (Function function: db.getFunctions(fn.functionName())) {
+        if (isPersistentJavaFn || (function.isPersistent() &&
+            (function.getBinaryType() == TFunctionBinaryType.JAVA)) ||
+                function.compare(fn, Function.CompareMode.IS_INDISTINGUISHABLE)) {
+          if (!params.if_not_exists) {
+            throw new CatalogException("Function " + fn.functionName() +
+                " already exists.");
+          }
+          return;
+        }
+      }
+
+      List<TCatalogObject> addedFunctions = Lists.newArrayList();
+      if (isPersistentJavaFn) {
+        // For persistent Java functions we extract all supported function signatures from
+        // the corresponding Jar and add each signature to the catalog.
+        Preconditions.checkState(fn instanceof ScalarFunction);
+        org.apache.hadoop.hive.metastore.api.Function hiveFn =
+            ((ScalarFunction)fn).toHiveFunction();
+        List<Function> funcs = CatalogServiceCatalog.extractFunctions(fn.dbName(), hiveFn);
+        if (funcs.isEmpty()) {
+          throw new CatalogException(
+            "No compatible function signatures found in class: " + hiveFn.getClassName());
+        }
+        if (addJavaFunctionToHms(fn.dbName(), hiveFn, params.if_not_exists)) {
+          LOG.info("Funcs size:" + funcs.size());
+          for (Function addedFn: funcs) {
+            LOG.info(String.format("Adding function: %s.%s", addedFn.dbName(),
+                addedFn.signatureString()));
+            Preconditions.checkState(catalog_.addFunction(addedFn));
+            addedFunctions.add(buildTCatalogFnObject(addedFn));
+          }
+        }
+      } else {
+        if (catalog_.addFunction(fn)) {
+          // Flush DB changes to metastore
+          applyAlterDatabase(catalog_.getDb(fn.dbName()));
+          addedFunctions.add(buildTCatalogFnObject(fn));
+        }
+      }
+      if (!addedFunctions.isEmpty()) {
+        resp.result.setUpdated_catalog_objects(addedFunctions);
+        resp.result.setVersion(catalog_.getCatalogVersion());
+      }
     }
-    if (catalog_.addFunction(fn)) {
-      // Flush DB changes to metastore
-      applyAlterDatabase(catalog_.getDb(fn.dbName()));
-    }
-    TCatalogObject addedObject = new TCatalogObject();
-    addedObject.setType(TCatalogObjectType.FUNCTION);
-    addedObject.setFn(fn.toThrift());
-    addedObject.setCatalog_version(fn.getCatalogVersion());
-    resp.result.setUpdated_catalog_object(addedObject);
-    resp.result.setVersion(fn.getCatalogVersion());
   }
+
+
 
   private void createDataSource(TCreateDataSourceParams params, TDdlExecResponse resp)
       throws ImpalaException {
@@ -859,7 +913,7 @@ public class CatalogOpExecutor {
     addedObject.setType(TCatalogObjectType.DATA_SOURCE);
     addedObject.setData_source(dataSource.toThrift());
     addedObject.setCatalog_version(dataSource.getCatalogVersion());
-    resp.result.setUpdated_catalog_object(addedObject);
+    resp.result.setUpdated_catalog_objects(Lists.newArrayList(addedObject));
     resp.result.setVersion(dataSource.getCatalogVersion());
   }
 
@@ -882,7 +936,7 @@ public class CatalogOpExecutor {
     removedObject.setType(TCatalogObjectType.DATA_SOURCE);
     removedObject.setData_source(dataSource.toThrift());
     removedObject.setCatalog_version(dataSource.getCatalogVersion());
-    resp.result.setRemoved_catalog_object(removedObject);
+    resp.result.setRemoved_catalog_objects(Lists.newArrayList(removedObject));
     resp.result.setVersion(dataSource.getCatalogVersion());
   }
 
@@ -1060,7 +1114,7 @@ public class CatalogOpExecutor {
     removedObject.setDb(new TDatabase());
     removedObject.getDb().setDb_name(params.getDb());
     resp.result.setVersion(removedObject.getCatalog_version());
-    resp.result.setRemoved_catalog_object(removedObject);
+    resp.result.setRemoved_catalog_objects(Lists.newArrayList(removedObject));
   }
 
   /**
@@ -1123,7 +1177,7 @@ public class CatalogOpExecutor {
     removedObject.getTable().setTbl_name(tableName.getTbl());
     removedObject.getTable().setDb_name(tableName.getDb());
     removedObject.setCatalog_version(resp.result.getVersion());
-    resp.result.setRemoved_catalog_object(removedObject);
+    resp.result.setRemoved_catalog_objects(Lists.newArrayList(removedObject));
   }
 
   /**
@@ -1169,36 +1223,54 @@ public class CatalogOpExecutor {
 
       loadTableMetadata(table, newCatalogVersion, true, true, null);
       addTableToCatalogUpdate(table, resp.result);
-    } // end symchronization
+    } // end synchronization
   }
 
   private void dropFunction(TDropFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
-    ArrayList<Type> argTypes = Lists.newArrayList();
-    for (TColumnType t: params.arg_types) {
-      argTypes.add(Type.fromThrift(t));
-    }
-    Function desc = new Function(FunctionName.fromThrift(params.fn_name),
-        argTypes, Type.INVALID, false);
-    LOG.debug(String.format("Dropping Function %s", desc.signatureString()));
-    Function fn = catalog_.removeFunction(desc);
-    if (fn == null) {
-      if (!params.if_exists) {
-        throw new CatalogException(
-            "Function: " + desc.signatureString() + " does not exist.");
+    FunctionName fName = FunctionName.fromThrift(params.fn_name);
+    synchronized (metastoreDdlLock_) {
+      Db db = catalog_.getDb(fName.getDb());
+      if (db == null) {
+        if (!params.if_exists) {
+            throw new CatalogException("Database: " + fName.getDb()
+                + " does not exist.");
+        }
+        return;
       }
-      // The user specified IF NOT EXISTS and the function didn't exist, just
-      // return the current catalog version.
+      List<TCatalogObject> removedFunctions = Lists.newArrayList();
+      if (!params.isSetSignature()) {
+        dropJavaFunctionFromHms(fName.getDb(), fName.getFunction(), params.if_exists);
+        for (Function fn: db.getFunctions(fName.getFunction())) {
+          if (fn.getBinaryType() != TFunctionBinaryType.JAVA
+              || !fn.isPersistent()) {
+            continue;
+          }
+          Preconditions.checkNotNull(catalog_.removeFunction(fn));
+          removedFunctions.add(buildTCatalogFnObject(fn));
+        }
+      } else {
+        ArrayList<Type> argTypes = Lists.newArrayList();
+        for (TColumnType t: params.arg_types) {
+          argTypes.add(Type.fromThrift(t));
+        }
+        Function desc = new Function(fName, argTypes, Type.INVALID, false);
+        Function fn = catalog_.removeFunction(desc);
+        if (fn == null) {
+          if (!params.if_exists) {
+            throw new CatalogException(
+                "Function: " + desc.signatureString() + " does not exist.");
+          }
+        } else {
+          // Flush DB changes to metastore
+          applyAlterDatabase(catalog_.getDb(fn.dbName()));
+          removedFunctions.add(buildTCatalogFnObject(fn));
+        }
+      }
       resp.result.setVersion(catalog_.getCatalogVersion());
-    } else {
-      // Flush DB changes to metastore
-      applyAlterDatabase(catalog_.getDb(fn.dbName()));
-      TCatalogObject removedObject = new TCatalogObject();
-      removedObject.setType(TCatalogObjectType.FUNCTION);
-      removedObject.setFn(fn.toThrift());
-      removedObject.setCatalog_version(fn.getCatalogVersion());
-      resp.result.setRemoved_catalog_object(removedObject);
-      resp.result.setVersion(fn.getCatalogVersion());
+      if (removedFunctions.size() > 0) {
+        resp.result.setRemoved_catalog_objects(removedFunctions);
+      }
     }
   }
 
@@ -1694,8 +1766,9 @@ public class CatalogOpExecutor {
     removedObject.getTable().setTbl_name(tableName.getTbl());
     removedObject.getTable().setDb_name(tableName.getDb());
     removedObject.setCatalog_version(newTable.getCatalog_version());
-    response.result.setRemoved_catalog_object(removedObject);
-    response.result.setUpdated_catalog_object(newTable);
+    response.result.setRemoved_catalog_objects(
+        Lists.newArrayList(removedObject));
+    response.result.setUpdated_catalog_objects(Lists.newArrayList(newTable));
     response.result.setVersion(newTable.getCatalog_version());
   }
 
@@ -2116,20 +2189,70 @@ public class CatalogOpExecutor {
   }
 
   /**
+   * Creates a new function in the Hive metastore. Returns true if successful
+   * and false if the call fails and ifNotExists is true.
+   */
+  public boolean addJavaFunctionToHms(String db,
+      org.apache.hadoop.hive.metastore.api.Function fn, boolean ifNotExists)
+      throws ImpalaRuntimeException{
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
+    try {
+      msClient.getHiveClient().createFunction(fn);
+    } catch(AlreadyExistsException e) {
+      if (!ifNotExists) {
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "createFunction"), e);
+      }
+      return false;
+    } catch (Exception e) {
+      LOG.error("Error executing createFunction() metastore call: " +
+          fn.getFunctionName(), e);
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "createFunction"), e);
+    } finally {
+      msClient.release();
+    }
+    return true;
+  }
+
+  /**
+   * Drops the given function from Hive metastore. Returns true if successful
+   * and false if the function does not exist and ifExists is true.
+   */
+  public boolean dropJavaFunctionFromHms(String db, String fn, boolean ifExists)
+      throws ImpalaRuntimeException {
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
+    try {
+      msClient.getHiveClient().dropFunction(db, fn);
+    } catch (NoSuchObjectException e) {
+      if (!ifExists) {
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "dropFunction"), e);
+      }
+      return false;
+    } catch (TException e) {
+      LOG.error("Error executing dropFunction() metastore call: " + fn, e);
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "dropFunction"), e);
+    } finally {
+      msClient.release();
+    }
+    return true;
+  }
+
+  /**
    * Updates the database object in the metastore.
    */
   private void applyAlterDatabase(Db db)
       throws ImpalaRuntimeException {
-    synchronized (metastoreDdlLock_) {
-      MetaStoreClient msClient = catalog_.getMetaStoreClient();
-      try {
-        msClient.getHiveClient().alterDatabase(db.getName(), db.getMetaStoreDb());
-      } catch (TException e) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "alterDatabase"), e);
-      } finally {
-        msClient.release();
-      }
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
+    try {
+      msClient.getHiveClient().alterDatabase(db.getName(), db.getMetaStoreDb());
+    } catch (TException e) {
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "alterDatabase"), e);
+    } finally {
+      msClient.release();
     }
   }
 
@@ -2206,9 +2329,9 @@ public class CatalogOpExecutor {
     catalogObject.setRole(role.toThrift());
     catalogObject.setCatalog_version(role.getCatalogVersion());
     if (createDropRoleParams.isIs_drop()) {
-      resp.result.setRemoved_catalog_object(catalogObject);
+      resp.result.setRemoved_catalog_objects(Lists.newArrayList(catalogObject));
     } else {
-      resp.result.setUpdated_catalog_object(catalogObject);
+      resp.result.setUpdated_catalog_objects(Lists.newArrayList(catalogObject));
     }
     resp.result.setVersion(role.getCatalogVersion());
   }
@@ -2238,7 +2361,7 @@ public class CatalogOpExecutor {
     catalogObject.setType(role.getCatalogObjectType());
     catalogObject.setRole(role.toThrift());
     catalogObject.setCatalog_version(role.getCatalogVersion());
-    resp.result.setUpdated_catalog_object(catalogObject);
+    resp.result.setUpdated_catalog_objects(Lists.newArrayList(catalogObject));
     resp.result.setVersion(role.getCatalogVersion());
   }
 
@@ -2280,9 +2403,11 @@ public class CatalogOpExecutor {
       // from the privilege.
       if (grantRevokePrivParams.isIs_grant() ||
           privileges.get(0).isHas_grant_opt()) {
-        resp.result.setUpdated_catalog_object(updatedPrivs.get(0));
+        resp.result.setUpdated_catalog_objects(
+            Lists.newArrayList(updatedPrivs.get(0)));
       } else {
-        resp.result.setRemoved_catalog_object(updatedPrivs.get(0));
+        resp.result.setRemoved_catalog_objects(
+            Lists.newArrayList(updatedPrivs.get(0)));
       }
       resp.result.setVersion(updatedPrivs.get(0).getCatalog_version());
     } else if (updatedPrivs.size() > 1) {
@@ -2531,9 +2656,11 @@ public class CatalogOpExecutor {
           // Return the TCatalogObject in the result to indicate this request can be
           // processed as a direct DDL operation.
           if (wasRemoved) {
-            resp.getResult().setRemoved_catalog_object(thriftTable);
+            resp.getResult().setRemoved_catalog_objects(
+                Lists.newArrayList(thriftTable));
           } else {
-            resp.getResult().setUpdated_catalog_object(thriftTable);
+            resp.getResult().setUpdated_catalog_objects(
+                Lists.newArrayList(thriftTable));
           }
         } else {
           // Table does not exist in the meta store and Impala catalog, throw error.

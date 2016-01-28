@@ -144,8 +144,8 @@ enum TFunctionBinaryType {
   // depending on the query option.
   BUILTIN,
 
-  // Hive UDFs, loaded from *.jar
-  HIVE,
+  // Java UDFs, loaded from *.jar
+  JAVA,
 
   // Native-interface, precompiled UDFs loaded from *.so
   NATIVE,
@@ -212,4 +212,7 @@ struct TFunction {
   // One of these should be set.
   9: optional TScalarFunction scalar_fn
   10: optional TAggregateFunction aggregate_fn
+
+  // True for builtins or user-defined functions persisted by the catalog
+  11: required bool is_persistent
 }

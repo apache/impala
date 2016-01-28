@@ -246,7 +246,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       } else if (texpr_node.fn.name.function_name == "coalesce") {
         *expr = pool->Add(new CoalesceExpr(texpr_node));
 
-      } else if (texpr_node.fn.binary_type == TFunctionBinaryType::HIVE) {
+      } else if (texpr_node.fn.binary_type == TFunctionBinaryType::JAVA) {
         *expr = pool->Add(new HiveUdfCall(texpr_node));
       } else {
         *expr = pool->Add(new ScalarFnCall(texpr_node));

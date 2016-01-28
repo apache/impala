@@ -68,7 +68,7 @@ HiveUdfCall::HiveUdfCall(const TExprNode& node)
   : Expr(node),
     input_buffer_size_(0) {
   DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
-  DCHECK_EQ(node.fn.binary_type, TFunctionBinaryType::HIVE);
+  DCHECK_EQ(node.fn.binary_type, TFunctionBinaryType::JAVA);
 }
 
 AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {

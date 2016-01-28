@@ -1362,17 +1362,17 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
   // If this this update result contains a catalog object to add or remove, directly apply
   // the update to the local impalad's catalog cache. Otherwise, wait for a statestore
   // heartbeat that contains this update version.
-  if ((catalog_update_result.__isset.updated_catalog_object ||
-      catalog_update_result.__isset.removed_catalog_object)) {
+  if ((catalog_update_result.__isset.updated_catalog_objects ||
+      catalog_update_result.__isset.removed_catalog_objects)) {
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(true);
     update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
 
-    if (catalog_update_result.__isset.updated_catalog_object) {
-      update_req.updated_objects.push_back(catalog_update_result.updated_catalog_object);
+    if (catalog_update_result.__isset.updated_catalog_objects) {
+      update_req.__set_updated_objects(catalog_update_result.updated_catalog_objects);
     }
-    if (catalog_update_result.__isset.removed_catalog_object) {
-      update_req.removed_objects.push_back(catalog_update_result.removed_catalog_object);
+    if (catalog_update_result.__isset.removed_catalog_objects) {
+      update_req.__set_removed_objects(catalog_update_result.removed_catalog_objects);
     }
      // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;

@@ -17,9 +17,15 @@ package com.cloudera.impala.catalog;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hive.metastore.api.FunctionType;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.hadoop.hive.metastore.api.ResourceType;
+import org.apache.hadoop.hive.metastore.api.ResourceUri;
+
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.hive.executor.UdfExecutor.JavaUdfDataType;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TScalarFunction;
@@ -64,6 +70,7 @@ public class ScalarFunction extends Function {
         new FunctionName(Catalog.BUILTINS_DB, name), argTypes, retType, hasVarArgs);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.setUserVisible(userVisible);
+    fn.setIsPersistent(true);
     try {
       fn.symbolName_ = fn.lookupSymbol(symbol, TSymbolType.UDF_EVALUATE, null,
           fn.hasVarArgs(), fn.getArgs());
@@ -91,6 +98,54 @@ public class ScalarFunction extends Function {
       }
     }
     return fn;
+  }
+
+  /**
+   * Creates a Function object based on following inputs.
+   * @param dbName Name of fn's database
+   * @param fnName Name of the function
+   * @param fnClass Function symbol name
+   * @param fnArgs List of Class objects corresponding to the args of evaluate method
+   * @param fnRetType Class corresponding to the return type of the evaluate method
+   * @param hdfsUri URI of the jar holding the udf class.
+   * @return Function object corresponding to the hive udf if the parameters are
+   *         compatible, null otherwise.
+   */
+  public static Function fromHiveFunction(String dbName, String fnName, String fnClass,
+      Class<?>[] fnArgs, Class<?> fnRetType, String hdfsUri) {
+    // Check if the return type and the method arguments are supported.
+    // Currently we only support certain primitive types.
+    JavaUdfDataType javaRetType = JavaUdfDataType.getType(fnRetType);
+    if (javaRetType == JavaUdfDataType.INVALID_TYPE) return null;
+    List<Type> fnArgsList = Lists.newArrayList();
+    for (Class<?> argClass: fnArgs) {
+      JavaUdfDataType javaUdfType = JavaUdfDataType.getType(argClass);
+      if (javaUdfType == JavaUdfDataType.INVALID_TYPE) return null;
+      fnArgsList.add(new ScalarType(
+          PrimitiveType.fromThrift(javaUdfType.getPrimitiveType())));
+    }
+    ScalarType retType = new ScalarType(
+        PrimitiveType.fromThrift(javaRetType.getPrimitiveType()));
+    ScalarFunction fn = new ScalarFunction(new FunctionName(dbName, fnName), fnArgsList,
+        retType, new HdfsUri(hdfsUri), fnClass, null, null);
+    // We do not support varargs for Java UDFs, and neither does Hive.
+    fn.setHasVarArgs(false);
+    fn.setBinaryType(TFunctionBinaryType.JAVA);
+    fn.setIsPersistent(true);
+    return fn;
+  }
+
+  /**
+   * Creates a Hive function object from 'this'. Returns null if 'this' is not
+   * a Java UDF.
+   */
+  public org.apache.hadoop.hive.metastore.api.Function toHiveFunction() {
+    if (getBinaryType() != TFunctionBinaryType.JAVA) return null;
+    List<ResourceUri> resources = Lists.newArrayList(new ResourceUri(ResourceType.JAR,
+        getLocation().toString()));
+    return new org.apache.hadoop.hive.metastore.api.Function(functionName(), dbName(),
+        symbolName_, "", PrincipalType.USER, (int) (System.currentTimeMillis() / 1000),
+        FunctionType.JAVA, resources);
   }
 
   /**
@@ -164,6 +219,7 @@ public class ScalarFunction extends Function {
         new FunctionName(Catalog.BUILTINS_DB, name), argTypes, retType, hasVarArgs);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.setUserVisible(userVisible);
+    fn.setIsPersistent(true);
     try {
       fn.symbolName_ = fn.lookupSymbol(symbol, TSymbolType.UDF_EVALUATE, null,
           fn.hasVarArgs(), fn.getArgs());
@@ -201,6 +257,7 @@ public class ScalarFunction extends Function {
     ScalarFunction fn = new ScalarFunction(new FunctionName(db, fnName), args,
         retType, new HdfsUri(uriPath), symbolName, initFnSymbol, closeFnSymbol);
     fn.setBinaryType(type);
+    fn.setIsPersistent(true);
     return fn;
   }
 

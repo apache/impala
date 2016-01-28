@@ -157,7 +157,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     type = LibCache::TYPE_SO;
   } else if (params.fn_binary_type == TFunctionBinaryType::IR) {
     type = LibCache::TYPE_IR;
-  } else if (params.fn_binary_type == TFunctionBinaryType::HIVE) {
+  } else if (params.fn_binary_type == TFunctionBinaryType::JAVA) {
     type = LibCache::TYPE_JAR;
   } else {
     DCHECK(false) << params.fn_binary_type;
@@ -188,7 +188,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     return;
   }
 
-  if (params.fn_binary_type == TFunctionBinaryType::HIVE ||
+  if (params.fn_binary_type == TFunctionBinaryType::JAVA ||
       SymbolsUtil::IsMangled(params.symbol)) {
     // No use trying to mangle Hive or already mangled symbols, return the error.
     // TODO: we can demangle the user symbol here and validate it against
@@ -207,7 +207,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   if (params.__isset.ret_arg_type) ret_type = ColumnType::FromThrift(params.ret_arg_type);
 
   // Mangle the user input
-  DCHECK_NE(params.fn_binary_type, TFunctionBinaryType::HIVE);
+  DCHECK_NE(params.fn_binary_type, TFunctionBinaryType::JAVA);
   if (params.symbol_type == TSymbolType::UDF_EVALUATE) {
     symbol = SymbolsUtil::MangleUserFunction(params.symbol,
         arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);

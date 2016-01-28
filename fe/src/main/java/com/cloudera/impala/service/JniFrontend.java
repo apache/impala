@@ -338,14 +338,20 @@ public class JniFrontend {
     TGetFunctionsResult result = new TGetFunctionsResult();
     List<String> signatures = Lists.newArrayList();
     List<String> retTypes = Lists.newArrayList();
+    List<String> fnBinaryTypes = Lists.newArrayList();
+    List<String> fnIsPersistent = Lists.newArrayList();
     List<Function> fns = frontend_.getFunctions(params.category, params.db,
         params.pattern, false);
     for (Function fn: fns) {
       signatures.add(fn.signatureString());
       retTypes.add(fn.getReturnType().toString());
+      fnBinaryTypes.add(fn.getBinaryType().name());
+      fnIsPersistent.add(String.valueOf(fn.isPersistent()));
     }
     result.setFn_signatures(signatures);
     result.setFn_ret_types(retTypes);
+    result.setFn_binary_types(fnBinaryTypes);
+    result.setFn_persistence(fnIsPersistent);
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

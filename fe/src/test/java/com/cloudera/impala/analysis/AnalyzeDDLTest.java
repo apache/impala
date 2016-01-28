@@ -1812,9 +1812,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     final String udfSuffixIr = " LOCATION '/test-warehouse/test-udfs.ll' " +
         "SYMBOL=" + symbol;
     final String hdfsPath = "hdfs://localhost:20500/test-warehouse/libTestUdfs.so";
+    final String javaFnSuffix = " LOCATION '/test-warehouse/impala-hive-udfs.jar' " +
+        "SYMBOL='com.cloudera.impala.TestUdf'";
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
     AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);
+    AnalyzesOk("create function foo" + javaFnSuffix);
+    AnalyzesOk("create function foo(INT) returns INT" + javaFnSuffix);
 
     // Try some fully qualified function names
     AnalyzesOk("create function functional.B() RETURNS int" + udfSuffix);
@@ -1844,23 +1848,23 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function foo() RETURNS int LOCATION " +
         "'/test-warehouse/hive-exec.jar' SYMBOL='a'");
 
-    // Test hive UDFs for unsupported types
+    // Test Java UDFs for unsupported types
     AnalysisError("create function foo() RETURNS timestamp LOCATION '/test-warehouse/hive-exec.jar' SYMBOL='a'",
-        "Hive UDFs that use TIMESTAMP are not yet supported.");
+        "Type TIMESTAMP is not supported for Java UDFs.");
     AnalysisError("create function foo(timestamp) RETURNS int LOCATION '/a.jar'",
-        "Hive UDFs that use TIMESTAMP are not yet supported.");
+        "Type TIMESTAMP is not supported for Java UDFs.");
     AnalysisError("create function foo() RETURNS decimal LOCATION '/a.jar'",
-        "Hive UDFs that use DECIMAL are not yet supported.");
+        "Type DECIMAL(9,0) is not supported for Java UDFs.");
     AnalysisError("create function foo(Decimal) RETURNS int LOCATION '/a.jar'",
-        "Hive UDFs that use DECIMAL are not yet supported.");
+        "Type DECIMAL(9,0) is not supported for Java UDFs.");
     AnalysisError("create function foo(char(5)) RETURNS int LOCATION '/a.jar'",
-        "UDFs that use CHAR are not yet supported.");
+        "Type CHAR(5) is not supported for Java UDFs.");
     AnalysisError("create function foo(varchar(5)) RETURNS int LOCATION '/a.jar'",
-        "UDFs that use VARCHAR are not yet supported.");
+        "Type VARCHAR(5) is not supported for Java UDFs.");
     AnalysisError("create function foo() RETURNS CHAR(5) LOCATION '/a.jar'",
-        "UDFs that use CHAR are not yet supported.");
+        "Type CHAR(5) is not supported for Java UDFs.");
     AnalysisError("create function foo() RETURNS VARCHAR(5) LOCATION '/a.jar'",
-        "UDFs that use VARCHAR are not yet supported.");
+        "Type VARCHAR(5) is not supported for Java UDFs.");
     AnalysisError("create function foo() RETURNS CHAR(5)" + udfSuffix,
         "UDFs that use CHAR are not yet supported.");
     AnalysisError("create function foo() RETURNS VARCHAR(5)" + udfSuffix,
@@ -1907,10 +1911,18 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Try to create with a bad location
     AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' SYMBOL='c'",
         "URI path must be absolute: bad-location");
+    AnalysisError("create function foo LOCATION 'bad-location' SYMBOL='c'",
+        "URI path must be absolute: bad-location");
     AnalysisError("create function foo() RETURNS int LOCATION " +
         "'blah://localhost:50200/bad-location' SYMBOL='c'",
         "No FileSystem for scheme: blah");
+    AnalysisError("create function foo LOCATION " +
+        "'blah://localhost:50200/bad-location' SYMBOL='c'",
+        "No FileSystem for scheme: blah");
     AnalysisError("create function foo() RETURNS int LOCATION " +
+        "'file:///foo.jar' SYMBOL='c'",
+        "Could not load binary: file:///foo.jar");
+    AnalysisError("create function foo LOCATION " +
         "'file:///foo.jar' SYMBOL='c'",
         "Could not load binary: file:///foo.jar");
 
@@ -1930,6 +1942,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create function foo() RETURNS int LOCATION '/blah.so' " +
         "SYMBOL='ab'", "Could not load binary: /blah.so");
     AnalysisError("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'",
+        "Could not load binary: /binary.JAR");
+    AnalysisError("create function foo LOCATION '/binary.JAR' SYMBOL='a'",
         "Could not load binary: /binary.JAR");
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
@@ -2014,6 +2028,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop function if exists a.foo()");
     AnalysisError("drop function a.foo()", "Database does not exist: a");
     AnalyzesOk("drop function if exists foo()");
+    AnalyzesOk("drop function if exists foo");
     AnalyzesOk("drop function if exists foo(int...)");
     AnalyzesOk("drop function if exists foo(double, int...)");
 
@@ -2026,6 +2041,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Function already exists: testfn()");
     AnalysisError("create function TestFn(double) RETURNS INT " + udfSuffix,
         "Function already exists: testfn(DOUBLE)");
+    // Persistent Java UDF name clashes with existing NATIVE function and fails if
+    // 'if not exists' is specified.
+    AnalysisError("create function TestFn" + javaFnSuffix,
+        "Function already exists: testfn()");
+    AnalyzesOk("create function if not exists TestFn" + javaFnSuffix);
 
     // Fn(Double) and Fn(Double...) should be a conflict.
     AnalysisError("create function TestFn(double...) RETURNS INT" + udfSuffix,
@@ -2057,11 +2077,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop function TestFn()");
     AnalyzesOk("drop function TestFn(double)");
     AnalyzesOk("drop function TestFn(string...)");
+    AnalyzesOk("drop function if exists functional.TestFn");
     AnalysisError("drop function TestFn(double...)",
         "Function does not exist: testfn(DOUBLE...)");
     AnalysisError("drop function TestFn(int)", "Function does not exist: testfn(INT)");
     AnalysisError(
         "drop function functional.TestFn()", "Function does not exist: testfn()");
+    AnalysisError("drop function functional.TestFn", "Function does not exist: testfn");
 
     AnalysisError("create function f() returns int " + udfSuffix +
         "init_fn='a'", "Optional argument 'INIT_FN' should not be set");

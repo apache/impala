@@ -271,6 +271,8 @@ struct TGetFunctionsParams {
 struct TGetFunctionsResult {
   1: list<string> fn_signatures
   2: list<string> fn_ret_types
+  3: list<string> fn_binary_types
+  4: list<string> fn_persistence
 }
 
 // Parameters for the USE db command

@@ -845,16 +845,16 @@ STRING
 ---- QUERY
 show functions in test_drop_cascade_db
 ---- RESULTS
-'STRING','f1()'
+'STRING','f1()','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show aggregate functions in test_drop_cascade_db
 ---- RESULTS
-'INT','f2(INT, STRING)'
+'INT','f2(INT, STRING)','NATIVE','true'
 ---- TYPES
-STRING, STRING
+STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Should drop all tables and the database
