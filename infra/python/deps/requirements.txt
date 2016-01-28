@@ -32,6 +32,7 @@ psutil == 0.7.1
 pyparsing == 2.0.3
 pytest == 2.7.2
   py == 1.4.30
+pytest-random == 0.02
 pytest-xdist == 1.12
 pywebhdfs == 0.3.2
   pbr == 1.8.1
