@@ -93,8 +93,8 @@ class HashTable;
 /// TODO: this is not a fancy hash table in terms of memory access patterns
 /// (cuckoo-hashing or something that spills to disk). We will likely want to invest
 /// more time into this.
-/// TODO: hash-join and aggregation have very different access patterns.  Joins insert
-/// all the rows and then calls scan to find them.  Aggregation interleaves Find() and
+/// TODO: hash-join and aggregation have very different access patterns.  Joins insert all
+/// the rows and then calls scan to find them.  Aggregation interleaves FindProbeRow() and
 /// Inserts().  We may want to optimize joins more heavily for Inserts() (in particular
 /// growing).
 /// TODO: Batched interface for inserts and finds.
@@ -106,10 +106,10 @@ class HashTableCtx {
  public:
   /// Create a hash table context.
   ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
-  ///  - probe_exprs are used during Find()
+  ///  - probe_exprs are used during FindProbeRow()
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
-  ///  - finds_nulls: if finds_nulls[i] is false, Find() returns End() for TupleRows with
-  ///      nulls in position i even if stores_nulls is true.
+  ///  - finds_nulls: if finds_nulls[i] is false, FindProbeRow() returns End() for
+  ///      TupleRows with nulls in position i even if stores_nulls is true.
   ///  - initial_seed: Initial seed value to use when computing hashes for rows with
   ///    level 0. Other levels have their seeds derived from this seed.
   ///  - The max levels we will hash with.
@@ -162,7 +162,9 @@ class HashTableCtx {
 
   /// Codegen for evaluating a TupleRow and comparing equality against
   /// 'expr_values_buffer_'.  Function signature matches HashTable::Equals().
-  llvm::Function* CodegenEquals(RuntimeState* state);
+  /// force_null_equality is true if the generated equality function should treat all
+  /// NULLs as equal. See the template parameter to HashTable::Equals().
+  llvm::Function* CodegenEquals(RuntimeState* state, bool force_null_equality);
 
   /// Codegen for hashing the expr values in 'expr_values_buffer_'. Function prototype
   /// matches HashCurrentRow identically. Unlike HashCurrentRow(), the returned function
@@ -226,9 +228,11 @@ class HashTableCtx {
   /// This will be replaced by codegen.
   bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
 
-  /// Returns true if the values of build_exprs evaluated over 'build_row' equal
-  /// the values cached in expr_values_buffer_.
-  /// This will be replaced by codegen.
+  /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
+  /// values cached in expr_values_buffer_.  This will be replaced by
+  /// codegen. FORCE_NULL_EQUALITY is true if all nulls should be treated as equal,
+  /// regardless of the values of finds_nulls_
+  template<bool FORCE_NULL_EQUALITY>
   bool IR_NO_INLINE Equals(TupleRow* build_row);
 
   const std::vector<ExprContext*>& build_expr_ctxs_;
@@ -252,7 +256,7 @@ class HashTableCtx {
   std::vector<uint32_t> seeds_;
 
   /// Cache of exprs values for the current row being evaluated.  This can either
-  /// be a build row (during Insert()) or probe row (during Find()).
+  /// be a build row (during Insert()) or probe row (during FindProbeRow()).
   std::vector<int> expr_values_buffer_offsets_;
 
   /// Byte offset into 'expr_values_buffer_' that begins the variable length results.
@@ -384,13 +388,13 @@ class HashTable {
   /// go to the next matching row. The matching rows do not need to be evaluated since all
   /// the nodes of a bucket are duplicates. One scan can be in progress for each 'ht_ctx'.
   /// Used during the probe phase of hash joins.
-  Iterator IR_ALWAYS_INLINE Find(HashTableCtx* ht_ctx, uint32_t hash);
+  Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash);
 
-  /// If a match is found in the table, return an iterator as in Find(). If a match was
-  /// not present, return an iterator pointing to the empty bucket where the key should
-  /// be inserted. Returns End() if the table is full. The caller can set the data in
-  /// the bucket using a Set*() method on the iterator.
-  Iterator IR_ALWAYS_INLINE FindBucket(HashTableCtx* ht_ctx, uint32_t hash,
+  /// If a match is found in the table, return an iterator as in FindProbeRow(). If a
+  /// match was not present, return an iterator pointing to the empty bucket where the key
+  /// should be inserted. Returns End() if the table is full. The caller can set the data
+  /// in the bucket using a Set*() method on the iterator.
+  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(HashTableCtx* ht_ctx, uint32_t hash,
       bool* found);
 
   /// Returns number of elements inserted in the hash table
@@ -463,6 +467,9 @@ class HashTable {
   /// Update and print some statistics that can be used for performance debugging.
   std::string PrintStats() const;
 
+  /// Number of hash collisions so far in the lifetime of this object
+  int64_t NumHashCollisions() const { return num_hash_collisions_; }
+
   /// stl-like iterator interface.
   class Iterator {
    private:
@@ -493,9 +500,9 @@ class HashTable {
     TupleRow* GetRow() const;
     Tuple* GetTuple() const;
 
-    /// Set the current tuple for an empty bucket. Designed to be used with the
-    /// iterator returned from FindBucket() in the case when the value is not found.
-    /// It is not valid to call this function if the bucket already has an entry.
+    /// Set the current tuple for an empty bucket. Designed to be used with the iterator
+    /// returned from FindBuildRowBucket() in the case when the value is not found.  It is
+    /// not valid to call this function if the bucket already has an entry.
     void SetTuple(Tuple* tuple, uint32_t hash);
 
     /// Sets as matched the Bucket or DuplicateNode currently pointed by the iterator,
@@ -558,12 +565,15 @@ class HashTable {
   /// Using the returned index value, the caller can create an iterator that can be
   /// iterated until End() to find all the matching rows.
   /// EvalAndHashBuild() or EvalAndHashProb(e) must have been called before calling this.
+  /// 'FORCE_NULL_EQUALITY' is true if NULLs should always be considered equal when
+  /// comparing two rows.
   /// 'hash' must be the hash returned by these functions.
   /// 'found' indicates that a bucket that contains an equal row is found.
   ///
   /// There are wrappers of this function that perform the Find and Insert logic.
+  template <bool FORCE_NULL_EQUALITY>
   int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
-      HashTableCtx* ht_ctx, uint32_t hash,  bool* found);
+      HashTableCtx* ht_ctx, uint32_t hash, bool* found);
 
   /// Performs the insert logic. Returns the HtData* of the bucket or duplicate node
   /// where the data should be inserted. Returns NULL if the insert was not successful.
@@ -672,7 +682,8 @@ class HashTable {
 
   /// The stats below can be used for debugging perf.
   /// TODO: Should we make these statistics atomic?
-  /// Number of Find(), Insert(), or FindBucket() calls that probe the hash table.
+  /// Number of FindProbeRow(), Insert(), or FindBuildRowBucket() calls that probe the
+  /// hash table.
   int64_t num_probes_;
 
   /// Number of probes that failed and had to fall back to linear probing without cap.

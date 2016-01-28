@@ -30,7 +30,7 @@ class SlotRef : public Expr {
   SlotRef(const SlotDescriptor* desc, const ColumnType& type);
 
   /// Used for testing.  GetValue will return tuple + offset interpreted as 'type'
-  SlotRef(const ColumnType& type, int offset);
+  SlotRef(const ColumnType& type, int offset, const bool nullable = false);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                          ExprContext* context);

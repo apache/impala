@@ -65,14 +65,14 @@ class HashTableTest : public testing::Test {
     // Not very easy to test complex tuple layouts so this test will use the
     // simplest.  The purpose of these tests is to exercise the hash map
     // internals so a simple build/probe expr is fine.
-    Expr* expr = pool_.Add(new SlotRef(TYPE_INT, 0));
+    Expr* expr = pool_.Add(new SlotRef(TYPE_INT, 1, true /* nullable */));
     build_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
     status = Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_);
     EXPECT_TRUE(status.ok());
     status = Expr::Open(build_expr_ctxs_, NULL);
     EXPECT_TRUE(status.ok());
 
-    expr = pool_.Add(new SlotRef(TYPE_INT, 0));
+    expr = pool_.Add(new SlotRef(TYPE_INT, 1, true /* nullable */));
     probe_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
     status = Expr::Prepare(probe_expr_ctxs_, NULL, desc, &tracker_);
     EXPECT_TRUE(status.ok());
@@ -90,8 +90,18 @@ class HashTableTest : public testing::Test {
 
   TupleRow* CreateTupleRow(int32_t val) {
     uint8_t* tuple_row_mem = mem_pool_.Allocate(sizeof(int32_t*));
+    Tuple* tuple_mem = Tuple::Create(sizeof(char) + sizeof(int32_t), &mem_pool_);
+    *reinterpret_cast<int32_t *>(tuple_mem->GetSlot(1)) = val;
+    tuple_mem->SetNotNull(NullIndicatorOffset(0,1));
+    TupleRow* row = reinterpret_cast<TupleRow*>(tuple_row_mem);
+    row->SetTuple(0, tuple_mem);
+    return row;
+  }
+
+  TupleRow* CreateNullTupleRow() {
+    uint8_t* tuple_row_mem = mem_pool_.Allocate(sizeof(int32_t*));
     Tuple* tuple_mem = Tuple::Create(sizeof(int32_t), &mem_pool_);
-    *reinterpret_cast<int32_t*>(tuple_mem) = val;
+    tuple_mem->SetNull(NullIndicatorOffset(0,1));
     TupleRow* row = reinterpret_cast<TupleRow*>(tuple_row_mem);
     row->SetTuple(0, tuple_mem);
     return row;
@@ -146,7 +156,7 @@ class HashTableTest : public testing::Test {
 
       HashTable::Iterator iter;
       if (ht_ctx->EvalAndHashProbe(row, &hash)) continue;
-      iter = table->Find(ht_ctx, hash);
+      iter = table->FindProbeRow(ht_ctx, hash);
 
       if (data[i].expected_build_rows.size() == 0) {
         EXPECT_TRUE(iter.AtEnd());
@@ -216,6 +226,28 @@ class HashTableTest : public testing::Test {
     bool initialized = CreateHashTable(quadratic, initial_num_buckets, &hash_table);
     EXPECT_EQ(too_big, !initialized);
 
+    hash_table->Close();
+  }
+
+  // IMPALA-2897: Build rows that are equivalent (where NULLs are counted as equivalent)
+  // should not occupy distinct buckets.
+  void NullBuildRowTest() {
+    TupleRow* build_rows[2];
+    for (int i = 0; i < 2; ++i) build_rows[i] = CreateNullTupleRow();
+
+    // Create the hash table and insert the build rows
+    scoped_ptr<HashTable> hash_table;
+    ASSERT_TRUE(CreateHashTable(true, 1024, &hash_table));
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, true /* stores_nulls_ */,
+        std::vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1);
+
+    for (int i = 0; i < 2; ++i) {
+      uint32_t hash = 0;
+      if (!ht_ctx.EvalAndHashBuild(build_rows[i], &hash)) continue;
+      bool inserted = hash_table->Insert(&ht_ctx, build_rows[i]->GetTuple(0), hash);
+      EXPECT_TRUE(inserted);
+    }
+    EXPECT_EQ(hash_table->num_buckets() - hash_table->EmptyBuckets(), 1);
     hash_table->Close();
   }
 
@@ -373,7 +405,7 @@ class HashTableTest : public testing::Test {
     for (int i = 0; i < expected_size * 5; i += 100000) {
       TupleRow* probe_row = CreateTupleRow(i);
       if (!ht_ctx.EvalAndHashProbe(probe_row, &hash)) continue;
-      HashTable::Iterator iter = hash_table->Find(&ht_ctx, hash);
+      HashTable::Iterator iter = hash_table->FindProbeRow(&ht_ctx, hash);
       if (i < hash_table->size()) {
         EXPECT_TRUE(!iter.AtEnd()) << " i: " << i;
         ValidateMatch(probe_row, iter.GetRow());
@@ -411,7 +443,7 @@ class HashTableTest : public testing::Test {
         bool inserted = hash_table->Insert(&ht_ctx, row->GetTuple(0), hash);
         EXPECT_TRUE(inserted);
       } else {
-        iter = hash_table->FindBucket(&ht_ctx, hash, &found);
+        iter = hash_table->FindBuildRowBucket(&ht_ctx, hash, &found);
         EXPECT_FALSE(iter.AtEnd());
         EXPECT_FALSE(found);
         iter.SetTuple(row->GetTuple(0), hash);
@@ -420,11 +452,11 @@ class HashTableTest : public testing::Test {
 
       passes = ht_ctx.EvalAndHashProbe(row, &hash);
       EXPECT_TRUE(passes);
-      iter = hash_table->Find(&ht_ctx, hash);
+      iter = hash_table->FindProbeRow(&ht_ctx, hash);
       EXPECT_FALSE(iter.AtEnd());
       EXPECT_EQ(row->GetTuple(0), iter.GetTuple());
 
-      iter = hash_table->FindBucket(&ht_ctx, hash, &found);
+      iter = hash_table->FindBuildRowBucket(&ht_ctx, hash, &found);
       EXPECT_FALSE(iter.AtEnd());
       EXPECT_TRUE(found);
       EXPECT_EQ(row->GetTuple(0), iter.GetTuple());
@@ -436,11 +468,11 @@ class HashTableTest : public testing::Test {
     TupleRow* probe_row = CreateTupleRow(table_size);
     bool passes = ht_ctx.EvalAndHashProbe(probe_row, &hash);
     EXPECT_TRUE(passes);
-    iter = hash_table->Find(&ht_ctx, hash);
+    iter = hash_table->FindProbeRow(&ht_ctx, hash);
     EXPECT_TRUE(iter.AtEnd());
 
     // Since hash_table is full, FindBucket cannot find an empty bucket, so returns End().
-    iter = hash_table->FindBucket(&ht_ctx, hash, &found);
+    iter = hash_table->FindBuildRowBucket(&ht_ctx, hash, &found);
     EXPECT_TRUE(iter.AtEnd());
     EXPECT_FALSE(found);
 
@@ -485,6 +517,10 @@ TEST_F(HashTableTest, QuadraticSetupTest) {
   // Regression test for IMPALA-2065. Trying to init a hash table with large (>2^31)
   // number of buckets.
   SetupTest(true, 4294967296, true); // 2^32
+}
+
+TEST_F(HashTableTest, NullBuildRowTest) {
+  NullBuildRowTest();
 }
 
 TEST_F(HashTableTest, LinearBasicTest) {

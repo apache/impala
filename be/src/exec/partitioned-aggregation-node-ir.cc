@@ -73,7 +73,7 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* row, HashTableCtx* ht_ct
   bool found;
   // Find the appropriate bucket in the hash table. There will always be a free
   // bucket because we checked the size above.
-  HashTable::Iterator it = ht->FindBucket(ht_ctx, hash, &found);
+  HashTable::Iterator it = ht->FindBuildRowBucket(ht_ctx, hash, &found);
   DCHECK(!it.AtEnd()) << "Hash table had no free buckets";
   if (AGGREGATED_ROWS) {
     // If the row is already an aggregate row, it cannot match anything in the

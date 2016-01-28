@@ -18,6 +18,9 @@
 
 #include "exec/hash-table.h"
 
+#include "exprs/expr.h"
+#include "exprs/expr-context.h"
+
 namespace impala {
 
 inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
@@ -34,6 +37,7 @@ inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
   return true;
 }
 
+template <bool FORCE_NULL_EQUALITY>
 inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   DCHECK(buckets != NULL);
@@ -49,7 +53,8 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     Bucket* bucket = &buckets[bucket_idx];
     if (!bucket->filled) return bucket_idx;
     if (hash == bucket->hash) {
-      if (ht_ctx != NULL && ht_ctx->Equals(GetRow(bucket, ht_ctx->row_))) {
+      if (ht_ctx != NULL &&
+          ht_ctx->Equals<FORCE_NULL_EQUALITY>(GetRow(bucket, ht_ctx->row_))) {
         *found = true;
         return bucket_idx;
       }
@@ -78,7 +83,7 @@ inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx,
     uint32_t hash) {
   ++num_probes_;
   bool found = false;
-  int64_t bucket_idx = Probe(buckets_, num_buckets_, ht_ctx, hash, &found);
+  int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, &found);
   DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND);
   if (found) {
     // We need to insert a duplicate node, note that this may fail to allocate memory.
@@ -114,10 +119,10 @@ inline bool HashTable::Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash)
   return false;
 }
 
-inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) {
+inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash) {
   ++num_probes_;
   bool found = false;
-  int64_t bucket_idx = Probe(buckets_, num_buckets_, ht_ctx, hash, &found);
+  int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
   if (found) {
     return Iterator(this, ht_ctx->row(), bucket_idx,
         buckets_[bucket_idx].bucketData.duplicates);
@@ -125,10 +130,10 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) 
   return End();
 }
 
-inline HashTable::Iterator HashTable::FindBucket(HashTableCtx* ht_ctx, uint32_t hash,
-    bool* found) {
+inline HashTable::Iterator HashTable::FindBuildRowBucket(
+    HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   ++num_probes_;
-  int64_t bucket_idx = Probe(buckets_, num_buckets_, ht_ctx, hash, found);
+  int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
   DuplicateNode* duplicates = LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND) ?
       buckets_[bucket_idx].bucketData.duplicates : NULL;
   return Iterator(this, ht_ctx->row(), bucket_idx, duplicates);

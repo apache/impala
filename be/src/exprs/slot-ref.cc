@@ -53,11 +53,11 @@ SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-SlotRef::SlotRef(const ColumnType& type, int offset)
+  SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = false */)
   : Expr(type, true),
     tuple_idx_(0),
     slot_offset_(offset),
-    null_indicator_offset_(0, -1),
+    null_indicator_offset_(0, nullable ? offset : -1),
     slot_id_(-1) {
 }
 

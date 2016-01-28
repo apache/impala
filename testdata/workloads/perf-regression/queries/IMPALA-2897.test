@@ -1,0 +1,19 @@
+====
+---- QUERY: IMPALA-2897
+# In a right outer join, build side rows that are equivalent (where nulls are considered
+# equivalent) should compare equal and be placed in the same hash bucket. If they compare
+# unequal and hash to different buckets, this query exhibits quadratic runtime.
+#
+# We have to use an expression (rather than just NULL) in the inner SELECTs because of
+# IMPALA-2909.
+select straight_join (x is null) and (y is null) from
+(select a.id + b.id + null as x from
+functional.alltypes a, functional.alltypessmall b) c right outer join
+(select a.id + b.id + null as y from
+functional.alltypes a, functional.alltypessmall b) d
+on c.x = d.y limit 1
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====

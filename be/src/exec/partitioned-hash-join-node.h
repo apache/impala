@@ -348,6 +348,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// 1 / PARTITION_FANOUT. A value much larger indicates skew.
   RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
 
+  /// Number of hash collisions - unequal rows that have identical hash values
+  RuntimeProfile::Counter* num_hash_collisions_;
+
   /// Time spent evaluating other_join_conjuncts for NAAJ.
   RuntimeProfile::Counter* null_aware_eval_timer_;
 

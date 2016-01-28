@@ -163,6 +163,8 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "SpilledPartitions", TUnit::UNIT);
   largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
       "LargestPartitionPercent", TUnit::UNIT);
+  num_hash_collisions_ =
+      ADD_COUNTER(runtime_profile(), "HashCollisions", TUnit::UNIT);
 
   bool build_codegen_enabled = false;
   bool probe_codegen_enabled = false;
@@ -295,7 +297,11 @@ int64_t PartitionedHashJoinNode::Partition::InMemSize() const {
 void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
   if (is_closed()) return;
   is_closed_ = true;
-  if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+
+  if (hash_tbl_.get() != NULL) {
+    COUNTER_ADD(parent_->num_hash_collisions_, hash_tbl_->NumHashCollisions());
+    hash_tbl_->Close();
+  }
 
   // Transfer ownership of build_rows_/probe_rows_ to batch if batch is not NULL.
   // Otherwise, close the stream here.
@@ -1655,8 +1661,8 @@ bool PartitionedHashJoinNode::CodegenProcessProbeBatch(
   ht_ctx_arg->replaceAllUsesWith(ht_ctx_loc);
 
   // Codegen HashTable::Equals
-  Function* equals_fn = ht_ctx_->CodegenEquals(state);
-  if (equals_fn == NULL) return false;
+  Function* probe_equals_fn = ht_ctx_->CodegenEquals(state, false);
+  if (probe_equals_fn == NULL) return false;
 
   // Codegen for evaluating probe rows
   Function* eval_row_fn = ht_ctx_->CodegenEvalRow(state, false);
@@ -1703,8 +1709,8 @@ bool PartitionedHashJoinNode::CodegenProcessProbeBatch(
       eval_other_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced);
   DCHECK_EQ(replaced, 1);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
-      equals_fn, "Equals", &replaced);
+  process_probe_batch_fn = codegen->ReplaceCallSites(
+      process_probe_batch_fn, true, probe_equals_fn, "Equals", &replaced);
   // Depends on join_op_
   DCHECK(replaced == 1 || replaced == 2 || replaced == 3 || replaced == 4) << replaced;
 

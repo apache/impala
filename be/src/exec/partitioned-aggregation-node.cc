@@ -1440,9 +1440,9 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
     Function* hash_fn = ht_ctx_->CodegenHashCurrentRow(state_, /* use murmur */ false);
     if (hash_fn == NULL) return NULL;
 
-    // Codegen HashTable::Equals
-    Function* equals_fn = ht_ctx_->CodegenEquals(state_);
-    if (equals_fn == NULL) return NULL;
+    // Codegen HashTable::Equals<true>
+    Function* build_equals_fn = ht_ctx_->CodegenEquals(state_, true);
+    if (build_equals_fn == NULL) return NULL;
 
     // Codegen for evaluating probe rows
     Function* eval_probe_row_fn = ht_ctx_->CodegenEvalRow(state_, false);
@@ -1458,7 +1458,7 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
     DCHECK_EQ(replaced, 1);
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
-        equals_fn, "Equals", &replaced);
+        build_equals_fn, "Equals", &replaced);
     DCHECK_EQ(replaced, 1);
   }
 

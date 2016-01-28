@@ -199,7 +199,7 @@ next_row:
     }
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     if (LIKELY(hash_tbls_[partition_idx] != NULL)) {
-      hash_tbl_iterator_= hash_tbls_[partition_idx]->Find(ht_ctx, hash);
+      hash_tbl_iterator_= hash_tbls_[partition_idx]->FindProbeRow(ht_ctx, hash);
     } else {
       Partition* partition = hash_partitions_[partition_idx];
       if (UNLIKELY(partition->is_closed())) {

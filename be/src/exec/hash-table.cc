@@ -92,6 +92,7 @@ HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
           finds_nulls_.begin(), finds_nulls_.end(), false, std::logical_or<bool>())),
       level_(0),
       row_(reinterpret_cast<TupleRow*>(malloc(sizeof(Tuple*) * num_build_tuples))) {
+  DCHECK(!finds_some_nulls_ || stores_nulls_);
   // Compute the layout and buffer size to store the evaluated expr results
   DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
   DCHECK_EQ(build_expr_ctxs_.size(), finds_nulls_.size());
@@ -173,11 +174,12 @@ uint32_t HashTableCtx::HashVariableLenRow() {
   return hash;
 }
 
+template<bool FORCE_NULL_EQUALITY>
 bool HashTableCtx::Equals(TupleRow* build_row) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     void* val = build_expr_ctxs_[i]->GetValue(build_row);
     if (val == NULL) {
-      if (!(stores_nulls_ && finds_nulls_[i])) return false;
+      if (!(FORCE_NULL_EQUALITY || finds_nulls_[i])) return false;
       if (!expr_value_null_bits_[i]) return false;
       continue;
     } else {
@@ -191,6 +193,9 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
   }
   return true;
 }
+
+template bool HashTableCtx::Equals<true>(TupleRow* build_row);
+template bool HashTableCtx::Equals<false>(TupleRow* build_row);
 
 const double HashTable::MAX_FILL_FACTOR = 0.75f;
 
@@ -302,8 +307,8 @@ bool HashTable::ResizeBuckets(int64_t num_buckets, HashTableCtx* ht_ctx) {
        NextFilledBucket(&iter.bucket_idx_, &iter.node_)) {
     Bucket* bucket_to_copy = &buckets_[iter.bucket_idx_];
     bool found = false;
-    int64_t bucket_idx = Probe(new_buckets, num_buckets, NULL, bucket_to_copy->hash,
-                               &found);
+    int64_t bucket_idx =
+        Probe<true>(new_buckets, num_buckets, NULL, bucket_to_copy->hash, &found);
     DCHECK(!found);
     DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND) << " Probe failed even though "
         " there are free buckets. " << num_buckets << " " << num_filled_buckets_;
@@ -784,7 +789,7 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murm
 // continue3:                                        ; preds = %not_null2, %null1
 //   ret i1 true
 // }
-Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
+Function* HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // Disable codegen for CHAR
     if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
@@ -833,21 +838,24 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
         build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");
     Value* is_null = result.GetIsNull();
 
-    // Determine if probe is null (i.e. expr_value_null_bits_[i] == true). In
+    // Determine if row is null (i.e. expr_value_null_bits_[i] == true). In
     // the case where the hash table does not store nulls, this is always false.
-    Value* probe_is_null = codegen->false_value();
+    Value* row_is_null = codegen->false_value();
     uint8_t* null_byte_loc = &expr_value_null_bits_[i];
-    if (stores_nulls_ && finds_nulls_[i]) {
+
+    // We consider null values equal if we are comparing build rows or if the join
+    // predicate is <=>
+    if (force_null_equality || finds_nulls_[i]) {
       Value* llvm_null_byte_loc =
           codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
       Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
-      probe_is_null = builder.CreateICmpNE(null_byte,
+      row_is_null = builder.CreateICmpNE(null_byte,
                                            codegen->GetIntConstant(TYPE_TINYINT, 0));
     }
 
-    // Get llvm value for probe_val from 'expr_values_buffer_'
+    // Get llvm value for row_val from 'expr_values_buffer_'
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
-    Value* probe_val = codegen->CastPtrToLlvmPtr(
+    Value* row_val = codegen->CastPtrToLlvmPtr(
         codegen->GetPtrType(build_expr_ctxs_[i]->root()->type()), loc);
 
     // Branch for GetValue() returning NULL
@@ -855,18 +863,18 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
 
     // Null block
     builder.SetInsertPoint(null_block);
-    builder.CreateCondBr(probe_is_null, continue_block, false_block);
+    builder.CreateCondBr(row_is_null, continue_block, false_block);
 
     // Not-null block
     builder.SetInsertPoint(not_null_block);
     if (stores_nulls_) {
       BasicBlock* cmp_block = BasicBlock::Create(context, "cmp", fn);
-      // First need to compare that probe expr[i] is not null
-      builder.CreateCondBr(probe_is_null, false_block, cmp_block);
+      // First need to compare that row expr[i] is not null
+      builder.CreateCondBr(row_is_null, false_block, cmp_block);
       builder.SetInsertPoint(cmp_block);
     }
-    // Check result == probe_val
-    Value* is_equal = result.EqToNativePtr(probe_val);
+    // Check result == row_val
+    Value* is_equal = result.EqToNativePtr(row_val);
     builder.CreateCondBr(is_equal, continue_block, false_block);
 
     builder.SetInsertPoint(continue_block);
