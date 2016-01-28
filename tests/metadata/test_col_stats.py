@@ -25,7 +25,6 @@ from tests.common.skip import SkipIfS3
 
 TEST_DB = 'colstats_test_db'
 
-@SkipIfS3.insert
 # End-to-end validation of Impala column stats usage.
 class TestColStats(ImpalaTestSuite):
   @classmethod

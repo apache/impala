@@ -35,7 +35,6 @@ TEST_DB = "tmp_shell"
 TEST_TBL = "tbl1"
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
-@SkipIfS3.insert
 class TestImpalaShell(object):
   """A set of sanity tests for the Impala shell commandline parameters.
 

@@ -27,17 +27,19 @@ from tests.util.filesystem_utils import IS_DEFAULT_FS, IS_S3, IS_ISILON, IS_LOCA
 class SkipIfS3:
 
   # These ones are skipped due to product limitations.
-  insert = pytest.mark.skipif(IS_S3, reason="INSERT not implemented for S3")
-  load_data = pytest.mark.skipif(IS_S3, reason="LOAD DATA not implemented for S3")
   caching = pytest.mark.skipif(IS_S3, reason="SET CACHED not implemented for S3")
   hive = pytest.mark.skipif(IS_S3, reason="Hive doesn't work with S3")
   hdfs_block_size = pytest.mark.skipif(IS_S3, reason="S3 uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(IS_S3, reason="HDFS acls are not supported on S3")
   jira = partial(pytest.mark.skipif, IS_S3)
+  hdfs_encryption = pytest.mark.skipif(IS_S3,
+      reason="HDFS encryption is not supported with S3")
+  hdfs_purge = pytest.mark.skipif(IS_S3,
+      reason="PURGE has no effect on S3")
 
   # These ones need test infra work to re-enable.
   udfs = pytest.mark.skipif(IS_S3, reason="udas/udfs not copied to S3")
   datasrc = pytest.mark.skipif(IS_S3, reason="data sources not copied to S3")
-  hdfs_client = pytest.mark.skipif(IS_S3, reason="hdfs_client doesn't work with S3")
   hbase = pytest.mark.skipif(IS_S3, reason="HBase not started with S3")
   qualified_path = pytest.mark.skipif(IS_S3,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")

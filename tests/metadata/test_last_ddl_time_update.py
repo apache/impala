@@ -72,7 +72,6 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     self.run_test("alter table %s set fileformat textfile" % FULL_NAME, True)
 
   @pytest.mark.execute_serially
-  @SkipIfS3.insert
   def test_insert(self, vector):
     # static partition insert
     self.run_test("insert into %s partition(j=1, s='2012') "

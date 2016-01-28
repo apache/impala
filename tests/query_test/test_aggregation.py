@@ -94,7 +94,6 @@ class TestAggregationQueries(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_non_codegen_tinyint_grouping(self, vector):
     # Regression for IMPALA-901. The test includes an INSERT statement, so can only be run

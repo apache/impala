@@ -28,9 +28,9 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
-  TEST_DBS = ['ddl_test_db', 'ddl_purge_db', 'alter_table_test_db', 'alter_table_test_db2',
-              'function_ddl_test', 'udf_test', 'data_src_test', 'truncate_table_test_db',
-              'test_db', 'alter_purge_db', 'db_with_comment']
+  TEST_DBS = ['ddl_test_db', 'ddl_purge_db', 'alter_table_test_db',
+              'alter_table_test_db2', 'function_ddl_test', 'udf_test', 'data_src_test',
+              'truncate_table_test_db', 'test_db', 'alter_purge_db', 'db_with_comment']
 
   @classmethod
   def get_workload(self):
@@ -65,9 +65,9 @@ class TestDdlStatements(ImpalaTestSuite):
     # time a table is created with the same location. This also helps remove any stale
     # data from the last test run.
     for dir_ in ['part_data', 't1_tmp1', 't_part_tmp']:
-      self.hdfs_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
+      self.filesystem_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
 
-  @SkipIfS3.hdfs_client # S3: missing coverage: drop table/partition with PURGE
+  @SkipIfS3.hdfs_purge
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_table_with_purge(self):
@@ -80,31 +80,31 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("create table {0}.t2(i int)".format(DDL_PURGE_DB))
     # Create sample test data files under the table directories
     self.hdfs_client.create_file("test-warehouse/{0}.db/t1/t1.txt".format(DDL_PURGE_DB),\
-            file_data='t1')
+        file_data='t1')
     self.hdfs_client.create_file("test-warehouse/{0}.db/t2/t2.txt".format(DDL_PURGE_DB),\
-            file_data='t2')
+        file_data='t2')
     # Drop the table (without purge) and make sure it exists in trash
     self.client.execute("drop table {0}.t1".format(DDL_PURGE_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/t1.txt".\
-            format(DDL_PURGE_DB))
+        format(DDL_PURGE_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/".format(DDL_PURGE_DB))
     assert self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/t1.txt".\
-            format(getpass.getuser(), DDL_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/t1.txt".\
+        format(getpass.getuser(), DDL_PURGE_DB))
     assert self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1".\
-            format(getpass.getuser(), DDL_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1".\
+        format(getpass.getuser(), DDL_PURGE_DB))
     # Drop the table (with purge) and make sure it doesn't exist in trash
     self.client.execute("drop table {0}.t2 purge".format(DDL_PURGE_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t2/".format(DDL_PURGE_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t2/t2.txt".\
-            format(DDL_PURGE_DB))
+        format(DDL_PURGE_DB))
     assert not self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t2/t2.txt".\
-            format(getpass.getuser(), DDL_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t2/t2.txt".\
+        format(getpass.getuser(), DDL_PURGE_DB))
     assert not self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t2".\
-            format(getpass.getuser(), DDL_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t2".\
+        format(getpass.getuser(), DDL_PURGE_DB))
     # Create an external table t3 and run the same test as above. Make
     # sure the data is not deleted
     self.hdfs_client.make_dir("test-warehouse/data_t3/", permission=777)
@@ -115,101 +115,100 @@ class TestDdlStatements(ImpalaTestSuite):
     assert self.hdfs_client.exists("test-warehouse/data_t3/data.txt")
     self.hdfs_client.delete_file_dir("test-warehouse/data_t3", recursive=True)
 
-  @SkipIfS3.hdfs_client # S3: missing coverage: drop table/database
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_cleans_hdfs_dirs(self):
     DDL_TEST_DB = "ddl_test_db"
-    self.hdfs_client.delete_file_dir("test-warehouse/ddl_test_db.db/", recursive=True)
-    assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
+    self.filesystem_client.delete_file_dir("test-warehouse/ddl_test_db.db/",
+                                           recursive=True)
+    assert not self.filesystem_client.exists("test-warehouse/ddl_test_db.db/")
 
     self.client.execute('use default')
     self._create_db(DDL_TEST_DB)
     # Verify the db directory exists
-    assert self.hdfs_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
+    assert self.filesystem_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
 
     self.client.execute("create table {0}.t1(i int)".format(DDL_TEST_DB))
     # Verify the table directory exists
-    assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
+    assert self.filesystem_client.exists("test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
 
     # Dropping the table removes the table's directory and preserves the db's directory
     self.client.execute("drop table {0}.t1".format(DDL_TEST_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
-    assert self.hdfs_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
+    assert not self.filesystem_client.exists(
+        "test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
+    assert self.filesystem_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
 
     # Dropping the db removes the db's directory
     self.client.execute("drop database {0}".format(DDL_TEST_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
+    assert not self.filesystem_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
 
     # Dropping the db using "cascade" removes all tables' and db's directories
     # but keeps the external tables' directory
     self._create_db(DDL_TEST_DB)
     self.client.execute("create table {0}.t1(i int)".format(DDL_TEST_DB))
     self.client.execute("create table {0}.t2(i int)".format(DDL_TEST_DB))
-    self.client.execute("create external table {0}.t3(i int) "
-                        "location '/test-warehouse/{0}/t3/'".format(DDL_TEST_DB))
+    result = self.client.execute("create external table {0}.t3(i int) "
+        "location '{1}/{0}/t3/'".format(DDL_TEST_DB, WAREHOUSE))
     self.client.execute("drop database {0} cascade".format(DDL_TEST_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t2/".format(DDL_TEST_DB))
-    assert self.hdfs_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
-    self.hdfs_client.delete_file_dir("test-warehouse/{0}/t3/".format(DDL_TEST_DB),
+    assert not self.filesystem_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
+    assert not self.filesystem_client.exists(
+        "test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
+    assert not self.filesystem_client.exists(
+        "test-warehouse/{0}.db/t2/".format(DDL_TEST_DB))
+    assert self.filesystem_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
+    self.filesystem_client.delete_file_dir("test-warehouse/{0}/t3/".format(DDL_TEST_DB),
         recursive=True)
-    assert not self.hdfs_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
+    assert not self.filesystem_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
 
-  @SkipIfS3.insert # S3: missing coverage: truncate table
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_truncate_cleans_hdfs_files(self):
     TRUNCATE_DB = "truncate_table_test_db"
-    self.hdfs_client.delete_file_dir("test-warehouse/%s.db/" % TRUNCATE_DB,
+    self.filesystem_client.delete_file_dir("test-warehouse/%s.db/" % TRUNCATE_DB,
         recursive=True)
-    assert not self.hdfs_client.exists("test-warehouse/%s.db/" % TRUNCATE_DB)
+    assert not self.filesystem_client.exists("test-warehouse/%s.db/" % TRUNCATE_DB)
 
     self._create_db(TRUNCATE_DB, sync=True)
     # Verify the db directory exists
-    assert self.hdfs_client.exists("test-warehouse/%s.db/" % TRUNCATE_DB)
+    assert self.filesystem_client.exists("test-warehouse/%s.db/" % TRUNCATE_DB)
 
     self.client.execute("create table %s.t1(i int)" % TRUNCATE_DB)
     # Verify the table directory exists
-    assert self.hdfs_client.exists("test-warehouse/truncate_table_test_db.db/t1/")
+    assert self.filesystem_client.exists("test-warehouse/truncate_table_test_db.db/t1/")
 
     # Should have created one file in the table's dir
     self.client.execute("insert into %s.t1 values (1)" % TRUNCATE_DB)
-    ls = self.hdfs_client.list_dir("test-warehouse/%s.db/t1/" % TRUNCATE_DB)
-    assert len(ls['FileStatuses']['FileStatus']) == 2
+    assert len(self.filesystem_client.ls("test-warehouse/%s.db/t1/" % TRUNCATE_DB)) == 2
 
     # Truncating the table removes the data files and preserves the table's directory
     self.client.execute("truncate table %s.t1" % TRUNCATE_DB)
-    ls = self.hdfs_client.list_dir("test-warehouse/%s.db/t1/" % TRUNCATE_DB)
-    assert len(ls['FileStatuses']['FileStatus']) == 1
+    assert len(self.filesystem_client.ls("test-warehouse/%s.db/t1/" % TRUNCATE_DB)) == 1
 
     self.client.execute(
         "create table %s.t2(i int) partitioned by (p int)" % TRUNCATE_DB)
     # Verify the table directory exists
-    assert self.hdfs_client.exists("test-warehouse/%s.db/t2/" % TRUNCATE_DB)
+    assert self.filesystem_client.exists("test-warehouse/%s.db/t2/" % TRUNCATE_DB)
 
     # Should have created the partition dir, which should contain exactly one file
     self.client.execute(
         "insert into %s.t2 partition(p=1) values (1)" % TRUNCATE_DB)
-    ls = self.hdfs_client.list_dir("test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)
-    assert len(ls['FileStatuses']['FileStatus']) == 1
+    assert len(self.filesystem_client.ls(
+        "test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)) == 1
 
     # Truncating the table removes the data files and preserves the partition's directory
     self.client.execute("truncate table %s.t2" % TRUNCATE_DB)
-    assert self.hdfs_client.exists("test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)
-    ls = self.hdfs_client.list_dir("test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)
-    assert len(ls['FileStatuses']['FileStatus']) == 0
+    assert self.filesystem_client.exists("test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)
+    assert len(self.filesystem_client.ls(
+        "test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)) == 0
 
-  @SkipIfS3.insert # S3: missing coverage: truncate table
   @pytest.mark.execute_serially
   def test_truncate_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     self._create_db('truncate_table_test_db', sync=True)
-    self.run_test_case('QueryTest/truncate-table', vector, use_db='truncate_table_test_db',
+    self.run_test_case('QueryTest/truncate-table', vector,
+        use_db='truncate_table_test_db',
         multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_create_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -270,7 +269,6 @@ class TestDdlStatements(ImpalaTestSuite):
     assert 'test_tbl' in self.client.execute("show tables in test_db").data
 
   @SkipIf.kudu_not_supported
-  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_create_kudu(self, vector):
     self.expected_exceptions = 2
@@ -291,15 +289,15 @@ class TestDdlStatements(ImpalaTestSuite):
     assert 'ddl_test_db' not in self.all_db_names()
 
   # TODO: don't use hdfs_client
-  @SkipIfS3.insert # S3: missing coverage: alter table
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     # Create directory for partition data that does not use the (key=value)
     # format.
-    self.hdfs_client.make_dir("test-warehouse/part_data/", permission=777)
-    self.hdfs_client.create_file("test-warehouse/part_data/data.txt", file_data='1984')
+    self.filesystem_client.make_dir("test-warehouse/part_data/", permission=777)
+    self.filesystem_client.create_file(
+        "test-warehouse/part_data/data.txt", file_data='1984')
 
     # Create test databases
     self._create_db('alter_table_test_db', sync=True)
@@ -307,7 +305,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/alter-table', vector, use_db='alter_table_test_db',
         multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIfS3.hdfs_client # S3: missing coverage: alter table drop partition
+  @SkipIfS3.hdfs_purge # S3: missing coverage: alter table drop partition
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_partition_with_purge(self, vector):
@@ -327,28 +325,28 @@ class TestDdlStatements(ImpalaTestSuite):
     # Drop the partition (j=1) without purge and make sure it exists in trash
     self.client.execute("alter table {0}.t1 drop partition(j=1)".format(ALTER_PURGE_DB));
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".\
-            format(ALTER_PURGE_DB))
+        format(ALTER_PURGE_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1".\
-            format(ALTER_PURGE_DB))
+        format(ALTER_PURGE_DB))
     assert self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1/j1.txt".\
-            format(getpass.getuser(), ALTER_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1/j1.txt".\
+        format(getpass.getuser(), ALTER_PURGE_DB))
     assert self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1".\
-            format(getpass.getuser(), ALTER_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1".\
+        format(getpass.getuser(), ALTER_PURGE_DB))
     # Drop the partition (with purge) and make sure it doesn't exist in trash
     self.client.execute("alter table {0}.t1 drop partition(j=2) purge".\
-            format(ALTER_PURGE_DB));
+        format(ALTER_PURGE_DB));
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2/j2.txt".\
-            format(ALTER_PURGE_DB))
+        format(ALTER_PURGE_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2".\
-            format(ALTER_PURGE_DB))
+        format(ALTER_PURGE_DB))
     assert not self.hdfs_client.exists(\
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2".\
-            format(getpass.getuser(), ALTER_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2".\
+        format(getpass.getuser(), ALTER_PURGE_DB))
     assert not self.hdfs_client.exists(
-            "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2/j2.txt".\
-            format(getpass.getuser(), ALTER_PURGE_DB))
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2/j2.txt".\
+        format(getpass.getuser(), ALTER_PURGE_DB))
 
   @pytest.mark.execute_serially
   def test_views_ddl(self, vector):
@@ -434,11 +432,11 @@ class TestDdlStatements(ImpalaTestSuite):
 
   def create_drop_ddl(self, vector, db_name, create_stmts, drop_stmts, select_stmt,
       num_iterations=3):
-    """ Helper method to run CREATE/DROP DDL commands repeatedly and exercise the lib cache
-    create_stmts is the list of CREATE statements to be executed in order drop_stmts is
-    the list of DROP statements to be executed in order. Each statement should have a
-    '%s' placeholder to insert "IF EXISTS" or "". The select_stmt is just a single
-    statement to test after executing the CREATE statements.
+    """ Helper method to run CREATE/DROP DDL commands repeatedly and exercise the lib
+    cache create_stmts is the list of CREATE statements to be executed in order
+    drop_stmts is the list of DROP statements to be executed in order. Each statement
+    should have a '%s' placeholder to insert "IF EXISTS" or "". The select_stmt is just a
+    single statement to test after executing the CREATE statements.
     TODO: it's hard to tell that the cache is working (i.e. if it did nothing to drop
     the cache, these tests would still pass). Testing that is a bit harder and requires
     us to update the udf binary in the middle.
@@ -454,7 +452,6 @@ class TestDdlStatements(ImpalaTestSuite):
       self.client.execute(select_stmt)
       for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))
 
-  @SkipIfS3.insert # S3: missing coverage: alter table partitions.
   @pytest.mark.execute_serially
   def test_create_alter_bulk_partition(self, vector):
     TBL_NAME = 'foo_part'
@@ -478,8 +475,8 @@ class TestDdlStatements(ImpalaTestSuite):
         " set fileformat parquetfile" % TBL_NAME)
 
     # Alter one partition to a non-existent location twice (IMPALA-741)
-    self.hdfs_client.delete_file_dir("tmp/dont_exist1/", recursive=True)
-    self.hdfs_client.delete_file_dir("tmp/dont_exist2/", recursive=True)
+    self.filesystem_client.delete_file_dir("tmp/dont_exist1/", recursive=True)
+    self.filesystem_client.delete_file_dir("tmp/dont_exist2/", recursive=True)
 
     self.execute_query_expect_success(self.client,
         "alter table {0} partition(j=1,s='1') set location '{1}/tmp/dont_exist1'"

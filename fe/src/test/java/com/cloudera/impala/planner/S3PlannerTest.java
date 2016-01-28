@@ -49,7 +49,7 @@ public class S3PlannerTest extends PlannerTestBase {
     String targetFs = System.getenv("TARGET_FILESYSTEM");
     // Skip if the config property was not set. i.e. not running against S3.
     assumeTrue(targetFs != null && targetFs.equals("s3"));
-    String fsNameStr = System.getenv("FILESYSTEM_PREFIX");
+    String fsNameStr = System.getenv("DEFAULT_FS");
     fsName = new Path(fsNameStr);
   }
 

@@ -396,6 +396,9 @@ struct TInsertPartitionStatus {
 
   // Detailed statistics gathered by table writers for this partition
   3: optional TInsertStats stats
+
+  // Fully qualified URI to the base directory for this partition.
+  4: required string partition_base_dir
 }
 
 // The results of an INSERT query, sent to the coordinator as part of

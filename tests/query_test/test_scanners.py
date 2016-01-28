@@ -281,7 +281,6 @@ class TestParquet(ImpalaTestSuite):
     for scan_ranges_complete in scan_ranges_complete_list:
       assert int(scan_ranges_complete) == ranges_per_node
 
-  @SkipIfS3.insert
   def test_annotate_utf8_option(self, vector, unique_database):
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
 
@@ -338,7 +337,6 @@ class TestParquet(ImpalaTestSuite):
     assert c_schema_elt.converted_type == ConvertedType.UTF8
     assert d_schema_elt.converted_type == None
 
-  @SkipIfS3.insert
   @SkipIfOldAggsJoins.nested_types
   def test_resolution_by_name(self, unique_database, vector):
     self.run_test_case('QueryTest/parquet-resolution-by-name', vector,

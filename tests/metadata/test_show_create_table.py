@@ -47,7 +47,6 @@ class TestShowCreateTable(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
 
-  @SkipIfS3.insert
   def test_show_create_table(self, vector, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector,
                                            unique_database)

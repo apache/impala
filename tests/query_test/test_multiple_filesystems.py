@@ -8,7 +8,6 @@ from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.skip import SkipIf, SkipIfIsilon, SkipIfS3
 from tests.util.filesystem_utils import get_fs_path
 
-@SkipIfS3.insert
 @SkipIf.default_fs # Run only when a non-default filesystem is available.
 @SkipIfIsilon.untriaged # Missing coverage: Find out why this is failing.
 class TestMultipleFilesystems(ImpalaTestSuite):

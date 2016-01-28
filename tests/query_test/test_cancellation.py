@@ -157,7 +157,6 @@ class TestCancellationSerial(TestCancellation):
       cls.TestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') in [3])
       cls.TestMatrix.add_constraint(lambda v: v.get_value('query') == choice(QUERIES))
 
-  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_cancel_insert(self, vector):
     self.execute_cancel_test(vector)

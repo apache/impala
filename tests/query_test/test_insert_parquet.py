@@ -18,7 +18,6 @@ PARQUET_CODECS = ['none', 'snappy']
 # TODO: these tests take a while so we don't want to go through too many sizes but
 # we should in more exhaustive testing
 PARQUET_FILE_SIZES = [0, 32 * 1024 * 1024]
-@SkipIfS3.insert
 class TestInsertParquetQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -57,7 +56,6 @@ class TestInsertParquetQueries(ImpalaTestSuite):
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, multiple_impalad=True)
 
-@SkipIfS3.insert
 class TestInsertParquetInvalidCodec(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -88,7 +86,6 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
                        multiple_impalad=True)
 
 
-@SkipIfS3.insert
 class TestInsertParquetVerifySize(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -136,13 +133,10 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     # Get the files in hdfs and verify. There can be at most 1 file that is smaller
     # that the BLOCK_SIZE. The rest should be within 80% of it and not over.
     found_small_file = False
-    ls = self.hdfs_client.list_dir(DIR)
-    for f in ls['FileStatuses']['FileStatus']:
-      if f['type'] != 'FILE':
-        continue
-      length = f['length']
-      print length
-      assert length < BLOCK_SIZE
-      if length < BLOCK_SIZE * 0.80:
+    sizes = self.filesystem_client.get_all_file_sizes(DIR)
+    for size in sizes:
+      assert size < BLOCK_SIZE, "File size greater than expected.\
+          Expected: {0}, Got: {1}".format(BLOCK_SIZE, size)
+      if size < BLOCK_SIZE * 0.80:
         assert found_small_file == False
         found_small_file = True

@@ -42,10 +42,12 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const std::string& src_path,
                     const hdfsFS& dst_conn, const std::string& dst_path);
 
 /// Returns true iff the path refers to a location on an HDFS filesystem.
-bool IsDfsPath(const char* path);
+bool IsHdfsPath(const char* path);
 
 /// Returns true iff the path refers to a location on an S3A filesystem.
 bool IsS3APath(const char* path);
 
+/// Returns true iff 'pathA' and 'pathB' are on the same filesystem.
+bool FilesystemsMatch(const char* pathA, const char* pathB);
 }
 #endif // IMPALA_UTIL_HDFS_UTIL_H

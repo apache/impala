@@ -56,7 +56,6 @@ class TestPartitionMetadata(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB)
 
-  @SkipIfS3.insert # S3: missing coverage: partition DDL
   @SkipIfLocal.hdfs_client
   def test_multiple_partitions_same_location(self, vector):
     """Regression test for IMPALA-597. Verifies Impala is able to properly read
@@ -64,16 +63,16 @@ class TestPartitionMetadata(ImpalaTestSuite):
     """
     self.client.execute("use %s" % self.TEST_DB)
     impala_location = '%s/%s.db/%s' % (WAREHOUSE, self.TEST_DB, self.TEST_TBL)
-    hdfs_client_location = impala_location.split("/")[-1]
+    filesystem_client_location = impala_location.split("/")[-1]
     # Cleanup any existing data in the table directory.
-    self.hdfs_client.delete_file_dir(hdfs_client_location, recursive=True)
+    self.filesystem_client.delete_file_dir(filesystem_client_location, recursive=True)
     # Create the table
     self.client.execute("create table {0}(i int) partitioned by(j int)"
         "location '{1}/{2}.db/{0}'".format(self.TEST_TBL, WAREHOUSE, self.TEST_DB))
 
     # Point multiple partitions to the same location and use partition locations that
     # do not contain a key=value path.
-    self.hdfs_client.make_dir(hdfs_client_location + '/p')
+    self.filesystem_client.make_dir(filesystem_client_location + '/p')
 
     # Point both partitions to the same location.
     self.client.execute("alter table %s add partition (j=1) location '%s/p'" %

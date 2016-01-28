@@ -28,7 +28,7 @@ PYWEBHDFS_TMP_DIR = 'tmp/test_encryption_load_data'
 TMP_DIR = '/%s' % (PYWEBHDFS_TMP_DIR)
 
 
-@SkipIfS3.load_data
+@SkipIfS3.hdfs_encryption
 @SkipIfIsilon.hdfs_encryption
 @SkipIfLocal.hdfs_encryption
 @pytest.mark.execute_serially
@@ -136,7 +136,6 @@ class TestHdfsEncryption(ImpalaTestSuite):
     else:
       self.client.execute('load data inpath \'%s\' into table tbl ' % (TMP_DIR))
 
-  @SkipIfS3.hdfs_client
   @SkipIfIsilon.hdfs_encryption
   @pytest.mark.execute_serially
   def test_drop_partition_encrypt(self):
@@ -187,7 +186,6 @@ class TestHdfsEncryption(ImpalaTestSuite):
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=3/j3.txt".format(TEST_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=3".format(TEST_DB))
 
-  @SkipIfS3.hdfs_client
   @SkipIfIsilon.hdfs_encryption
   @pytest.mark.execute_serially
   def test_drop_table_encrypt(self):

@@ -814,7 +814,7 @@ Status HdfsParquetTableWriter::InitNewFile() {
   per_file_mem_pool_->Clear();
 
   // Get the file limit
-  RETURN_IF_ERROR(HdfsTableSink::GetFileBlockSize(output_, &file_size_limit_));
+  file_size_limit_ = output_->block_size;
   if (file_size_limit_ < HDFS_MIN_FILE_SIZE) {
     stringstream ss;
     ss << "Hdfs file size (" << file_size_limit_ << ") is too small.";

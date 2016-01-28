@@ -111,7 +111,6 @@ class TestCompressedFormats(ImpalaTestSuite):
     finally:
       call(["hive", "-e", drop_cmd]);
 
-@SkipIfS3.insert
 class TestTableWriters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -143,7 +142,6 @@ class TestTableWriters(ImpalaTestSuite):
     pytest.skip()
     self.run_test_case('QueryTest/text-writer', vector)
 
-@SkipIfS3.insert
 @pytest.mark.execute_serially
 class TestLargeCompressedFile(ImpalaTestSuite):
   """ Tests that we gracefully handle when a compressed file in HDFS is larger

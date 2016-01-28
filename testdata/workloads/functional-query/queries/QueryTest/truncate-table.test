@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # First create a partitioned table
-create table t1 like functional.alltypes;
+create table t1 like functional.alltypes location '$FILESYSTEM_PREFIX/test-warehouse/t1';
 insert into t1 partition(year, month) select * from functional.alltypes;
 compute incremental stats t1;
 show table stats t1;
@@ -117,7 +117,7 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Create an unpartitioned table.
-create table t2 like functional.tinytable;
+create table t2 like functional.tinytable location '$FILESYSTEM_PREFIX/test-warehouse/t2';
 insert into t2 select * from functional.tinytable;
 compute incremental stats t2;
 show table stats t2;
@@ -167,7 +167,7 @@ truncate table if exists non_existent;
 ====
 ---- QUERY
 # Create an unpartitioned table.
-create table t3 like functional.tinytable;
+create table t3 like functional.tinytable location '$FILESYSTEM_PREFIX/test-warehouse/t3';
 insert into t3 select * from functional.tinytable;
 select count(*) from t3;
 ---- RESULTS

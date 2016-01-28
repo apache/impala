@@ -33,7 +33,7 @@ HdfsOp::HdfsOp(HdfsOpType op, const std::string& src, HdfsOperationSet* op_set)
 
 HdfsOp::HdfsOp(HdfsOpType op, const std::string& src, const std::string& dst,
     HdfsOperationSet* op_set) : op_(op), src_(src), dst_(dst), op_set_(op_set) {
-  DCHECK(op == RENAME);
+  DCHECK(op == RENAME || op == MOVE);
   DCHECK(!src_.empty());
   DCHECK(!dst_.empty());
 }
@@ -48,64 +48,85 @@ HdfsOp::HdfsOp(HdfsOpType op, const string& src, short permissions,
 // Required for ThreadPool
 HdfsOp::HdfsOp() { }
 
+void HdfsOp::AddError(const string& error_msg) const {
+  stringstream ss;
+  ss << "Hdfs op (";
+  switch (op_) {
+    case DELETE:
+      ss << "DELETE " << src_;
+      break;
+    case CREATE_DIR:
+      ss << "CREATE_DIR " << src_;
+      break;
+    case RENAME:
+      ss << "RENAME " << src_ << " TO " << dst_;
+      break;
+    case MOVE:
+      ss << "MOVE " << src_ << " TO " << dst_;
+      break;
+    case DELETE_THEN_CREATE:
+      ss << "DELETE_THEN_CREATE " << src_;
+      break;
+    case CHMOD:
+      ss << "CHMOD " << src_ << " " << oct << permissions_;
+      break;
+  }
+  ss << ") failed, error was: " << error_msg;
+  op_set_->AddError(ss.str(), this);
+}
+
 void HdfsOp::Execute() const {
   if (op_set_->ShouldAbort()) return;
   int err = 0;
-  hdfsFS* hdfs_connection = op_set_->hdfs_connection();
+  hdfsFS src_connection;
+  Status connection_status = HdfsFsCache::instance()->GetConnection(src_, &src_connection,
+      op_set_->connection_cache());
+
+  if (!connection_status.ok()) {
+    AddError(connection_status.GetDetail());
+    op_set_->MarkOneOpDone();
+    return;
+  }
   switch (op_) {
     case DELETE:
-      err = hdfsDelete(*hdfs_connection, src_.c_str(), 1);
-      VLOG_FILE << "hdfsDelete() file=" << src_.c_str();
+      err = hdfsDelete(src_connection, src_.c_str(), 1);
+      VLOG_FILE << "hdfsDelete() file=" << src_;
       break;
     case CREATE_DIR:
-      err = hdfsCreateDirectory(*hdfs_connection, src_.c_str());
-      VLOG_FILE << "hdfsCreateDirectory() file=" << src_.c_str();
+      err = hdfsCreateDirectory(src_connection, src_.c_str());
+      VLOG_FILE << "hdfsCreateDirectory() file=" << src_;
       break;
     case RENAME:
-      err = hdfsRename(*hdfs_connection, src_.c_str(), dst_.c_str());
-      VLOG_FILE << "hdfsRename() src_file=" << src_.c_str()
-                << " dst_file=" << dst_.c_str();
+      err = hdfsRename(src_connection, src_.c_str(), dst_.c_str());
+      VLOG_FILE << "hdfsRename() src_file=" << src_ << " dst_file=" << dst_;
+      break;
+    case MOVE:
+      hdfsFS dst_connection;
+      connection_status = HdfsFsCache::instance()->GetConnection(dst_, &dst_connection,
+          op_set_->connection_cache());
+      if (!connection_status.ok()) break;
+      err = hdfsMove(src_connection, src_.c_str(), dst_connection, dst_.c_str());
+      VLOG_FILE << "hdfsMove() src_file=" << src_ << " dst_file=" << dst_;
       break;
     case DELETE_THEN_CREATE:
-      err = hdfsDelete(*hdfs_connection, src_.c_str(), 1);
-      VLOG_FILE << "hdfsDelete() file=" << src_.c_str();
+      err = hdfsDelete(src_connection, src_.c_str(), 1);
+      VLOG_FILE << "hdfsDelete() file=" << src_;
       if (err != -1) {
-        err = hdfsCreateDirectory(*hdfs_connection, src_.c_str());
-        VLOG_FILE << "hdfsCreateDirectory() file=" << src_.c_str();
+        err = hdfsCreateDirectory(src_connection, src_.c_str());
+        VLOG_FILE << "hdfsCreateDirectory() file=" << src_;
       }
       break;
     case CHMOD:
-      err = hdfsChmod(*hdfs_connection, src_.c_str(), permissions_);
-      VLOG_FILE << "hdfsChmod() file=" << src_.c_str();
+      err = hdfsChmod(src_connection, src_.c_str(), permissions_);
+      VLOG_FILE << "hdfsChmod() file=" << src_;
       break;
   }
 
-  if (err == -1) {
-    string error_msg = GetStrErrMsg();
-    stringstream ss;
-    ss << "Hdfs op (";
-    switch (op_) {
-      case DELETE:
-        ss << "DELETE " << src_;
-        break;
-      case CREATE_DIR:
-        ss << "CREATE_DIR " << src_;
-        break;
-      case RENAME:
-        ss << "RENAME " << src_ << " TO " << dst_;
-        break;
-      case DELETE_THEN_CREATE:
-        ss << "DELETE_THEN_CREATE " << src_;
-        break;
-      case CHMOD:
-        ss << "CHMOD " << src_ << " " << oct << permissions_;
-        break;
-    }
-    ss << ") failed, error was: " << error_msg;
-
-    op_set_->AddError(ss.str(), this);
+  if (err == -1 || !connection_status.ok()) {
+    string error_msg =
+        connection_status.ok() ? GetStrErrMsg() : connection_status.GetDetail();
+    AddError(error_msg);
   }
-
   op_set_->MarkOneOpDone();
 }
 
@@ -122,24 +143,25 @@ HdfsOpThreadPool* impala::CreateHdfsOpThreadPool(const string& name, uint32_t nu
       max_queue_length, &HdfsThreadPoolHelper);
 }
 
-HdfsOperationSet::HdfsOperationSet(hdfsFS* hdfs_connection)
-    : num_ops_(0L), hdfs_connection_(hdfs_connection) {
-}
+HdfsOperationSet::HdfsOperationSet(HdfsFsCache::HdfsFsMap* connection_cache)
+    : connection_cache_(connection_cache) { }
 
-bool HdfsOperationSet::Execute(ThreadPool<HdfsOp>* pool,
-    bool abort_on_error) {
+bool HdfsOperationSet::Execute(ThreadPool<HdfsOp>* pool, bool abort_on_error) {
   {
     lock_guard<mutex> l(errors_lock_);
     abort_on_error_ = abort_on_error;
   }
+
   int64_t num_ops = ops_.size();
   if (num_ops == 0) return true;
-  num_ops_.Add(num_ops);
 
+  ops_complete_barrier_.reset(new CountingBarrier(num_ops));
   BOOST_FOREACH(const HdfsOp& op, ops_) {
     pool->Offer(op);
   }
-  return promise_.Get();
+
+  ops_complete_barrier_->Wait();
+  return errors().size() == 0;
 }
 
 void HdfsOperationSet::Add(HdfsOpType op, const string& src) {
@@ -160,9 +182,7 @@ void HdfsOperationSet::AddError(const string& err, const HdfsOp* op) {
 }
 
 void HdfsOperationSet::MarkOneOpDone() {
-  if (num_ops_.Add(-1) == 0) {
-    promise_.Set(errors().size() == 0);
-  }
+  ops_complete_barrier_->Notify();
 }
 
 bool HdfsOperationSet::ShouldAbort() {

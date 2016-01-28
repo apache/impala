@@ -15,7 +15,6 @@ from tests.util.filesystem_utils import IS_LOCAL
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']
 
-@SkipIfS3.insert
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -125,7 +124,6 @@ class TestInsertWideTable(ImpalaTestSuite):
     actual = QueryTestResult(parse_result_rows(result), types, labels, order_matters=False)
     assert expected == actual
 
-@SkipIfS3.insert
 class TestInsertPartKey(ImpalaTestSuite):
   """Regression test for IMPALA-875"""
   @classmethod
@@ -151,7 +149,6 @@ class TestInsertPartKey(ImpalaTestSuite):
     self.run_test_case('QueryTest/insert_part_key', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
-@SkipIfS3.insert
 class TestInsertNullQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

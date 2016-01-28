@@ -146,7 +146,6 @@ class TestQueriesTextTables(ImpalaTestSuite):
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 
-  @SkipIfS3.insert
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)
 

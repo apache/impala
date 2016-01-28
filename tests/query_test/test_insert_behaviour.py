@@ -22,8 +22,6 @@ from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 
-
-@SkipIfS3.insert
 @SkipIfLocal.hdfs_client
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
@@ -45,12 +43,12 @@ class TestInsertBehaviour(ImpalaTestSuite):
   def test_insert_removes_staging_files(self):
     TBL_NAME = "insert_overwrite_nopart"
     insert_staging_dir = ("test-warehouse/functional.db/%s/"
-                          "_impala_insert_staging" % TBL_NAME)
-    self.hdfs_client.delete_file_dir(insert_staging_dir, recursive=True)
-    self.client.execute("INSERT OVERWRITE functional.%s"
-                        " SELECT int_col FROM functional.tinyinttable" % TBL_NAME)
-    ls = self.hdfs_client.list_dir(insert_staging_dir)
-    assert len(ls['FileStatuses']['FileStatus']) == 0
+        "_impala_insert_staging" % TBL_NAME)
+    self.filesystem_client.delete_file_dir(insert_staging_dir, recursive=True)
+    self.client.execute("INSERT OVERWRITE functional.%s "
+                        "SELECT int_col FROM functional.tinyinttable" % TBL_NAME)
+    ls = self.filesystem_client.ls(insert_staging_dir)
+    assert len(ls) == 0
 
   @pytest.mark.execute_serially
   def test_insert_preserves_hidden_files(self):
@@ -59,27 +57,28 @@ class TestInsertBehaviour(ImpalaTestSuite):
     table_dir = "test-warehouse/functional.db/%s/" % TBL_NAME
     hidden_file_locations = [".hidden", "_hidden"]
     dir_locations = ["dir", ".hidden_dir"]
+
     for dir_ in dir_locations:
-      self.hdfs_client.make_dir(table_dir + dir_)
+      self.filesystem_client.make_dir(table_dir + dir_)
+
+    # We do this here because the above 'make_dir' call doesn't make a directory for S3.
+    for dir_ in dir_locations:
+      self.filesystem_client.create_file(
+          table_dir + dir_ + '/' + hidden_file_locations[0] , '', overwrite=True)
+
     for file_ in hidden_file_locations:
-      self.hdfs_client.create_file(table_dir + file_, '', overwrite=True)
+      self.filesystem_client.create_file(table_dir + file_, '', overwrite=True)
 
     self.client.execute("INSERT OVERWRITE functional.%s"
                         " SELECT int_col FROM functional.tinyinttable" % TBL_NAME)
 
     for file_ in hidden_file_locations:
-      try:
-        self.hdfs_client.get_file_dir_status(table_dir + file_)
-      except:
-        err_msg = "Hidden file '%s' was unexpectedly deleted by INSERT OVERWRITE"
-        pytest.fail(err_msg % (table_dir + file_))
+      assert self.filesystem_client.exists(table_dir + file_), "Hidden file {0} was " \
+          "unexpectedly deleted by INSERT OVERWRITE".format(table_dir + file_)
 
     for dir_ in dir_locations:
-      try:
-        self.hdfs_client.get_file_dir_status(table_dir + file_)
-      except:
-        err_msg = "Directory '%s' was unexpectedly deleted by INSERT OVERWRITE"
-        pytest.fail(err_msg % (table_dir + dir_))
+      assert self.filesystem_client.exists(table_dir + dir_), "Directory {0} was " \
+          "unexpectedly deleted by INSERT OVERWRITE".format(table_dir + dir_)
 
   @UniqueDatabase.parametrize(name_prefix='test_insert_alter_partition_location_db')
   def test_insert_alter_partition_location(self, unique_database):
@@ -90,7 +89,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     table_name = "`{0}`.`insert_alter_partition_location`".format(unique_database)
 
     self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % table_name)
-    self.hdfs_client.delete_file_dir(part_dir, recursive=True)
+    self.filesystem_client.delete_file_dir(part_dir, recursive=True)
 
     self.execute_query_expect_success(
         self.client,
@@ -113,9 +112,9 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
     # Should have created the partition dir, which should contain exactly one file (not in
     # a subdirectory)
-    ls = self.hdfs_client.list_dir(part_dir)
-    assert len(ls['FileStatuses']['FileStatus']) == 1
+    assert len(self.filesystem_client.ls(part_dir)) == 1
 
+  @SkipIfS3.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   @pytest.mark.xfail(run=False, reason="Fails intermittently on test clusters")
   @pytest.mark.execute_serially
@@ -175,6 +174,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
                                       "PARTITION(p1=1, p2=2, p3=30) VALUES(1)")
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
+  @SkipIfS3.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_insert_file_permissions(self, unique_database):
     """Test that INSERT correctly respects file permission (minimum ACLs)"""
@@ -224,6 +224,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, insert_query)
 
+  @SkipIfS3.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_insert_acl_permissions(self, unique_database):
     """Test that INSERT correctly respects ACLs"""
@@ -300,6 +301,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, insert_query)
 
+  @SkipIfS3.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_load_permissions(self, unique_database):
     # We rely on test_insert_acl_permissions() to exhaustively check that ACL semantics
@@ -357,13 +359,9 @@ class TestInsertBehaviour(ImpalaTestSuite):
     """Test insert/select query won't trigger partition directory or zero size data file
     creation if the resultset of select is empty."""
     def check_path_exists(path, should_exist):
-      try:
-        self.hdfs_client.get_file_dir_status(path)
-        if not should_exist:
-          pytest.fail("file/dir '%s' unexpectedly exists" % path)
-      except Exception:
-        if should_exist:
-          pytest.fail("file/dir '%s' does not exist" % path)
+      assert self.filesystem_client.exists(path) == should_exist, "file/dir '{0}' " \
+          "should {1}exist but does {2}exist.".format(
+              path, '' if should_exist else 'not ', 'not ' if should_exist else '')
 
     db_path = "test-warehouse/%s.db/" % self.TEST_DB_NAME
     table_path = db_path + "test_insert_empty_result"
@@ -382,8 +380,8 @@ class TestInsertBehaviour(ImpalaTestSuite):
     insert_query = ("INSERT INTO TABLE {0} PARTITION(year=2009, month=1)"
                     "select 1, 1 from {0} LIMIT 0".format(table_name))
     self.execute_query_expect_success(self.client, insert_query)
-    # Partition directory should not be created
-    check_path_exists(partition_path, False)
+    # Partition directory is created
+    check_path_exists(partition_path, True)
 
     # Insert one record
     insert_query_one_row = ("INSERT INTO TABLE %s PARTITION(year=2009, month=1) "
@@ -391,24 +389,24 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, insert_query_one_row)
     # Partition directory should be created with one data file
     check_path_exists(partition_path, True)
-    ls = self.hdfs_client.list_dir(partition_path)
-    assert len(ls['FileStatuses']['FileStatus']) == 1
+    ls = (self.filesystem_client.ls(partition_path))
+    assert len(ls) == 1
 
     # Run an insert/select statement that returns an empty resultset again
     self.execute_query_expect_success(self.client, insert_query)
     # No new data file should be created
-    new_ls = self.hdfs_client.list_dir(partition_path)
-    assert len(new_ls['FileStatuses']['FileStatus']) == 1
-    assert new_ls['FileStatuses'] == ls['FileStatuses']
+    new_ls = self.filesystem_client.ls(partition_path)
+    assert len(new_ls) == 1
+    assert new_ls == ls
 
     # Run an insert overwrite/select that returns an empty resultset
     insert_query = ("INSERT OVERWRITE {0} PARTITION(year=2009, month=1)"
                     " select 1, 1 from  {0} LIMIT 0".format(table_name))
     self.execute_query_expect_success(self.client, insert_query)
     # Data file should be deleted
-    new_ls2 = self.hdfs_client.list_dir(partition_path)
-    assert len(new_ls2['FileStatuses']['FileStatus']) == 0
-    assert new_ls['FileStatuses'] != new_ls2['FileStatuses']
+    new_ls2 = self.filesystem_client.ls(partition_path)
+    assert len(new_ls2) == 0
+    assert new_ls != new_ls2
 
     # Test for IMPALA-2008 insert overwrite to an empty table with empty dataset
     empty_target_tbl = "test_overwrite_with_empty_target"
@@ -422,9 +420,10 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # Delete target table directory, query should fail with
     # "No such file or directory" error
     target_table_path = "%s%s" % (db_path, empty_target_tbl)
-    self.hdfs_client.delete_file_dir(target_table_path, recursive=True)
+    self.filesystem_client.delete_file_dir(target_table_path, recursive=True)
     self.execute_query_expect_failure(self.client, insert_query)
 
+  @SkipIfS3.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_multiple_group_acls(self, unique_database):
     """Test that INSERT correctly respects multiple group ACLs"""

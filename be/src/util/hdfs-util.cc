@@ -64,7 +64,7 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const string& src_path,
   return Status::OK();
 }
 
-bool IsDfsPath(const char* path) {
+bool IsHdfsPath(const char* path) {
   if (strstr(path, ":/") == NULL) {
     return ExecEnv::GetInstance()->default_fs().compare(0, 7, "hdfs://") == 0;
   }
@@ -76,6 +76,47 @@ bool IsS3APath(const char* path) {
     return ExecEnv::GetInstance()->default_fs().compare(0, 6, "s3a://") == 0;
   }
   return strncmp(path, "s3a://", 6) == 0;
+}
+
+// Returns the length of the filesystem name in 'path' which is the length of the
+// 'scheme://authority'. Returns 0 if the path is unqualified.
+static int GetFilesystemNameLength(const char* path) {
+  // Special case for "file:/". It will not have an authority following it.
+  if (strncmp(path, "file:", 5) == 0) return 5;
+
+  const char* after_scheme = strstr(path, "://");
+  if (after_scheme == NULL) return 0;
+  // Some paths may come only with a scheme. We add 3 to skip over "://".
+  if (*(after_scheme + 3) == '\0') return strlen(path);
+
+  const char* after_authority = strstr(after_scheme + 3, "/");
+  if (after_authority == NULL) return strlen(path);
+  return after_authority - path;
+}
+
+bool FilesystemsMatch(const char* path_a, const char* path_b) {
+  int fs_a_name_length = GetFilesystemNameLength(path_a);
+  int fs_b_name_length = GetFilesystemNameLength(path_b);
+
+  const char* default_fs = ExecEnv::GetInstance()->default_fs().c_str();
+  int default_fs_name_length = GetFilesystemNameLength(default_fs);
+
+  // Neither is fully qualified: both are on default_fs.
+  if (fs_a_name_length == 0 && fs_b_name_length == 0) return true;
+  // One is a relative path: check fully-qualified one against default_fs.
+  if (fs_a_name_length == 0) {
+    DCHECK_GT(fs_b_name_length, 0);
+    return strncmp(path_b, default_fs, default_fs_name_length) == 0;
+  }
+  if (fs_b_name_length == 0) {
+    DCHECK_GT(fs_a_name_length, 0);
+    return strncmp(path_a, default_fs, default_fs_name_length) == 0;
+  }
+  DCHECK_GT(fs_a_name_length, 0);
+  DCHECK_GT(fs_b_name_length, 0);
+  // Both fully qualified: check the filesystem prefix.
+  if (fs_a_name_length != fs_b_name_length) return false;
+  return strncmp(path_a, path_b, fs_a_name_length) == 0;
 }
 
 }

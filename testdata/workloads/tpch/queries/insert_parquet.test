@@ -1,7 +1,8 @@
 ====
 ---- QUERY
 # Tests using a larger table.
-create table if not exists orders_insert_test like orders;
+create table if not exists orders_insert_test like orders location
+'$FILESYSTEM_PREFIX/test-warehouse/orders_insert_table';
 insert overwrite table orders_insert_test select * from tpch.orders
 ---- RESULTS
 : 1500000
@@ -55,7 +56,7 @@ bigint
 ---- QUERY
 # Test to verify that huge (larger than 64k) values can be written, see IMPALA-1705
 create table if not exists test_insert_huge_vals (s string) stored as parquet
-location '$FILESYSTEM_PREFIX/test_insert_huge_vals';
+location '$FILESYSTEM_PREFIX/test-warehouse/test_insert_huge_vals';
 insert overwrite table test_insert_huge_vals
   select cast(l_orderkey as string) from tpch.lineitem
   union select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier

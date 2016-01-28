@@ -542,15 +542,16 @@ public class Frontend {
     }
 
     Path destPath = new Path(destPathString);
-    FileSystem fs = destPath.getFileSystem(FileSystemUtil.getConfiguration());
+    Path sourcePath = new Path(request.source_path);
+    FileSystem destFs = destPath.getFileSystem(FileSystemUtil.getConfiguration());
+    FileSystem sourceFs = sourcePath.getFileSystem(FileSystemUtil.getConfiguration());
 
     // Create a temporary directory within the final destination directory to stage the
     // file move.
     Path tmpDestPath = FileSystemUtil.makeTmpSubdirectory(destPath);
 
-    Path sourcePath = new Path(request.source_path);
     int filesLoaded = 0;
-    if (fs.isDirectory(sourcePath)) {
+    if (sourceFs.isDirectory(sourcePath)) {
       filesLoaded = FileSystemUtil.relocateAllVisibleFiles(sourcePath, tmpDestPath);
     } else {
       FileSystemUtil.relocateFile(sourcePath, tmpDestPath, true);
@@ -565,7 +566,7 @@ public class Frontend {
     // Move the files from the temporary location to the final destination.
     FileSystemUtil.relocateAllVisibleFiles(tmpDestPath, destPath);
     // Cleanup the tmp directory.
-    fs.delete(tmpDestPath, true);
+    destFs.delete(tmpDestPath, true);
     TLoadDataResp response = new TLoadDataResp();
     TColumnValue col = new TColumnValue();
     String loadMsg = String.format(

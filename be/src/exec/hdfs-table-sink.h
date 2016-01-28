@@ -35,16 +35,16 @@ class RuntimeState;
 class HdfsTableWriter;
 class MemTracker;
 
-/// Records the temporary and final Hdfs file name, the opened temporary Hdfs file, and the
-/// number of appended rows of an output partition.
+/// Records the temporary and final Hdfs file name, the opened temporary Hdfs file, and
+/// the number of appended rows of an output partition.
 struct OutputPartition {
   /// In the below, <unique_id_str> is the unique ID passed to HdfsTableSink in string
   /// form. It is typically the fragment ID that owns the sink.
 
   /// Full path to root of the group of files that will be created for this partition.
   /// Each file will have a sequence number appended.  A table writer may produce multiple
-  /// files per partition. The root is either partition_descriptor->location (if non-empty,
-  /// i.e. the partition has a custom location) or table_dir/partition_name/
+  /// files per partition. The root is either partition_descriptor->location (if
+  /// non-empty, i.e. the partition has a custom location) or table_dir/partition_name/
   /// Path: <root>/<unique_id_str>
   std::string final_hdfs_file_name_prefix;
 
@@ -85,12 +85,15 @@ struct OutputPartition {
   /// The descriptor for this partition.
   const HdfsPartitionDescriptor* partition_descriptor;
 
+  /// The block size decided on for this file.
+  int64_t block_size;
+
   OutputPartition();
 };
 
-/// The sink consumes all row batches of its child execution tree, and writes the evaluated
-/// output_exprs into temporary Hdfs files. The query coordinator moves the temporary files
-/// into their final locations after the sinks have finished executing.
+/// The sink consumes all row batches of its child execution tree, and writes the
+/// evaluated output_exprs into temporary Hdfs files. The query coordinator moves the
+/// temporary files into their final locations after the sinks have finished executing.
 //
 /// This sink supports static and dynamic partition inserts (Hive terminology),
 /// as well as inserting into unpartitioned tables,
@@ -142,11 +145,6 @@ class HdfsTableSink : public DataSink {
   /// Remove original Hdfs files if overwrite was specified.
   /// Closes output_exprs and partition_key_exprs.
   virtual void Close(RuntimeState* state);
-
-  /// Get the block size of the current file opened for this partition.
-  /// This is a utility routine that can be called by specific table
-  /// writers.  Currently used by the parquet writer.
-  static Status GetFileBlockSize(OutputPartition* output_partition, int64_t* size);
 
   int skip_header_line_count() const { return skip_header_line_count_; }
 

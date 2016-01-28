@@ -96,7 +96,6 @@ class TestHBaseDataErrors(TestDataErrors):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('DataErrorsTest/hbase-insert-errors', vector)
 
-@SkipIfS3.insert
 class TestTimestampErrors(TestDataErrors):
   """
   Create test table with various valid/invalid timestamp values, then run

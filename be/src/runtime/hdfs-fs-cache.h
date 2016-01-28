@@ -20,7 +20,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/thread/mutex.hpp>
-#include <hdfs.h>
+#include "common/hdfs.h"
 
 #include "common/status.h"
 

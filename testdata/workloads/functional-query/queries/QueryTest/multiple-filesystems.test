@@ -30,12 +30,6 @@ show table stats tinytable_like
 BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-# Verify INSERT into non-hdfs table is disallowed.
-insert into tinytable_like select * from functional.tinytable
----- CATCH
-Unable to INSERT into target table (multi_fs_db.tinytable_like) because $NAMENODE/test-warehouse/tinytable is not an HDFS filesystem.
-====
----- QUERY
 create external table tinytable_copy (a string, b string)
 row format delimited fields terminated by ','
 location '$FILESYSTEM_PREFIX/test-warehouse/tinytable'
@@ -99,13 +93,6 @@ select * from alltypes where id%100=0 order by id
 4200,true,0,0,0,0,0,0,'02/25/10','0',2010-02-25 04:00:10.800000000,2010,2
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
-====
----- QUERY
-# Verify INSERT into table with partitions on a different filesystem than the table's
-# base directory is disallowed.
-insert into alltypes select * from functional.alltypes
----- CATCH
-Unable to INSERT into target table (multi_fs_db.alltypes) because the table spans multiple filesystems.
 ====
 ---- QUERY
 # Verify DROP PARTITION for non-default filesystem.
@@ -242,12 +229,6 @@ select * from alltypes where id%100=0 order by id
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
 ---- QUERY
-# Verify INSERT into table with partitions on a different filesystems is disallowed.
-insert into alltypes select * from functional.alltypes
----- CATCH
-Unable to INSERT into target table (multi_fs_db.alltypes) because the table spans multiple filesystems.
-====
----- QUERY
 compute stats alltypes
 ---- RESULTS
 'Updated 4 partition(s) and 11 column(s).'
@@ -302,4 +283,48 @@ order by id
 4862,'05/02/10'
 ---- TYPES
 INT, STRING
+====
+---- QUERY
+create table alltypes_multipart_insert like functional_parquet.alltypes
+---- RESULTS
+====
+---- QUERY
+# ADD PARTITION on a non-default filesystem.
+alter table alltypes_multipart_insert add partition(year=2009, month=1)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_multipart_insert/year=2009/month=1'
+---- RESULTS
+====
+---- QUERY
+insert into alltypes_multipart_insert partition (year=2009, month=1)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes where year = 2009 and month = 1
+---- RESULTS
+year=2009/month=1/: 310
+====
+---- QUERY
+# ADD PARTITION on the default filesystem.
+alter table alltypes_multipart_insert add partition(year=2009, month=2)
+location '/test-warehouse/alltypes_multipart_insert/year=2009/month=2'
+---- RESULTS
+====
+---- QUERY
+insert into alltypes_multipart_insert partition (year=2009, month=2)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes where year = 2009 and month = 2
+---- RESULTS
+year=2009/month=2/: 280
+====
+---- QUERY
+select * from alltypes_multipart_insert where id%100=0 order by id;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+100,true,0,0,0,0,0,0,'01/11/09','0',2009-01-11 01:40:04.500000000,2009,1
+200,true,0,0,0,0,0,0,'01/21/09','0',2009-01-21 03:20:09,2009,1
+300,true,0,0,0,0,0,0,'01/31/09','0',2009-01-31 05:00:13.500000000,2009,1
+400,true,0,0,0,0,0,0,'02/10/09','0',2009-02-10 01:30:04.500000000,2009,2
+500,true,0,0,0,0,0,0,'02/20/09','0',2009-02-20 03:10:08.550000000,2009,2
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====

@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -133,9 +134,9 @@ public class LoadDataStmt extends StatementBase {
     try {
       Path source = sourceDataPath_.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
-      if (!(fs instanceof DistributedFileSystem)) {
+      if (!(fs instanceof DistributedFileSystem) && !(fs instanceof S3AFileSystem)) {
         throw new AnalysisException(String.format("INPATH location '%s' " +
-            "must point to an HDFS filesystem.", sourceDataPath_));
+            "must point to an HDFS or S3A filesystem.", sourceDataPath_));
       }
       if (!fs.exists(source)) {
         throw new AnalysisException(String.format(
@@ -154,7 +155,8 @@ public class LoadDataStmt extends StatementBase {
         }
         if (FileSystemUtil.containsVisibleSubdirectory(source)) {
           throw new AnalysisException(String.format(
-              "INPATH location '%s' cannot contain non-hidden subdirectories.", sourceDataPath_));
+              "INPATH location '%s' cannot contain non-hidden subdirectories.",
+              sourceDataPath_));
         }
         if (!checker.getPermissions(fs, source).checkPermissions(
             FsAction.READ_WRITE)) {
@@ -206,16 +208,6 @@ public class LoadDataStmt extends StatementBase {
       }
       Preconditions.checkNotNull(partition);
 
-      // Until Frontend.loadTableData() can handle cross-filesystem and filesystems
-      // that aren't HDFS, require that source and dest are on the same HDFS.
-      if (!FileSystemUtil.isPathOnFileSystem(new Path(location), fs)) {
-        throw new AnalysisException(String.format(
-            "Unable to LOAD DATA into target table (%s) because source path (%s) and " +
-            "destination %s (%s) are on different filesystems.",
-            hdfsTable.getFullName(),
-            source, partitionSpec_ == null ? "table" : "partition",
-            partition.getLocation()));
-      }
       // Verify the files being loaded are supported.
       for (FileStatus fStatus: fs.listStatus(source)) {
         if (fs.isDirectory(fStatus.getPath())) continue;

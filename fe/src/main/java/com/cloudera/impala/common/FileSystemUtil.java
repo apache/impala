@@ -81,10 +81,14 @@ public class FileSystemUtil {
   }
 
   /**
-   * Returns true if path p1 and path p2 are in the same encryption zone.
+   * Returns true if path p1 and path p2 are in the same encryption zone in HDFS.
+   * Returns false if they are in different encryption zones or if either of the paths
+   * are not on HDFS.
    */
-  private static boolean arePathsInSameEncryptionZone(FileSystem fs, Path p1,
+  private static boolean arePathsInSameHdfsEncryptionZone(FileSystem fs, Path p1,
       Path p2) throws IOException {
+    // Only distributed file systems have encryption zones.
+    if (!isDistributedFileSystem(p1) || !isDistributedFileSystem(p2)) return false;
     HdfsAdmin hdfsAdmin = new HdfsAdmin(fs.getUri(), CONF);
     EncryptionZone z1 = hdfsAdmin.getEncryptionZoneForPath(p1);
     EncryptionZone z2 = hdfsAdmin.getEncryptionZoneForPath(p2);
@@ -104,9 +108,10 @@ public class FileSystemUtil {
    */
   public static int relocateAllVisibleFiles(Path sourceDir, Path destDir)
       throws IOException {
-    FileSystem fs = destDir.getFileSystem(CONF);
-    Preconditions.checkState(fs.isDirectory(destDir));
-    Preconditions.checkState(fs.isDirectory(sourceDir));
+    FileSystem destFs = destDir.getFileSystem(CONF);
+    FileSystem sourceFs = sourceDir.getFileSystem(CONF);
+    Preconditions.checkState(destFs.isDirectory(destDir));
+    Preconditions.checkState(sourceFs.isDirectory(sourceDir));
 
     // Use the same UUID to resolve all file name conflicts. This helps mitigate problems
     // that might happen if there is a conflict moving a set of files that have
@@ -115,7 +120,7 @@ public class FileSystemUtil {
 
     // Enumerate all the files in the source
     int numFilesMoved = 0;
-    for (FileStatus fStatus: fs.listStatus(sourceDir)) {
+    for (FileStatus fStatus: sourceFs.listStatus(sourceDir)) {
       if (fStatus.isDirectory()) {
         LOG.debug("Skipping copy of directory: " + fStatus.getPath());
         continue;
@@ -124,7 +129,7 @@ public class FileSystemUtil {
       }
 
       Path destFile = new Path(destDir, fStatus.getPath().getName());
-      if (fs.exists(destFile)) {
+      if (destFs.exists(destFile)) {
         destFile = new Path(destDir,
             appendToBaseFileName(destFile.getName(), uuid.toString()));
       }
@@ -136,44 +141,65 @@ public class FileSystemUtil {
 
   /**
    * Relocates the given file to a new location (either another directory or a
-   * file. The file is moved (renamed) to the new location unless the source and
-   * destination are in different encryption zones, in which case the file is copied
-   * so that the file can be decrypted and/or encrypted. If renameIfAlreadyExists
-   * is true, no error will be thrown if a file with the same name already exists in the
+   * file in the same or different filesystem). The file is generally moved (renamed) to
+   * the new location. However, the file is copied if the source and destination are in
+   * different encryption zones so that the file can be decrypted and/or encrypted, or if
+   * the source and destination are in different filesystems. If renameIfAlreadyExists is
+   * true, no error will be thrown if a file with the same name already exists in the
    * destination location. Instead, a UUID will be appended to the base file name,
-   * preserving the the existing file extension. If renameIfAlreadyExists is false, an
+   * preserving the existing file extension. If renameIfAlreadyExists is false, an
    * IOException will be thrown if there is a file name conflict.
    */
   public static void relocateFile(Path sourceFile, Path dest,
       boolean renameIfAlreadyExists) throws IOException {
-    FileSystem fs = dest.getFileSystem(CONF);
-    // TODO: Handle moving between file systems
-    Preconditions.checkArgument(isPathOnFileSystem(sourceFile, fs));
+    FileSystem destFs = dest.getFileSystem(CONF);
+    FileSystem sourceFs = sourceFile.getFileSystem(CONF);
 
-    Path destFile = fs.isDirectory(dest) ? new Path(dest, sourceFile.getName()) : dest;
+    Path destFile =
+        destFs.isDirectory(dest) ? new Path(dest, sourceFile.getName()) : dest;
     // If a file with the same name does not already exist in the destination location
     // then use the same file name. Otherwise, generate a unique file name.
-    if (renameIfAlreadyExists && fs.exists(destFile)) {
-      Path destDir = fs.isDirectory(dest) ? dest : dest.getParent();
+    if (renameIfAlreadyExists && destFs.exists(destFile)) {
+      Path destDir = destFs.isDirectory(dest) ? dest : dest.getParent();
       destFile = new Path(destDir,
           appendToBaseFileName(destFile.getName(), UUID.randomUUID().toString()));
     }
+    boolean sameFileSystem = isPathOnFileSystem(sourceFile, destFs);
+    boolean destIsDfs = isDistributedFileSystem(destFs);
 
-    if (arePathsInSameEncryptionZone(fs, sourceFile, destFile)) {
+    // If the source and the destination are on different file systems, or in different
+    // encryption zones, files can't be moved from one location to the other and must be
+    // copied instead.
+    boolean sameEncryptionZone =
+        arePathsInSameHdfsEncryptionZone(destFs, sourceFile, destFile);
+    // We can do a rename if the src and dst are in the same encryption zone in the same
+    // distributed filesystem.
+    boolean doRename = destIsDfs && sameFileSystem && sameEncryptionZone;
+    // Alternatively, we can do a rename if the src and dst are on the same
+    // non-distributed filesystem.
+    if (!doRename) doRename = !destIsDfs && sameFileSystem;
+    if (doRename) {
       LOG.debug(String.format(
           "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
       // Move (rename) the file.
-      fs.rename(sourceFile, destFile);
-    } else {
-      // We must copy rather than move if the source and dest are in different encryption
-      // zones. A move would return an error from the NN because a move is a metadata-only
-      // operation and the files would not be encrypted/decrypted properly on the DNs.
-      LOG.info(String.format(
-          "Copying source '%s' to '%s' because HDFS encryption zones are different",
-          sourceFile, destFile));
-      FileUtil.copy(sourceFile.getFileSystem(CONF), sourceFile, fs, destFile,
-          true, true, CONF);
+      destFs.rename(sourceFile, destFile);
+      return;
     }
+    if (destIsDfs && sameFileSystem) {
+      Preconditions.checkState(!doRename);
+      // We must copy rather than move if the source and dest are in different
+      // encryption zones. A move would return an error from the NN because a move is a
+      // metadata-only operation and the files would not be encrypted/decrypted properly
+      // on the DNs.
+      LOG.info(String.format(
+          "Copying source '%s' to '%s' because HDFS encryption zones are different.",
+          sourceFile, destFile));
+    } else {
+      Preconditions.checkState(!sameFileSystem);
+      LOG.info(String.format("Copying '%s' to '%s' between filesystems.",
+          sourceFile, destFile));
+    }
+    FileUtil.copy(sourceFs, sourceFile, destFs, destFile, true, true, CONF);
   }
 
   /**
@@ -253,6 +279,20 @@ public class FileSystemUtil {
     // Blacklist FileSystems that are known to not implement getFileBlockLocations().
     return !(fs instanceof S3AFileSystem || fs instanceof NativeS3FileSystem ||
         fs instanceof S3FileSystem || fs instanceof LocalFileSystem);
+  }
+
+  /**
+   * Returns true iff the filesystem is a S3AFileSystem.
+   */
+  public static boolean isS3AFileSystem(FileSystem fs) {
+    return fs instanceof S3AFileSystem;
+  }
+
+  /**
+   * Returns true iff the path is on a S3AFileSystem.
+   */
+  public static boolean isS3AFileSystem(Path path) throws IOException {
+    return isS3AFileSystem(path.getFileSystem(CONF));
   }
 
   /**
@@ -378,6 +418,6 @@ public class FileSystemUtil {
       throws IOException {
     Path path = new Path(location);
     return (FileSystemUtil.isDistributedFileSystem(path) ||
-        FileSystemUtil.isLocalFileSystem(path));
+        FileSystemUtil.isLocalFileSystem(path) || FileSystemUtil.isS3AFileSystem(path));
   }
 }

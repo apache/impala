@@ -22,7 +22,6 @@ from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
 # TODO: Merge this test file with test_col_stats.py
-@SkipIfS3.insert # S3: missing coverage: compute stats
 @SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestComputeStats(ImpalaTestSuite):
   TEST_DB_NAME = "compute_stats_db"
@@ -71,7 +70,6 @@ class TestComputeStats(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfS3.hive
-  @SkipIfS3.insert
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   def test_compute_stats_impala_2201(self, vector):
@@ -120,7 +118,6 @@ class TestComputeStats(ImpalaTestSuite):
     assert("1\tpval\t8" in show_result.data[0])
 
 
-@SkipIfS3.insert # S3: missing coverage: compute stats
 @SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestCorruptTableStats(TestComputeStats):
 

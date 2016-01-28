@@ -9,7 +9,6 @@ from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE
 
-@SkipIfS3.insert
 class TestStringQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

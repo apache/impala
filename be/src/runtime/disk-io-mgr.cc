@@ -1153,7 +1153,9 @@ Status DiskIoMgr::AddWriteRange(RequestContext* writer, WriteRange* write_range)
 int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
   // If it's a remote range, check for an appropriate remote disk queue.
   if (!expected_local) {
-    if (IsDfsPath(file) && FLAGS_num_remote_hdfs_io_threads > 0) return RemoteDfsDiskId();
+    if (IsHdfsPath(file) && FLAGS_num_remote_hdfs_io_threads > 0) {
+      return RemoteDfsDiskId();
+    }
     if (IsS3APath(file)) return RemoteS3DiskId();
   }
   // Assign to a local disk queue.

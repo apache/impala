@@ -1,6 +1,7 @@
 ====
 ---- QUERY
-create database insert_permutation_test
+create database insert_permutation_test location
+'$FILESYSTEM_PREFIX/test-warehouse/insert_permutation_test'
 ---- RESULTS
 ====
 ---- QUERY

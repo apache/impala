@@ -373,17 +373,13 @@ public class InsertStmt extends StatementBase {
             "(%s) because Impala does not have WRITE access to at least one HDFS path" +
             ": %s", targetTableName_, hdfsTable.getFirstLocationWithoutWriteAccess()));
       }
-      if (hdfsTable.spansMultipleFileSystems()) {
-        throw new AnalysisException(String.format("Unable to INSERT into target table " +
-            "(%s) because the table spans multiple filesystems.", targetTableName_));
-      }
       StringBuilder error = new StringBuilder();
       hdfsTable.parseSkipHeaderLineCount(error);
       if (error.length() > 0) throw new AnalysisException(error.toString());
       try {
         if (!FileSystemUtil.isImpalaWritableFilesystem(hdfsTable.getLocation())) {
           throw new AnalysisException(String.format("Unable to INSERT into target " +
-              "table (%s) because %s is not an HDFS filesystem.", targetTableName_,
+              "table (%s) because %s is not a supported filesystem.", targetTableName_,
               hdfsTable.getLocation()));
         }
       } catch (IOException e) {

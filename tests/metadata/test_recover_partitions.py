@@ -16,7 +16,7 @@
 import pytest
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfLocal
+from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 
 # Validates ALTER TABLE RECOVER PARTITIONS statement
@@ -59,7 +59,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB)
 
-  @SkipIfS3.insert
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_recover_partitions(self, vector):
@@ -81,8 +80,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Create a path for a new partition using hdfs client and add a file with some values.
     # Test that the partition can be recovered and that the inserted data are accessible.
-    self.hdfs_client.make_dir(self.BASE_DIR + leaf_dir)
-    self.hdfs_client.create_file(self.BASE_DIR + leaf_dir + file_path, inserted_value)
+    self.filesystem_client.make_dir(self.BASE_DIR + leaf_dir)
+    self.filesystem_client.create_file(self.BASE_DIR + leaf_dir + file_path,
+                                       inserted_value)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % (self.TEST_TBL))
     assert self.has_value(part_name, result.data) == False
@@ -102,7 +102,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % (self.TEST_TBL))
     old_length = len(result.data)
-    self.hdfs_client.make_dir(self.BASE_DIR + malformed_dir)
+    self.filesystem_client.make_dir(self.BASE_DIR + malformed_dir)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL))
     result = self.execute_query_expect_success(self.client,
@@ -113,8 +113,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Create a directory whose subdirectory names contain __HIVE_DEFAULT_PARTITION__
     # and check that is recovered as a NULL partition.
-    self.hdfs_client.make_dir(self.BASE_DIR + null_dir)
-    self.hdfs_client.create_file(self.BASE_DIR + null_dir + file_path, null_inserted_value)
+    self.filesystem_client.make_dir(self.BASE_DIR + null_dir)
+    self.filesystem_client.create_file(
+        self.BASE_DIR + null_dir + file_path, null_inserted_value)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % (self.TEST_TBL))
     assert self.has_value(self.DEF_NULL_PART_KEY, result.data) == False
@@ -129,7 +130,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "select c from %s" % self.TEST_TBL)
     assert self.has_value(null_inserted_value, result.data) == True
 
-  @SkipIfS3.insert
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_nondefault_location_partitions(self, vector):
@@ -149,9 +149,10 @@ class TestRecoverPartitions(ImpalaTestSuite):
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s PARTITION (i=1, p='p3') SET LOCATION '%s/%s.db/tmp' "
         % (self.TEST_TBL, WAREHOUSE, self.TEST_DB))
-    self.hdfs_client.delete_file_dir(self.BASE_DIR + leaf_dir, recursive=True)
-    self.hdfs_client.make_dir(self.BASE_DIR + leaf_dir);
-    self.hdfs_client.create_file(self.BASE_DIR + leaf_dir + file_path, inserted_value)
+    self.filesystem_client.delete_file_dir(self.BASE_DIR + leaf_dir, recursive=True)
+    self.filesystem_client.make_dir(self.BASE_DIR + leaf_dir);
+    self.filesystem_client.create_file(self.BASE_DIR + leaf_dir + file_path,
+                                       inserted_value)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL))
     # Ensure that no duplicate partitions are recovered.
@@ -166,7 +167,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "select c from %s" % self.TEST_TBL)
     assert self.has_value(inserted_value, result.data) == True
 
-  @SkipIfS3.insert
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_duplicate_partitions(self, vector):
@@ -184,14 +184,15 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Create a partition with path "/i=1/p=p4".
     # Create a path "/i=0001/p=p4" using hdfs client, and add a file with some values.
-    # Test that no new partition will be recovered and the inserted data are not accessible.
+    # Test that no new partition will be recovered and the inserted data are not
+    # accessible.
     leaf_dir = "i=0001/p=p4/"
     inserted_value = "5"
 
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s ADD PARTITION(i=1, p='p4')" % (self.TEST_TBL))
-    self.hdfs_client.make_dir(self.BASE_DIR + leaf_dir);
-    self.hdfs_client.create_file(self.BASE_DIR + leaf_dir + file_path, inserted_value)
+    self.filesystem_client.make_dir(self.BASE_DIR + leaf_dir);
+    self.filesystem_client.create_file(self.BASE_DIR + leaf_dir + file_path, inserted_value)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL))
     result = self.execute_query_expect_success(self.client,
@@ -205,8 +206,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % (self.TEST_TBL))
     old_length = len(result.data)
-    self.hdfs_client.make_dir(self.BASE_DIR + same_value_dir1)
-    self.hdfs_client.make_dir(self.BASE_DIR + same_value_dir2)
+    self.filesystem_client.make_dir(self.BASE_DIR + same_value_dir1)
+    self.filesystem_client.make_dir(self.BASE_DIR + same_value_dir2)
     # Only one partition will be added.
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL))
@@ -216,7 +217,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS failed to handle duplicate partition key values."
         % (self.TEST_TBL))
 
-  @SkipIfS3.insert
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_post_invalidate(self, vector):
@@ -233,8 +233,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
     # Test that the recovered partitions are properly stored in Hive MetaStore.
     # Invalidate the table metadata and then check if the recovered partitions
     # are accessible.
-    self.hdfs_client.make_dir(self.BASE_DIR + leaf_dir);
-    self.hdfs_client.create_file(self.BASE_DIR + leaf_dir + file_path, inserted_value)
+    self.filesystem_client.make_dir(self.BASE_DIR + leaf_dir);
+    self.filesystem_client.create_file(self.BASE_DIR + leaf_dir + file_path,
+                                       inserted_value)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL))
     result = self.execute_query_expect_success(self.client,
@@ -252,7 +253,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "select c from %s" % self.TEST_TBL)
     assert self.has_value('4', result.data) == True
 
-  @SkipIfS3.insert
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_support_all_types(self, vector):
@@ -279,7 +279,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "SHOW PARTITIONS %s" % (self.TEST_TBL2))
     old_length = len(result.data)
     normal_dir = '/'.join(normal_values)
-    self.hdfs_client.make_dir(self.BASE_DIR2 + normal_dir)
+    self.filesystem_client.make_dir(self.BASE_DIR2 + normal_dir)
     # One partition will be added.
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL2))
@@ -308,7 +308,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
           invalid_dir += (normal_values[j] + "/")
         else:
           invalid_dir += (invalid_values[j] + "/")
-      self.hdfs_client.make_dir(self.BASE_DIR2 + invalid_dir)
+      self.filesystem_client.make_dir(self.BASE_DIR2 + invalid_dir)
       # No partition will be added.
       self.execute_query_expect_success(self.client,
           "ALTER TABLE %s RECOVER PARTITIONS" % (self.TEST_TBL2))

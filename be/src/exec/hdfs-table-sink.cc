@@ -68,7 +68,7 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
 
 OutputPartition::OutputPartition()
     : hdfs_connection(NULL), tmp_hdfs_file(NULL), num_rows(0), num_files(0),
-      partition_descriptor(NULL) {
+      partition_descriptor(NULL), block_size(0) {
 }
 
 Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
@@ -135,7 +135,7 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
     return Status(error_msg.str());
   }
 
-  staging_dir_ = Substitute("$0/_impala_insert_staging/$1/", table_desc_->hdfs_base_dir(),
+  staging_dir_ = Substitute("$0/_impala_insert_staging/$1", table_desc_->hdfs_base_dir(),
       PrintId(state->query_id(), "_"));
 
   RETURN_IF_ERROR(PrepareExprs(state));
@@ -298,6 +298,25 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 
   output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
       tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, block_size);
+
+  if (IsS3APath(output_partition->current_file_name.c_str())) {
+    // On S3A, the file cannot be stat'ed until after it's closed, and even so, the block
+    // size reported will be just the filesystem default. So, remember the requested
+    // block size.
+    output_partition->block_size = block_size;
+  } else {
+    // HDFS may choose to override the block size that we've recommended, so for non-S3
+    // files, we get the block size by stat-ing the file.
+    hdfsFileInfo* info = hdfsGetPathInfo(output_partition->hdfs_connection,
+        output_partition->current_file_name.c_str());
+    if (info == NULL) {
+      return Status(GetHdfsErrorMsg("Failed to get info on temporary HDFS file: ",
+          output_partition->current_file_name));
+    }
+    output_partition->block_size = info->mBlockSize;
+    hdfsFreeFileInfo(info, 1);
+  }
+
   VLOG_FILE << "hdfsOpenFile() file=" << tmp_hdfs_file_name_cstr;
   if (output_partition->tmp_hdfs_file == NULL) {
     return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
@@ -478,6 +497,7 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
     partition_status.__set_num_appended_rows(0L);
     partition_status.__set_id(partition_descriptor->id());
     partition_status.__set_stats(TInsertStats());
+    partition_status.__set_partition_base_dir(table_desc_->hdfs_base_dir());
     state->per_partition_status()->insert(
         make_pair(partition->partition_name, partition_status));
 
@@ -642,21 +662,6 @@ void HdfsTableSink::Close(RuntimeState* state) {
   }
   DataSink::Close(state);
   closed_ = true;
-}
-
-Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_t* size) {
-  hdfsFileInfo* info = hdfsGetPathInfo(output_partition->hdfs_connection,
-      output_partition->current_file_name.c_str());
-
-  if (info == NULL) {
-    return Status(GetHdfsErrorMsg("Failed to get info on temporary HDFS file: ",
-        output_partition->current_file_name));
-  }
-
-  *size = info->mBlockSize;
-  hdfsFreeFileInfo(info, 1);
-
-  return Status::OK();
 }
 
 string HdfsTableSink::DebugString() const {

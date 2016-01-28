@@ -43,11 +43,9 @@ class TestDelimitedText(ImpalaTestSuite):
     self.client.execute('drop table if exists %s.nl_queries' % self.TEST_DB_NAME)
     self.client.execute('drop database if exists %s' % self.TEST_DB_NAME)
 
-  @SkipIfS3.insert
   def test_delimited_text(self, vector):
     self.run_test_case('QueryTest/delimited-text', vector)
 
-  @SkipIfS3.insert
   def test_delimited_text_newlines(self, vector):
     """ Test text with newlines in strings - IMPALA-1943. Execute queries from Python to
     avoid issues with newline handling in test file format. """
@@ -73,7 +71,6 @@ class TestDelimitedText(ImpalaTestSuite):
     assert len(result.data) == 1
     assert result.data[0] == "2"
 
-  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_delimited_text_latin_chars(self, vector):
     """Verifies Impala is able to properly handle delimited text that contains

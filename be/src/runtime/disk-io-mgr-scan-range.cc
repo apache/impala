@@ -299,7 +299,7 @@ void DiskIoMgr::ScanRange::Close() {
     if (hdfs_file_ == NULL) return;
 
     struct hdfsReadStatistics* stats;
-    if (IsDfsPath(file())) {
+    if (IsHdfsPath(file())) {
       int success = hdfsFileGetReadStatistics(hdfs_file_->file(), &stats);
       if (success == 0) {
         reader_->bytes_read_local_.Add(stats->totalLocalBytesRead);

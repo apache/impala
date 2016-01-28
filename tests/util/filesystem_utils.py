@@ -29,6 +29,9 @@ IS_DEFAULT_FS = not FILESYSTEM_PREFIX or IS_LOCAL
 # Isilon specific values.
 ISILON_WEBHDFS_PORT = 8082
 
+# S3 specific values
+S3_BUCKET_NAME = os.getenv("S3_BUCKET")
+
 def get_fs_path(path):
   return "%s%s" % (FILESYSTEM_PREFIX, path)
 

@@ -18,12 +18,13 @@ from os import environ
 from os.path import join as join_path
 from pywebhdfs.webhdfs import PyWebHdfsClient, errors, _raise_pywebhdfs_exception
 from xml.etree.ElementTree import parse
+from tests.util.filesystem_base import BaseFilesystem
 import getpass
 import httplib
 import requests
 import types
 
-class PyWebHdfsClientWithChmod(PyWebHdfsClient):
+class PyWebHdfsClientWithChmod(PyWebHdfsClient, BaseFilesystem):
   def chmod(self, path, permission):
     """Set the permission of 'path' to 'permission' (specified as an octal string, e.g.
     '775'"""
@@ -61,9 +62,7 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     Overrides the superclass's method by providing delete if exists semantics. This takes
     the burden of stat'ing the file away from the caller.
     """
-    try:
-      self.get_file_dir_status(path)
-    except Exception as e:
+    if not self.exists(path):
       return True
     return super(PyWebHdfsClientWithChmod, self).delete_file_dir(path,
         recursive=recursive)
@@ -76,6 +75,14 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     """
     path = path.lstrip('/')
     return super(PyWebHdfsClientWithChmod, self).get_file_dir_status(path)
+
+  def get_all_file_sizes(self, path):
+    """Returns a list of all file sizes in the path"""
+    sizes = []
+    for status in self.list_dir(path).get('FileStatuses').get('FileStatus'):
+      if status['type'] == 'FILE':
+        sizes += [status['length']]
+    return sizes
 
   def copy(self, src, dest):
     """Copies a file in hdfs from src to destination
@@ -92,8 +99,21 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     self.create_file(dest, data)
     assert self.get_file_dir_status(dest)
     assert self.read_file(dest) == data
-    return True
 
+  def ls(self, path):
+    """Returns a list of all file and directory names in 'path'"""
+    # list_dir() returns a dictionary of file statues. This function picks out the
+    # file and directory names and just returns a list of the names.
+    file_infos = self.list_dir(path).get('FileStatuses').get('FileStatus')
+    return [info.get('pathSuffix') for info in file_infos]
+
+  def exists(self, path):
+    """Checks if a particular path exists"""
+    try:
+      self.get_file_dir_status(path)
+    except errors.FileNotFound:
+      return False
+    return True
 
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
@@ -116,23 +136,9 @@ def get_hdfs_client_from_conf(conf):
   host, port = hostport.split(":")
   return get_hdfs_client(host=host, port=port)
 
-def _pyweb_hdfs_client_exists(self, path):
-  """The PyWebHdfsClient doesn't provide an API to cleanly detect if a file or directory
-  exists. This method is bound to each client that is created so tests can simply call
-  hdfs_client.exists('path') and get back a bool.
-  """
-  try:
-    self.get_file_dir_status(path)
-  except errors.FileNotFound:
-    return False
-  return True
-
 def get_hdfs_client(host, port, user_name=getpass.getuser()):
   """Returns a new HTTP client for an HDFS cluster using an explict host:port pair"""
-  hdfs_client = PyWebHdfsClientWithChmod(host=host, port=port, user_name=user_name)
-  # Bind our "exists" method to hdfs_client.exists
-  hdfs_client.exists = types.MethodType(_pyweb_hdfs_client_exists, hdfs_client)
-  return hdfs_client
+  return PyWebHdfsClientWithChmod(host=host, port=port, user_name=user_name)
 
 def get_default_hdfs_config():
   core_site_path = join_path(environ.get('HADOOP_CONF_DIR'), 'core-site.xml')

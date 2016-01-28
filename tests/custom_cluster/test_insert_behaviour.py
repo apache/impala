@@ -21,7 +21,7 @@ from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_fr
 
 TEST_TBL = "insert_inherit_permission"
 
-@SkipIfS3.insert
+@SkipIfS3.hdfs_acls
 class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
 
   @classmethod

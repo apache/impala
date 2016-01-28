@@ -22,6 +22,8 @@
 #include "common/atomic.h"
 #include "common/status.h"
 #include "util/thread-pool.h"
+#include "util/counting-barrier.h"
+#include "runtime/hdfs-fs-cache.h"
 
 namespace impala {
 
@@ -29,6 +31,7 @@ enum HdfsOpType {
   DELETE,
   CREATE_DIR,
   RENAME,
+  MOVE,
   DELETE_THEN_CREATE,
   CHMOD
 };
@@ -65,7 +68,7 @@ class HdfsOp {
   /// First operand
   std::string src_;
 
-  /// Second string operand, ignored except for RENAME
+  /// Second string operand, ignored except for RENAME and MOVE
   std::string dst_;
 
   /// Permission operand, ignored except for CHMOD
@@ -73,6 +76,9 @@ class HdfsOp {
 
   /// Containing operation set, used to record errors and to signal completion.
   HdfsOperationSet* op_set_;
+
+  /// Records an error if it happens during an operation.
+  void AddError(const string& error_msg) const;
 };
 
 typedef ThreadPool<HdfsOp> HdfsOpThreadPool;
@@ -86,16 +92,14 @@ HdfsOpThreadPool* CreateHdfsOpThreadPool(const std::string& name, uint32_t num_t
 /// added.
 class HdfsOperationSet {
  public:
-  /// Constructs a new operation set. The hdfsFS parameter is shared between all
-  /// operations, and is not owned by this class (and therefore should remain valid until
-  /// Execute returns).
-  HdfsOperationSet(hdfsFS* hdfs_connection);
+  /// Initializes an operation set. 'connection_cache' is not owned.
+  HdfsOperationSet(HdfsFsCache::HdfsFsMap* connection_cache);
 
   /// Add an operation that takes only a single 'src' parameter (e.g. DELETE, CREATE_DIR,
   /// DELETE_THEN_CREATE)
   void Add(HdfsOpType op, const std::string& src);
 
-  /// Add an operation that takes two parameters (e.g. RENAME)
+  /// Add an operation that takes two parameters (e.g. RENAME, MOVE)
   void Add(HdfsOpType op, const std::string& src, const std::string& dst);
 
   /// Add an operation that takes a permission argument (i.e. CHMOD)
@@ -103,7 +107,7 @@ class HdfsOperationSet {
 
   /// Run all operations on the given pool, blocking until all are complete. Returns false
   /// if there were any errors, true otherwise.
-  /// If abort_on_error is true, execution will finish after the first error seen.
+  /// If 'abort_on_error' is true, execution will finish after the first error seen.
   bool Execute(HdfsOpThreadPool* pool, bool abort_on_error);
 
   typedef std::pair<const HdfsOp*, std::string> Error;
@@ -113,22 +117,19 @@ class HdfsOperationSet {
   /// until Execute has returned.
   const Errors& errors() { return errors_; }
 
-  hdfsFS* hdfs_connection() const { return hdfs_connection_; }
+  HdfsFsCache::HdfsFsMap* connection_cache() { return connection_cache_; }
 
  private:
   /// The set of operations to be submitted to HDFS
   std::vector<HdfsOp> ops_;
 
-  /// Used to coordinate between the executing threads and the caller; Execute blocks until
-  /// this is signalled.
-  Promise<bool> promise_;
+  /// Used to coordinate between the executing threads and the caller. This is initialized
+  /// with the number of operations to be executed. Unblocks once all the operations in
+  /// the set are complete.
+  boost::scoped_ptr<CountingBarrier> ops_complete_barrier_;
 
-  /// The number of ops remaining to be executed. Used to coordinate between executor
-  /// threads so that when all ops are finished, promise_ is signalled.
-  AtomicInt64 num_ops_;
-
-  /// HDFS connection shared between all operations. Not owned by this class.
-  hdfsFS* hdfs_connection_;
+  /// A connection cache used by this operation set. Not owned.
+  HdfsFsCache::HdfsFsMap* connection_cache_;
 
   /// Protects errors_ and abort_on_error_ during Execute
   boost::mutex errors_lock_;
@@ -141,8 +142,8 @@ class HdfsOperationSet {
 
   friend class HdfsOp;
 
-  /// Called by HdfsOp to signal its completion. When the last op has finished, this method
-  /// signals Execute() so that it can return.
+  /// Called by HdfsOp to signal its completion. When the last op has finished, this
+  /// method signals Execute() so that it can return.
   void MarkOneOpDone();
 
   /// Called by HdfsOp to record an error

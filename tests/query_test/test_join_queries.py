@@ -96,7 +96,6 @@ class TestTPCHJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('tpch-outer-joins', new_vector)
 
-@SkipIfS3.insert
 class TestSemiJoinQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

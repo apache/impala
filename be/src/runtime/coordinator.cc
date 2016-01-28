@@ -760,17 +760,12 @@ void Coordinator::PopulatePathPermissionCache(hdfsFS fs, const string& path_str,
 
 Status Coordinator::FinalizeSuccessfulInsert() {
   PermissionCache permissions_cache;
-  hdfsFS hdfs_connection;
-  // InsertStmt ensures that all partitions are on the same filesystem as the table's
-  // base directory, so opening a single connection is okay.
-  // TODO: modify this code so that restriction can be lifted.
-  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-      finalize_params_.hdfs_base_dir, &hdfs_connection));
+  HdfsFsCache::HdfsFsMap filesystem_connection_cache;
+  HdfsOperationSet partition_create_ops(&filesystem_connection_cache);
 
   // INSERT finalization happens in the five following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
-  HdfsOperationSet partition_create_ops(&hdfs_connection);
   DescriptorTbl* descriptor_table;
   DescriptorTbl::Create(obj_pool(), desc_tbl_, &descriptor_table);
   HdfsTableDescriptor* hdfs_table = static_cast<HdfsTableDescriptor*>(
@@ -783,6 +778,14 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   BOOST_FOREACH(const PartitionStatusMap::value_type& partition, per_partition_status_) {
     SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",
           "FinalizationTimer"));
+    // INSERT allows writes to tables that have partitions on multiple filesystems.
+    // So we need to open connections to different filesystems as necessary. We use a
+    // local connection cache and populate it with one connection per filesystem that the
+    // partitions are on.
+    hdfsFS partition_fs_connection;
+    RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+      partition.second.partition_base_dir, &partition_fs_connection,
+          &filesystem_connection_cache));
 
     // Look up the partition in the descriptor table.
     stringstream part_path_ss;
@@ -798,6 +801,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       part_path_ss << part->location();
     }
     const string& part_path = part_path_ss.str();
+    bool is_s3_path = IsS3APath(part_path.c_str());
 
     // If this is an overwrite insert, we will need to delete any updated partitions
     if (finalize_params_.is_overwrite) {
@@ -816,11 +820,11 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // Once HDFS-8407 is fixed, the errno reset won't be needed.
         errno = 0;
         hdfsFileInfo* existing_files =
-            hdfsListDirectory(hdfs_connection, part_path.c_str(), &num_files);
+            hdfsListDirectory(partition_fs_connection, part_path.c_str(), &num_files);
         if (existing_files == NULL && errno == EAGAIN) {
           errno = 0;
           existing_files =
-              hdfsListDirectory(hdfs_connection, part_path.c_str(), &num_files);
+              hdfsListDirectory(partition_fs_connection, part_path.c_str(), &num_files);
         }
         // hdfsListDirectory() returns NULL not only when there is an error but also
         // when the directory is empty(HDFS-8407). Need to check errno to make sure
@@ -840,10 +844,18 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // recursively with abandon, after checking that it ever existed.
         // TODO: There's a potential race here between checking for the directory
         // and a third-party deleting it.
-        if (FLAGS_insert_inherit_permissions) {
-          PopulatePathPermissionCache(hdfs_connection, part_path, &permissions_cache);
+        if (FLAGS_insert_inherit_permissions && !is_s3_path) {
+          // There is no directory structure in S3, so "inheriting" permissions is not
+          // possible.
+          // TODO: Try to mimic inheriting permissions for S3.
+          PopulatePathPermissionCache(
+              partition_fs_connection, part_path, &permissions_cache);
         }
-        if (hdfsExists(hdfs_connection, part_path.c_str()) != -1) {
+        // S3 doesn't have a directory structure, so we technically wouldn't need to
+        // CREATE_DIR on S3. However, libhdfs always checks if a path exists before
+        // carrying out an operation on that path. So we still need to call CREATE_DIR
+        // before we access that path due to this limitation.
+        if (hdfsExists(partition_fs_connection, part_path.c_str()) != -1) {
           partition_create_ops.Add(DELETE_THEN_CREATE, part_path);
         } else {
           // Otherwise just create the directory.
@@ -851,10 +863,11 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         }
       }
     } else {
-      if (FLAGS_insert_inherit_permissions) {
-        PopulatePathPermissionCache(hdfs_connection, part_path, &permissions_cache);
+      if (FLAGS_insert_inherit_permissions && !is_s3_path) {
+        PopulatePathPermissionCache(
+            partition_fs_connection, part_path, &permissions_cache);
       }
-      if (hdfsExists(hdfs_connection, part_path.c_str()) == -1) {
+      if (hdfsExists(partition_fs_connection, part_path.c_str()) == -1) {
         partition_create_ops.Add(CREATE_DIR, part_path);
       }
     }
@@ -868,18 +881,17 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // It's ok to ignore errors creating the directories, since they may already
         // exist. If there are permission errors, we'll run into them later.
         if (err.first->op() != CREATE_DIR) {
-          stringstream ss;
-          ss << "Error(s) deleting partition directories. First error (of "
-             << partition_create_ops.errors().size() << ") was: " << err.second;
-          return Status(ss.str());
+          return Status(Substitute(
+              "Error(s) deleting partition directories. First error (of $0) was: $1",
+              partition_create_ops.errors().size(), err.second));
         }
       }
     }
   }
 
   // 3. Move all tmp files
-  HdfsOperationSet move_ops(&hdfs_connection);
-  HdfsOperationSet dir_deletion_ops(&hdfs_connection);
+  HdfsOperationSet move_ops(&filesystem_connection_cache);
+  HdfsOperationSet dir_deletion_ops(&filesystem_connection_cache);
 
   BOOST_FOREACH(FileMoveMap::value_type& move, files_to_move_) {
     // Empty destination means delete, so this is a directory. These get deleted in a
@@ -889,7 +901,11 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       dir_deletion_ops.Add(DELETE, move.first);
     } else {
       VLOG_ROW << "Moving tmp file: " << move.first << " to " << move.second;
-      move_ops.Add(RENAME, move.first, move.second);
+      if (FilesystemsMatch(move.first.c_str(), move.second.c_str())) {
+        move_ops.Add(RENAME, move.first, move.second);
+      } else {
+        move_ops.Add(MOVE, move.first, move.second);
+      }
     }
   }
 
@@ -917,9 +933,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   }
 
   // 5. Optionally update the permissions of the created partition directories
-  // Do this last in case we make the dirs unwriteable.
+  // Do this last so that we don't make a dir unwritable before we write to it.
   if (FLAGS_insert_inherit_permissions) {
-    HdfsOperationSet chmod_ops(&hdfs_connection);
+    HdfsOperationSet chmod_ops(&filesystem_connection_cache);
     BOOST_FOREACH(const PermissionCache::value_type& perm, permissions_cache) {
       bool new_dir = perm.second.first;
       if (new_dir) {
@@ -1528,6 +1544,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       TInsertPartitionStatus* status = &(per_partition_status_[partition.first]);
       status->num_appended_rows += partition.second.num_appended_rows;
       status->id = partition.second.id;
+      status->partition_base_dir = partition.second.partition_base_dir;
       if (!status->__isset.stats) status->__set_stats(TInsertStats());
       DataSink::MergeInsertStats(partition.second.stats, &status->stats);
     }
