@@ -161,6 +161,12 @@ class DbCursor(object):
   def __getattr__(self, attr):
     return getattr(self._cursor, attr)
 
+  def __setattr__(self, attr, value):
+    # Transfer unknown attributes to the underlying cursor.
+    if attr not in ["_conn", "_cursor"]:
+      setattr(self._cursor, attr, value)
+    object.__setattr__(self, attr, value)
+
   def __enter__(self):
     return self
 
@@ -723,7 +729,7 @@ class ImpalaCursor(DbCursor):
 
 class ImpalaConnection(DbConnection):
 
-  PORT = 21000
+  PORT = 21050   # For HS2
 
   _DB_TYPE = IMPALA
   _CURSOR_CLASS = ImpalaCursor

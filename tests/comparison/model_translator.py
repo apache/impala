@@ -74,6 +74,11 @@ class SqlWriter(object):
         'Divide': '({0}) / ({1})',
         'Equals': '({0}) = ({1})',
         'NotEquals': '({0}) != ({1})',
+        'IsNotDistinctFrom': '({0}) IS NOT DISTINCT FROM ({1})',
+        # If a database supports the operator version of 'IS NOT DISTINCT FROM', it
+        # should overwrite the value of 'IsNotDistinctFromOp'.
+        'IsNotDistinctFromOp': '({0}) IS NOT DISTINCT FROM ({1})',
+        'IsDistinctFrom': '({0}) IS DISTINCT FROM ({1})',
         'LessThan': '({0}) < ({1})',
         'GreaterThan': '({0}) > ({1})',
         'LessThanOrEquals': '({0}) <= ({1})',
@@ -426,6 +431,10 @@ class SqlWriter(object):
 class ImpalaSqlWriter(SqlWriter):
 
   DIALECT = 'IMPALA'
+
+  def __init__(self, *args, **kwargs):
+    super(ImpalaSqlWriter, self).__init__(*args, **kwargs)
+    self.operator_funcs['IsNotDistinctFromOp'] = '({0}) <=> ({1})'
 
 
 class OracleSqlWriter(SqlWriter):

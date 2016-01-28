@@ -346,7 +346,7 @@ class QueryExecutor(object):
       log_file.flush()
       cursor.execute(query_sql)
       col_count = len(cursor.description)
-      batch_size = min(10000 / col_count, 1)
+      batch_size = max(10000 / col_count, 1)
       row_limit = self.TOO_MUCH_DATA / col_count
       data_set = list()
       current_thread().data_set = data_set
@@ -663,7 +663,7 @@ if __name__ == '__main__':
   # TODO: Seed the random query generator for repeatable queries?
 
   args = parser.parse_args()
-  cli_options.configure_logging(args.log_level)
+  cli_options.configure_logging(args.log_level, debug_log_file=args.debug_log_file)
   cluster = cli_options.create_cluster(args)
 
   ref_conn = cli_options.create_connection(args, args.ref_db_type, db_name=args.db_name)

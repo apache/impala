@@ -468,6 +468,7 @@ class DefaultProfile(object):
         return False
     return True
 
+
 class ImpalaNestedTypesProfile(DefaultProfile):
 
   def __init__(self):
@@ -494,6 +495,18 @@ class ImpalaNestedTypesProfile(DefaultProfile):
     while random() < (0.85 ** num):
       num += 1
     return num
+
+
+# This profile was added for ad-hoc testing.
+class TestFunctionProfile(DefaultProfile):
+
+  def choose_func_signature(self, signatures):
+    if not signatures:
+      raise Exception('At least one signature is required')
+    preferred_signatures = filter(lambda s: "DistinctFrom" in s.func._NAME, signatures)
+    if preferred_signatures:
+      signatures = preferred_signatures
+    return super(TestFunctionProfile, self).choose_func_signature(signatures)
 
 
 class HiveProfile(DefaultProfile):
