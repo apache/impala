@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/webserver.h"
-#include "common/init.h"
-
-#include <gtest/gtest.h>
 #include <string>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
+
+#include "testutil/gtest-util.h"
+#include "util/webserver.h"
+#include "common/init.h"
 
 DECLARE_int32(webserver_port);
 DECLARE_string(webserver_password_file);
@@ -89,10 +89,10 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
 
 TEST(Webserver, SmokeTest) {
   Webserver webserver(FLAGS_webserver_port);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
 
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents));
 }
 
 void AssertArgsCallback(bool* success, const Webserver::ArgumentMap& args,
@@ -108,13 +108,13 @@ TEST(Webserver, ArgsTest) {
   Webserver::UrlCallback callback = bind<void>(AssertArgsCallback, &success , _1, _2);
   webserver.RegisterUrlCallback(ARGS_TEST_PATH, "json-test.tmpl", callback);
 
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, ARGS_TEST_PATH, &contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, ARGS_TEST_PATH, &contents));
   ASSERT_FALSE(success) << "Unexpectedly found " << TEST_ARG;
 
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-      Substitute("$0?$1", ARGS_TEST_PATH, TEST_ARG), &contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+      Substitute("$0?$1", ARGS_TEST_PATH, TEST_ARG), &contents));
   ASSERT_TRUE(success) << "Did not find " << TEST_ARG;
 }
 
@@ -141,33 +141,33 @@ TEST(Webserver, JsonTest) {
 
   Webserver::UrlCallback text_callback = bind<void>(JsonCallback, true, _1, _2);
   webserver.RegisterUrlCallback(RAW_TEXT_PATH, "json-test.tmpl", text_callback);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
 
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents));
   ASSERT_TRUE(contents.str().find(SALUTATION_VALUE) != string::npos);
   ASSERT_TRUE(contents.str().find(SALUTATION_KEY) == string::npos);
 
   stringstream json_contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-      Substitute("$0?json", JSON_TEST_PATH), &json_contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+      Substitute("$0?json", JSON_TEST_PATH), &json_contents));
   ASSERT_TRUE(json_contents.str().find("\"Salutation\": \"Hello!\"") != string::npos);
 
   stringstream error_contents;
-  ASSERT_TRUE(
-      HttpGet("localhost", FLAGS_webserver_port, NO_TEMPLATE_PATH, &error_contents).ok());
+  ASSERT_OK(
+      HttpGet("localhost", FLAGS_webserver_port, NO_TEMPLATE_PATH, &error_contents));
   ASSERT_TRUE(error_contents.str().find("Could not open template: ") != string::npos);
 
   // Adding ?raw should send text
   stringstream raw_contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-          Substitute("$0?raw", JSON_TEST_PATH), &raw_contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+          Substitute("$0?raw", JSON_TEST_PATH), &raw_contents));
   ASSERT_TRUE(raw_contents.str().find("text/plain") != string::npos);
 
   // Any callback that includes ENABLE_RAW_JSON_KEY should always return text.
   stringstream raw_cb_contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, RAW_TEXT_PATH,
-      &raw_cb_contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, RAW_TEXT_PATH,
+      &raw_cb_contents));
   ASSERT_TRUE(raw_cb_contents.str().find("text/plain") != string::npos);
 }
 
@@ -177,19 +177,19 @@ TEST(Webserver, EscapingTest) {
   const string JSON_TEST_PATH = "/json-test";
   Webserver::UrlCallback callback = bind<void>(JsonCallback, false, _1, _2);
   webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents));
   ASSERT_TRUE(contents.str().find(ESCAPED_VALUE) != string::npos);
   ASSERT_TRUE(contents.str().find(TO_ESCAPE_VALUE) == string::npos);
 }
 
 TEST(Webserver, EscapeErrorUriTest) {
   Webserver webserver(FLAGS_webserver_port);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-          "/dont-exist<script>alert(42);</script>", &contents, 404).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+          "/dont-exist<script>alert(42);</script>", &contents, 404));
   ASSERT_EQ(contents.str().find("<script>alert(42);</script>"), string::npos);
   ASSERT_TRUE(contents.str().find("dont-exist&lt;script&gt;alert(42);&lt;/script&gt;") !=
       string::npos);
@@ -217,7 +217,7 @@ TEST(Webserver, SslTest) {
       Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
 
   Webserver webserver(FLAGS_webserver_port);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
 }
 
 TEST(Webserver, SslBadCertTest) {
@@ -239,7 +239,7 @@ TEST(Webserver, SslWithPrivateKeyPasswordTest) {
       &FLAGS_webserver_private_key_password_cmd, "echo password");
 
   Webserver webserver(FLAGS_webserver_port);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
 }
 
 TEST(Webserver, SslBadPrivateKeyPasswordTest) {
@@ -261,7 +261,7 @@ TEST(Webserver, StartWithPasswordFileTest) {
       password_file.str());
 
   Webserver webserver(FLAGS_webserver_port);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
 
   // Don't expect HTTP requests to work without a password
   stringstream contents;
@@ -280,10 +280,10 @@ TEST(Webserver, StartWithMissingPasswordFileTest) {
 
 TEST(Webserver, DirectoryListingDisabledTest) {
   Webserver webserver(FLAGS_webserver_port);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-      "/www/bootstrap/", &contents, 403).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+      "/www/bootstrap/", &contents, 403));
   ASSERT_TRUE(contents.str().find("Directory listing denied") != string::npos);
 }
 
@@ -297,10 +297,10 @@ TEST(Webserver, NoFrameEmbeddingTest) {
   Webserver webserver(FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
   webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw-text.tmpl", callback);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-      FRAME_TEST_PATH, &contents, 200).ok());
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+      FRAME_TEST_PATH, &contents, 200));
 
   // Confirm that the embedded frame isn't rendered
   ASSERT_TRUE(contents.str().find("Metrics") == string::npos);
@@ -316,10 +316,10 @@ TEST(Webserver, NullCharTest) {
   const string NULL_CHAR_TEST_PATH = "/null-char-test";
   Webserver webserver(FLAGS_webserver_port);
   webserver.RegisterUrlCallback(NULL_CHAR_TEST_PATH, NullCharCallback);
-  ASSERT_TRUE(webserver.Start().ok());
+  ASSERT_OK(webserver.Start());
   stringstream contents;
-  ASSERT_TRUE(
-      HttpGet("localhost", FLAGS_webserver_port, NULL_CHAR_TEST_PATH, &contents).ok());
+  ASSERT_OK(
+      HttpGet("localhost", FLAGS_webserver_port, NULL_CHAR_TEST_PATH, &contents));
   ASSERT_TRUE(contents.str().find(STRING_WITH_NULL) != string::npos);
 }
 

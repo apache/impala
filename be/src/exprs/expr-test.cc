@@ -24,8 +24,8 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/regex.hpp>
 #include <boost/unordered_map.hpp>
-#include <gtest/gtest.h>
 
+#include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
@@ -949,9 +949,8 @@ template <typename T> void TestSingleLiteralConstruction(
 
   Expr* expr = pool.Add(new Literal(type, value));
   ExprContext ctx(expr);
-  ctx.Prepare(&state, desc, &tracker);
-  Status status = ctx.Open(&state);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(ctx.Prepare(&state, desc, &tracker));
+  EXPECT_OK(ctx.Open(&state));
   EXPECT_EQ(0, RawValue::Compare(ctx.GetValue(NULL), &value, type))
       << "type: " << type << ", value: " << value;
   ctx.Close(&state);
@@ -963,10 +962,8 @@ TEST_F(ExprTest, NullLiteral) {
     ExprContext ctx(&expr);
     RuntimeState state(TExecPlanFragmentParams(), "", NULL);
     MemTracker tracker;
-    Status status = ctx.Prepare(&state, RowDescriptor(), &tracker);
-    EXPECT_TRUE(status.ok());
-    status = ctx.Open(&state);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(ctx.Prepare(&state, RowDescriptor(), &tracker));
+    EXPECT_OK(ctx.Open(&state));
     EXPECT_TRUE(ctx.GetValue(NULL) == NULL);
     ctx.Close(&state);
   }

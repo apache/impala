@@ -16,12 +16,11 @@
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 
-#include <gtest/gtest.h>
-
 #include <set>
 #include <string>
 #include <limits> // for std::numeric_limits<int>::max()
 
+#include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "gutil/gscoped_ptr.h"
@@ -98,11 +97,9 @@ class SimpleTupleStreamTest : public testing::Test {
   /// Setup a block manager with the provided settings and client with no reservation,
   /// tracked by tracker_.
   void InitBlockMgr(int64_t limit, int block_size) {
-    Status status = test_env_->CreateQueryState(0, limit, block_size, &runtime_state_);
-    ASSERT_TRUE(status.ok());
-    status = runtime_state_->block_mgr()->RegisterClient(0, false, &tracker_,
-        runtime_state_, &client_);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(test_env_->CreateQueryState(0, limit, block_size, &runtime_state_));
+    ASSERT_OK(runtime_state_->block_mgr()->RegisterClient(0, false, &tracker_,
+        runtime_state_, &client_));
   }
 
   /// Generate the ith element of a sequence of int values.
@@ -215,8 +212,7 @@ class SimpleTupleStreamTest : public testing::Test {
     int batches_read = 0;
     do {
       batch.Reset();
-      Status status = stream->GetNext(&batch, &eos);
-      EXPECT_TRUE(status.ok());
+      EXPECT_OK(stream->GetNext(&batch, &eos));
       ++batches_read;
       for (int i = 0; i < batch.num_rows(); ++i) {
         AppendRowTuples(batch.GetRow(i), results);
@@ -271,14 +267,9 @@ class SimpleTupleStreamTest : public testing::Test {
       bool unpin_stream) {
     BufferedTupleStream stream(runtime_state_, *desc, runtime_state_->block_mgr(),
         client_, true, false);
-    Status status = stream.Init(-1, NULL, true);
-    ASSERT_TRUE(status.ok()) << status.GetDetail();
+    ASSERT_OK(stream.Init(-1, NULL, true));
 
-    if (unpin_stream) {
-      status = stream.UnpinStream();
-      ASSERT_TRUE(status.ok());
-    }
-
+    if (unpin_stream) ASSERT_OK(stream.UnpinStream());
     // Add rows to the stream
     int offset = 0;
     for (int i = 0; i < num_batches; ++i) {
@@ -290,17 +281,17 @@ class SimpleTupleStreamTest : public testing::Test {
       } else {
         ASSERT_TRUE(false);
       }
+      Status status;
       for (int j = 0; j < batch->num_rows(); ++j) {
         bool b = stream.AddRow(batch->GetRow(j), &status);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(status)
         if (!b) {
           ASSERT_TRUE(stream.using_small_buffers());
           bool got_buffer;
-          status = stream.SwitchToIoBuffers(&got_buffer);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(stream.SwitchToIoBuffers(&got_buffer));
           ASSERT_TRUE(got_buffer);
           b = stream.AddRow(batch->GetRow(j), &status);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(status);
         }
         ASSERT_TRUE(b);
       }
@@ -309,8 +300,7 @@ class SimpleTupleStreamTest : public testing::Test {
       batch->Reset();
     }
 
-    status = stream.PrepareForRead(false);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(stream.PrepareForRead(false));
 
     // Read all the rows back
     vector<T> results;
@@ -328,23 +318,19 @@ class SimpleTupleStreamTest : public testing::Test {
       BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
           client_, small_buffers == 0,  // initial small buffers
           true); // read_write
-      Status status = stream.Init(-1, NULL, true);
-      ASSERT_TRUE(status.ok());
-      status = stream.PrepareForRead(true);
-      ASSERT_TRUE(status.ok());
-      if (unpin_stream) {
-        status = stream.UnpinStream();
-        ASSERT_TRUE(status.ok());
-      }
+      ASSERT_OK(stream.Init(-1, NULL, true));
+      ASSERT_OK(stream.PrepareForRead(true));
+      if (unpin_stream) ASSERT_OK(stream.UnpinStream());
 
       vector<int> results;
 
       for (int i = 0; i < num_batches; ++i) {
         RowBatch* batch = CreateIntBatch(i * BATCH_SIZE, BATCH_SIZE, false);
         for (int j = 0; j < batch->num_rows(); ++j) {
+          Status status;
           bool b = stream.AddRow(batch->GetRow(j), &status);
           ASSERT_TRUE(b);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(status);
         }
         // Reset the batch to make sure the stream handles the memory correctly.
         batch->Reset();
@@ -546,8 +532,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
 
   BufferedTupleStream stream(runtime_state_, *row_desc, runtime_state_->block_mgr(),
       client_, true, false);
-  Status status = stream.Init(-1, NULL, true);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(stream.Init(-1, NULL, true));
 
   int offset = 0;
   bool full = false;
@@ -556,19 +541,18 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
                                   : CreateIntBatch(offset, BATCH_SIZE, false);
     int j = 0;
     for (; j < batch->num_rows(); ++j) {
+      Status status;
       full = !stream.AddRow(batch->GetRow(j), &status);
-      ASSERT_TRUE(status.ok());
+      ASSERT_OK(status);
       if (full) break;
     }
     offset += j;
   }
 
-  status = stream.UnpinStream();
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(stream.UnpinStream());
 
   bool pinned = false;
-  status = stream.PinStream(false, &pinned);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(stream.PinStream(false, &pinned));
   ASSERT_TRUE(pinned);
 
 
@@ -577,8 +561,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
   int read_iters = 3;
   for (int i = 0; i < read_iters; ++i) {
     bool delete_on_read = i == read_iters - 1;
-    status = stream.PrepareForRead(delete_on_read);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(stream.PrepareForRead(delete_on_read));
 
     if (varlen_data) {
       vector<StringValue> results;
@@ -616,17 +599,18 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
 
   BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
       client_, true, false);
-  Status status = stream.Init(-1, NULL, false);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(stream.Init(-1, NULL, false));
 
   // Initial buffer should be small.
   EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
 
   RowBatch* batch = CreateIntBatch(0, 1024, false);
+
+  Status status;
   for (int i = 0; i < batch->num_rows(); ++i) {
     bool ret = stream.AddRow(batch->GetRow(i), &status);
     EXPECT_TRUE(ret);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(status);
   }
   EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
   EXPECT_LT(stream.byte_size(), buffer_size);
@@ -636,15 +620,14 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   batch = CreateIntBatch(0, 10 * 1024 * 1024, false);
   for (int i = 0; i < batch->num_rows(); ++i) {
     bool ret = stream.AddRow(batch->GetRow(i), &status);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(status);
     if (!ret) {
       ASSERT_TRUE(stream.using_small_buffers());
       bool got_buffer;
-      status = stream.SwitchToIoBuffers(&got_buffer);
-      ASSERT_TRUE(status.ok());
+      ASSERT_OK(stream.SwitchToIoBuffers(&got_buffer));
       ASSERT_TRUE(got_buffer);
       ret = stream.AddRow(batch->GetRow(i), &status);
-      ASSERT_TRUE(status.ok());
+      ASSERT_OK(status);
     }
     ASSERT_TRUE(ret);
   }
@@ -975,7 +958,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     EXPECT_EQ(expected_row_size, stream.ComputeRowSize(row.get()));
     bool b = stream.AddRow(row.get(), &status);
     ASSERT_TRUE(b);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(status);
     mem_pool_->FreeAll(); // Free data as soon as possible to smoke out issues.
   }
 
@@ -988,7 +971,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   RowBatch batch(*array_desc_, BATCH_SIZE, &tracker_);
   do {
     batch.Reset();
-    ASSERT_TRUE(stream.GetNext(&batch, &eos).ok());
+    ASSERT_OK(stream.GetNext(&batch, &eos));
     for (int i = 0; i < batch.num_rows(); ++i) {
       TupleRow* row = batch.GetRow(i);
       Tuple* tuple0 = row->GetTuple(0);

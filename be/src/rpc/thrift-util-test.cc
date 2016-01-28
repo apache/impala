@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <iostream>
 
-#include <gtest/gtest.h>
+#include "testutil/gtest-util.h"
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
 
@@ -27,7 +27,6 @@
 namespace impala {
 
 TEST(ThriftUtil, SimpleSerializeDeserialize) {
-  Status status;
   // Loop over compact and binary protocols
   for (int i = 0; i < 2; ++i) {
     bool compact = (i == 0);
@@ -39,30 +38,26 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     counter.__set_value(123);
 
     vector<uint8_t> msg;
-    status = serializer.Serialize(&counter, &msg);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(serializer.Serialize(&counter, &msg));
 
     uint8_t* buffer1 = NULL;
     uint8_t* buffer2 = NULL;
     uint32_t len1 = 0;
     uint32_t len2 = 0;
 
-    status = serializer.Serialize(&counter, &len1, &buffer1);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(serializer.Serialize(&counter, &len1, &buffer1));
 
     EXPECT_EQ(len1, msg.size());
     EXPECT_TRUE(memcmp(buffer1, &msg[0], len1) == 0);
 
     // Serialize again and ensure the memory buffer is the same and being reused.
-    status = serializer.Serialize(&counter, &len2, &buffer2);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(serializer.Serialize(&counter, &len2, &buffer2));
 
     EXPECT_EQ(len1, len2);
     EXPECT_TRUE(buffer1 == buffer2);
 
     TCounter deserialized_counter;
-    status = DeserializeThriftMsg(buffer1, &len1, compact, &deserialized_counter);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(DeserializeThriftMsg(buffer1, &len1, compact, &deserialized_counter));
     EXPECT_EQ(len1, len2);
     EXPECT_TRUE(counter == deserialized_counter);
   }

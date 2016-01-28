@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
-
+#include "testutil/gtest-util.h"
 #include "runtime/collection-value.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/raw-value.h"
@@ -52,7 +51,7 @@ class RowBatchSerializeTest : public testing::Test {
     if (print_batches) cout << PrintBatch(batch) << endl;
 
     TRowBatch trow_batch;
-    EXPECT_TRUE(batch->Serialize(&trow_batch, full_dedup).ok());
+    EXPECT_OK(batch->Serialize(&trow_batch, full_dedup));
 
     RowBatch deserialized_batch(row_desc, trow_batch, tracker_.get());
     if (print_batches) cout << PrintBatch(&deserialized_batch) << endl;
@@ -471,7 +470,7 @@ void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   CreateTuples(tuple_desc, batch->tuple_data_pool(), num_distinct_tuples, 0, 10, &tuples);
   AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
   TRowBatch trow_batch;
-  EXPECT_TRUE(batch->Serialize(&trow_batch, full_dedup).ok());
+  EXPECT_OK(batch->Serialize(&trow_batch, full_dedup));
   // Serialized data should only have one copy of each tuple.
   int64_t total_byte_size = 0; // Total size without duplication
   for (int i = 0; i < tuples.size(); ++i) {
@@ -608,7 +607,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   EXPECT_TRUE(UseFullDedup(batch));
   LOG(INFO) << "Serializing row batch";
   TRowBatch trow_batch;
-  EXPECT_TRUE(batch->Serialize(&trow_batch).ok());
+  EXPECT_OK(batch->Serialize(&trow_batch));
   LOG(INFO) << "Serialized batch size: " << trow_batch.tuple_data.size();
   LOG(INFO) << "Serialized batch uncompressed size: " << trow_batch.uncompressed_size;
   LOG(INFO) << "Serialized batch expected size: " << total_byte_size;

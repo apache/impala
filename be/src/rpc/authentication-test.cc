@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
-
+#include "testutil/gtest-util.h"
 #include "common/logging.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
@@ -38,10 +37,10 @@ namespace impala {
 
 TEST(Auth, PrincipalSubstitution) {
   string hostname;
-  ASSERT_TRUE(GetHostname(&hostname).ok());
+  ASSERT_OK(GetHostname(&hostname));
   SaslAuthProvider sa(false);  // false means it's external
-  ASSERT_TRUE(sa.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
-  ASSERT_TRUE(sa.Start().ok());
+  ASSERT_OK(sa.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
+  ASSERT_OK(sa.Start());
   ASSERT_EQ(string::npos, sa.principal().find("_HOST"));
   ASSERT_NE(string::npos, sa.principal().find(hostname));
   ASSERT_EQ("service_name", sa.service_name());
@@ -50,7 +49,7 @@ TEST(Auth, PrincipalSubstitution) {
 }
 
 TEST(Auth, ValidAuthProviders) {
-  ASSERT_TRUE(AuthManager::GetInstance()->Init().ok());
+  ASSERT_OK(AuthManager::GetInstance()->Init());
   ASSERT_TRUE(AuthManager::GetInstance()->GetExternalAuthProvider() != NULL);
   ASSERT_TRUE(AuthManager::GetInstance()->GetInternalAuthProvider() != NULL);
 }
@@ -64,7 +63,7 @@ TEST(Auth, LdapAuth) {
   FLAGS_ldap_uri = "ldaps://bogus.com";
 
   // Initialization based on above "command line" args
-  ASSERT_TRUE(AuthManager::GetInstance()->Init().ok());
+  ASSERT_OK(AuthManager::GetInstance()->Init());
 
   // External auth provider is sasl, ldap, but not kerberos
   ap = AuthManager::GetInstance()->GetExternalAuthProvider();
@@ -92,7 +91,7 @@ TEST(Auth, LdapKerbAuth) {
   FLAGS_ldap_uri = "ldaps://bogus.com";
 
   // Initialization based on above "command line" args
-  ASSERT_TRUE(AuthManager::GetInstance()->Init().ok());
+  ASSERT_OK(AuthManager::GetInstance()->Init());
 
   // External auth provider is sasl, ldap, and kerberos
   ap = AuthManager::GetInstance()->GetExternalAuthProvider();
@@ -113,16 +112,16 @@ TEST(Auth, LdapKerbAuth) {
 // Tests that Impala will successfully start if so configured.
 TEST(Auth, KerbAndSslEnabled) {
   string hostname;
-  ASSERT_TRUE(GetHostname(&hostname).ok());
+  ASSERT_OK(GetHostname(&hostname));
   FLAGS_ssl_client_ca_certificate = "some_path";
   FLAGS_ssl_server_certificate = "some_path";
   ASSERT_TRUE(EnableInternalSslConnections());
   SaslAuthProvider sa_internal(true);
-  ASSERT_TRUE(
-      sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
+  ASSERT_OK(
+      sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
   SaslAuthProvider sa_external(false);
-  ASSERT_TRUE(
-      sa_external.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
+  ASSERT_OK(
+      sa_external.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
 }
 
 }

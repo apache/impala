@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "testutil/gtest-util.h"
 #include "testutil/in-process-servers.h"
-
-#include <gtest/gtest.h>
 #include "common/init.h"
 #include "util/metrics.h"
 #include "statestore/statestore-subscriber.h"
@@ -45,7 +44,7 @@ TEST(StatestoreTest, SmokeTest) {
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
       MakeNetworkAddress("localhost", ips->port() + 20),
       MakeNetworkAddress("localhost", ips->port()), new MetricGroup(""));
-  ASSERT_TRUE(sub_will_start->Start().ok());
+  ASSERT_OK(sub_will_start->Start());
 
   // Confirm that a subscriber trying to use an in-use port will fail to start.
   StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub2",
@@ -70,7 +69,7 @@ TEST(StatestoreSslTest, SmokeTest) {
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("smoke_sub1",
       MakeNetworkAddress("localhost", statestore->port() + 10),
       MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
-  ASSERT_TRUE(sub_will_start->Start().ok());
+  ASSERT_OK(sub_will_start->Start());
 
   stringstream invalid_server_cert;
   invalid_server_cert << impala_home << "/be/src/testutil/invalid-server-cert.pem";

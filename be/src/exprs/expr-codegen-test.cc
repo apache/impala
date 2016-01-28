@@ -42,8 +42,7 @@ IntVal TestGetConstant(
 // Don't compile the actual test to IR
 #ifndef IR_COMPILE
 
-#include <gtest/gtest.h>
-
+#include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "exprs/expr-context.h"
@@ -234,15 +233,13 @@ TEST_F(ExprCodegenTest, TestInlineConstants) {
   ObjectPool pool;
   MemTracker tracker;
   ExprContext* ctx;
-  Status status = Expr::CreateExprTree(&pool, texpr, &ctx);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(Expr::CreateExprTree(&pool, texpr, &ctx));
 
   // Get TestGetConstant() IR function
   stringstream test_udf_file;
   test_udf_file << getenv("IMPALA_HOME") << "/be/build/latest/exprs/expr-codegen-test.ll";
   scoped_ptr<LlvmCodeGen> codegen;
-  status = LlvmCodeGen::LoadFromFile(&pool, test_udf_file.str(), "test", &codegen);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(LlvmCodeGen::LoadFromFile(&pool, test_udf_file.str(), "test", &codegen));
   Function* fn = codegen->module()->getFunction(TEST_GET_CONSTANT_SYMBOL);
   ASSERT_TRUE(fn != NULL);
 
@@ -262,8 +259,7 @@ TEST_F(ExprCodegenTest, TestInlineConstants) {
   ASSERT_TRUE(fn != NULL);
   void* fn_ptr;
   codegen->AddFunctionToJit(fn, &fn_ptr);
-  status = codegen->FinalizeModule();
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(codegen->FinalizeModule());
   LOG(ERROR) << "Optimized fn: " << LlvmCodeGen::Print(fn);
 
   // Call fn and check results

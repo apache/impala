@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include <string>
-#include <gtest/gtest.h>
 #include <boost/thread/thread.hpp>
 
+#include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "runtime/raw-value.h"
@@ -39,14 +39,9 @@ class LlvmCodeGenTest : public testing:: Test {
       LlvmCodeGen object2(&pool, "Test");
       LlvmCodeGen object3(&pool, "Test");
 
-      status = object1.Init();
-      ASSERT_TRUE(status.ok());
-
-      status = object2.Init();
-      ASSERT_TRUE(status.ok());
-
-      status = object3.Init();
-      ASSERT_TRUE(status.ok());
+      ASSERT_OK(object1.Init());
+      ASSERT_OK(object2.Init());
+      ASSERT_OK(object3.Init());
     }
   }
 
@@ -96,8 +91,7 @@ TEST_F(LlvmCodeGenTest, BadIRFile) {
   ObjectPool pool;
   string module_file = "NonExistentFile.ir";
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGenTest::LoadFromFile(&pool, module_file.c_str(), &codegen);
-  EXPECT_TRUE(!status.ok());
+  EXPECT_FALSE(LlvmCodeGenTest::LoadFromFile(&pool, module_file.c_str(), &codegen).ok());
 }
 
 // IR for the generated linner loop
@@ -155,9 +149,8 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
 
   // Part 1: Load the module and make sure everything is loaded correctly.
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGenTest::LoadFromFile(&pool, module_file.c_str(), &codegen);
+  ASSERT_OK(LlvmCodeGenTest::LoadFromFile(&pool, module_file.c_str(), &codegen));
   EXPECT_TRUE(codegen.get() != NULL);
-  EXPECT_TRUE(status.ok());
 
   vector<Function*> functions;
   codegen->GetFunctions(&functions);
@@ -278,8 +271,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   ObjectPool pool;
 
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen);
-  EXPECT_TRUE(status.ok());
+  ASSERT_OK(LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen));
   EXPECT_TRUE(codegen.get() != NULL);
 
   string str("Test");
@@ -320,8 +312,7 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   ObjectPool pool;
 
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen));
   ASSERT_TRUE(codegen.get() != NULL);
 
   LlvmCodeGen::FnPrototype prototype(codegen.get(), "MemcpyTest", codegen->void_type());
@@ -362,8 +353,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   const char* data2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen));
   ASSERT_TRUE(codegen.get() != NULL);
 
   bool restore_sse_support = false;

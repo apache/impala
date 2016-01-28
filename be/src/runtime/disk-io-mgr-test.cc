@@ -17,8 +17,7 @@
 #include <boost/thread/thread.hpp>
 #include <sys/stat.h>
 
-#include <gtest/gtest.h>
-
+#include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-stress.h"
@@ -44,7 +43,7 @@ class DiskIoMgrTest : public testing::Test {
       DiskIoMgr* io_mgr, DiskIoMgr::RequestContext* reader, int32_t* data,
       Status expected_status, const Status& status) {
     if (expected_status.code() == TErrorCode::CANCELLED) {
-      EXPECT_TRUE(status.ok() || status.IsCancelled());
+      EXPECT_TRUE(status.ok() || status.IsCancelled()) << "Error: " << status.GetDetail();
     } else {
       EXPECT_TRUE(status.code() == expected_status.code());
     }
@@ -64,7 +63,7 @@ class DiskIoMgrTest : public testing::Test {
   }
 
   void WriteCompleteCallback(int num_writes, const Status& status) {
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
     {
       lock_guard<mutex> l(written_mutex_);
       ++num_ranges_written_;
@@ -103,8 +102,7 @@ class DiskIoMgrTest : public testing::Test {
   static void ValidateSyncRead(DiskIoMgr* io_mgr, DiskIoMgr::RequestContext* reader,
       DiskIoMgr::ScanRange* range, const char* expected, int expected_len = -1) {
     DiskIoMgr::BufferDescriptor* buffer;
-    Status status = io_mgr->Read(reader, range, &buffer);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr->Read(reader, range, &buffer));
     ASSERT_TRUE(buffer != NULL);
     EXPECT_EQ(buffer->len(), range->len());
     if (expected_len < 0) expected_len = strlen(expected);
@@ -186,17 +184,14 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
 
   scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 10));
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
-  Status status = read_io_mgr->Init(&reader_mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(read_io_mgr->Init(&reader_mem_tracker));
   DiskIoMgr::RequestContext* reader;
-  status = read_io_mgr->RegisterContext(&reader, &reader_mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(read_io_mgr->RegisterContext(&reader, &reader_mem_tracker));
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
       pool_.reset(new ObjectPool);
       DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 10);
-      status = io_mgr.Init(&mem_tracker);
-      ASSERT_TRUE(status.ok());
+      ASSERT_OK(io_mgr.Init(&mem_tracker));
       DiskIoMgr::RequestContext* writer;
       io_mgr.RegisterContext(&writer, &mem_tracker);
       for (int i = 0; i < num_ranges; ++i) {
@@ -209,8 +204,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
         *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, cur_offset,
             num_ranges % num_disks, callback));
         (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-        Status add_status = io_mgr.AddWriteRange(writer, *new_range);
-        EXPECT_TRUE(add_status.ok());
+        EXPECT_OK(io_mgr.AddWriteRange(writer, *new_range));
         cur_offset += sizeof(int32_t);
       }
 
@@ -233,10 +227,9 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   num_ranges_written_ = 0;
   string tmp_file = "/tmp/non-existent.txt";
   DiskIoMgr io_mgr(1, 1, 1, 10);
-  Status status = io_mgr.Init(&mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(io_mgr.Init(&mem_tracker));
   DiskIoMgr::RequestContext* writer;
-  status = io_mgr.RegisterContext(&writer);
+  ASSERT_OK(io_mgr.RegisterContext(&writer));
   pool_.reset(new ObjectPool);
   int32_t* data = pool_->Add(new int32_t);
   *data = rand();
@@ -250,8 +243,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-  status = io_mgr.AddWriteRange(writer, *new_range);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(io_mgr.AddWriteRange(writer, *new_range));
 
   // Write to a bad location in a file that exists.
   tmp_file = "/tmp/disk_io_mgr_test.txt";
@@ -268,8 +260,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
 
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, -1, 0, callback));
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-  status = io_mgr.AddWriteRange(writer, *new_range);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(io_mgr.AddWriteRange(writer, *new_range));
 
   {
     unique_lock<mutex> lock(written_mutex_);
@@ -299,16 +290,14 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
 
   scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 10));
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
-  Status status = read_io_mgr->Init(&reader_mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(read_io_mgr->Init(&reader_mem_tracker));
   DiskIoMgr::RequestContext* reader;
-  status = read_io_mgr->RegisterContext(&reader, &reader_mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(read_io_mgr->RegisterContext(&reader, &reader_mem_tracker));
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
       pool_.reset(new ObjectPool);
       DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 10);
-      status = io_mgr.Init(&mem_tracker);
+      ASSERT_OK(io_mgr.Init(&mem_tracker));
       DiskIoMgr::RequestContext* writer;
       io_mgr.RegisterContext(&writer, &mem_tracker);
       Status validate_status = Status::OK();
@@ -371,12 +360,10 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
 
-          Status status = io_mgr.Init(&mem_tracker);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(io_mgr.Init(&mem_tracker));
           MemTracker reader_mem_tracker;
           DiskIoMgr::RequestContext* reader;
-          status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
           vector<DiskIoMgr::ScanRange*> ranges;
           for (int i = 0; i < len; ++i) {
@@ -384,8 +371,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
             ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
                 stat_val.st_mtime));
           }
-          status = io_mgr.AddScanRanges(reader, ranges);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
           AtomicInt<int> num_ranges_processed;
           thread_group threads;
@@ -428,12 +414,10 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
 
-        Status status = io_mgr.Init(&mem_tracker);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
         DiskIoMgr::RequestContext* reader;
-        status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
         vector<DiskIoMgr::ScanRange*> ranges_first_half;
         vector<DiskIoMgr::ScanRange*> ranges_second_half;
@@ -451,16 +435,14 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         AtomicInt<int> num_ranges_processed;
 
         // Issue first half the scan ranges.
-        status = io_mgr.AddScanRanges(reader, ranges_first_half);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.AddScanRanges(reader, ranges_first_half));
 
         // Read a couple of them
         ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::OK(), 2,
             &num_ranges_processed);
 
         // Issue second half
-        status = io_mgr.AddScanRanges(reader, ranges_second_half);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.AddScanRanges(reader, ranges_second_half));
 
         // Start up some threads and then cancel
         thread_group threads;
@@ -505,12 +487,10 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         DiskIoMgr io_mgr(
             num_disks, num_threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
-        Status status = io_mgr.Init(&mem_tracker);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
         DiskIoMgr::RequestContext* reader;
-        status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
         DiskIoMgr::ScanRange* complete_range = InitRange(1, tmp_file, 0, strlen(data), 0,
             stat_val.st_mtime);
@@ -525,8 +505,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
           ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
               stat_val.st_mtime));
         }
-        status = io_mgr.AddScanRanges(reader, ranges);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
         AtomicInt<int> num_ranges_processed;
         thread_group threads;
@@ -578,12 +557,10 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
 
-        Status status = io_mgr.Init(&mem_tracker);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
         DiskIoMgr::RequestContext* reader;
-        status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < len; ++i) {
@@ -591,8 +568,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
           ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
               stat_val.st_mtime));
         }
-        status = io_mgr.AddScanRanges(reader, ranges);
-        ASSERT_TRUE(status.ok());
+        ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
         AtomicInt<int> num_ranges_processed;
         int num_succesful_ranges = ranges.size() / 2;
@@ -646,20 +622,17 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     MemTracker mem_tracker(mem_limit_num_buffers * MAX_BUFFER_SIZE);
     DiskIoMgr io_mgr(1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
-    Status status = io_mgr.Init(&mem_tracker);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr.Init(&mem_tracker));
     MemTracker reader_mem_tracker;
     DiskIoMgr::RequestContext* reader;
-    status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
     vector<DiskIoMgr::ScanRange*> ranges;
     for (int i = 0; i < num_buffers; ++i) {
       ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, 0,
           stat_val.st_mtime));
     }
-    status = io_mgr.AddScanRanges(reader, ranges);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
     // Don't return buffers to force memory pressure
     vector<DiskIoMgr::BufferDescriptor*> buffers;
@@ -674,7 +647,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     while (true) {
       memset(result, 0, strlen(data) + 1);
       DiskIoMgr::ScanRange* range = NULL;
-      status = io_mgr.GetNextRange(reader, &range);
+      Status status = io_mgr.GetNextRange(reader, &range);
       ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
       if (range == NULL) break;
 
@@ -724,12 +697,10 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
     DiskIoMgr io_mgr(num_disks, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
-    Status status = io_mgr.Init(&mem_tracker);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr.Init(&mem_tracker));
     MemTracker reader_mem_tracker;
     DiskIoMgr::RequestContext* reader;
-    status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
     DiskIoMgr::ScanRange* complete_range =
         InitRange(1, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, NULL, true);
@@ -744,8 +715,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
       ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
           stat_val.st_mtime, NULL, true));
     }
-    status = io_mgr.AddScanRanges(reader, ranges);
-    ASSERT_TRUE(status.ok());
+    ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
     AtomicInt<int> num_ranges_processed;
     thread_group threads;
@@ -802,8 +772,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
         DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
         io_mgr.Init(&mem_tracker);
         for (int file_index = 0; file_index < num_contexts; ++file_index) {
-          status = io_mgr.RegisterContext(&contexts[file_index]);
-          ASSERT_TRUE(status.ok());
+          ASSERT_OK(io_mgr.RegisterContext(&contexts[file_index]));
         }
         pool_.reset(new ObjectPool);
         int read_offset = 0;
@@ -914,12 +883,10 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
           DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
-          Status status = io_mgr.Init(&mem_tracker);
-          ASSERT_TRUE(status.ok());
+          EXPECT_OK(io_mgr.Init(&mem_tracker));
 
           for (int i = 0; i < NUM_READERS; ++i) {
-            status = io_mgr.RegisterContext(&readers[i], NULL);
-            ASSERT_TRUE(status.ok());
+            ASSERT_OK(io_mgr.RegisterContext(&readers[i], NULL));
 
             vector<DiskIoMgr::ScanRange*> ranges;
             for (int j = 0; j < DATA_LEN; ++j) {
@@ -928,8 +895,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
                   InitRange(num_buffers,file_names[i].c_str(), j, 1, disk_id,
                   mtimes[i]));
             }
-            status = io_mgr.AddScanRanges(readers[i], ranges);
-            ASSERT_TRUE(status.ok());
+            ASSERT_OK(io_mgr.AddScanRanges(readers[i], ranges));
           }
 
           AtomicInt<int> num_ranges_processed;
@@ -969,8 +935,7 @@ TEST_F(DiskIoMgrTest, Buffers) {
   MemTracker mem_tracker(max_buffer_size * 2);
 
   DiskIoMgr io_mgr(1, 1, min_buffer_size, max_buffer_size);
-  Status status = io_mgr.Init(&mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(io_mgr.Init(&mem_tracker));
   ASSERT_EQ(mem_tracker.consumption(), 0);
 
   // buffer length should be rounded up to min buffer size
@@ -1033,18 +998,15 @@ TEST_F(DiskIoMgrTest, PartialRead) {
   pool_.reset(new ObjectPool);
   scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, read_len, read_len));
 
-  Status status = io_mgr->Init(&mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(io_mgr->Init(&mem_tracker));
   MemTracker reader_mem_tracker;
   DiskIoMgr::RequestContext* reader;
-  status = io_mgr->RegisterContext(&reader, &reader_mem_tracker);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(io_mgr->RegisterContext(&reader, &reader_mem_tracker));
 
   // We should not read past the end of file.
   DiskIoMgr::ScanRange* range = InitRange(1, tmp_file, 0, read_len, 0, stat_val.st_mtime);
   DiskIoMgr::BufferDescriptor* buffer;
-  status = io_mgr->Read(reader, range, &buffer);
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(io_mgr->Read(reader, range, &buffer));
   ASSERT_TRUE(buffer->eosr());
   ASSERT_EQ(len, buffer->len());
   ASSERT_TRUE(memcmp(buffer->buffer(), data, len) == 0);

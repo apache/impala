@@ -17,8 +17,7 @@
 #include <iostream>
 #include <vector>
 
-#include <gtest/gtest.h>
-
+#include "testutil/gtest-util.h"
 #include "common/compiler-util.h"
 #include "exec/old-hash-table.inline.h"
 #include "exprs/expr.h"
@@ -55,17 +54,13 @@ class OldHashTableTest : public testing::Test {
     // internals so a simple build/probe expr is fine.
     Expr* expr = pool_.Add(new SlotRef(TYPE_INT, 0));
     build_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
-    status = Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_);
-    EXPECT_TRUE(status.ok());
-    status = Expr::Open(build_expr_ctxs_, NULL);
-    EXPECT_TRUE(status.ok());
+    ASSERT_OK(Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_));
+    ASSERT_OK(Expr::Open(build_expr_ctxs_, NULL));
 
     expr = pool_.Add(new SlotRef(TYPE_INT, 0));
     probe_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
-    status = Expr::Prepare(probe_expr_ctxs_, NULL, desc, &tracker_);
-    EXPECT_TRUE(status.ok());
-    status = Expr::Open(probe_expr_ctxs_, NULL);
-    EXPECT_TRUE(status.ok());
+    ASSERT_OK(Expr::Prepare(probe_expr_ctxs_, NULL, desc, &tracker_));
+    ASSERT_OK(Expr::Open(probe_expr_ctxs_, NULL));
   }
 
   virtual void TearDown() {

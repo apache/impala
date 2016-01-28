@@ -14,8 +14,8 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <string>
-#include <gtest/gtest.h>
 
+#include "testutil/gtest-util.h"
 #include "rpc/thrift-client.h"
 #include "service/impala-server.h"
 #include "testutil/in-process-servers.h"
@@ -63,11 +63,11 @@ TEST(SessionTest, TestExpiry) {
     for (int i = 0; i < 5; ++i) {
       beeswax_clients[i].reset(new ThriftClient<ImpalaServiceClient>(
               "localhost", impala->beeswax_port()));
-      EXPECT_TRUE(beeswax_clients[i]->Open().ok());
+      EXPECT_OK(beeswax_clients[i]->Open());
 
       hs2_clients[i].reset(new ThriftClient<ImpalaHiveServer2ServiceClient>(
               "localhost", impala->hs2_port()));
-      EXPECT_TRUE(hs2_clients[i]->Open().ok());
+      EXPECT_OK(hs2_clients[i]->Open());
       TOpenSessionResp response;
       TOpenSessionReq request;
       hs2_clients[i]->iface()->OpenSession(response, request);

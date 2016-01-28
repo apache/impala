@@ -15,7 +15,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <gtest/gtest.h>
+
+#include "testutil/gtest-util.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/mem-pool.h"
 #include "util/decompress.h"
@@ -56,10 +57,8 @@ class DecompressorTest : public ::testing::Test {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
 
-    EXPECT_TRUE(
-        Codec::CreateCompressor(&mem_pool_, true, format, &compressor).ok());
-    EXPECT_TRUE(
-        Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor).ok());
+    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, format, &compressor));
+    EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
 
     // LZ4 is not implemented to work without an allocated output
     if(format == THdfsCompression::LZ4) {
@@ -85,10 +84,8 @@ class DecompressorTest : public ::testing::Test {
   void RunTestStreaming(THdfsCompression::type format) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
-    EXPECT_TRUE(
-        Codec::CreateCompressor(&mem_pool_, true, format, &compressor).ok());
-    EXPECT_TRUE(
-        Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor).ok());
+    EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, format, &compressor));
+    EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
 
     CompressAndStreamingDecompress(compressor.get(), decompressor.get(),
         sizeof(input_streaming_), input_streaming_);
@@ -104,12 +101,12 @@ class DecompressorTest : public ::testing::Test {
     // Non-preallocated output buffers
     uint8_t* compressed;
     int64_t compressed_length;
-    EXPECT_TRUE(compressor->ProcessBlock(false, input_len,
-        input, &compressed_length, &compressed).ok());
+    EXPECT_OK(compressor->ProcessBlock(false, input_len,
+        input, &compressed_length, &compressed));
     uint8_t* output;
     int64_t output_len;
-    EXPECT_TRUE(decompressor->ProcessBlock(false, compressed_length,
-        compressed, &output_len, &output).ok());
+    EXPECT_OK(decompressor->ProcessBlock(false, compressed_length,
+        compressed, &output_len, &output));
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
@@ -124,16 +121,16 @@ class DecompressorTest : public ::testing::Test {
       compressed_length = max_compressed_length;
 
 
-      EXPECT_TRUE(compressor->ProcessBlock(true, input_len, input, &compressed_length,
-                                           &compressed).ok());
+      EXPECT_OK(compressor->ProcessBlock(true, input_len, input, &compressed_length,
+                                           &compressed));
     }
 
     output_len = decompressor->MaxOutputLen(compressed_length, compressed);
     if (output_len == -1) output_len = input_len;
     output = mem_pool_.Allocate(output_len);
 
-    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length, compressed,
-                                           &output_len, &output).ok());
+    EXPECT_OK(decompressor->ProcessBlock(true, compressed_length, compressed,
+                                           &output_len, &output));
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
@@ -143,8 +140,8 @@ class DecompressorTest : public ::testing::Test {
       int64_t input_len, uint8_t* input) {
     uint8_t* compressed;
     int64_t compressed_length;
-    EXPECT_TRUE(compressor->ProcessBlock(false, input_len,
-        input, &compressed_length, &compressed).ok());
+    EXPECT_OK(compressor->ProcessBlock(false, input_len,
+        input, &compressed_length, &compressed));
 
     // Should take multiple calls to ProcessBlockStreaming() to decompress the buffer.
     int64_t total_output_produced = 0;
@@ -155,8 +152,8 @@ class DecompressorTest : public ::testing::Test {
       uint8_t* output = NULL;
       int64_t output_len = 0;
       int64_t compressed_bytes_read = 0;
-      EXPECT_TRUE(decompressor->ProcessBlockStreaming(compressed_bytes_remaining,
-            compressed, &compressed_bytes_read, &output_len, &output, &eos).ok());
+      EXPECT_OK(decompressor->ProcessBlockStreaming(compressed_bytes_remaining,
+            compressed, &compressed_bytes_read, &output_len, &output, &eos));
       EXPECT_EQ(memcmp(input + total_output_produced, output, output_len), 0);
       total_output_produced += output_len;
       compressed = compressed + compressed_bytes_read;
@@ -174,15 +171,15 @@ class DecompressorTest : public ::testing::Test {
     uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
     int64_t compressed_length = max_compressed_length;
 
-    EXPECT_TRUE(compressor->ProcessBlock(true, input_len, input, &compressed_length,
-                                         &compressed).ok());
+    EXPECT_OK(compressor->ProcessBlock(true, input_len, input, &compressed_length,
+        &compressed));
 
     int64_t output_len = decompressor->MaxOutputLen(compressed_length, compressed);
     if (output_len == -1) output_len = input_len;
     uint8_t* output = mem_pool_.Allocate(output_len);
 
-    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length, compressed,
-                                           &output_len, &output).ok());
+    EXPECT_OK(decompressor->ProcessBlock(true, compressed_length, compressed,
+        &output_len, &output));
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
@@ -244,12 +241,10 @@ TEST_F(DecompressorTest, Impala1506) {
   uint8_t* output = NULL;
 
   // call twice because the compressor will reallocate the first time
-  EXPECT_TRUE(
-      compressor->ProcessBlock(false, input_len, input, &output_len, &output).ok());
+  EXPECT_OK(compressor->ProcessBlock(false, input_len, input, &output_len, &output));
   EXPECT_GE(output_len, 0);
   output_len = -1;
-  EXPECT_TRUE(
-      compressor->ProcessBlock(false, input_len, input, &output_len, &output).ok());
+  EXPECT_OK(compressor->ProcessBlock(false, input_len, input, &output_len, &output));
   EXPECT_GE(output_len, 0);
 
   pool.FreeAll();

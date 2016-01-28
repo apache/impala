@@ -20,8 +20,7 @@
 #include <gutil/strings/substitute.h>
 #include <sys/stat.h>
 
-#include <gtest/gtest.h>
-
+#include "testutil/gtest-util.h"
 #include "common/init.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/disk-io-mgr.h"
@@ -186,9 +185,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
     Status status;
     BufferedBlockMgr::Block* new_block;
     for (int i = 0; i < num_blocks; ++i) {
-      status = block_mgr->GetNewBlock(client, NULL, &new_block);
-      ASSERT_TRUE(status.ok());
-      ASSERT_TRUE(new_block != NULL);
+      EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block));
+      EXPECT_TRUE(new_block != NULL);
       data = new_block->Allocate<int32_t>(sizeof(int32_t));
       *data = blocks->size();
       blocks->push_back(new_block);
@@ -199,8 +197,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   void PinBlocks(const vector<BufferedBlockMgr::Block*>& blocks) {
     for (int i = 0; i < blocks.size(); ++i) {
       bool pinned;
-      Status status = blocks[i]->Pin(&pinned);
-      EXPECT_TRUE(status.ok()) << status.msg().msg();
+      EXPECT_OK(blocks[i]->Pin(&pinned));
       EXPECT_TRUE(pinned);
     }
   }
@@ -332,7 +329,6 @@ class BufferedBlockMgrTest : public ::testing::Test {
   }
 
   void TestEvictionImpl(int block_size) {
-    Status status;
     ASSERT_GT(block_size, 0);
     int max_num_buffers = 5;
     BufferedBlockMgr* block_mgr;
@@ -355,8 +351,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     // Re-pinning all blocks
     for (int i = 0; i < blocks.size(); ++i) {
       bool pinned;
-      status = blocks[i]->Pin(&pinned);
-      EXPECT_TRUE(status.ok());
+      EXPECT_OK(blocks[i]->Pin(&pinned));
       EXPECT_TRUE(pinned);
       ValidateBlock(blocks[i], i);
     }
@@ -373,8 +368,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     EXPECT_GE(block_mgr->writes_issued(), 2);
     for (int i = 0; i < (max_num_buffers - 2); ++i) {
       bool pinned;
-      status = blocks[i]->Pin(&pinned);
-      EXPECT_TRUE(status.ok());
+      EXPECT_OK(blocks[i]->Pin(&pinned));
       EXPECT_TRUE(pinned);
       ValidateBlock(blocks[i], i);
     }
@@ -403,9 +397,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     ApiFunction api_function;
 
     BufferedBlockMgr::Client* client;
-    Status status = block_mgr->RegisterClient(0, false, client_tracker_.get(), state,
-        &client);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(block_mgr->RegisterClient(0, false, client_tracker_.get(), state, &client));
     EXPECT_TRUE(client != NULL);
 
     pinned_blocks.reserve(num_buffers);
@@ -434,6 +426,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
       int rand_pick = 0;
       int32_t* data = NULL;
       bool pinned = false;
+      Status status;
       switch (api_function) {
         case New:
           status = block_mgr->GetNewBlock(client, NULL, &new_block);
@@ -442,7 +435,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
             EXPECT_TRUE(status.IsCancelled());
             continue;
           }
-          EXPECT_TRUE(status.ok());
+          EXPECT_OK(status);
           EXPECT_TRUE(new_block != NULL);
           data = MakeRandomSizeData(new_block);
           block_data = make_pair(new_block, *data);
@@ -464,7 +457,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
             if (tid == SINGLE_THREADED_TID) EXPECT_FALSE(pinned);
             continue;
           }
-          EXPECT_TRUE(status.ok());
+          EXPECT_OK(status);
           EXPECT_TRUE(pinned);
           ValidateRandomSizeData(block_data.first, block_data.second);
           unpinned_blocks[rand_pick] = unpinned_blocks.back();
@@ -482,7 +475,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
             EXPECT_TRUE(status.IsCancelled());
             continue;
           }
-          EXPECT_TRUE(status.ok());
+          EXPECT_OK(status);
           pinned_blocks[rand_pick] = pinned_blocks.back();
           pinned_blocks.pop_back();
           pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
@@ -606,7 +599,7 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
 
   // Allocate a small block.
   BufferedBlockMgr::Block* new_block = NULL;
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block, 128).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block, 128));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), 0);
   EXPECT_EQ(test_env_->block_mgr_parent_tracker()->consumption(), 0);
@@ -617,7 +610,7 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   blocks.push_back(new_block);
 
   // Allocate a normal block
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), block_mgr->max_block_size());
   EXPECT_EQ(test_env_->block_mgr_parent_tracker()->consumption(),
@@ -629,7 +622,7 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   blocks.push_back(new_block);
 
   // Allocate another small block.
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block, 512).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block, 512));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), block_mgr->max_block_size());
   EXPECT_EQ(test_env_->block_mgr_parent_tracker()->consumption(),
@@ -641,10 +634,10 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   blocks.push_back(new_block);
 
   // Should be able to unpin and pin the middle block
-  EXPECT_TRUE(blocks[1]->Unpin().ok());
+  EXPECT_OK(blocks[1]->Unpin());
 
   bool pinned;
-  EXPECT_TRUE(blocks[1]->Pin(&pinned).ok());
+  EXPECT_OK(blocks[1]->Pin(&pinned));
   EXPECT_TRUE(pinned);
 
   DeleteBlocks(blocks);
@@ -653,7 +646,6 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
 
 // Test that pinning more blocks than the max available buffers.
 TEST_F(BufferedBlockMgrTest, Pin) {
-  Status status;
   int max_num_blocks = 5;
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
@@ -666,8 +658,7 @@ TEST_F(BufferedBlockMgrTest, Pin) {
 
   // Unpin them all.
   for (int i = 0; i < blocks.size(); ++i) {
-    status = blocks[i]->Unpin();
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(blocks[i]->Unpin());
   }
 
   // Allocate more, this should work since we just unpinned some blocks.
@@ -675,26 +666,22 @@ TEST_F(BufferedBlockMgrTest, Pin) {
 
   // Try to pin a unpinned block, this should not be possible.
   bool pinned;
-  status = blocks[0]->Pin(&pinned);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(blocks[0]->Pin(&pinned));
   EXPECT_FALSE(pinned);
 
   // Unpin all blocks.
   for (int i = 0; i < blocks.size(); ++i) {
-    status = blocks[i]->Unpin();
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(blocks[i]->Unpin());
   }
 
   // Should be able to pin max_num_blocks blocks.
   for (int i = 0; i < max_num_blocks; ++i) {
-    status = blocks[i]->Pin(&pinned);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(blocks[i]->Pin(&pinned));
     EXPECT_TRUE(pinned);
   }
 
   // Can't pin any more though.
-  status = blocks[max_num_blocks]->Pin(&pinned);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(blocks[max_num_blocks]->Pin(&pinned));
   EXPECT_FALSE(pinned);
 
   DeleteBlocks(blocks);
@@ -746,7 +733,7 @@ TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
 
   // Pinned I/O block.
   BufferedBlockMgr::Block* new_block;
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_TRUE(new_block->is_max_size());
@@ -755,7 +742,7 @@ TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
 
   // Pinned non-I/O block.
   int small_block_size = 128;
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block, small_block_size).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block, small_block_size));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_EQ(small_block_size, client_tracker_->consumption());
@@ -763,7 +750,7 @@ TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
   EXPECT_EQ(0, client_tracker_->consumption());
 
   // Unpinned I/O block - delete after written to disk.
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_TRUE(new_block->is_max_size());
@@ -774,7 +761,7 @@ TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
   EXPECT_TRUE(client_tracker_->consumption() == 0);
 
   // Unpinned I/O block - delete before written to disk.
-  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client, NULL, &new_block));
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_TRUE(new_block->is_max_size());
@@ -935,7 +922,6 @@ static int clear_scratch_dir() {
 // directory before an operation that would cause a write and test that subsequent API
 // calls return 'CANCELLED' correctly.
 TEST_F(BufferedBlockMgrTest, WriteError) {
-  Status status;
   int max_num_buffers = 2;
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
@@ -947,30 +933,26 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   // Unpin two blocks here, to ensure that backing storage is allocated in tmp file.
   for (int i = 0; i < 2; ++i) {
-    status = blocks[i]->Unpin();
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(blocks[i]->Unpin());
   }
   WaitForWrites(block_mgr);
   // Repin the blocks
   for (int i = 0; i < 2; ++i) {
     bool pinned;
-    status = blocks[i]->Pin(&pinned);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(blocks[i]->Pin(&pinned));
     EXPECT_TRUE(pinned);
   }
   // Remove the backing storage so that future writes will fail
   int num_files = clear_scratch_dir();
   EXPECT_TRUE(num_files > 0);
   for (int i = 0; i < 2; ++i) {
-    status = blocks[i]->Unpin();
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(blocks[i]->Unpin());
   }
   WaitForWrites(block_mgr);
   // Subsequent calls should fail.
   DeleteBlocks(blocks);
   BufferedBlockMgr::Block* new_block;
-  status = block_mgr->GetNewBlock(client, NULL, &new_block);
-  EXPECT_TRUE(status.IsCancelled());
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).IsCancelled());
   EXPECT_TRUE(new_block == NULL);
 
   TearDownMgrs();
@@ -979,7 +961,6 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
 // Test block manager error handling when temporary file space cannot be allocated to
 // back an unpinned buffer.
 TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
-  Status status;
   int max_num_buffers = 2;
   BufferedBlockMgr::Client* client;
   BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_, 0,
@@ -988,8 +969,7 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   // Unpin a block, forcing a write.
-  status = blocks[0]->Unpin();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(blocks[0]->Unpin());
   WaitForWrites(block_mgr);
   // Remove temporary files - subsequent operations will fail.
   int num_files = clear_scratch_dir();
@@ -997,7 +977,7 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   // Current implementation will fail here because it tries to expand the tmp file
   // immediately. This behavior is not contractual but we want to know if it changes
   // accidentally.
-  status = blocks[1]->Unpin();
+  Status status = blocks[1]->Unpin();
   EXPECT_FALSE(status.ok());
 
   DeleteBlocks(blocks);
@@ -1164,7 +1144,6 @@ TEST_F(BufferedBlockMgrTest, NoTmpDirs) {
 
 // Create two clients with different number of reserved buffers.
 TEST_F(BufferedBlockMgrTest, MultipleClients) {
-  Status status;
   int client1_buffers = 3;
   int client2_buffers = 5;
   int max_num_buffers = client1_buffers + client2_buffers;
@@ -1174,13 +1153,11 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
-  status = block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
-      runtime_state, &client1);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
+      runtime_state, &client1));
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
-      runtime_state, &client2);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+      runtime_state, &client2));
   EXPECT_TRUE(client2 != NULL);
 
   // Reserve client 1's and 2's buffers. They should succeed.
@@ -1195,8 +1172,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
   // Try allocating one more, that should fail.
   BufferedBlockMgr::Block* block;
-  status = block_mgr->GetNewBlock(client1, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client1, NULL, &block));
   EXPECT_TRUE(block == NULL);
 
   // Trying to reserve should also fail.
@@ -1208,17 +1184,14 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   AllocateBlocks(block_mgr, client2, client2_buffers, &client2_blocks);
 
   // Try allocating one more from client 2, that should fail.
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block));
   EXPECT_TRUE(block == NULL);
 
   // Unpin one block from client 1.
-  status = client1_blocks[0]->Unpin();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(client1_blocks[0]->Unpin());
 
   // Client 2 should still not be able to allocate.
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block));
   EXPECT_TRUE(block == NULL);
 
   // Client 2 should still not be able to reserve.
@@ -1226,16 +1199,13 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   EXPECT_FALSE(reserved);
 
   // Client 1 should be able to though.
-  status = block_mgr->GetNewBlock(client1, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client1, NULL, &block));
   EXPECT_TRUE(block != NULL);
   client1_blocks.push_back(block);
 
   // Unpin two of client 1's blocks (client 1 should have 3 unpinned blocks now).
-  status = client1_blocks[1]->Unpin();
-  EXPECT_TRUE(status.ok());
-  status = client1_blocks[2]->Unpin();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(client1_blocks[1]->Unpin());
+  EXPECT_OK(client1_blocks[2]->Unpin());
 
   // Clear client 1's reservation
   block_mgr->ClearReservations(client1);
@@ -1246,32 +1216,26 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
   // Client one can only pin 1.
   bool pinned;
-  status = client1_blocks[0]->Pin(&pinned);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(client1_blocks[0]->Pin(&pinned));
   EXPECT_TRUE(pinned);
   // Can't get this one.
-  status = client1_blocks[1]->Pin(&pinned);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(client1_blocks[1]->Pin(&pinned));
   EXPECT_FALSE(pinned);
 
   // Client 2 can pick up the one reserved buffer
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block));
   EXPECT_TRUE(block != NULL);
   client2_blocks.push_back(block);
 
   // But not a second
   BufferedBlockMgr::Block* block2;
-  status = block_mgr->GetNewBlock(client2, NULL, &block2);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block2));
   EXPECT_TRUE(block2 == NULL);
 
   // Unpin client 2's block it got from the reservation. Sine this is a tmp
   // reservation, client 1 can pick it up again (it is not longer reserved).
-  status = block->Unpin();
-  EXPECT_TRUE(status.ok());
-  status = client1_blocks[1]->Pin(&pinned);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block->Unpin());
+  EXPECT_OK(client1_blocks[1]->Pin(&pinned));
   EXPECT_TRUE(pinned);
 
   DeleteBlocks(client1_blocks);
@@ -1281,7 +1245,6 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
 // Create two clients with different number of reserved buffers and some additional.
 TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
-  Status status;
   int client1_buffers = 1;
   int client2_buffers = 1;
   int max_num_buffers = client1_buffers + client2_buffers + 2;
@@ -1292,13 +1255,11 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
   BufferedBlockMgr::Block* block = NULL;
-  status = block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
-      runtime_state, &client1);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
+      runtime_state, &client1));
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
-      runtime_state, &client2);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+      runtime_state, &client2));
   EXPECT_TRUE(client2 != NULL);
 
   vector<BufferedBlockMgr::Block*> client1_blocks;
@@ -1310,21 +1271,17 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   AllocateBlocks(block_mgr, client2, client2_buffers, &client2_blocks);
 
   // We have two spare buffers now. Each client should be able to allocate it.
-  status = block_mgr->GetNewBlock(client1, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client1, NULL, &block));
   EXPECT_TRUE(block != NULL);
   client1_blocks.push_back(block);
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block));
   EXPECT_TRUE(block != NULL);
   client2_blocks.push_back(block);
 
   // Now we are completely full, no one should be able to allocate a new block.
-  status = block_mgr->GetNewBlock(client1, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client1, NULL, &block));
   EXPECT_TRUE(block == NULL);
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block));
   EXPECT_TRUE(block == NULL);
 
   DeleteBlocks(client1_blocks);
@@ -1348,46 +1305,38 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   BufferedBlockMgr::Client* client2 = NULL;
   BufferedBlockMgr::Client* client3 = NULL;
   BufferedBlockMgr::Block* block = NULL;
-  status = block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
-      runtime_state, &client1);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
+      runtime_state, &client1));
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
-      runtime_state, &client2);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+      runtime_state, &client2));
   EXPECT_TRUE(client2 != NULL);
-  status = block_mgr->RegisterClient(client3_buffers, true, client_tracker_.get(),
-      runtime_state, &client3);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->RegisterClient(client3_buffers, true, client_tracker_.get(),
+      runtime_state, &client3));
   EXPECT_TRUE(client3 != NULL);
 
   // Client one allocates first block, should work.
-  status = block_mgr->GetNewBlock(client1, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client1, NULL, &block));
   EXPECT_TRUE(block != NULL);
   blocks.push_back(block);
 
   // Client two allocates first block, should work.
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client2, NULL, &block));
   EXPECT_TRUE(block != NULL);
   blocks.push_back(block);
 
   // At this point we've used both buffers. Client one reserved one so subsequent
   // calls should fail with no error (but returns no block).
-  status = block_mgr->GetNewBlock(client1, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client1, NULL, &block));
   EXPECT_TRUE(block == NULL);
 
   // Allocate with client two. Since client two reserved 2 buffers, this should fail
   // with MEM_LIMIT_EXCEEDED.
-  status = block_mgr->GetNewBlock(client2, NULL, &block);
-  EXPECT_TRUE(status.IsMemLimitExceeded());
+  EXPECT_TRUE(block_mgr->GetNewBlock(client2, NULL, &block).IsMemLimitExceeded());
 
   // Allocate with client three. Since client three can tolerate oversubscription,
   // this should fail with no error even though it was a reserved request.
-  status = block_mgr->GetNewBlock(client3, NULL, &block);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(block_mgr->GetNewBlock(client3, NULL, &block));
   EXPECT_TRUE(block == NULL);
 
   DeleteBlocks(blocks);

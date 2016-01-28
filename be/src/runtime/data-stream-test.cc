@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include <boost/thread/thread.hpp>
-#include <gtest/gtest.h>
 
+#include "testutil/gtest-util.h"
 #include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
@@ -266,7 +266,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_nullIndicatorBit(-1);
     slot_desc.__set_slotIdx(0);
     thrift_desc_tbl.slotDescriptors.push_back(slot_desc);
-    EXPECT_TRUE(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_).ok());
+    EXPECT_OK(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_));
     runtime_state_.set_desc_tbl(desc_tbl_);
 
     vector<TTupleId> row_tids;
@@ -391,7 +391,7 @@ class DataStreamTest : public testing::Test {
     multiset<int64_t> all_data_values;
     for (int i = 0; i < receiver_info_.size(); ++i) {
       ReceiverInfo& info = receiver_info_[i];
-      EXPECT_TRUE(info.status.ok());
+      EXPECT_OK(info.status);
       total += info.data_values.size();
       ASSERT_EQ(info.stream_type, stream_type);
       ASSERT_EQ(info.num_senders, num_senders);
@@ -433,7 +433,7 @@ class DataStreamTest : public testing::Test {
 
   void CheckSenders() {
     for (int i = 0; i < sender_info_.size(); ++i) {
-      EXPECT_TRUE(sender_info_[i].status.ok());
+      EXPECT_OK(sender_info_[i].status);
       EXPECT_GT(sender_info_[i].num_bytes_sent, 0);
     }
   }
@@ -480,8 +480,8 @@ class DataStreamTest : public testing::Test {
     const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
         &obj_pool_, sender_num, *row_desc_, sink, dest_, channel_buffer_size);
-    EXPECT_TRUE(sender.Prepare(&state).ok());
-    EXPECT_TRUE(sender.Open(&state).ok());
+    EXPECT_OK(sender.Prepare(&state));
+    EXPECT_OK(sender.Open(&state));
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];
     int next_val = 0;
@@ -530,7 +530,7 @@ TEST_F(DataStreamTest, UnknownSenderSmallResult) {
   GetNextInstanceId(&dummy_id);
   StartSender(TPartitionType::UNPARTITIONED, TOTAL_DATA_SIZE + 1024);
   JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
+  EXPECT_OK(sender_info_[0].status);
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
 }
 
@@ -540,7 +540,7 @@ TEST_F(DataStreamTest, UnknownSenderLargeResult) {
   GetNextInstanceId(&dummy_id);
   StartSender();
   JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
+  EXPECT_OK(sender_info_[0].status);
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
 }
 

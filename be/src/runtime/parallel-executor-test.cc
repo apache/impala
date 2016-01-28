@@ -14,9 +14,9 @@
 
 
 #include <string>
-#include <gtest/gtest.h>
 #include <boost/bind.hpp>
 
+#include "testutil/gtest-util.h"
 #include "runtime/parallel-executor.h"
 #include "util/thread.h"
 
@@ -67,10 +67,9 @@ TEST(ParallelExecutorTest, Basic) {
     args.push_back(i);
   }
 
-  Status status = ParallelExecutor::Exec(
+  EXPECT_OK(ParallelExecutor::Exec(
       bind<Status>(mem_fn(&ParallelExecutorTest::UpdateFunction), &test_caller, _1),
-      reinterpret_cast<void**>(&args[0]), args.size());
-  EXPECT_TRUE(status.ok());
+      reinterpret_cast<void**>(&args[0]), args.size()));
 
   test_caller.Validate();
 }
