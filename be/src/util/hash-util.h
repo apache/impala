@@ -57,6 +57,74 @@ class HashUtil {
     return hash;
   }
 
+  /// CrcHash() specialized for 1-byte data
+  static inline uint32_t CrcHash1(const void* v, uint32_t hash) {
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(v);
+    hash = SSE4_crc32_u8(hash, *s);
+    hash = (hash << 16) | (hash >> 16);
+    return hash;
+  }
+
+  /// CrcHash() specialized for 2-byte data
+  static inline uint32_t CrcHash2(const void* v, uint32_t hash) {
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(v);
+    hash = SSE4_crc32_u8(hash, *s);
+    ++s;
+    hash = SSE4_crc32_u8(hash, *s);
+    hash = (hash << 16) | (hash >> 16);
+    return hash;
+  }
+
+  /// CrcHash() specialized for 4-byte data
+  static inline uint32_t CrcHash4(const void* v, uint32_t hash) {
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
+    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
+    hash = SSE4_crc32_u32(hash, *p);
+    hash = (hash << 16) | (hash >> 16);
+    return hash;
+  }
+
+  /// CrcHash() specialized for 8-byte data
+  static inline uint32_t CrcHash8(const void* v, uint32_t hash) {
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
+    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
+    hash = SSE4_crc32_u32(hash, *p);
+    ++p;
+    hash = SSE4_crc32_u32(hash, *p);
+    hash = (hash << 16) | (hash >> 16);
+    return hash;
+  }
+
+  /// CrcHash() specialized for 12-byte data
+  static inline uint32_t CrcHash12(const void* v, uint32_t hash) {
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
+    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
+    hash = SSE4_crc32_u32(hash, *p);
+    ++p;
+    hash = SSE4_crc32_u32(hash, *p);
+    ++p;
+    hash = SSE4_crc32_u32(hash, *p);
+    hash = (hash << 16) | (hash >> 16);
+    return hash;
+  }
+
+  /// CrcHash() specialized for 16-byte data
+  static inline uint32_t CrcHash16(const void* v, uint32_t hash) {
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
+    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
+    hash = SSE4_crc32_u32(hash, *p);
+    ++p;
+    hash = SSE4_crc32_u32(hash, *p);
+    ++p;
+    hash = SSE4_crc32_u32(hash, *p);
+    ++p;
+    hash = SSE4_crc32_u32(hash, *p);
+    hash = (hash << 16) | (hash >> 16);
+    return hash;
+  }
+
   static const uint64_t MURMUR_PRIME = 0xc6a4a7935bd1e995;
   static const int MURMUR_R = 47;
 

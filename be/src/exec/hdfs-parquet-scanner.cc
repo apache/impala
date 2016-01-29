@@ -725,7 +725,8 @@ class HdfsParquetScanner::ScalarColumnReader :
     if (NeedsConversion()) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
     // Avoid branch by using & instead of &&.
     if (*conjuncts_passed & (bitmap_filter_ != NULL)) {
-      uint32_t h = RawValue::GetHashValue(slot, slot_desc()->type(), hash_seed_);
+      uint32_t h = RawValue::GetHashValue<T>(reinterpret_cast<T*>(slot),
+          slot_desc()->type(), hash_seed_);
       *conjuncts_passed = bitmap_filter_->Get<true>(h);
       ++bitmap_filter_rows_processed_;
       // TODO: always incrementing bitmap_filter_rows_rejected_ is a known bug. Before

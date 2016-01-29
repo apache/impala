@@ -118,6 +118,77 @@ TEST(HashUtil, IntNullSkew) {
   }
 }
 
+TEST_F(RawValueTest, TemplatizedHash) {
+  uint32_t seed = 12345;
+
+  int8_t tinyint_val = 8;
+  EXPECT_EQ(RawValue::GetHashValue<int8_t>(&tinyint_val, TYPE_TINYINT, seed),
+    RawValue::GetHashValue(&tinyint_val, TYPE_TINYINT, seed));
+
+  int16_t smallint_val = 8;
+  EXPECT_EQ(RawValue::GetHashValue<int16_t>(&smallint_val, TYPE_SMALLINT, seed),
+    RawValue::GetHashValue(&smallint_val, TYPE_SMALLINT, seed));
+
+  int32_t int_val = 8;
+  EXPECT_EQ(RawValue::GetHashValue<int32_t>(&int_val, TYPE_INT, seed),
+    RawValue::GetHashValue(&int_val, TYPE_INT, seed));
+
+  int64_t bigint_val = 8;
+  EXPECT_EQ(RawValue::GetHashValue<int64_t>(&bigint_val, TYPE_BIGINT, seed),
+    RawValue::GetHashValue(&bigint_val, TYPE_BIGINT, seed));
+
+  float float_val = 8.0f;
+  EXPECT_EQ(RawValue::GetHashValue<float>(&float_val, TYPE_FLOAT, seed),
+    RawValue::GetHashValue(&float_val, TYPE_FLOAT, seed));
+
+  double double_val = 8.0d;
+  EXPECT_EQ(RawValue::GetHashValue<double>(&double_val, TYPE_DOUBLE, seed),
+    RawValue::GetHashValue(&double_val, TYPE_DOUBLE, seed));
+
+  bool false_val = false;
+  EXPECT_EQ(RawValue::GetHashValue<bool>(&false_val, TYPE_BOOLEAN, seed),
+    RawValue::GetHashValue(&false_val, TYPE_BOOLEAN, seed));
+
+  bool true_val = true;
+  EXPECT_EQ(RawValue::GetHashValue<bool>(&true_val, TYPE_BOOLEAN, seed),
+    RawValue::GetHashValue(&true_val, TYPE_BOOLEAN, seed));
+
+  StringValue string_value("aaaaa");
+  EXPECT_EQ(RawValue::GetHashValue<impala::StringValue>(
+    &string_value, ColumnType::CreateCharType(10), seed),
+    RawValue::GetHashValue(&string_value, ColumnType::CreateCharType(10), seed));
+
+  EXPECT_EQ(RawValue::GetHashValue<impala::StringValue>(
+    &string_value, TYPE_STRING, seed),
+    RawValue::GetHashValue(&string_value, TYPE_STRING, seed));
+
+  EXPECT_EQ(RawValue::GetHashValue<impala::StringValue>(
+    &string_value, ColumnType::CreateVarcharType(
+    ColumnType::MAX_VARCHAR_LENGTH), seed),
+    RawValue::GetHashValue(&string_value,ColumnType::CreateVarcharType(
+    ColumnType::MAX_VARCHAR_LENGTH), seed));
+
+  TimestampValue timestamp_value(253433923200);
+  EXPECT_EQ(RawValue::GetHashValue<impala::TimestampValue>(
+    &timestamp_value, TYPE_TIMESTAMP, seed),RawValue::GetHashValue(
+    &timestamp_value, TYPE_TIMESTAMP, seed));
+
+  ColumnType d4_type = ColumnType::CreateDecimalType(9, 1);
+  Decimal4Value d4_value(123456789);
+  EXPECT_EQ(RawValue::GetHashValue<impala::Decimal4Value>(&d4_value, d4_type, seed),
+   RawValue::GetHashValue(&d4_value, d4_type, seed));
+
+  ColumnType d8_type = ColumnType::CreateDecimalType(18, 6);
+  Decimal8Value d8_value(123456789);
+  EXPECT_EQ(RawValue::GetHashValue<impala::Decimal8Value>(&d8_value, d8_type, seed),
+    RawValue::GetHashValue(&d8_value, d8_type, seed));
+
+  ColumnType d16_type = ColumnType::CreateDecimalType(19, 4);
+  Decimal16Value d16_value(123456789);
+  EXPECT_EQ(RawValue::GetHashValue<impala::Decimal16Value>(&d16_value, d16_type, seed),
+    RawValue::GetHashValue(&d16_value, d16_type, seed));
+}
+
 }
 
 int main(int argc, char **argv) {

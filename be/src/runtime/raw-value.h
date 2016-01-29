@@ -59,6 +59,17 @@ class RawValue {
   /// is combined with the seed value.
   static uint32_t GetHashValue(const void* v, const ColumnType& type, uint32_t seed = 0);
 
+  /// Templatized version of GetHashValue, use if type is known ahead. GetHashValue
+  /// handles nulls.
+  template<typename T>
+  static uint32_t GetHashValue(const T* v, const ColumnType& type, uint32_t seed = 0);
+
+  /// Returns hash value for non-nullable 'v' for type T. GetHashValueNonNull doesn't
+  /// handle nulls.
+  template<typename T>
+  static uint32_t GetHashValueNonNull(const T* v, const ColumnType& type,
+                                uint32_t seed = 0);
+
   /// Get a 32-bit hash value using the FNV hash function.
   /// Using different seeds with FNV results in different hash functions.
   /// GetHashValue() does not have this property and cannot be safely used as the first
@@ -158,32 +169,206 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
 static const uint32_t HASH_VAL_NULL = 0x58081667;
 static const uint32_t HASH_VAL_EMPTY = 0x7dca7eee;
 
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<bool>(const bool* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_BOOLEAN);
+  DCHECK(v != NULL);
+  return HashUtil::HashCombine32(*reinterpret_cast<const bool*>(v), seed);
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<int8_t>(const int8_t* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_TINYINT);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash1(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 1, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<int16_t>(const int16_t* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_SMALLINT);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash2(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 2, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<int32_t>(const int32_t* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_INT);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash4(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 4, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<int64_t>(const int64_t* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_BIGINT);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash8(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 8, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<float>(const float* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_FLOAT);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash4(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 4, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<double>(const double* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_DOUBLE);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash8(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 8, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<impala::StringValue>(
+    const impala::StringValue* v,const ColumnType& type, uint32_t seed) {
+  DCHECK(v != NULL);
+  if (type.type == TYPE_CHAR) {
+    return HashUtil::Hash(StringValue::CharSlotToPtr(
+        reinterpret_cast<const void*>(v), type),type.len, seed);
+  } else {
+    DCHECK(type.type == TYPE_STRING || type.type == TYPE_VARCHAR);
+    if (v->len == 0) {
+      return HashUtil::HashCombine32(HASH_VAL_EMPTY, seed);
+    }
+    return HashUtil::Hash(v->ptr, v->len, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<TimestampValue>(
+    const TimestampValue* v, const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_TIMESTAMP);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash12(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 12, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<Decimal4Value>(
+    const Decimal4Value* v, const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_DECIMAL);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash4(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 4, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<Decimal8Value>(
+    const Decimal8Value* v, const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_DECIMAL);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash8(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 8, seed);
+  }
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<Decimal16Value>(
+    const Decimal16Value* v, const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_DECIMAL);
+  DCHECK(v != NULL);
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    return HashUtil::CrcHash16(v, seed);
+  } else {
+    return HashUtil::MurmurHash2_64(v, 16, seed);
+  }
+}
+
+template<typename T>
+inline uint32_t RawValue::GetHashValue(const T* v, const ColumnType& type,
+    uint32_t seed) {
+  // Use HashCombine with arbitrary constant to ensure we don't return seed.
+  if (UNLIKELY(v == NULL)) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
+  return RawValue::GetHashValueNonNull<T>(v, type, seed);
+}
+
 inline uint32_t RawValue::GetHashValue(const void* v, const ColumnType& type,
     uint32_t seed) {
   // Use HashCombine with arbitrary constant to ensure we don't return seed.
   if (v == NULL) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
 
   switch (type.type) {
+    case TYPE_CHAR:
     case TYPE_STRING:
-    case TYPE_VARCHAR: {
-      const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
-      if (string_value->len == 0) {
-        return HashUtil::HashCombine32(HASH_VAL_EMPTY, seed);
-      }
-      return HashUtil::Hash(string_value->ptr, string_value->len, seed);
-    }
+    case TYPE_VARCHAR:
+      return RawValue::GetHashValueNonNull<impala::StringValue>(
+        reinterpret_cast<const StringValue*>(v), type, seed);
     case TYPE_BOOLEAN:
-      return HashUtil::HashCombine32(*reinterpret_cast<const bool*>(v), seed);
-    case TYPE_TINYINT: return HashUtil::Hash(v, 1, seed);
-    case TYPE_SMALLINT: return HashUtil::Hash(v, 2, seed);
-    case TYPE_INT: return HashUtil::Hash(v, 4, seed);
-    case TYPE_BIGINT: return HashUtil::Hash(v, 8, seed);
-    case TYPE_FLOAT: return HashUtil::Hash(v, 4, seed);
-    case TYPE_DOUBLE: return HashUtil::Hash(v, 8, seed);
-    case TYPE_TIMESTAMP: return HashUtil::Hash(v, 12, seed);
-    case TYPE_CHAR: return HashUtil::Hash(StringValue::CharSlotToPtr(v, type),
-                                          type.len, seed);
-    case TYPE_DECIMAL: return HashUtil::Hash(v, type.GetByteSize(), seed);
+      return RawValue::GetHashValueNonNull<bool>(
+        reinterpret_cast<const bool*>(v), type, seed);
+    case TYPE_TINYINT:
+      return RawValue::GetHashValueNonNull<int8_t>(
+        reinterpret_cast<const int8_t*>(v), type, seed);
+    case TYPE_SMALLINT:
+      return RawValue::GetHashValueNonNull<int16_t>(
+        reinterpret_cast<const int16_t*>(v), type, seed);
+    case TYPE_INT:
+      return RawValue::GetHashValueNonNull<int32_t>(
+        reinterpret_cast<const int32_t*>(v), type, seed);
+    case TYPE_BIGINT:
+      return RawValue::GetHashValueNonNull<int64_t>(
+        reinterpret_cast<const int64_t*>(v), type, seed);
+    case TYPE_FLOAT:
+      return  RawValue::GetHashValueNonNull<float>(
+        reinterpret_cast<const float*>(v), type, seed);
+    case TYPE_DOUBLE:
+      return RawValue::GetHashValueNonNull<double>(
+        reinterpret_cast<const double*>(v), type, seed);
+    case TYPE_TIMESTAMP:
+      return  RawValue::GetHashValueNonNull<TimestampValue>(
+        reinterpret_cast<const TimestampValue*>(v), type, seed);
+    case TYPE_DECIMAL:
+      switch(type.GetByteSize()) {
+        case 4: return
+          RawValue::GetHashValueNonNull<Decimal4Value>(
+            reinterpret_cast<const impala::Decimal4Value*>(v), type, seed);
+        case 8:
+          return RawValue::GetHashValueNonNull<Decimal8Value>(
+            reinterpret_cast<const Decimal8Value*>(v), type, seed);
+        case 16:
+          return RawValue::GetHashValueNonNull<Decimal16Value>(
+            reinterpret_cast<const Decimal16Value*>(v), type, seed);
+        DCHECK(false);
+    }
     default:
       DCHECK(false);
       return 0;
