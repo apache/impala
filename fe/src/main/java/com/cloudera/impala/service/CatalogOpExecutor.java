@@ -467,10 +467,10 @@ public class CatalogOpExecutor {
    * Creates a new HdfsPartition object and adds it to the corresponding HdfsTable.
    * Does not create the object in the Hive metastore.
    */
-  private Table addHdfsPartition(TableName tableName, Partition partition)
+  private Table addHdfsPartition(Table tbl, Partition partition)
       throws CatalogException {
+    Preconditions.checkNotNull(tbl);
     Preconditions.checkNotNull(partition);
-    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
     }
@@ -1539,7 +1539,7 @@ public class CatalogOpExecutor {
     if (cacheIds != null) catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
     // Return the table object with an updated catalog version after creating the
     // partition.
-    result = addHdfsPartition(tableName, partition);
+    result = addHdfsPartition(tbl, partition);
     return result;
   }
 
@@ -2042,7 +2042,7 @@ public class CatalogOpExecutor {
       for (Partition partition: hmsPartitions) {
         // Create and add the HdfsPartition. Return the table object with an updated
         // catalog version.
-        addHdfsPartition(tableName, partition);
+        addHdfsPartition(tbl, partition);
       }
 
       // Handle HDFS cache.
