@@ -67,7 +67,8 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   ImpalaInternalServiceConnection coord(client_cache_, coord_address(), &coord_status);
   if (!coord_status.ok()) {
     stringstream s;
-    s << "couldn't get a client for " << coord_address();
+    s << "Couldn't get a client for " << coord_address() <<"\tReason: "
+      << coord_status.GetDetail();
     UpdateStatus(Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, s.str())));
     return;
   }
@@ -109,9 +110,17 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   params.__isset.error_log = (params.error_log.size() > 0);
 
   TReportExecStatusResult res;
-  Status rpc_status =
-      coord.DoRpc(&ImpalaInternalServiceClient::ReportExecStatus, params, &res);
-  if (rpc_status.ok()) rpc_status = Status(res.status);
+  Status rpc_status;
+  // Try to send the RPC 3 times before failing.
+  for (int i = 0; i < 3; ++i) {
+    rpc_status =
+        coord.DoRpc(&ImpalaInternalServiceClient::ReportExecStatus, params, &res);
+    if (rpc_status.ok()) {
+      rpc_status = Status(res.status);
+      break;
+    }
+    if (i < 2) SleepForMs(100);
+  }
   if (!rpc_status.ok()) {
     UpdateStatus(rpc_status);
     // TODO: Do we really need to cancel?

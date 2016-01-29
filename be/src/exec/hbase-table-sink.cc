@@ -92,6 +92,11 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   return Status::OK();
 }
 
+Status HBaseTableSink::FlushFinal(RuntimeState* state) {
+  // No buffered state to flush.
+  return Status::OK();
+}
+
 void HBaseTableSink::Close(RuntimeState* state) {
   if (closed_) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());

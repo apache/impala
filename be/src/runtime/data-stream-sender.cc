@@ -97,9 +97,11 @@ class DataStreamSender::Channel {
   // Waits for the rpc thread pool to finish the current rpc.
   void WaitForRpc();
 
-  // Flush buffered rows and close channel.
-  // Logs errors if any of the preceding rpcs failed.
-  void Close(RuntimeState* state);
+  // Drain and shutdown the rpc thread and free the row batch allocation.
+  void Teardown(RuntimeState* state);
+
+  // Flushes any buffered row batches and sends the EOS RPC to close the channel.
+  Status FlushAndSendEos(RuntimeState* state);
 
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
   TRowBatch* thrift_batch() { return &thrift_batch_; }
@@ -144,8 +146,6 @@ class DataStreamSender::Channel {
   // Called from a thread from the rpc_thread_ pool.
   void TransmitData(int thread_id, const TRowBatch*);
   void TransmitDataHelper(const TRowBatch*);
-
-  Status CloseInternal();
 };
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
@@ -263,22 +263,25 @@ Status DataStreamSender::Channel::GetSendStatus() {
   return rpc_status_;
 }
 
-Status DataStreamSender::Channel::CloseInternal() {
-  VLOG_RPC << "Channel::Close() instance_id=" << fragment_instance_id_
+Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
+  VLOG_RPC << "Channel::FlushAndSendEos() instance_id=" << fragment_instance_id_
            << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
 
+  // We can return an error here and not go on to send the EOS RPC because the error that
+  // we returned will be sent to the coordinator who will then cancel all the remote
+  // fragments including the one that this sender is sending to.
   if (batch_->num_rows() > 0) {
     // flush
     RETURN_IF_ERROR(SendCurrentBatch());
   }
-  // if the last transmitted batch resulted in a error, return that error
+
   RETURN_IF_ERROR(GetSendStatus());
-  Status status;
-  ImpalaInternalServiceConnection client(client_cache_, address_, &status);
-  if (!status.ok()) {
-    return status;
-  }
+
+  Status client_cnxn_status;
+  ImpalaInternalServiceConnection client(client_cache_, address_, &client_cnxn_status);
+  RETURN_IF_ERROR(client_cnxn_status);
+
   TTransmitDataParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   params.__set_dest_fragment_instance_id(fragment_instance_id_);
@@ -286,19 +289,20 @@ Status DataStreamSender::Channel::CloseInternal() {
   params.__set_sender_id(parent_->sender_id_);
   params.__set_eos(true);
   TTransmitDataResult res;
-  VLOG_RPC << "calling TransmitData to close channel";
+
+  VLOG_RPC << "calling TransmitData(eos=true) to terminate channel.";
   rpc_status_ = client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &res);
   if (!rpc_status_.ok()) {
     stringstream msg;
-    msg << "CloseChannel() to " << address_ << " failed:\n" << rpc_status_.msg().msg();
+    msg << "TransmitData(eos=true) to " << address_ << " failed:\n" << rpc_status_.msg().msg();
     return Status(rpc_status_.code(), msg.str());
   }
   return Status(res.status);
 }
 
-void DataStreamSender::Channel::Close(RuntimeState* state) {
-  Status s = CloseInternal();
-  if (!s.ok()) state->LogError(s.msg());
+void DataStreamSender::Channel::Teardown(RuntimeState* state) {
+  // FlushAndSendEos() should have been called before calling Teardown(), which means that
+  // all the data should already be drained. Calling DrainAndShutdown() only to shutdown.
   rpc_thread_.DrainAndShutdown();
   batch_.reset();
 }
@@ -311,6 +315,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     pool_(pool),
     row_desc_(row_desc),
     current_channel_idx_(0),
+    flushed_(false),
     closed_(false),
     current_thrift_batch_(&thrift_batch1_),
     profile_(NULL),
@@ -397,6 +402,7 @@ Status DataStreamSender::Open(RuntimeState* state) {
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(profile_->total_time_counter());
   DCHECK(!closed_);
+  DCHECK(!flushed_);
 
   if (batch->num_rows() == 0) return Status::OK();
   if (broadcast_ || channels_.size() == 1) {
@@ -442,10 +448,23 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   return Status::OK();
 }
 
+Status DataStreamSender::FlushFinal(RuntimeState* state) {
+  DCHECK(!flushed_);
+  DCHECK(!closed_);
+  flushed_ = true;
+  for (int i = 0; i < channels_.size(); ++i) {
+    // If we hit an error here, we can return without closing the remaining channels as
+    // the error is propagated back to the coordinator, which in turn cancels the query,
+    // which will cause the remaining open channels to be closed.
+    RETURN_IF_ERROR(channels_[i]->FlushAndSendEos(state));
+  }
+  return Status::OK();
+}
+
 void DataStreamSender::Close(RuntimeState* state) {
   if (closed_) return;
   for (int i = 0; i < channels_.size(); ++i) {
-    channels_[i]->Close(state);
+    channels_[i]->Teardown(state);
   }
   Expr::Close(partition_expr_ctxs_, state);
   if (mem_tracker_.get() != NULL) {

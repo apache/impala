@@ -38,6 +38,7 @@ class HBaseTableSink : public DataSink {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
+  virtual Status FlushFinal(RuntimeState* state);
   virtual void Close(RuntimeState* state);
   virtual RuntimeProfile* profile() { return runtime_profile_; }
 

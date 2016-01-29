@@ -134,6 +134,10 @@ class HdfsTableSink : public DataSink {
   /// Append all rows in batch to the temporary Hdfs files corresponding to partitions.
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
 
+  /// Currently a no-op function.
+  /// TODO: Move calls to functions that can fail in Close() to FlushFinal()
+  virtual Status FlushFinal(RuntimeState* state);
+
   /// Move temporary Hdfs files to final locations.
   /// Remove original Hdfs files if overwrite was specified.
   /// Closes output_exprs and partition_key_exprs.

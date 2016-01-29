@@ -326,6 +326,20 @@ Status PlanFragmentExecutor::Open() {
   OptimizeLlvmModule();
 
   Status status = OpenInternal();
+  if (sink_.get() != NULL) {
+    // We call Close() here rather than in OpenInternal() because we want to make sure
+    // that Close() gets called even if there was an error in OpenInternal().
+    // We also want to call sink_->Close() here rather than in PlanFragmentExecutor::Close
+    // because we do not want the sink_ to hold on to all its resources as we will never
+    // use it after this.
+    sink_->Close(runtime_state());
+    // If there's a sink and no error, OpenInternal() completed the fragment execution.
+    if (status.ok()) {
+      done_ = true;
+      FragmentComplete();
+    }
+  }
+
   if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
     // Log error message in addition to returning in Status. Queries that do not
     // fetch results (e.g. insert) may not receive the message directly and can
@@ -361,18 +375,12 @@ Status PlanFragmentExecutor::OpenInternal() {
     RETURN_IF_ERROR(sink_->Send(runtime_state(), batch, done_));
   }
 
-  // Close the sink *before* stopping the report thread. Close may need to add some
+  // Flush the sink *before* stopping the report thread. Flush may need to add some
   // important information to the last report that gets sent. (e.g. table sinks record the
   // files they have written to in this method)
   //
-  // The coordinator report channel waits until all backends are either in error or have
-  // returned a status report with done = true, so tearing down any data stream state (a
-  // separate channel) in Close is safe.
   SCOPED_TIMER(profile()->total_time_counter());
-  sink_->Close(runtime_state());
-  done_ = true;
-
-  FragmentComplete();
+  RETURN_IF_ERROR(sink_->FlushFinal(runtime_state()));
   return Status::OK();
 }
 
@@ -580,7 +588,6 @@ void PlanFragmentExecutor::Close() {
           runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
     }
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
-    if (sink_.get() != NULL) sink_->Close(runtime_state());
     BOOST_FOREACH(DiskIoMgr::RequestContext* context,
         *runtime_state_->reader_contexts()) {
       runtime_state_->io_mgr()->UnregisterContext(context);

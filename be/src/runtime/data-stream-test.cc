@@ -496,6 +496,7 @@ class DataStreamTest : public testing::Test {
       if (!info.status.ok()) break;
     }
     VLOG_QUERY << "closing sender" << sender_num;
+    sender.FlushFinal(&state);
     sender.Close(&state);
     info.num_bytes_sent = sender.GetNumDataBytesSent();
 

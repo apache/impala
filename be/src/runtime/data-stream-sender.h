@@ -67,6 +67,11 @@ class DataStreamSender : public DataSink {
   /// compiled (i.e. in an ExecNode's Open() function).
   virtual Status Open(RuntimeState* state);
 
+  /// Flush all buffered data and close all existing channels to destination hosts.
+  /// Further Send() calls are illegal after calling FlushFinal().
+  /// It is legal to call FlushFinal() only 0 or 1 times.
+  virtual Status FlushFinal(RuntimeState* state);
+
   /// Send data in 'batch' to destination nodes according to partitioning
   /// specification provided in c'tor.
   /// Blocks until all rows in batch are placed in their appropriate outgoing
@@ -74,8 +79,8 @@ class DataStreamSender : public DataSink {
   /// Send() call).
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
 
-  /// Flush all buffered data and close all existing channels to destination
-  /// hosts. Further Send() calls are illegal after calling Close().
+  /// Shutdown all existing channels to destination hosts. Further FlushFinal() calls are
+  /// illegal after calling Close().
   virtual void Close(RuntimeState* state);
 
   /// Serializes the src batch into the dest thrift batch. Maintains metrics.
@@ -100,6 +105,10 @@ class DataStreamSender : public DataSink {
   bool broadcast_;  // if true, send all rows on all channels
   bool random_; // if true, round-robins row batches among channels
   int current_channel_idx_; // index of current channel to send to if random_ == true
+
+  /// If true, this sender has called FlushFinal() successfully.
+  /// Not valid to call Send() anymore.
+  bool flushed_;
 
   /// If true, this sender has been closed. Not valid to call Send() anymore.
   bool closed_;

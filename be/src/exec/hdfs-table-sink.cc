@@ -579,7 +579,8 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
     PartitionStatusMap::iterator it =
         state->per_partition_status()->find(partition->partition_name);
 
-    // Should have been created in GetOutputPartition() when the partition was initialised.
+    // Should have been created in GetOutputPartition() when the partition was
+    // initialised.
     DCHECK(it != state->per_partition_status()->end());
     it->second.num_appended_rows += partition->num_rows;
     DataSink::MergeInsertStats(partition->writer->stats(), &it->second.stats);
@@ -600,6 +601,13 @@ void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* par
   }
   partition->tmp_hdfs_file = NULL;
   ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
+}
+
+Status HdfsTableSink::FlushFinal(RuntimeState* state) {
+  // Currently a no-op function.
+  // TODO: Move call to ClosePartitionFile() here so that the error status can be
+  // propagated. If closing the file fails, the query should fail.
+  return Status::OK();
 }
 
 void HdfsTableSink::Close(RuntimeState* state) {
