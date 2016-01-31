@@ -21,10 +21,13 @@ import signal
 
 from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE, call
-from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_service import ImpaladService
 from time import sleep
 
-SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
+IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
+assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
+IMPALAD = IMPALAD_HOST_PORT_LIST[0]
+SHELL_CMD = "%s/bin/impala-shell.sh -i %s" % (os.environ['IMPALA_HOME'], IMPALAD)
 DEFAULT_QUERY = 'select 1'
 TEST_DB = "tmp_shell"
 TEST_TBL = "tbl1"
@@ -287,15 +290,13 @@ class TestImpalaShell(object):
     # Execute the shell command async
     p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
 
-    impala_cluster = ImpalaCluster()
-    impalad = impala_cluster.impalads[0].service
+    impalad_service = ImpaladService(IMPALAD.split(':')[0])
     # The last query in the test SQL script will sleep for 10 seconds, so sleep
     # here for 5 seconds and verify the number of in-flight queries is 1.
     sleep(5)
-    assert 1 == impalad.get_num_in_flight_queries()
+    assert 1 == impalad_service.get_num_in_flight_queries()
     assert get_shell_cmd_result(p).rc == 0
-    assert 0 == impalad.get_num_in_flight_queries()
-
+    assert 0 == impalad_service.get_num_in_flight_queries()
 
   @pytest.mark.execute_serially
   def test_cancellation(self):
