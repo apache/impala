@@ -199,15 +199,23 @@ class BufferedBlockMgrTest : public ::testing::Test {
   void PinBlocks(const vector<BufferedBlockMgr::Block*>& blocks) {
     for (int i = 0; i < blocks.size(); ++i) {
       bool pinned;
-      EXPECT_TRUE(blocks[i]->Pin(&pinned).ok());
+      Status status = blocks[i]->Pin(&pinned);
+      EXPECT_TRUE(status.ok()) << status.msg().msg();
       EXPECT_TRUE(pinned);
     }
   }
 
-  // Pin all blocks, expecting no errors from Unpin() calls.
-  void UnpinBlocks(const vector<BufferedBlockMgr::Block*>& blocks) {
+  // Pin all blocks. By default, expect no errors from Unpin() calls. If
+  // expect_cancelled is true, returning cancelled is allowed.
+  void UnpinBlocks(const vector<BufferedBlockMgr::Block*>& blocks,
+      bool expect_cancelled = false) {
     for (int i = 0; i < blocks.size(); ++i) {
-      EXPECT_TRUE(blocks[i]->Unpin().ok());
+      Status status = blocks[i]->Unpin();
+      if (expect_cancelled) {
+        EXPECT_TRUE(status.ok() || status.IsCancelled()) << status.msg().msg();
+      } else {
+        EXPECT_TRUE(status.ok()) << status.msg().msg();
+      }
     }
   }
 
@@ -859,8 +867,9 @@ void BufferedBlockMgrTest::TestRuntimeStateTeardown(bool write_error,
     DeleteBackingFile(blocks[0]);
   }
 
-  // Unpin will initiate writes.
-  UnpinBlocks(blocks);
+  // Unpin will initiate writes. If the write error propagates fast enough, some Unpin()
+  // calls may see a cancelled block mgr.
+  UnpinBlocks(blocks, write_error);
 
   // Tear down while writes are in flight. The block mgr may outlive the runtime state
   // because it may be referenced by other runtime states. This test simulates this
