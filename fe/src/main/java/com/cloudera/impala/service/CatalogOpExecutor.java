@@ -935,11 +935,9 @@ public class CatalogOpExecutor {
    * that were updated as part of this operation.
    */
   private int dropColumnStats(Table table) throws ImpalaRuntimeException {
-    MetaStoreClient msClient = null;
     int numColsUpdated = 0;
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     try {
-      msClient = catalog_.getMetaStoreClient();
-
       for (Column col: table.getColumns()) {
         // Skip columns that don't have stats.
         if (!col.getStats().hasStats()) continue;
@@ -961,7 +959,7 @@ public class CatalogOpExecutor {
         }
       }
     } finally {
-      if (msClient != null) msClient.release();
+      msClient.release();
     }
     return numColsUpdated;
   }
@@ -1360,8 +1358,7 @@ public class CatalogOpExecutor {
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
-      }
-        finally {
+      } finally {
         msClient.release();
       }
     }
@@ -2303,7 +2300,6 @@ public class CatalogOpExecutor {
    */
   private void bulkAlterPartitions(String dbName, String tableName,
       List<HdfsPartition> modifiedParts) throws ImpalaException {
-    MetaStoreClient msClient = null;
     List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
         Lists.newArrayList();
     for (HdfsPartition p: modifiedParts) {
@@ -2311,9 +2307,9 @@ public class CatalogOpExecutor {
       if (msPart != null) hmsPartitions.add(msPart);
     }
     if (hmsPartitions.size() == 0) return;
-    try {
-      msClient = catalog_.getMetaStoreClient();
 
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
+    try {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
       for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
         int numPartitionsToUpdate =
@@ -2341,7 +2337,7 @@ public class CatalogOpExecutor {
         }
       }
     } finally {
-      if (msClient != null) msClient.release();
+      msClient.release();
     }
   }
 
@@ -2639,7 +2635,7 @@ public class CatalogOpExecutor {
         }
 
         if (!partsToCreate.isEmpty()) {
-           MetaStoreClient msClient = catalog_.getMetaStoreClient();
+          MetaStoreClient msClient = catalog_.getMetaStoreClient();
           try {
             org.apache.hadoop.hive.metastore.api.Table msTbl =
                 table.getMetaStoreTable().deepCopy();

@@ -657,14 +657,19 @@ public class CatalogServiceCatalog extends Catalog {
       long newCatalogVersion = incrementAndGetCatalogVersion();
       catalogLock_.writeLock().unlock();
       MetaStoreClient msClient = getMetaStoreClient();
-      org.apache.hadoop.hive.metastore.api.Table msTbl = null;
       try {
-        msTbl = msClient.getHiveClient().getTable(db.getName(), tblName.getTable_name());
-      } catch (Exception e) {
-        throw new TableLoadingException("Error loading metadata for table: " +
-            db.getName() + "." + tblName.getTable_name(), e);
+        org.apache.hadoop.hive.metastore.api.Table msTbl = null;
+        try {
+          msTbl = msClient.getHiveClient().getTable(db.getName(),
+              tblName.getTable_name());
+        } catch (Exception e) {
+          throw new TableLoadingException("Error loading metadata for table: " +
+              db.getName() + "." + tblName.getTable_name(), e);
+        }
+        tbl.load(true, msClient.getHiveClient(), msTbl);
+      } finally {
+        msClient.release();
       }
-      tbl.load(true, msClient.getHiveClient(), msTbl);
       tbl.setCatalogVersion(newCatalogVersion);
       return tbl;
     }
@@ -748,49 +753,50 @@ public class CatalogServiceCatalog extends Catalog {
     // 2) false - Table does not exist in metastore.
     // 3) unknown (null) - There was exception thrown by the metastore client.
     Boolean tableExistsInMetaStore;
+    Db db = null;
     MetaStoreClient msClient = getMetaStoreClient();
-    org.apache.hadoop.hive.metastore.api.Database msDb = null;
     try {
-      tableExistsInMetaStore = msClient.getHiveClient().tableExists(dbName, tblName);
-    } catch (UnknownDBException e) {
-      // The parent database does not exist in the metastore. Treat this the same
-      // as if the table does not exist.
-      tableExistsInMetaStore = false;
-    } catch (TException e) {
-      LOG.error("Error executing tableExists() metastore call: " + tblName, e);
-      tableExistsInMetaStore = null;
-    }
-
-    if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
-      updatedObjects.second = removeTable(dbName, tblName);
-      msClient.release();
-      return true;
-    }
-
-    Db db = getDb(dbName);
-    if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
-      // The table does not exist in our cache AND it is unknown whether the
-      // table exists in the metastore. Do nothing.
-      msClient.release();
-      return false;
-    } else if (db == null && tableExistsInMetaStore) {
-      // The table exists in the metastore, but our cache does not contain the parent
-      // database. A new db will be added to the cache along with the new table. msDb
-      // must be valid since tableExistsInMetaStore is true.
+      org.apache.hadoop.hive.metastore.api.Database msDb = null;
       try {
-        msDb = msClient.getHiveClient().getDatabase(dbName);
-        Preconditions.checkNotNull(msDb);
-        db = new Db(dbName, this, msDb);
-        db.setCatalogVersion(incrementAndGetCatalogVersion());
-        addDb(db);
-        updatedObjects.first = db;
+        tableExistsInMetaStore = msClient.getHiveClient().tableExists(dbName, tblName);
+      } catch (UnknownDBException e) {
+        // The parent database does not exist in the metastore. Treat this the same
+        // as if the table does not exist.
+        tableExistsInMetaStore = false;
       } catch (TException e) {
-        // The metastore database cannot be get. Log the error and return.
-        LOG.error("Error executing getDatabase() metastore call: " + dbName, e);
-        return false;
-      } finally {
-        msClient.release();
+        LOG.error("Error executing tableExists() metastore call: " + tblName, e);
+        tableExistsInMetaStore = null;
       }
+
+      if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
+        updatedObjects.second = removeTable(dbName, tblName);
+        return true;
+      }
+
+      db = getDb(dbName);
+      if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
+        // The table does not exist in our cache AND it is unknown whether the
+        // table exists in the metastore. Do nothing.
+        return false;
+      } else if (db == null && tableExistsInMetaStore) {
+        // The table exists in the metastore, but our cache does not contain the parent
+        // database. A new db will be added to the cache along with the new table. msDb
+        // must be valid since tableExistsInMetaStore is true.
+        try {
+          msDb = msClient.getHiveClient().getDatabase(dbName);
+          Preconditions.checkNotNull(msDb);
+          db = new Db(dbName, this, msDb);
+          db.setCatalogVersion(incrementAndGetCatalogVersion());
+          addDb(db);
+          updatedObjects.first = db;
+        } catch (TException e) {
+          // The metastore database cannot be get. Log the error and return.
+          LOG.error("Error executing getDatabase() metastore call: " + dbName, e);
+          return false;
+        }
+      }
+    } finally {
+      msClient.release();
     }
 
     // Add a new uninitialized table to the table cache, effectively invalidating
