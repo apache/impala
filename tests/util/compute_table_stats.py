@@ -48,6 +48,9 @@ if __name__ == "__main__":
   parser.add_option("--continue_on_error", dest="continue_on_error",
                     action="store_true", default=True, help="If True, continue "\
                     "if there is an error executing the compute stats statement.")
+  parser.add_option("--stop_on_error", dest="continue_on_error",
+                    action="store_false", default=True, help="If True, stop "\
+                    "if there is an error executing the compute stats statement.")
   parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                     help="Impala daemon <host:port> to connect to.")
   parser.add_option("--use_kerberos", action="store_true", default=False,
