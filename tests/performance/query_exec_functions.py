@@ -30,6 +30,7 @@ from tests.performance.query_executor import (
     )
 from tests.util.shell_util import exec_process
 from time import time
+import threading
 
 DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
@@ -59,11 +60,15 @@ def get_hs2_hive_cursor(hiveserver, user=None, use_kerberos=False,
 def execute_using_hive_hs2(query, query_config):
   exec_result = HiveQueryResult(query, query_config=query_config)
   plugin_runner = query_config.plugin_runner
-  cursor = get_hs2_hive_cursor(query_config.hiveserver,
+  cursor = getattr(threading.current_thread(), 'cursor', None)
+  if cursor is None:
+    cursor = get_hs2_hive_cursor(query_config.hiveserver,
       user=query_config.user,
       database=query.db,
       use_kerberos=query_config.use_kerberos,
       execOptions=query_config.exec_options)
+    threading.current_thread().cursor = cursor
+
   if cursor is None: return exec_result
 
   if plugin_runner: plugin_runner.run_plugins_pre(scope="Query")
@@ -77,7 +82,6 @@ def execute_using_hive_hs2(query, query_config):
     LOG.error(str(e))
     exec_result.query_error = str(e)
   finally:
-    cursor.close()
     if plugin_runner: plugin_runner.run_plugins_post(scope="Query")
   return exec_result
 

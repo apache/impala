@@ -24,6 +24,7 @@ from copy import deepcopy
 from random import shuffle
 from sys import exit
 from threading import Lock, Thread, Event
+import threading
 
 logging.basicConfig(level=logging.INFO, format='%(name)s %(threadName)s: %(message)s')
 LOG = logging.getLogger('scheduler')
@@ -123,6 +124,9 @@ class Scheduler(object):
           workload_time_sec += query_executor.result.time_taken
       if self.query_iterations == 1:
         LOG.info("Workload iteration %d finished in %s seconds" % (j+1, workload_time_sec))
+      cursor = getattr(threading.current_thread(), 'cursor', None)
+      if cursor is not None:
+        cursor.close()
 
   def run(self):
     """Run the query pipelines concurrently"""
