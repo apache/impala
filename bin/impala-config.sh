@@ -237,6 +237,9 @@ export AUX_CLASSPATH="${LZO_JAR_PATH}"
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
+# Export the location of Postgres JDBC driver so Sentry can pick it up.
+export POSTGRES_JDBC_DRIVER="$JDBC_DRIVER"
+
 export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
 export PATH=$HBASE_HOME/bin:$PATH
 
