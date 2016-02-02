@@ -1591,4 +1591,30 @@ FROM functional_parquet.alltypes t1 CROSS JOIN functional_parquet.alltypes t2 LI
 ---- CATCH
 Memory limit exceeded
 ====
-
+---- QUERY
+# IMPALA-2906: Tests that an analytic sort does not attempt to materialize
+# a constant expr wrapped in a TupleIsNullPredicate that is not executable
+# at the analytic sort. Here 'y' is wrapped in a TupleIsNullPredicate, and
+# the analytic sort of the top-level block should not attempt to materialize
+# that wrapped constant expr.
+SELECT
+LEAD(996, 13) OVER (ORDER BY t1.int_col)
+FROM functional.alltypestiny t1
+LEFT JOIN (
+  SELECT
+    v1.x,
+    (-560) IN (694, 44) AS y
+  FROM (
+    SELECT
+      LAG(bigint_col, 34) OVER (ORDER BY t2.int_col) AS x
+    FROM functional.alltypestiny t2
+    ) v1
+  ) v2
+ON v2.x = t1.bigint_col AND v2.y = t1.bigint_col
+GROUP BY t1.int_col
+---- TYPES
+SMALLINT
+---- RESULTS
+NULL
+NULL
+====

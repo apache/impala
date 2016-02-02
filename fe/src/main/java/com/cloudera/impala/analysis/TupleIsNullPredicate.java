@@ -19,7 +19,6 @@ import java.util.Set;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TTupleIsNullPredicate;
@@ -88,6 +87,11 @@ public class TupleIsNullPredicate extends Predicate {
   protected String toSqlImpl() { return "TupleIsNull()"; }
 
   public Set<TupleId> getTupleIds() { return tupleIds_; }
+
+  @Override
+  public boolean isBoundByTupleIds(List<TupleId> tids) {
+    return tids.containsAll(tupleIds_);
+  }
 
   @Override
   public boolean isConstant() { return false; }
