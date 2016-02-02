@@ -21,6 +21,7 @@ from os.path import join as join_path
 from time import sleep
 from tests.comparison.leopard.controller import (
     SHOULD_BUILD_IMPALA,
+    SHOULD_LOAD_DATA,
     SHOULD_PULL_DOCKER_IMAGE)
 import random
 import os
@@ -162,6 +163,22 @@ class ImpalaDockerEnv(object):
         result = retry(run)(build_command, pty=False)
         LOG.info('Build Complete, Result: {0}'.format(result))
 
+  def load_data(self):
+    if SHOULD_LOAD_DATA:
+      with settings(
+          warn_only = True,
+          host_string = '{0}@{1}:{2}'.format(DOCKER_USER_NAME, self.host, self.ssh_port),
+          password = os.environ['DOCKER_PASSWORD']):
+        self.start_impala()
+        load_command = '''cd {IMPALA_HOME} \
+            && source bin/impala-config.sh \
+            && ./tests/comparison/data_generator.py \
+                --use-postgresql --db-name=functional \
+                --migrate-table-names=alltypes,alltypestiny,alltypesagg migrate \
+            && ./tests/comparison/data_generator.py --use-postgresql'''.format(
+                IMPALA_HOME=IMPALA_HOME)
+        result = retry(run)(load_command, pty=False)
+
   def start_impala(self):
     with settings(
         warn_only = True,
@@ -181,8 +198,7 @@ class ImpalaDockerEnv(object):
       return retry(run)('ps aux | grep impalad').count('/service/impalad') == 3
 
   def get_stack(self):
-    '''Finds the newest core file and extracts the stack trace from it using gdb.
-    '''
+    '''Finds the newest core file and extracts the stack trace from it using gdb. '''
     IMPALAD_PATH = '{IMPALA_HOME}/be/build/debug/service/impalad'.format(
         IMPALA_HOME = IMPALA_HOME)
     with settings(
@@ -222,3 +238,4 @@ class ImpalaDockerEnv(object):
     except Exception:
       LOG.info('run_all exception')
     LOG.info('Run All Complete, Result: {0}'.format(result))
+    self.load_data()

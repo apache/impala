@@ -269,24 +269,26 @@ class DbCursor(object):
     This output is used to create the appropriate columns by self.create_column().
     '''
 
-    print 'data_type', data_type
-
     COMMA, LPAR, RPAR, COLON, LBRA, RBRA = map(Suppress, ",<>:()")
 
     t_bigint = Literal('bigint')
     t_int = Literal('int')
+    t_integer = Literal('integer')
     t_smallint = Literal('smallint')
     t_tinyint = Literal('tinyint')
     t_boolean = Literal('boolean')
     t_string = Literal('string')
     t_timestamp = Literal('timestamp')
+    t_timestamp_without_time_zone = Literal('timestamp without time zone')
     t_float = Literal('float')
     t_double = Literal('double')
     t_real = Literal('real')
     t_double_precision = Literal('double precision')
 
     t_decimal = Group(Literal('decimal') + LBRA + Word(nums) + COMMA + Word(nums) + RBRA)
+    t_numeric = Group(Literal('numeric') + LBRA + Word(nums) + COMMA + Word(nums) + RBRA)
     t_char = Group(Literal('char') + LBRA + Word(nums) + RBRA)
+    t_character = Group(Literal('character') + LBRA + Word(nums) + RBRA)
     t_varchar = (Group(Literal('varchar') + LBRA + Word(nums) + RBRA) |
         Literal('varchar'))
     t_character_varying = Group(Literal('character varying') + LBRA + Word(nums) + RBRA)
@@ -301,17 +303,21 @@ class DbCursor(object):
         complex_type |
         t_bigint |
         t_int |
+        t_integer |
         t_smallint |
         t_tinyint |
         t_boolean |
         t_string |
         t_timestamp |
+        t_timestamp_without_time_zone |
         t_float |
         t_double |
         t_real |
         t_double_precision |
         t_decimal |
+        t_numeric |
         t_char |
+        t_character |
         t_character_varying |
         t_varchar)
 
@@ -335,6 +341,27 @@ class DbCursor(object):
           name=col_name.lower(),
           exact_type=self.TYPES_BY_NAME[type_name])
 
+    general_class = col_type[0]
+
+    if general_class.upper() == 'ARRAY':
+      return ArrayColumn(
+          owner=None,
+          name=col_name.lower(),
+          item=self.create_column(col_name='item', col_type=col_type[1]))
+
+    if general_class.upper() == 'MAP':
+      return MapColumn(
+          owner=None,
+          name=col_name.lower(),
+          key=self.create_column(col_name='key', col_type=col_type[1]),
+          value=self.create_column(col_name='value', col_type=col_type[2]))
+
+    if general_class.upper() == 'STRUCT':
+      struct_col = StructColumn(owner=None, name=col_name.lower())
+      for field_name, field_type in col_type[1:]:
+        struct_col.add_col(self.create_column(field_name, field_type))
+      return struct_col
+
     general_class = self.TYPE_NAME_ALIASES.get(col_type[0].upper())
 
     if general_class.upper() == 'DECIMAL':
@@ -356,25 +383,6 @@ class DbCursor(object):
       return Column(owner=None,
           name=col_name.lower(),
           exact_type=cur_type)
-
-    if general_class.upper() == 'ARRAY':
-      return ArrayColumn(
-          owner=None,
-          name=col_name.lower(),
-          item=self.create_column(col_name='item', col_type=col_type[1]))
-
-    if general_class.upper() == 'MAP':
-      return MapColumn(
-          owner=None,
-          name=col_name.lower(),
-          key=self.create_column(col_name='key', col_type=col_type[1]),
-          value=self.create_column(col_name='value', col_type=col_type[2]))
-
-    if general_class.upper() == 'STRUCT':
-      struct_col = StructColumn(owner=None, name=col_name.lower())
-      for field_name, field_type in col_type[1:]:
-        struct_col.add_col(self.create_column(field_name, field_type))
-      return struct_col
 
     raise Exception('unable to parse: {0}, type: {1}'.format(col_name, col_type))
 
