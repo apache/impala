@@ -706,7 +706,7 @@ public class HdfsTable extends Table {
         // If the partition is null, its HDFS path does not exist, and it was not added
         // to this table's partition list. Skip the partition.
         if (partition == null) continue;
-        if (msPartition.getParameters() != null); {
+        if (msPartition.getParameters() != null) {
           partition.setNumRows(getRowCount(msPartition.getParameters()));
         }
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
@@ -850,7 +850,7 @@ public class HdfsTable extends Table {
    */
   public void addPartition(HdfsPartition partition) throws CatalogException {
     if (partitionMap_.containsKey(partition.getId())) {
-      throw new CatalogException(String.format("Partition %s already exists in table %",
+      throw new CatalogException(String.format("Partition %s already exists in table %s",
           partition.getPartitionName(), getFullName()));
     }
     partitionMap_.put(partition.getId(), partition);

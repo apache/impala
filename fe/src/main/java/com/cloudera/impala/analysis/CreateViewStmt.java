@@ -37,6 +37,8 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
+
     tableName_.analyze();
     // Use a child analyzer to let views have complex-typed columns.
     Analyzer viewAnalyzerr = new Analyzer(analyzer);
@@ -44,7 +46,6 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
     viewAnalyzerr.setUseHiveColLabels(true);
     viewDefStmt_.analyze(viewAnalyzerr);
 
-    Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     dbName_ = analyzer.getTargetDbName(tableName_);
     owner_ = analyzer.getUser().getName();
     if (analyzer.dbContainsTable(dbName_, tableName_.getTbl(), Privilege.CREATE) &&

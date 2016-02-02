@@ -381,7 +381,7 @@ public abstract class Type {
           type = ScalarType.createVarcharType(scalarType.getLen());
         } else if (scalarType.getType() == TPrimitiveType.DECIMAL) {
           Preconditions.checkState(scalarType.isSetPrecision()
-              && scalarType.isSetPrecision());
+              && scalarType.isSetScale());
           type = ScalarType.createDecimalType(scalarType.getPrecision(),
               scalarType.getScale());
         } else {

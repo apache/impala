@@ -40,6 +40,7 @@ public class MetaStoreClientPool {
   private final ConcurrentLinkedQueue<MetaStoreClient> clientPool_ =
       new ConcurrentLinkedQueue<MetaStoreClient>();
   private Boolean poolClosed_ = false;
+  private final Object poolCloseLock_ = new Object();
   private final HiveConf hiveConf_;
 
   /**
@@ -78,7 +79,7 @@ public class MetaStoreClientPool {
       // Ensure the connection isn't returned to the pool if the pool has been closed.
       // This lock is needed to ensure proper behavior when a thread reads poolClosed
       // is false, but a call to pool.close() comes in immediately afterward.
-      synchronized (poolClosed_) {
+      synchronized (poolCloseLock_) {
         if (poolClosed_) {
           hiveClient_.close();
         } else {
@@ -159,10 +160,8 @@ public class MetaStoreClientPool {
    */
   public void close() {
     // Ensure no more items get added to the pool once close is called.
-    synchronized (poolClosed_) {
-      if (poolClosed_) {
-        return;
-      }
+    synchronized (poolCloseLock_) {
+      if (poolClosed_) { return; }
       poolClosed_ = true;
     }
 
