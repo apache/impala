@@ -22,6 +22,7 @@ import java.util.Set;
 import com.cloudera.impala.analysis.Path.PathType;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.View;
@@ -31,6 +32,7 @@ import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TReplicaPreference;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -83,6 +85,10 @@ public class TableRef implements ParseNode {
   protected ArrayList<String> joinHints_;
   protected List<String> usingColNames_;
 
+  protected ArrayList<String> tableHints_;
+  protected TReplicaPreference replicaPreference_;
+  protected boolean randomReplica_;
+
   // Hinted distribution mode for this table ref; set after analyzeJoinHints()
   // TODO: Move join-specific members out of TableRef.
   private DistributionMode distrMode_ = DistributionMode.NONE;
@@ -127,6 +133,8 @@ public class TableRef implements ParseNode {
       hasExplicitAlias_ = false;
     }
     isAnalyzed_ = false;
+    replicaPreference_ = null;
+    randomReplica_ = false;
   }
 
   /**
@@ -143,6 +151,10 @@ public class TableRef implements ParseNode {
     onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
     usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
+    tableHints_ =
+        (other.tableHints_ != null) ? Lists.newArrayList(other.tableHints_) : null;
+    replicaPreference_ = other.replicaPreference_;
+    randomReplica_ = other.randomReplica_;
     distrMode_ = other.distrMode_;
     // The table ref links are created at the statement level, so cloning a set of linked
     // table refs is the responsibility of the statement.
@@ -180,7 +192,7 @@ public class TableRef implements ParseNode {
       throw new AnalysisException(String.format(
           "Failed to load metadata for table: '%s'", Joiner.on(".").join(rawPath_)), e);
     }
-
+    Preconditions.checkState(resolvedPath_ != null);
     if (resolvedPath_.isRootedAtTable()) {
       // Add access event for auditing.
       Table table = resolvedPath_.getRootTable();
@@ -225,6 +237,7 @@ public class TableRef implements ParseNode {
   protected void setJoinAttrs(TableRef other) {
     this.joinOp_ = other.joinOp_;
     this.joinHints_ = other.joinHints_;
+    this.tableHints_ = other.tableHints_;
     this.onClause_ = other.onClause_;
     this.usingColNames_ = other.usingColNames_;
   }
@@ -233,6 +246,9 @@ public class TableRef implements ParseNode {
     // if it's not explicitly set, we're doing an inner join
     return (joinOp_ == null ? JoinOperator.INNER_JOIN : joinOp_);
   }
+
+  public TReplicaPreference getReplicaPreference() { return replicaPreference_; }
+  public boolean getRandomReplica() { return randomReplica_; }
 
   /**
    * Returns true if this table ref has a resolved path that is rooted at a registered
@@ -281,6 +297,7 @@ public class TableRef implements ParseNode {
     return resolvedPath_.getRootTable();
   }
   public ArrayList<String> getJoinHints() { return joinHints_; }
+  public ArrayList<String> getTableHints() { return tableHints_; }
   public Expr getOnClause() { return onClause_; }
   public List<String> getUsingClause() { return usingColNames_; }
   public void setJoinOp(JoinOperator op) { this.joinOp_ = op; }
@@ -289,6 +306,7 @@ public class TableRef implements ParseNode {
   public TableRef getLeftTblRef() { return leftTblRef_; }
   public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef_ = leftTblRef; }
   public void setJoinHints(ArrayList<String> hints) { this.joinHints_ = hints; }
+  public void setTableHints(ArrayList<String> hints) { this.tableHints_ = hints; }
   public boolean isBroadcastJoin() { return distrMode_ == DistributionMode.BROADCAST; }
   public boolean isPartitionedJoin() {
     return distrMode_ == DistributionMode.PARTITIONED;
@@ -355,6 +373,53 @@ public class TableRef implements ParseNode {
     }
   }
 
+  protected void analyzeHints(Analyzer analyzer) throws AnalysisException {
+    // We prefer adding warnings over throwing exceptions here to maintain view
+    // compatibility with Hive.
+    Preconditions.checkState(isResolved());
+    analyzeTableHints(analyzer);
+    analyzeJoinHints(analyzer);
+  }
+
+  private void analyzeTableHints(Analyzer analyzer) {
+    if (tableHints_ == null) return;
+    if (!(this instanceof BaseTableRef)) {
+      analyzer.addWarning("Table hints not supported for inline view and collections");
+      return;
+    }
+    // BaseTableRef will always have their path resolved at this point.
+    Preconditions.checkState(getResolvedPath() != null);
+    if (getResolvedPath().destTable() != null &&
+        !(getResolvedPath().destTable() instanceof HdfsTable)) {
+      analyzer.addWarning("Table hints only supported for Hdfs tables");
+    }
+    for (String hint: tableHints_) {
+      if (hint.equalsIgnoreCase("SCHEDULE_CACHE_LOCAL")) {
+        analyzer.setHasPlanHints();
+        replicaPreference_ = TReplicaPreference.CACHE_LOCAL;
+      } else if (hint.equalsIgnoreCase("SCHEDULE_CACHE_RACK")) {
+        analyzer.setHasPlanHints();
+        replicaPreference_ = TReplicaPreference.CACHE_RACK;
+      } else if (hint.equalsIgnoreCase("SCHEDULE_DISK_LOCAL")) {
+        analyzer.setHasPlanHints();
+        replicaPreference_ = TReplicaPreference.DISK_LOCAL;
+      } else if (hint.equalsIgnoreCase("SCHEDULE_DISK_RACK")) {
+        analyzer.setHasPlanHints();
+        replicaPreference_ = TReplicaPreference.DISK_RACK;
+      } else if (hint.equalsIgnoreCase("SCHEDULE_REMOTE")) {
+        analyzer.setHasPlanHints();
+        replicaPreference_ = TReplicaPreference.REMOTE;
+      } else if (hint.equalsIgnoreCase("RANDOM_REPLICA")) {
+        analyzer.setHasPlanHints();
+        randomReplica_ = true;
+      } else {
+        Preconditions.checkState(getAliases() != null && getAliases().length > 0);
+        analyzer.addWarning("Table hint not recognized for table " + getUniqueAlias() +
+            ": " + hint);
+      }
+    }
+  }
+
   private void analyzeJoinHints(Analyzer analyzer) throws AnalysisException {
     if (joinHints_ == null) return;
     for (String hint: joinHints_) {
@@ -393,7 +458,6 @@ public class TableRef implements ParseNode {
    */
   public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(desc_ != null);
-    analyzeJoinHints(analyzer);
     if (joinOp_ == JoinOperator.CROSS_JOIN) {
       // A CROSS JOIN is always a broadcast join, regardless of the join hints
       distrMode_ = DistributionMode.BROADCAST;

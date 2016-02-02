@@ -430,29 +430,40 @@ Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec
   map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry;
   for (entry = exec_request.per_node_scan_ranges.begin();
       entry != exec_request.per_node_scan_ranges.end(); ++entry) {
-    int fragment_idx = schedule->GetFragmentIdx(entry->first);
+    const TPlanNodeId node_id = entry->first;
+    int fragment_idx = schedule->GetFragmentIdx(node_id);
     const TPlanFragment& fragment = exec_request.fragments[fragment_idx];
     bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
+
+    const TPlanNode& node = fragment.plan.nodes[schedule->GetNodeIdx(node_id)];
+    DCHECK_EQ(node.node_id, node_id);
+
+    const TReplicaPreference::type* node_replica_preference = node.__isset.hdfs_scan_node
+        && node.hdfs_scan_node.__isset.replica_preference
+        ? &node.hdfs_scan_node.replica_preference : NULL;
+    bool node_random_replica = node.__isset.hdfs_scan_node &&
+        node.hdfs_scan_node.__isset.random_replica &&
+        node.hdfs_scan_node.random_replica;
 
     FragmentScanRangeAssignment* assignment =
         &(*schedule->exec_params())[fragment_idx].scan_range_assignment;
     RETURN_IF_ERROR(ComputeScanRangeAssignment(
-        entry->first, entry->second, exec_request.host_list, exec_at_coord,
-        schedule->query_options(), assignment));
+        node_id, node_replica_preference, node_random_replica, entry->second,
+        exec_request.host_list, exec_at_coord, schedule->query_options(), assignment));
     schedule->AddScanRanges(entry->second.size());
   }
   return Status::OK();
 }
 
 Status SimpleScheduler::ComputeScanRangeAssignment(
-    PlanNodeId node_id, const vector<TScanRangeLocations>& locations,
+    PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
+    bool node_random_replica, const vector<TScanRangeLocations>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment) {
   // We adjust all replicas with memory distance less than base_distance to base_distance
   // and view all replicas with equal or better distance as the same. For a full list of
   // memory distance classes see TReplicaPreference in ImpalaInternalService.thrift.
   TReplicaPreference::type base_distance = query_options.replica_preference;
-
   // The query option to disable cached reads adjusts the memory base distance to view
   // all replicas as disk_local or worse.
   // TODO remove in CDH6
@@ -461,10 +472,13 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     base_distance = TReplicaPreference::DISK_LOCAL;
   }
 
+  // A preference attached to the plan node takes precedence.
+  if (node_replica_preference) base_distance = *node_replica_preference;
+
   // On otherwise equivalent disk replicas we either pick the first one, or we pick a
   // random one. Picking random ones helps with preventing hot spots across several
   // queries. On cached replica we will always break ties randomly.
-  bool random_non_cached_tiebreak = query_options.random_replica;
+  bool random_non_cached_tiebreak = node_random_replica || query_options.random_replica;
 
   // map from datanode host to total assigned bytes.
   unordered_map<TNetworkAddress, uint64_t> assigned_bytes_per_host;

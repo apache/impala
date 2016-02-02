@@ -42,14 +42,6 @@ const i32 INVALID_PLAN_NODE_ID = -1
 // Constant default partition ID, must be < 0 to avoid collisions
 const i64 DEFAULT_PARTITION_ID = -1;
 
-enum TReplicaPreference {
-  CACHE_LOCAL,
-  CACHE_RACK,
-  DISK_LOCAL,
-  DISK_RACK,
-  REMOTE
-}
-
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -138,8 +130,8 @@ struct TQueryOptions {
 
   // Specify the prefered locality level of replicas during scan scheduling.
   // Replicas with an equal or better locality will be preferred.
-  33: optional TReplicaPreference replica_preference =
-      TReplicaPreference.CACHE_LOCAL
+  33: optional PlanNodes.TReplicaPreference replica_preference =
+      PlanNodes.TReplicaPreference.CACHE_LOCAL
 
   // Configure whether scheduling of scans over multiple non-cached replicas will break
   // ties between multiple, otherwise equivalent locations at random or deterministically.

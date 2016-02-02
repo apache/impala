@@ -1286,7 +1286,8 @@ public class SingleNodePlanner {
       return unionNode;
     } else {
       ScanNode scanNode =
-          new HdfsScanNode(ctx_.getNextNodeId(), tupleDesc, conjuncts, partitions);
+          new HdfsScanNode(ctx_.getNextNodeId(), tupleDesc, conjuncts, partitions,
+              hdfsTblRef.getReplicaPreference(), hdfsTblRef.getRandomReplica());
       scanNode.init(analyzer);
       return scanNode;
     }

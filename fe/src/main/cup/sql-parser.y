@@ -1878,47 +1878,55 @@ from_clause ::=
   ;
 
 table_ref_list ::=
-  table_ref:table
+  table_ref:table opt_plan_hints:hints
   {:
     ArrayList<TableRef> list = new ArrayList<TableRef>();
+    table.setTableHints(hints);
     list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list COMMA table_ref:table
+  | table_ref_list:list COMMA table_ref:table opt_plan_hints:hints
   {:
+    table.setTableHints(hints);
     list.add(table);
     RESULT = list;
   :}
   | table_ref_list:list KW_CROSS KW_JOIN opt_plan_hints:hints table_ref:table
+    opt_plan_hints:table_hints
   {:
     table.setJoinOp(JoinOperator.CROSS_JOIN);
     // We will throw an AnalysisException if there are join hints so that we can provide
     // a better error message than a parser exception.
     table.setJoinHints(hints);
+    table.setTableHints(table_hints);
     list.add(table);
     RESULT = list;
   :}
   | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
+    opt_plan_hints:table_hints
   {:
     table.setJoinOp((JoinOperator) op);
     table.setJoinHints(hints);
+    table.setTableHints(table_hints);
     list.add(table);
     RESULT = list;
   :}
   | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
-    KW_ON expr:e
+    opt_plan_hints:table_hints KW_ON expr:e
   {:
     table.setJoinOp((JoinOperator) op);
     table.setJoinHints(hints);
+    table.setTableHints(table_hints);
     table.setOnClause(e);
     list.add(table);
     RESULT = list;
   :}
   | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
-    KW_USING LPAREN ident_list:colNames RPAREN
+    opt_plan_hints:table_hints KW_USING LPAREN ident_list:colNames RPAREN
   {:
     table.setJoinOp((JoinOperator) op);
     table.setJoinHints(hints);
+    table.setTableHints(table_hints);
     table.setUsingClause(colNames);
     list.add(table);
     RESULT = list;

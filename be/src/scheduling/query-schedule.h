@@ -56,6 +56,7 @@ struct FragmentExecParams {
   /// N = hosts.size (i.e. N = number of fragment instances)
   int sender_id_base;
 };
+
 /// A QuerySchedule contains all necessary information for a query coordinator to
 /// generate fragment execution requests and start query execution. If resource management
 /// is enabled, then a schedule also contains the resource reservation request
@@ -107,7 +108,12 @@ class QuerySchedule {
   int64_t num_fragment_instances() const { return num_fragment_instances_; }
   int64_t num_hosts() const { return num_hosts_; }
   int64_t num_scan_ranges() const { return num_scan_ranges_; }
+
+  /// Map node ids to the index of their fragment in TQueryExecRequest.fragments.
   int32_t GetFragmentIdx(PlanNodeId id) const { return plan_node_to_fragment_idx_[id]; }
+
+  /// Map node ids to the index of the node inside their plan.nodes list.
+  int32_t GetNodeIdx(PlanNodeId id) const { return plan_node_to_plan_node_idx_[id]; }
   std::vector<FragmentExecParams>* exec_params() { return &fragment_exec_params_; }
   const boost::unordered_set<TNetworkAddress>& unique_hosts() const {
     return unique_hosts_;
@@ -141,6 +147,9 @@ class QuerySchedule {
 
   /// Maps from plan node id to its fragment index. Filled in c'tor.
   std::vector<int32_t> plan_node_to_fragment_idx_;
+
+  /// Maps from plan node id to its index in plan.nodes. Filled in c'tor.
+  std::vector<int32_t> plan_node_to_plan_node_idx_;
 
   /// vector is indexed by fragment index from TQueryExecRequest.fragments;
   /// populated by Scheduler::Schedule()

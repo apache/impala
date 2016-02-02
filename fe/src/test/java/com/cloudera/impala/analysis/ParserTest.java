@@ -257,7 +257,33 @@ public class ParserTest {
       List<String> hints = selectStmt.getTableRefs().get(i).getJoinHints();
       if (hints != null) actualHints.addAll(hints);
     }
-    if (actualHints.isEmpty()) actualHints = Lists.<String>newArrayList((String) null);
+    if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
+    assertEquals(Lists.newArrayList(expectedHints), actualHints);
+  }
+
+  private void TestTableHints(String stmt, String... expectedHints) {
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    Preconditions.checkState(selectStmt.getTableRefs().size() > 0);
+    List<String> actualHints = Lists.newArrayList();
+    for (int i = 0; i < selectStmt.getTableRefs().size(); ++i) {
+      List<String> hints = selectStmt.getTableRefs().get(i).getTableHints();
+      if (hints != null) actualHints.addAll(hints);
+    }
+    if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
+    assertEquals(Lists.newArrayList(expectedHints), actualHints);
+  }
+
+  private void TestTableAndJoinHints(String stmt, String... expectedHints) {
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    Preconditions.checkState(selectStmt.getTableRefs().size() > 0);
+    List<String> actualHints = Lists.newArrayList();
+    for (int i = 0; i < selectStmt.getTableRefs().size(); ++i) {
+      List<String> joinHints = selectStmt.getTableRefs().get(i).getJoinHints();
+      if (joinHints != null) actualHints.addAll(joinHints);
+      List<String> tableHints = selectStmt.getTableRefs().get(i).getTableHints();
+      if (tableHints != null) actualHints.addAll(tableHints);
+    }
+    if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
@@ -268,7 +294,7 @@ public class ParserTest {
   private void TestSelectListHints(String stmt, String... expectedHints) {
     SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
     List<String> actualHints = selectStmt.getSelectList().getPlanHints();
-    if (actualHints == null) actualHints = Lists.<String>newArrayList((String) null);
+    if (actualHints == null) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
@@ -278,7 +304,7 @@ public class ParserTest {
   private void TestInsertHints(String stmt, String... expectedHints) {
     InsertStmt insertStmt = (InsertStmt) ParsesOk(stmt);
     List<String> actualHints = insertStmt.getPlanHints();
-    if (actualHints == null) actualHints = Lists.<String>newArrayList((String) null);
+    if (actualHints == null) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
@@ -359,6 +385,28 @@ public class ParserTest {
       TestInsertHints(String.format(
           "insert overwrite t(a, b) partition(x, y) %sfoo,bar,baz%s select * from t",
           prefix, suffix), "foo", "bar", "baz");
+
+      // Test TableRef hints.
+      TestTableHints(String.format(
+          "select * from functional.alltypes %sschedule_disk_local%s", prefix, suffix),
+          "schedule_disk_local");
+      TestTableHints(String.format(
+          "select * from functional.alltypes %sschedule_cache_local,random_replica%s",
+          prefix, suffix), "schedule_cache_local", "random_replica");
+      TestTableHints(String.format(
+          "select * from functional.alltypes a %sschedule_cache_local,random_replica%s",
+          prefix, suffix), "schedule_cache_local", "random_replica");
+      TestTableHints(String.format(
+          "select * from functional.alltypes a %sschedule_cache_local,random_replica%s" +
+          ", functional.alltypes b %sschedule_remote%s", prefix, suffix,
+          prefix, suffix), "schedule_cache_local", "random_replica", "schedule_remote");
+
+      // Test both TableRef and join hints.
+      TestTableAndJoinHints(String.format(
+          "select * from functional.alltypes a %sschedule_cache_local,random_replica%s" +
+          "join %sbroadcast%s functional.alltypes b %sschedule_remote%s using(id)",
+          prefix, suffix, prefix, suffix, prefix, suffix), "schedule_cache_local",
+          "random_replica", "broadcast", "schedule_remote");
 
       // Test select-list hints (e.g., straight_join). The legacy-style hint has no
       // prefix and suffix.
@@ -2708,7 +2756,7 @@ public class ParserTest {
         "                             ^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
-        "ON, ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
+        "ON, ORDER, RIGHT, STRAIGHT_JOIN, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the start
     ParserError("select a a a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -2717,7 +2765,7 @@ public class ParserTest {
         "           ^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
-        "ON, ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
+        "ON, ORDER, RIGHT, STRAIGHT_JOIN, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the end
     ParserError("select a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t",

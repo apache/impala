@@ -69,14 +69,19 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     num_scan_ranges_(0),
     is_admitted_(false) {
   fragment_exec_params_.resize(request.fragments.size());
-  // map from plan node id to fragment index in exec_request.fragments
-  vector<PlanNodeId> per_node_fragment_idx;
+  // Build two maps to map node ids to their fragments as well as to the offset in their
+  // fragment's plan's nodes list.
   for (int i = 0; i < request.fragments.size(); ++i) {
+    int node_idx = 0;
     BOOST_FOREACH(const TPlanNode& node, request.fragments[i].plan.nodes) {
       if (plan_node_to_fragment_idx_.size() < node.node_id + 1) {
         plan_node_to_fragment_idx_.resize(node.node_id + 1);
+        plan_node_to_plan_node_idx_.resize(node.node_id + 1);
       }
+      DCHECK_EQ(plan_node_to_fragment_idx_.size(), plan_node_to_plan_node_idx_.size());
       plan_node_to_fragment_idx_[node.node_id] = i;
+      plan_node_to_plan_node_idx_[node.node_id] = node_idx;
+      ++node_idx;
     }
   }
 }

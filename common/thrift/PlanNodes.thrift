@@ -62,6 +62,15 @@ enum TDebugAction {
   FAIL
 }
 
+// Preference for replica selection
+enum TReplicaPreference {
+  CACHE_LOCAL,
+  CACHE_RACK,
+  DISK_LOCAL,
+  DISK_RACK,
+  REMOTE
+}
+
 // The information contained in subclasses of ScanNode captured in two separate
 // Thrift structs:
 // - TScanRange: the data range that's covered by the scan (which varies with the
@@ -120,6 +129,12 @@ struct THdfsScanNode {
   // collection-typed slots. Maps from item tuple id to the list of conjuncts
   // to be evaluated.
   2: optional map<Types.TTupleId, list<Exprs.TExpr>> collection_conjuncts
+
+  // Option to control replica selection during scan scheduling.
+  3: optional TReplicaPreference replica_preference
+
+  // Option to control tie breaks during scan scheduling.
+  4: optional bool random_replica
 }
 
 struct TDataSourceScanNode {

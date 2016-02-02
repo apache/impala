@@ -466,6 +466,23 @@ public class ToSqlTest extends AnalyzerTest {
               "PARTITION (year, month) \n-- +noshuffle\n " +
           "SELECT int_col, bool_col, year, month FROM functional.alltypes");
 
+      // Table hint
+      testToSql(String.format(
+          "select * from functional.alltypes at %srandom_replica%s", prefix, suffix),
+          "SELECT * FROM functional.alltypes at \n-- +random_replica\n");
+      testToSql(String.format(
+          "select * from functional.alltypes %srandom_replica%s", prefix, suffix),
+          "SELECT * FROM functional.alltypes \n-- +random_replica\n");
+      testToSql(String.format(
+          "select * from functional.alltypes %srandom_replica,schedule_disk_local%s",
+          prefix, suffix), "SELECT * FROM functional.alltypes \n-- +random_replica," +
+          "schedule_disk_local\n");
+      testToSql(String.format(
+          "select c1 from (select at.tinyint_col as c1 from functional.alltypes at " +
+          "%srandom_replica%s) s1", prefix, suffix),
+          "SELECT c1 FROM (SELECT at.tinyint_col c1 FROM functional.alltypes at \n-- +" +
+          "random_replica\n) s1");
+
       // Select-list hint. The legacy-style hint has no prefix and suffix.
       if (prefix.contains("[")) {
         prefix = "";

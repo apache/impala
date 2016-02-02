@@ -26,7 +26,7 @@ include "Partitions.thrift"
 
 // TPlanFragment encapsulates info needed to execute a particular
 // plan fragment, including how to produce and how to partition its output.
-// It leaves out node-specific parameters neede for the actual execution.
+// It leaves out node-specific parameters needed for the actual execution.
 struct TPlanFragment {
   // display name to be shown in the runtime profile; unique within a query
   1: required string display_name

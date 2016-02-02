@@ -46,6 +46,7 @@ import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TQueryOptions;
+import com.cloudera.impala.thrift.TReplicaPreference;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
@@ -90,6 +91,9 @@ public class HdfsScanNode extends ScanNode {
   // Partitions that are filtered in for scanning by the key ranges
   private final List<HdfsPartition> partitions_;
 
+  private TReplicaPreference replicaPreference_;
+  private boolean randomReplica_;
+
   // Total number of files from partitions_
   private long totalFiles_ = 0;
 
@@ -113,12 +117,15 @@ public class HdfsScanNode extends ScanNode {
    * class comments above for details.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      List<HdfsPartition> partitions) {
+      List<HdfsPartition> partitions, TReplicaPreference replicaPreference,
+      boolean randomReplica) {
     super(id, desc, "SCAN HDFS");
     Preconditions.checkState(desc.getTable() instanceof HdfsTable);
     tbl_ = (HdfsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = partitions;
+    replicaPreference_ = replicaPreference;
+    randomReplica_ = randomReplica;
   }
 
   @Override
@@ -431,6 +438,10 @@ public class HdfsScanNode extends ScanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt());
+    if (replicaPreference_ != null) {
+      msg.hdfs_scan_node.setReplica_preference(replicaPreference_);
+    }
+    msg.hdfs_scan_node.setRandom_replica(randomReplica_);
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
     if (!collectionConjuncts_.isEmpty()) {
       Map<Integer, List<TExpr>> tcollectionConjuncts = Maps.newLinkedHashMap();

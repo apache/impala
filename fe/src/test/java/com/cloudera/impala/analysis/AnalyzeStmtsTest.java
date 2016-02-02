@@ -1538,14 +1538,20 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
   }
 
-  @Test
-  public void TestJoinHints() throws AnalysisException {
-    String[][] hintStyles = new String[][] {
+  /**
+   * Return all supported hint styles.
+   */
+  private String[][] getHintStyles() {
+    return new String[][] {
         new String[] { "/* +", "*/" }, // traditional commented hint
         new String[] { "\n-- +", "\n" }, // eol commented hint
         new String[] { "[", "]" } // legacy style
     };
-    for (String[] hintStyle: hintStyles) {
+  }
+
+  @Test
+  public void TestJoinHints() throws AnalysisException {
+    for (String[] hintStyle: getHintStyles()) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
       AnalyzesOk(
@@ -1599,11 +1605,68 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestTableHints() throws AnalysisException {
+    for (String[] hintStyle: getHintStyles()) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+      for (String alias : new String[] { "", "a" }) {
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_cache_local%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_cache_rack%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_disk_local%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_disk_rack%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_remote%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_remote," +
+            "random_replica%s", alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %srandom_replica," +
+            "schedule_remote%s", alias, prefix, suffix));
+
+        String name = alias.isEmpty() ? "functional.alltypes" : alias;
+        AnalyzesOk(String.format("select * from functional.alltypes %s %sFOO%s", alias,
+            prefix, suffix), String.format("Table hint not recognized for table %s: " +
+            "FOO", name));
+
+        // Table hints not supported for HBase tables
+        AnalyzesOk(String.format("select * from functional_hbase.alltypes %s " +
+              "%srandom_replica%s", alias, prefix, suffix),
+            "Table hints only supported for Hdfs tables");
+        // Table hints not supported for catalog views
+        AnalyzesOk(String.format("select * from functional.alltypes_view %s " +
+              "%srandom_replica%s", alias, prefix, suffix),
+            "Table hints not supported for inline view and collections");
+        // Table hints not supported for with clauses
+        AnalyzesOk(String.format("with t as (select 1) select * from t %s " +
+              "%srandom_replica%s", alias, prefix, suffix),
+            "Table hints not supported for inline view and collections");
+      }
+      // Table hints not supported for inline views
+      AnalyzesOk(String.format("select * from (select tinyint_col * 2 as c1 from " +
+          "functional.alltypes) as v1 %srandom_replica%s", prefix, suffix),
+          "Table hints not supported for inline view and collections");
+      // Table hints not supported for collection tables
+      AnalyzesOk(String.format("select item from functional.allcomplextypes, " +
+          "allcomplextypes.int_array_col %srandom_replica%s", prefix, suffix),
+          "Table hints not supported for inline view and collections");
+    }
+  }
+
+  @Test
   public void TestSelectListHints() throws AnalysisException {
     String[][] hintStyles = new String[][] {
         new String[] { "/* +", "*/" }, // traditional commented hint
         new String[] { "\n-- +", "\n" }, // eol commented hint
-        new String[] { "", "" } // legacy style
+        new String[] { "", "" } // without surrounding characters
     };
     for (String[] hintStyle: hintStyles) {
       String prefix = hintStyle[0];
@@ -1628,12 +1691,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestInsertHints() throws AnalysisException {
-    String[][] hintStyles = new String[][] {
-        new String[] { "/* +", "*/" }, // traditional commented hint
-        new String[] { "\n-- +", "\n" }, // eol commented hint
-        new String[] { "[", "]" } // legacy style
-    };
-    for (String[] hintStyle: hintStyles) {
+    for (String[] hintStyle: getHintStyles()) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
       // Test plan hints for partitioned Hdfs tables.
@@ -3393,7 +3451,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 14);
+    testNumberOfMembers(TableRef.class, 17);
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 8);
   }

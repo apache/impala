@@ -185,7 +185,8 @@ TEST_F(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached) {
   for (int i = 0; i < num_runs_; ++i) {
     FragmentScanRangeAssignment assignment;
     local_remote_scheduler_->ComputeScanRangeAssignment(
-        0, locations_, host_list_, false, query_options, &assignment);
+        0, NULL, false, locations_, host_list_, false,
+        query_options, &assignment);
     ASSERT_FALSE(assignment.empty());
     EXPECT_EQ(assignment.size(), 1U);
     picked_hosts.insert(assignment.begin()->first.hostname);
@@ -208,7 +209,8 @@ TEST_F(SimpleAssignmentTest, ComputeAssignmentRandomNonCached) {
   for (int i = 0; i < num_runs_; ++i) {
     FragmentScanRangeAssignment assignment;
     local_remote_scheduler_->ComputeScanRangeAssignment(
-        0, locations_, host_list_, false, query_options, &assignment);
+        0, NULL, false, locations_, host_list_, false,
+        query_options, &assignment);
     ASSERT_FALSE(assignment.empty());
     EXPECT_EQ(assignment.size(), 1U);
     picked_hosts.insert(assignment.begin()->first.hostname);

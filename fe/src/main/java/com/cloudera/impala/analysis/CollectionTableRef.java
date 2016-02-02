@@ -104,6 +104,7 @@ public class CollectionTableRef extends TableRef {
           .toRequest());
     }
     isAnalyzed_ = true;
+    analyzeHints(analyzer);
     analyzeJoin(analyzer);
   }
 
