@@ -897,6 +897,29 @@ TEST_F(BufferedBlockMgrTest, RuntimeStateTeardownWriteError) {
   TestRuntimeStateTeardown(true, true);
 }
 
+// Regression test for IMPALA-2927 write complete with cancelled runtime state
+TEST_F(BufferedBlockMgrTest, WriteCompleteWithCancelledRuntimeState) {
+  const int max_num_buffers = 10;
+  RuntimeState* state;
+  BufferedBlockMgr::Client* client;
+  BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_, 0,
+      false, client_tracker_.get(), &client, &state);
+
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
+
+  // Force flushing blocks to disk so that more writes are in flight.
+  UnpinBlocks(blocks);
+
+  // Cancel the runtime state and re-pin the blocks while writes are in flight to check
+  // that WriteComplete() handles the case ok.
+  state->set_is_cancelled(true);
+  PinBlocks(blocks);
+
+  WaitForWrites(block_mgr);
+  DeleteBlocks(blocks);
+}
+
 // Clear scratch directory. Return # of files deleted.
 static int clear_scratch_dir() {
   int num_files = 0;

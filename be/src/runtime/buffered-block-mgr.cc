@@ -821,15 +821,15 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
 
   // ReturnUnusedBlock() will clear the block, so save required state in local vars.
   // state is not valid if the block was deleted because the state may be torn down
-  // after deleting its blocks.
+  // after the state's fragment has deleted all of its blocks.
   TmpFileMgr::File* tmp_file = block->tmp_file_;
-  RuntimeState* state = block->is_deleted_ || block->client_->state_->is_cancelled() ?
-      NULL : block->client_->state_;
+  RuntimeState* state = block->is_deleted_ ? NULL : block->client_->state_;
 
   // If the block was re-pinned when it was in the IOMgr queue, don't free it.
   if (block->is_pinned_) {
     // The number of outstanding writes has decreased but the number of free buffers
     // hasn't.
+    DCHECK(!block->is_deleted_);
     DCHECK(!block->client_local_)
         << "Client should be waiting. No one should have pinned this block.";
     if (write_status.ok() && !is_cancelled_ && !state->is_cancelled()) {
