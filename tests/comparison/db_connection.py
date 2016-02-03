@@ -18,6 +18,7 @@
    connection.
 
 '''
+import hashlib
 import impala.dbapi
 import shelve
 from abc import ABCMeta, abstractmethod
@@ -455,7 +456,15 @@ class DbCursor(object):
     LOG.info('Indexing table %s', table_name)
     table = self.describe_table(table_name)
     for col in table.cols:
-      self.execute('CREATE INDEX ON %s(%s)' % (table_name, col.name))
+      index_name = '%s_%s' % (table_name, col.name)
+      if self.db_name:
+        index_name = '%s_%s' % (self.db_name, index_name)
+      # Older versions of Postgres require index name to be included in the statement.
+      # In the past, there were some failures when trying to index a table with long
+      # column names because there is a limit to how long index name is allowed to be,
+      # This is why index_name is hashed and truncated to 10 characters.
+      index_name = 'ind_' + hashlib.sha256(index_name).hexdigest()[:10]
+      self.execute('CREATE INDEX %s ON %s(%s)' % (index_name, table_name, col.name))
 
   def search_for_unique_cols(self, table=None, table_name=None, depth=2):
     if not table:
