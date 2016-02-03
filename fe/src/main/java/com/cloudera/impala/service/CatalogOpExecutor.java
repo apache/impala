@@ -174,9 +174,18 @@ import com.google.common.collect.Sets;
  * 5. Modify table metadata
  * 6. Release table lock
  *
+ * Operations that CREATE/DROP catalog objects such as tables and databases employ the
+ * following locking protocol:
+ * 1. Acquire the metastoreDdlLock_
+ * 2. Update the Hive Metastore
+ * 3. Increment and get a new catalog version
+ * 4. Update the catalog
+ * 5. Release the metastoreDdlLock_
+ *
  * It is imperative that other operations that need to hold both the catalog lock and
  * table locks at the same time follow the same locking protocol and acquire these
- * locks in that particular order.
+ * locks in that particular order. Also, operations that modify table metadata
+ * (e.g. alter table statements) should not acquire the metastoreDdlLock_.
  *
  * TODO: Refactor the CatalogOpExecutor and CatalogServiceCatalog classes and consolidate
  * the locking protocol into a single class.
@@ -197,9 +206,8 @@ public class CatalogOpExecutor {
 
   private final CatalogServiceCatalog catalog_;
 
-  // Lock used to ensure that in-place modifications to cached table/db objects in
-  // catalog_ and the corresponding RPC to apply the change in the HMS are atomic.
-  // Such modifications are done for CREATE/DROP/DATABASE requests.
+  // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
+  // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
   private final Object metastoreDdlLock_ = new Object();
   private static final Logger LOG = Logger.getLogger(CatalogOpExecutor.class);
 
@@ -561,22 +569,19 @@ public class CatalogOpExecutor {
 
       // Update all partitions.
       bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
-
-      synchronized (metastoreDdlLock_) {
-        if (numUpdatedColumns > 0) {
-          Preconditions.checkNotNull(colStats);
-          // Update column stats.
-          try {
-            msClient.getHiveClient().updateTableColumnStatistics(colStats);
-          } catch (Exception e) {
-            throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
-                    "updateTableColumnStatistics"), e);
-          }
+      if (numUpdatedColumns > 0) {
+        Preconditions.checkNotNull(colStats);
+        // Update column stats.
+        try {
+          msClient.getHiveClient().updateTableColumnStatistics(colStats);
+        } catch (Exception e) {
+          throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
+                  "updateTableColumnStatistics"), e);
         }
-        // Update the table stats. Apply the table alteration last to ensure the
-        // lastDdlTime is as accurate as possible.
-        applyAlterTable(msTbl);
       }
+      // Update the table stats. Apply the table alteration last to ensure the
+      // lastDdlTime is as accurate as possible.
+      applyAlterTable(msTbl);
     } finally {
       msClient.release();
     }
@@ -914,13 +919,11 @@ public class CatalogOpExecutor {
         }
 
         if (partition.getPartitionStats() != null)  {
-          synchronized (metastoreDdlLock_) {
-            PartitionStatsUtil.deletePartStats(partition);
-            try {
-              applyAlterPartition(table, partition);
-            } finally {
-              partition.markDirty();
-            }
+          PartitionStatsUtil.deletePartStats(partition);
+          try {
+            applyAlterPartition(table, partition);
+          } finally {
+            partition.markDirty();
           }
         }
       }
@@ -935,6 +938,7 @@ public class CatalogOpExecutor {
    * that were updated as part of this operation.
    */
   private int dropColumnStats(Table table) throws ImpalaRuntimeException {
+    Preconditions.checkState(Thread.holdsLock(table));
     int numColsUpdated = 0;
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     try {
@@ -943,11 +947,9 @@ public class CatalogOpExecutor {
         if (!col.getStats().hasStats()) continue;
 
         try {
-          synchronized (metastoreDdlLock_) {
-            msClient.getHiveClient().deleteTableColumnStatistics(
-                table.getDb().getName(), table.getName(), col.getName());
-            ++numColsUpdated;
-          }
+          msClient.getHiveClient().deleteTableColumnStatistics(
+              table.getDb().getName(), table.getName(), col.getName());
+          ++numColsUpdated;
         } catch (NoSuchObjectException e) {
           // We don't care if the column stats do not exist, just ignore the exception.
           // We would only expect to make it here if the Impala and HMS metadata
@@ -971,6 +973,7 @@ public class CatalogOpExecutor {
    * is unpartitioned.
    */
   private int dropTableStats(Table table) throws ImpalaException {
+    Preconditions.checkState(Thread.holdsLock(table));
     // Delete the ROW_COUNT from the table (if it was set).
     org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
     int numTargetedPartitions = 0;
@@ -1361,21 +1364,20 @@ public class CatalogOpExecutor {
       } finally {
         msClient.release();
       }
-    }
 
-    // Submit the cache request and update the table metadata.
-    if (cacheOp != null && cacheOp.isSet_cached()) {
-      short replication = cacheOp.isSetReplication() ? cacheOp.getReplication() :
-          JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
-      long id = HdfsCachingUtil.submitCacheTblDirective(newTable,
-          cacheOp.getCache_pool_name(), replication);
-      catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
-          new TTableName(newTable.getDbName(), newTable.getTableName()));
-      applyAlterTable(newTable);
+      // Submit the cache request and update the table metadata.
+      if (cacheOp != null && cacheOp.isSet_cached()) {
+        short replication = cacheOp.isSetReplication() ? cacheOp.getReplication() :
+            JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
+        long id = HdfsCachingUtil.submitCacheTblDirective(newTable,
+            cacheOp.getCache_pool_name(), replication);
+        catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
+            new TTableName(newTable.getDbName(), newTable.getTableName()));
+        applyAlterTable(newTable);
+      }
+      Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
+      addTableToCatalogUpdate(newTbl, response.result);
     }
-
-    Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
-    addTableToCatalogUpdate(newTbl, response.result);
     return true;
   }
 
@@ -2314,26 +2316,24 @@ public class CatalogOpExecutor {
       for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
         int numPartitionsToUpdate =
             Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
-        synchronized (metastoreDdlLock_) {
-          try {
-            // Alter partitions in bulk.
-            msClient.getHiveClient().alter_partitions(dbName, tableName,
-                hmsPartitions.subList(i, numPartitionsToUpdate));
-            // Mark the corresponding HdfsPartition objects as dirty
-            for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
-                 hmsPartitions.subList(i, numPartitionsToUpdate)) {
-              try {
-                catalog_.getHdfsPartition(dbName, tableName, msPartition).markDirty();
-              } catch (PartitionNotFoundException e) {
-                LOG.error(String.format("Partition of table %s could not be found: %s",
-                    tableName, e.getMessage()));
-                continue;
-              }
+        try {
+          // Alter partitions in bulk.
+          msClient.getHiveClient().alter_partitions(dbName, tableName,
+              hmsPartitions.subList(i, numPartitionsToUpdate));
+          // Mark the corresponding HdfsPartition objects as dirty
+          for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
+               hmsPartitions.subList(i, numPartitionsToUpdate)) {
+            try {
+              catalog_.getHdfsPartition(dbName, tableName, msPartition).markDirty();
+            } catch (PartitionNotFoundException e) {
+              LOG.error(String.format("Partition of table %s could not be found: %s",
+                  tableName, e.getMessage()));
+              continue;
             }
-          } catch (TException e) {
-            throw new ImpalaRuntimeException(
-                String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
           }
+        } catch (TException e) {
+          throw new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
         }
       }
     } finally {
