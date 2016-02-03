@@ -58,6 +58,13 @@ class UtilityFunctions {
   /// database from the parent session of this query.
   static StringVal CurrentDatabase(FunctionContext* ctx);
 
+  /// Implementation of the Uuid() function.
+  static StringVal Uuid(FunctionContext* ctx);
+  static void UuidPrepare(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+  static void UuidClose(FunctionContext* ctx,
+      FunctionContext::FunctionStateScope scope);
+
   /// Implementation of the typeOf() function. Returns the type of the input
   /// expression. input_val is not used and it is kept here in order to let
   /// the compiler generate the corresponding fully-qualified function name.

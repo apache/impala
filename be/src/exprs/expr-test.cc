@@ -22,6 +22,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
+#include <boost/regex.hpp>
 #include <boost/unordered_map.hpp>
 #include <gtest/gtest.h>
 
@@ -303,6 +304,16 @@ class ExprTest : public testing::Test {
     GetValue(expr, type, reinterpret_cast<void**>(&result));
     string tmp(result->ptr, result->len);
     EXPECT_EQ(expected_result, tmp) << expr;
+  }
+
+  string TestStringValueRegex(const string& expr, const string& regex) {
+    StringValue* result;
+    GetValue(expr, TYPE_STRING, reinterpret_cast<void **>(&result));
+    static const boost::regex e(regex);
+    string result_cxxstr(result->ptr, result->len);
+    const bool is_regex_match = regex_match(result_cxxstr, e);
+    EXPECT_TRUE(is_regex_match);
+    return result_cxxstr;
   }
 
   // We can't put this into TestValue() because GTest can't resolve
@@ -5718,7 +5729,18 @@ TEST_F(ExprTest, BitByteBuiltins) {
   TestValue("shiftright(cast(1 as BIGINT), -2)", TYPE_BIGINT, 4);
   TestValue("rotateleft(4, -3)", TYPE_TINYINT, -128);
   TestValue("rotateright(256, -2)", TYPE_SMALLINT, 1024);
+}
 
+TEST_F(ExprTest, UuidTest) {
+  boost::unordered_set<string> string_set;
+  const unsigned int NUM_UUIDS = 10;
+  const string regex(
+      "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}");
+  for (int i = 0; i < NUM_UUIDS; ++i) {
+    const string uuid_str = TestStringValueRegex("uuid()", regex);
+    string_set.insert(uuid_str);
+  }
+  EXPECT_TRUE(string_set.size() == NUM_UUIDS);
 }
 
 } // namespace impala

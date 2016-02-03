@@ -535,6 +535,10 @@ visible_functions = [
   [['isnotfalse'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsNotFalse'],
 
   # Utility functions
+  [['uuid'], 'STRING', [],
+   '_ZN6impala16UtilityFunctions4UuidEPN10impala_udf15FunctionContextE',
+   '_ZN6impala16UtilityFunctions11UuidPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
+   '_ZN6impala16UtilityFunctions9UuidCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
   [['current_database'], 'STRING', [], 'impala::UtilityFunctions::CurrentDatabase'],
   [['user'], 'STRING', [], 'impala::UtilityFunctions::User'],
   [['effective_user'], 'STRING', [], 'impala::UtilityFunctions::EffectiveUser'],
