@@ -449,6 +449,16 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalyzesOk("select int_col from functional.alltypestiny a where " +
         "int_col not in (select 1 as int_col from functional.alltypesagg b " +
         "where a.int_col = b.int_col)");
+
+    // NOT IN uncorrelated aggregate subquery with a constant
+    AnalysisError("select * from functional.alltypestiny t1 where " +
+        "10 not in (select max(int_col) from functional.alltypestiny)",
+        "Unsupported NOT IN predicate with subquery: 10 NOT IN (SELECT " +
+        "max(int_col) FROM functional.alltypestiny)");
+    AnalysisError("select * from functional.alltypestiny t1 where " +
+        "(10 - 2) not in (select count(*) from functional.alltypestiny)",
+        "Unsupported NOT IN predicate with subquery: (10 - 2) NOT IN " +
+        "(SELECT count(*) FROM functional.alltypestiny)");
   }
 
   @Test

@@ -498,6 +498,13 @@ public class StmtRewriter {
             expr.toSql());
       }
 
+      // TODO: Requires support for null-aware anti-join mode in nested-loop joins
+      if (expr.getSubquery().isScalarSubquery() && expr instanceof InPredicate
+          && ((InPredicate) expr).isNotIn()) {
+        throw new AnalysisException("Unsupported NOT IN predicate with subquery: " +
+            expr.toSql());
+      }
+
       // We can rewrite the aggregate subquery using a cross join. All conjuncts
       // that were extracted from the subquery are added to stmt's WHERE clause.
       stmt.whereClause_ =
