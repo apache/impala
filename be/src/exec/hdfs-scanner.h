@@ -23,6 +23,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"
+#include "common/object-pool.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scan-node.h"
 #include "exec/scanner-context.h"
@@ -146,6 +147,9 @@ class HdfsScanner {
 
   /// Context for this scanner
   ScannerContext* context_;
+
+  /// Object pool for objects with same lifetime as scanner.
+  ObjectPool obj_pool_;
 
   /// The first stream for context_
   ScannerContext::Stream* stream_;

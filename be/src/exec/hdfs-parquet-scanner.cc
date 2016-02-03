@@ -744,10 +744,6 @@ class HdfsParquetScanner::ScalarColumnReader :
     return false;
   }
 
-  void CopySlot(T* slot, MemPool* pool) {
-    // no-op for non-string columns.
-  }
-
   /// Converts and writes src into dst based on desc_->type()
   void ConvertSlot(const T* src, T* dst, MemPool* pool) {
     DCHECK(false);
@@ -776,15 +772,6 @@ class HdfsParquetScanner::ScalarColumnReader :
 template<>
 inline bool HdfsParquetScanner::ScalarColumnReader<StringValue, true>::NeedsConversion() const {
   return needs_conversion_;
-}
-
-template<>
-void HdfsParquetScanner::ScalarColumnReader<StringValue, true>::CopySlot(
-    StringValue* slot, MemPool* pool) {
-  if (slot->len == 0) return;
-  uint8_t* buffer = pool->Allocate(slot->len);
-  memcpy(buffer, slot->ptr, slot->len);
-  slot->ptr = reinterpret_cast<char*>(buffer);
 }
 
 template<>
@@ -1014,7 +1001,7 @@ HdfsParquetScanner::ColumnReader* HdfsParquetScanner::CreateReader(
     // only the rep and def levels, so it doesn't matter what kind of reader we make.
     reader = new ScalarColumnReader<int8_t, false>(this, node, slot_desc);
   }
-  return scan_node_->runtime_state()->obj_pool()->Add(reader);
+  return obj_pool_.Add(reader);
 }
 
 inline void HdfsParquetScanner::ColumnReader::ReadPosition(Tuple* tuple) {

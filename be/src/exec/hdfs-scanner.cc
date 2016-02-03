@@ -104,6 +104,7 @@ void HdfsScanner::Close() {
   for (; iter != scanner_conjuncts_map_.end(); ++iter) {
     Expr::Close(iter->second, state_);
   }
+  obj_pool_.Clear();
 }
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
