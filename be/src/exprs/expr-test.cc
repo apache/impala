@@ -2750,6 +2750,8 @@ TEST_F(ExprTest, MathConversionFunctions) {
     TestStringValue("conv(" + q + "11" + q + ", 36, 2)", "100101");
     TestStringValue("conv(" + q + "100101" + q + ", 2, 36)", "11");
     TestStringValue("conv(" + q + "0" + q + ", 10, 2)", "0");
+    // Test for very large big int
+    TestStringValue("conv(" + q + "2061013007" + q + ", 16, 10)", "139066421255");
     // Test negative numbers (tests from Hive).
     // If to_base is positive, the number should be handled as a 2's complement (64-bit).
     TestStringValue("conv(" + q + "-641" + q + ", 10, -10)", "-641");

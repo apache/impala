@@ -358,7 +358,7 @@ StringVal MathFunctions::DecimalToBase(FunctionContext* ctx, int64_t src_num,
 bool MathFunctions::DecimalInBaseToDecimal(int64_t src_num, int8_t src_base,
     int64_t* result) {
   uint64_t temp_num = abs(src_num);
-  int32_t place = 1;
+  int64_t place = 1;
   *result = 0;
   do {
     int32_t digit = temp_num % 10;
