@@ -495,7 +495,7 @@ class Impala(Service):
     """
     stopped_impalads = self.find_stopped_impalads()
     if not stopped_impalads:
-      return stopped_impalads
+      return dict.fromkeys(stopped_impalads)
     messages = OrderedDict()
     impalads_with_message = dict()
     for i, message in izip(stopped_impalads, self.for_each_impalad(
@@ -505,16 +505,16 @@ class Impala(Service):
       else:
         messages[i] = "%s crashed but no info could be found" % i.host_name
     messages.update(impalads_with_message)
-    return stopped_impalads
+    return messages
 
   def for_each_impalad(self, func, impalads=None, as_dict=False):
     if impalads is None:
       impalads = self.impalads
-    promise = self._thread_pool.map_async(func, self.impalads)
+    promise = self._thread_pool.map_async(func, impalads)
     # Python doesn't handle ctrl-c well unless a timeout is provided.
     results = promise.get(maxint)
     if as_dict:
-      results = dict(izip(self.impalads, results))
+      results = dict(izip(impalads, results))
     return results
 
   def restart(self):
@@ -623,7 +623,7 @@ class Impalad(object):
     bt = self.shell("""
         LAST_CORE_FILE=$(
             find "{core_dump_dir}" -maxdepth 1 -name "*core*" -printf "%T@ %p\\n" \\
-                | sort -n | head -1 | cut -f 1 -d ' ' --complement)
+                | sort -n | tail -1 | cut -f 1 -d ' ' --complement)
         if [[ -n "$LAST_CORE_FILE" ]]; then
           MTIME=$(stat -c %Y "$LAST_CORE_FILE")
           if [[ "$MTIME" -ge {start_time_unix} ]]; then

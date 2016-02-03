@@ -126,7 +126,18 @@ def print_crash_info_if_exists(impala, start_time):
      error message will be printed to stderr for each stopped impalad. Returns a value
      that evaluates to True if any impalads are stopped.
   """
-  crashed_impalads = impala.find_crashed_impalads(start_time)
+  max_attempts = 5
+  for remaining_attempts in xrange(max_attempts - 1, -1, -1):
+    try:
+      crashed_impalads = impala.find_crashed_impalads(start_time)
+      break
+    except Timeout as e:
+      LOG.info("Timeout checking if impalads crashed: %s." % e +
+          (" Will retry." if remaining_attempts else ""))
+  else:
+    LOG.error("Aborting after %s failed attempts to check if impalads crashed",
+        max_attempts)
+    raise e
   for message in crashed_impalads.itervalues():
     print(message, file=sys.stderr)
   return crashed_impalads
@@ -353,18 +364,23 @@ class StressRunner(object):
         # This is bad enough to abort early. A failure here probably means there's a
         # bug in this script. The mem poller could be checked for an error too. It is
         # not critical so is ignored.
+        LOG.error("Aborting due to error in producer/consumer")
         sys.exit(1)
+      checked_for_crashes = False
       for idx, runner in enumerate(self._query_runners):
         if runner.exitcode is not None:
           if runner.exitcode != 0:
-            if self.num_successive_errors_needed_to_abort \
-                >= self._num_successive_errors.value:
-              if self.num_successive_errors_needed_to_abort > 1:
-                print("Aborting due to %s successive errors encounter"
-                    % self.num_successive_errors_needed_to_abort, file=sys.stderr)
+            if not checked_for_crashes:
+              LOG.info("Checking for crashes")
+              if print_crash_info_if_exists(impala, start_time):
+                sys.exit(runner.exitcode)
+              LOG.info("No crashes detected")
+              checked_for_crashes = True
+            if self._num_successive_errors.value \
+                >= self.num_successive_errors_needed_to_abort:
+              print("Aborting due to %s successive errors encountered"
+                  % self._num_successive_errors.value, file=sys.stderr)
               sys.exit(1)
-            if print_crash_info_if_exists(impala, start_time):
-              sys.exit(runner.exitcode)
           del self._query_runners[idx]
       sleep(sleep_secs)
       if should_print_status:
@@ -394,6 +410,7 @@ class StressRunner(object):
         for _ in xrange(self._num_queries_to_run):
           self._query_queue.put(choice(queries))
       except Exception as e:
+        LOG.error("Error producing queries: %s", e)
         current_thread().error = e
         raise e
     self._query_producer_thread = create_and_start_daemon_thread(enqueue_queries,
@@ -416,6 +433,7 @@ class StressRunner(object):
           self._query_runners.append(runner)
           runner.start()
       except Exception as e:
+        LOG.error("Error consuming queries: %s", e)
         current_thread().error = e
         raise e
     self._query_consumer_thread = create_and_start_daemon_thread(
@@ -524,6 +542,9 @@ class StressRunner(object):
         query = self._query_queue.get(True, 1)
       except Empty:
         continue
+      except EOFError:
+        LOG.debug("Query running aborting due to closed query queue")
+        break
       LOG.debug("Getting query_idx")
       with self._num_queries_dequeued.get_lock():
         query_idx = self._num_queries_dequeued.value
@@ -576,6 +597,11 @@ class StressRunner(object):
           # made which results in "Invalid session id" since the server destroyed the
           # session upon disconnect.
           if "Invalid session id" in error_msg:
+            self._num_successive_errors.value = 0
+            continue
+          # The server may fail to respond to clients if the load is high.
+          if "Connection timed out" in error_msg or "ECONNRESET" in error_msg \
+              or "couldn't get a client" in error_msg:
             self._num_successive_errors.value = 0
             continue
           increment(self._num_successive_errors)
@@ -775,7 +801,7 @@ class QueryRunner(object):
       report.mem_limit_exceeded = True
       return
 
-    LOG.error("Non-mem limit error for query with id %s: %s",
+    LOG.debug("Non-mem limit error for query with id %s: %s",
         op_handle_to_query_id(cursor._last_operation_handle), caught_exception,
         exc_info=True)
     report.non_mem_limit_error = caught_exception
