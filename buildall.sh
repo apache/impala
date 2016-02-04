@@ -46,11 +46,13 @@ IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
 METASTORE_SNAPSHOT_FILE=
 MAKE_IMPALA_ARGS=""
+BUILD_COVERAGE=0
+BUILD_ASAN=0
 
 # Defaults that can be picked up from the environment, but are overridable through the
 # commandline.
 : ${EXPLORATION_STRATEGY:=core}
-: ${TARGET_BUILD_TYPE:=Debug}
+: ${CMAKE_BUILD_TYPE:=Debug}
 
 # parse command line options
 # TODO: We have to change this to use getopts, or something more sensible.
@@ -89,17 +91,14 @@ do
     -format_sentry_policy_db)
       FORMAT_SENTRY_POLICY_DB=1
       ;;
-    -codecoverage_debug)
-      TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
+    -release)
+      CMAKE_BUILD_TYPE=Release
       ;;
-    -codecoverage_release)
-      TARGET_BUILD_TYPE=CODE_COVERAGE_RELEASE
+    -codecoverage)
+      BUILD_COVERAGE=1
       ;;
     -asan)
-      TARGET_BUILD_TYPE=ADDRESS_SANITIZER
-      ;;
-    -release)
-      TARGET_BUILD_TYPE=Release
+      BUILD_ASAN=1
       ;;
     -testpairwise)
       EXPLORATION_STRATEGY=pairwise
@@ -149,9 +148,9 @@ do
       echo "[-format_cluster] : Format the minicluster [Default: False]"
       echo "[-format_metastore] : Format the metastore db [Default: False]"
       echo "[-format_sentry_policy_db] : Format the Sentry policy db [Default: False]"
-      echo "[-codecoverage_release] : Release code coverage build"
-      echo "[-codecoverage_debug] : Debug code coverage build"
-      echo "[-asan] : Build with address sanitizer"
+      echo "[-release] : Release build [Default: debug]"
+      echo "[-codecoverage] : Build with code coverage [Default: False]"
+      echo "[-asan] : Address sanitizer build [Default: False]"
       echo "[-skiptests] : Skips execution of all tests"
       echo "[-notests] : Skips building and execution of all tests"
       echo "[-testpairwise] : Sun tests in 'pairwise' mode (increases"\
@@ -194,6 +193,27 @@ Examples of common tasks:
     esac
   shift;
 done
+
+# Adjust CMAKE_BUILD_TYPE for ASAN and code coverage, if necessary.
+if [[ ${BUILD_COVERAGE} -eq 1 ]]; then
+  case ${CMAKE_BUILD_TYPE} in
+    Debug)
+      CMAKE_BUILD_TYPE=CODE_COVERAGE_DEBUG
+      ;;
+    Release)
+      CMAKE_BUILD_TYPE=CODE_COVERAGE_RELEASE
+      ;;
+  esac
+fi
+if [[ ${BUILD_ASAN} -eq 1 ]]; then
+  # The next check also catches cases where BUILD_COVERAGE=1, which is not supported
+  # together with BUILD_ASAN=1.
+  if [[ "${CMAKE_BUILD_TYPE}" != "Debug" ]]; then
+    echo "Address sanitizer build not supported for build type: ${CMAKE_BUILD_TYPE}"
+    exit 1
+  fi
+  CMAKE_BUILD_TYPE=ADDRESS_SANITIZER
+fi
 
 # If we aren't kerberized then we certainly don't need to talk about
 # re-sourcing impala-config.
@@ -264,7 +284,7 @@ if [ $METASTORE_SNAPSHOT_FILE ]; then
 fi
 
 # build common and backend
-MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${TARGET_BUILD_TYPE}"
+MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
 echo "Calling make_impala.sh ${MAKE_IMPALA_ARGS}"
 $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 
