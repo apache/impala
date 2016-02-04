@@ -14,15 +14,16 @@
 #
 # Client tests for Impala's HiveServer2 interface
 
-import pytest
 import json
+import pytest
 import time
-from socket import getfqdn
+
 from urllib2 import urlopen
+
+from ImpalaService import ImpalaHiveServer2Service
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
 from TCLIService import TCLIService
-from ImpalaService import ImpalaHiveServer2Service
-from ExecStats.ttypes import TExecState
+
 
 class TestHS2(HS2TestSuite):
   def test_open_session(self):
@@ -81,10 +82,11 @@ class TestHS2(HS2TestSuite):
   # This test verifies the number of open and expired sessions so avoid running
   # concurrently with other sessions.
   @pytest.mark.execute_serially
-  def test_idle_session_timeout(self):
-    """Test for idle sessions' expiration"""
+  def test_concurrent_session_mixed_idle_timeout(self):
+    """Test for concurrent idle sessions' expiration with mixed timeout durations."""
     timeout_periods = [0, 5, 10]
     session_handles = []
+    last_time_session_active = []
 
     for timeout in timeout_periods:
       open_session_req = TCLIService.TOpenSessionReq()
@@ -95,9 +97,9 @@ class TestHS2(HS2TestSuite):
       session_handles.append(resp.sessionHandle)
 
     num_open_sessions = self.impalad_test_service.get_metric_value(
-      "impala-server.num-open-hiveserver2-sessions")
+        "impala-server.num-open-hiveserver2-sessions")
     num_expired_sessions = self.impalad_test_service.get_metric_value(
-      "impala-server.num-sessions-expired")
+        "impala-server.num-sessions-expired")
 
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.statement = "SELECT 1+2"
@@ -105,11 +107,12 @@ class TestHS2(HS2TestSuite):
       execute_statement_req.sessionHandle = session_handle
       resp = self.hs2_client.ExecuteStatement(execute_statement_req)
       TestHS2.check_response(resp)
+      last_time_session_active.append(time.time())
 
     assert num_open_sessions == self.impalad_test_service.get_metric_value(
-      "impala-server.num-open-hiveserver2-sessions")
+        "impala-server.num-open-hiveserver2-sessions")
     assert num_expired_sessions == self.impalad_test_service.get_metric_value(
-      "impala-server.num-sessions-expired")
+        "impala-server.num-sessions-expired")
 
     for timeout in timeout_periods:
       sleep_period = timeout * 1.5
@@ -118,8 +121,11 @@ class TestHS2(HS2TestSuite):
         if session_handle is not None:
           execute_statement_req.sessionHandle = session_handle
           resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-          if timeout_periods[i] == 0 or sleep_period < timeout_periods[i]:
+          last_exec_statement_time = time.time()
+          if timeout_periods[i] == 0 or \
+             timeout_periods[i] > last_exec_statement_time - last_time_session_active[i]:
             TestHS2.check_response(resp)
+            last_time_session_active[i] = last_exec_statement_time
           else:
             TestHS2.check_response(resp, TCLIService.TStatusCode.ERROR_STATUS)
             close_session_req = TCLIService.TCloseSessionReq()
@@ -129,9 +135,9 @@ class TestHS2(HS2TestSuite):
             num_open_sessions -= 1
             num_expired_sessions += 1
       assert num_open_sessions == self.impalad_test_service.get_metric_value(
-        "impala-server.num-open-hiveserver2-sessions")
+          "impala-server.num-open-hiveserver2-sessions")
       assert num_expired_sessions == self.impalad_test_service.get_metric_value(
-        "impala-server.num-sessions-expired")
+          "impala-server.num-sessions-expired")
 
   @needs_session()
   def test_get_operation_status(self):
@@ -187,20 +193,20 @@ class TestHS2(HS2TestSuite):
     resp = self.hs2_client.OpenSession(open_session_req)
     TestHS2.check_response(resp)
     num_sessions = self.impalad_test_service.get_metric_value(
-      "impala-server.num-open-hiveserver2-sessions")
+        "impala-server.num-open-hiveserver2-sessions")
 
     assert num_sessions > 0
 
     self.socket.close()
     self.socket = None
     self.impalad_test_service.wait_for_metric_value(
-      "impala-server.num-open-hiveserver2-sessions", num_sessions - 1)
+        "impala-server.num-open-hiveserver2-sessions", num_sessions - 1)
 
   @pytest.mark.execute_serially
   def test_multiple_sessions(self):
     """Test that multiple sessions on the same socket connection are allowed"""
     num_sessions = self.impalad_test_service.get_metric_value(
-      "impala-server.num-open-hiveserver2-sessions")
+        "impala-server.num-open-hiveserver2-sessions")
     session_ids = []
     for _ in xrange(5):
       open_session_req = TCLIService.TOpenSessionReq()
@@ -211,12 +217,12 @@ class TestHS2(HS2TestSuite):
       session_ids.append(resp.sessionHandle)
 
     self.impalad_test_service.wait_for_metric_value(
-      "impala-server.num-open-hiveserver2-sessions", num_sessions + 5)
+        "impala-server.num-open-hiveserver2-sessions", num_sessions + 5)
 
     self.socket.close()
     self.socket = None
     self.impalad_test_service.wait_for_metric_value(
-      "impala-server.num-open-hiveserver2-sessions", num_sessions)
+        "impala-server.num-open-hiveserver2-sessions", num_sessions)
 
   @needs_session()
   def test_get_schemas(self):
