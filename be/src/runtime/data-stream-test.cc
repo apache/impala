@@ -578,6 +578,57 @@ TEST_F(DataStreamTest, BasicTest) {
   }
 }
 
+// This test checks for the avoidance of IMPALA-2931, which is a crash that would occur if
+// the parent memtracker of a DataStreamRecvr's memtracker was deleted before the
+// DataStreamRecvr was destroyed. The fix was to move decoupling the child tracker from
+// the parent into DataStreamRecvr::Close() which should always be called before the
+// parent is destroyed. In practice the parent is a member of the query's runtime state.
+//
+// TODO: Make lifecycle requirements more explicit.
+TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
+  scoped_ptr<RuntimeState> runtime_state(
+      new RuntimeState(TExecPlanFragmentParams(), "", &exec_env_));
+  runtime_state->InitMemTrackers(TUniqueId(), NULL, -1);
+
+  scoped_ptr<RuntimeProfile> profile(new RuntimeProfile(&obj_pool_, "TestReceiver"));
+
+  // Start just one receiver.
+  TUniqueId instance_id;
+  GetNextInstanceId(&instance_id);
+  shared_ptr<DataStreamRecvr> stream_recvr = stream_mgr_->CreateRecvr(runtime_state.get(),
+      *row_desc_, instance_id, DEST_NODE_ID, 1, 1, profile.get(), false);
+
+  // Perform tear down, but keep a reference to the receiver so that it is deleted last
+  // (to confirm that the destructor does not access invalid state after tear-down).
+  stream_recvr->Close();
+
+  // Force deletion of the parent memtracker by destroying it's owning runtime state.
+  runtime_state.reset();
+
+  // Send an eos RPC to the receiver. Not required for tear-down, but confirms that the
+  // RPC does not cause an error (the receiver will still be called, since it is only
+  // Close()'d, not deleted from the data stream manager).
+  Status rpc_status;
+  ImpalaInternalServiceConnection client(exec_env_.impalad_client_cache(),
+      MakeNetworkAddress("localhost", FLAGS_port), &rpc_status);
+  EXPECT_TRUE(rpc_status.ok());
+  TTransmitDataParams params;
+  params.protocol_version = ImpalaInternalServiceVersion::V1;
+  params.__set_eos(true);
+  params.__set_dest_fragment_instance_id(instance_id);
+  params.__set_dest_node_id(DEST_NODE_ID);
+  TUniqueId dummy_id;
+  params.__set_sender_id(0);
+
+  TTransmitDataResult result;
+  rpc_status =
+      client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &result);
+
+  // Finally, stream_recvr destructor happens here. Before fix for IMPALA-2931, this
+  // would have resulted in a crash.
+  stream_recvr.reset();
+}
+
 // TODO: more tests:
 // - test case for transmission error in last batch
 // - receivers getting created concurrently

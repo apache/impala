@@ -343,12 +343,12 @@ void DataStreamRecvr::Close() {
   mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
   mgr_ = NULL;
   merger_.reset();
+  mem_tracker_->UnregisterFromParent();
+  mem_tracker_.reset();
 }
 
 DataStreamRecvr::~DataStreamRecvr() {
   DCHECK(mgr_ == NULL) << "Must call Close()";
-  mem_tracker_->UnregisterFromParent();
-  mem_tracker_.reset();
 }
 
 Status DataStreamRecvr::GetBatch(RowBatch** next_batch) {

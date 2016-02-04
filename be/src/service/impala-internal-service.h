@@ -49,14 +49,6 @@ class ImpalaInternalService : public ImpalaInternalServiceIf {
 
   virtual void TransmitData(TTransmitDataResult& return_val,
       const TTransmitDataParams& params) {
-    // Prevent the fragment (which has the receiver for transmit data) from being
-    // destroyed unti TransmitData() completes. Otherwise if query cancellation happens
-    // while TransmitData() is running, TransmitData() could end up with the last
-    // shared_ptr to a DataStreamRecvr. When the DataStreamRecvr is destroyed it expects
-    // the fragment which owns it to still be around. Even if no fragment is found call
-    // TransmitData() to set the return_val.
-    boost::shared_ptr<FragmentMgr::FragmentExecState> fragment_exec_state
-        = fragment_mgr_->GetFragmentExecState(params.dest_fragment_instance_id);
     impala_server_->TransmitData(return_val, params);
   }
 
