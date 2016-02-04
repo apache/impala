@@ -92,11 +92,13 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
   ExprContext** conjunct_ctxs = &conjunct_ctxs_[0];
   int num_conjunct_ctxs = conjunct_ctxs_.size();
 
-  for (; child_row_idx_ < child_row_batch_->num_rows(); ++child_row_idx_) {
+  while (child_row_idx_ < child_row_batch_->num_rows()) {
     // Add a new row to output_batch
     int dst_row_idx = output_batch->AddRow();
     TupleRow* dst_row = output_batch->GetRow(dst_row_idx);
     TupleRow* src_row = child_row_batch_->GetRow(child_row_idx_);
+    // Make sure to increment row idx before returning.
+    ++child_row_idx_;
 
     if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, src_row)) {
       output_batch->CopyRow(src_row, dst_row);

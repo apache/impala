@@ -78,3 +78,15 @@ INT, INT
 6,6
 8,8
 ====
+---- QUERY
+# IMPALA-2926: Test query plan with a select node that processes multiple row batches
+# but filters no rows.
+select count(*) from (
+  select id from
+    (select id from functional.alltypes limit 7300) v1
+  where id >= 0) v2
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
