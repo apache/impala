@@ -122,6 +122,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     pattern = re.compile(line_regex)
     found = 0
     log_file_path = os.path.join(self.impala_log_dir, "impalad." + level)
+    # Resolve symlinks to make finding the file easier.
+    log_file_path = os.path.realpath(log_file_path)
     with open(log_file_path) as log_file:
       for line in log_file:
         if pattern.search(line):

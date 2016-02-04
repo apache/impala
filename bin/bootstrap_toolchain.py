@@ -296,7 +296,7 @@ def unpack_name_and_version(package):
   return package[0], package[1]
 
 if __name__ == "__main__":
-  packages = ["avro", "binutils", "boost", "bzip2", "gcc", "gflags", "glog", "gperftools",
-      "gtest", "kudu", "llvm", ("llvm", "3.8.0-asserts-p1"), "lz4", "openldap",
-      "rapidjson", "re2", "snappy", "thrift", "zlib"]
+  packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "gcc", "gflags", "glog",
+      "gperftools", "gtest", "kudu", "llvm", ("llvm", "3.8.0-asserts-p1"), "lz4",
+      "openldap", "rapidjson", "re2", "snappy", "thrift", "zlib"]
   bootstrap(packages)

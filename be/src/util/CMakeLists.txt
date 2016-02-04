@@ -51,6 +51,7 @@ add_library(Util
   mem-info.cc
   memory-metrics.cc
   metrics.cc
+  minidump.cc
   network-util.cc
   os-info.cc
   os-util.cc

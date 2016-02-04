@@ -28,6 +28,7 @@
 #include "util/disk-info.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
+#include "util/minidump.h"
 #include "util/network-util.h"
 #include "util/os-info.h"
 #include "util/pretty-printer.h"
@@ -181,6 +182,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     if (!error_message.empty()) CLEAN_EXIT_WITH_ERROR(error_message);
   }
   impala::InitGoogleLoggingSafe(argv[0]);
+  // Breakpad needs flags and logging to initialize.
+  ABORT_IF_ERROR(RegisterMinidump(argv[0]));
   AtomicOps_x86CPUFeaturesInit();
   impala::InitThreading();
   impala::TimestampParser::Init();

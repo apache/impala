@@ -67,6 +67,15 @@ DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redacti
     "Web UI and audit records. Query results will not be affected. Refer to the "
     "documentation for the rule file format.");
 
+DEFINE_string(minidump_path, "/tmp/impala-minidumps", "Directory to write minidump files "
+    "to. Minidump files contain crash-related information in a compressed format and "
+    "will only be written when a daemon exits unexpectedly, for example on an unhandled "
+    "exception or signal. Each daemon will create its own subdirectory under this "
+    "directory. Set to empty to disable writing minidump files.");
+
+DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
+    "Older files are removed first. Set to 0 to keep all minidump files.");
+
 // Stress option for testing failed memory allocation. Debug builds only.
 #ifndef NDEBUG
 DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "

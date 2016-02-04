@@ -1,0 +1,38 @@
+# - Find breakpad headers and lib.
+# This module defines
+#  BREAKPAD_INCLUDE_DIR, directory containing headers
+#  BREAKPAD_STATIC_LIB, path to libbreakpad_client.a
+#  breakpad, imported static library
+
+set(BREAKPAD_SEARCH_LIB_PATH
+  ${BREAKPAD_ROOT}/lib
+)
+
+set(BREAKPAD_INCLUDE_DIR
+  ${BREAKPAD_ROOT}/include/breakpad
+)
+
+find_library(BREAKPAD_LIB_PATH NAMES breakpad_client
+  PATHS ${BREAKPAD_SEARCH_LIB_PATH}
+        NO_DEFAULT_PATH
+  DOC   "Breakpad library"
+)
+
+if (BREAKPAD_LIB_PATH)
+  set(BREAKPAD_LIBS ${BREAKPAD_SEARCH_LIB_PATH})
+  set(BREAKPAD_STATIC_LIB ${BREAKPAD_SEARCH_LIB_PATH}/libbreakpad_client.a)
+  set(BREAKPAD_FOUND TRUE)
+  add_library(breakpad STATIC IMPORTED)
+  set_target_properties(breakpad PROPERTIES IMPORTED_LOCATION "${BREAKPAD_STATIC_LIB}")
+else ()
+  message(FATAL_ERROR "Breakpad library NOT found. "
+    "in ${BREAKPAD_SEARCH_LIB_PATH}")
+  set(BREAKPAD_FOUND FALSE)
+endif ()
+
+mark_as_advanced(
+  BREAKPAD_INCLUDE_DIR
+  BREAKPAD_LIBS
+  BREAKPAD_STATIC_LIB
+  breakpad
+)

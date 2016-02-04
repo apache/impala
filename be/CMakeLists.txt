@@ -315,6 +315,7 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   glogstatic
   gflagsstatic
   pprofstatic
+  breakpad
   ${HDFS_LIB}
   ${LIBZ}
   ${LIBBZ2}

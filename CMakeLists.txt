@@ -101,6 +101,7 @@ if (IMPALA_TOOLCHAIN)
   #   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
   set_dep_root(GCC)
   set_dep_root(AVRO)
+  set_dep_root(BREAKPAD)
   set_dep_root(BZIP2)
   set_dep_root(GFLAGS)
   set_dep_root(GLOG)
@@ -333,6 +334,13 @@ include_directories(${JNI_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JNI_LIBRARIES})
 message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
 message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
+
+# find breakpad headers and libs
+find_package(Breakpad REQUIRED)
+include_directories(${BREAKPAD_INCLUDE_DIR})
+set(LIBS ${LIBS} ${BREAKPAD_LIBRARIES})
+message(STATUS "Breakpad include dir: " ${BREAKPAD_INCLUDE_DIR})
+message(STATUS "Breakpad library: " ${BREAKPAD_STATIC_LIB})
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)

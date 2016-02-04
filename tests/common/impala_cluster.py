@@ -20,6 +20,7 @@ import socket
 
 from getpass import getuser
 from random import choice
+from signal import SIGKILL
 from tests.common.impala_service import *
 from tests.util.shell_util import exec_process_async, exec_process
 from time import sleep
@@ -147,7 +148,7 @@ class Process(object):
     stdout, stderr = self.process.communicate()
     return self.process.returncode, stdout, stderr
 
-  def kill(self):
+  def kill(self, signal=SIGKILL):
     """
     Kills the given processes.
 
@@ -156,8 +157,8 @@ class Process(object):
     pid = self.get_pid()
     if pid is None:
       assert 0, "No processes %s found" % self.cmd
-    LOG.info('Killing: %s (PID: %d)'  % (' '.join(self.cmd), pid))
-    exec_process("kill -9 %d" % pid)
+    LOG.info('Killing: %s (PID: %d) with signal %s'  % (' '.join(self.cmd), pid, signal))
+    exec_process("kill -%d %d" % (signal, pid))
     return pid
 
   def restart(self):
