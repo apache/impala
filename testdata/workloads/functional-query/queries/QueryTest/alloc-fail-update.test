@@ -1,78 +1,52 @@
 ====
 ---- QUERY
-#Due to somewhat non-determinstic way memory allocation happens in Impala now,
-#we will just check to make sure the exception is a memory allocation failure.
-select group_concat(string_col) from functional.alltypes
+# Due to somewhat non-determinstic way memory allocation happens in Impala now,
+# we will just check to make sure the exception is a memory allocation failure.
+select group_concat(l_comment) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select ndv(int_col) from functional.alltypes
+select min(l_comment) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select min(string_col) from functional.alltypes
+select max(l_comment) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select max(string_col) from functional.alltypes
+select rank() over (partition by l_orderkey order by l_commitdate) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select sample(string_col) from functional.alltypes
+select first_value(l_comment) over (partition by l_orderkey order by l_commitdate) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select distinctpc(string_col) from functional.alltypes
+select last_value(l_comment) over (partition by l_orderkey order by l_commitdate) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select distinctpcsa(string_col) from functional.alltypes
+select cast(l_comment as char(120)) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select rank() over (partition by month order by year) from functional.alltypes
+# This aims to exercise malloc() failure in the Serialize() function of appx_median() but
+# allocation can sometimes fail in the Init() functions as well.
+select appx_median(l_quantity), appx_median(l_discount) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
 ---- QUERY
-select extract(year from timestamp_col) from functional.alltypes limit 10
----- CATCH
-failed to allocate
-====
----- QUERY
-select trunc(timestamp_col, 'YEAR') from functional.alltypes limit 10
----- CATCH
-failed to allocate
-====
----- QUERY
-select first_value(string_col) over (partition by month order by year) from functional.alltypes
----- CATCH
-failed to allocate
-====
----- QUERY
-select last_value(string_col) over (partition by month order by year) from functional.alltypes
----- CATCH
-failed to allocate
-====
----- QUERY
-select rand() from functional.alltypes;
----- CATCH
-failed to allocate
-====
----- QUERY
-select cast(string_col as char(120)) from functional.alltypes
----- CATCH
-failed to allocate
-====
----- QUERY
-select appx_median(int_col) from functional.alltypes
+# This aims to exercise malloc() failure in the Serialize() functions of distinctpc() and
+# ndv() but allocation can sometimes fail in the Init() functions as well.
+select ndv(l_partkey), distinctpc(l_suppkey) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====

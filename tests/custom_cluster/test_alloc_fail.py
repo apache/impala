@@ -34,4 +34,8 @@ class TestAllocFail(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_free_pool_alloc=3")
   def test_alloc_fail_update(self, vector):
+    # Note that this test relies on pre-aggregation to exercise the Serialize() path so
+    # query option 'num_nodes' must not be 1. CustomClusterTestSuite.add_test_dimensions()
+    # already filters out vectors with 'num_nodes' != 0 so just assert it here.
+    assert vector.get_value('exec_option')['num_nodes'] == 0
     self.run_test_case('QueryTest/alloc-fail-update', vector)
