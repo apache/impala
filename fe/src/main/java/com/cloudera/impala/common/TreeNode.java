@@ -53,6 +53,18 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
   }
 
   /**
+   * Count the total number of nodes in this tree. Leaf node will return 1.
+   * Non-leaf node will include all its children.
+   */
+  public int numNodes() {
+    int numNodes = 1;
+    for (NodeType child: children_) {
+      numNodes += child.numNodes();
+    }
+    return numNodes;
+  }
+
+  /**
    * Add all nodes in the tree that satisfy 'predicate' to the list 'matches'
    * This node is checked first, followed by its children in order. If the node
    * itself matches, the children are skipped.

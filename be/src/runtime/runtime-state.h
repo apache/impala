@@ -191,6 +191,13 @@ class RuntimeState {
   /// 'codegen' will be set to NULL if codegen_ has not been initialized.
   Status GetCodegen(LlvmCodeGen** codegen, bool initialize = true);
 
+  /// Returns true if codegen should be used for expr evaluation in this plan fragment.
+  bool ShouldCodegenExpr() { return codegen_expr_; }
+
+  /// Records that this fragment should use codegen for expr evaluation whenever
+  /// applicable if codegen is not disabled.
+  void SetCodegenExpr() { codegen_expr_ = codegen_enabled(); }
+
   BufferedBlockMgr* block_mgr() {
     DCHECK(block_mgr_.get() != NULL);
     return block_mgr_.get();
@@ -322,6 +329,9 @@ class RuntimeState {
   std::string cgroup_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
+
+  /// True if this fragment should force codegen for expr evaluation.
+  bool codegen_expr_;
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.

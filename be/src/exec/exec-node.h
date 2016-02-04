@@ -124,7 +124,7 @@ class ExecNode {
   /// traversal. All nodes are placed in pool and have Init() called on them.
   /// Returns error if 'plan' is corrupted, otherwise success.
   static Status CreateTree(ObjectPool* pool, const TPlan& plan,
-                           const DescriptorTbl& descs, ExecNode** root);
+      const DescriptorTbl& descs, ExecNode** root, RuntimeState* state);
 
   /// Set debug action for node with given id in 'tree'
   static void SetDebugOptions(int node_id, TExecNodePhase::type phase,
@@ -268,10 +268,11 @@ class ExecNode {
 
   /// Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,
-                           const DescriptorTbl& descs, ExecNode** node);
+      const DescriptorTbl& descs, ExecNode** node, RuntimeState* state);
 
   static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
-      const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root);
+      const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root,
+      RuntimeState* state);
 
   virtual bool IsScanNode() const { return false; }
 

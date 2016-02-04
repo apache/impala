@@ -308,6 +308,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_random_replica(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::SCAN_NODE_CODEGEN_THRESHOLD:
+        query_options->__set_scan_node_codegen_threshold(atol(value.c_str()));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

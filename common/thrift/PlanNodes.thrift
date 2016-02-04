@@ -135,6 +135,9 @@ struct THdfsScanNode {
 
   // Option to control tie breaks during scan scheduling.
   4: optional bool random_replica
+
+  // Option to control whether codegen should be used for conjuncts evaluation.
+  5: optional bool codegen_conjuncts
 }
 
 struct TDataSourceScanNode {

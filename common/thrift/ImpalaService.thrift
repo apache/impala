@@ -179,6 +179,10 @@ enum TImpalaQueryOptions {
 
   // Determines tie breaking policy when picking locations.
   RANDOM_REPLICA,
+
+  // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
+  // the number of rows * number of operators in the conjuncts exceeds this threshold.
+  SCAN_NODE_CODEGEN_THRESHOLD
 }
 
 // The summary of an insert.

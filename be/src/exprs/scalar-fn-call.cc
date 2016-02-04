@@ -50,7 +50,7 @@ ScalarFnCall::ScalarFnCall(const TExprNode& node)
 }
 
 Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
-                             ExprContext* context) {
+    ExprContext* context) {
   RETURN_IF_ERROR(Expr::Prepare(state, desc, context));
 
   if (fn_.scalar_fn.symbol.empty()) {
@@ -81,17 +81,32 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     }
   }
 
-  fn_context_index_ = context->Register(state, return_type, arg_types, varargs_buffer_size);
+  fn_context_index_ = context->Register(state, return_type, arg_types,
+      varargs_buffer_size);
 
-  // If the codegen object hasn't been created yet and we're calling a builtin or native
-  // UDF with <= 8 non-variadic arguments, we can use the interpreted path and call the
-  // builtin without codegen. This saves us the overhead of creating the codegen object
-  // when it's not necessary (i.e., in plan fragments with no codegen-enabled operators).
-  // In addition, we can never codegen char arguments.
+  // Use the interpreted path and call the builtin without codegen if:
+  // 1. there are char arguments (as they aren't supported yet)
+  // OR
+  // if all of the following conditions are satisfied:
+  // 2. the codegen object hasn't been created yet.
+  // 3. the planner doesn't insist on using codegen.
+  // 4. we're calling a builtin or native UDF with <= 8 non-variadic arguments.
+  //    The templates for UDFs used in the interpretation path support up to 8
+  //    arguments only.
+  //
+  // This saves us the overhead of creating the codegen object when it's not necessary
+  // (i.e., in plan fragments with no codegen-enabled operators).
+  //
   // TODO: codegen for char arguments
-  if (char_arg || (!state->codegen_created() && NumFixedArgs() <= 8 &&
-                   (fn_.binary_type == TFunctionBinaryType::BUILTIN ||
-                    fn_.binary_type == TFunctionBinaryType::NATIVE))) {
+  // TODO: remove condition 2 above and put a flag in the RuntimeState to indicate
+  // if codegen should be enabled for the entire fragment.
+  bool skip_codegen = false;
+  if (char_arg) {
+    skip_codegen = true;
+  } else if (!state->codegen_created() && !state->ShouldCodegenExpr()) {
+    skip_codegen = fn_.binary_type != TFunctionBinaryType::IR && NumFixedArgs() <= 8;
+  }
+  if (skip_codegen) {
     // Builtins with char arguments must still have <= 8 arguments.
     // TODO: delete when we have codegen for char arguments
     if (char_arg) {

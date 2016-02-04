@@ -139,6 +139,10 @@ struct TQueryOptions {
   // metastore. This setting will not affect tie-breaking for cached replicas. Instead,
   // they will always break ties randomly.
   34: optional bool random_replica = 0
+
+  // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
+  // the number of rows * number of operators in the conjuncts exceeds this threshold.
+  35: optional i64 scan_node_codegen_threshold = 1800000
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

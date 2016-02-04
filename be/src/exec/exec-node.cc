@@ -213,13 +213,13 @@ void ExecNode::AddCodegenExecOption(bool codegen_enabled, const string& extra_in
 }
 
 Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan,
-                            const DescriptorTbl& descs, ExecNode** root) {
+    const DescriptorTbl& descs, ExecNode** root, RuntimeState* state) {
   if (plan.nodes.size() == 0) {
     *root = NULL;
     return Status::OK();
   }
   int node_idx = 0;
-  Status status = CreateTreeHelper(pool, plan.nodes, descs, NULL, &node_idx, root);
+  Status status = CreateTreeHelper(pool, plan.nodes, descs, NULL, &node_idx, root, state);
   if (status.ok() && node_idx + 1 != plan.nodes.size()) {
     status = Status(
         "Plan tree only partially reconstructed. Not all thrift nodes were used.");
@@ -237,7 +237,8 @@ Status ExecNode::CreateTreeHelper(
     const DescriptorTbl& descs,
     ExecNode* parent,
     int* node_idx,
-    ExecNode** root) {
+    ExecNode** root,
+    RuntimeState* state) {
   // propagate error case
   if (*node_idx >= tnodes.size()) {
     return Status("Failed to reconstruct plan tree from thrift.");
@@ -246,7 +247,7 @@ Status ExecNode::CreateTreeHelper(
 
   int num_children = tnode.num_children;
   ExecNode* node = NULL;
-  RETURN_IF_ERROR(CreateNode(pool, tnode, descs, &node));
+  RETURN_IF_ERROR(CreateNode(pool, tnode, descs, &node, state));
   if (parent != NULL) {
     parent->children_.push_back(node);
   } else {
@@ -254,7 +255,8 @@ Status ExecNode::CreateTreeHelper(
   }
   for (int i = 0; i < num_children; ++i) {
     ++*node_idx;
-    RETURN_IF_ERROR(CreateTreeHelper(pool, tnodes, descs, node, node_idx, NULL));
+    RETURN_IF_ERROR(
+        CreateTreeHelper(pool, tnodes, descs, node, node_idx, NULL, state));
     // we are expecting a child, but have used all nodes
     // this means we have been given a bad tree and must fail
     if (*node_idx >= tnodes.size()) {
@@ -278,11 +280,16 @@ Status ExecNode::CreateTreeHelper(
 }
 
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
-                            const DescriptorTbl& descs, ExecNode** node) {
+    const DescriptorTbl& descs, ExecNode** node, RuntimeState* state) {
   stringstream error_msg;
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
+      // If true, this node requests codegen over interpretation for conjuncts
+      // evaluation whenever possible. Turn codegen on for expr evaluation for
+      // the entire fragment.
+      if (tnode.hdfs_scan_node.codegen_conjuncts) state->SetCodegenExpr();
+      (*node)->AddCodegenExecOption(state->ShouldCodegenExpr(), "", "Expr Evaluation");
       break;
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode, descs));
