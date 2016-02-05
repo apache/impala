@@ -532,11 +532,15 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
 }
 
 void PlanFragmentExecutor::Cancel() {
+  VLOG_QUERY << "Cancelling plan fragment...";
   lock_guard<mutex> l(prepare_lock_);
-  VLOG_QUERY << "Cancel(): instance_id=" << runtime_state_->fragment_instance_id();
   is_cancelled_ = true;
-  if (!is_prepared_) return;
+  if (!is_prepared_) {
+    VLOG_QUERY << "Cancel() called before Prepare()";
+    return;
+  }
   DCHECK(runtime_state_ != NULL);
+  VLOG_QUERY << "Cancel(): instance_id=" << runtime_state_->fragment_instance_id();
   runtime_state_->set_is_cancelled(true);
   runtime_state_->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
