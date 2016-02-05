@@ -32,7 +32,6 @@ const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 
 MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
   : current_chunk_idx_(-1),
-    last_offset_conversion_chunk_idx_(-1),
     // round up chunk size to nearest 8 bytes
     chunk_size_(chunk_size == 0
       ? 0
@@ -48,7 +47,6 @@ MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
 MemPool::ChunkInfo::ChunkInfo(int64_t size, uint8_t* buf)
   : data(buf),
     size(size),
-    cumulative_allocated_bytes(0),
     allocated_bytes(0) {
   if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
     ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(size);
@@ -68,6 +66,16 @@ MemPool::~MemPool() {
   }
 }
 
+void MemPool::Clear() {
+  current_chunk_idx_ = -1;
+  for (std::vector<ChunkInfo>::iterator chunk = chunks_.begin();
+       chunk != chunks_.end(); ++chunk) {
+    chunk->allocated_bytes = 0;
+  }
+  total_allocated_bytes_ = 0;
+  DCHECK(CheckIntegrity(false));
+}
+
 void MemPool::FreeAll() {
   int64_t total_bytes_released = 0;
   for (size_t i = 0; i < chunks_.size(); ++i) {
@@ -76,7 +84,6 @@ void MemPool::FreeAll() {
   }
   chunks_.clear();
   current_chunk_idx_ = -1;
-  last_offset_conversion_chunk_idx_ = -1;
   total_allocated_bytes_ = 0;
   total_reserved_bytes_ = 0;
 
@@ -153,12 +160,6 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
     total_reserved_bytes_ += chunk_size;
   }
 
-  if (current_chunk_idx_ > 0) {
-    ChunkInfo& prev_chunk = chunks_[current_chunk_idx_ - 1];
-    chunks_[current_chunk_idx_].cumulative_allocated_bytes =
-        prev_chunk.cumulative_allocated_bytes + prev_chunk.allocated_bytes;
-  }
-
   DCHECK_LT(current_chunk_idx_, static_cast<int>(chunks_.size()));
   DCHECK(CheckIntegrity(true));
   return true;
@@ -202,7 +203,6 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
     src->current_chunk_idx_ = 0;
     DCHECK(src->chunks_.size() == 1 || src->chunks_[1].allocated_bytes == 0);
     total_allocated_bytes_ += src->total_allocated_bytes_ - src->GetFreeOffset();
-    src->chunks_[0].cumulative_allocated_bytes = 0;
     src->total_allocated_bytes_ = src->GetFreeOffset();
   } else {
     src->current_chunk_idx_ = -1;
@@ -211,34 +211,8 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
   }
   peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
 
-  // recompute cumulative_allocated_bytes
-  int start_idx = chunks_.size() - num_acquired_chunks;
-  int cumulative_bytes = (start_idx == 0
-      ? 0
-      : chunks_[start_idx - 1].cumulative_allocated_bytes
-        + chunks_[start_idx - 1].allocated_bytes);
-  for (int i = start_idx; i <= current_chunk_idx_; ++i) {
-    chunks_[i].cumulative_allocated_bytes = cumulative_bytes;
-    cumulative_bytes += chunks_[i].allocated_bytes;
-  }
-
   if (!keep_current) src->FreeAll();
   DCHECK(CheckIntegrity(false));
-}
-
-bool MemPool::Contains(uint8_t* ptr, int size) {
-  for (int i = 0; i < chunks_.size(); ++i) {
-    const ChunkInfo& info = chunks_[i];
-    if (ptr >= info.data && ptr < info.data + info.allocated_bytes) {
-      if (ptr + size > info.data + info.allocated_bytes) {
-        DCHECK_LE(reinterpret_cast<size_t>(ptr + size),
-                  reinterpret_cast<size_t>(info.data + info.allocated_bytes));
-        return false;
-      }
-      return true;
-    }
-  }
-  return false;
 }
 
 string MemPool::DebugString() {
@@ -250,7 +224,6 @@ string MemPool::DebugString() {
     out << (i > 0 ? " " : "")
         << str
         << chunks_[i].size
-        << "/" << chunks_[i].cumulative_allocated_bytes
         << "/" << chunks_[i].allocated_bytes;
   }
   out << "] current_chunk=" << current_chunk_idx_
@@ -288,64 +261,9 @@ bool MemPool::CheckIntegrity(bool current_chunk_empty) {
     } else {
       DCHECK_EQ(chunks_[i].allocated_bytes, 0);
     }
-    if (i > 0 && i <= current_chunk_idx_) {
-      DCHECK_EQ(chunks_[i-1].cumulative_allocated_bytes + chunks_[i-1].allocated_bytes,
-                chunks_[i].cumulative_allocated_bytes);
-    }
     if (chunk_size_ != 0) DCHECK_GE(chunks_[i].size, chunk_size_);
     total_allocated += chunks_[i].allocated_bytes;
   }
   DCHECK_EQ(total_allocated, total_allocated_bytes_);
   return true;
-}
-
-int MemPool::GetOffsetHelper(uint8_t* data) {
-  if (chunks_.empty()) return -1;
-  // try to locate chunk containing 'data', starting with chunk following
-  // the last one we looked at
-  for (int i = 0; i < chunks_.size(); ++i) {
-    int idx = (last_offset_conversion_chunk_idx_ + i + 1) % chunks_.size();
-    const ChunkInfo& info = chunks_[idx];
-    if (info.data <= data && info.data + info.allocated_bytes > data) {
-      last_offset_conversion_chunk_idx_ = idx;
-      return info.cumulative_allocated_bytes + data - info.data;
-    }
-  }
-  return -1;
-}
-
-uint8_t* MemPool::GetDataPtrHelper(int offset) {
-  if (offset > total_allocated_bytes_) return NULL;
-  for (int i = 0; i < chunks_.size(); ++i) {
-    int idx = (last_offset_conversion_chunk_idx_ + i + 1) % chunks_.size();
-    const ChunkInfo& info = chunks_[idx];
-    if (info.cumulative_allocated_bytes <= offset
-        && info.cumulative_allocated_bytes + info.allocated_bytes > offset) {
-      last_offset_conversion_chunk_idx_ = idx;
-      return info.data + offset - info.cumulative_allocated_bytes;
-    }
-  }
-  return NULL;
-}
-
-void MemPool::GetChunkInfo(vector<pair<uint8_t*, int> >* chunk_info) {
-  chunk_info->clear();
-  for (vector<ChunkInfo>::iterator info = chunks_.begin(); info != chunks_.end(); ++info) {
-    chunk_info->push_back(make_pair(info->data, info->allocated_bytes));
-  }
-}
-
-string MemPool::DebugPrint() {
-  char str[3];
-  stringstream out;
-  for (int i = 0; i < chunks_.size(); ++i) {
-    ChunkInfo& info = chunks_[i];
-    if (info.allocated_bytes == 0) return out.str();
-
-    for (int j = 0; j < info.allocated_bytes; ++j) {
-      sprintf(str, "%x ", info.data[j]);
-      out << str;
-    }
-  }
-  return out.str();
 }

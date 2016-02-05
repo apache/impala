@@ -115,16 +115,7 @@ class MemPool {
   }
 
   /// Makes all allocated chunks available for re-use, but doesn't delete any chunks.
-  void Clear() {
-    current_chunk_idx_ = -1;
-    for (std::vector<ChunkInfo>::iterator chunk = chunks_.begin();
-         chunk != chunks_.end(); ++chunk) {
-      chunk->cumulative_allocated_bytes = 0;
-      chunk->allocated_bytes = 0;
-    }
-    total_allocated_bytes_ = 0;
-    DCHECK(CheckIntegrity(false));
-  }
+  void Clear();
 
   /// Deletes all allocated chunks. FreeAll() or AcquireData() must be called for
   /// each mem pool
@@ -135,13 +126,6 @@ class MemPool {
   /// All offsets handed out by calls to GetCurrentOffset() for 'src' become invalid.
   void AcquireData(MemPool* src, bool keep_current);
 
-  /// Diagnostic to check if memory is allocated from this mempool.
-  /// Inputs:
-  ///   ptr: start of memory block.
-  ///   size: size of memory block.
-  /// Returns true if memory block is in one of the chunks in this mempool.
-  bool Contains(uint8_t* ptr, int size);
-
   std::string DebugString();
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }
@@ -151,12 +135,6 @@ class MemPool {
 
   /// Return sum of chunk_sizes_.
   int64_t GetTotalChunkSizes() const;
-
-  /// Return (data ptr, allocated bytes) pairs for all chunks owned by this mempool.
-  void GetChunkInfo(std::vector<std::pair<uint8_t*, int> >* chunk_info);
-
-  /// Print allocated bytes from all chunks.
-  std::string DebugPrint();
 
   /// TODO: make a macro for doing this
   /// For C++/IR interop, we need to be able to look up types by name.
@@ -170,11 +148,6 @@ class MemPool {
     uint8_t* data; // Owned by the ChunkInfo.
     int64_t size;  // in bytes
 
-    /// number of bytes allocated via Allocate() up to but excluding this chunk;
-    /// *not* valid for chunks > current_chunk_idx_ (because that would create too
-    /// much maintenance work if we have trailing unoccupied chunks)
-    int64_t cumulative_allocated_bytes;
-
     /// bytes allocated via Allocate() in this chunk
     int64_t allocated_bytes;
 
@@ -183,7 +156,6 @@ class MemPool {
     ChunkInfo()
       : data(NULL),
         size(0),
-        cumulative_allocated_bytes(0),
         allocated_bytes(0) {}
   };
 
@@ -193,10 +165,6 @@ class MemPool {
   /// (chunks_[i].allocated_bytes > 0 for i: 0..current_chunk_idx_);
   /// -1 if no chunks present
   int current_chunk_idx_;
-
-  /// chunk where last offset conversion (GetOffset() or GetDataPtr()) took place;
-  /// -1 if those functions have never been called
-  int last_offset_conversion_chunk_idx_;
 
   int chunk_size_;  // if != 0, use this size for new chunks
 
@@ -226,9 +194,6 @@ class MemPool {
   /// all invariants.
   /// If 'current_chunk_empty' is false, checks that the current chunk contains data.
   bool CheckIntegrity(bool current_chunk_empty);
-
-  int GetOffsetHelper(uint8_t* data);
-  uint8_t* GetDataPtrHelper(int offset);
 
   /// Return offset to unoccpied space in current chunk.
   int GetFreeOffset() const {
