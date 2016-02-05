@@ -38,12 +38,45 @@ class QueryFlattener(object):
   '''
 
   def __init__(self):
-    self.tmp_alias = 0
+    self.clear_state()
 
   def clear_state(self):
     self.tmp_alias = 0
+    # Elements such as join clauses or columns that are not present in the original query.
+    self.for_flattening = set()
 
-  def flatten_join_clause(self, join_clause):
+  def contains_jump(self, table_expr):
+    '''If some ancestor CollectionColumn or Table has an alias, but there is a closer
+       ancestor CollectionColumn without an alias, then this function will return True.
+       For example, suppose we have customer t1 and t1.orders.lineitems t2. If we call
+       this function with t2 CollectionColumn as parameter, it will return True.
+    '''
+    result = False
+    while True:
+      if table_expr.owner.alias:
+        return result
+      if isinstance(table_expr.owner, Table):
+        # We reached the root and did not encounter an ancestor with an alias
+        return False
+      if isinstance(table_expr.owner, CollectionColumn):
+        # We encountered a CollectionColumn with no alias
+        result = True
+      table_expr = table_expr.owner
+
+  def get_first_aliased_ancestor(self, table_expr):
+    '''Finds the first ancestor that is not a struct. It is returned if it has an alias,
+       otherwise, None is returned.
+    '''
+    while True:
+      if table_expr.owner.alias:
+        return table_expr.owner
+      elif isinstance(table_expr.owner, StructColumn):
+        table_expr = table_expr.owner
+      else:
+        return None
+
+  def flatten_join_clause(self, join_clause, query):
+
     if join_clause.is_lateral_join:
       if isinstance(join_clause.table_expr, CollectionColumn):
         # All laterally joined Collecitons are converted to an inline view.
@@ -51,47 +84,31 @@ class QueryFlattener(object):
             join_clause.table_expr)
       self.flatten(join_clause.table_expr.query, inner=True)
       join_clause.boolean_expr = join_clause.boolean_expr or Boolean(True)
-    else:
-      # If this is not a lateral join, we assume that self.table_expr does not have an
-      # aliased ancestor, and so there is no need to do anything else. If this assumption
-      # is changed, we would have to convert the collection to an inline view here.
-      pass
+    elif join_clause not in self.for_flattening:
+      if isinstance(join_clause.table_expr, CollectionColumn) and \
+          self.contains_jump(join_clause.table_expr):
+        join_clause.table_expr = self.convert_correlated_collection_to_inline_view(
+            join_clause.table_expr)
+      if isinstance(join_clause.table_expr, CollectionColumn):
+        aliased_ancestor = self.get_first_aliased_ancestor(join_clause.table_expr)
+        if aliased_ancestor:
+          predicate = self.create_join_predicate(aliased_ancestor, join_clause.table_expr)
+          if query.where_clause:
+            query.where_clause.boolean_expr = And.create_from_args(
+                predicate, query.where_clause.boolean_expr)
+          else:
+            query.where_clause = WhereClause(predicate)
+      elif isinstance(join_clause.table_expr, InlineView):
+        self.flatten(join_clause.table_expr.query, inner=True)
 
   def flatten_from_clause(self, from_clause, query):
-    def contains_jump(table_expr):
-      '''If some ancestor CollectionColumn or Table has an alias, but there is a closer
-         ancestor CollectionColumn without an alias, then this function will return True.
-         For example, suppose we have customer t1 and t1.orders.lineitems t2. If we call
-         this function with t2 CollectionColumn as parameter, it will return True.
-      '''
-      result = False
-      while True:
-        if table_expr.owner.alias:
-          return result
-        if isinstance(table_expr.owner, Table):
-          # We reached the root and did not encounter an ancestor with an alias
-          return False
-        if isinstance(table_expr.owner, CollectionColumn):
-          # We encountered a CollectionColumn with no alias
-          result = True
-        table_expr = table_expr.owner
-
-    def get_first_aliased_ancestor(table_expr):
-      '''Returns the first table_expr that has an alias.'''
-      while True:
-        if table_expr.owner.alias:
-          return table_expr.owner
-        elif isinstance(table_expr.owner, StructColumn):
-          table_expr = table_expr.owner
-        else:
-          return None
 
     if isinstance(from_clause.table_expr, CollectionColumn) and \
-        contains_jump(from_clause.table_expr):
+        self.contains_jump(from_clause.table_expr):
       from_clause.table_expr = self.convert_correlated_collection_to_inline_view(
           from_clause.table_expr)
     if isinstance(from_clause.table_expr, CollectionColumn):
-      aliased_ancestor = get_first_aliased_ancestor(from_clause.table_expr)
+      aliased_ancestor = self.get_first_aliased_ancestor(from_clause.table_expr)
       if aliased_ancestor:
         predicate = self.create_join_predicate(aliased_ancestor, from_clause.table_expr)
         if query.where_clause:
@@ -102,7 +119,7 @@ class QueryFlattener(object):
     elif isinstance(from_clause.table_expr, InlineView):
       self.flatten(from_clause.table_expr.query, inner=True)
     for join_clause in from_clause.join_clauses:
-      self.flatten_join_clause(join_clause)
+      self.flatten_join_clause(join_clause, query)
 
   def flatten(self, query, inner=False):
     '''This function is idempotent.'''
@@ -152,6 +169,7 @@ class QueryFlattener(object):
       predicate = self.create_join_predicate(parent, child)
       join_clause = JoinClause('INNER', child)
       join_clause.boolean_expr = predicate
+      self.for_flattening.add(join_clause)
       return join_clause
 
     query = Query()
@@ -240,8 +258,8 @@ class QueryFlattener(object):
         name = 'value'
       elif col.name == 'pos':
         name = 'idx'
-      if isinstance(col.owner, StructColumn) and not getattr(
-          col, 'for_flattening', False):
+      if isinstance(col.owner, StructColumn) \
+          and not getattr(col, 'for_flattening', False):
         # This is a struct field. To get the name in the flattened table, concatenate the
         # name of the struct with the field struct field name.
         return cls.flat_column_name(col.owner) + '_' + name
