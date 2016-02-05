@@ -470,3 +470,8 @@ where c_custkey = 1
    partitions=1/1 files=4 size=554.13MB
    predicates: c_custkey = 1
 ====
+# IMPALA-2215: Having clause without aggregation.
+select 1 from (select 1) v having 1 > 1
+---- PLAN
+00:EMPTYSET
+====

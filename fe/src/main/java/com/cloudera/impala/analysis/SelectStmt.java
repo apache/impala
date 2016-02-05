@@ -490,24 +490,9 @@ public class SelectStmt extends QueryStmt {
    * AggregationInfo, including the agg output tuple, and transform all post-agg exprs
    * given AggregationInfo's smap.
    */
-  private void analyzeAggregation(Analyzer analyzer)
-      throws AnalysisException {
-    if (groupingExprs_ == null && !selectList_.isDistinct()
-        && !TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())
-        && (sortInfo_ == null
-            || !TreeNode.contains(sortInfo_.getOrderingExprs(),
-                                  Expr.isAggregatePredicate()))) {
-      // we're not computing aggregates
-      return;
-    }
-
-    // If we're computing an aggregate, we must have a FROM clause.
-    if (tableRefs_.size() == 0) {
-      throw new AnalysisException(
-          "aggregation without a FROM clause is not allowed");
-    }
-
-    // analyze having clause
+  private void analyzeAggregation(Analyzer analyzer) throws AnalysisException {
+    // Analyze the HAVING clause first so we can check if it contains aggregates.
+    // We need to analyze/register it even if we are not computing aggregates.
     if (havingClause_ != null) {
       if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
         throw new AnalysisException(
@@ -523,6 +508,25 @@ public class SelectStmt extends QueryStmt {
             "HAVING clause must not contain analytic expressions: "
                + analyticExpr.toSql());
       }
+    }
+
+    if (groupingExprs_ == null && !selectList_.isDistinct()
+        && !TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())
+        && (havingPred_ == null
+            || !havingPred_.contains(Expr.isAggregatePredicate()))
+        && (sortInfo_ == null
+            || !TreeNode.contains(sortInfo_.getOrderingExprs(),
+                                  Expr.isAggregatePredicate()))) {
+      // We're not computing aggregates but we still need to register the HAVING
+      // clause which could, e.g., contain a constant expression evaluating to false.
+      if (havingPred_ != null) analyzer.registerConjuncts(havingPred_, true);
+      return;
+    }
+
+    // If we're computing an aggregate, we must have a FROM clause.
+    if (tableRefs_.size() == 0) {
+      throw new AnalysisException(
+          "aggregation without a FROM clause is not allowed");
     }
 
     if (selectList_.isDistinct()

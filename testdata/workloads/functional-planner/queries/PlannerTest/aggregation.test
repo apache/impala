@@ -897,3 +897,13 @@ group_concat(distinct string_col, '---')  from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ====
+# IMPALA-852: Aggregation only in the HAVING clause.
+select 1 from functional.alltypestiny having count(*) > 0
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  having: count(*) > 0
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====

@@ -518,18 +518,22 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "(select f11 from t1.complex_nested_struct_col.f2 t2 " +
           "where t1.id = f11 and %s " +
           "(select value.f21 from t2.f12 where key = 'test'))", op, op));
+      // Correlated EXISTS subquery with aggregation only in the HAVING clause
+      AnalyzesOk(String.format("select 1 from functional.alltypestiny t1 " +
+          "where %s (select 1 from functional.alltypestiny t2 where " +
+          "t1.int_col = t2.int_col having count(*) > 1)", op));
       // Correlated EXISTS subquery with a group by and aggregation
       AnalyzesOk(String.format("select 1 from functional.alltypestiny t " +
           "where %s (select id, count(*) from functional.alltypesagg g where " +
           "t.id = g.id group by id having count(*) > 2)", op));
-      // Correlated EXISTS subquery with a having clause but no grouping or
+      // Correlated EXISTS subquery with a HAVING clause but no grouping or
       // aggregate exprs
       AnalysisError(String.format("select 1 from functional.alltypestiny t1 " +
           "where %s (select 1 from functional.alltypestiny t2 where " +
-          "t1.int_col = t2.int_col having count(*) > 1)", op),
+          "t1.int_col = t2.int_col having t2.int_col > 1)", op),
           "Unsupported correlated EXISTS subquery with a HAVING clause: " +
           "SELECT 1 FROM functional.alltypestiny t2 WHERE t1.int_col = " +
-          "t2.int_col HAVING count(*) > 1");
+          "t2.int_col HAVING t2.int_col > 1");
       // Correlated EXISTS subquery with a HAVING clause and non-equality
       // correlated predicates
       AnalysisError(String.format("select 1 from functional.alltypestiny t1 " +
