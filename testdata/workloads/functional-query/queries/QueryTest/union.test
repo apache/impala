@@ -1008,3 +1008,17 @@ bigint
 1
 1
 ====
+---- QUERY
+# Regression test for IMPALA-2948. When fast partition key scan is enabled,
+# make sure union nodes formed contain correct constant expressions even if
+# there are unmaterialized slots.
+set optimize_partition_key_scans=1;
+select t1.int_col
+from functional.alltypestiny t1 inner join
+  (select count(t2.tinyint_col) = 1337 as boolean_col,
+          min(t2.year) as int_col from functional.alltypestiny t2) t3
+on (t1.int_col = t3.int_col)
+---- RESULTS
+---- TYPES
+INT
+=====

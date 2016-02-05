@@ -168,6 +168,7 @@ public class UnionNode extends PlanNode {
     for (int i = 0; i < resultExprLists_.size(); ++i) {
       List<Expr> exprList = resultExprLists_.get(i);
       List<Expr> newExprList = Lists.newArrayList();
+      Preconditions.checkState(exprList.size() == slots.size());
       for (int j = 0; j < exprList.size(); ++j) {
         if (slots.get(j).isMaterialized()) newExprList.add(exprList.get(j));
       }
@@ -179,6 +180,7 @@ public class UnionNode extends PlanNode {
 
     materializedConstExprLists_.clear();
     for (List<Expr> exprList: constExprLists_) {
+      Preconditions.checkState(exprList.size() == slots.size());
       List<Expr> newExprList = Lists.newArrayList();
       for (int i = 0; i < exprList.size(); ++i) {
         if (slots.get(i).isMaterialized()) newExprList.add(exprList.get(i));

@@ -170,6 +170,25 @@ select c1, c2 from
 00:UNION
    constant-operands=24
 ====
+# IMPALA-2948. Unmaterialized slots won't block the optimization (the hash join version).
+select t1.int_col
+from functional.alltypestiny t1 inner join
+  (select count(t2.tinyint_col) = 1337 as boolean_col,
+          min(t2.year) as int_col from functional.alltypestiny t2) t3
+on (t1.int_col = t3.int_col)
+---- PLAN
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.int_col = min(t2.year)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(t2.year)
+|  |
+|  01:UNION
+|     constant-operands=1
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+====
 # Test with with clauses on the partition keys.
 with c1 as (select distinct month from functional.alltypes),
      c2 as (select distinct year from functional.alltypes)

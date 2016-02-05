@@ -39,6 +39,7 @@ import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SingularRowSrcTableRef;
@@ -1254,7 +1255,6 @@ public class SingleNodePlanner {
     // If the optimization for partition key scans with metadata is enabled,
     // try evaluating with metadata first. If not, fall back to scanning.
     if (fastPartitionKeyScans && tupleDesc.hasClusteringColsOnly()) {
-      UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tupleDesc.getId());
       HashSet<List<Expr>> uniqueExprs = new HashSet<List<Expr>>();
 
       for (HdfsPartition partition: partitions) {
@@ -1264,14 +1264,21 @@ public class SingleNodePlanner {
         }
         List<Expr> exprs = Lists.newArrayList();
         for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-          if (!slotDesc.isMaterialized()) continue;
-          int pos = slotDesc.getColumn().getPosition();
-          exprs.add(partition.getPartitionValue(pos));
+          // UnionNode.init() will go through all the slots in the tuple descriptor so
+          // there needs to be an entry in 'exprs' for each slot. For unmaterialized
+          // slots, use dummy null values. UnionNode will filter out unmaterialized slots.
+          if (!slotDesc.isMaterialized()) {
+            exprs.add(NullLiteral.create(slotDesc.getType()));
+          } else {
+            int pos = slotDesc.getColumn().getPosition();
+            exprs.add(partition.getPartitionValue(pos));
+          }
         }
         uniqueExprs.add(exprs);
       }
 
       // Create a UNION node with all unique partition keys.
+      UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tupleDesc.getId());
       for (List<Expr> exprList: uniqueExprs) {
         unionNode.addConstExprList(exprList);
       }
