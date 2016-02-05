@@ -141,7 +141,7 @@ TEST_F(RawValueTest, TemplatizedHash) {
   EXPECT_EQ(RawValue::GetHashValue<float>(&float_val, TYPE_FLOAT, seed),
     RawValue::GetHashValue(&float_val, TYPE_FLOAT, seed));
 
-  double double_val = 8.0d;
+  double double_val = 8.0;
   EXPECT_EQ(RawValue::GetHashValue<double>(&double_val, TYPE_DOUBLE, seed),
     RawValue::GetHashValue(&double_val, TYPE_DOUBLE, seed));
 
