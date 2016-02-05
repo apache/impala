@@ -683,3 +683,32 @@ select count(*) from functional.alltypestiny t1 left outer join [shuffle]
 ---- TYPES
 bigint
 ====
+---- QUERY
+# IMPALA-2950: Tests correct execution of exprs from an outer-joined inline view that can
+# evaluate to a non-NULL value with NULL-valued slots. This test covers deeply nested
+# inline views where exprs with the said property are present at various nesting levels.
+SELECT t1.id, v3.id, v3.int_col, v3.bigint_col
+FROM functional.alltypestiny t1
+LEFT OUTER JOIN
+  (SELECT id, int_col, COALESCE(bigint_col, 4000) AS bigint_col
+   FROM
+    (SELECT id, COALESCE(int_col, 3000) AS int_col, bigint_col
+     FROM
+       (SELECT COALESCE(id + 100, 2000) AS id, int_col, bigint_col
+        FROM functional.alltypestiny t2
+       ) v1
+     ) v2
+   ) v3
+ON t1.id = v3.id
+---- RESULTS
+0,NULL,NULL,NULL
+1,NULL,NULL,NULL
+2,NULL,NULL,NULL
+3,NULL,NULL,NULL
+4,NULL,NULL,NULL
+5,NULL,NULL,NULL
+6,NULL,NULL,NULL
+7,NULL,NULL,NULL
+---- TYPES
+int,bigint,int,bigint
+====

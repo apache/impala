@@ -17,12 +17,12 @@ package com.cloudera.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +38,6 @@ import com.cloudera.impala.analysis.ExprId;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
@@ -1110,22 +1109,24 @@ public class SingleNodePlanner {
     // select references to its resultExprs from the enclosing scope(s)
     rootNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
 
-    ExprSubstitutionMap inlineViewSmap = inlineViewRef.getSmap();
-    if (analyzer.isOuterJoined(inlineViewRef.getId())) {
-      // Exprs against non-matched rows of an outer join should always return NULL.
-      // Make the rhs exprs of the inline view's smap nullable, if necessary.
-      List<Expr> nullableRhs = TupleIsNullPredicate.wrapExprs(
-          inlineViewSmap.getRhs(), rootNode.getTupleIds(), analyzer);
-      inlineViewSmap = new ExprSubstitutionMap(inlineViewSmap.getLhs(), nullableRhs);
-    }
-    // Set output smap of rootNode *before* creating a SelectNode for proper resolution.
     // The output smap is the composition of the inline view's smap and the output smap
     // of the inline view's plan root. This ensures that all downstream exprs referencing
-    // the inline view are replaced with exprs referencing the physical output of
-    // the inline view's plan.
-    ExprSubstitutionMap composedSmap = ExprSubstitutionMap.compose(inlineViewSmap,
-        rootNode.getOutputSmap(), analyzer);
-    rootNode.setOutputSmap(composedSmap);
+    // the inline view are replaced with exprs referencing the physical output of the
+    // inline view's plan.
+    ExprSubstitutionMap outputSmap = ExprSubstitutionMap.compose(
+        inlineViewRef.getSmap(), rootNode.getOutputSmap(), analyzer);
+    if (analyzer.isOuterJoined(inlineViewRef.getId())) {
+      // Exprs against non-matched rows of an outer join should always return NULL.
+      // Make the rhs exprs of the output smap nullable, if necessary. This expr wrapping
+      // must be performed on the composed smap, and not on the the inline view's smap,
+      // because the rhs exprs must first be resolved against the physical output of
+      // 'planRoot' to correctly determine whether wrapping is necessary.
+      List<Expr> nullableRhs = TupleIsNullPredicate.wrapExprs(
+          outputSmap.getRhs(), rootNode.getTupleIds(), analyzer);
+      outputSmap = new ExprSubstitutionMap(outputSmap.getLhs(), nullableRhs);
+    }
+    // Set output smap of rootNode *before* creating a SelectNode for proper resolution.
+    rootNode.setOutputSmap(outputSmap);
 
     // If the inline view has a LIMIT/OFFSET or unassigned conjuncts due to analytic
     // functions, we may have conjuncts that need to be assigned to a SELECT node on
