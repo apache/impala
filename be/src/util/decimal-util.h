@@ -28,11 +28,17 @@ namespace impala {
 
 class DecimalUtil {
  public:
-  /// Maximum absolute value of int128_t that we use. This is 38 digits of 9's.
-  static int128_t MAX_UNSCALED_DECIMAL;
+  /// Maximum absolute value of a valid Decimal4Value. This is 9 digits of 9's.
+  static const int32_t MAX_UNSCALED_DECIMAL4;
 
-  /// Initializes MAX_UNSCALED_DECIMAL. Must be called once before using it.
-  static void InitMaxUnscaledDecimal();
+  /// Maximum absolute value of a valid Decimal8Value. This is 18 digits of 9's.
+  static const int64_t MAX_UNSCALED_DECIMAL8;
+
+  /// Maximum absolute value a valid Decimal16Value. This is 38 digits of 9's.
+  static int128_t MAX_UNSCALED_DECIMAL16;
+
+  /// Initializes MAX_UNSCALED_DECIMAL16. Must be called once before using it.
+  static void InitMaxUnscaledDecimal16();
 
   /// TODO: do we need to handle overflow here or at a higher abstraction.
   template<typename T>
@@ -217,44 +223,44 @@ inline int128_t DecimalUtil::GetScaleQuotient(int scale) {
   DCHECK_LE(scale, ColumnType::MAX_PRECISION);
   static const int128_t values[] = {
       static_cast<int128_t>(0ll),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(1),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(2),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(3),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(4),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(5),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(6),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(7),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(8),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(9),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(10),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(11),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(12),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(13),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(14),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(15),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(16),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(17),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(18),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(19),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(20),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(21),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(22),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(23),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(24),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(25),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(26),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(27),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(28),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(29),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(30),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(31),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(32),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(33),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(34),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(35),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(36),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(37),
-      MAX_UNSCALED_DECIMAL / GetScaleMultiplier<int128_t>(38)};
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(1),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(2),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(3),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(4),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(5),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(6),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(7),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(8),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(9),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(10),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(11),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(12),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(13),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(14),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(15),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(16),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(17),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(18),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(19),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(20),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(21),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(22),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(23),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(24),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(25),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(26),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(27),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(28),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(29),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(30),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(31),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(32),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(33),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(34),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(35),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(36),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(37),
+      MAX_UNSCALED_DECIMAL16 / GetScaleMultiplier<int128_t>(38)};
   DCHECK_GE(sizeof(values) / sizeof(int128_t), ColumnType::MAX_PRECISION);
   return values[scale];
 }

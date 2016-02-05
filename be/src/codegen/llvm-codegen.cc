@@ -878,6 +878,7 @@ Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
     case TYPE_SMALLINT:
     case TYPE_INT:
     case TYPE_BIGINT:
+    case TYPE_DECIMAL:
       if (min) {
         compare = builder.CreateICmpSLT(params[0], params[1]);
       } else {
@@ -909,7 +910,7 @@ Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
     builder.CreateRet(params[1]);
   }
 
-  if (!VerifyFunction(fn)) return NULL;
+  fn = FinalizeFunction(fn);
   return fn;
 }
 

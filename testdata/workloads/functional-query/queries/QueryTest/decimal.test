@@ -141,6 +141,84 @@ select avg(d1), avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl;
 decimal,decimal,decimal,decimal,decimal,decimal
 ====
 ---- QUERY
+select d1, avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl group by d1;
+---- RESULTS
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+12345,333,679.0123395000,0.12345678900000000000000000000000000000,5.66000,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+select count(d1), count(d2), count(d3), count(d4), count(d5), count(d6) from decimal_tbl;
+---- RESULTS
+5,5,5,5,5,5
+---- TYPES
+bigint,bigint,bigint,bigint,bigint,bigint
+====
+---- QUERY
+select d1, count(d2), count(d3), count(d4), count(d5), count(d6) from decimal_tbl group by d1;
+---- RESULTS
+132842,1,1,1,1,1
+2345,1,1,1,1,1
+1234,1,1,1,1,1
+12345,2,2,2,2,2
+---- TYPES
+decimal,bigint,bigint,bigint,bigint,bigint
+====
+---- QUERY
+select min(d1), min(d2), min(d3), min(d4), min(d5), min(d6) from decimal_tbl;
+---- RESULTS
+1234,111,1.2345678900,0.12345678900000000000000000000000000000,0.10000,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+select d1, min(d2), min(d3), min(d4), min(d5), min(d6) from decimal_tbl group by d1;
+---- RESULTS
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,0.10000,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+select max(d1), max(d2), max(d3), max(d4), max(d5), max(d6) from decimal_tbl;
+---- RESULTS
+132842,2222,12345.6789000000,0.12345678900000000000000000000000000000,12345.78900,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+select d1, max(d2), max(d3), max(d4), max(d5), max(d6) from decimal_tbl group by d1;
+---- RESULTS
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,11.22000,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+select ndv(d1), ndv(d2), ndv(d3), ndv(d4), ndv(d5), ndv(d6) from decimal_tbl;
+---- RESULTS
+4,3,5,1,5,1
+---- TYPES
+bigint,bigint,bigint,bigint,bigint,bigint
+====
+---- QUERY
+select d1, ndv(d2), ndv(d3), ndv(d4), ndv(d5), ndv(d6) from decimal_tbl group by d1;
+---- RESULTS
+132842,1,1,1,1,1
+2345,1,1,1,1,1
+1234,1,1,1,1,1
+12345,1,2,1,2,1
+---- TYPES
+decimal,bigint,bigint,bigint,bigint,bigint
+====
+---- QUERY
 select cast(avg(c1) as decimal(10,4)) as c from decimal_tiny
 group by c3 having c > 5.5 order by 1
 ---- RESULTS

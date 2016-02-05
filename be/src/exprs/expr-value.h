@@ -122,6 +122,18 @@ struct ExprValue {
       case TYPE_BIGINT:
         bigint_val = std::numeric_limits<int64_t>::min();
         return &bigint_val;
+      case TYPE_DECIMAL:
+        switch (type.GetByteSize()) {
+          case 4:
+            decimal4_val = -DecimalUtil::MAX_UNSCALED_DECIMAL4;
+            return &decimal4_val;
+          case 8:
+            decimal8_val = -DecimalUtil::MAX_UNSCALED_DECIMAL8;
+            return &decimal8_val;
+          case 16:
+            decimal16_val = -DecimalUtil::MAX_UNSCALED_DECIMAL16;
+            return &decimal16_val;
+        }
       case TYPE_FLOAT:
         // For floats and doubles, numeric_limits::min() is the smallest positive
         // representable value.
@@ -156,6 +168,18 @@ struct ExprValue {
       case TYPE_BIGINT:
         bigint_val = std::numeric_limits<int64_t>::max();
         return &bigint_val;
+      case TYPE_DECIMAL:
+        switch (type.GetByteSize()) {
+          case 4:
+            decimal4_val = DecimalUtil::MAX_UNSCALED_DECIMAL4;
+            return &decimal4_val;
+          case 8:
+            decimal8_val = DecimalUtil::MAX_UNSCALED_DECIMAL8;
+            return &decimal8_val;
+          case 16:
+            decimal16_val = DecimalUtil::MAX_UNSCALED_DECIMAL16;
+            return &decimal16_val;
+        }
       case TYPE_FLOAT:
         float_val = std::numeric_limits<float>::max();
         return &float_val;

@@ -181,7 +181,7 @@ class DecimalValue {
       DCHECK_EQ(sizeof(RESULT_T), 16);
       RESULT_T result = 0;
       *overflow |= __builtin_add_overflow(x, y, &result);
-      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL;
+      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
       return DecimalValue<RESULT_T>(result);
     } else {
       DCHECK(!*overflow) << "Cannot overflow unless result is Decimal16Value";
@@ -203,7 +203,7 @@ class DecimalValue {
           result_precision == ColumnType::MAX_PRECISION) {
         // Can only overflow if the signs are the same and result precision reaches
         // max precision.
-        *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL - abs(x) < abs(y);
+        *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(x) < abs(y);
         // TODO: faster to return here? We don't care at all about the perf on
         // the overflow case but what makes the normal path faster?
       }
@@ -257,7 +257,7 @@ class DecimalValue {
       DCHECK_EQ(sizeof(RESULT_T), 16);
       // Check overflow
       *overflow |= __builtin_mul_overflow(x, y, &result);
-      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL;
+      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
     } else {
       result = x * y;
     }
@@ -289,7 +289,7 @@ class DecimalValue {
     if (result_precision == ColumnType::MAX_PRECISION) {
       DCHECK_EQ(sizeof(RESULT_T), 16);
       // Check overflow
-      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL / abs(y) < abs(x);
+      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 / abs(y) < abs(x);
     }
     RESULT_T result = x * y;
     int delta_scale = this_scale + other_scale - result_scale;
@@ -333,7 +333,7 @@ class DecimalValue {
       int256_t x = DecimalUtil::MultiplyByScale<int256_t>(
           ConvertToInt256(value()), scale_by);
       int256_t y = ConvertToInt256(other.value());
-      int128_t r = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL, overflow);
+      int128_t r = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
       return DecimalValue<RESULT_T>(r);
     } else {
       int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);

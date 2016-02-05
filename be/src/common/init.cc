@@ -125,7 +125,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   DiskInfo::Init();
   MemInfo::Init();
   OsInfo::Init();
-  DecimalUtil::InitMaxUnscaledDecimal();
+  DecimalUtil::InitMaxUnscaledDecimal16();
   TestInfo::Init(test_mode);
 
   // Verify CPU meets the minimum requirements before calling InitGoogleLoggingSafe()

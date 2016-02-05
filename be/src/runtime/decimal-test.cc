@@ -336,7 +336,7 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("01000000000000000000", ColumnType::CreateDecimalType(18, 0),
       Decimal8Value(0), StringParser::PARSE_OVERFLOW);
 
-  int128_t result = DecimalUtil::MAX_UNSCALED_DECIMAL;
+  int128_t result = DecimalUtil::MAX_UNSCALED_DECIMAL16;
   VerifyParse("99999999999999999999999999999999999999",
       ColumnType::CreateDecimalType(38, 0),
       Decimal16Value(result), StringParser::PARSE_SUCCESS);
@@ -384,7 +384,7 @@ TEST(DecimalTest, Overflow) {
   ColumnType t1 = ColumnType::CreateDecimalType(38, 0);
 
   Decimal16Value result;
-  Decimal16Value d_max(DecimalUtil::MAX_UNSCALED_DECIMAL);
+  Decimal16Value d_max(DecimalUtil::MAX_UNSCALED_DECIMAL16);
   Decimal16Value two(2);
   Decimal16Value one(1);
   Decimal16Value zero(0);
@@ -516,16 +516,16 @@ TEST(DecimalTest, Overflow) {
   EXPECT_TRUE(overflow);
 
   // Add 37 9's (with scale 0)
-  Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL / 10);
+  Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL16 / 10);
   overflow = false;
   result = d3.Add<int128_t>(t1, zero, t2, 38, 1, &overflow);
   EXPECT_FALSE(overflow);
-  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 9);
+  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL16 - 9);
 
   overflow = false;
   result = d3.Add<int128_t>(t1, one, t2, 38, 1, &overflow);
   EXPECT_FALSE(overflow);
-  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 8);
+  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL16 - 8);
 
   // Mod
   overflow = false;
@@ -539,7 +539,7 @@ TEST(DecimalTest, Overflow) {
   result = d3.Mod<int128_t>(t1, two, t1, 38, 0, &is_nan, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_FALSE(is_nan);
-  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL % 2);
+  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL16 % 2);
 
   result = d3.Mod<int128_t>(t1, zero, t2, 38, 1, &is_nan, &overflow);
   EXPECT_TRUE(is_nan);
@@ -797,6 +797,6 @@ TEST(DecimalArithmetic, RandTesting) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::DecimalUtil::InitMaxUnscaledDecimal();
+  impala::DecimalUtil::InitMaxUnscaledDecimal16();
   return RUN_ALL_TESTS();
 }

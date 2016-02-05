@@ -726,8 +726,7 @@ void PartitionedAggregationNode::InitAggSlots(
     if ((*slot_desc)->type().type != TYPE_STRING &&
         (*slot_desc)->type().type != TYPE_VARCHAR &&
         (*slot_desc)->type().type != TYPE_TIMESTAMP &&
-        (*slot_desc)->type().type != TYPE_CHAR &&
-        (*slot_desc)->type().type != TYPE_DECIMAL) {
+        (*slot_desc)->type().type != TYPE_CHAR) {
       ExprValue default_value;
       void* default_value_ptr = NULL;
       switch (evaluator->agg_op()) {
@@ -1370,12 +1369,6 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
     // Only AVG and NDV support string intermediates
     if ((type == TYPE_STRING || type == TYPE_VARCHAR) &&
         !(op == AggFnEvaluator::AVG || op == AggFnEvaluator::NDV)) {
-      supported = false;
-    }
-    // Only SUM, AVG, and NDV support decimal intermediates
-    if (type == TYPE_DECIMAL &&
-        !(op == AggFnEvaluator::SUM || op == AggFnEvaluator::AVG ||
-          op == AggFnEvaluator::NDV)) {
       supported = false;
     }
     if (!supported) {

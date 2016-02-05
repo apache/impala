@@ -123,7 +123,7 @@ TEST(HistogramTest, TestDecimal) {
   // All input values are x, result should be constant.
   {
     vector<DecimalVal> input;
-    int128_t val = DecimalUtil::MAX_UNSCALED_DECIMAL;
+    int128_t val = DecimalUtil::MAX_UNSCALED_DECIMAL16;
     stringstream ss;
     for (int i = 0; i < INPUT_SIZE; ++i) input.push_back(DecimalVal(val));
     for (int i = 0; i < NUM_BUCKETS; ++i) {
@@ -164,7 +164,7 @@ TEST(HistogramTest, TestString) {
 
 int main(int argc, char** argv) {
   impala::InitGoogleLoggingSafe(argv[0]);
-  impala::DecimalUtil::InitMaxUnscaledDecimal();
+  impala::DecimalUtil::InitMaxUnscaledDecimal16();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

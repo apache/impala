@@ -376,7 +376,7 @@ DecimalVal DecimalOperators::RoundDecimalNegativeScale(FunctionContext* context,
       int128_t delta = d * base - (val16.value() % base);
       // Need to check for overflow. This can't happen in the other cases since the
       // FE should have picked a high enough precision.
-      if (DecimalUtil::MAX_UNSCALED_DECIMAL - abs(delta) < abs(val16.value())) {
+      if (DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(delta) < abs(val16.value())) {
         context->AddWarning("Expression overflowed, returning NULL");
         return DecimalVal::null();
       }

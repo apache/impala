@@ -439,7 +439,8 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
       case TYPE_SMALLINT:
       case TYPE_INT:
       case TYPE_BIGINT:
-        null_value = codegen->GetIntConstant(type.type, fvn_seed);
+      case TYPE_DECIMAL:
+        null_value = codegen->GetIntConstant(type.GetByteSize(), fvn_seed);
         break;
       case TYPE_FLOAT: {
         // Don't care about the value, just the bit pattern
@@ -495,7 +496,7 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
   const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
   for (int i = 0; i < ctxs.size(); ++i) {
     PrimitiveType type = ctxs[i]->root()->type().type;
-    if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL || type == TYPE_CHAR) {
+    if (type == TYPE_TIMESTAMP || type == TYPE_CHAR) {
       return Status(Substitute("HashTableCtx::CodegenEvalRow(): type $0 NYI",
           TypeToString(type)));
     }
