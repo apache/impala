@@ -34,6 +34,7 @@ class HashUtil {
   /// NOTE: Any changes made to this function need to be reflected in Codegen::GetHashFn.
   /// TODO: crc32 hashes with different seeds do not result in different hash functions.
   /// The resulting hashes are correlated.
+  /// TODO: update this to also use SSE4_crc32_u64 and SSE4_crc32_u16 where appropriate.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
     uint32_t words = bytes / sizeof(uint32_t);
@@ -69,10 +70,8 @@ class HashUtil {
   /// CrcHash() specialized for 2-byte data
   static inline uint32_t CrcHash2(const void* v, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
-    const uint8_t* s = reinterpret_cast<const uint8_t*>(v);
-    hash = SSE4_crc32_u8(hash, *s);
-    ++s;
-    hash = SSE4_crc32_u8(hash, *s);
+    const uint16_t* s = reinterpret_cast<const uint16_t*>(v);
+    hash = SSE4_crc32_u16(hash, *s);
     hash = (hash << 16) | (hash >> 16);
     return hash;
   }
@@ -89,10 +88,8 @@ class HashUtil {
   /// CrcHash() specialized for 8-byte data
   static inline uint32_t CrcHash8(const void* v, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
-    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
-    hash = SSE4_crc32_u32(hash, *p);
-    ++p;
-    hash = SSE4_crc32_u32(hash, *p);
+    const uint64_t* p = reinterpret_cast<const uint64_t*>(v);
+    hash = SSE4_crc32_u64(hash, *p);
     hash = (hash << 16) | (hash >> 16);
     return hash;
   }
@@ -100,12 +97,10 @@ class HashUtil {
   /// CrcHash() specialized for 12-byte data
   static inline uint32_t CrcHash12(const void* v, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
-    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
-    hash = SSE4_crc32_u32(hash, *p);
+    const uint64_t* p = reinterpret_cast<const uint64_t*>(v);
+    hash = SSE4_crc32_u64(hash, *p);
     ++p;
-    hash = SSE4_crc32_u32(hash, *p);
-    ++p;
-    hash = SSE4_crc32_u32(hash, *p);
+    hash = SSE4_crc32_u32(hash, *reinterpret_cast<const uint32_t *>(p));
     hash = (hash << 16) | (hash >> 16);
     return hash;
   }
@@ -113,14 +108,10 @@ class HashUtil {
   /// CrcHash() specialized for 16-byte data
   static inline uint32_t CrcHash16(const void* v, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
-    const uint32_t* p = reinterpret_cast<const uint32_t*>(v);
-    hash = SSE4_crc32_u32(hash, *p);
+    const uint64_t* p = reinterpret_cast<const uint64_t*>(v);
+    hash = SSE4_crc32_u64(hash, *p);
     ++p;
-    hash = SSE4_crc32_u32(hash, *p);
-    ++p;
-    hash = SSE4_crc32_u32(hash, *p);
-    ++p;
-    hash = SSE4_crc32_u32(hash, *p);
+    hash = SSE4_crc32_u64(hash, *p);
     hash = (hash << 16) | (hash >> 16);
     return hash;
   }

@@ -115,9 +115,20 @@ static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t v) {
   return crc;
 }
 
+static inline uint32_t SSE4_crc32_u16(uint32_t crc, uint16_t v) {
+  __asm__("crc32w %1, %0" : "+r"(crc) : "rm"(v));
+  return crc;
+}
+
 static inline uint32_t SSE4_crc32_u32(uint32_t crc, uint32_t v) {
   __asm__("crc32l %1, %0" : "+r"(crc) : "rm"(v));
   return crc;
+}
+
+static inline uint32_t SSE4_crc32_u64(uint32_t crc, uint64_t v) {
+  uint64_t result = crc;
+  __asm__("crc32q %1, %0" : "+r"(result) : "rm"(v));
+  return result;
 }
 
 static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
@@ -149,7 +160,9 @@ static inline int SSE4_cmpestri(
 }
 
 #define SSE4_crc32_u8 _mm_crc32_u8
+#define SSE4_crc32_u16 _mm_crc32_u16
 #define SSE4_crc32_u32 _mm_crc32_u32
+#define SSE4_crc32_u64 _mm_crc32_u64
 #define POPCNT_popcnt_u64 _mm_popcnt_u64
 
 #else  // IR_COMPILE without SSE 4.2.
@@ -175,7 +188,17 @@ static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t v) {
   return 0;
 }
 
+static inline uint32_t SSE4_crc32_u16(uint32_t crc, uint16_t v) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return 0;
+}
+
 static inline uint32_t SSE4_crc32_u32(uint32_t crc, uint32_t v) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return 0;
+}
+
+static inline uint32_t SSE4_crc32_u64(uint32_t crc, uint64_t v) {
   DCHECK(false) << "CPU doesn't support SSE 4.2";
   return 0;
 }
