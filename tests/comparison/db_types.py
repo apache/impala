@@ -77,12 +77,17 @@ class DataType(ValExpr):
   def name(cls):
     return cls.__name__
 
+  @classmethod
+  def is_approximate(cls):
+    return False
+
   def __init__(self, val):
     self.val = val
 
   @property
   def exact_type(self):
     return type(self)
+
 
 
 class Boolean(DataType):
@@ -148,6 +153,10 @@ class Float(Number):
   @classmethod
   def get_generic_type(cls):
     return Float
+
+  @classmethod
+  def is_approximate(cls):
+    return True
 
   CMP_VALUE = 5
 

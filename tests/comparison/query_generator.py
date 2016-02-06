@@ -182,16 +182,20 @@ class QueryGenerator(object):
     if (select_clause.agg_items and select_clause.basic_items) \
         or (require_aggregate is None \
             and select_clause.basic_items \
+            and not select_clause.analytic_items \
+            and not select_clause.contains_approximate_types \
             and self.profile.use_group_by_clause()):
       group_by_items = [item for item in select_clause.basic_items
                         if not item.val_expr.is_constant]
+      # TODO: What if there are select_clause.analytic_items?
       if group_by_items:
         query.group_by_clause = GroupByClause(group_by_items)
 
     # Impala doesn't support DISTINCT with analytics or "SELECT DISTINCT" when
     # GROUP BY is used.
     if not select_clause.analytic_items \
-        and not (query.group_by_clause and not select_clause.agg_items) \
+        and not query.group_by_clause \
+        and not select_clause.contains_approximate_types \
         and self.profile.use_distinct():
       if select_clause.agg_items:
         self._enable_distinct_on_random_agg_items(select_clause.agg_items)
@@ -221,7 +225,11 @@ class QueryGenerator(object):
           table_exprs,
           allow_with_clause=False,
           select_item_data_types=select_item_data_types))
-      query.union_clause.all = self.profile.use_union_all()
+      if select_clause.contains_approximate_types or any(
+          q.select_clause.contains_approximate_types for q in query.union_clause.queries):
+        query.union_clause.all = True
+      else:
+        query.union_clause.all = self.profile.use_union_all()
 
     self.queries_under_construction.pop()
     if self.queries_under_construction:

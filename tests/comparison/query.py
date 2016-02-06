@@ -16,6 +16,7 @@ from copy import deepcopy
 from logging import getLogger
 
 from common import Column, TableExpr, TableExprList, ValExpr, ValExprList
+from db_types import Float
 
 LOG = getLogger(__name__)
 
@@ -123,6 +124,11 @@ class SelectClause(object):
        this list will be propagated but additions will not be.
     '''
     return SelectItemSubList(self.items, lambda item: item.is_analytic)
+
+  @property
+  def contains_approximate_types(self):
+    '''Returns true if there is a select item that is approximate (such as Float).'''
+    return any(item.type.is_approximate() for item in self.items)
 
   def __deepcopy__(self, memo):
     other = SelectClause([deepcopy(item, memo) for item in self.items])
