@@ -436,6 +436,13 @@ class ImpalaSqlWriter(SqlWriter):
     super(ImpalaSqlWriter, self).__init__(*args, **kwargs)
     self.operator_funcs['IsNotDistinctFromOp'] = '({0}) <=> ({1})'
 
+  def _write_column(self, col):
+    result = super(ImpalaSqlWriter, self)._write_column(col)
+    if col.exact_type == Char:
+      # TRIM is a temporary workaround for IMPALA-1652
+      result = 'TRIM(%s)' % result
+    return result
+
 
 class OracleSqlWriter(SqlWriter):
 

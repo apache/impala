@@ -1165,10 +1165,6 @@ class QueryGenerator(object):
     col_type = choice(list(common_col_types))
     left_col = choice(cur_table_expr.joinable_cols_by_type[col_type])
     right_col = choice(target_table_expr.joinable_cols_by_type[col_type])
-    if issubclass(right_col.type, (String, VarChar)) and left_col.type == Char:
-      left_col = Trim.create_from_args(left_col)
-    elif left_col.type == Char and issubclass(right_col.type, (String, VarChar)):
-      right_col = Trim.create_from_args(right_col)
     return Equals.create_from_args(left_col, right_col)
 
   def _create_relational_join_condition(self,
