@@ -179,8 +179,8 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       probe_codegen_enabled = CodegenProcessProbeBatch(state, hash_fn, murmur_hash_fn);
     }
   }
-  AddCodegenExecOption(build_codegen_enabled, "Build Side");
-  AddCodegenExecOption(probe_codegen_enabled, "Probe Side");
+  AddCodegenExecOption(build_codegen_enabled, "", "Build Side");
+  AddCodegenExecOption(probe_codegen_enabled, "", "Probe Side");
   return Status::OK();
 }
 

@@ -57,9 +57,9 @@ class TupleRowComparator {
         codegend_compare_fn_(NULL) {
   }
 
-  /// Codegens a Compare() function for this comparator that is used in the ()
-  /// operator. Returns true if the codegen was successful, false if not.
-  bool Codegen(RuntimeState* state);
+  /// Codegens a Compare() function for this comparator that is used in the () operator.
+  /// Returns Status::OK() iff the codegen was successful.
+  Status Codegen(RuntimeState* state);
 
   /// Returns a negative value if lhs is less than rhs, a positive value if lhs is greater
   /// than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_) must
@@ -118,9 +118,9 @@ class TupleRowComparator {
       TupleRow*);
   CompareFn* codegend_compare_fn_;
 
-  /// Returns a codegen'd version of the Compare() function.
+  /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
   /// TODO: have codegen'd users inline this instead of calling through the () operator
-  llvm::Function* CodegenCompare(RuntimeState* state);
+  Status CodegenCompare(RuntimeState* state, llvm::Function** fn);
 };
 
 /// Compares the equality of two Tuples, going slot by slot.

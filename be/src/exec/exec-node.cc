@@ -204,8 +204,10 @@ void ExecNode::AddRuntimeExecOption(const string& str) {
   runtime_profile()->AddInfoString("ExecOption", runtime_exec_options_);
 }
 
-void ExecNode::AddCodegenExecOption(bool codegen_enabled, const string& extra_label) {
+void ExecNode::AddCodegenExecOption(bool codegen_enabled, const string& extra_info,
+    const string& extra_label) {
   string str = codegen_enabled ? "Codegen Enabled" : "Codegen Disabled";
+  if (!extra_info.empty()) str = str + ": " + extra_info;
   if (!extra_label.empty()) str = extra_label + " " + str;
   AddRuntimeExecOption(str);
 }

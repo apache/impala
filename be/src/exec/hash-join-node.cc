@@ -144,8 +144,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       }
     }
   }
-  AddCodegenExecOption(build_codegen_enabled, "Build Side");
-  AddCodegenExecOption(probe_codegen_enabled, "Probe Side");
+  AddCodegenExecOption(build_codegen_enabled, "", "Build Side");
+  AddCodegenExecOption(probe_codegen_enabled, "", "Probe Side");
   return Status::OK();
 }
 

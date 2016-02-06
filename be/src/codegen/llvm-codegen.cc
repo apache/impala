@@ -450,6 +450,7 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
   return loaded_functions_[function];
 }
 
+// TODO: this should return a Status
 bool LlvmCodeGen::VerifyFunction(Function* fn) {
   if (is_corrupt_) return false;
 

@@ -47,9 +47,15 @@ Status SortNode::Prepare(RuntimeState* state) {
       state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
   AddExprCtxsToFree(sort_exec_exprs_);
   TupleRowComparator less_than(sort_exec_exprs_, is_asc_order_, nulls_first_);
+
   bool codegen_enabled = false;
-  if (state->codegen_enabled()) codegen_enabled = less_than.Codegen(state);
-  AddCodegenExecOption(codegen_enabled);
+  Status codegen_status;
+  if (state->codegen_enabled()) {
+    codegen_status = less_than.Codegen(state);
+    codegen_enabled = codegen_status.ok();
+  }
+  AddCodegenExecOption(codegen_enabled, codegen_status);
+
   sorter_.reset(new Sorter(
       less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
       &row_descriptor_, mem_tracker(), runtime_profile(), state));

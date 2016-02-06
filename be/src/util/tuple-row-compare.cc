@@ -14,22 +14,25 @@
 
 #include "util/tuple-row-compare.h"
 
+#include <gutil/strings/substitute.h>
+
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/runtime-state.h"
 
 using namespace impala;
 using namespace llvm;
+using namespace strings;
 
-bool TupleRowComparator::Codegen(RuntimeState* state) {
-  Function* fn = CodegenCompare(state);
-  if (fn == NULL) return false;
+Status TupleRowComparator::Codegen(RuntimeState* state) {
+  Function* fn;
+  RETURN_IF_ERROR(CodegenCompare(state, &fn));
   LlvmCodeGen* codegen;
   bool got_codegen = state->GetCodegen(&codegen).ok();
   DCHECK(got_codegen);
   codegend_compare_fn_ = state->obj_pool()->Add(new CompareFn);
   codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(codegend_compare_fn_));
-  return true;
+  return Status::OK();
 }
 
 // Codegens an unrolled version of Compare(). Uses codegen'd key exprs and injects
@@ -147,9 +150,9 @@ bool TupleRowComparator::Codegen(RuntimeState* state) {
 // next_key2:                                        ; preds = %rhs_non_null12, %next_key
 //   ret i32 0
 // }
-Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
+Status TupleRowComparator::CodegenCompare(RuntimeState* state, Function** fn) {
   LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
   LLVMContext& context = codegen->context();
 
@@ -162,9 +165,8 @@ Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
     Status status =
         key_expr_ctxs_lhs_[i]->root()->GetCodegendComputeFn(state, &key_fns[i]);
     if (!status.ok()) {
-      VLOG_QUERY << "Could not codegen TupleRowComparator::Compare(): "
-                 << status.GetDetail();
-      return NULL;
+      return Status(Substitute("Could not codegen TupleRowComparator::Compare(): %s",
+          status.GetDetail()));
     }
   }
 
@@ -181,9 +183,9 @@ Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
   prototype.AddArgument("lhs", tuple_row_type);
   prototype.AddArgument("rhs", tuple_row_type);
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmCodeGen::LlvmBuilder builder(context);
   Value* args[4];
-  Function* fn = prototype.GeneratePrototype(&builder, args);
+  *fn = prototype.GeneratePrototype(&builder, args);
   Value* lhs_ctxs_arg = args[0];
   Value* rhs_ctxs_arg = args[1];
   Value* lhs_arg = args[2];
@@ -193,7 +195,7 @@ Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
   for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
     // The start of the next key expr after this one. Used to implement "continue" logic
     // in the unrolled loop.
-    BasicBlock* next_key_block = BasicBlock::Create(context, "next_key", fn);
+    BasicBlock* next_key_block = BasicBlock::Create(context, "next_key", *fn);
 
     // Call key_fns[i](key_expr_ctxs_lhs[i], lhs_arg)
     Value* lhs_ctx = codegen->CodegenArrayAt(&builder, lhs_ctxs_arg, i);
@@ -213,23 +215,23 @@ Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
     // if (lhs_value == NULL && rhs_value == NULL) continue;
     Value* both_null = builder.CreateAnd(lhs_null, rhs_null, "both_null");
     BasicBlock* non_null_block =
-        BasicBlock::Create(context, "non_null", fn, next_key_block);
+        BasicBlock::Create(context, "non_null", *fn, next_key_block);
     builder.CreateCondBr(both_null, next_key_block, non_null_block);
     // if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
     builder.SetInsertPoint(non_null_block);
     BasicBlock* lhs_null_block =
-        BasicBlock::Create(context, "lhs_null", fn, next_key_block);
+        BasicBlock::Create(context, "lhs_null", *fn, next_key_block);
     BasicBlock* lhs_non_null_block =
-        BasicBlock::Create(context, "lhs_non_null", fn, next_key_block);
+        BasicBlock::Create(context, "lhs_non_null", *fn, next_key_block);
     builder.CreateCondBr(lhs_null, lhs_null_block, lhs_non_null_block);
     builder.SetInsertPoint(lhs_null_block);
     builder.CreateRet(builder.getInt32(nulls_first_[i]));
     // if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
     builder.SetInsertPoint(lhs_non_null_block);
     BasicBlock* rhs_null_block =
-        BasicBlock::Create(context, "rhs_null", fn, next_key_block);
+        BasicBlock::Create(context, "rhs_null", *fn, next_key_block);
     BasicBlock* rhs_non_null_block =
-        BasicBlock::Create(context, "rhs_non_null", fn, next_key_block);
+        BasicBlock::Create(context, "rhs_non_null", *fn, next_key_block);
     builder.CreateCondBr(rhs_null, rhs_null_block, rhs_non_null_block);
     builder.SetInsertPoint(rhs_null_block);
     builder.CreateRet(builder.getInt32(-nulls_first_[i]));
@@ -244,7 +246,7 @@ Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
     // Otherwise, try the next Expr
     Value* result_nonzero = builder.CreateICmpNE(result, builder.getInt32(0));
     BasicBlock* result_nonzero_block =
-        BasicBlock::Create(context, "result_nonzero", fn, next_key_block);
+        BasicBlock::Create(context, "result_nonzero", *fn, next_key_block);
     builder.CreateCondBr(result_nonzero, result_nonzero_block, next_key_block);
     builder.SetInsertPoint(result_nonzero_block);
     builder.CreateRet(result);
@@ -253,5 +255,10 @@ Function* TupleRowComparator::CodegenCompare(RuntimeState* state) {
     builder.SetInsertPoint(next_key_block);
   }
   builder.CreateRet(builder.getInt32(0));
-  return codegen->FinalizeFunction(fn);
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == NULL) {
+    return Status("Codegen'd TupleRowComparator::Compare() function failed verification, "
+        "see log");
+  }
+  return Status::OK();
 }
