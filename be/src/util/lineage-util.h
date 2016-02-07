@@ -30,52 +30,47 @@ namespace impala {
 class LineageUtil {
   private:
     /// Serializes a TVertex object to JSON
-    static string TVertexToJSON(TVertex vertex) {
-      rapidjson::StringBuffer buffer;
-      rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-      writer.StartObject();
-      writer.String("id");
-      writer.Int64(vertex.id);
-      writer.String("vertexType");
-      writer.String("COLUMN");
-      writer.String("vertexId");
-      writer.String(vertex.label.c_str());
-      writer.EndObject();
-      // Return a string representation of json
-      return buffer.GetString();
+    static void TVertexToJSON(const TVertex &vertex,
+        rapidjson::Writer<rapidjson::StringBuffer>* writer) {
+      writer->StartObject();
+      writer->String("id");
+      writer->Int64(vertex.id);
+      writer->String("vertexType");
+      writer->String("COLUMN");
+      writer->String("vertexId");
+      writer->String(vertex.label.c_str());
+      writer->EndObject();
     }
 
     /// Serializes a TMultiEdge object to JSON
-    static string TMultiEdgeToJSON(TMultiEdge obj) {
-      rapidjson::StringBuffer buffer;
-      rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-      writer.StartObject();
+    static void TMultiEdgeToJSON(const TMultiEdge &obj,
+        rapidjson::Writer<rapidjson::StringBuffer>* writer) {
+      writer->StartObject();
       // Write source vertices
-      writer.String("sources");
-      writer.StartArray();
+      writer->String("sources");
+      writer->StartArray();
       for(int i=0; i < obj.sources.size(); ++i) {
-        writer.Int64(obj.sources[i].id);
+        writer->Int64(obj.sources[i].id);
       }
-      writer.EndArray();
+      writer->EndArray();
       // Write target vertices
-      writer.String("targets");
-      writer.StartArray();
+      writer->String("targets");
+      writer->StartArray();
       for(int i=0; i < obj.targets.size(); ++i) {
-        writer.Int64(obj.targets[i].id);
+        writer->Int64(obj.targets[i].id);
       }
-      writer.EndArray();
+      writer->EndArray();
       // Write edgetype
-      writer.String("edgeType");
+      writer->String("edgeType");
       string edge_type =
           (obj.edgetype == TEdgeType::PROJECTION) ? "PROJECTION" : "PREDICATE";
-      writer.String(edge_type.c_str());
-      writer.EndObject();
-      return buffer.GetString();
+      writer->String(edge_type.c_str());
+      writer->EndObject();
     }
 
   public:
     /// Serializes a TLineageGraph object to JSON
-    static string TLineageToJSON(TLineageGraph lineage) {
+    static void TLineageToJSON(const TLineageGraph &lineage, string* out) {
       rapidjson::StringBuffer buffer;
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
       writer.StartObject();
@@ -96,20 +91,19 @@ class LineageUtil {
       writer.String("edges");
       writer.StartArray();
       for(int i=0; i < lineage.edges.size(); ++i) {
-        writer.String(TMultiEdgeToJSON(lineage.edges[i]).c_str());
+        TMultiEdgeToJSON(lineage.edges[i], &writer);
       }
       writer.EndArray();
       // Write vertices
       writer.String("vertices");
       writer.StartArray();
       for(int i=0; i < lineage.vertices.size(); ++i) {
-        writer.String(TVertexToJSON(lineage.vertices[i]).c_str());
+        TVertexToJSON(lineage.vertices[i], &writer);
       }
       writer.EndArray();
       writer.EndObject();
-      return buffer.GetString();
+      *out = buffer.GetString();
     }
-
 };
 
 }
