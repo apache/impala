@@ -25,7 +25,7 @@ LOG = logging.getLogger('admission_test')
 # We set a WAIT debug action so it doesn't complete the execution of this query. The
 # limit is a parameter for debugging purposes; each thread will insert its id so
 # that running queries can be correlated with the thread that submitted them.
-QUERY = "select * from alltypes limit %s"
+QUERY = "select * from alltypes where id != %s"# limit %s"
 
 # Time to sleep (in milliseconds) between issuing queries. The default statestore
 # heartbeat is 500ms, so the lower the delay the more we can submit before the global
@@ -55,7 +55,7 @@ MAX_NUM_CONCURRENT_QUERIES = 5
 MAX_NUM_QUEUED_QUERIES = 10
 
 # Mem limit (bytes) used in the mem limit test
-MEM_TEST_LIMIT = 100000 * 1024 * 1024
+MEM_TEST_LIMIT = 12 * 1024 * 1024 * 1024
 
 _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTBEAT_MS)
 
@@ -63,10 +63,11 @@ _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTB
 PROFILE_QUERY_OPTIONS_KEY = "Query Options (non default): "
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
+  proc_limit_flag = ("-mem_limit=%s" % (mem_limit)) if mem_limit > 0 else ""
   return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
       "-default_pool_max_queued %s -default_pool_mem_limit %s "
-      "-disable_admission_control=false" %\
-      (max_requests, max_queued, mem_limit))
+      "-disable_admission_control=false %s" %\
+      (max_requests, max_queued, mem_limit, proc_limit_flag))
 
 
 def impalad_admission_ctrl_config_args(additional_args=""):
@@ -628,12 +629,30 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     self.pool_name = 'root.queueB'
     self.run_admission_test(vector, {'request_pool': self.pool_name})
 
+  def get_proc_limit(self):
+    """Gets the process mem limit as reported by the impalad's mem-tracker metric.
+       Raises an assertion if not all impalads have the same value."""
+    limit_metrics = []
+    for impalad in self.cluster.impalads:
+      limit_metrics.append(impalad.service.get_metric_value("mem-tracker.process.limit"))
+      assert limit_metrics[0] == limit_metrics[-1],\
+          "Not all impalads have the same process limit: %s" % (limit_metrics,)
+    assert limit_metrics[0] is not None
+    return limit_metrics[0]
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES * 100,
+      impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES * 30,
         MAX_NUM_QUEUED_QUERIES, MEM_TEST_LIMIT),
       statestored_args=_STATESTORED_ARGS)
   def test_mem_limit(self, vector):
+    # Impala may set the proc mem limit lower than we think depending on the overcommit
+    # settings of the OS. It should be fine to continue anyway.
+    proc_limit = self.get_proc_limit()
+    if proc_limit != MEM_TEST_LIMIT:
+      LOG.info("Warning: Process mem limit %s is not expected val %s", limit_val,
+          MEM_TEST_LIMIT)
+
     self.pool_name = 'default-pool'
     # Each query mem limit (set the query option to override the per-host memory
     # estimate) should use a bit less than (total pool mem limit) / #queries so that
@@ -642,6 +661,6 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # of running requests is very high so that requests are only queued/rejected due to
     # the mem limit.
     num_impalads = len(self.cluster.impalads)
-    query_mem_limit = (MEM_TEST_LIMIT / MAX_NUM_CONCURRENT_QUERIES / num_impalads) - 1
+    query_mem_limit = (proc_limit / MAX_NUM_CONCURRENT_QUERIES / num_impalads) - 1
     self.run_admission_test(vector,
         {'request_pool': self.pool_name, 'mem_limit': query_mem_limit})

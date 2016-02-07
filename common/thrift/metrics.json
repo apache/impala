@@ -20,6 +20,36 @@
     "key": "external-data-source.class-cache.hits"
   },
   {
+    "description": "Resource Pool $0 Configured Max Mem Resources",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Configured Max Mem Resources",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-mem-resources.$0"
+  },
+  {
+    "description": "Resource Pool $0 Configured Max Requests",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Configured Max Requests",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-requests.$0"
+  },
+  {
+    "description": "Resource Pool $0 Configured Max Queued",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Configured Max Queued",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-queued.$0"
+  },
+  {
     "description": "Resource Pool $0 Aggregate Queue Size",
     "contexts": [
       "RESOURCE_POOL"
@@ -38,16 +68,6 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "admission-controller.agg-mem-reserved.$0"
-  },
-  {
-    "description": "Resource Pool $0 Aggregate Mem Admitted",
-    "contexts": [
-      "RESOURCE_POOL"
-    ],
-    "label": "Resource Pool $0 Aggregate Mem Admitted",
-    "units": "NONE",
-    "kind": "GAUGE",
-    "key": "admission-controller.agg-mem-admitted.$0"
   },
   {
     "description": "Resource Pool $0 Aggregate Num Running",
@@ -88,6 +108,16 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "admission-controller.total-dequeued.$0"
+  },
+  {
+    "description": "Resource Pool $0 Local Mem Admitted",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Mem Admitted",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.local-mem-admitted.$0"
   },
   {
     "description": "Resource Pool $0 Queue Size on the coordinator",

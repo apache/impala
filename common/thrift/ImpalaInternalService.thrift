@@ -495,12 +495,16 @@ struct TPoolConfigParams {
 // Returned by RequestPoolService.getPoolConfig()
 struct TPoolConfig {
   // Maximum number of placed requests before incoming requests are queued.
+  // A value of 0 effectively disables the pool. -1 indicates no limit.
   1: required i64 max_requests
 
   // Maximum number of queued requests before incoming requests are rejected.
+  // Any non-positive number (<= 0) disables queuing, i.e. requests are rejected instead
+  // of queued.
   2: required i64 max_queued
 
-  // Maximum memory resources of the pool in bytes. -1 indicates no limit.
+  // Maximum memory resources of the pool in bytes.
+  // A value of 0 effectively disables the pool. -1 indicates no limit.
   3: required i64 max_mem_resources
 
   // Maximum amount of time (in milliseconds) that a request will wait to be admitted

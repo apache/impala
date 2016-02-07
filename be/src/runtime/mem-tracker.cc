@@ -59,7 +59,8 @@ MemTracker::MemTracker(int64_t byte_limit, int64_t rm_reserved_limit, const stri
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
-    bytes_over_limit_metric_(NULL) {
+    bytes_over_limit_metric_(NULL),
+    limit_metric_(NULL) {
   if (parent != NULL) parent_->AddChildTracker(this);
   Init();
 }
@@ -81,7 +82,8 @@ MemTracker::MemTracker(
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
-    bytes_over_limit_metric_(NULL) {
+    bytes_over_limit_metric_(NULL),
+    limit_metric_(NULL) {
   if (parent != NULL) parent_->AddChildTracker(this);
   Init();
 }
@@ -102,7 +104,8 @@ MemTracker::MemTracker(UIntGauge* consumption_metric,
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
-    bytes_over_limit_metric_(NULL) {
+    bytes_over_limit_metric_(NULL),
+    limit_metric_(NULL) {
   Init();
 }
 
@@ -130,6 +133,27 @@ void MemTracker::UnregisterFromParent() {
   lock_guard<mutex> l(parent_->child_trackers_lock_);
   parent_->child_trackers_.erase(child_tracker_it_);
   child_tracker_it_ = parent_->child_trackers_.end();
+}
+
+int64_t MemTracker::GetPoolMemReserved() const {
+  // Pool trackers should have a pool_name_ and no limit.
+  DCHECK(!pool_name_.empty());
+  DCHECK_EQ(limit_, -1);
+
+  int64_t mem_reserved = 0L;
+  lock_guard<mutex> l(child_trackers_lock_);
+  for (list<MemTracker*>::const_iterator it = child_trackers_.begin();
+       it != child_trackers_.end(); ++it) {
+    int64_t child_limit = (*it)->limit();
+    if (child_limit > 0) {
+      // Make sure we don't overflow if the query limits are set to ridiculous values.
+      mem_reserved += min(child_limit, MemInfo::physical_mem());
+    } else {
+      DCHECK_EQ(child_limit, -1);
+      mem_reserved += (*it)->consumption();
+    }
+  }
+  return mem_reserved;
 }
 
 MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
@@ -210,6 +234,8 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
 
   bytes_over_limit_metric_ = metrics->AddGauge<int64_t>(
       Substitute("$0.bytes-over-limit", prefix), -1);
+
+  limit_metric_ = metrics->AddGauge<int64_t>(Substitute("$0.limit", prefix), limit_);
 }
 
 void MemTracker::RefreshConsumptionFromMetric() {

@@ -65,7 +65,6 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     summary_profile_(summary_profile),
     query_events_(query_events),
     num_fragment_instances_(0),
-    num_hosts_(0),
     num_scan_ranges_(0),
     is_admitted_(false) {
   fragment_exec_params_.resize(request.fragments.size());
@@ -87,8 +86,8 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
 }
 
 int64_t QuerySchedule::GetClusterMemoryEstimate() const {
-  DCHECK_GT(num_hosts_, 0);
-  const int64_t total_cluster_mem = GetPerHostMemoryEstimate() * num_hosts_;
+  DCHECK_GT(unique_hosts_.size(), 0);
+  const int64_t total_cluster_mem = GetPerHostMemoryEstimate() * unique_hosts_.size();
   DCHECK_GE(total_cluster_mem, 0); // Assume total cluster memory fits in an int64_t.
   return total_cluster_mem;
 }

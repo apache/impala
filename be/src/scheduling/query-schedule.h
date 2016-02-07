@@ -101,12 +101,7 @@ class QuerySchedule {
   void set_num_fragment_instances(int64_t num_fragment_instances) {
     num_fragment_instances_ = num_fragment_instances;
   }
-  void set_num_hosts(int64_t num_hosts) {
-    DCHECK_GT(num_hosts, 0);
-    num_hosts_ = num_hosts;
-  }
   int64_t num_fragment_instances() const { return num_fragment_instances_; }
-  int64_t num_hosts() const { return num_hosts_; }
   int64_t num_scan_ranges() const { return num_scan_ranges_; }
 
   /// Map node ids to the index of their fragment in TQueryExecRequest.fragments.
@@ -160,10 +155,6 @@ class QuerySchedule {
 
   /// Number of backends executing plan fragments on behalf of this query.
   int64_t num_fragment_instances_;
-
-  /// Total number of hosts. Used to compute the total cluster estimated memory
-  /// in GetClusterMemoryEstimate().
-  int64_t num_hosts_;
 
   /// Total number of scan ranges of this query.
   int64_t num_scan_ranges_;

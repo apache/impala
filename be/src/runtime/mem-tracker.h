@@ -303,6 +303,12 @@ class MemTracker {
     return v;
   }
 
+  /// Returns the memory 'reserved' by this resource pool mem tracker, which is the sum
+  /// of the memory reserved by the queries in it (i.e. its child trackers). The mem
+  /// reserved for a query is its limit_, if set (which should be the common case with
+  /// admission control). Otherwise the current consumption is used.
+  int64_t GetPoolMemReserved() const;
+
   /// Returns the memory consumed in bytes.
   int64_t consumption() const { return consumption_->current_value(); }
 
@@ -434,8 +440,9 @@ class MemTracker {
   std::vector<MemTracker*> all_trackers_;  // this tracker plus all of its ancestors
   std::vector<MemTracker*> limit_trackers_;  // all_trackers_ with valid limits
 
-  /// All the child trackers of this tracker. Used for error reporting only.
-  /// i.e., Updating a parent tracker does not update the children.
+  /// All the child trackers of this tracker. Used only for computing resource pool mem
+  /// reserved and error reporting, i.e., updating a parent tracker does not update its
+  /// children.
   mutable boost::mutex child_trackers_lock_;
   std::list<MemTracker*> child_trackers_;
 
@@ -481,6 +488,9 @@ class MemTracker {
   /// and the limit was exceeded pre-GC. -1 if there is no limit or the limit was never
   /// exceeded.
   IntGauge* bytes_over_limit_metric_;
+
+  /// Metric for limit_.
+  IntGauge* limit_metric_;
 };
 
 }

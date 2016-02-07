@@ -90,7 +90,7 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
   if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
   if (!FLAGS_disable_admission_control) {
     admission_controller_.reset(
-        new AdmissionController(request_pool_service_, metrics, backend_id_));
+        new AdmissionController(request_pool_service_, metrics, backend_address));
   }
 
   if (FLAGS_enable_rm) {
@@ -133,7 +133,7 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
   // request_pool_service_ may be null in unit tests
   if (request_pool_service_ != NULL && !FLAGS_disable_admission_control) {
     admission_controller_.reset(
-        new AdmissionController(request_pool_service_, metrics, backend_id_));
+        new AdmissionController(request_pool_service_, metrics, TNetworkAddress()));
   }
 
   for (int i = 0; i < backends.size(); ++i) {
@@ -868,13 +868,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
       schedule->request().query_ctx, &resolved_pool));
   schedule->set_request_pool(resolved_pool);
-  // Statestore topic may not have been updated yet if this is soon after startup, but
-  // there is always at least this backend.
-  schedule->set_num_hosts(max<int64_t>(num_fragment_instances_metric_->value(), 1));
 
-  if (!FLAGS_disable_admission_control) {
-    RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
-  }
   if (ExecEnv::GetInstance()->impala_server()->IsOffline()) {
     return Status("This Impala server is offline. Please retry your query later.");
   }
@@ -882,6 +876,9 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
+  if (!FLAGS_disable_admission_control) {
+    RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
+  }
   if (!FLAGS_enable_rm) return Status::OK();
   string user = coord->runtime_state()->effective_user();
   if (user.empty()) user = "default";

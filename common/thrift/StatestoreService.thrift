@@ -23,23 +23,22 @@ enum StatestoreServiceVersion {
 }
 
 // Structure serialized for the topic AdmissionController::IMPALA_REQUEST_QUEUE_TOPIC.
-// Statistics for a single pool. If RM is used, this is a YARN 'queue'. The topic key is
-// of the form "<pool_name>!<backend_id>".
+// Statistics for a single admission control pool. The topic key is of the form
+// "<pool_name>!<backend_id>".
 struct TPoolStats {
-  // The current number of admitted requests that are running. This is an instantaneous
-  // value (as opposed to a cumulative sum).
-  1: required i64 num_running;
+  // The current number of requests admitted by this host's admission controller
+  // and are currently running. This is an instantaneous value (as opposed to a
+  // cumulative sum).
+  1: required i64 num_admitted_running;
 
   // The current number of queued requests. This is an instantaneous value.
   2: required i64 num_queued;
 
-  // The current memory used (in bytes) by everything executing in this pool on this
-  // backend.
-  3: required i64 mem_usage;
-
-  // The sum of the cluster memory estimates from planning (in bytes) by all running
-  // requests in this pool.
-  4: required i64 mem_estimate;
+  // The memory (in bytes) currently reserved on this backend for use by queries in this
+  // pool. E.g.  when a query which reserves 10G/host admitted to this pool begins
+  // execution on this impalad, this value increases by 10G. Any other impalads executing
+  // this query will also increment their backend_mem_reserved by 10G.
+  3: required i64 backend_mem_reserved;
 }
 
 // Structure serialised in the Impala backend topic. Each Impalad
