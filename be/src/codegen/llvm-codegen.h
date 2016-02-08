@@ -331,9 +331,11 @@ class LlvmCodeGen {
   /// function is invalid.
   bool VerifyFunction(llvm::Function* function);
 
-  /// This will generate a printf call instruction to output 'message' at the
-  /// builder's insert point.  Only for debugging.
-  void CodegenDebugTrace(LlvmBuilder* builder, const char* message);
+  /// This will generate a printf call instruction to output 'message' at the builder's
+  /// insert point. If 'v1' is non-NULL, it will also be passed to the printf call. Only
+  /// for debugging.
+  void CodegenDebugTrace(LlvmBuilder* builder, const char* message,
+      llvm::Value* v1 = NULL);
 
   /// Returns the string representation of a llvm::Value* or llvm::Type*
   template <typename T> static std::string Print(T* value_or_type) {
@@ -386,8 +388,11 @@ class LlvmCodeGen {
   /// c-code and code-generated IR.  The resulting value will be of 'type'.
   llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, const void* ptr);
 
-  /// Returns the constant 'val' of 'type'
+  /// Returns the constant 'val' of 'type'.
   llvm::Value* GetIntConstant(PrimitiveType type, int64_t val);
+
+  /// Returns the constant 'val' of the int type of size 'byte_size'.
+  llvm::Value* GetIntConstant(int byte_size, int64_t val);
 
   /// Returns true/false constants (bool type)
   llvm::Value* true_value() { return true_value_; }
@@ -569,10 +574,6 @@ class LlvmCodeGen {
 
   /// The vector of functions to automatically JIT compile after FinalizeModule().
   std::vector<std::pair<llvm::Function*, void**> > fns_to_jit_compile_;
-
-  /// Debug utility that will insert a printf-like function into the generated
-  /// IR.  Useful for debugging the IR.  This is lazily created.
-  llvm::Function* debug_trace_fn_;
 
   /// Debug strings that will be outputted by jitted code.  This is a copy of all
   /// strings passed to CodegenDebugTrace.

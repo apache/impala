@@ -45,7 +45,13 @@
 #include "runtime/raw-value-ir.cc"
 #include "udf/udf-ir.cc"
 #include "util/hash-util-ir.cc"
+
+// Unused function to make sure printf declaration is included in IR module. Used by
+// LlvmCodegen::CodegenDebugTrace().
+void printf_dummy_fn() {
+  printf("dummy");
+}
+
 #else
 #error "This file should only be used for cross compiling to IR."
 #endif
-

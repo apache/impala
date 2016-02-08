@@ -112,7 +112,7 @@ Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int de
   Function* jitted_loop_call = fn_prototype.GeneratePrototype();
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", jitted_loop_call);
   builder.SetInsertPoint(entry_block);
-  codegen->CodegenDebugTrace(&builder, "Jitted");
+  codegen->CodegenDebugTrace(&builder, "Jitted\n");
 
   // Store &jitted_counter as a constant.
   Value* const_delta = ConstantInt::get(context, APInt(64, delta));
@@ -145,7 +145,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   typedef void (*TestLoopFn)(int);
 
   string module_file;
-  PathBuilder::GetFullPath("llvm-ir/test-loop.ir", &module_file);
+  PathBuilder::GetFullPath("llvm-ir/test-loop.bc", &module_file);
 
   // Part 1: Load the module and make sure everything is loaded correctly.
   scoped_ptr<LlvmCodeGen> codegen;
@@ -154,7 +154,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
 
   vector<Function*> functions;
   codegen->GetFunctions(&functions);
-  EXPECT_EQ(functions.size(), 2);
+  EXPECT_EQ(functions.size(), 3);
 
   Function* loop_call = functions[0];
   Function* loop = functions[1];

@@ -18,6 +18,7 @@
 #include <iostream>
 #include <sstream>
 #include <boost/thread/mutex.hpp>
+#include <gutil/strings/substitute.h>
 
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/InstructionSimplify.h>
@@ -57,6 +58,7 @@
 #include "common/names.h"
 
 using namespace llvm;
+using namespace strings;
 using std::fstream;
 
 DEFINE_bool(print_llvm_ir_instruction_count, false,
@@ -105,8 +107,7 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& id) :
   is_compiled_(false),
   context_(new llvm::LLVMContext()),
   module_(NULL),
-  execution_engine_(NULL),
-  debug_trace_fn_(NULL) {
+  execution_engine_(NULL) {
 
   DCHECK(llvm_initialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
@@ -410,6 +411,10 @@ Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
       DCHECK(false);
       return NULL;
   }
+}
+
+Value* LlvmCodeGen::GetIntConstant(int num_bytes, int64_t val) {
+  return ConstantInt::get(context(), APInt(8 * num_bytes, val));
 }
 
 AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable& var) {
@@ -795,44 +800,25 @@ void* LlvmCodeGen::JitFunction(Function* function) {
   return jitted_function;
 }
 
-// Wrapper around printf to make it easier to call from IR
-extern "C" void DebugTrace(const char* str) {
-  printf("LLVM Trace: %s\n", str);
-}
-
-void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str) {
+void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str,
+    Value* v1) {
   LOG(ERROR) << "Remove IR codegen debug traces before checking in.";
-
-  // Lazily link in debug function to the module
-  if (debug_trace_fn_ == NULL) {
-    vector<Type*> args;
-    args.push_back(ptr_type_);
-    FunctionType* fn_type = FunctionType::get(void_type_, args, false);
-    debug_trace_fn_ = Function::Create(fn_type, GlobalValue::ExternalLinkage,
-        "DebugTrace", module_);
-
-    DCHECK(debug_trace_fn_ != NULL);
-    // DebugTrace shouldn't already exist (llvm mangles function names if there
-    // are duplicates)
-    DCHECK(debug_trace_fn_->getName() ==  "DebugTrace");
-
-    debug_trace_fn_->setCallingConv(CallingConv::C);
-
-    // Add a mapping to the execution engine so it can link the DebugTrace function
-    execution_engine_->addGlobalMapping(debug_trace_fn_,
-        reinterpret_cast<void*>(&DebugTrace));
-  }
 
   // Make a copy of str into memory owned by this object.  This is no guarantee that str is
   // still around when the debug printf is executed.
-  debug_strings_.push_back(str);
-  str = debug_strings_[debug_strings_.size() - 1].c_str();
+  debug_strings_.push_back(Substitute("LLVM Trace: $0", str));
+  str = debug_strings_.back().c_str();
 
-  // Call the function by turning 'str' into a constant ptr value
+  Function* printf = module()->getFunction("printf");
+  DCHECK(printf != NULL);
+
+  // Call printf by turning 'str' into a constant ptr value
   Value* str_ptr = CastPtrToLlvmPtr(ptr_type_, const_cast<char*>(str));
+
   vector<Value*> calling_args;
   calling_args.push_back(str_ptr);
-  builder->CreateCall(debug_trace_fn_, calling_args);
+  if (v1 != NULL) calling_args.push_back(v1);
+  builder->CreateCall(printf, calling_args);
 }
 
 void LlvmCodeGen::GetFunctions(vector<Function*>* functions) {

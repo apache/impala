@@ -1,6 +1,6 @@
 // Copyright (c) 2012 Cloudera, Inc.  All right reserved.
 
-// This is a test-only file.  It was used to generate test-loop.ir
+// This is a test-only file.  It was used to generate test-loop.bc
 // which is used by the unit test to exercise loading precompiled
 // ir.
 #include <stdio.h>
@@ -15,3 +15,8 @@ void TestLoop(int n) {
   }
 }
 
+// Unused function to make sure printf declaration is included in IR module. Used by
+// LlvmCodegen::CodegenDebugTrace().
+void printf_dummy_fn() {
+  printf("dummy");
+}
