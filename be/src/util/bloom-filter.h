@@ -95,11 +95,13 @@ class BloomFilter {
   /// The BloomFilter is divided up into Buckets, each of which is a cache line.
   static constexpr uint64_t BUCKET_WORDS = 8;
   typedef uint64_t BucketWord;
-  static constexpr int LOG_BUCKET_WORD_BITS =
-      log2(std::numeric_limits<BucketWord>::digits);
+  // log2(number of bits in a BucketWord)
+  // TODO: Use BitUtil::Log2(numeric_limits<BucketWord>::digits) once we enable C++14 for
+  // codegen.
+  static constexpr int LOG_BUCKET_WORD_BITS = 6;
   static constexpr BucketWord BUCKET_WORD_MASK =
       (static_cast<BucketWord>(1) << LOG_BUCKET_WORD_BITS) - 1;
-  static_assert(1 << LOG_BUCKET_WORD_BITS == std::numeric_limits<BucketWord>::digits,
+  static_assert((1 << LOG_BUCKET_WORD_BITS) == std::numeric_limits<BucketWord>::digits,
       "BucketWord must have a bit-width that is be a power of 2, like 64 for uint64_t.");
   typedef BucketWord Bucket[BUCKET_WORDS];
   Bucket* directory_;
