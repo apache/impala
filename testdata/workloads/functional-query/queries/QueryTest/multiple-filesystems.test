@@ -171,11 +171,11 @@ STRING
 ---- QUERY
 show table stats alltypes
 ---- RESULTS
-'2009','1',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','2',280,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','3',310,1,regex:'.+KB'','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','4',300,1,regex:'.+KB'','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'Total','',1200,4,regex:'.+KB','0B','','','',''
+'2009','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'Total','',1200,4,regex:.+KB,'0B','','','',''
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
@@ -257,11 +257,11 @@ STRING
 ---- QUERY
 show table stats alltypes
 ---- RESULTS
-'2009','5',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2009','6',300,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','2',280,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'2010','5',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
-'Total','',1200,4,regex:'.+KB','0B','','','',''
+'2009','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'Total','',1200,4,regex:.+KB,'0B','','','',''
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
