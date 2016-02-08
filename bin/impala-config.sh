@@ -47,10 +47,17 @@ fi
 # faster using gold. A shared object build using gold is a little faster than using ld.
 : ${USE_GOLD_LINKER=false}
 
+# Override the default compiler by setting a path to the new compiler. The default
+# compiler depends on USE_SYSTEM_GCC, DISABLE_IMPALA_TOOLCHAIN, and IMPALA_GCC_VERSION.
+# The intended use case is to set the compiler to distcc, in that case the user would
+# also set IMPALA_BUILD_THREADS to increase parallelism.
+: ${IMPALA_CXX_COMPILER=default}
+
 export DISABLE_IMPALA_TOOLCHAIN
 export IMPALA_TOOLCHAIN
 export USE_SYSTEM_GCC
 export USE_GOLD_LINKER
+export IMPALA_CXX_COMPILER
 export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
 
 export CDH_MAJOR_VERSION=5
@@ -272,7 +279,8 @@ fi
 
 export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
-export IMPALA_BUILD_THREADS=`nproc`
+: {IMPALA_BUILD_THREADS=$(nproc)}
+export IMPALA_BUILD_THREADS
 
 # Some environments (like the packaging build) might not have $USER set.  Fix that here.
 export USER=${USER-`id -un`}
