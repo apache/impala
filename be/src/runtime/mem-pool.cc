@@ -14,6 +14,7 @@
 
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "util/bit-util.h"
 #include "util/impalad-metrics.h"
 
 #include <algorithm>
@@ -26,21 +27,18 @@ using namespace impala;
 
 DECLARE_bool(disable_mem_pools);
 
-const int MemPool::DEFAULT_INITIAL_CHUNK_SIZE;
+const int MemPool::INITIAL_CHUNK_SIZE;
+const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 
-MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
+MemPool::MemPool(MemTracker* mem_tracker)
   : current_chunk_idx_(-1),
-    // round up chunk size to nearest 8 bytes
-    chunk_size_(chunk_size == 0
-      ? 0
-      : ((chunk_size + 7) / 8) * 8),
+    next_chunk_size_(INITIAL_CHUNK_SIZE),
     total_allocated_bytes_(0),
     peak_allocated_bytes_(0),
     total_reserved_bytes_(0),
     mem_tracker_(mem_tracker) {
-  DCHECK_GE(chunk_size_, 0);
   DCHECK(mem_tracker != NULL);
 }
 
@@ -83,6 +81,7 @@ void MemPool::FreeAll() {
     free(chunks_[i].data);
   }
   chunks_.clear();
+  next_chunk_size_ = INITIAL_CHUNK_SIZE;
   current_chunk_idx_ = -1;
   total_allocated_bytes_ = 0;
   total_reserved_bytes_ = 0;
@@ -115,18 +114,16 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
 
   if (current_chunk_idx_ == static_cast<int>(chunks_.size())) {
     // need to allocate new chunk.
-    int64_t chunk_size = chunk_size_;
-    if (chunk_size == 0) {
-      if (current_chunk_idx_ == 0) {
-        chunk_size = DEFAULT_INITIAL_CHUNK_SIZE;
-      } else {
-        // double the size of the last chunk in the list
-        chunk_size = chunks_[current_chunk_idx_ - 1].size * 2;
-      }
-    }
-    chunk_size = ::max(min_size, chunk_size);
+    int64_t chunk_size;
+    DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
+    DCHECK_LE(next_chunk_size_, MAX_CHUNK_SIZE);
 
-    if (FLAGS_disable_mem_pools) chunk_size = min_size;
+    if (FLAGS_disable_mem_pools) {
+      // Disable pooling by sizing the chunk to fit only this allocation.
+      chunk_size = min_size;
+    } else {
+      chunk_size = max<int64_t>(min_size, next_chunk_size_);
+    }
 
     if (check_limits) {
       if (!mem_tracker_->TryConsume(chunk_size)) {
@@ -158,6 +155,9 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
       chunks_.insert(insert_chunk, ChunkInfo(chunk_size, buf));
     }
     total_reserved_bytes_ += chunk_size;
+    // Don't increment the chunk size until the allocation succeeds: if an attempted
+    // large allocation fails we don't want to increase the chunk size further.
+    next_chunk_size_ = static_cast<int>(min<int64_t>(chunk_size * 2, MAX_CHUNK_SIZE));
   }
 
   DCHECK_LT(current_chunk_idx_, static_cast<int>(chunks_.size()));
@@ -261,7 +261,6 @@ bool MemPool::CheckIntegrity(bool current_chunk_empty) {
     } else {
       DCHECK_EQ(chunks_[i].allocated_bytes, 0);
     }
-    if (chunk_size_ != 0) DCHECK_GE(chunks_[i].size, chunk_size_);
     total_allocated += chunks_[i].allocated_bytes;
   }
   DCHECK_EQ(total_allocated, total_allocated_bytes_);

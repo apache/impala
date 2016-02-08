@@ -77,11 +77,8 @@ class MemTracker;
 
 class MemPool {
  public:
-  /// Allocates mempool with fixed-size chunks of size 'chunk_size'.
-  /// Chunk_size must be >= 0; 0 requests automatic doubling of chunk sizes,
-  /// up to a limit.
   /// 'tracker' tracks the amount of memory allocated by this pool. Must not be NULL.
-  MemPool(MemTracker* mem_tracker, int chunk_size = 0);
+  MemPool(MemTracker* mem_tracker);
 
   /// Frees all chunks of memory and subtracts the total allocated bytes
   /// from the registered limits.
@@ -142,7 +139,11 @@ class MemPool {
 
  private:
   friend class MemPoolTest;
-  static const int DEFAULT_INITIAL_CHUNK_SIZE = 4 * 1024;
+  static const int INITIAL_CHUNK_SIZE = 4 * 1024;
+
+  /// The maximum size of chunk that should be allocated. Allocations larger than this
+  /// size will get their own individual chunk.
+  static const int MAX_CHUNK_SIZE = 1024 * 1024;
 
   struct ChunkInfo {
     uint8_t* data; // Owned by the ChunkInfo.
@@ -166,7 +167,8 @@ class MemPool {
   /// -1 if no chunks present
   int current_chunk_idx_;
 
-  int chunk_size_;  // if != 0, use this size for new chunks
+  /// The size of the next chunk to allocate.
+  int next_chunk_size_;
 
   /// sum of allocated_bytes_
   int64_t total_allocated_bytes_;
