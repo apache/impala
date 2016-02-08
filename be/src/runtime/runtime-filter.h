@@ -142,7 +142,9 @@ class RuntimeFilterBank {
 class RuntimeFilter {
  public:
   RuntimeFilter(const TRuntimeFilterDesc& filter)
-      : bloom_filter_(NULL), filter_desc_(filter) { }
+      : bloom_filter_(NULL), filter_desc_(filter), arrival_time_(0L) {
+    registration_time_ = MonotonicMillis();
+  }
 
   /// Returns NULL if no calls to SetBloomFilter() have been made yet.
   const BloomFilter* GetBloomFilter() const { return bloom_filter_; }
@@ -157,6 +159,7 @@ class RuntimeFilter {
     // this assignment. Not an issue for correctness (as assignment is atomic), but
     // potentially confusing.
     bloom_filter_ = bloom_filter;
+    arrival_time_ = MonotonicMillis();
   }
 
   /// Returns false iff the bloom_filter filter has been set via SetBloomFilter() and
@@ -175,12 +178,33 @@ class RuntimeFilter {
     return bloom_filter_->Find(h);
   }
 
+  /// Returns the amount of time waited since registration for the filter to
+  /// arrive. Returns 0 if filter has not yet arrived.
+  int32_t arrival_delay() const {
+    if (arrival_time_ == 0L) return 0L;
+    return arrival_time_ - registration_time_;
+  }
+
+  /// Periodically (every 20ms) checks to see if the global filter has arrived. Waits for
+  /// a maximum of timeout_ms before returning. Returns true if the filter has arrived,
+  /// false otherwise.
+  bool WaitForArrival(int32_t timeout_ms) const;
+
+  /// Frequency with which to check for filter arrival in WaitForArrival()
+  static const int SLEEP_PERIOD_MS;
+
  private:
   /// Membership bloom_filter.
   BloomFilter* bloom_filter_;
 
   /// Descriptor of the filter.
   TRuntimeFilterDesc filter_desc_;
+
+  /// Time, in ms, that the filter was registered.
+  int64_t registration_time_;
+
+  /// Time, in ms, that the global fiter arrived.
+  int64_t arrival_time_;
 };
 
 }

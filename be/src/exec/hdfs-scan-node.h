@@ -553,6 +553,10 @@ class HdfsScanNode : public ScanNode {
   /// for bookkeeping. Returns true if all filters pass or are not present.
   bool FilePassesFilterPredicates(const std::vector<FilterContext>& filter_ctxs,
       const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
+
+  /// Waits for up to time_ms for partition column filters to arrive, checking every
+  /// 20ms. Returns true if all filters arrived within the time limit,f alse otherwise.
+  bool WaitForPartitionFilters(int32_t time_ms);
 };
 
 }

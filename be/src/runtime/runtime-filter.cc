@@ -14,6 +14,8 @@
 
 #include "runtime/runtime-filter.h"
 
+#include <gutil/strings/substitute.h>
+
 #include "common/names.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
@@ -22,6 +24,7 @@
 
 using namespace impala;
 using namespace boost;
+using namespace strings;
 
 // 20 is BloomFilter::MinLogSpace(1ull << 20, 0.1)
 DEFINE_int32(bloom_filter_size, 1024 * 1024, "(Advanced) Sets the size in bytes of Bloom "
@@ -30,6 +33,8 @@ DEFINE_int32(bloom_filter_size, 1024 * 1024, "(Advanced) Sets the size in bytes 
 
 DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability of false "
     "positives in a runtime filter before it is disabled.");
+
+const int RuntimeFilter::SLEEP_PERIOD_MS = 20;
 
 RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state)
     : query_ctx_(query_ctx), state_(state), closed_(false) {
@@ -142,6 +147,8 @@ void RuntimeFilterBank::PublishGlobalFilter(uint32_t filter_id,
   BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(thrift_filter, NULL, NULL));
   memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
   it->second->SetBloomFilter(bloom_filter);
+  state_->runtime_profile()->AddInfoString(Substitute("Filter $0 arrival", filter_id),
+      PrettyPrinter::Print(it->second->arrival_delay(), TUnit::TIME_MS));
 }
 
 BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter() {
@@ -180,4 +187,14 @@ void RuntimeFilterBank::Close() {
     }
   }
   obj_pool_.Clear();
+}
+
+bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
+  if (GetBloomFilter() != NULL) return true;
+  while ((MonotonicMillis() - registration_time_) < timeout_ms) {
+    SleepForMs(SLEEP_PERIOD_MS);
+    if (GetBloomFilter() != NULL) return true;
+  }
+
+  return false;
 }

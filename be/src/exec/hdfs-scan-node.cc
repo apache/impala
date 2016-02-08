@@ -60,6 +60,8 @@ DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_"
 DEFINE_bool(suppress_unknown_disk_id_warnings, false,
     "Suppress unknown disk id warnings generated when the HDFS implementation does not"
     " provide volume/disk information.");
+DEFINE_int32(runtime_filter_wait_time_ms, 30000, "(Advanced) the maximum time, in ms, "
+    "that a scan node will wait for expected runtime filters to arrive.");
 DECLARE_string(cgroup_hierarchy_path);
 DECLARE_bool(enable_rm);
 
@@ -67,6 +69,7 @@ namespace filesystem = boost::filesystem;
 using namespace impala;
 using namespace llvm;
 using namespace strings;
+using boost::algorithm::join;
 
 const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =
     "Hdfs split stats (<volume id>:<# splits>/<split lengths>)";
@@ -170,6 +173,40 @@ bool HdfsScanNode::FilePassesFilterPredicates(const vector<FilterContext>& filte
   return true;
 }
 
+bool HdfsScanNode::WaitForPartitionFilters(int32_t time_ms) {
+  vector<string> arrived_filter_ids;
+  bool all_filters_arrived = true;
+  bool have_partition_filter = false;
+  int32_t start = MonotonicMillis();
+  for (auto& ctx: filter_ctxs_) {
+    if (ctx.filter->filter_desc().is_bound_by_partition_columns) {
+      have_partition_filter = true;
+      if (!ctx.filter->WaitForArrival(time_ms)) {
+        all_filters_arrived = false;
+      } else {
+        arrived_filter_ids.push_back(Substitute("$0", ctx.filter->filter_desc().filter_id));
+      }
+    }
+  }
+  if (!have_partition_filter) return true;
+  int32_t end = MonotonicMillis();
+  const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
+  if (all_filters_arrived) {
+    runtime_profile()->AddInfoString("Partition filters",
+        Substitute("All filters arrived. Waited $0", wait_time));
+    VLOG_QUERY << "Filters arrived. Waited " << wait_time;
+    return true;
+  }
+
+  const string& filter_str = join(arrived_filter_ids, ", ");
+  runtime_profile()->AddInfoString("Partition filters",
+      Substitute("Only following filters arrived: $0, waited $1",
+          filter_str, wait_time));
+
+  VLOG_QUERY << "Partition filters did not arrive within " << wait_time;
+  return false;
+}
+
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
@@ -178,6 +215,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     // been generated (e.g. probe side bitmap filters).
     initial_ranges_issued_ = true;
 
+    WaitForPartitionFilters(FLAGS_runtime_filter_wait_time_ms);
     // Apply dynamic partition-pruning per-file.
     FileFormatsMap matching_per_type_files;
     BOOST_FOREACH(const FileFormatsMap::value_type& v, per_type_files_) {
@@ -410,6 +448,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     RETURN_IF_ERROR(
         filter_ctxs_[i].expr->Prepare(state, row_desc(), expr_mem_tracker()));
+    AddExprCtxToFree(filter_ctxs_[i].expr);
   }
 
   // Parse Avro table schema if applicable
@@ -977,7 +1016,10 @@ void HdfsScanNode::ScannerThread() {
           }
           runtime_state_->resource_pool()->ReleaseThreadToken(false);
           if (filter_status.ok()) {
-            for (auto& ctx: filter_ctxs) ctx.expr->Close(runtime_state_);
+            for (auto& ctx: filter_ctxs) {
+              ctx.expr->FreeLocalAllocations();
+              ctx.expr->Close(runtime_state_);
+            }
           }
           return;
         }
@@ -1040,7 +1082,10 @@ void HdfsScanNode::ScannerThread() {
   }
 
   if (filter_status.ok()) {
-    for (auto& ctx: filter_ctxs) ctx.expr->Close(runtime_state_);
+    for (auto& ctx: filter_ctxs) {
+      ctx.expr->FreeLocalAllocations();
+      ctx.expr->Close(runtime_state_);
+    }
   }
 
   COUNTER_ADD(&active_scanner_thread_counter_, -1);

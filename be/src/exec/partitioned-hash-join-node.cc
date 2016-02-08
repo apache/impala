@@ -134,6 +134,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
   BOOST_FOREACH(const FilterContext& ctx, filters_) {
     RETURN_IF_ERROR(ctx.expr->Prepare(state, child(1)->row_desc(), expr_mem_tracker()));
+    AddExprCtxToFree(ctx.expr);
   }
 
   // Although ConstructBuildSide() maybe be run in a separate thread, it is safe to free
