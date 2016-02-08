@@ -259,16 +259,16 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   void CleanupProbeFilters();
 
   /// Codegen function to create output row. Assumes that the probe row is non-NULL.
-  llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
+  Status CodegenCreateOutputRow(LlvmCodeGen* codegen, llvm::Function** fn);
 
   /// Codegen processing build batches.  Identical signature to ProcessBuildBatch.
-  /// Returns false if codegen was not possible.
-  bool CodegenProcessBuildBatch(
+  /// Returns non-OK status if codegen was not possible.
+  Status CodegenProcessBuildBatch(
       RuntimeState* state, llvm::Function* hash_fn, llvm::Function* murmur_hash_fn);
 
   /// Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
-  /// Returns false if codegen was not possible.
-  bool CodegenProcessProbeBatch(
+  /// Returns non-OK if codegen was not possible.
+  Status CodegenProcessProbeBatch(
       RuntimeState* state, llvm::Function* hash_fn, llvm::Function* murmur_hash_fn);
 
   /// Returns the current state of the partition as a string.

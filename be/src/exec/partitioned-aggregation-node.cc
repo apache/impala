@@ -202,17 +202,19 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   }
 
   bool codegen_enabled = false;
+  Status codegen_status;
   if (state->codegen_enabled()) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
-    Function* codegen_process_row_batch_fn = CodegenProcessBatch();
-    if (codegen_process_row_batch_fn != NULL) {
+    Function* codegen_process_row_batch_fn;
+    codegen_status = CodegenProcessBatch(&codegen_process_row_batch_fn);
+    if (codegen_status.ok()) {
       codegen->AddFunctionToJit(codegen_process_row_batch_fn,
           reinterpret_cast<void**>(&process_row_batch_fn_));
       codegen_enabled = true;
     }
   }
-  AddCodegenExecOption(codegen_enabled);
+  AddCodegenExecOption(codegen_enabled, codegen_status);
   return Status::OK();
 }
 
@@ -1155,10 +1157,10 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 // ret:                                              ; preds = %src_not_null, %entry
 //   ret void
 // }
-llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
-    AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
+Status PartitionedAggregationNode::CodegenUpdateSlot(
+    AggFnEvaluator* evaluator, SlotDescriptor* slot_desc, Function** fn) {
   LlvmCodeGen* codegen;
-  if (!state_->GetCodegen(&codegen).ok()) return NULL;
+  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
 
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
   ExprContext* input_expr_ctx = evaluator->input_expr_ctxs()[0];
@@ -1167,21 +1169,20 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
   // TODO: implement timestamp
   if (input_expr->type().type == TYPE_TIMESTAMP &&
       evaluator->agg_op() != AggFnEvaluator::AVG) {
-    return NULL;
+    return Status("PartitionedAggregationNode::CodegenUpdateSlot(): timestamp input type "
+        "NYI");
   }
 
   Function* agg_expr_fn;
-  Status status = input_expr->GetCodegendComputeFn(state_, &agg_expr_fn);
-  if (!status.ok()) {
-    VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetDetail();
-    return NULL;
-  }
-  DCHECK(agg_expr_fn != NULL);
+  RETURN_IF_ERROR(input_expr->GetCodegendComputeFn(state_, &agg_expr_fn));
 
   PointerType* fn_ctx_type =
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
   StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
-  if (tuple_struct == NULL) return NULL; // Could not generate tuple struct
+  if (tuple_struct == NULL) {
+    return Status("PartitionedAggregationNode::CodegenUpdateSlot(): failed to generate "
+        "intermediate tuple desc");
+  }
   PointerType* tuple_ptr_type = PointerType::get(tuple_struct, 0);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
 
@@ -1193,14 +1194,14 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* args[3];
-  Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+  *fn = prototype.GeneratePrototype(&builder, &args[0]);
   Value* fn_ctx_arg = args[0];
   Value* agg_tuple_arg = args[1];
   Value* row_arg = args[2];
 
   BasicBlock* src_not_null_block =
-      BasicBlock::Create(codegen->context(), "src_not_null", fn);
-  BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", fn);
+      BasicBlock::Create(codegen->context(), "src_not_null", *fn);
+  BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", *fn);
 
   // Call expr function to get src slot value
   Value* expr_ctx = codegen->CastPtrToLlvmPtr(
@@ -1269,7 +1270,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 
       // Create pointer to src to pass to ir_fn. We must use the unlowered type.
       Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          fn, LlvmCodeGen::NamedVariable("src_lowered_ptr", src.value()->getType()));
+          *fn, LlvmCodeGen::NamedVariable("src_lowered_ptr", src.value()->getType()));
       builder.CreateStore(src.value(), src_lowered_ptr);
       Type* unlowered_ptr_type =
           CodegenAnyVal::GetUnloweredPtrType(codegen, input_expr->type());
@@ -1283,7 +1284,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
       dst.SetFromRawValue(dst_value);
       // Create pointer to dst to pass to ir_fn. We must use the unlowered type.
       Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr", dst.value()->getType()));
+          *fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr", dst.value()->getType()));
       builder.CreateStore(dst.value(), dst_lowered_ptr);
       unlowered_ptr_type = CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
       Value* dst_unlowered_ptr =
@@ -1307,7 +1308,12 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
   builder.SetInsertPoint(ret_block);
   builder.CreateRetVoid();
 
-  return codegen->FinalizeFunction(fn);
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == NULL) {
+    return Status("PartitionedAggregationNode::CodegenUpdateSlot(): codegen'd "
+        "UpdateSlot() function failed verification, see log");
+  }
+  return Status::OK();
 }
 
 // IR codegen for the UpdateTuple loop.  This loop is query specific and based on the
@@ -1341,9 +1347,9 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 //                          %"class.impala::TupleRow"* %row)
 //   ret void
 // }
-Function* PartitionedAggregationNode::CodegenUpdateTuple() {
+Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
   LlvmCodeGen* codegen;
-  if (!state_->GetCodegen(&codegen).ok()) return NULL;
+  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
 
   int j = grouping_expr_ctxs_.size();
@@ -1352,7 +1358,9 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
 
     // Don't codegen things that aren't builtins (for now)
-    if (!evaluator->is_builtin()) return NULL;
+    if (!evaluator->is_builtin()) {
+      return Status("PartitionedAggregationNode::CodegenUpdateTuple(): UDA codegen NYI");
+    }
 
     bool supported = true;
     AggFnEvaluator::AggregationOp op = evaluator->agg_op();
@@ -1371,18 +1379,17 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
       supported = false;
     }
     if (!supported) {
-      VLOG_QUERY << "Could not codegen UpdateTuple because intermediate type "
-                 << slot_desc->type()
-                 << " is not yet supported for aggregate function \""
-                 << evaluator->fn_name() << "()\"";
-      return NULL;
+      stringstream ss;
+      ss << "Could not codegen PartitionedAggregationNode::UpdateTuple because "
+         << "intermediate type " << slot_desc->type() << " is not yet supported for "
+         << "aggregate function \"" << evaluator->fn_name() << "()\"";
+      return Status(ss.str());
     }
   }
 
   if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == NULL) {
-    VLOG_QUERY << "Could not codegen UpdateTuple because we could"
-               << "not generate a matching llvm struct for the intermediate tuple.";
-    return NULL;
+    return Status("PartitionedAggregationNode::CodegenUpdateTuple(): failed to generate "
+        "intermediate tuple desc");
   }
 
   // Get the types to match the UpdateTuple signature
@@ -1407,7 +1414,7 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* args[5];
-  Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+  *fn = prototype.GeneratePrototype(&builder, &args[0]);
 
   Value* agg_fn_ctxs_arg = args[1];
   Value* tuple_arg = args[2];
@@ -1433,8 +1440,8 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
     } else {
-      Function* update_slot_fn = CodegenUpdateSlot(evaluator, slot_desc);
-      if (update_slot_fn == NULL) return NULL;
+      Function* update_slot_fn;
+      RETURN_IF_ERROR(CodegenUpdateSlot(evaluator, slot_desc, &update_slot_fn));
       Value* fn_ctx_ptr = builder.CreateConstGEP1_32(agg_fn_ctxs_arg, i);
       Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
       builder.CreateCall3(update_slot_fn, fn_ctx, tuple_arg, row_arg);
@@ -1443,16 +1450,21 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
   builder.CreateRetVoid();
 
   // CodegenProcessBatch() does the final optimizations.
-  return codegen->FinalizeFunction(fn);
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == NULL) {
+    return Status("PartitionedAggregationNode::CodegeUpdateTuple(): codegen'd "
+        "UpdateTuple() function failed verification, see log");
+  }
+  return Status::OK();
 }
 
-Function* PartitionedAggregationNode::CodegenProcessBatch() {
+Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
   LlvmCodeGen* codegen;
-  if (!state_->GetCodegen(&codegen).ok()) return NULL;
+  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
 
-  Function* update_tuple_fn = CodegenUpdateTuple();
-  if (update_tuple_fn == NULL) return NULL;
+  Function* update_tuple_fn;
+  RETURN_IF_ERROR(CodegenUpdateTuple(&update_tuple_fn));
 
   // Get the cross compiled update row batch function
   IRFunction::Type ir_fn = (!grouping_expr_ctxs_.empty() ?
@@ -1468,16 +1480,17 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
     // Codegen for hash
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
-    Function* hash_fn = ht_ctx_->CodegenHashCurrentRow(state_, /* use murmur */ false);
-    if (hash_fn == NULL) return NULL;
+    Function* hash_fn;
+    RETURN_IF_ERROR(ht_ctx_->CodegenHashCurrentRow(state_, /* use murmur */ false,
+        &hash_fn));
 
     // Codegen HashTable::Equals<true>
-    Function* build_equals_fn = ht_ctx_->CodegenEquals(state_, true);
-    if (build_equals_fn == NULL) return NULL;
+    Function* build_equals_fn;
+    RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state_, true, &build_equals_fn));
 
     // Codegen for evaluating probe rows
-    Function* eval_probe_row_fn = ht_ctx_->CodegenEvalRow(state_, false);
-    if (eval_probe_row_fn == NULL) return NULL;
+    Function* eval_probe_row_fn;
+    RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_probe_row_fn));
 
     // Replace call sites
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
@@ -1497,7 +1510,12 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
       update_tuple_fn, "UpdateTuple", &replaced);
   DCHECK_GE(replaced, 1);
   DCHECK(process_batch_fn != NULL);
-  return codegen->OptimizeFunctionWithExprs(process_batch_fn);
+  *fn = codegen->OptimizeFunctionWithExprs(process_batch_fn);
+  if (*fn == NULL) {
+    return Status("PartitionedAggregationNode::CodegenProcessBatch(): codegen'd "
+        "ProcessBatch() function failed verification, see log");
+  }
+  return Status::OK();
 }
 
 }

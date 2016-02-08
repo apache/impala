@@ -159,20 +159,21 @@ class HashTableCtx {
   /// Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
   /// If build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs.
-  llvm::Function* CodegenEvalRow(RuntimeState* state, bool build_row);
+  Status CodegenEvalRow(RuntimeState* state, bool build_row, llvm::Function** fn);
 
   /// Codegen for evaluating a TupleRow and comparing equality against
   /// 'expr_values_buffer_'.  Function signature matches HashTable::Equals().
   /// force_null_equality is true if the generated equality function should treat all
   /// NULLs as equal. See the template parameter to HashTable::Equals().
-  llvm::Function* CodegenEquals(RuntimeState* state, bool force_null_equality);
+  Status CodegenEquals(RuntimeState* state, bool force_null_equality,
+      llvm::Function** fn);
 
   /// Codegen for hashing the expr values in 'expr_values_buffer_'. Function prototype
   /// matches HashCurrentRow identically. Unlike HashCurrentRow(), the returned function
   /// only uses a single hash function, rather than switching based on level_.
   /// If 'use_murmur' is true, murmur hash is used, otherwise CRC is used if the hardware
   /// supports it (see hash-util.h).
-  llvm::Function* CodegenHashCurrentRow(RuntimeState* state, bool use_murmur);
+  Status CodegenHashCurrentRow(RuntimeState* state, bool use_murmur, llvm::Function** fn);
 
   static const char* LLVM_CLASS_NAME;
 

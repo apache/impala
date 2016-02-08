@@ -597,13 +597,15 @@ Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* 
   if (create_output_row_fn == NULL) return NULL;
 
   // Codegen evaluating other join conjuncts
-  Function* eval_other_conjuncts_fn = ExecNode::CodegenEvalConjuncts(
-      state, other_join_conjunct_ctxs_, "EvalOtherConjuncts");
-  if (eval_other_conjuncts_fn == NULL) return NULL;
+  Function* eval_other_conjuncts_fn;
+  Status status = ExecNode::CodegenEvalConjuncts(state, other_join_conjunct_ctxs_,
+      &eval_other_conjuncts_fn, "EvalOtherConjuncts");
+  if (!status.ok()) return NULL;
 
   // Codegen evaluating conjuncts
-  Function* eval_conjuncts_fn = ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs_);
-  if (eval_conjuncts_fn == NULL) return NULL;
+  Function* eval_conjuncts_fn;
+  status = ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs_, &eval_conjuncts_fn);
+  if (!status.ok()) return NULL;
 
   // Replace all call sites with codegen version
   int replaced = 0;

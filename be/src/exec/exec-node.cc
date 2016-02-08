@@ -484,19 +484,15 @@ void ExecNode::AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs) {
 // false:                                            ; preds = %continue, %entry
 //   ret i1 false
 // }
-Function* ExecNode::CodegenEvalConjuncts(
-    RuntimeState* state, const vector<ExprContext*>& conjunct_ctxs, const char* name) {
+Status ExecNode::CodegenEvalConjuncts(RuntimeState* state,
+    const vector<ExprContext*>& conjunct_ctxs, Function** fn, const char* name) {
   Function* conjunct_fns[conjunct_ctxs.size()];
   for (int i = 0; i < conjunct_ctxs.size(); ++i) {
-    Status status =
-        conjunct_ctxs[i]->root()->GetCodegendComputeFn(state, &conjunct_fns[i]);
-    if (!status.ok()) {
-      VLOG_QUERY << "Could not codegen EvalConjuncts: " << status.GetDetail();
-      return NULL;
-    }
+    RETURN_IF_ERROR(
+        conjunct_ctxs[i]->root()->GetCodegendComputeFn(state, &conjunct_fns[i]));
   }
   LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // Construct function signature to match
   // bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow* row)
@@ -518,16 +514,16 @@ Function* ExecNode::CodegenEvalConjuncts(
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* args[3];
-  Function* fn = prototype.GeneratePrototype(&builder, args);
+  *fn = prototype.GeneratePrototype(&builder, args);
   Value* ctxs_arg = args[0];
   Value* tuple_row_arg = args[2];
 
   if (conjunct_ctxs.size() > 0) {
     LLVMContext& context = codegen->context();
-    BasicBlock* false_block = BasicBlock::Create(context, "false", fn);
+    BasicBlock* false_block = BasicBlock::Create(context, "false", *fn);
 
     for (int i = 0; i < conjunct_ctxs.size(); ++i) {
-      BasicBlock* true_block = BasicBlock::Create(context, "continue", fn, false_block);
+      BasicBlock* true_block = BasicBlock::Create(context, "continue", *fn, false_block);
 
       Value* ctx_arg_ptr = builder.CreateConstGEP1_32(ctxs_arg, i, "ctx_ptr");
       Value* ctx_arg = builder.CreateLoad(ctx_arg_ptr, "ctx");
@@ -555,7 +551,12 @@ Function* ExecNode::CodegenEvalConjuncts(
     builder.CreateRet(codegen->true_value());
   }
 
-  return codegen->FinalizeFunction(fn);
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == NULL) {
+    return Status("ExecNode::CodegenEvalConjuncts(): codegen'd EvalConjuncts() function "
+        "failed verification, see log");
+  }
+  return Status::OK();
 }
 
 }

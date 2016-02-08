@@ -826,6 +826,7 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
   return Status::OK();
 }
 
+// TODO: return Status
 Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
     Function* materialize_tuple_fn, const vector<ExprContext*>& conjunct_ctxs) {
   LlvmCodeGen* codegen;
@@ -839,12 +840,16 @@ Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
       materialize_tuple_fn, "MaterializeTuple", &replaced);
   DCHECK_EQ(replaced, 1);
 
-  Function* eval_conjuncts_fn = ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs);
+  Function* eval_conjuncts_fn;
+  Status status =
+      ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs, &eval_conjuncts_fn);
+  if (!status.ok()) return NULL;
+
   decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
       eval_conjuncts_fn, "EvalConjuncts", &replaced);
   DCHECK_EQ(replaced, 1);
-  decode_avro_data_fn->setName("DecodeAvroData");
 
+  decode_avro_data_fn->setName("DecodeAvroData");
   decode_avro_data_fn = codegen->OptimizeFunctionWithExprs(decode_avro_data_fn);
   DCHECK(decode_avro_data_fn != NULL);
   return decode_avro_data_fn;

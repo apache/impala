@@ -467,19 +467,20 @@ class PartitionedAggregationNode : public ExecNode {
   void CleanupHashTbl(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
       HashTable::Iterator it);
 
-  /// Codegen UpdateSlot(). Returns NULL if codegen is unsuccessful.
+  /// Codegen UpdateSlot(). Returns non-OK status if codegen is unsuccessful.
   /// Assumes is_merge = false;
-  llvm::Function* CodegenUpdateSlot(AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
+  Status CodegenUpdateSlot(AggFnEvaluator* evaluator, SlotDescriptor* slot_desc,
+      llvm::Function** fn);
 
-  /// Codegen UpdateTuple(). Returns NULL if codegen is unsuccessful.
-  llvm::Function* CodegenUpdateTuple();
+  /// Codegen UpdateTuple(). Returns non-OK status if codegen is unsuccessful.
+  Status CodegenUpdateTuple(llvm::Function** fn);
 
   /// Codegen the process row batch loop.  The loop has already been compiled to
   /// IR and loaded into the codegen object.  UpdateAggTuple has also been
   /// codegen'd to IR.  This function will modify the loop subsituting the statically
   /// compiled functions with codegen'd ones.
   /// Assumes AGGREGATED_ROWS = false.
-  llvm::Function* CodegenProcessBatch();
+  Status CodegenProcessBatch(llvm::Function** fn);
 
   /// Functions to instantiate templated versions of ProcessBatch().
   /// The xcompiled versions of these functions are used in CodegenProcessBatch().

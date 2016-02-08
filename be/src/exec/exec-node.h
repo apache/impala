@@ -142,11 +142,11 @@ class ExecNode {
   /// out how to deal with declaring a templated std:vector type in IR
   static bool EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* row);
 
-  /// Returns a codegen'd version of EvalConjuncts(), or NULL if the function couldn't be
+  /// Codegen EvalConjuncts(). Returns a non-OK status if the function couldn't be
   /// codegen'd. The codegen'd version uses inlined, codegen'd GetBooleanVal() functions.
-  static llvm::Function* CodegenEvalConjuncts(
+  static Status CodegenEvalConjuncts(
       RuntimeState* state, const std::vector<ExprContext*>& conjunct_ctxs,
-      const char* name = "EvalConjuncts");
+      llvm::Function** fn, const char* name = "EvalConjuncts");
 
   /// Returns a string representation in DFS order of the plan rooted at this.
   std::string DebugString() const;
