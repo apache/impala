@@ -41,6 +41,9 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++14")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wl,-fuse-ld=gold")
+ENDIF()
 
 # On Apple we build with clang and need libstdc++ instead of libc++
 if (APPLE)

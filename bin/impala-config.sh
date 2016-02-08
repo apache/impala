@@ -39,14 +39,18 @@ if [ -z $IMPALA_HOME ]; then
   fi
 fi
 
-# Setting up Impala binary toolchain.
 : ${DISABLE_IMPALA_TOOLCHAIN=0}
 : ${IMPALA_TOOLCHAIN=$IMPALA_HOME/toolchain}
 : ${USE_SYSTEM_GCC=0}
 
-export USE_SYSTEM_GCC
-export IMPALA_TOOLCHAIN
+# Gold is available on newer systems and a full build with static linking is ~1.5 mins
+# faster using gold. A shared object build using gold is a little faster than using ld.
+: ${USE_GOLD_LINKER=false}
+
 export DISABLE_IMPALA_TOOLCHAIN
+export IMPALA_TOOLCHAIN
+export USE_SYSTEM_GCC
+export USE_GOLD_LINKER
 export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
 
 export CDH_MAJOR_VERSION=5
