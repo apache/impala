@@ -112,7 +112,7 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& id) :
 
   load_module_timer_ = ADD_TIMER(&profile_, "LoadTime");
   prepare_module_timer_ = ADD_TIMER(&profile_, "PrepareTime");
-  module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TUnit::BYTES);
+  module_bitcode_size_ = ADD_COUNTER(&profile_, "ModuleBitcodeSize", TUnit::BYTES);
   codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
   optimization_timer_ = ADD_TIMER(&profile_, "OptimizationTime");
   compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
@@ -159,7 +159,7 @@ Status LlvmCodeGen::LoadModuleFromFile(LlvmCodeGen* codegen, const string& file,
     }
   }
 
-  COUNTER_ADD(codegen->module_file_size_, file_buffer->getBufferSize());
+  COUNTER_ADD(codegen->module_bitcode_size_, file_buffer->getBufferSize());
   return LoadModuleFromMemory(codegen, file_buffer.get(), file, module);
 }
 
@@ -173,6 +173,7 @@ Status LlvmCodeGen::LoadModuleFromMemory(LlvmCodeGen* codegen, MemoryBuffer* mod
     ss << "Could not parse module " << module_name << ": " << error;
     return Status(ss.str());
   }
+  COUNTER_ADD(codegen->module_bitcode_size_, module_ir->getBufferSize());
   return Status::OK();
 }
 

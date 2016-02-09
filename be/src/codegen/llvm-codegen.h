@@ -498,8 +498,8 @@ class LlvmCodeGen {
   /// Time spent compiling the module.
   RuntimeProfile::Counter* compile_timer_;
 
-  /// Total size of modules loaded from disk.
-  RuntimeProfile::Counter* module_file_size_;
+  /// Total size of bitcode modules loaded in bytes.
+  RuntimeProfile::Counter* module_bitcode_size_;
 
   /// whether or not optimizations are enabled
   bool optimizations_enabled_;
