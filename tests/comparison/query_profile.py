@@ -161,6 +161,8 @@ class DefaultProfile(object):
             'INLINE_VIEW': 0.1,   # MAX_NESTED_QUERY_COUNT bounds take precedence
             'SELECT_DISTINCT': 0.1,
             'SCALAR_SUBQUERY': 0.1,
+            'ONLY_USE_EQUALITY_JOIN_PREDICATES': 0.95,
+            'ONLY_USE_AGGREGATES_IN_HAVING_CLAUSE': 0.7,
             'UNION_ALL': 0.5}}   # Determines use of "ALL" but not "UNION"
 
     self.__type_weights = {}
@@ -230,6 +232,12 @@ class DefaultProfile(object):
 
   def use_with_clause(self):
     return self._decide_from_probability('OPTIONAL_QUERY_CLAUSES', 'WITH')
+
+  def only_use_equality_join_predicates(self):
+    return self._decide_from_probability('MISC', 'ONLY_USE_EQUALITY_JOIN_PREDICATES')
+
+  def only_use_aggregates_in_having_clause(self):
+    return self._decide_from_probability('MISC', 'ONLY_USE_AGGREGATES_IN_HAVING_CLAUSE')
 
   def get_with_clause_table_ref_count(self):
     '''Return the number of table ref entries a WITH clause should contain.'''
