@@ -55,12 +55,6 @@ struct Rule {
 
   bool case_sensitive() const { return search_pattern.options().case_sensitive(); }
 
-  // For use with vector.
-  const Rule& operator=(const Rule& other) {
-    *this = Rule(other);
-    return *this;
-  }
-
  private:
   // For use with the factory constructor. The case-sensitivity option in
   // 'regex_options' also applies to 'trigger'.
