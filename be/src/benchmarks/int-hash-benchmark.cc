@@ -15,9 +15,8 @@
 #include <stdint.h>
 
 #include <iostream>
+#include <limits>
 #include <vector>
-
-#include <x86intrin.h>
 
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -38,6 +37,14 @@ using namespace impala;
 //                  MultiplyShift                25.3              1.799X
 //                            CRC               25.53              1.816X
 
+// Rotate 32 bits right by 'shift'. This is _rotr in the intel instrinsics, but that isn't
+// usable on Clang yet. Fortunately, both GCC and Clang can optimize this to use the 'ror'
+// instruction.
+uint32_t RotateRight(uint32_t x, int shift) {
+  DCHECK_GT(shift, 0);
+  DCHECK_LT(shift, std::numeric_limits<decltype(x)>::digits);
+  return (x << (std::numeric_limits<decltype(x)>::digits - shift)) | (x >> shift);
+}
 
 // Make a random uint32_t, avoiding the absent high bit and the low-entropy low bits
 // produced by rand().
@@ -65,11 +72,11 @@ uint32_t MultiplyAddShift(uint32_t x) {
 // From http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm:
 int32_t Jenkins1(int32_t x) {
   x = ~x + (x << 15);  // x = (x << 15) - x - 1;
-  x = x ^ _rotr(x, 12);
+  x = x ^ RotateRight(x, 12);
   x = x + (x << 2);
-  x = x ^ _rotr(x, 4);
+  x = x ^ RotateRight(x, 4);
   x = x * 2057;  // x = (x + (x << 3)) + (x << 11);
-  x = x ^ _rotr(x, 16);
+  x = x ^ RotateRight(x, 16);
   return x;
 }
 
@@ -87,11 +94,11 @@ uint32_t Jenkins2(uint32_t a) {
 // From http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm:
 int32_t MultRot(int32_t key) {
   static const int32_t c2 = 0x27d4eb2d;  // a prime or an odd constant
-  key = (key ^ 61) ^ _rotr(key, 16);
+  key = (key ^ 61) ^ RotateRight(key, 16);
   key = key + (key << 3);
-  key = key ^ _rotr(key, 4);
+  key = key ^ RotateRight(key, 4);
   key = key * c2;
-  key = key ^ _rotr(key, 15);
+  key = key ^ RotateRight(key, 15);
   return key;
 }
 
