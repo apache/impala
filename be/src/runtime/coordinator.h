@@ -47,7 +47,6 @@ namespace impala {
 class CountingBarrier;
 class DataStreamMgr;
 class DataSink;
-class DebugOptions;
 class RowBatch;
 class RowDescriptor;
 class PlanFragmentExecutor;
@@ -65,6 +64,8 @@ class TPlanExecRequest;
 class TRuntimeProfileTree;
 class RuntimeProfile;
 class TablePrinter;
+
+struct DebugOptions;
 
 /// Query coordinator: handles execution of plan fragments on remote nodes, given
 /// a TQueryExecRequest. As part of that, it handles all interactions with the

@@ -253,7 +253,7 @@ class StringParser {
     switch (*s) {
       case '-':
         negative = true;
-        max_val = std::numeric_limits<T>::max() + 1;
+        max_val = static_cast<UnsignedT>(std::numeric_limits<T>::max()) + 1;
       case '+': ++i;
     }
 
@@ -309,7 +309,7 @@ class StringParser {
     switch (*s) {
       case '-':
         negative = true;
-        max_val = std::numeric_limits<T>::max() + 1;
+        max_val = static_cast<UnsignedT>(std::numeric_limits<T>::max()) + 1;
       case '+': i = 1;
     }
 

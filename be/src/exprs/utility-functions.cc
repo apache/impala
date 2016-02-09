@@ -119,7 +119,7 @@ void UtilityFunctions::UuidPrepare(FunctionContext* ctx,
   if (scope == FunctionContext::THREAD_LOCAL) {
     if (ctx->GetFunctionState(FunctionContext::THREAD_LOCAL) == NULL) {
       boost::uuids::random_generator* uuid_gen =
-        new boost::uuids::random_generator;
+          new boost::uuids::random_generator;
       ctx->SetFunctionState(scope, uuid_gen);
     }
   }
@@ -129,7 +129,7 @@ StringVal UtilityFunctions::Uuid(FunctionContext* ctx) {
   void* uuid_gen = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
   DCHECK(uuid_gen != NULL);
   boost::uuids::uuid uuid_value =
-    (*reinterpret_cast<boost::uuids::random_generator*>(uuid_gen))();
+      (*reinterpret_cast<boost::uuids::random_generator*>(uuid_gen))();
   const std::string cxx_string = boost::uuids::to_string(uuid_value);
   return StringVal::CopyFrom(ctx,
       reinterpret_cast<const uint8_t*>(cxx_string.c_str()),
@@ -139,7 +139,9 @@ StringVal UtilityFunctions::Uuid(FunctionContext* ctx) {
 void UtilityFunctions::UuidClose(FunctionContext* ctx,
     FunctionContext::FunctionStateScope scope){
   if (scope == FunctionContext::THREAD_LOCAL) {
-    void* uuid_gen = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
+    boost::uuids::random_generator* uuid_gen =
+        reinterpret_cast<boost::uuids::random_generator*>(
+            ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
     DCHECK(uuid_gen != NULL);
     delete uuid_gen;
   }

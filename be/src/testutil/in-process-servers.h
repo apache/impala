@@ -86,10 +86,6 @@ class InProcessImpalaServer {
 
   uint32_t backend_port_;
 
-  uint32_t subscriber_port_;
-
-  uint32_t webserver_port_;
-
   uint32_t beeswax_port_;
 
   uint32_t hs2_port_;

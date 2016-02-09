@@ -50,12 +50,7 @@ using namespace apache::thrift;
 // the exact on file size.
 // The current buffered pages (one for each column) can have a very poor estimate.
 // To adjust for this, we aim for a slightly smaller file size than the ideal.
-
-// The maximum entries in the dictionary before giving up and switching to
-// plain encoding.
-// TODO: more complicated heuristic?
-static const int MAX_DICTIONARY_ENTRIES = (1 << 16) - 1;
-
+//
 // Class that encapsulates all the state for writing a single column.  This contains
 // all the buffered pages as well as the metadata (e.g. byte sizes, num values, etc).
 // This is intended to be created once per writer per column and reused across

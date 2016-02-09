@@ -1093,8 +1093,6 @@ TEST_F(BufferedBlockMgrTest, AllocationErrorHandling) {
   }
   const string& bad_dir = tmp_dirs[0];
   const string& bad_scratch_subdir = bad_dir + SCRATCH_SUFFIX;
-  const string& good_dir = tmp_dirs[1];
-  const string& good_scratch_subdir = good_dir + SCRATCH_SUFFIX;
   chmod(bad_scratch_subdir.c_str(), 0);
   // The block mgr should attempt to allocate space in bad dir for one block, which will
   // cause an error when it tries to create/expand the file. It should recover and just

@@ -114,10 +114,9 @@ struct DebugOptions {
 /// - updates through UpdateFragmentExecStatus()
 class Coordinator::FragmentInstanceState {
  public:
-  FragmentInstanceState(int fragment_instance_idx, int fragment_idx,
-      const FragmentExecParams* params, int instance_idx, ObjectPool* obj_pool)
-    : fragment_instance_idx_(fragment_instance_idx),
-      fragment_instance_id_(params->instance_ids[instance_idx]),
+  FragmentInstanceState(int fragment_idx, const FragmentExecParams* params,
+      int instance_idx, ObjectPool* obj_pool)
+    : fragment_instance_id_(params->instance_ids[instance_idx]),
       impalad_address_(params->hosts[instance_idx]),
       total_split_size_(0),
       fragment_idx_(fragment_idx),
@@ -195,10 +194,6 @@ class Coordinator::FragmentInstanceState {
   }
 
  private:
-  /// Integer index (into fragment_instance_states_ in the coordinator) of the backend
-  /// that this fragment is running on.
-  int fragment_instance_idx_;
-
   /// The unique ID of this instance of this fragment (there may be many instance of the
   /// same fragment, but this ID uniquely identifies this FragmentInstanceState).
   TUniqueId fragment_instance_id_;
@@ -1191,7 +1186,7 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_par
     rpc_params.params.__set_debug_phase(debug_options->phase);
   }
   FragmentInstanceState* exec_state = obj_pool()->Add(
-      new FragmentInstanceState(fragment_instance_idx, fragment_idx, fragment_exec_params,
+      new FragmentInstanceState(fragment_idx, fragment_exec_params,
           per_fragment_instance_idx, obj_pool()));
   exec_state->ComputeTotalSplitSize(rpc_params.params.per_node_scan_ranges);
   fragment_instance_states_[fragment_instance_idx] = exec_state;

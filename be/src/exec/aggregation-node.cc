@@ -150,7 +150,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     output_iterator_ = hash_tbl_->Begin();
   }
 
-  bool codegen_enabled;
+  bool codegen_enabled = false;
   if (state->codegen_enabled()) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));

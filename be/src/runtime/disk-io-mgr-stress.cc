@@ -27,8 +27,6 @@ static const int MAX_READ_LEN = 20;
 static const int MIN_FILE_LEN = 10;
 static const int MAX_FILE_LEN = 1024;
 
-static const int MAX_BUFFERS = 12;
-
 // Make sure this is between MIN/MAX FILE_LEN to test more cases
 static const int MIN_READ_BUFFER_SIZE = 64;
 static const int MAX_READ_BUFFER_SIZE = 128;

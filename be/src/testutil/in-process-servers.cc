@@ -70,8 +70,6 @@ InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend
     int subscriber_port, int webserver_port, const string& statestore_host,
     int statestore_port)
     : hostname_(hostname), backend_port_(backend_port),
-      subscriber_port_(subscriber_port),
-      webserver_port_(webserver_port),
       beeswax_port_(0),
       hs2_port_(0),
       impala_server_(NULL),
