@@ -60,6 +60,9 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
     "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
     "be converted from UTC to local time. Writes are unaffected.");
 
+DEFINE_double(parquet_min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
+    "rows rejected by a runtime filter drops below this value, the filter is disabled.");
+
 const int64_t HdfsParquetScanner::FOOTER_SIZE = 100 * 1024;
 
 // Max data page header size in bytes. This is an estimate and only needs to be an upper
@@ -444,6 +447,7 @@ class HdfsParquetScanner::BaseScalarColumnReader :
         // TODO: Better check for non-slotref exprs?
         if (ctx->expr->root()->type() != slot_desc->type()) continue;
         filter_ctxs_.push_back(ctx);
+        filter_enabled_.push_back(true);
       }
       filter_rows_total_possible_.resize(filter_ctxs_.size(), 0);
       filter_rows_considered_.resize(filter_ctxs_.size(), 0);
@@ -514,6 +518,10 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   /// TODO: When using expressions to evaluate filters (not just slot refs), will need to
   /// clone the expressions (and therefore the FilterCtxt) here instead of sharing it.
   vector<const FilterContext*> filter_ctxs_;
+
+  /// filter_enabled_[i] is true if filter in filter_ctxs_ should be applied, false if it
+  /// was ineffective and was disabled.
+  vector<bool> filter_enabled_;
 
   /// Pointer to start of next value in data page
   uint8_t* data_;
@@ -744,7 +752,17 @@ class HdfsParquetScanner::ScalarColumnReader :
     if (NeedsConversion()) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
 
     for (int i = 0; i < filter_ctxs_.size(); ++i) {
+      if (!filter_enabled_[i]) continue;
       ++filter_rows_total_possible_[i];
+      // Check filter effectiveness every 16K rows.
+      if (UNLIKELY(filter_rows_total_possible_[i] % (16 * 1024) == 0)) {
+        double reject_ratio =
+            filter_rows_rejected_[i] / static_cast<double>(filter_rows_considered_[i]);
+        if (reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
+          filter_enabled_[i] = false;
+          continue;
+        }
+      }
       if (*conjuncts_passed) {
         ++filter_rows_considered_[i];
         // TODO: At this point we don't have a tuple to evaluate
