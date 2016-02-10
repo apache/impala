@@ -53,13 +53,6 @@ Status NestedLoopJoinNode::Init(const TPlanNode& tnode) {
 
   DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN ||
       join_conjunct_ctxs_.size() == 0) << "Join conjuncts in a cross join";
-
-  // For some join modes we need to record the build rows with matches in a bitmap.
-  if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
-      join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
-    // Allocate empty bitmap to be expanded later.
-    matching_build_rows_.reset(new Bitmap(0));
-  }
   return Status::OK();
 }
 
@@ -80,6 +73,22 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
       join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
   build_batch_cache_.reset(new RowBatchCache(
       child(1)->row_desc(), state->batch_size(), mem_tracker()));
+
+  // For some join modes we need to record the build rows with matches in a bitmap.
+  if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
+      join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+    if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
+      // Allocate a fixed-size bitmap with a single element if we have a singular
+      // row source node as our build child.
+      if (!mem_tracker()->TryConsume(Bitmap::MemUsage(1))) {
+        return Status::MemLimitExceeded();
+      }
+      matching_build_rows_.reset(new Bitmap(1));
+    } else {
+      // Allocate empty bitmap to be expanded later.
+      matching_build_rows_.reset(new Bitmap(0));
+    }
+  }
   return Status::OK();
 }
 
@@ -110,6 +119,26 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
 }
 
 Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
+  if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
+    // Optimized path for a common subplan shape with a singular row src
+    // node on the build side. This specialized build construction is
+    // faster mostly because it avoids the expensive timers below.
+    DCHECK(IsInSubplan());
+    RowBatch* batch = build_batch_cache_->GetNextBatch();
+    bool eos;
+    RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
+    DCHECK_EQ(batch->num_rows(), 1);
+    DCHECK(eos);
+    DCHECK(!batch->need_to_return());
+    raw_build_batches_.AddRowBatch(batch);
+    build_batches_ = &raw_build_batches_;
+    if (matching_build_rows_ != NULL) {
+      DCHECK_EQ(matching_build_rows_->num_bits(), 1);
+      matching_build_rows_->SetAllBits(false);
+    }
+    return Status::OK();
+  }
+
   {
     SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
     RETURN_IF_ERROR(child(1)->Open(state));
