@@ -115,8 +115,8 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
   if (!scan_node_->tuple_desc()->string_slots().empty()
       && partition->escape_char() != '\0') {
-    // Cannot use codegen if there are strings slots and we need to
-    // compact (i.e. copy) the data.
+    // Codegen currently doesn't emit call to MemPool::TryAllocate() so skip codegen if
+    // there are strings slots and we need to compact (i.e. copy) the data.
     scan_node_->IncNumScannersCodegenDisabled();
     return Status::OK();
   }
@@ -181,8 +181,8 @@ Status HdfsScanner::CommitRows(int num_rows) {
     RETURN_IF_ERROR(StartNewRowBatch());
   }
   if (context_->cancelled()) return Status::CANCELLED;
-  // TODO: Replace with GetQueryStatus().
-  RETURN_IF_ERROR(state_->CheckQueryState());
+  // Check for UDF errors.
+  RETURN_IF_ERROR(state_->GetQueryStatus());
   // Free local expr allocations for this thread
   HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();
   for (; iter != scanner_conjuncts_map_.end(); ++iter) {

@@ -49,7 +49,7 @@ class TextConverter {
   /// and writes the result into the tuples's slot.
   /// copy_string indicates whether we need to make a separate copy of the string data:
   /// For regular unescaped strings, we point to the original data in the file_buf_.
-  /// For regular escaped strings, we copy an its unescaped string into a separate buffer
+  /// For regular escaped strings, we copy its unescaped string into a separate buffer
   /// and point to it.
   /// If the string needs to be copied, the memory is allocated from 'pool', otherwise
   /// 'pool' is unused.

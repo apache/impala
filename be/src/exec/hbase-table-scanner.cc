@@ -28,6 +28,7 @@
 #include "common/names.h"
 
 using namespace impala;
+using namespace strings;
 
 jclass HBaseTableScanner::scan_cl_ = NULL;
 jclass HBaseTableScanner::resultscanner_cl_ = NULL;
@@ -69,6 +70,9 @@ jmethodID HBaseTableScanner::single_column_value_filter_ctor_ = NULL;
 jobject HBaseTableScanner::empty_row_ = NULL;
 jobject HBaseTableScanner::must_pass_all_op_ = NULL;
 jobjectArray HBaseTableScanner::compare_ops_ = NULL;
+
+const string HBASE_MEM_LIMIT_EXCEEDED = "HBaseTableScanner::$0() failed to "
+    "allocate $1 bytes for $2.";
 
 void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
     stringstream* out) {
@@ -573,53 +577,77 @@ inline void HBaseTableScanner::WriteTupleSlot(const SlotDescriptor* slot_desc,
   BitUtil::ByteSwap(slot, data, slot_desc->type().GetByteSize());
 }
 
-inline void HBaseTableScanner::GetRowKey(JNIEnv* env, jobject cell,
+inline Status HBaseTableScanner::GetRowKey(JNIEnv* env, jobject cell,
     void** data, int* length) {
   int offset = env->CallIntMethod(cell, cell_get_row_offset_id_);
   *length = env->CallShortMethod(cell, cell_get_row_length_id_);
   jbyteArray jdata =
       (jbyteArray) env->CallObjectMethod(cell, cell_get_row_array_);
-  *data = value_pool_->Allocate(*length);
+  *data = value_pool_->TryAllocate(*length);
+  if (UNLIKELY(*data == NULL)) {
+    string details = Substitute(HBASE_MEM_LIMIT_EXCEEDED, "GetRowKey",
+        *length, "row array");
+    return value_pool_->mem_tracker()->MemLimitExceeded(state_, details, *length);
+  }
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
   COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
+  return Status::OK();
 }
 
-inline void HBaseTableScanner::GetFamily(JNIEnv* env, jobject cell,
+inline Status HBaseTableScanner::GetFamily(JNIEnv* env, jobject cell,
     void** data, int* length) {
   int offset = env->CallIntMethod(cell, cell_get_family_offset_id_);
   *length = env->CallShortMethod(cell, cell_get_family_length_id_);
   jbyteArray jdata =
       (jbyteArray) env->CallObjectMethod(cell, cell_get_family_array_);
-  *data = value_pool_->Allocate(*length);
+  *data = value_pool_->TryAllocate(*length);
+  if (UNLIKELY(*data == NULL)) {
+    string details = Substitute(HBASE_MEM_LIMIT_EXCEEDED, "GetFamily",
+        *length, "family array");
+    return value_pool_->mem_tracker()->MemLimitExceeded(state_, details, *length);
+  }
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
   COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
+  return Status::OK();
 }
 
-inline void HBaseTableScanner::GetQualifier(JNIEnv* env, jobject cell,
+inline Status HBaseTableScanner::GetQualifier(JNIEnv* env, jobject cell,
     void** data, int* length) {
   int offset = env->CallIntMethod(cell, cell_get_qualifier_offset_id_);
   *length = env->CallIntMethod(cell, cell_get_qualifier_length_id_);
   jbyteArray jdata =
       (jbyteArray) env->CallObjectMethod(cell, cell_get_qualifier_array_);
-  *data = value_pool_->Allocate(*length);
+  *data = value_pool_->TryAllocate(*length);
+  if (UNLIKELY(*data == NULL)) {
+    string details = Substitute(HBASE_MEM_LIMIT_EXCEEDED, "GetQualifier",
+        *length, "qualifier array");
+    return value_pool_->mem_tracker()->MemLimitExceeded(state_, details, *length);
+  }
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
   COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
+  return Status::OK();
 }
 
-inline void HBaseTableScanner::GetValue(JNIEnv* env, jobject cell,
+inline Status HBaseTableScanner::GetValue(JNIEnv* env, jobject cell,
     void** data, int* length) {
   int offset = env->CallIntMethod(cell, cell_get_value_offset_id_);
   *length = env->CallIntMethod(cell, cell_get_value_length_id_);
   jbyteArray jdata =
       (jbyteArray) env->CallObjectMethod(cell, cell_get_value_array_);
-  *data = value_pool_->Allocate(*length);
+  *data = value_pool_->TryAllocate(*length);
+  if (UNLIKELY(*data == NULL)) {
+    string details = Substitute(HBASE_MEM_LIMIT_EXCEEDED, "GetValue",
+        *length, "value array");
+    return value_pool_->mem_tracker()->MemLimitExceeded(state_, details, *length);
+  }
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
   COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
+  return Status::OK();
 }
 
 Status HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {
   jobject cell = env->GetObjectArrayElement(cells_, 0);
-  GetRowKey(env, cell, key, key_length);
+  RETURN_IF_ERROR(GetRowKey(env, cell, key, key_length));
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
 }
@@ -650,7 +678,7 @@ Status HBaseTableScanner::GetCurrentValue(JNIEnv* env, const string& family,
     // Check family. If it doesn't match, we have a NULL value.
     void* family_data;
     int family_length;
-    GetFamily(env, cell, &family_data, &family_length);
+    RETURN_IF_ERROR(GetFamily(env, cell, &family_data, &family_length));
     if (CompareStrings(family, family_data, family_length) != 0) {
       *is_null = true;
       return Status::OK();
@@ -659,13 +687,13 @@ Status HBaseTableScanner::GetCurrentValue(JNIEnv* env, const string& family,
     // Check qualifier. If it doesn't match, we have a NULL value.
     void* qualifier_data;
     int qualifier_length;
-    GetQualifier(env, cell, &qualifier_data, &qualifier_length);
+    RETURN_IF_ERROR(GetQualifier(env, cell, &qualifier_data, &qualifier_length));
     if (CompareStrings(qualifier, qualifier_data, qualifier_length) != 0) {
       *is_null = true;
       return Status::OK();
     }
   }
-  GetValue(env, cell, data, length);
+  RETURN_IF_ERROR(GetValue(env, cell, data, length));
   *is_null = false;
   return Status::OK();
 }

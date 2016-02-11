@@ -35,6 +35,7 @@ using boost::algorithm::ends_with;
 using boost::algorithm::to_lower;
 using namespace impala;
 using namespace llvm;
+using namespace strings;
 
 const char* HdfsTextScanner::LLVM_CLASS_NAME = "class.impala::HdfsTextScanner";
 
@@ -359,7 +360,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
       // There can be one partial tuple which returned no more fields from this buffer.
       DCHECK_LE(*num_tuples, num_fields + 1);
       if (!boundary_column_.Empty()) {
-        CopyBoundaryField(&field_locations_[0], pool);
+        RETURN_IF_ERROR(CopyBoundaryField(&field_locations_[0], pool));
         boundary_column_.Clear();
       }
       num_tuples_materialized = WriteFields(pool, tuple_row_mem, num_fields, *num_tuples);
@@ -379,14 +380,14 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     // Save contents that are split across buffers if we are going to return this column
     if (col_start != byte_buffer_ptr_ && delimited_text_parser_->ReturnCurrentColumn()) {
       DCHECK_EQ(byte_buffer_ptr_, byte_buffer_end_);
-      boundary_column_.Append(col_start, byte_buffer_ptr_ - col_start);
+      RETURN_IF_ERROR(boundary_column_.Append(col_start, byte_buffer_ptr_ - col_start));
       char* last_row = NULL;
       if (*num_tuples == 0) {
         last_row = batch_start_ptr_;
       } else {
         last_row = row_end_locations_[*num_tuples - 1] + 1;
       }
-      boundary_row_.Append(last_row, byte_buffer_ptr_ - last_row);
+      RETURN_IF_ERROR(boundary_row_.Append(last_row, byte_buffer_ptr_ - last_row));
     }
     COUNTER_ADD(scan_node_->rows_read_counter(), *num_tuples);
 
@@ -718,6 +719,10 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
     int tuples_returned = 0;
     // Call jitted function if possible
     if (write_tuples_fn_ != NULL) {
+      // HdfsScanner::InitializeWriteTuplesFn() will skip codegen if there are string
+      // slots and escape characters. TextConverter::WriteSlot() will be used instead.
+      DCHECK(scan_node_->tuple_desc()->string_slots().empty() ||
+          delimited_text_parser_->escape_char() == '\0');
       tuples_returned = write_tuples_fn_(this, pool, tuple_row,
           batch_->row_byte_size(), fields, num_tuples, max_added_tuples,
           scan_node_->materialized_slots().size(), num_tuples_processed);
@@ -751,15 +756,21 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
   return num_tuples_materialized;
 }
 
-void HdfsTextScanner::CopyBoundaryField(FieldLocation* data, MemPool* pool) {
+Status HdfsTextScanner::CopyBoundaryField(FieldLocation* data, MemPool* pool) {
   bool needs_escape = data->len < 0;
   int copy_len = needs_escape ? -data->len : data->len;
   int total_len = copy_len + boundary_column_.Size();
-  char* str_data = reinterpret_cast<char*>(pool->Allocate(total_len));
+  char* str_data = reinterpret_cast<char*>(pool->TryAllocate(total_len));
+  if (UNLIKELY(str_data == NULL)) {
+    string details = Substitute("HdfsTextScanner::CopyBoundaryField() failed to allocate "
+        "$0 bytes.", total_len);
+    return pool->mem_tracker()->MemLimitExceeded(state_, details, total_len);
+  }
   memcpy(str_data, boundary_column_.str().ptr, boundary_column_.Size());
   memcpy(str_data + boundary_column_.Size(), data->start, copy_len);
   data->start = str_data;
   data->len = needs_escape ? -total_len : total_len;
+  return Status::OK();
 }
 
 int HdfsTextScanner::WritePartialTuple(FieldLocation* fields,

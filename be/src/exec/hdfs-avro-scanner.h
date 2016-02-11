@@ -176,8 +176,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   int DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data,
       Tuple* tuple, TupleRow* tuple_row);
 
-  /// Materializes a single tuple from serialized record data.
-  void MaterializeTuple(const AvroSchemaElement& record_schema, MemPool* pool,
+  /// Materializes a single tuple from serialized record data. Will return false and set
+  /// error in parse_status_ if memory limit is exceeded when allocating new char buffer.
+  /// See comments below for ReadAvroChar().
+  bool MaterializeTuple(const AvroSchemaElement& record_schema, MemPool* pool,
       uint8_t** data, Tuple* tuple);
 
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
@@ -190,7 +192,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// schema.
   /// TODO: Codegen a function for each unique file schema.
   static llvm::Function* CodegenMaterializeTuple(HdfsScanNode* node,
-                                                 LlvmCodeGen* codegen);
+      LlvmCodeGen* codegen);
 
   /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
   /// record.
@@ -200,21 +202,23 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// - builder: used to insert the IR, starting at the current insert point. The insert
   ///     point will be left at the end of the record but before the 'insert_before'
   ///     block.
-  /// - insert_before: the block to insert any new blocks directly before. NULL if blocks
-  ///     should be inserted at the end of fn. (This could theoretically be inferred from
-  ///     builder's insert point, but I can't figure out how to get the successor to a
-  ///     basic block.)
+  /// - insert_before: the block to insert any new blocks directly before. This is either
+  ///     the bail_out block or some basic blocks before that.
+  /// - bail_out: the block to jump to if anything fails. This is used in particular by
+  ///     ReadAvroChar() which can exceed memory limit during allocation from MemPool.
   /// - this_val, pool_val, tuple_val, data_val: arguments to MaterializeTuple()
   static Status CodegenReadRecord(
       const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNode* node,
       LlvmCodeGen* codegen, void* builder, llvm::Function* fn,
-      llvm::BasicBlock* insert_before, llvm::Value* this_val, llvm::Value* pool_val,
-      llvm::Value* tuple_val, llvm::Value* data_val);
+      llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out, llvm::Value* this_val,
+      llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val);
 
   /// Creates the IR for reading an Avro scalar at builder's current insert point.
   static Status CodegenReadScalar(const AvroSchemaElement& element,
-    SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* builder, llvm::Value* this_val,
-    llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val);
+      SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder,
+      llvm::BasicBlock* end_field_block, llvm::BasicBlock* bail_out_block,
+      llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
+      llvm::Value* data_val);
 
   /// The following are cross-compiled functions for parsing a serialized Avro primitive
   /// type and writing it to a slot. They can also be used for skipping a field without
@@ -225,6 +229,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// - type: The type of the slot. (This is necessary because there is not a 1:1 mapping
   ///         between Avro types and Impala's primitive types.)
   /// - pool: MemPool for string data.
+  ///
+  /// ReadAvroChar() will return false and set error in parse_status_ if memory limit
+  /// is exceeded when allocating the new char buffer. It returns true otherwise.
+  ///
   void ReadAvroBoolean(
       PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
   void ReadAvroInt32(
@@ -238,11 +246,11 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   void ReadAvroVarchar(
       PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
       MemPool* pool);
-  void ReadAvroChar(
+  bool ReadAvroChar(
       PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
       MemPool* pool);
-  void ReadAvroString( PrimitiveType type, uint8_t** data, bool write_slot, void* slot,
-      MemPool* pool);
+  void ReadAvroString(
+      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
 
   /// Same as the above functions, except takes the size of the decimal slot (i.e. 4, 8, or
   /// 16) instead of the type (which should be TYPE_DECIMAL). The slot size is passed

@@ -271,18 +271,20 @@ class HBaseTableScanner {
   Status InitScanRange(JNIEnv* env, jbyteArray start_bytes, jbyteArray end_bytes);
 
   /// Copies the row key of cell into value_pool_ and returns it via *data and *length.
-  inline void GetRowKey(JNIEnv* env, jobject cell, void** data, int* length);
+  /// Returns error status if memory limit is exceeded.
+  inline Status GetRowKey(JNIEnv* env, jobject cell, void** data, int* length);
 
   /// Copies the column family of cell into value_pool_ and returns it
-  /// via *data and *length.
-  inline void GetFamily(JNIEnv* env, jobject cell, void** data, int* length);
+  /// via *data and *length. Returns error status if memory limit is exceeded.
+  inline Status GetFamily(JNIEnv* env, jobject cell, void** data, int* length);
 
   /// Copies the column qualifier of cell into value_pool_ and returns it
-  /// via *data and *length.
-  inline void GetQualifier(JNIEnv* env, jobject cell, void** data, int* length);
+  /// via *data and *length. Returns error status if memory limit is exceeded.
+  inline Status GetQualifier(JNIEnv* env, jobject cell, void** data, int* length);
 
   /// Copies the value of cell into value_pool_ and returns it via *data and *length.
-  inline void GetValue(JNIEnv* env, jobject cell, void** data, int* length);
+  /// Returns error status if memory limit is exceeded.
+  inline Status GetValue(JNIEnv* env, jobject cell, void** data, int* length);
 
   /// Returns the current value of cells_[cell_index_] in *data and *length
   /// if its family/qualifier match the given family/qualifier.

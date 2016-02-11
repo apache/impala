@@ -19,15 +19,18 @@
 #include "runtime/string-value.inline.h"
 
 using namespace impala;
+using namespace strings;
 
 // Functions in this file are cross-compiled to IR with clang.
 
 int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data,
-                                    Tuple* tuple, TupleRow* tuple_row) {
+    Tuple* tuple, TupleRow* tuple_row) {
   int num_to_commit = 0;
   for (int i = 0; i < max_tuples; ++i) {
     InitTuple(template_tuple_, tuple);
-    MaterializeTuple(*avro_header_->schema.get(), pool, data, tuple);
+    if (UNLIKELY(!MaterializeTuple(*avro_header_->schema.get(), pool, data, tuple))) {
+      return 0;
+    }
     tuple_row->SetTuple(scan_node_->tuple_idx(), tuple);
     if (EvalConjuncts(tuple_row)) {
       ++num_to_commit;
@@ -50,7 +53,7 @@ bool HdfsAvroScanner::ReadUnionType(int null_union_position, uint8_t** data) {
 }
 
 void HdfsAvroScanner::ReadAvroBoolean(PrimitiveType type, uint8_t** data, bool write_slot,
-                                      void* slot, MemPool* pool) {
+    void* slot, MemPool* pool) {
   if (write_slot) {
     DCHECK_EQ(type, TYPE_BOOLEAN);
     *reinterpret_cast<bool*>(slot) = *reinterpret_cast<bool*>(*data);
@@ -59,7 +62,7 @@ void HdfsAvroScanner::ReadAvroBoolean(PrimitiveType type, uint8_t** data, bool w
 }
 
 void HdfsAvroScanner::ReadAvroInt32(PrimitiveType type, uint8_t** data, bool write_slot,
-                                    void* slot, MemPool* pool) {
+    void* slot, MemPool* pool) {
   int32_t val = ReadWriteUtil::ReadZInt(data);
   if (write_slot) {
     if (type == TYPE_INT) {
@@ -77,7 +80,7 @@ void HdfsAvroScanner::ReadAvroInt32(PrimitiveType type, uint8_t** data, bool wri
 }
 
 void HdfsAvroScanner::ReadAvroInt64(PrimitiveType type, uint8_t** data, bool write_slot,
-                                    void* slot, MemPool* pool) {
+    void* slot, MemPool* pool) {
   int64_t val = ReadWriteUtil::ReadZLong(data);
   if (write_slot) {
     if (type == TYPE_BIGINT) {
@@ -93,7 +96,7 @@ void HdfsAvroScanner::ReadAvroInt64(PrimitiveType type, uint8_t** data, bool wri
 }
 
 void HdfsAvroScanner::ReadAvroFloat(PrimitiveType type, uint8_t** data, bool write_slot,
-                                    void* slot, MemPool* pool) {
+    void* slot, MemPool* pool) {
   if (write_slot) {
     float val = *reinterpret_cast<float*>(*data);
     if (type == TYPE_FLOAT) {
@@ -108,7 +111,7 @@ void HdfsAvroScanner::ReadAvroFloat(PrimitiveType type, uint8_t** data, bool wri
 }
 
 void HdfsAvroScanner::ReadAvroDouble(PrimitiveType type, uint8_t** data, bool write_slot,
-                                     void* slot, MemPool* pool) {
+    void* slot, MemPool* pool) {
   if (write_slot) {
     DCHECK_EQ(type, TYPE_DOUBLE);
     *reinterpret_cast<double*>(slot) = *reinterpret_cast<double*>(*data);
@@ -117,7 +120,7 @@ void HdfsAvroScanner::ReadAvroDouble(PrimitiveType type, uint8_t** data, bool wr
 }
 
 void HdfsAvroScanner::ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t** data,
-                                     bool write_slot, void* slot, MemPool* pool) {
+    bool write_slot, void* slot, MemPool* pool) {
   int64_t len = ReadWriteUtil::ReadZLong(data);
   if (write_slot) {
     DCHECK(type == TYPE_VARCHAR);
@@ -130,8 +133,8 @@ void HdfsAvroScanner::ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t**
   *data += len;
 }
 
-void HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** data,
-                                   bool write_slot, void* slot, MemPool* pool) {
+bool HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** data,
+    bool write_slot, void* slot, MemPool* pool) {
   int64_t len = ReadWriteUtil::ReadZLong(data);
   if (write_slot) {
     DCHECK(type == TYPE_CHAR);
@@ -139,7 +142,13 @@ void HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** da
     int str_len = std::min(static_cast<int>(len), max_len);
     if (ctype.IsVarLenStringType()) {
       StringValue* sv = reinterpret_cast<StringValue*>(slot);
-      sv->ptr = reinterpret_cast<char*>(pool->Allocate(max_len));
+      sv->ptr = reinterpret_cast<char*>(pool->TryAllocate(max_len));
+      if (UNLIKELY(sv->ptr == NULL)) {
+        string details = Substitute("HdfsAvroScanner::ReadAvroChar() failed to allocate"
+            "$0 bytes for char slot.", max_len);
+        parse_status_ = pool->mem_tracker()->MemLimitExceeded(state_, details, max_len);
+        return false;
+      }
       sv->len = max_len;
       memcpy(sv->ptr, *data, str_len);
       StringValue::PadWithSpaces(sv->ptr, max_len, str_len);
@@ -149,10 +158,11 @@ void HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** da
     }
   }
   *data += len;
+  return true;
 }
 
 void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
-                                     bool write_slot, void* slot, MemPool* pool) {
+    bool write_slot, void* slot, MemPool* pool) {
   int64_t len = ReadWriteUtil::ReadZLong(data);
   if (write_slot) {
     DCHECK(type == TYPE_STRING);
@@ -164,7 +174,7 @@ void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
 }
 
 void HdfsAvroScanner::ReadAvroDecimal(int slot_byte_size, uint8_t** data,
-                                      bool write_slot, void* slot, MemPool* pool) {
+    bool write_slot, void* slot, MemPool* pool) {
   int64_t len = ReadWriteUtil::ReadZLong(data);
   if (write_slot) {
     // Decimals are encoded as big-endian integers. Copy the decimal into the most

@@ -116,11 +116,12 @@ class HdfsTextScanner : public HdfsScanner {
       int64_t* decompressed_len, bool *eosr);
 
   /// Prepends field data that was from the previous file buffer (This field straddled two
-  /// file buffers).  'data' already contains the pointer/len from the current file buffer,
-  /// boundary_column_ contains the beginning of the data from the previous file
-  /// buffer. This function will allocate a new string from the tuple pool, concatenate the
-  /// two pieces and update 'data' to contain the new pointer/len.
-  void CopyBoundaryField(FieldLocation* data, MemPool* pool);
+  /// file buffers). 'data' already contains the pointer/len from the current file buffer,
+  /// boundary_column_ contains the beginning of the data from the previous file buffer.
+  /// This function will allocate a new string from the tuple pool, concatenate the
+  /// two pieces and update 'data' to contain the new pointer/len. Return error status if
+  /// memory limit is exceeded when allocating a new string.
+  Status CopyBoundaryField(FieldLocation* data, MemPool* pool);
 
   /// Writes the intermediate parsed data into slots, outputting
   /// tuples to row_batch as they complete.

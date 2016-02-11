@@ -55,6 +55,8 @@ const string ERROR_INVALID_TIMESTAMP = "Data source returned invalid timestamp d
     "This likely indicates a problem with the data source library.";
 const string ERROR_INVALID_DECIMAL = "Data source returned invalid decimal data. "
     "This likely indicates a problem with the data source library.";
+const string ERROR_MEM_LIMIT_EXCEEDED = "DataSourceScanNode::$0() failed to allocate "
+    "$1 bytes for $2.";
 
 // Size of an encoded TIMESTAMP
 const size_t TIMESTAMP_SIZE = sizeof(int64_t) + sizeof(int32_t);
@@ -210,7 +212,12 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool) {
           }
           const string& val = col.string_vals[val_idx];
           size_t val_size = val.size();
-          char* buffer = reinterpret_cast<char*>(tuple_pool->Allocate(val_size));
+          char* buffer = reinterpret_cast<char*>(tuple_pool->TryAllocate(val_size));
+          if (UNLIKELY(buffer == NULL)) {
+            string details = Substitute(ERROR_MEM_LIMIT_EXCEEDED, "MaterializeNextRow",
+                val_size, "string slot");
+            return tuple_pool->mem_tracker()->MemLimitExceeded(NULL, details, val_size);
+          }
           memcpy(buffer, val.data(), val_size);
           reinterpret_cast<StringValue*>(slot)->ptr = buffer;
           reinterpret_cast<StringValue*>(slot)->len = val_size;
@@ -300,7 +307,12 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   // create new tuple buffer for row_batch
   MemPool* tuple_pool = row_batch->tuple_data_pool();
   int tuple_buffer_size = row_batch->MaxTupleBufferSize();
-  void* tuple_buffer = tuple_pool->Allocate(tuple_buffer_size);
+  void* tuple_buffer = tuple_pool->TryAllocate(tuple_buffer_size);
+  if (UNLIKELY(tuple_buffer == NULL)) {
+    string details = Substitute(ERROR_MEM_LIMIT_EXCEEDED, "GetNext",
+        tuple_buffer_size, "tuple");
+    return tuple_pool->mem_tracker()->MemLimitExceeded(state, details, tuple_buffer_size);
+  }
   tuple_ = reinterpret_cast<Tuple*>(tuple_buffer);
   ExprContext** ctxs = &conjunct_ctxs_[0];
   int num_ctxs = conjunct_ctxs_.size();

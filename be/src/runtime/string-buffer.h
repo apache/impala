@@ -16,8 +16,11 @@
 #ifndef IMPALA_RUNTIME_STRING_BUFFER_H
 #define IMPALA_RUNTIME_STRING_BUFFER_H
 
+#include "common/status.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
+
+using namespace strings;
 
 namespace impala {
 
@@ -30,7 +33,7 @@ namespace impala {
 class StringBuffer {
  public:
   /// C'tor for StringBuffer.  Memory backing the string will be allocated from
-  /// the pool as necessary.  Can optionally be initialized from a StringValue.
+  /// the pool as necessary. Can optionally be initialized from a StringValue.
   StringBuffer(MemPool* pool, StringValue* str = NULL)
       : pool_(pool), buffer_size_(0) {
     DCHECK(pool_ != NULL);
@@ -41,24 +44,24 @@ class StringBuffer {
   }
 
   /// Append 'str' to the current string, allocating a new buffer as necessary.
-  void Append(const char* str, int len) {
+  /// Return error status if memory limit is exceeded.
+  Status Append(const char* str, int len) {
     int new_len = len + string_value_.len;
-    if (new_len > buffer_size_) {
-      GrowBuffer(new_len);
-    }
+    if (new_len > buffer_size_) RETURN_IF_ERROR(GrowBuffer(new_len));
     memcpy(string_value_.ptr + string_value_.len, str, len);
     string_value_.len = new_len;
+    return Status::OK();
   }
 
   /// TODO: switch everything to uint8_t?
-  void Append(const uint8_t* str, int len) {
-    Append(reinterpret_cast<const char*>(str), len);
+  Status Append(const uint8_t* str, int len) {
+    return Append(reinterpret_cast<const char*>(str), len);
   }
 
-  /// Assigns contents to StringBuffer
-  void Assign(const char* str, int len) {
+  /// Assigns contents to StringBuffer. Return error status if memory limit is exceeded.
+  Status Assign(const char* str, int len) {
     Clear();
-    Append(str, len);
+    return Append(str, len);
   }
 
   /// Clear the underlying StringValue.  The allocated buffer can be reused.
@@ -94,16 +97,23 @@ class StringBuffer {
 
  private:
   /// Grows the buffer backing the string to be at least new_size, copying over the
-  /// previous string data into the new buffer.
-  void GrowBuffer(int new_len) {
+  /// previous string data into the new buffer. Return error status if memory limit
+  /// is exceeded.
+  Status GrowBuffer(int new_len) {
     // TODO: Release/reuse old buffers somehow
     buffer_size_ = std::max(buffer_size_ * 2, new_len);
     DCHECK_LE(buffer_size_, StringValue::MAX_LENGTH);
-    char* new_buffer = reinterpret_cast<char*>(pool_->Allocate(buffer_size_));
-    if (string_value_.len > 0) {
+    char* new_buffer = reinterpret_cast<char*>(pool_->TryAllocate(buffer_size_));
+    if (UNLIKELY(new_buffer == NULL)) {
+      string details = Substitute("StringBuffer failed to grow buffer by $0 bytes.",
+          buffer_size_);
+      return pool_->mem_tracker()->MemLimitExceeded(NULL, details, buffer_size_);
+    }
+    if (LIKELY(string_value_.len > 0)) {
       memcpy(new_buffer, string_value_.ptr, string_value_.len);
     }
     string_value_.ptr = new_buffer;
+    return Status::OK();
   }
 
   MemPool* pool_;

@@ -176,7 +176,8 @@ DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
 
 namespace impala {
 
-const string PARQUET_MEM_LIMIT_EXCEEDED = "$0 failed to allocate $1 bytes for $2.";
+const string PARQUET_MEM_LIMIT_EXCEEDED = "HdfsParquetScanner::$0() failed to allocate "
+    "$1 bytes for $2.";
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : HdfsScanner(scan_node, state),
@@ -750,7 +751,7 @@ bool HdfsParquetScanner::ScalarColumnReader<StringValue, true>::ConvertSlot(
   if (slot_desc()->type().IsVarLenStringType()) {
     sv.ptr = reinterpret_cast<char*>(pool->TryAllocate(len));
     if (UNLIKELY(sv.ptr == NULL)) {
-      string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ConvertSlot()",
+      string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ConvertSlot",
           len, "StringValue");
       parent_->parse_status_ =
           pool->mem_tracker()->MemLimitExceeded(parent_->state_, details, len);
@@ -1132,7 +1133,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
       if (decompressor_.get() != NULL) {
         dict_values = parent_->dictionary_pool_->TryAllocate(uncompressed_size);
         if (UNLIKELY(dict_values == NULL)) {
-          string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ReadDataPage()",
+          string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ReadDataPage",
               uncompressed_size, "dictionary");
           return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
               parent_->state_, details, uncompressed_size);
@@ -1147,7 +1148,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
         // more data) to a new buffer
         dict_values = parent_->dictionary_pool_->TryAllocate(data_size);
         if (UNLIKELY(dict_values == NULL)) {
-          string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ReadDataPage()",
+          string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ReadDataPage",
               data_size, "dictionary");
           return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
               parent_->state_, details, data_size);
@@ -1184,7 +1185,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
       uint8_t* decompressed_buffer =
           decompressed_data_pool_->TryAllocate(uncompressed_size);
       if (UNLIKELY(decompressed_buffer == NULL)) {
-        string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ReadDataPage()",
+        string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "ReadDataPage",
             uncompressed_size, "decompressed data");
         return decompressed_data_pool_->mem_tracker()->MemLimitExceeded(
             parent_->state_, details, uncompressed_size);

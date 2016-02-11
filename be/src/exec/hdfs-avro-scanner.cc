@@ -47,6 +47,9 @@ const string HdfsAvroScanner::AVRO_NULL_CODEC("null");
 const string HdfsAvroScanner::AVRO_SNAPPY_CODEC("snappy");
 const string HdfsAvroScanner::AVRO_DEFLATE_CODEC("deflate");
 
+const string AVRO_MEM_LIMIT_EXCEEDED = "HdfsAvroScanner::$0() failed to allocate "
+    "$1 bytes for $2.";
+
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
 HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
@@ -496,6 +499,7 @@ Status HdfsAvroScanner::ProcessRange() {
           num_to_commit = DecodeAvroData(max_tuples, pool, &data, tuple, tuple_row);
         }
       }
+      RETURN_IF_ERROR(parse_status_);
       RETURN_IF_ERROR(CommitRows(num_to_commit));
       num_records -= max_tuples;
       COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
@@ -512,7 +516,7 @@ Status HdfsAvroScanner::ProcessRange() {
   return Status::OK();
 }
 
-void HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
+bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
     MemPool* pool, uint8_t** data, Tuple* tuple) {
   DCHECK_EQ(record_schema.schema->type, AVRO_RECORD);
   BOOST_FOREACH(const AvroSchemaElement& element, record_schema.children) {
@@ -555,7 +559,11 @@ void HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
         if (slot_desc != NULL && slot_desc->type().type == TYPE_VARCHAR) {
           ReadAvroVarchar(slot_type, slot_desc->type().len, data, write_slot, slot, pool);
         } else if (slot_desc != NULL && slot_desc->type().type == TYPE_CHAR) {
-          ReadAvroChar(slot_type, slot_desc->type().len, data, write_slot, slot, pool);
+          if (UNLIKELY(!ReadAvroChar(slot_type, slot_desc->type().len, data, write_slot,
+                           slot, pool))) {
+            DCHECK(!parse_status_.ok());
+            return false;
+          }
         } else {
           ReadAvroString(slot_type, data, write_slot, slot, pool);
         }
@@ -576,53 +584,86 @@ void HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
         DCHECK(false) << "Unsupported SchemaElement: " << type;
     }
   }
+  return true;
 }
 
 // This function produces a codegen'd function equivalent to MaterializeTuple() but
 // optimized for the table schema. Via helper functions CodegenReadRecord() and
 // CodegenReadScalar(), it eliminates the conditionals necessary when interpreting the
 // type of each element in the schema, instead generating code to handle each element in
-// the schema. Example output:
+// the schema. Example output with tpch.region:
 //
-// define void @MaterializeTuple(%"class.impala::HdfsAvroScanner"* %this,
+// define i1 @MaterializeTuple(%"class.impala::HdfsAvroScanner"* %this,
+//     %"struct.impala::AvroSchemaElement"* %record_schema,
 //     %"class.impala::MemPool"* %pool, i8** %data, %"class.impala::Tuple"* %tuple) {
 // entry:
-//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple to { i8, i32 }*
+//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple to { i8, i32,
+//       %"struct.impala::StringValue", %"struct.impala::StringValue" }*
 //   %is_not_null = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPh(
 //       %"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data)
 //   br i1 %is_not_null, label %read_field, label %null_field
 //
 // read_field:                                       ; preds = %entry
-//   %slot = getelementptr inbounds { i8, i32 }* %tuple_ptr, i32 0, i32 1
+//   %slot = getelementptr inbounds { i8, i32, %"struct.impala::StringValue",
+//       %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 1
 //   %opaque_slot = bitcast i32* %slot to i8*
 //   call void
-//    @_ZN6impala15HdfsAvroScanner13ReadAvroInt32ENS_13PrimitiveTypeEPPhPvPNS_7MemPoolE(
-//        %"class.impala::HdfsAvroScanner"* %this, i32 5, i8** %data,
+//    @_ZN6impala15HdfsAvroScanner13ReadAvroInt32ENS_13PrimitiveTypeEPPhbPvPNS_7MemPoolE(
+//        %"class.impala::HdfsAvroScanner"* %this, i32 5, i8** %data, i1 true,
 //        i8* %opaque_slot, %"class.impala::MemPool"* %pool)
-//   br label %endif
+//   br label %end_field
 //
 // null_field:                                       ; preds = %entry
-//   call void @SetNull({ i8, i32 }* %tuple_ptr)
-//   br label %endif
+//   call void @SetNull({ i8, i32, %"struct.impala::StringValue",
+//       %"struct.impala::StringValue" }* %tuple_ptr)
+//   br label %end_field
 //
-// endif:                                            ; preds = %null_field, %read_field
-//   %is_not_null4 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPh(
+// end_field:                                        ; preds = %read_field, %null_field
+//  %is_not_null4 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPh(
+//      %"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data)
+//  br i1 %is_not_null4, label %read_field1, label %null_field3
+//
+// read_field1:                                      ; preds = %end_field
+//  %slot5 = getelementptr inbounds { i8, i32, %"struct.impala::StringValue",
+//      %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 2
+//  %opaque_slot6 = bitcast %"struct.impala::StringValue"* %slot5 to i8*
+//  call void
+//   @_ZN6impala15HdfsAvroScanner14ReadAvroStringENS_13PrimitiveTypeEPPhbPvPNS_7MemPoolE(
+//       %"class.impala::HdfsAvroScanner"* %this, i32 10, i8** %data, i1 true,
+//       i8* %opaque_slot6, %"class.impala::MemPool"* %pool)
+//  br label %end_field2
+//
+// null_field3:                                      ; preds = %end_field
+//   call void @SetNull1({ i8, i32, %"struct.impala::StringValue",
+//       %"struct.impala::StringValue" }* %tuple_ptr)
+//   br label %end_field2
+//
+// end_field2:                                       ; preds = %read_field1, %null_field3
+//   %is_not_null10 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPh(
 //       %"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data)
-//   br i1 %is_not_null4, label %read_field1, label %null_field2
+//   br i1 %is_not_null10, label %read_field7, label %null_field9
 //
-// read_field1:                                      ; preds = %endif
+// read_field7:                                      ; preds = %end_field2
+//   %slot11 = getelementptr inbounds { i8, i32, %"struct.impala::StringValue",
+//       %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 3
+//   %opaque_slot12 = bitcast %"struct.impala::StringValue"* %slot11 to i8*
 //   call void
-//    @_ZN6impala15HdfsAvroScanner15ReadAvroBooleanENS_13PrimitiveTypeEPPhPvPNS_7MemPoolE(
-//        %"class.impala::HdfsAvroScanner"* %this, i32 0, i8** %data,
-//        i8* null, %"class.impala::MemPool"* %pool)
-//   br label %endif3
+//    @_ZN6impala15HdfsAvroScanner14ReadAvroStringENS_13PrimitiveTypeEPPhbPvPNS_7MemPoolE(
+//        %"class.impala::HdfsAvroScanner"* %this, i32 10, i8** %data, i1 true,
+//        i8* %opaque_slot12, %"class.impala::MemPool"* %pool)
+//   br label %end_field8
 //
-// null_field2:                                      ; preds = %endif
-//   br label %endif3
+// null_field9:                                      ; preds = %end_field2
+//   call void @SetNull2({ i8, i32, %"struct.impala::StringValue",
+//       %"struct.impala::StringValue" }* %tuple_ptr)
+//   br label %end_field8
 //
-// endif3:                                           ; preds = %null_field2, %read_field1
-//   ret void
-// }
+// end_field8:                                       ; preds = %read_field7, %null_field9
+//   ret i1 true
+//
+// bail_out:                                         ; No predecessors!
+//   ret i1 false                                    // used only if there is CHAR.
+//}
 Function* HdfsAvroScanner::CodegenMaterializeTuple(
     HdfsScanNode* node, LlvmCodeGen* codegen) {
   LLVMContext& context = codegen->context();
@@ -644,7 +685,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(
   Type* mempool_type = PointerType::get(codegen->GetType(MemPool::LLVM_CLASS_NAME), 0);
   Type* schema_element_type = codegen->GetPtrType(AvroSchemaElement::LLVM_CLASS_NAME);
 
-  LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeTuple", codegen->void_type());
+  LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeTuple", codegen->boolean_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("record_schema", schema_element_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("pool", mempool_type));
@@ -661,24 +702,33 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(
 
   Value* tuple_val = builder.CreateBitCast(opaque_tuple_val, tuple_ptr_type, "tuple_ptr");
 
+  // Create a bail out block to handle decoding failures.
+  BasicBlock* bail_out_block = BasicBlock::Create(context, "bail_out", fn, NULL);
+
   Status status = CodegenReadRecord(
-      SchemaPath(), node->avro_schema(), node, codegen, &builder, fn, NULL, this_val,
-      pool_val, tuple_val, data_val);
+      SchemaPath(), node->avro_schema(), node, codegen, &builder, fn, bail_out_block,
+      bail_out_block, this_val, pool_val, tuple_val, data_val);
   if (!status.ok()) {
     VLOG_QUERY << status.GetDetail();
     fn->eraseFromParent();
     return NULL;
   }
 
-  builder.SetInsertPoint(&fn->back());
-  builder.CreateRetVoid();
+  // Returns true on successful decoding.
+  builder.CreateRet(codegen->true_value());
+
+  // Returns false on decoding errors.
+  builder.SetInsertPoint(bail_out_block);
+  builder.CreateRet(codegen->false_value());
+
   return codegen->FinalizeFunction(fn);
 }
 
 Status HdfsAvroScanner::CodegenReadRecord(
     const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNode* node,
     LlvmCodeGen* codegen, void* void_builder, Function* fn, BasicBlock* insert_before,
-    Value* this_val, Value* pool_val, Value* tuple_val, Value* data_val) {
+    BasicBlock* bail_out, Value* this_val, Value* pool_val, Value* tuple_val,
+    Value* data_val) {
   DCHECK_EQ(record.schema->type, AVRO_RECORD);
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder* builder =
@@ -742,21 +792,22 @@ Status HdfsAvroScanner::CodegenReadRecord(
       BasicBlock* insert_before_block =
           (null_block != NULL) ? null_block : end_field_block;
       RETURN_IF_ERROR(CodegenReadRecord(new_path, *field, node, codegen, builder, fn,
-          insert_before_block, this_val, pool_val, tuple_val, data_val));
+          insert_before_block, bail_out, this_val, pool_val, tuple_val, data_val));
     } else {
-      RETURN_IF_ERROR(CodegenReadScalar(
-          *field, slot_desc, codegen, builder, this_val, pool_val, tuple_val, data_val));
+      RETURN_IF_ERROR(CodegenReadScalar(*field, slot_desc, codegen, builder,
+          end_field_block, bail_out, this_val, pool_val, tuple_val, data_val));
     }
     builder->CreateBr(end_field_block);
 
-    // Set insertion point for next field
+    // Set insertion point for next field.
     builder->SetInsertPoint(end_field_block);
   }
   return Status::OK();
 }
 
 Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
-    SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder, Value* this_val,
+    SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder,
+    BasicBlock* end_field_block, BasicBlock* bail_out_block, Value* this_val,
     Value* pool_val, Value* tuple_val, Value* data_val) {
   LlvmCodeGen::LlvmBuilder* builder =
       reinterpret_cast<LlvmCodeGen::LlvmBuilder*>(void_builder);
@@ -781,10 +832,13 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
     case AVRO_BYTES:
       if (slot_desc != NULL && slot_desc->type().type == TYPE_VARCHAR) {
         read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_VARCHAR, false);
+      } else if (slot_desc != NULL && slot_desc->type().type == TYPE_CHAR) {
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_CHAR, false);
       } else {
         read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_STRING, false);
       }
       break;
+    // TODO: Add AVRO_DECIMAL here.
     default:
       return Status(Substitute(
           "Failed to codegen MaterializeTuple() due to unsupported type: $0",
@@ -811,13 +865,19 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
   }
 
   // NOTE: ReadAvroVarchar/Char has different signature than rest of read functions
-  if ((slot_desc != NULL) &&
+  if (slot_desc != NULL &&
       (slot_desc->type().type == TYPE_VARCHAR || slot_desc->type().type == TYPE_CHAR)) {
-    // Need to pass an extra argument (the length) to the codegen function
+    // Need to pass an extra argument (the length) to the codegen function.
     Value* fixed_len = builder->getInt32(slot_desc->type().len);
     Value* read_field_args[] = {this_val, slot_type_val, fixed_len, data_val,
                                 write_slot_val, opaque_slot_val, pool_val};
-    builder->CreateCall(read_field_fn, read_field_args);
+    if (slot_desc->type().type == TYPE_VARCHAR) {
+      builder->CreateCall(read_field_fn, read_field_args);
+    } else {
+      // ReadAvroChar() returns false if allocation from MemPool fails.
+      Value* ret_val = builder->CreateCall(read_field_fn, read_field_args);
+      builder->CreateCondBr(ret_val, end_field_block, bail_out_block);
+    }
   } else {
     Value* read_field_args[] =
         {this_val, slot_type_val, data_val, write_slot_val, opaque_slot_val, pool_val};

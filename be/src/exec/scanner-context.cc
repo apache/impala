@@ -118,7 +118,7 @@ void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool don
 }
 
 Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
-  if (parent_->cancelled()) return Status::CANCELLED;
+  if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
 
   // io_buffer_ should only be null the first time this is called
   DCHECK(io_buffer_ != NULL ||
@@ -178,7 +178,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
   *len = 0;
   if (eosr()) return Status::OK();
 
-  if (parent_->cancelled()) {
+  if (UNLIKELY(parent_->cancelled())) {
     DCHECK(*out_buffer == NULL);
     return Status::CANCELLED;
   }
@@ -243,11 +243,11 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
   while (requested_len > boundary_buffer_bytes_left_ + io_buffer_bytes_left_) {
     // We need to fetch more bytes. Copy the end of the current buffer and fetch the next
     // one.
-    boundary_buffer_->Append(io_buffer_pos_, io_buffer_bytes_left_);
+    RETURN_IF_ERROR(boundary_buffer_->Append(io_buffer_pos_, io_buffer_bytes_left_));
     boundary_buffer_bytes_left_ += io_buffer_bytes_left_;
 
     RETURN_IF_ERROR(GetNextBuffer());
-    if (parent_->cancelled()) return Status::CANCELLED;
+    if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
 
     if (io_buffer_bytes_left_ == 0) {
       // No more bytes (i.e. EOF)
@@ -267,7 +267,7 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
     output_buffer_pos_ = &io_buffer_pos_;
     output_buffer_bytes_left_ = &io_buffer_bytes_left_;
   } else {
-    boundary_buffer_->Append(io_buffer_pos_, num_bytes);
+    RETURN_IF_ERROR(boundary_buffer_->Append(io_buffer_pos_, num_bytes));
     boundary_buffer_bytes_left_ += num_bytes;
     boundary_buffer_pos_ = reinterpret_cast<uint8_t*>(boundary_buffer_->str().ptr) +
                            boundary_buffer_->Size() - boundary_buffer_bytes_left_;

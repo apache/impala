@@ -98,7 +98,8 @@ void BaseSequenceScanner::Close() {
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
-  if (!only_parsing_header_) {
+  // 'header_' can be NULL if HdfsScanNode::CreateAndPrepareScanner() failed.
+  if (!only_parsing_header_ && header_ != NULL) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
   HdfsScanner::Close();

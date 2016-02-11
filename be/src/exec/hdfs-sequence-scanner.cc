@@ -252,6 +252,10 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   // Call jitted function if possible
   int tuples_returned;
   if (write_tuples_fn_ != NULL) {
+    // HdfsScanner::InitializeWriteTuplesFn() will skip codegen if there are string slots
+    // and escape characters. TextConverter::WriteSlot() will be used instead.
+    DCHECK(scan_node_->tuple_desc()->string_slots().empty() ||
+        delimited_text_parser_->escape_char() == '\0');
     // last argument: seq always starts at record_location[0]
     tuples_returned = write_tuples_fn_(this, pool, tuple_row,
         batch_->row_byte_size(), &field_locations_[0], num_to_process,
