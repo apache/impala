@@ -347,6 +347,15 @@ IntVal TimestampFunctions::Second(FunctionContext* context, const TimestampVal& 
   return IntVal(ts_value.time().seconds());
 }
 
+IntVal TimestampFunctions::Millisecond(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (!ts_value.HasTime()) return IntVal::null();
+  const boost::posix_time::time_duration& time = ts_value.time();
+  return IntVal(time.total_milliseconds() - time.total_seconds() * 1000);
+}
+
 TimestampVal TimestampFunctions::Now(FunctionContext* context) {
   const TimestampValue* now = context->impl()->state()->now();
   TimestampVal return_val;

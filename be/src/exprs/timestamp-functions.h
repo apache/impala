@@ -106,6 +106,7 @@ class TimestampFunctions {
   static IntVal Hour(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal Minute(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal Second(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Millisecond(FunctionContext* context, const TimestampVal& ts_val);
 
   /// Date/time functions.
   static TimestampVal Now(FunctionContext* context);

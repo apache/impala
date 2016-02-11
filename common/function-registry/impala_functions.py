@@ -116,6 +116,7 @@ visible_functions = [
   [['hour'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions4HourEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['minute'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions6MinuteEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['second'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions6SecondEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
+  [['millisecond'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions11MillisecondEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['to_date'], 'STRING', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions6ToDateEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['dayname'], 'STRING', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions7DayNameEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['years_add'], 'TIMESTAMP', ['TIMESTAMP', 'INT'],
