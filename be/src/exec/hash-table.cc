@@ -652,7 +652,8 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
   *fn = prototype.GeneratePrototype(&builder, &this_arg);
 
   // Call GetHashSeed() to get seeds_[level_]
-  Function* get_hash_seed_fn = codegen->GetFunction(IRFunction::HASH_TABLE_GET_HASH_SEED);
+  Function* get_hash_seed_fn =
+      codegen->GetFunction(IRFunction::HASH_TABLE_GET_HASH_SEED, false);
   Value* seed = builder.CreateCall(get_hash_seed_fn, this_arg, "seed");
 
   Value* hash_result = seed;

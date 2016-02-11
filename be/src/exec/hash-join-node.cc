@@ -577,22 +577,19 @@ Function* HashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
   if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Get cross compiled function
-  Function* process_build_batch_fn = codegen->GetFunction(
-      IRFunction::HASH_JOIN_PROCESS_BUILD_BATCH);
+  Function* process_build_batch_fn =
+      codegen->GetFunction(IRFunction::HASH_JOIN_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != NULL);
 
   // Codegen for evaluating build rows
   Function* eval_row_fn = hash_tbl_->CodegenEvalTupleRow(state, true);
   if (eval_row_fn == NULL) return NULL;
 
-  int replaced = 0;
-  // Replace call sites
-  process_build_batch_fn = codegen->ReplaceCallSites(process_build_batch_fn, false,
-      eval_row_fn, "EvalBuildRow", &replaced);
+  int replaced = codegen->ReplaceCallSites(process_build_batch_fn, eval_row_fn,
+      "EvalBuildRow");
   DCHECK_EQ(replaced, 1);
 
-  process_build_batch_fn = codegen->ReplaceCallSites(process_build_batch_fn, false,
-      hash_fn, "HashCurrentRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn, hash_fn, "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
   return codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
@@ -604,7 +601,7 @@ Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* 
 
   // Get cross compiled function
   Function* process_probe_batch_fn =
-      codegen->GetFunction(IRFunction::HASH_JOIN_PROCESS_PROBE_BATCH);
+      codegen->GetFunction(IRFunction::HASH_JOIN_PROCESS_PROBE_BATCH, true);
   DCHECK(process_probe_batch_fn != NULL);
 
   // Codegen HashTable::Equals
@@ -631,29 +628,27 @@ Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* 
   if (!status.ok()) return NULL;
 
   // Replace all call sites with codegen version
-  int replaced = 0;
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
-      hash_fn, "HashCurrentRow", &replaced);
+  int replaced = codegen->ReplaceCallSites(process_probe_batch_fn, hash_fn,
+      "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
-      eval_row_fn, "EvalProbeRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_row_fn,
+      "EvalProbeRow");
   DCHECK_EQ(replaced, 1);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
-      create_output_row_fn, "CreateOutputRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, create_output_row_fn,
+      "CreateOutputRow");
   DCHECK_EQ(replaced, 3);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
-      eval_conjuncts_fn, "EvalConjuncts", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_conjuncts_fn,
+      "EvalConjuncts");
   DCHECK_EQ(replaced, 2);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
-      eval_other_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_other_conjuncts_fn,
+      "EvalOtherJoinConjuncts");
   DCHECK_EQ(replaced, 2);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
-      equals_fn, "Equals", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, equals_fn, "Equals");
   DCHECK_EQ(replaced, 2);
 
   return codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);

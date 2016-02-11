@@ -715,7 +715,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
       // Field could be null. Create conditional branch based on ReadUnionType result.
       null_block = BasicBlock::Create(context, "null_field", fn, end_field_block);
       Function* read_union_fn =
-          codegen->GetFunction(IRFunction::READ_UNION_TYPE);
+          codegen->GetFunction(IRFunction::READ_UNION_TYPE, false);
       Value* null_union_pos_val =
           codegen->GetIntConstant(TYPE_INT, field->null_union_position);
       Value* is_not_null_val = builder->CreateCall3(
@@ -763,26 +763,26 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
   Function* read_field_fn;
   switch (element.schema->type) {
     case AVRO_BOOLEAN:
-      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_BOOLEAN);
+      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_BOOLEAN, false);
       break;
     case AVRO_INT32:
-      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT32);
+      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT32, false);
       break;
     case AVRO_INT64:
-      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT64);
+      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_INT64, false);
       break;
     case AVRO_FLOAT:
-      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_FLOAT);
+      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_FLOAT, false);
       break;
     case AVRO_DOUBLE:
-      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_DOUBLE);
+      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_DOUBLE, false);
       break;
     case AVRO_STRING:
     case AVRO_BYTES:
       if (slot_desc != NULL && slot_desc->type().type == TYPE_VARCHAR) {
-        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_VARCHAR);
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_VARCHAR, false);
       } else {
-        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_STRING);
+        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_STRING, false);
       }
       break;
     default:
@@ -834,10 +834,11 @@ Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(materialize_tuple_fn != NULL);
 
-  Function* decode_avro_data_fn = codegen->GetFunction(IRFunction::DECODE_AVRO_DATA);
-  int replaced = 0;
-  decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
-      materialize_tuple_fn, "MaterializeTuple", &replaced);
+  Function* decode_avro_data_fn =
+      codegen->GetFunction(IRFunction::DECODE_AVRO_DATA, true);
+
+  int replaced = codegen->ReplaceCallSites(decode_avro_data_fn, materialize_tuple_fn,
+      "MaterializeTuple");
   DCHECK_EQ(replaced, 1);
 
   Function* eval_conjuncts_fn;
@@ -845,8 +846,8 @@ Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
       ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs, &eval_conjuncts_fn);
   if (!status.ok()) return NULL;
 
-  decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
-      eval_conjuncts_fn, "EvalConjuncts", &replaced);
+  replaced = codegen->ReplaceCallSites(decode_avro_data_fn, eval_conjuncts_fn,
+      "EvalConjuncts");
   DCHECK_EQ(replaced, 1);
 
   decode_avro_data_fn->setName("DecodeAvroData");

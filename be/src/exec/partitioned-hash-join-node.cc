@@ -1579,29 +1579,31 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(
     RuntimeState* state, Function* hash_fn, Function* murmur_hash_fn) {
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
-  // Get cross compiled function
+
   Function* process_build_batch_fn =
-      codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH);
+      codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != NULL);
 
   // Codegen for evaluating build rows
   Function* eval_row_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state, true, &eval_row_fn));
 
-  int replaced = 0;
   // Replace call sites
-  process_build_batch_fn = codegen->ReplaceCallSites(process_build_batch_fn, false,
-      eval_row_fn, "EvalBuildRow", &replaced);
+  int replaced = codegen->ReplaceCallSites(process_build_batch_fn, eval_row_fn,
+      "EvalBuildRow");
   DCHECK_EQ(replaced, 1);
+
+  Function* process_build_batch_fn_level0 =
+      codegen->CloneFunction(process_build_batch_fn);
 
   // process_build_batch_fn_level0 uses CRC hash if available,
-  // process_build_batch_fn uses murmur
-  Function* process_build_batch_fn_level0 = codegen->ReplaceCallSites(
-      process_build_batch_fn, false, hash_fn, "HashCurrentRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn_level0, hash_fn,
+      "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
-  process_build_batch_fn = codegen->ReplaceCallSites(
-      process_build_batch_fn, true, murmur_hash_fn, "HashCurrentRow", &replaced);
+  // process_build_batch_fn uses murmur
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn, murmur_hash_fn,
+      "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
   // Finalize ProcessBuildBatch functions
@@ -1663,11 +1665,8 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
     default:
       DCHECK(false);
   }
-  Function* process_probe_batch_fn = codegen->GetFunction(ir_fn);
+  Function* process_probe_batch_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_probe_batch_fn != NULL);
-
-  // Clone process_probe_batch_fn so we don't clobber the original for other join nodes
-  process_probe_batch_fn = codegen->CloneFunction(process_probe_batch_fn);
   process_probe_batch_fn->setName("ProcessProbeBatch");
 
   // Since ProcessProbeBatch() is a templated function, it has linkonce_odr linkage, which
@@ -1711,46 +1710,58 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
       &eval_conjuncts_fn));
 
   // Replace all call sites with codegen version
-  int replaced = 0;
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
-      eval_row_fn, "EvalProbeRow", &replaced);
+  int replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_row_fn,
+      "EvalProbeRow");
   DCHECK_EQ(replaced, 1);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
-      create_output_row_fn, "CreateOutputRow", &replaced);
-  DCHECK(replaced == 1 || replaced == 2) << replaced; // Depends on join_op_
-
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
-      eval_conjuncts_fn, "EvalConjuncts", &replaced);
-  // Depends on join_op_:
-  // INNER_JOIN -> 1
-  // LEFT_OUTER_JOIN -> 2
-  // LEFT_SEMI_JOIN -> 1
-  // LEFT_ANTI_JOIN/NULL_AWARE_ANTI_JOIN -> 2
-  // RIGHT_OUTER_JOIN -> 1
-  // RIGHT_SEMI_JOIN -> 1
-  // RIGHT_ANTI_JOIN -> 0
-  // FULL_OUTER_JOIN -> 2
-  // CROSS_JOIN -> N/A
-  DCHECK(replaced == 0 || replaced == 1 || replaced == 2) << replaced;
-
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
-      eval_other_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced);
-  DCHECK_EQ(replaced, 1);
-
-  process_probe_batch_fn = codegen->ReplaceCallSites(
-      process_probe_batch_fn, true, probe_equals_fn, "Equals", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, create_output_row_fn,
+      "CreateOutputRow");
   // Depends on join_op_
+  // TODO: switch statement
+  DCHECK(replaced == 1 || replaced == 2) << replaced;
+
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_conjuncts_fn,
+      "EvalConjuncts");
+  switch (join_op_) {
+    case TJoinOp::INNER_JOIN:
+    case TJoinOp::LEFT_SEMI_JOIN:
+    case TJoinOp::RIGHT_OUTER_JOIN:
+    case TJoinOp::RIGHT_SEMI_JOIN:
+      DCHECK_EQ(replaced, 1);
+      break;
+    case TJoinOp::LEFT_OUTER_JOIN:
+    case TJoinOp::FULL_OUTER_JOIN:
+      DCHECK_EQ(replaced, 2);
+      break;
+    case TJoinOp::LEFT_ANTI_JOIN:
+    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
+    case TJoinOp::RIGHT_ANTI_JOIN:
+      DCHECK_EQ(replaced, 0);
+      break;
+    default:
+      DCHECK(false);
+  }
+
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_other_conjuncts_fn,
+      "EvalOtherJoinConjuncts");
+  DCHECK_EQ(replaced, 1);
+
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, probe_equals_fn, "Equals");
+  // Depends on join_op_
+  // TODO: switch statement
   DCHECK(replaced == 1 || replaced == 2 || replaced == 3 || replaced == 4) << replaced;
+
+  Function* process_probe_batch_fn_level0 =
+      codegen->CloneFunction(process_probe_batch_fn);
 
   // process_probe_batch_fn_level0 uses CRC hash if available,
   // process_probe_batch_fn uses murmur
-  Function* process_probe_batch_fn_level0 = codegen->ReplaceCallSites(
-      process_probe_batch_fn, false, hash_fn, "HashCurrentRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn_level0, hash_fn,
+      "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
-  process_probe_batch_fn = codegen->ReplaceCallSites(
-      process_probe_batch_fn, true, murmur_hash_fn, "HashCurrentRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, murmur_hash_fn,
+      "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
   // Finalize ProcessProbeBatch functions

@@ -516,7 +516,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
       }
 
       Function* get_ctx_fn =
-          codegen->GetFunction(IRFunction::HDFS_SCANNER_GET_CONJUNCT_CTX);
+          codegen->GetFunction(IRFunction::HDFS_SCANNER_GET_CONJUNCT_CTX, false);
       Value* ctx = builder.CreateCall2(
           get_ctx_fn, this_arg, codegen->GetIntConstant(TYPE_INT, conjunct_idx));
 
@@ -542,14 +542,12 @@ Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node,
   DCHECK(write_complete_tuple_fn != NULL);
 
   Function* write_tuples_fn =
-      codegen->GetFunction(IRFunction::HDFS_SCANNER_WRITE_ALIGNED_TUPLES);
+      codegen->GetFunction(IRFunction::HDFS_SCANNER_WRITE_ALIGNED_TUPLES, true);
   DCHECK(write_tuples_fn != NULL);
 
-  int replaced = 0;
-  write_tuples_fn = codegen->ReplaceCallSites(write_tuples_fn, false,
-      write_complete_tuple_fn, "WriteCompleteTuple", &replaced);
-  DCHECK_EQ(replaced, 1) << "One call site should be replaced.";
-  DCHECK(write_tuples_fn != NULL);
+  int replaced = codegen->ReplaceCallSites(write_tuples_fn, write_complete_tuple_fn,
+      "WriteCompleteTuple");
+  DCHECK_EQ(replaced, 1);
 
   return codegen->FinalizeFunction(write_tuples_fn);
 }

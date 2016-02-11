@@ -1739,10 +1739,10 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
   IRFunction::Type ir_fn = (!grouping_expr_ctxs_.empty() ?
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_FALSE :
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_NO_GROUPING);
-  Function* process_batch_fn = codegen->GetFunction(ir_fn);
+  Function* process_batch_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_batch_fn != NULL);
 
-  int replaced = 0;
+  int replaced;
   if (!grouping_expr_ctxs_.empty()) {
     // Codegen for grouping using hash table
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
@@ -1760,23 +1760,19 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
     RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_grouping_expr_fn));
 
     // Replace call sites
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        eval_grouping_expr_fn, "EvalProbeRow", &replaced);
+    replaced = codegen->ReplaceCallSites(process_batch_fn, eval_grouping_expr_fn,
+        "EvalProbeRow");
     DCHECK_EQ(replaced, 1);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
-        hash_fn, "HashCurrentRow", &replaced);
+    replaced = codegen->ReplaceCallSites(process_batch_fn, hash_fn, "HashCurrentRow");
     DCHECK_EQ(replaced, 1);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
-        build_equals_fn, "Equals", &replaced);
+    replaced = codegen->ReplaceCallSites(process_batch_fn, build_equals_fn, "Equals");
     DCHECK_EQ(replaced, 1);
   }
 
-  process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-      update_tuple_fn, "UpdateTuple", &replaced);
+  replaced = codegen->ReplaceCallSites(process_batch_fn, update_tuple_fn, "UpdateTuple");
   DCHECK_GE(replaced, 1);
-  DCHECK(process_batch_fn != NULL);
   *fn = codegen->OptimizeFunctionWithExprs(process_batch_fn);
   if (*fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenProcessBatch(): codegen'd "
@@ -1792,7 +1788,7 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
   SCOPED_TIMER(codegen->codegen_timer());
 
   IRFunction::Type ir_fn = IRFunction::PART_AGG_NODE_PROCESS_BATCH_STREAMING;
-  Function* process_batch_streaming_fn = codegen->GetFunction(ir_fn);
+  Function* process_batch_streaming_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_batch_streaming_fn != NULL);
 
   // Make needs_serialize arg constant so dead code can be optimised out.
@@ -1816,21 +1812,19 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
   RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_grouping_expr_fn));
 
   // Replace call sites
-  int replaced = 0;
-  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn,
-      false, update_tuple_fn, "UpdateTuple", &replaced);
+  int replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, update_tuple_fn,
+      "UpdateTuple");
   DCHECK_EQ(replaced, 2);
 
-  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn,
-      true, eval_grouping_expr_fn, "EvalProbeRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, eval_grouping_expr_fn,
+      "EvalProbeRow");
   DCHECK_EQ(replaced, 1);
 
-  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn, true,
-      hash_fn, "HashCurrentRow", &replaced);
+  replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, hash_fn,
+      "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
-  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn, true,
-      equals_fn, "Equals", &replaced);
+  replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, equals_fn, "Equals");
   DCHECK_EQ(replaced, 1);
 
   DCHECK(process_batch_streaming_fn != NULL);

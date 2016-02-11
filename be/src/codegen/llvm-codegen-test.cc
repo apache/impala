@@ -22,6 +22,7 @@
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
 #include "util/path-builder.h"
+#include "util/test-info.h"
 
 #include "common/names.h"
 
@@ -64,9 +65,17 @@ class LlvmCodeGenTest : public testing:: Test {
     codegen->ClearHashFns();
   }
 
-  static void* JitFunction(
-      LlvmCodeGen* codegen, Function* function) {
+  static void* JitFunction(LlvmCodeGen* codegen, Function* function) {
     return codegen->JitFunction(function);
+  }
+
+  static void AddFunctionToJit(LlvmCodeGen* codegen, llvm::Function* fn, void** fn_ptr) {
+    // Bypass Impala-specific logic in AddFunctionToJit().
+    codegen->fns_to_jit_compile_.push_back(make_pair(fn, fn_ptr));
+  }
+
+  static Status FinalizeModule(LlvmCodeGen* codegen) {
+    return codegen->FinalizeModule();
   }
 };
 
@@ -133,8 +142,11 @@ Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int de
 //   1. create a LlvmCodegen object from the precompiled file
 //   2. add another function to the module with the same signature as the inner
 //      loop function.
-//   3. Replace the call instruction in the outer loop to a call to the new inner loop
-//      function.
+//   3. Replace the call instruction in a clone of the outer loop to a call to the new
+//      inner loop function.
+//   4. Update the original loop with another jitted inner loop function
+//   5. Run both loops and make sure the correct inner loop is called
+
 //   4. Run the loop and make sure the inner loop is called.
 //   5. Updated the jitted loop in place with another jitted inner loop function
 //   6. Run the loop and make sure the updated is called.
@@ -164,12 +176,6 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_TRUE(loop->getName().find(loop_name) != string::npos);
   EXPECT_EQ(loop->arg_size(), 1);
 
-  void* original_loop = LlvmCodeGenTest::JitFunction(codegen.get(), loop);
-  EXPECT_TRUE(original_loop != NULL);
-
-  TestLoopFn original_loop_fn = reinterpret_cast<TestLoopFn>(original_loop);
-  original_loop_fn(5);
-
   // Part 2: Generate a new inner loop function.
   //
   // The c++ version of the code is
@@ -182,17 +188,29 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   int64_t jitted_counter = 0;
   Function* jitted_loop_call = CodegenInnerLoop(codegen.get(), &jitted_counter, 1);
 
-  // Part 3: Replace the call instruction to the normal function with a call to the
-  // jitted one
-  int num_replaced;
-  Function* jitted_loop = codegen->ReplaceCallSites(
-      loop, false, jitted_loop_call, loop_call_name, &num_replaced);
+  // Part 3: Clone 'loop' and replace the call instruction to the normal function with a
+  // call to the jitted one
+  Function* jitted_loop = codegen->CloneFunction(loop);
+  int num_replaced =
+      codegen->ReplaceCallSites(jitted_loop, jitted_loop_call, loop_call_name);
   EXPECT_EQ(num_replaced, 1);
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop));
 
-  // Part4: Call the new loop and verify results
-  void* new_loop = LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop);
-  EXPECT_TRUE(new_loop != NULL);
+  // Part 4: Generate a new inner loop function and update 'loop'
+  Function* jitted_loop_call2 = CodegenInnerLoop(codegen.get(), &jitted_counter, -2);
+  num_replaced = codegen->ReplaceCallSites(loop, jitted_loop_call2, loop_call_name);
+  EXPECT_EQ(num_replaced, 1);
+  EXPECT_TRUE(codegen->VerifyFunction(loop));
+
+  // Part 5: JIT and run both loops
+  void* new_loop = NULL;
+  AddFunctionToJit(codegen.get(), jitted_loop, &new_loop);
+  void* new_loop2 = NULL;
+  AddFunctionToJit(codegen.get(), loop, &new_loop2);
+
+  ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
+  ASSERT_TRUE(new_loop != NULL);
+  ASSERT_TRUE(new_loop2 != NULL);
 
   TestLoopFn new_loop_fn = reinterpret_cast<TestLoopFn>(new_loop);
   EXPECT_EQ(jitted_counter, 0);
@@ -200,18 +218,6 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_EQ(jitted_counter, 5);
   new_loop_fn(5);
   EXPECT_EQ(jitted_counter, 10);
-
-  // Part5: Generate a new inner loop function and a new loop function in place
-  Function* jitted_loop_call2 = CodegenInnerLoop(codegen.get(), &jitted_counter, -2);
-  Function* jitted_loop2 = codegen->ReplaceCallSites(loop, true, jitted_loop_call2,
-      loop_call_name, &num_replaced);
-  EXPECT_EQ(num_replaced, 1);
-  EXPECT_TRUE(codegen->VerifyFunction(jitted_loop2));
-
-  // Part6: Call new loop
-  void* new_loop2 =
-      LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop2);
-  EXPECT_TRUE(new_loop2 != NULL);
 
   TestLoopFn new_loop_fn2 = reinterpret_cast<TestLoopFn>(new_loop2);
   new_loop_fn2(5);
@@ -425,7 +431,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
 }
 
 int main(int argc, char **argv) {
-  impala::InitCommonRuntime(argc, argv, false);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   ::testing::InitGoogleTest(&argc, argv);
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();

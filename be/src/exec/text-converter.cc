@@ -109,9 +109,9 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   bool is_default_null = (len == 2 && null_col_val[0] == '\\' && null_col_val[1] == 'N');
   Function* is_null_string_fn;
   if (is_default_null) {
-    is_null_string_fn = codegen->GetFunction(IRFunction::IS_NULL_STRING);
+    is_null_string_fn = codegen->GetFunction(IRFunction::IS_NULL_STRING, false);
   } else {
-    is_null_string_fn = codegen->GetFunction(IRFunction::GENERIC_IS_NULL_STRING);
+    is_null_string_fn = codegen->GetFunction(IRFunction::GENERIC_IS_NULL_STRING, false);
   }
   if (is_null_string_fn == NULL) return NULL;
 
@@ -223,7 +223,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
         DCHECK(false);
         return NULL;
     }
-    parse_fn = codegen->GetFunction(parse_fn_enum);
+    parse_fn = codegen->GetFunction(parse_fn_enum, false);
     DCHECK(parse_fn != NULL);
 
     // Set up trying to parse the string to the slot type

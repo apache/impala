@@ -601,7 +601,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
       DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
       IRFunction::Type ir_function_type = evaluator->is_merge() ? IRFunction::HLL_MERGE
                                           : GetHllUpdateFunction2(input_expr->type());
-      Function* hll_fn = codegen->GetFunction(ir_function_type);
+      Function* hll_fn = codegen->GetFunction(ir_function_type, false);
 
       // Create pointer to src_anyval to pass to HllUpdate() function. We must use the
       // unlowered type.
@@ -780,14 +780,14 @@ Function* AggregationNode::CodegenProcessRowBatch(
   IRFunction::Type ir_fn = (!probe_expr_ctxs_.empty() ?
       IRFunction::AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING :
       IRFunction::AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING);
-  Function* process_batch_fn = codegen->GetFunction(ir_fn);
+  Function* process_batch_fn = codegen->GetFunction(ir_fn, true);
 
   if (process_batch_fn == NULL) {
     LOG(ERROR) << "Could not find AggregationNode::ProcessRowBatch in module.";
     return NULL;
   }
 
-  int replaced = 0;
+  int replaced;
   if (!probe_expr_ctxs_.empty()) {
     // Aggregation w/o grouping does not use a hash table.
 
@@ -808,27 +808,24 @@ Function* AggregationNode::CodegenProcessRowBatch(
     if (eval_probe_row_fn == NULL) return NULL;
 
     // Replace call sites
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        eval_build_row_fn, "EvalBuildRow", &replaced);
+    replaced =
+        codegen->ReplaceCallSites(process_batch_fn, eval_build_row_fn, "EvalBuildRow");
     DCHECK_EQ(replaced, 1);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        eval_probe_row_fn, "EvalProbeRow", &replaced);
+    replaced =
+        codegen->ReplaceCallSites(process_batch_fn, eval_probe_row_fn, "EvalProbeRow");
     DCHECK_EQ(replaced, 1);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        hash_fn, "HashCurrentRow", &replaced);
+    replaced = codegen->ReplaceCallSites(process_batch_fn, hash_fn, "HashCurrentRow");
     DCHECK_EQ(replaced, 2);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        equals_fn, "Equals", &replaced);
+    replaced = codegen->ReplaceCallSites(process_batch_fn, equals_fn, "Equals");
     DCHECK_EQ(replaced, 1);
   }
 
-  process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-      update_tuple_fn, "UpdateTuple", &replaced);
-  DCHECK_EQ(replaced, 1) << "One call site should be replaced.";
-  DCHECK(process_batch_fn != NULL);
+  replaced = codegen->ReplaceCallSites(process_batch_fn, update_tuple_fn, "UpdateTuple");
+  DCHECK_EQ(replaced, 1);
+
   return codegen->OptimizeFunctionWithExprs(process_batch_fn);
 }
 

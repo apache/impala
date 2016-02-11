@@ -54,6 +54,7 @@
 #include "util/cpu-info.h"
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
+#include "util/test-info.h"
 
 #include "common/names.h"
 
@@ -315,9 +316,9 @@ Status LlvmCodeGen::Init() {
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
-  for (map<Function*, bool>::iterator iter = jitted_functions_.begin();
+  for (set<Function*>::iterator iter = jitted_functions_.begin();
       iter != jitted_functions_.end(); ++iter) {
-    execution_engine_->freeMachineCodeForFunction(iter->first);
+    execution_engine_->freeMachineCodeForFunction(*iter);
   }
 }
 
@@ -451,9 +452,11 @@ Function* LlvmCodeGen::GetLibCFunction(FnPrototype* prototype) {
   return func;
 }
 
-Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
+Function* LlvmCodeGen::GetFunction(IRFunction::Type function, bool clone) {
   DCHECK(loaded_functions_[function] != NULL);
-  return loaded_functions_[function];
+  Function* fn = loaded_functions_[function];
+  if (clone) return CloneFunction(fn);
+  return fn;
 }
 
 // TODO: this should return a Status
@@ -536,21 +539,12 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
   return fn;
 }
 
-Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
-    Function* new_fn, const string& replacee_name, int* replaced) {
+int LlvmCodeGen::ReplaceCallSites(Function* caller, Function* new_fn,
+    const string& replacee_name) {
   DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
   DCHECK(new_fn != NULL);
-
-  if (!update_in_place) {
-    caller = CloneFunction(caller);
-  } else if (jitted_functions_.find(caller) != jitted_functions_.end()) {
-    // This function is already dynamically linked, unlink it.
-    execution_engine_->freeMachineCodeForFunction(caller);
-    jitted_functions_.erase(caller);
-  }
-
-  *replaced = 0;
+  int replaced = 0;
   for (inst_iterator iter = inst_begin(caller); iter != inst_end(caller); ++iter) {
     Instruction* instr = &*iter;
     // look for call instructions
@@ -561,12 +555,11 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
       if (old_fn != NULL && old_fn->getName().find(replacee_name) != string::npos) {
         // Replace the called function
         call_instr->setCalledFunction(new_fn);
-        ++*replaced;
+        ++replaced;
       }
     }
   }
-
-  return caller;
+  return replaced;
 }
 
 Function* LlvmCodeGen::CloneFunction(Function* fn) {
@@ -795,7 +788,7 @@ void* LlvmCodeGen::JitFunction(Function* function) {
   void* jitted_function = execution_engine_->getPointerToFunction(function);
   boost::lock_guard<mutex> l(jitted_functions_lock_);
   if (jitted_function != NULL) {
-    jitted_functions_[function] = true;
+    jitted_functions_.insert(function);
   }
   return jitted_function;
 }
@@ -1020,7 +1013,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     if (num_bytes == -1) {
       // -1 indicates variable length, just return the generic loop based
       // hash fn.
-      return GetFunction(IRFunction::HASH_CRC);
+      return GetFunction(IRFunction::HASH_CRC, false);
     }
 
     map<int, Function*>::iterator cached_fn = hash_fns_.find(num_bytes);
@@ -1110,7 +1103,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
 
 static Function* GetLenOptimizedHashFn(
     LlvmCodeGen* codegen, IRFunction::Type f, int len) {
-  Function* fn = codegen->GetFunction(f);
+  Function* fn = codegen->GetFunction(f, false);
   DCHECK(fn != NULL);
   if (len != -1) {
     // Clone this function since we're going to modify it by replacing the

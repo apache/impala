@@ -568,13 +568,14 @@ Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
       return builder_->CreateFCmpUEQ(GetVal(), other->GetVal(), "eq");
     case TYPE_STRING:
     case TYPE_VARCHAR: {
-      Function* eq_fn = codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VAL_EQ);
+      Function* eq_fn =
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VAL_EQ, false);
       return builder_->CreateCall2(
           eq_fn, GetUnloweredPtr(), other->GetUnloweredPtr(), "eq");
     }
     case TYPE_TIMESTAMP: {
       Function* eq_fn =
-          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VAL_EQ);
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VAL_EQ, false);
       return builder_->CreateCall2(
           eq_fn, GetUnloweredPtr(), other->GetUnloweredPtr(), "eq");
     }
@@ -604,12 +605,13 @@ Value* CodegenAnyVal::EqToNativePtr(Value* native_ptr) {
       return builder_->CreateFCmpUEQ(GetVal(), val, "cmp_raw");
     case TYPE_STRING:
     case TYPE_VARCHAR: {
-      Function* eq_fn = codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ);
+      Function* eq_fn =
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ, false);
       return builder_->CreateCall2(eq_fn, GetUnloweredPtr(), native_ptr, "cmp_raw");
     }
     case TYPE_TIMESTAMP: {
       Function* eq_fn =
-          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VALUE_EQ);
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VALUE_EQ, false);
       return builder_->CreateCall2(eq_fn, GetUnloweredPtr(), native_ptr, "cmp_raw");
     }
     default:
@@ -625,7 +627,7 @@ Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
   Value* v2 = other->ToNativePtr();
   Value* void_v2 = builder_->CreateBitCast(v2, codegen_->ptr_type());
   Value* type_ptr = codegen_->GetPtrTo(builder_, type_.ToIR(codegen_), "type");
-  Function* compare_fn = codegen_->GetFunction(IRFunction::RAW_VALUE_COMPARE);
+  Function* compare_fn = codegen_->GetFunction(IRFunction::RAW_VALUE_COMPARE, false);
   Value* args[] = { void_v1, void_v2, type_ptr };
   return builder_->CreateCall(compare_fn, args, name);
 }
