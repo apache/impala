@@ -8,7 +8,7 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfS3
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, IS_S3
-from subprocess import call
+from subprocess import check_call
 
 class TestUdfs(ImpalaTestSuite):
   @classmethod
@@ -85,11 +85,12 @@ class TestUdfs(ImpalaTestSuite):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present
     on HDFS"""
     # Copy hive-exec.jar to a temporary file
-    jar_path = "tmp/" + get_random_id(5) + ".jar"
-    self.hdfs_client.copy('test-warehouse/hive-exec.jar', jar_path)
+    jar_path = get_fs_path("/tmp/" + get_random_id(5) + ".jar")
+    hive_jar = get_fs_path("/test-warehouse/hive-exec.jar")
+    check_call(["hadoop", "fs", "-cp", hive_jar, jar_path])
     drop_fn_stmt = "drop function if exists default.pi_missing_jar()"
     create_fn_stmt = "create function default.pi_missing_jar() returns double \
-        location '/%s' symbol='org.apache.hadoop.hive.ql.udf.UDFPI'" % jar_path
+        location '%s' symbol='org.apache.hadoop.hive.ql.udf.UDFPI'" % jar_path
 
     cluster = ImpalaCluster()
     impalad = cluster.get_any_impalad()
@@ -102,7 +103,7 @@ class TestUdfs(ImpalaTestSuite):
     self.execute_query_expect_success(client, drop_fn_stmt, exec_option)
     self.execute_query_expect_success(client, create_fn_stmt, exec_option)
     # Delete the udf jar
-    self.hdfs_client.delete_file_dir(jar_path)
+    check_call(["hadoop", "fs", "-rm", jar_path])
 
     different_impalad = cluster.get_different_impalad(impalad)
     client = different_impalad.service.create_beeswax_client()
@@ -137,14 +138,14 @@ class TestUdfs(ImpalaTestSuite):
     query_stmt = "select default.udf_update_test_drop()"
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
-    call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
+    check_call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
     self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self.__run_query_all_impalads(exec_options, query_stmt, ["Old UDF"])
 
     # Update the binary, drop and create the function again. The new binary should
     # be running.
-    call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
+    check_call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
     self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self.__run_query_all_impalads(exec_options, query_stmt, ["New UDF"])
@@ -174,7 +175,7 @@ class TestUdfs(ImpalaTestSuite):
     query_template = "select default.%s()"
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
-    call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
+    check_call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
     self.execute_query_expect_success(
       self.client, create_fn_template % old_function_name, exec_options)
     self.__run_query_all_impalads(
@@ -182,7 +183,7 @@ class TestUdfs(ImpalaTestSuite):
 
     # Update the binary, and create a new function using the binary. The new binary
     # should be running.
-    call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
+    check_call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
     self.execute_query_expect_success(
       self.client, create_fn_template % new_function_name, exec_options)
     self.__run_query_all_impalads(
