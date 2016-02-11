@@ -305,7 +305,13 @@ export LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
 
 export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 
-export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib
+if [[ -z "${IMPALA_TOOLCHAIN}" ]]; then
+  IMPALA_SNAPPY_PATH=${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib
+else
+  IMPALA_SNAPPY_PATH=${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib
+fi
+
+export JAVA_LIBRARY_PATH=${IMPALA_SNAPPY_PATH}
 
 # So that the frontend tests and PlanService can pick up libbackend.so
 # and other required libraries
@@ -317,7 +323,7 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`:`dirname ${LIB_HDFS}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$IMPALA_LZO/build"
 
 if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
