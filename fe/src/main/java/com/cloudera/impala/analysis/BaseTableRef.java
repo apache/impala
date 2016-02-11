@@ -15,6 +15,9 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.catalog.HdfsFileFormat;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.google.common.base.Preconditions;
 
 /**
@@ -52,6 +55,7 @@ public class BaseTableRef extends TableRef {
     isAnalyzed_ = true;
     analyzeHints(analyzer);
     analyzeJoin(analyzer);
+    analyzeSkipHeaderLineCount();
   }
 
   @Override
@@ -70,4 +74,17 @@ public class BaseTableRef extends TableRef {
   public String debugString() { return tableRefToSql(); }
   @Override
   protected TableRef clone() { return new BaseTableRef(this); }
+
+  /**
+   * Analyze the 'skip.header.line.count' property.
+   */
+  private void analyzeSkipHeaderLineCount() throws AnalysisException {
+    Table table = getTable();
+    if (!(table instanceof HdfsTable)) return;
+    HdfsTable hdfsTable = (HdfsTable)table;
+
+    StringBuilder error = new StringBuilder();
+    hdfsTable.parseSkipHeaderLineCount(error);
+    if (error.length() > 0) throw new AnalysisException(error.toString());
+  }
 }

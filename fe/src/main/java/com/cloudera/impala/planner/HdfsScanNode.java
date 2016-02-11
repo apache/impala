@@ -26,6 +26,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.Column;
@@ -115,6 +116,10 @@ public class HdfsScanNode extends ScanNode {
   // numRows set to 0. Set in computeStats().
   private boolean hasCorruptTableStats_;
 
+  // Number of header lines to skip at the beginning of each file of this table. Only set
+  // to values > 0 for hdfs text files.
+  private int skipHeaderLineCount_ = 0;
+
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -122,15 +127,22 @@ public class HdfsScanNode extends ScanNode {
    * class comments above for details.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      List<HdfsPartition> partitions, TReplicaPreference replicaPreference,
-      boolean randomReplica) {
+      List<HdfsPartition> partitions, TableRef hdfsTblRef) {
     super(id, desc, "SCAN HDFS");
     Preconditions.checkState(desc.getTable() instanceof HdfsTable);
     tbl_ = (HdfsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = partitions;
-    replicaPreference_ = replicaPreference;
-    randomReplica_ = randomReplica;
+    replicaPreference_ = hdfsTblRef.getReplicaPreference();
+    randomReplica_ = hdfsTblRef.getRandomReplica();
+    HdfsTable hdfsTable = (HdfsTable)hdfsTblRef.getTable();
+    Preconditions.checkState(tbl_ == hdfsTable);
+    StringBuilder error = new StringBuilder();
+    skipHeaderLineCount_ = tbl_.parseSkipHeaderLineCount(error);
+    if (error.length() > 0) {
+      // Any errors should already have been caught during analysis.
+      throw new IllegalStateException(error.toString());
+    }
   }
 
   @Override
@@ -511,6 +523,9 @@ public class HdfsScanNode extends ScanNode {
             Expr.treesToThrift(entry.getValue()));
       }
       msg.hdfs_scan_node.setCollection_conjuncts(tcollectionConjuncts);
+    }
+    if (skipHeaderLineCount_ > 0) {
+      msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
     }
   }
 

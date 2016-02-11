@@ -173,6 +173,10 @@ struct THdfsScanNode {
 
   // Option to control whether codegen should be used for conjuncts evaluation.
   5: optional bool codegen_conjuncts
+
+  // Number of header lines to skip at the beginning of each file of this table. Only set
+  // for hdfs text files.
+  6: optional i32 skip_header_line_count
 }
 
 struct TDataSourceScanNode {

@@ -750,3 +750,21 @@ NULL,NULL,NULL,NULL,NULL,NULL,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# IMPALA-1740: Test inserting into table with the skip.header.line.count tblproperty
+drop table if exists i1740_insert;
+create table i1740_insert (i1 integer) tblproperties('skip.header.line.count'='2');
+insert into i1740_insert values (1), (2), (3), (4);
+---- RESULTS
+: 4
+====
+---- QUERY
+select * from i1740_insert;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====

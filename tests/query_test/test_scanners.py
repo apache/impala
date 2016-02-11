@@ -405,6 +405,23 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
       result = self.client.execute("select count(*) from " + t)
       assert result.data == expected_result.data
 
+
+# Test for IMPALA-1740: Support for skip.header.line.count
+class TestTextScanRangeLengths(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTextScanRangeLengths, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'text')
+
+  def test_text_scanner_with_header(self, vector):
+    self.run_test_case('QueryTest/hdfs-text-scan-with-header', vector)
+
+
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive
 @SkipIfIsilon.hive

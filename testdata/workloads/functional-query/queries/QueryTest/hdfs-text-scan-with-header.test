@@ -1,0 +1,132 @@
+====
+---- QUERY
+set max_scan_range_length=0;
+select c1, c2 from functional.table_with_header
+---- RESULTS
+1,2
+3,4
+5,6
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=0;
+select count(*) from functional.table_with_header
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+set max_scan_range_length=2;
+select c1, c2 from functional.table_with_header
+---- RESULTS
+1,2
+3,4
+5,6
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=2;
+select count(*) from functional.table_with_header
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+set max_scan_range_length=30;
+select c1, c2 from functional.table_with_header
+---- RESULTS
+1,2
+3,4
+5,6
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=30;
+select count(*) from functional.table_with_header
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+set max_scan_range_length=0;
+select c1, c2 from functional.table_with_header_2
+---- RESULTS
+1,2
+3,4
+5,6
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=0;
+select count(*) from functional.table_with_header_2
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+set max_scan_range_length=2;
+set abort_on_error=1;
+select c1, c2 from functional.table_with_header_2
+---- CATCH
+increasing max_scan_range_length to a value larger than the size of the file's header.
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=2;
+set abort_on_error=0;
+select c1, c2 from functional.table_with_header_2
+---- CATCH
+increasing max_scan_range_length to a value larger than the size of the file's header.
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=30;
+select c1, c2 from functional.table_with_header_2
+---- RESULTS
+1,2
+3,4
+5,6
+---- TYPES
+INT,DOUBLE
+====
+---- QUERY
+set max_scan_range_length=30;
+select count(*) from functional.table_with_header_2
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+drop table if exists mixed;
+create table mixed (kf smallint) partitioned by (year smallint) stored as textfile;
+alter table mixed add partition (year=2012);
+alter table mixed add partition (year=2013);
+alter table mixed partition (year=2013) set fileformat parquet;
+insert into mixed partition (year=2012) values (1),(2),(3);
+insert into mixed partition (year=2013) values (4),(5),(6);
+alter table mixed set tblproperties("skip.header.line.count"="1");
+alter table mixed set fileformat parquet;
+alter table mixed set tblproperties("skip.header.line.count"="2");
+select * from mixed;
+---- RESULTS
+3,2012
+4,2013
+5,2013
+6,2013
+---- TYPES
+SMALLINT,SMALLINT
+====
+---- QUERY
+drop table mixed;
+====

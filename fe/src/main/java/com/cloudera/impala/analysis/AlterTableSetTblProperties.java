@@ -21,6 +21,9 @@ import java.util.Map;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 
+import com.cloudera.impala.catalog.HdfsFileFormat;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.*;
 import com.cloudera.impala.util.AvroSchemaParser;
@@ -82,6 +85,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
             AvroSerdeUtils.AvroTableProperties.SCHEMA_URL.getPropName())) {
       analyzeAvroSchema(analyzer);
     }
+
+    // Analyze 'skip.header.line.format' property.
+    analyzeSkipHeaderLineCount(getTargetTable(), tblProperties_);
   }
 
   /**
@@ -108,6 +114,34 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       throw new AnalysisException(String.format(
           "Error parsing Avro schema for table '%s': %s", table_.getFullName(),
           e.getMessage()));
+    }
+  }
+
+  /**
+   * Analyze the 'skip.header.line.count' property to make sure it is set to a valid
+   * value. It is looked up in 'tblProperties', which must not be null.
+   */
+  public static void analyzeSkipHeaderLineCount(Map<String, String> tblProperties)
+      throws AnalysisException {
+    analyzeSkipHeaderLineCount(null, tblProperties);
+  }
+
+  /**
+   * Analyze the 'skip.header.line.count' property to make sure it is set to a valid
+   * value. It is looked up in 'tblProperties', which must not be null. If 'table' is not
+   * null, then the method ensures that 'skip.header.line.count' is supported for its
+   * table type. If it is null, then this check is omitted.
+   */
+  public static void analyzeSkipHeaderLineCount(Table table,
+      Map<String, String> tblProperties) throws AnalysisException {
+    if (tblProperties.containsKey(HdfsTable.TBL_PROP_SKIP_HEADER_LINE_COUNT)) {
+      if (table != null && !(table instanceof HdfsTable)) {
+        throw new AnalysisException(String.format("Table property " +
+            "'skip.header.line.count' is only supported for HDFS tables."));
+      }
+      StringBuilder error = new StringBuilder();
+      HdfsTable.parseSkipHeaderLineCount(tblProperties, error);
+      if (error.length() > 0) throw new AnalysisException(error.toString());
     }
   }
 }

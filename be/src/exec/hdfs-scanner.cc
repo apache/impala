@@ -623,6 +623,23 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
        << desc->col_pos() - scan_node_->num_partition_keys()
        << " TO " << desc->type()
        << " (Data is: " << string(data,len) << ")";
+
+    // When skipping multiple header lines we only try to skip them in the first scan
+    // range. For subsequent scan ranges, it's impossible to determine how many lines
+    // precede it and whether any header lines should be skipped. If the header does not
+    // fit into the first scan range and spills into subsequent scan ranges, then we will
+    // try to parse header data here and fail. The scanner of the first scan range will
+    // fail the query if it cannot fully skip the header. However, if abort_on_error is
+    // set, then a race happens between the first scanner to detect the condition and any
+    // other scanner that tries to parse an invalid value. Therefore a possible mitigation
+    // is to increase the max_scan_range_length so the header is fully contained in the
+    // first scan range.
+    if (scan_node_->skip_header_line_count() > 1) {
+      ss << "\n" << "Table has skip.header.line.count set to a value > 1. If the data "
+         << "that could not be parsed looks like it's part of the file's header, then "
+         << "try increasing max_scan_range_length to a value larger than the size of the "
+         << "file's header.";
+    }
     if (state_->LogHasSpace()) {
       state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()), 2);
     }

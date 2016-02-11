@@ -55,6 +55,11 @@ struct TDataStreamSink {
 struct THdfsTableSink {
   1: required list<Exprs.TExpr> partition_key_exprs
   2: required bool overwrite
+
+  /// The 'skip.header.line.count' property of the target Hdfs table. We will insert this
+  /// many empty lines at the beginning of new text files, which will be skipped by the
+  /// scanners while reading from the files.
+  3: optional i32 skip_header_line_count
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

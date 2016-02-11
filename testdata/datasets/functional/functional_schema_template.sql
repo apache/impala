@@ -1861,3 +1861,31 @@ col string
 `hdfs dfs -mkdir -p /test-warehouse/large_multistream_bzip2_tbl_text_bzip/ && \
 hdfs dfs -put -f ${IMPALA_HOME}/testdata/data/large_pbzip2.bz2 /test-warehouse/large_multistream_bzip2_tbl_text_bzip/
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+table_with_header
+---- COLUMNS
+c1 int
+c2 double
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- ALTER
+ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='1');
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+table_with_header_2
+---- COLUMNS
+c1 int
+c2 double
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- ALTER
+ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='2');
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====

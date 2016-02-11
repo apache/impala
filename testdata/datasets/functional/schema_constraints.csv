@@ -168,3 +168,7 @@ table_name:text_comma_backslash_newline, constraint:only, table_format:kudu/none
 table_name:tinytable, constraint:only, table_format:kudu/none/none
 table_name:tinyinttable, constraint:only, table_format:kudu/none/none
 table_name:zipcode_incomes, constraint:only, table_format:kudu/none/none
+
+# Skipping header lines is only supported with text tables
+table_name:table_with_header, constraint:restrict_to, table_format:text/none/none
+table_name:table_with_header_2, constraint:restrict_to, table_format:text/none/none

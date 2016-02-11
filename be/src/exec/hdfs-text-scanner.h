@@ -77,7 +77,7 @@ class HdfsTextScanner : public HdfsScanner {
   /// Finds the start of the first tuple in this scan range and initializes
   /// byte_buffer_ptr to be the next character (the start of the first tuple).  If
   /// there are no tuples starts in the entire range, *tuple_found is set to false
-  /// and no more processing neesd to be done in this range (i.e. there are really large
+  /// and no more processing needs to be done in this range (i.e. there are really large
   /// columns)
   Status FindFirstTuple(bool* tuple_found);
 

@@ -95,6 +95,8 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
       runtime_state_(NULL),
+      skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
+          tnode.hdfs_scan_node.skip_header_line_count : 0),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       reader_context_(NULL),
       tuple_desc_(NULL),

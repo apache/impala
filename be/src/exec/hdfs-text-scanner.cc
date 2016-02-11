@@ -573,27 +573,44 @@ Status HdfsTextScanner::FillByteBufferCompressedFile(bool* eosr) {
 
 Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
   *tuple_found = true;
-  if (stream_->scan_range()->offset() != 0) {
+  // Either we're at the start of the file and thus skip all header lines, or we're in the
+  // middle of the file and look for the next tuple.
+  int num_rows_to_skip = stream_->scan_range()->offset() == 0
+      ? scan_node_->skip_header_line_count() : 1;
+  if (num_rows_to_skip > 0) {
+    int num_skipped_rows = 0;
     *tuple_found = false;
-    // Offset may not point to tuple boundary, skip ahead to the first full tuple
-    // start.
     while (true) {
       bool eosr = false;
-      RETURN_IF_ERROR(FillByteBuffer(&eosr));
+      RETURN_IF_ERROR(FillByteBuffer(&eosr));  // updates byte_buffer_read_size_
 
       delimited_text_parser_->ParserReset();
       SCOPED_TIMER(parse_delimiter_timer_);
-      int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
-          byte_buffer_ptr_, byte_buffer_read_size_);
+      int next_tuple_offset = 0;
+      while (num_skipped_rows < num_rows_to_skip) {
+        next_tuple_offset = delimited_text_parser_->FindFirstInstance(byte_buffer_ptr_,
+          byte_buffer_read_size_);
+        if (next_tuple_offset == -1) break;
+        byte_buffer_ptr_ += next_tuple_offset;
+        byte_buffer_read_size_ -= next_tuple_offset;
+        ++num_skipped_rows;
+      }
 
-      if (first_tuple_offset == -1) {
-        // Didn't find tuple in this buffer, keep going with this scan range
+      if (next_tuple_offset == -1) {
+        // Didn't find enough new tuples in this buffer, continue with the next one.
         if (!eosr) continue;
       } else {
-        byte_buffer_ptr_ += first_tuple_offset;
         *tuple_found = true;
       }
       break;
+    }
+    if (num_rows_to_skip > 1 && num_skipped_rows != num_rows_to_skip) {
+      DCHECK(!*tuple_found);
+      stringstream ss;
+      ss << "Could only skip " << num_skipped_rows << " header lines in first scan range "
+         << "but expected " << num_rows_to_skip << ". Try increasing "
+         << "max_scan_range_length to a value larger than the size of the file's header.";
+      return Status(ss.str());
     }
   }
   DCHECK(delimited_text_parser_->AtTupleStart());

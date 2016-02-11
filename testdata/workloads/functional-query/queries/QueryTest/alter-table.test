@@ -971,3 +971,32 @@ show partitions alter_table_test_db.table_many_part
 ---- TYPES
 STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_alter;
+create table i1740_alter (i1 integer);
+alter table i1740_alter set tblproperties ('skip.header.line.count'='2');
+---- RESULTS
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_alter;
+create table i1740_alter (i1 integer);
+alter table i1740_alter set tblproperties ('skip.header.line.count'='-1');
+---- CATCH
+Invalid value for table property skip.header.line.count:
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_alter;
+create table i1740_alter (i1 integer);
+alter table i1740_alter set tblproperties ('skip.header.line.count'='foo');
+---- CATCH
+Invalid value for table property skip.header.line.count:
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_alter;
+create table i1740_alter (i1 integer) stored as parquet;
+alter table i1740_alter set tblproperties ('skip.header.line.count'='2');
+====

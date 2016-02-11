@@ -137,6 +137,14 @@ public class HdfsTableSink extends TableSink {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
         Expr.treesToThrift(partitionKeyExprs_), overwrite_);
+    HdfsTable table = (HdfsTable) targetTable_;
+    StringBuilder error = new StringBuilder();
+    int skipHeaderLineCount = table.parseSkipHeaderLineCount(error);
+    // Errors will be caught during analysis.
+    Preconditions.checkState(error.length() == 0);
+    if (skipHeaderLineCount > 0) {
+      hdfsTableSink.setSkip_header_line_count(skipHeaderLineCount);
+    }
     TTableSink tTableSink = new TTableSink(targetTable_.getId().asInt(),
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;

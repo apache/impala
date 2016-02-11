@@ -164,6 +164,15 @@ Status HdfsTextTableWriter::Finalize() {
   return Flush();
 }
 
+Status HdfsTextTableWriter::InitNewFile() {
+  // Write empty header lines for tables with 'skip.header.line.count' property set to
+  // non-zero.
+  for (int i = 0; i < parent_->skip_header_line_count(); ++i) {
+    rowbatch_stringstream_ << '\n';
+  }
+  return Status::OK();
+}
+
 Status HdfsTextTableWriter::Flush() {
   string rowbatch_string = rowbatch_stringstream_.str();
   rowbatch_stringstream_.str(string());

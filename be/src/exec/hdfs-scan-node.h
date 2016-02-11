@@ -162,6 +162,8 @@ class HdfsScanNode : public ScanNode {
 
   RuntimeState* runtime_state() { return runtime_state_; }
 
+  int skip_header_line_count() const { return skip_header_line_count_; }
+
   DiskIoMgr::RequestContext* reader_context() { return reader_context_; }
 
   typedef std::map<TupleId, std::vector<ExprContext*> > ConjunctsMap;
@@ -314,6 +316,10 @@ class HdfsScanNode : public ScanNode {
   friend class ScannerContext;
 
   RuntimeState* runtime_state_;
+
+  // Number of header lines to skip at the beginning of each file of this table. Only set
+  // to values > 0 for hdfs text files.
+  const int skip_header_line_count_;
 
   /// Tuple id resolved in Prepare() to set tuple_desc_
   const int tuple_id_;

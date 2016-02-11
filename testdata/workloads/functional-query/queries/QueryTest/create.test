@@ -788,3 +788,29 @@ create table ddl_test_db.rand_ctas_t as select rand() from functional.alltypes;
 drop table if exists ddl_test_db.rand_ctas_t;
 ---- RESULTS
 ====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_create;
+create table i1740_create (i1 integer) tblproperties('skip.header.line.count'='2');
+---- RESULTS
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_create;
+create table i1740_create (i1 integer) tblproperties('skip.header.line.count'='-1');
+---- CATCH
+Invalid value for table property skip.header.line.count:
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_create;
+create table i1740_create (i1 integer) tblproperties('skip.header.line.count'='foo');
+---- CATCH
+Invalid value for table property skip.header.line.count:
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+drop table if exists i1740_create;
+create table i1740_create (i1 integer) stored as parquet tblproperties('skip.header.line.count'='2');
+---- RESULTS
+====

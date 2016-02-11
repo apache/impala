@@ -377,6 +377,9 @@ public class InsertStmt extends StatementBase {
         throw new AnalysisException(String.format("Unable to INSERT into target table " +
             "(%s) because the table spans multiple filesystems.", targetTableName_));
       }
+      StringBuilder error = new StringBuilder();
+      hdfsTable.parseSkipHeaderLineCount(error);
+      if (error.length() > 0) throw new AnalysisException(error.toString());
       try {
         if (!FileSystemUtil.isImpalaWritableFilesystem(hdfsTable.getLocation())) {
           throw new AnalysisException(String.format("Unable to INSERT into target " +

@@ -57,6 +57,9 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
     const TDataSink& tsink)
     :  row_desc_(row_desc),
        table_id_(tsink.table_sink.target_table_id),
+       skip_header_line_count_(
+           tsink.table_sink.hdfs_table_sink.__isset.skip_header_line_count
+           ? tsink.table_sink.hdfs_table_sink.skip_header_line_count : 0),
        select_list_texprs_(select_list_texprs),
        partition_key_texprs_(tsink.table_sink.hdfs_table_sink.partition_key_exprs),
        overwrite_(tsink.table_sink.hdfs_table_sink.overwrite) {

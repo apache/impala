@@ -148,6 +148,8 @@ class HdfsTableSink : public DataSink {
   /// writers.  Currently used by the parquet writer.
   static Status GetFileBlockSize(OutputPartition* output_partition, int64_t* size);
 
+  int skip_header_line_count() const { return skip_header_line_count_; }
+
   virtual RuntimeProfile* profile() { return runtime_profile_; }
   const HdfsTableDescriptor& TableDesc() { return *table_desc_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
@@ -230,6 +232,11 @@ class HdfsTableSink : public DataSink {
 
   /// Table id resolved in Prepare() to set tuple_desc_;
   TableId table_id_;
+
+  /// The 'skip.header.line.count' property of the target Hdfs table. We will insert this
+  /// many empty lines at the beginning of new text files, which will be skipped by the
+  /// scanners while reading from the files.
+  int skip_header_line_count_;
 
   /// Thrift representation of select list exprs, saved in the constructor
   /// to be used to initialise output_exprs_ in Init
