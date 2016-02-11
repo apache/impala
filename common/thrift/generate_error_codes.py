@@ -176,7 +176,8 @@ error_codes = (
   ("PARQUET_UNRECOGNIZED_SCHEMA", 55, "File '$0' has an incompatible Parquet schema for "
    "column '$1'. Column type: $2, Parquet schema:\\n$3"),
 
-  ("COLLECTION_ALLOC_FAILED", 56, "Failed to allocate buffer for collection '$0'."),
+  ("COLLECTION_ALLOC_FAILED", 56, "Failed to allocate $0 bytes for collection '$1'.\\n"
+   "Current buffer size: $2 num tuples: $3."),
 
   ("TMP_DEVICE_BLACKLISTED", 57,
     "Temporary device for directory $0 is blacklisted from a previous error and cannot "

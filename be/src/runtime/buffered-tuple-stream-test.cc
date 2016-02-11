@@ -997,7 +997,8 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     cv->num_tuples = 0;
     CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), array_len);
     Tuple* array_data;
-    builder.GetFreeMemory(&array_data);
+    int num_rows;
+    builder.GetFreeMemory(&array_data, &num_rows);
     expected_row_size += item_desc->byte_size() * array_len;
 
     // Fill the array with pointers to our constant strings.
@@ -1096,7 +1097,8 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   CollectionValue* cv = tuple0->GetCollectionSlot(array_slot->tuple_offset());
   CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), array_len);
   Tuple* array_data;
-  builder.GetFreeMemory(&array_data);
+  int num_rows;
+  builder.GetFreeMemory(&array_data, &num_rows);
   expected_row_size += item_desc->byte_size() * array_len;
 
   // Fill the array with pointers to our constant strings.

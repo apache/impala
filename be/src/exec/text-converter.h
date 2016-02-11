@@ -64,10 +64,6 @@ class TextConverter {
   /// maxlen bytes into dest.
   void UnescapeString(const char* src, char* dest, int* len, int64_t maxlen = -1);
 
-  /// Removes escape characters from 'str', allocating a new string from pool.
-  /// 'str' is updated with the new ptr and length.
-  void UnescapeString(StringValue* str, MemPool* pool);
-
   /// Codegen the function to write a slot for slot_desc.
   /// Returns NULL if codegen was not succesful.
   /// The signature of the generated function is:

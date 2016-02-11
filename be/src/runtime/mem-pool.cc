@@ -25,12 +25,15 @@
 
 using namespace impala;
 
+#define MEM_POOL_POISON (0x66aa77bb)
+
 DECLARE_bool(disable_mem_pools);
 
 const int MemPool::INITIAL_CHUNK_SIZE;
 const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
+uint32_t MemPool::zero_length_region_ = MEM_POOL_POISON;
 
 MemPool::MemPool(MemTracker* mem_tracker)
   : current_chunk_idx_(-1),
@@ -40,6 +43,7 @@ MemPool::MemPool(MemTracker* mem_tracker)
     total_reserved_bytes_(0),
     mem_tracker_(mem_tracker) {
   DCHECK(mem_tracker != NULL);
+  DCHECK_EQ(zero_length_region_, MEM_POOL_POISON);
 }
 
 MemPool::ChunkInfo::ChunkInfo(int64_t size, uint8_t* buf)
@@ -62,6 +66,7 @@ MemPool::~MemPool() {
   if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
     ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(-total_bytes_released);
   }
+  DCHECK_EQ(zero_length_region_, MEM_POOL_POISON);
 }
 
 void MemPool::Clear() {
@@ -190,8 +195,11 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
   src->total_reserved_bytes_ -= total_transfered_bytes;
   total_reserved_bytes_ += total_transfered_bytes;
 
-  src->mem_tracker_->Release(total_transfered_bytes);
-  mem_tracker_->Consume(total_transfered_bytes);
+  // Skip unnecessary atomic ops if the mem_trackers are the same.
+  if (src->mem_tracker_ != mem_tracker_) {
+    src->mem_tracker_->Release(total_transfered_bytes);
+    mem_tracker_->Consume(total_transfered_bytes);
+  }
 
   // insert new chunks after current_chunk_idx_
   vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_ + 1;
@@ -242,6 +250,8 @@ int64_t MemPool::GetTotalChunkSizes() const {
 }
 
 bool MemPool::CheckIntegrity(bool current_chunk_empty) {
+  DCHECK_EQ(zero_length_region_, MEM_POOL_POISON);
+
   // Without pooling, there are way too many chunks and this takes too long.
   if (FLAGS_disable_mem_pools) return true;
 

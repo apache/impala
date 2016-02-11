@@ -48,6 +48,7 @@
 
 using namespace impala;
 using namespace llvm;
+using namespace strings;
 
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
@@ -91,12 +92,14 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
          scanner_conjuncts_map_.end());
   scanner_conjunct_ctxs_ = &scanner_conjuncts_map_[scan_node_->tuple_desc()->id()];
 
+  // Initialize the template_tuple_.
   template_tuple_ = scan_node_->InitTemplateTuple(
       state_, context_->partition_descriptor()->partition_key_value_ctxs());
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
-  StartNewRowBatch();
-  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
 
+  // Allocate a new row batch. May fail if mem limit is exceeded.
+  RETURN_IF_ERROR(StartNewRowBatch());
+  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   return Status::OK();
 }
 
@@ -130,11 +133,17 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
   return Status::OK();
 }
 
-void HdfsScanner::StartNewRowBatch() {
+Status HdfsScanner::StartNewRowBatch() {
   batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
       scan_node_->mem_tracker());
-  tuple_mem_ =
-      batch_->tuple_data_pool()->Allocate(state_->batch_size() * tuple_byte_size_);
+  int64_t size = state_->batch_size() * tuple_byte_size_;
+  tuple_mem_ = batch_->tuple_data_pool()->TryAllocate(size);
+  if (UNLIKELY(tuple_mem_ == NULL)) {
+    string details = Substitute("StartNewRowBatch() failed to allocate $0 bytes.", size);
+    return batch_->tuple_data_pool()->mem_tracker()->MemLimitExceeded(state_,
+        details, size);
+  }
+  return Status::OK();
 }
 
 int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem) {
@@ -146,21 +155,15 @@ int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_r
   return batch_->capacity() - batch_->num_rows();
 }
 
-int HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
-    Tuple** tuple_mem, TupleRow** tuple_row_mem) {
-  DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_"
-      << parse_status_.GetDetail();
+Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
+    Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) {
+  int num_tuples;
   *pool = builder->pool();
-  int max_num_rows = builder->GetFreeMemory(tuple_mem);
-  if (max_num_rows == 0) {
-    parse_status_ = state_->SetMemLimitExceeded(ErrorMsg(
-        TErrorCode::COLLECTION_ALLOC_FAILED,
-        PrintPath(builder->tuple_desc().tuple_path())));
-    return 0;
-  }
+  RETURN_IF_ERROR(builder->GetFreeMemory(tuple_mem, &num_tuples));
   // Treat tuple as a single-tuple row
   *tuple_row_mem = reinterpret_cast<TupleRow*>(tuple_mem);
-  return max_num_rows;
+  *num_rows = num_tuples;
+  return Status::OK();
 }
 
 // TODO(skye): have this check scan_node_->ReachedLimit() and get rid of manual check?
@@ -176,9 +179,10 @@ Status HdfsScanner::CommitRows(int num_rows) {
   if (batch_->AtCapacity() || context_->num_completed_io_buffers() > 0) {
     context_->ReleaseCompletedResources(batch_, /* done */ false);
     scan_node_->AddMaterializedRowBatch(batch_);
-    StartNewRowBatch();
+    RETURN_IF_ERROR(StartNewRowBatch());
   }
   if (context_->cancelled()) return Status::CANCELLED;
+  // TODO: Replace with GetQueryStatus().
   RETURN_IF_ERROR(state_->CheckQueryState());
   // Free local expr allocations for this thread
   HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();

@@ -160,7 +160,8 @@ class RowBatchSerializeTest : public testing::Test {
         CollectionValue cv;
         CollectionValueBuilder builder(&cv, *item_desc, pool, array_len);
         Tuple* tuple_mem;
-        int n = builder.GetFreeMemory(&tuple_mem);
+        int n;
+        EXPECT_OK(builder.GetFreeMemory(&tuple_mem, &n));
         ASSERT_GE(n, array_len);
         memset(tuple_mem, 0, item_desc->byte_size() * array_len);
         for (int i = 0; i < array_len; ++i) {

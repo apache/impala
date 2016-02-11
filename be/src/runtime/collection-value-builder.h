@@ -17,6 +17,7 @@
 
 #include "runtime/collection-value.h"
 #include "runtime/tuple.h"
+#include "util/debug-util.h"
 
 namespace impala {
 
@@ -38,47 +39,43 @@ class CollectionValueBuilder {
     if (coll_value_->ptr == NULL) buffer_size_ = 0;
   }
 
-  /// Returns memory to write new tuples to in *tuple_mem and returns the maximum number
-  /// of tuples that may be written before calling CommitTuples(). After calling
-  /// CommitTuples(), GetMemory() can be called again. Allocates if there is no free tuple
-  /// memory left. Returns 0 if OOM.
-  int GetFreeMemory(Tuple** tuple_mem) {
+  /// Returns memory to write new tuples to in 'tuple_mem' and returns the maximum number
+  /// of tuples that may be written before calling CommitTuples() in 'num_tuples'. After
+  /// calling CommitTuples(), GetMemory() can be called again. Allocates if there is no
+  /// free tuple memory left. Returns error status if memory limit is exceeded.
+  Status GetFreeMemory(Tuple** tuple_mem, int* num_tuples) {
     if (tuple_desc_.byte_size() == 0) {
       // No tuple memory necessary, so caller can write as many tuples as 'num_tuples'
-      // field can count
-      return INT_MAX;
-    }
-    int64_t bytes_written = coll_value_->ByteSize(tuple_desc_);
-    DCHECK_GE(buffer_size_, bytes_written);
-    if (buffer_size_ == bytes_written) {
-      // Double tuple buffer
-      int64_t new_buffer_size = max<int64_t>(buffer_size_ * 2, tuple_desc_.byte_size());
-      // TODO: actual allocation limit is lower than INT_MAX - see IMPALA-1619.
-      if (UNLIKELY(new_buffer_size > INT_MAX)) {
-        LOG(INFO) << "Collection allocation failure: failed to allocate "
-                  << new_buffer_size << " bytes. Cannot allocate more than " << INT_MAX
-                  << " bytes in a single allocation. Current buffer size: "
-                  << buffer_size_ << ", num tuples: " << coll_value_->num_tuples;
-        *tuple_mem = NULL;
-        return 0;
+      // field can count.
+      // TODO: num_tuples should be 64-bit. Need to update CollectionValue too.
+      *num_tuples = INT_MAX;
+    } else {
+      int64_t bytes_written = coll_value_->ByteSize(tuple_desc_);
+      DCHECK_GE(buffer_size_, bytes_written);
+      if (buffer_size_ == bytes_written) {
+        // Double tuple buffer
+        int64_t new_buffer_size = max<int64_t>(buffer_size_ * 2, tuple_desc_.byte_size());
+        uint8_t* new_buf = pool_->TryAllocate(new_buffer_size);
+        if (UNLIKELY(new_buf == NULL)) {
+          *tuple_mem = NULL;
+          *num_tuples = 0;
+          string path = tuple_desc_.table_desc() == NULL ? "" :
+              PrintPath(*tuple_desc_.table_desc(), tuple_desc_.tuple_path());
+          Status status = Status::MemLimitExceeded();
+          status.AddDetail(ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED, new_buffer_size,
+              path, buffer_size_, coll_value_->num_tuples).msg());
+          return status;
+        }
+        memcpy(new_buf, coll_value_->ptr, bytes_written);
+        coll_value_->ptr = new_buf;
+        buffer_size_ = new_buffer_size;
       }
-      uint8_t* new_buf = pool_->TryAllocate(new_buffer_size);
-      if (new_buf == NULL) {
-        LOG(INFO) << "Collection allocation failure: failed to allocate "
-                  << new_buffer_size << " bytes. Current buffer size: " << buffer_size_
-                  << ", num tuples: " << coll_value_->num_tuples;
-        *tuple_mem = NULL;
-        return 0;
-      }
-      memcpy(new_buf, coll_value_->ptr, bytes_written);
-      coll_value_->ptr = new_buf;
-      buffer_size_ = new_buffer_size;
+      *tuple_mem = reinterpret_cast<Tuple*>(coll_value_->ptr + bytes_written);
+      *num_tuples = (buffer_size_ - bytes_written) / tuple_desc_.byte_size();
+      DCHECK_EQ((buffer_size_ - bytes_written) % tuple_desc_.byte_size(), 0);
+      DCHECK_GT(*num_tuples, 0);
     }
-    *tuple_mem = reinterpret_cast<Tuple*>(coll_value_->ptr + bytes_written);
-    int num_tuples = (buffer_size_ - bytes_written) / tuple_desc_.byte_size();
-    DCHECK_EQ((buffer_size_ - bytes_written) % tuple_desc_.byte_size(), 0);
-    DCHECK_GT(num_tuples, 0);
-    return num_tuples;
+    return Status::OK();
   }
 
   /// Adds 'num_tuples' to the size of the collection. 'num_tuples' must be <= the last

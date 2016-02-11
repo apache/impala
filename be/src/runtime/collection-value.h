@@ -36,7 +36,7 @@ struct CollectionValue {
   /// Returns the size of this collection in bytes, i.e. the number of bytes written to
   /// ptr.
   inline int64_t ByteSize(const TupleDescriptor& item_tuple_desc) const {
-    return num_tuples * item_tuple_desc.byte_size();
+    return static_cast<int64_t>(num_tuples) * item_tuple_desc.byte_size();
   }
 };
 

@@ -160,9 +160,9 @@ class MemTracker {
   /// Returns true if the try succeeded.
   bool TryConsume(int64_t bytes) {
     if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
-    if (bytes <= 0) return true;
+    if (UNLIKELY(bytes <= 0)) return true;
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
-    int i = 0;
+    int i;
     // Walk the tracker tree top-down, to avoid expanding a limit on a child whose parent
     // won't accommodate the change.
     for (i = all_trackers_.size() - 1; i >= 0; --i) {
@@ -174,16 +174,32 @@ class MemTracker {
         // If TryConsume fails, we can try to GC or expand the RM reservation, but we may
         // need to try several times if there are concurrent consumers because we don't
         // take a lock before trying to update consumption_.
-        bool fail_consume = false;
-        while (!tracker->consumption_->TryAdd(bytes, limit)) {
+        while (true) {
+          if (LIKELY(tracker->consumption_->TryAdd(bytes, limit))) break;
+
           VLOG_RPC << "TryConsume failed, bytes=" << bytes
                    << " consumption=" << tracker->consumption_->current_value()
                    << " limit=" << limit << " attempting to GC and expand reservation";
           // TODO: This may not be right if more than one tracker can actually change its
           // RM reservation limit.
-          if (tracker->GcMemory(limit - bytes) && !tracker->ExpandRmReservation(bytes)) {
-            fail_consume = true;
-            break;
+          if (UNLIKELY(tracker->GcMemory(limit - bytes) &&
+                  !tracker->ExpandRmReservation(bytes))) {
+            DCHECK_GE(i, 0);
+            // Failed for this mem tracker. Roll back the ones that succeeded.
+            // TODO: this doesn't roll it back completely since the max values for
+            // the updated trackers aren't decremented. The max values are only used
+            // for error reporting so this is probably okay. Rolling those back is
+            // pretty hard; we'd need something like 2PC.
+            //
+            // TODO: This might leave us with an allocated resource that we can't use.
+            // Specifically, the RM reservation of some ancestors' trackers may have been
+            // expanded only to fail at the current tracker. This may be wasteful as
+            // subsequent TryConsume() never gets to use the reserved resources. Consider
+            // adjusting the reservation of the ancestors' trackers.
+            for (int j = all_trackers_.size() - 1; j > i; --j) {
+              all_trackers_[j]->consumption_->Add(-bytes);
+            }
+            return false;
           }
           VLOG_RPC << "GC or expansion succeeded, TryConsume bytes=" << bytes
                    << " consumption=" << tracker->consumption_->current_value()
@@ -191,25 +207,11 @@ class MemTracker {
           // Need to update the limit if the RM reservation was expanded.
           limit = tracker->effective_limit();
         }
-        if (fail_consume) break;
       }
     }
     // Everyone succeeded, return.
-    if (i == -1) return true;
-
-    // Someone failed, roll back the ones that succeeded.
-    // TODO: this doesn't roll it back completely since the max values for
-    // the updated trackers aren't decremented. The max values are only used
-    // for error reporting so this is probably okay. Rolling those back is
-    // pretty hard; we'd need something like 2PC.
-    //
-    // TODO: This might leave us with an allocated resource that we can't use. Do we need
-    // to adjust the consumption of the query tracker to stop the resource from never
-    // getting used by a subsequent TryConsume()?
-    for (int j = all_trackers_.size() - 1; j > i; --j) {
-      all_trackers_[j]->consumption_->Add(-bytes);
-    }
-    return false;
+    DCHECK_EQ(i, -1);
+    return true;
   }
 
   /// Decreases consumption of this tracker and its ancestors by 'bytes'.
@@ -338,6 +340,11 @@ class MemTracker {
     enable_logging_ = enable;
     log_stack_ = log_stack;
   }
+
+  /// Log the memory usage when memory limit is exceeded and return a status object with
+  /// details of the allocation which caused the limit to be exceeded.
+  Status MemLimitExceeded(RuntimeState* state, const std::string& details,
+      int64_t failed_allocation);
 
   static const std::string COUNTER_NAME;
 

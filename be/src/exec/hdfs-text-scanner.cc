@@ -179,9 +179,15 @@ void HdfsTextScanner::Close() {
     decompressor_->Close();
     decompressor_.reset(NULL);
   }
-  AttachPool(data_buffer_pool_.get(), false);
-  AttachPool(boundary_pool_.get(), false);
-  AddFinalRowBatch();
+  if (batch_ != NULL) {
+    AttachPool(data_buffer_pool_.get(), false);
+    AttachPool(boundary_pool_.get(), false);
+    AddFinalRowBatch();
+  }
+  // Verify all resources (if any) have been transferred.
+  DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
+  DCHECK_EQ(boundary_pool_.get()->total_allocated_bytes(), 0);
+  DCHECK_EQ(context_->num_completed_io_buffers(), 0);
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(
         THdfsFileFormat::TEXT, stream_->file_desc()->file_compression);

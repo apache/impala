@@ -241,19 +241,9 @@ void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
   }
 }
 
-Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
-    int64_t failed_allocation_size, const ErrorMsg* msg) {
+void RuntimeState::LogMemLimitExceeded(const MemTracker* tracker,
+    int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);
-  {
-    lock_guard<SpinLock> l(query_status_lock_);
-    if (query_status_.ok()) {
-      query_status_ = Status::MemLimitExceeded();
-      if (msg != NULL) query_status_.MergeStatus(*msg);
-    } else {
-      return query_status_;
-    }
-  }
-
   DCHECK(query_mem_tracker_.get() != NULL);
   stringstream ss;
   ss << "Memory Limit Exceeded\n";
@@ -270,6 +260,20 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     ss << query_mem_tracker_->LogUsage();
   }
   LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+}
+
+Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
+    int64_t failed_allocation_size, const ErrorMsg* msg) {
+  {
+    lock_guard<SpinLock> l(query_status_lock_);
+    if (query_status_.ok()) {
+      query_status_ = Status::MemLimitExceeded();
+      if (msg != NULL) query_status_.MergeStatus(*msg);
+    } else {
+      return query_status_;
+    }
+  }
+  LogMemLimitExceeded(tracker, failed_allocation_size);
   // Add warning about missing stats except for compute stats child queries.
   if (!query_ctx().__isset.parent_query_id &&
       query_ctx().__isset.tables_missing_stats &&
@@ -282,9 +286,7 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
 }
 
 Status RuntimeState::CheckQueryState() {
-  // TODO: it would be nice if this also checked for cancellation, but doing so breaks
-  // cases where we use Status::CANCELLED to indicate that the limit was reached.
-  if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
+  if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) return SetMemLimitExceeded();
   return GetQueryStatus();
 }
 

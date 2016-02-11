@@ -36,12 +36,6 @@ TextConverter::TextConverter(char escape_char, const string& null_col_val,
     check_null_(check_null) {
 }
 
-void TextConverter::UnescapeString(StringValue* value, MemPool* pool) {
-  char* new_data = reinterpret_cast<char*>(pool->Allocate(value->len));
-  UnescapeString(value->ptr, new_data, &value->len);
-  value->ptr = new_data;
-}
-
 void TextConverter::UnescapeString(const char* src, char* dest, int* len,
     int64_t maxlen) {
   const char* src_end = src + *len;

@@ -26,7 +26,6 @@
 namespace impala {
 
 class MemPool;
-class RuntimeState;
 
 /// Create a compression object.  This is the base class for all compression algorithms. A
 /// compression algorithm is either a compressor or a decompressor.  To add a new

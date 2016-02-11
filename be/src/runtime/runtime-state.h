@@ -184,10 +184,14 @@ class RuntimeState {
     return block_mgr_.get();
   }
 
-  Status GetQueryStatus() {
-    boost::lock_guard<SpinLock> l(query_status_lock_);
-    return query_status_;
-  };
+  inline Status GetQueryStatus() {
+    // Do a racy check for query_status_ to avoid unnecessary spinlock acquisition.
+    if (UNLIKELY(!query_status_.ok())) {
+      boost::lock_guard<SpinLock> l(query_status_lock_);
+      return query_status_;
+    }
+    return Status::OK();
+  }
 
   /// Log an error that will be sent back to the coordinator based on an instance of the
   /// ErrorMsg class. The runtime state aggregates log messages based on type with one
@@ -240,6 +244,9 @@ class RuntimeState {
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);
   }
+
+  /// Function for logging memory usages to the error log when memory limit is exceeded.
+  void LogMemLimitExceeded(const MemTracker* tracker, int64_t failed_allocation_size);
 
   /// Sets query_status_ to MEM_LIMIT_EXCEEDED and logs all the registered trackers.
   /// Subsequent calls to this will be no-ops. Returns query_status_.
