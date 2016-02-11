@@ -567,7 +567,11 @@ void AdmissionController::PoolStats::UpdateRemoteStats(const string& host_id,
     VLOG_ROW << ss.str();
   }
   if (host_stats == NULL) {
-    remote_stats_.erase(it);
+    if (it != remote_stats_.end()) {
+      remote_stats_.erase(it);
+    } else {
+      VLOG_RPC << "Attempted to remove non-existent remote stats for host=" << host_id;
+    }
   } else {
     remote_stats_[host_id] = *host_stats;
   }
@@ -598,6 +602,7 @@ void AdmissionController::HandleTopicDeletions(const vector<string>& topic_delet
     string pool_name;
     string topic_backend_id;
     if (!ParsePoolTopicKey(topic_key, &pool_name, &topic_backend_id)) continue;
+    if (topic_backend_id == host_id_) continue;
     GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, NULL);
   }
 }

@@ -147,7 +147,7 @@ int64_t MemTracker::GetPoolMemReserved() const {
     int64_t child_limit = (*it)->limit();
     if (child_limit > 0) {
       // Make sure we don't overflow if the query limits are set to ridiculous values.
-      mem_reserved += min(child_limit, MemInfo::physical_mem());
+      mem_reserved += std::min(child_limit, MemInfo::physical_mem());
     } else {
       DCHECK_EQ(child_limit, -1);
       mem_reserved += (*it)->consumption();
