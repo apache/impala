@@ -94,6 +94,16 @@ public class CollectionTableRef extends TableRef {
         // InlineViews are currently not supported as a parent ref.
         Preconditions.checkState(!(parentRef instanceof InlineViewRef));
         correlatedTupleIds_.add(parentRef.getId());
+      } else if (getJoinOp().isCrossJoin() || getJoinOp().isInnerJoin()
+          || getJoinOp() == JoinOperator.LEFT_SEMI_JOIN) {
+        // Generate a predicate to filter out empty collections directly
+        // in the parent scan. This is a performance optimization to avoid
+        // processing empty collections inside a subplan that would yield
+        // an empty result set.
+        IsNotEmptyPredicate isNotEmptyPred =
+            new IsNotEmptyPredicate(collectionExpr_.clone());
+        isNotEmptyPred.analyze(analyzer);
+        analyzer.registerConjuncts(isNotEmptyPred, false);
       }
     }
     if (!isRelative()) {

@@ -39,6 +39,7 @@
 #include "exprs/decimal-operators.h"
 #include "exprs/hive-udf-call.h"
 #include "exprs/in-predicate.h"
+#include "exprs/is-not-empty-predicate.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
@@ -250,6 +251,9 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       } else {
         *expr = pool->Add(new ScalarFnCall(texpr_node));
       }
+      return Status::OK();
+    case TExprNodeType::IS_NOT_EMPTY_PRED:
+      *expr = pool->Add(new IsNotEmptyPredicate(texpr_node));
       return Status::OK();
     default:
       stringstream os;

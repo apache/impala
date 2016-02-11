@@ -37,6 +37,7 @@ add_library(Exprs
   expr-ir.cc
   hive-udf-call.cc
   in-predicate-ir.cc
+  is-not-empty-predicate.cc
   is-null-predicate.cc
   like-predicate.cc
   literal.cc

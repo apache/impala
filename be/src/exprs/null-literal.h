@@ -37,6 +37,7 @@ class NullLiteral: public Expr {
   virtual impala_udf::StringVal GetStringVal(ExprContext*, TupleRow*);
   virtual impala_udf::TimestampVal GetTimestampVal(ExprContext*, TupleRow*);
   virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, TupleRow*);
+  virtual impala_udf::CollectionVal GetCollectionVal(ExprContext*, TupleRow*);
 
   virtual std::string DebugString() const;
 

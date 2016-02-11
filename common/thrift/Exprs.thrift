@@ -34,6 +34,7 @@ enum TExprNodeType {
   FUNCTION_CALL,
   AGGREGATE_EXPR,
   DECIMAL_LITERAL,
+  IS_NOT_EMPTY_PRED
 }
 
 struct TBoolLiteral {

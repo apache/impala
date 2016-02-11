@@ -4165,7 +4165,9 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
         {
             "sources":[
                 7,
-                11
+                11,
+                14,
+                15
             ],
             "targets":[
                 0,
@@ -4249,6 +4251,16 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
             "id":13,
             "vertexType":"COLUMN",
             "vertexId":"functional.allcomplextypes.struct_map_col.value.f2"
+        },
+        {
+            "id":14,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.allcomplextypes.struct_map_col"
+        },
+        {
+            "id":15,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.allcomplextypes.int_array_col"
         }
     ]
 }
