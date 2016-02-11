@@ -139,5 +139,6 @@ TEST(BlockingQueueTest, TestMultipleThreads) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::OsInfo::Init();
   return RUN_ALL_TESTS();
 }

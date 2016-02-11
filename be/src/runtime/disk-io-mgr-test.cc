@@ -1026,6 +1026,7 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
   impala::DiskInfo::Init();
+  impala::OsInfo::Init();
   impala::InitThreading();
   return RUN_ALL_TESTS();
 }

@@ -17,6 +17,7 @@
 #define IMPALA_UTIL_STOPWATCH_H
 
 #include <boost/cstdint.hpp>
+#include <util/os-info.h>
 #include <util/time.h>
 #include <time.h>
 
@@ -76,12 +77,16 @@ class StopWatch {
   bool running_;
 };
 
-/// Stop watch for reporting elapsed time in nanosec based on MonotonicNanos.
-/// It is as fast as Rdtsc.
-/// It is also accurate because it not affected by cpu frequency changes and
-/// it is not affected by user setting the system clock.
-/// A monotonic clock represents monotonic time since some unspecified starting point.
-/// It is good for computing elapsed time.
+/// Stop watch for reporting elapsed time in nanosec based on clock_gettime (Linux) or
+/// MonotonicNanos (Apple).  It is not affected by cpu frequency changes and it is not
+/// affected by user setting the system clock.  A monotonic clock represents monotonic
+/// time since some unspecified starting point.  It is good for computing elapsed time.
+///
+/// The time values are in nanoseconds.  For most machine configurations, the clock
+/// resolution will be 1 nanosecond.  We fall back to low resolution in configurations
+/// where the clock is expensive.  For those machine configurations (notably EC2), the
+/// clock resolution will be that of the system jiffy, which is between 1 and 10
+/// milliseconds.
 class MonotonicStopWatch {
  public:
   MonotonicStopWatch() : start_(0), total_time_(0),
@@ -90,7 +95,7 @@ class MonotonicStopWatch {
 
   void Start() {
     if (!running_) {
-      start_ = MonotonicNanos();
+      start_ = Now();
       running_ = true;
     }
   }
@@ -102,14 +107,15 @@ class MonotonicStopWatch {
     }
   }
 
-  /// Set the time ceiling of the stop watch. The stop watch won't run past the ceiling.
-  void SetTimeCeiling(const uint64_t ceiling) { time_ceiling_ = ceiling; }
+  /// Set the time ceiling of the stop watch to Now(). The stop watch won't run past the
+  /// ceiling.
+  void SetTimeCeiling() { time_ceiling_ = Now(); }
 
   /// Restarts the timer. Returns the elapsed time until this point.
   uint64_t Reset() {
     uint64_t ret = ElapsedTime();
     if (running_) {
-      start_ = MonotonicNanos();
+      start_ = Now();
       time_ceiling_ = 0;
     }
     return ret;
@@ -141,10 +147,25 @@ class MonotonicStopWatch {
   /// True if stopwatch is running.
   bool running_;
 
+  /// While this function returns nanoseconds, its resolution may be as large as
+  /// milliseconds, depending on OsInfo::fast_clock().
+  static inline int64_t Now() {
+#if defined(__APPLE__)
+    // Apple does not support clock_gettime.
+    return MonotonicNanos();
+#else
+    // Use a fast but low-resolution clock if the high-resolution clock is slow because
+    // Now() can be called frequently (IMPALA-2407).
+    timespec ts;
+    clock_gettime(OsInfo::fast_clock(), &ts);
+    return ts.tv_sec * 1e9 + ts.tv_nsec;
+#endif
+  }
+
   /// Returns the time since start.
   /// If time_ceiling_ is set, the stop watch won't run pass the ceiling.
   uint64_t RunningTime() const {
-    uint64_t end = MonotonicNanos();
+    uint64_t end = Now();
     if (time_ceiling_ > 0) {
       if (time_ceiling_ < start_) return 0;
       if (time_ceiling_ < end) end = time_ceiling_;

@@ -69,6 +69,7 @@ TEST(ThreadPoolTest, BasicTest) {
 int main(int argc, char** argv) {
   impala::InitGoogleLoggingSafe(argv[0]);
   impala::InitThreading();
+  impala::OsInfo::Init();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

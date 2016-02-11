@@ -15,7 +15,10 @@
 #ifndef IMPALA_UTIL_OS_INFO_H
 #define IMPALA_UTIL_OS_INFO_H
 
+#include <time.h>
+
 #include <string>
+
 #include "common/logging.h"
 
 namespace impala {
@@ -31,11 +34,20 @@ class OsInfo {
     return os_version_;
   }
 
+  /// Return CLOCK_MONOTONIC if it's fast. Otherwise CLOCK_MONOTONIC_COARSE, which will be
+  /// fast but lower resolution.
+  static clockid_t fast_clock() {
+    DCHECK(initialized_);
+    return fast_clock_;
+  }
+
   static std::string DebugString();
 
  private:
   static bool initialized_;
   static std::string os_version_;
+  static clockid_t fast_clock_;
+  static std::string clock_name_;
 };
 
 }

@@ -194,7 +194,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     Status open_status = child(0)->Open(state);
 
     // The left/right child overlap stops here.
-    built_probe_overlap_stop_watch_.SetTimeCeiling(MonotonicNanos());
+    built_probe_overlap_stop_watch_.SetTimeCeiling();
 
     // Blocks until ConstructBuildSide has returned, after which the build side structures
     // are fully constructed.
@@ -211,7 +211,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(ConstructBuildSide(state));
   } else {
     // The left/right child never overlap. The overlap stops here.
-    built_probe_overlap_stop_watch_.SetTimeCeiling(MonotonicNanos());
+    built_probe_overlap_stop_watch_.SetTimeCeiling();
     RETURN_IF_ERROR(ConstructBuildSide(state));
     RETURN_IF_ERROR(child(0)->Open(state));
   }
