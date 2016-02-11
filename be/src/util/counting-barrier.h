@@ -44,6 +44,22 @@ class CountingBarrier {
   DISALLOW_COPY_AND_ASSIGN(CountingBarrier);
 };
 
+/// Helper class to ensure that ExecRemoteFragment() always notifies the coordinator's
+/// barrier on exit.
+class NotifyBarrierOnExit {
+ public:
+  NotifyBarrierOnExit(CountingBarrier* b) : barrier(b) {
+    DCHECK(b != NULL);
+  }
+
+  ~NotifyBarrierOnExit() {
+    barrier->Notify();
+  }
+
+ private:
+  CountingBarrier* barrier;
+};
+
 }
 
 #endif

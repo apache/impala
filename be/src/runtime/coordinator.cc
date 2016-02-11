@@ -475,7 +475,7 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   query_events_->MarkEvent(
       Substitute("Ready to start $0 remote fragments", num_fragment_instances));
 
-  fragment_start_barrier_.reset(new CountingBarrier(num_fragment_instances));
+  exec_complete_barrier_.reset(new CountingBarrier(num_fragment_instances));
   int fragment_instance_idx = 0;
   bool has_coordinator_fragment =
       request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
@@ -531,7 +531,7 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
     }
   }
 
-  fragment_start_barrier_->Wait();
+  exec_complete_barrier_->Wait();
   query_events_->MarkEvent(
       Substitute("All $0 remote fragments started", fragment_instance_idx));
   query_profile_->AddInfoString(
@@ -1224,6 +1224,7 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_par
     const TPlanFragment* plan_fragment, DebugOptions* debug_options,
     QuerySchedule* schedule, int fragment_instance_idx, int fragment_idx,
     int per_fragment_instance_idx) {
+  NotifyBarrierOnExit notifier(exec_complete_barrier_.get());
   TExecPlanFragmentParams rpc_params;
   SetExecPlanFragmentParams(*schedule, *plan_fragment, *fragment_exec_params,
       fragment_instance_idx, fragment_idx, per_fragment_instance_idx,
@@ -1259,7 +1260,6 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_par
       rpc_params, &thrift_result);
 
   exec_state->SetRpcLatency(MonotonicMillis() - start);
-  fragment_start_barrier_->Notify();
 
   const string ERR_TEMPLATE = "ExecPlanRequest rpc query_id=$0 instance_id=$1 failed: $2";
 
@@ -1880,9 +1880,9 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   }
 
   rpc_params->filter_id = params.filter_id;
-  DCHECK(fragment_start_barrier_.get() != NULL)
+  DCHECK(exec_complete_barrier_.get() != NULL)
       << "Filters received before fragments started!";
-  fragment_start_barrier_->Wait();
+  exec_complete_barrier_->Wait();
 
   for (int i = 0; i < fragment_instance_idxs.size(); ++i) {
     FragmentInstanceState* fragment_inst =

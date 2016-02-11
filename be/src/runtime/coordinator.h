@@ -357,9 +357,9 @@ class Coordinator {
   /// Total time spent in finalization (typically 0 except for INSERT into hdfs tables)
   RuntimeProfile::Counter* finalization_timer_;
 
-  /// Barrier that is released when all fragment instances have been started. Initialised
-  /// during StartRemoteFragments().
-  boost::scoped_ptr<CountingBarrier> fragment_start_barrier_;
+  /// Barrier that is released when all calls to ExecRemoteFragment() have
+  /// returned, successfully or not. Initialised during StartRemoteFragments().
+  boost::scoped_ptr<CountingBarrier> exec_complete_barrier_;
 
   struct Filter {
     TPlanNodeId src;
