@@ -255,6 +255,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
         std::vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
         MAX_PARTITION_DEPTH, 1));
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
+        Substitute("PartitionedAggregationNode id=$0 ptr=$1", id_, this),
         MinRequiredBuffers(), true, mem_tracker(), state, &block_mgr_client_));
     RETURN_IF_ERROR(CreateHashPartitions(0));
   }

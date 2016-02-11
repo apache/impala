@@ -14,6 +14,8 @@
 
 #include "exec/analytic-eval-node.h"
 
+#include <gutil/strings/substitute.h>
+
 #include "exprs/agg-fn-evaluator.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
@@ -24,6 +26,8 @@
 #include "common/names.h"
 
 static const int MAX_TUPLE_POOL_SIZE = 8 * 1024 * 1024; // 8MB
+
+using namespace strings;
 
 namespace impala {
 
@@ -168,8 +172,9 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     }
   }
 
-  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, false, mem_tracker(), state,
-      &client_));
+  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
+      Substitute("AnalyticEvalNode id=$0 ptr=$1", id_, this),
+      2, false, mem_tracker(), state, &client_));
   return Status::OK();
 }
 

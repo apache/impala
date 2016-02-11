@@ -132,6 +132,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   AddExprCtxsToFree(other_join_conjunct_ctxs_);
 
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
+      Substitute("PartitionedHashJoinNode id=$0 ptr=$1", id_, this),
       MinRequiredBuffers(), true, mem_tracker(), state, &block_mgr_client_));
 
   const bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||

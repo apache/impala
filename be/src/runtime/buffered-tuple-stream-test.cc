@@ -99,7 +99,7 @@ class SimpleTupleStreamTest : public testing::Test {
   /// tracked by tracker_.
   void InitBlockMgr(int64_t limit, int block_size) {
     ASSERT_OK(test_env_->CreateQueryState(0, limit, block_size, &runtime_state_));
-    ASSERT_OK(runtime_state_->block_mgr()->RegisterClient(0, false, &tracker_,
+    ASSERT_OK(runtime_state_->block_mgr()->RegisterClient("", 0, false, &tracker_,
         runtime_state_, &client_));
   }
 

@@ -151,8 +151,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
       BufferedBlockMgr::Client** client, RuntimeState** query_state = NULL) {
     RuntimeState* state;
     BufferedBlockMgr* mgr = CreateMgr(query_id, max_buffers, block_size, &state);
-    EXPECT_TRUE(mgr->RegisterClient(reserved_blocks, tolerates_oversubscription, tracker,
-        state, client).ok());
+    EXPECT_TRUE(mgr->RegisterClient(Substitute("Client for query $0", query_id),
+        reserved_blocks, tolerates_oversubscription, tracker, state, client).ok());
     EXPECT_TRUE(client != NULL);
     if (query_state != NULL) *query_state = state;
     return mgr;
@@ -397,7 +397,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
     ApiFunction api_function;
 
     BufferedBlockMgr::Client* client;
-    EXPECT_OK(block_mgr->RegisterClient(0, false, client_tracker_.get(), state, &client));
+    EXPECT_OK(block_mgr->RegisterClient("", 0, false, client_tracker_.get(), state,
+        &client));
     EXPECT_TRUE(client != NULL);
 
     pinned_blocks.reserve(num_buffers);
@@ -1151,10 +1152,10 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
-  EXPECT_OK(block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client1_buffers, false, client_tracker_.get(),
       runtime_state, &client1));
   EXPECT_TRUE(client1 != NULL);
-  EXPECT_OK(block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client2_buffers, false, client_tracker_.get(),
       runtime_state, &client2));
   EXPECT_TRUE(client2 != NULL);
 
@@ -1253,10 +1254,10 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   BufferedBlockMgr::Client* client1 = NULL;
   BufferedBlockMgr::Client* client2 = NULL;
   BufferedBlockMgr::Block* block = NULL;
-  EXPECT_OK(block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client1_buffers, false, client_tracker_.get(),
       runtime_state, &client1));
   EXPECT_TRUE(client1 != NULL);
-  EXPECT_OK(block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client2_buffers, false, client_tracker_.get(),
       runtime_state, &client2));
   EXPECT_TRUE(client2 != NULL);
 
@@ -1303,13 +1304,13 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   BufferedBlockMgr::Client* client2 = NULL;
   BufferedBlockMgr::Client* client3 = NULL;
   BufferedBlockMgr::Block* block = NULL;
-  EXPECT_OK(block_mgr->RegisterClient(client1_buffers, false, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client1_buffers, false, client_tracker_.get(),
       runtime_state, &client1));
   EXPECT_TRUE(client1 != NULL);
-  EXPECT_OK(block_mgr->RegisterClient(client2_buffers, false, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client2_buffers, false, client_tracker_.get(),
       runtime_state, &client2));
   EXPECT_TRUE(client2 != NULL);
-  EXPECT_OK(block_mgr->RegisterClient(client3_buffers, true, client_tracker_.get(),
+  EXPECT_OK(block_mgr->RegisterClient("", client3_buffers, true, client_tracker_.get(),
       runtime_state, &client3));
   EXPECT_TRUE(client3 != NULL);
 

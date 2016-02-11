@@ -185,7 +185,7 @@ class HashTableTest : public testing::Test {
         &runtime_state_).ok());
 
     BufferedBlockMgr::Client* client;
-    EXPECT_TRUE(runtime_state_->block_mgr()->RegisterClient(reserved_blocks, false,
+    EXPECT_TRUE(runtime_state_->block_mgr()->RegisterClient("", reserved_blocks, false,
         &tracker_, runtime_state_, &client).ok());
 
     // Initial_num_buckets must be a power of two.

@@ -44,10 +44,11 @@ SpinLock BufferedBlockMgr::static_block_mgrs_lock_;
 
 
 struct BufferedBlockMgr::Client {
-  Client(BufferedBlockMgr* mgr, int num_reserved_buffers,
+  Client(const string& debug_info, BufferedBlockMgr* mgr, int num_reserved_buffers,
       bool tolerates_oversubscription, MemTracker* tracker,
          RuntimeState* state)
-      : mgr_(mgr),
+      : debug_info_(debug_info),
+        mgr_(mgr),
         state_(state),
         tracker_(tracker),
         query_tracker_(mgr_->mem_tracker_->parent()),
@@ -57,6 +58,10 @@ struct BufferedBlockMgr::Client {
         num_pinned_buffers_(0) {
     DCHECK(tracker != NULL);
   }
+
+  /// A string that will be printed to identify the client, e.g. which exec node it
+  /// belongs to.
+  string debug_info_;
 
   /// Unowned.
   BufferedBlockMgr* mgr_;
@@ -110,6 +115,7 @@ struct BufferedBlockMgr::Client {
   string DebugString() const {
     stringstream ss;
     ss << "Client " << this << endl
+       << " " << debug_info_ << endl
        << "  num_reserved_buffers=" << num_reserved_buffers_ << endl
        << "  num_tmp_reserved_buffers=" << num_tmp_reserved_buffers_ << endl
        << "  num_pinned_buffers=" << num_pinned_buffers_;
@@ -189,7 +195,8 @@ string BufferedBlockMgr::Block::DebugString() const {
   ss << "  Deleted: " << is_deleted_ << endl
      << "  Pinned: " << is_pinned_ << endl
      << "  Write Issued: " << in_write_ << endl
-     << "  Client Local: " << client_local_;
+     << "  Client Local: " << client_local_ << endl;
+  if (client_ != NULL) ss << "  Client: " << client_->DebugString();
   return ss.str();
 }
 
@@ -249,12 +256,12 @@ int64_t BufferedBlockMgr::remaining_unreserved_buffers() const {
   return num_buffers;
 }
 
-Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers,
-    bool tolerates_oversubscription, MemTracker* tracker, RuntimeState* state,
-    Client** client) {
+Status BufferedBlockMgr::RegisterClient(const string& debug_info,
+    int num_reserved_buffers, bool tolerates_oversubscription, MemTracker* tracker,
+    RuntimeState* state, Client** client) {
   DCHECK_GE(num_reserved_buffers, 0);
-  Client* aClient = new Client(this, num_reserved_buffers, tolerates_oversubscription,
-      tracker, state);
+  Client* aClient = new Client(debug_info, this, num_reserved_buffers,
+      tolerates_oversubscription, tracker, state);
   lock_guard<mutex> lock(lock_);
   *client = obj_pool_.Add(aClient);
   unfullfilled_reserved_buffers_ += num_reserved_buffers;

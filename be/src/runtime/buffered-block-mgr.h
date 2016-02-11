@@ -318,10 +318,13 @@ class BufferedBlockMgr {
   /// tolerates_oversubscription determines how oversubscription is handled. If true,
   /// failure to allocate a reserved buffer is not an error. If false, failure to
   /// allocate a reserved buffer is a MEM_LIMIT_EXCEEDED error.
+  /// debug_info is a string that will be printed in debug messages and errors to
+  /// identify the client.
   /// TODO: The fact that we allow oversubscription is problematic.
   /// as some code expects the reservations to always be granted (currently not the case).
-  Status RegisterClient(int num_reserved_buffers, bool tolerates_oversubscription,
-      MemTracker* tracker, RuntimeState* state, Client** client);
+  Status RegisterClient(const std::string& debug_info, int num_reserved_buffers,
+      bool tolerates_oversubscription, MemTracker* tracker, RuntimeState* state,
+      Client** client);
 
   /// Clears all reservations for this client.
   void ClearReservations(Client* client);
