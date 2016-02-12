@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pickle
+import logging
 import os
-import time
+import pickle
 import stat
+import time
 from time import sleep
 from flask import Flask, render_template, request
 from schedule_item import ScheduleItem
@@ -34,6 +35,8 @@ from tests.comparison.db_types import (
 
 MAX_REPORT_AGE = 21 * 24 * 3600 # 21 days
 SLEEP_LENGTH = 20 * 60 # 20 min
+
+LOG = logging.getLogger('leopard.front_end')
 
 app = Flask(__name__)
 app.reports = {}
@@ -258,7 +261,11 @@ def reload_reports():
   '''
   while True:
     new_reports = {}
-    report_ids = os.listdir(PATH_TO_REPORTS)
+    try:
+      report_ids = os.listdir(PATH_TO_REPORTS)
+    except EnvironmentError as e:
+      report_ids = []
+      LOG.warn('{0}: {1}'.format(e.filename, e.strerror))
     for report_id in report_ids:
       file_age = time.time() - os.stat(
           os.path.join(PATH_TO_REPORTS, report_id))[stat.ST_MTIME]
@@ -277,7 +284,12 @@ def front_page():
   '''Renders the front page as HTML.
   '''
 
-  schedule_item_ids = os.listdir(PATH_TO_SCHEDULE)
+  try:
+    schedule_item_ids = os.listdir(PATH_TO_SCHEDULE)
+  except EnvironmentError as e:
+    schedule_item_ids = []
+    LOG.warn('{0}: {1}'.format(e.filename, e.strerror))
+
   schedule_items = []
 
   for schedule_item_id in schedule_item_ids:
@@ -292,7 +304,11 @@ def front_page():
       schedule_items=schedule_items)
 
 if __name__ == '__main__':
-  thread = Thread(target=reload_reports)
+  logging.basicConfig(
+      format='%(asctime)s %(levelname)s [%(name)s.%(threadName)s:%(lineno)s]: '
+             '%(message)s',
+      level=logging.INFO)
+  thread = Thread(name='reload_reports', target=reload_reports)
   thread.daemon = True
   thread.start()
   app.run(host='0.0.0.0', debug=False)
