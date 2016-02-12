@@ -395,7 +395,7 @@ public class PlannerTestBase {
 
     StringBuilder explainBuilder = new StringBuilder();
     TExecRequest execRequest = null;
-    actualOutput.append(section.getHeader() + "\n");
+    if (sectionExists) actualOutput.append(section.getHeader() + "\n");
     try {
       execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
     } catch (NotImplementedException e) {
@@ -616,4 +616,3 @@ public class PlannerTestBase {
     runPlannerTestFile(testFile, dbName, null);
   }
 }
-
