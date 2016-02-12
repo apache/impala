@@ -76,22 +76,11 @@ SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
-# if no build build type is specified, default to debug builds
-if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug)
-endif(NOT CMAKE_BUILD_TYPE)
-
-STRING (TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
-
 # Set compile flags based on the build type.
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_DEBUG})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_RELEASE})
-elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")
-  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_DEBUG} ${CXX_COVERAGE_FLAGS}")
-elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_RELEASE")
-  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_RELEASE} ${CXX_COVERAGE_FLAGS}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   if (NOT IMPALA_TOOLCHAIN)
     SET(CMAKE_CXX_COMPILER ${LLVM_CLANG_EXECUTABLE})
@@ -99,7 +88,11 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_ADDRESS_SANITIZER}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
-endif ()
+endif()
+
+if (ENABLE_CODE_COVERAGE)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_COVERAGE_FLAGS}")
+endif()
 
 # Add flags that are common across build types
 #  - fverboase-asm creates better annotated assembly.  This doesn't seem to affect
@@ -222,7 +215,6 @@ add_definitions(-fPIC)
 
 # set compile output directory
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
-    "${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
 else()
@@ -320,11 +312,6 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${JAVA_JVM_LIBRARY}
   -lrt
 )
-
-
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
-  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)
-endif ()
 
 # The above link list does not include tcmalloc. This is because the Impala JVM support
 # libraries (libfesupport, libloggingsupport) cannot use tcmalloc in all cases. When they

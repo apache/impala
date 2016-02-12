@@ -150,6 +150,7 @@ export IMPALA_GLOG_VERSION=0.3.2
 export IMPALA_GPERFTOOLS_VERSION=2.0
 export IMPALA_GTEST_VERSION=1.6.0
 export IMPALA_LLVM_VERSION=3.3
+export IMPALA_LLVM_DEBUG_VERSION=3.3
 export IMPALA_LLVM_ASAN_VERSION=3.7.0
 export IMPALA_LZ4_VERSION=svn
 export IMPALA_MIN_BOOST_VERSION=1.46.0
@@ -171,7 +172,11 @@ if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   IMPALA_GPERFTOOLS_VERSION+=-p1
   IMPALA_THRIFT_VERSION+=-p2
   IMPALA_RE2_VERSION+=-p1
-  IMPALA_LLVM_VERSION+=-p1
+  IMPALA_LLVM_VERSION+=-no-asserts-p1
+  # Debug builds should use the default release-with-assertions build from the toolchain
+  # Note that the default toolchain build of 3.7 and trunk is release with no assertions,
+  # so this will need to be revisited when upgrading the LLVM version.
+  IMPALA_LLVM_DEBUG_VERSION+=-p1
 fi
 
 if [[ $OSTYPE == "darwin"* ]]; then

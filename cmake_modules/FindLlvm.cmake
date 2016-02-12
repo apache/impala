@@ -6,14 +6,13 @@
 #  LLVM_LFLAGS      - llvm linker flags
 #  LLVM_MODULE_LIBS - list of llvm libs for working with modules.
 
-# First look in ENV{LLVM_HOME} then system path.
+# First look in LLVM_ROOT then ENV{LLVM_HOME} then system path.
 find_program(LLVM_CONFIG_EXECUTABLE llvm-config
   PATHS
   ${LLVM_ROOT}/bin
   $ENV{LLVM_HOME}
   NO_DEFAULT_PATH
 )
-find_program(LLVM_CONFIG_EXECUTABLE llvm-config)
 
 if (LLVM_CONFIG_EXECUTABLE STREQUAL "LLVM_CONFIG_EXECUTABLE-NOTFOUND")
   message(FATAL_ERROR "Could not find llvm-config")
@@ -31,19 +30,7 @@ if (NOT "${LLVM_VERSION}" VERSION_EQUAL "$ENV{IMPALA_LLVM_VERSION}")
       "LLVM version must be $ENV{IMPALA_LLVM_VERSION}. Found version: ${LLVM_VERSION}")
 endif()
 
-# get the location of the binaries
-execute_process(
-  COMMAND ${LLVM_CONFIG_EXECUTABLE} --bindir
-  OUTPUT_VARIABLE LLVM_BIN_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-set(LLVM_CLANG_EXECUTABLE "${LLVM_BIN_DIR}/clang++")
-set(LLVM_OPT_EXECUTABLE "${LLVM_BIN_DIR}/opt")
-
 message(STATUS "LLVM llvm-config found at: ${LLVM_CONFIG_EXECUTABLE}")
-message(STATUS "LLVM clang++ found at: ${LLVM_CLANG_EXECUTABLE}")
-message(STATUS "LLVM opt found at: ${LLVM_OPT_EXECUTABLE}")
 
 execute_process(
   COMMAND ${LLVM_CONFIG_EXECUTABLE} --includedir
