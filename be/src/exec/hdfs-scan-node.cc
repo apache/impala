@@ -60,7 +60,7 @@ DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_"
 DEFINE_bool(suppress_unknown_disk_id_warnings, false,
     "Suppress unknown disk id warnings generated when the HDFS implementation does not"
     " provide volume/disk information.");
-DEFINE_int32(runtime_filter_wait_time_ms, 30000, "(Advanced) the maximum time, in ms, "
+DEFINE_int32(runtime_filter_wait_time_ms, 1000, "(Advanced) the maximum time, in ms, "
     "that a scan node will wait for expected runtime filters to arrive.");
 DECLARE_string(cgroup_hierarchy_path);
 DECLARE_bool(enable_rm);
@@ -215,7 +215,11 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     // been generated (e.g. probe side bitmap filters).
     initial_ranges_issued_ = true;
 
-    WaitForPartitionFilters(FLAGS_runtime_filter_wait_time_ms);
+    int32 wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
+    if (state->query_options().runtime_filter_wait_time_ms > 0) {
+      wait_time_ms = state->query_options().runtime_filter_wait_time_ms;
+    }
+    WaitForPartitionFilters(wait_time_ms);
     // Apply dynamic partition-pruning per-file.
     FileFormatsMap matching_per_type_files;
     BOOST_FOREACH(const FileFormatsMap::value_type& v, per_type_files_) {

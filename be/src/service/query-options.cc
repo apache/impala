@@ -322,6 +322,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
           query_options->__set_runtime_bloom_filter_size(size);
           break;
         }
+      case TImpalaQueryOptions::RUNTIME_FILTER_WAIT_TIME_MS: {
+        int32 time_ms = atoi(value.c_str());
+        query_options->__set_runtime_filter_wait_time_ms(time_ms);
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

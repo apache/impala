@@ -187,12 +187,15 @@ enum TImpalaQueryOptions {
   // If true, the planner will not generate plans with streaming preaggregations.
   DISABLE_STREAMING_PREAGGREGATIONS,
 
-  // If true, enable runtime filter propagation
+  // If true, enable runtime filter propagation.
   ENABLE_RUNTIME_FILTER_PROPAGATION,
 
   // Size (in bytes) of a runtime Bloom Filter. Will be rounded up to nearest power of
   // two.
-  RUNTIME_BLOOM_FILTER_SIZE
+  RUNTIME_BLOOM_FILTER_SIZE,
+
+  // Time (in ms) to wait in scans for partition filters to arrive.
+  RUNTIME_FILTER_WAIT_TIME_MS
 }
 
 // The summary of an insert.

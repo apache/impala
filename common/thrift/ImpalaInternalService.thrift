@@ -152,6 +152,9 @@ struct TQueryOptions {
 
   // Size in bytes of runtime bloom filters
   38: optional i32 runtime_bloom_filter_size = 0
+
+  // Time in ms to wait until partition filters are delivered
+  39: optional i32 runtime_filter_wait_time_ms = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
