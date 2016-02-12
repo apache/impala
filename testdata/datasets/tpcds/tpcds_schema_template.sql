@@ -463,8 +463,6 @@ WHERE 2452184 <= ss_sold_date_sk;
 ---- LOAD
 USE {db_name};
 
--- Disable auto.convert.join due to HIVE-5068
-set hive.auto.convert.join=false;
 set hive.exec.max.dynamic.partitions.pernode=10000;
 set hive.exec.max.dynamic.partitions=10000;
 set hive.exec.dynamic.partition.mode=nonstrict;
@@ -499,8 +497,6 @@ distribute by ss_sold_date_sk;
 ---- LOAD_LOCAL
 USE {db_name};
 
--- Disable auto.convert.join due to HIVE-5068
-set hive.auto.convert.join=false;
 set hive.exec.max.dynamic.partitions.pernode=10000;
 set hive.exec.max.dynamic.partitions=10000;
 set hive.exec.dynamic.partition.mode=nonstrict;
