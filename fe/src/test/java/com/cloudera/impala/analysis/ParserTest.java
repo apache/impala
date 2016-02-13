@@ -392,14 +392,29 @@ public class ParserTest {
 
       // Test TableRef hints.
       TestTableHints(String.format(
-          "select * from functional.alltypes %sschedule_random_replica%s", prefix,
-          suffix), "schedule_random_replica");
+          "select * from functional.alltypes %sschedule_disk_local%s", prefix, suffix),
+          "schedule_disk_local");
+      TestTableHints(String.format(
+          "select * from functional.alltypes %sschedule_cache_local," +
+          "schedule_random_replica%s", prefix, suffix), "schedule_cache_local",
+          "schedule_random_replica");
+      TestTableHints(String.format(
+          "select * from functional.alltypes a %sschedule_cache_local," +
+          "schedule_random_replica%s", prefix, suffix), "schedule_cache_local",
+          "schedule_random_replica");
+      TestTableHints(String.format(
+          "select * from functional.alltypes a %sschedule_cache_local," +
+          "schedule_random_replica%s" + ", functional.alltypes b %sschedule_remote%s",
+          prefix, suffix, prefix, suffix), "schedule_cache_local",
+          "schedule_random_replica", "schedule_remote");
 
       // Test both TableRef and join hints.
       TestTableAndJoinHints(String.format(
-          "select * from functional.alltypes a %sschedule_random_replica%s join " +
-          "%sbroadcast%s functional.alltypes b using(id)", prefix, suffix, prefix, suffix,
-          prefix, suffix), "schedule_random_replica", "broadcast");
+          "select * from functional.alltypes a %sschedule_cache_local," +
+          "schedule_random_replica%s join %sbroadcast%s functional.alltypes b " +
+          "%sschedule_remote%s using(id)", prefix, suffix, prefix, suffix, prefix,
+          suffix), "schedule_cache_local", "schedule_random_replica", "broadcast",
+          "schedule_remote");
 
       // Test select-list hints (e.g., straight_join). The legacy-style hint has no
       // prefix and suffix.

@@ -65,6 +65,7 @@ class TQueryOptions;
   QUERY_OPT_FN(seq_compression_mode, SEQ_COMPRESSION_MODE)\
   QUERY_OPT_FN(exec_single_node_rows_threshold, EXEC_SINGLE_NODE_ROWS_THRESHOLD)\
   QUERY_OPT_FN(optimize_partition_key_scans, OPTIMIZE_PARTITION_KEY_SCANS)\
+  QUERY_OPT_FN(replica_preference, REPLICA_PREFERENCE)\
   QUERY_OPT_FN(schedule_random_replica, SCHEDULE_RANDOM_REPLICA)\
   QUERY_OPT_FN(scan_node_codegen_threshold, SCAN_NODE_CODEGEN_THRESHOLD)\
   QUERY_OPT_FN(disable_streaming_preaggregations, DISABLE_STREAMING_PREAGGREGATIONS)\

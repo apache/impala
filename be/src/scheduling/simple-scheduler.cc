@@ -14,6 +14,8 @@
 
 #include "scheduling/simple-scheduler.h"
 
+#include <atomic>
+#include <random>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
@@ -41,6 +43,7 @@
 #include "util/llama-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
+#include "util/runtime-profile-counters.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
 
 #include "common/names.h"
@@ -65,6 +68,7 @@ static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 
+
 static const string BACKENDS_WEB_PAGE = "/backends";
 static const string BACKENDS_TEMPLATE = "backends.tmpl";
 
@@ -74,19 +78,19 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
     MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
     RequestPoolService* request_pool_service)
-  : metrics_(metrics->GetChildGroup("scheduler")),
+  : backend_config_(std::make_shared<const BackendConfig>()),
+    metrics_(metrics->GetChildGroup("scheduler")),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
-    backend_id_(backend_id),
+    local_backend_id_(backend_id),
     thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
-    initialised_(NULL),
-    update_count_(0),
+    initialized_(NULL),
     resource_broker_(resource_broker),
     request_pool_service_(request_pool_service) {
-  backend_descriptor_.address = backend_address;
-  next_nonlocal_backend_entry_ = backend_map_.begin();
+  local_backend_descriptor_.address = backend_address;
+
   if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
   if (!FLAGS_disable_admission_control) {
     admission_controller_.reset(
@@ -118,56 +122,42 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
     RequestPoolService* request_pool_service)
-  : metrics_(metrics),
+  : backend_config_(std::make_shared<const BackendConfig>(backends)),
+    metrics_(metrics),
     webserver_(webserver),
     statestore_subscriber_(NULL),
     thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
-    initialised_(NULL),
-    update_count_(0),
+    initialized_(NULL),
     resource_broker_(resource_broker),
     request_pool_service_(request_pool_service) {
   DCHECK(backends.size() > 0);
+  local_backend_descriptor_.address = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
   if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
   // request_pool_service_ may be null in unit tests
   if (request_pool_service_ != NULL && !FLAGS_disable_admission_control) {
     admission_controller_.reset(
         new AdmissionController(request_pool_service_, metrics, TNetworkAddress()));
   }
-
-  for (int i = 0; i < backends.size(); ++i) {
-    vector<string> ipaddrs;
-    Status status = HostnameToIpAddrs(backends[i].hostname, &ipaddrs);
-    if (!status.ok()) {
-      VLOG(1) << "Failed to resolve " << backends[i].hostname << ": "
-              << status.GetDetail();
-      continue;
-    }
-
-    // Try to find a non-localhost address, otherwise just use the
-    // first IP address returned.
-    string ipaddr = ipaddrs[0];
-    if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
-      VLOG(1) << "Only localhost addresses found for " << backends[i].hostname;
-    }
-
-    BackendMap::iterator it = backend_map_.find(ipaddr);
-    if (it == backend_map_.end()) {
-      it = backend_map_.insert(
-          make_pair(ipaddr, list<TBackendDescriptor>())).first;
-      backend_ip_map_[backends[i].hostname] = ipaddr;
-    }
-
-    TBackendDescriptor descriptor;
-    descriptor.address = MakeNetworkAddress(ipaddr, backends[i].port);
-    it->second.push_back(descriptor);
-  }
-  next_nonlocal_backend_entry_ = backend_map_.begin();
 }
 
 Status SimpleScheduler::Init() {
   LOG(INFO) << "Starting simple scheduler";
+
+  // Figure out what our IP address is, so that each subscriber
+  // doesn't have to resolve it on every heartbeat.
+  IpAddr ip;
+  const Hostname& hostname = local_backend_descriptor_.address.hostname;
+  Status status = HostnameToIpAddr(hostname, &ip);
+  if (!status.ok()) {
+    VLOG(1) << status.GetDetail();
+    status.AddDetail("SimpleScheduler failed to start");
+    return status;
+  }
+
+  local_backend_descriptor_.ip_address = ip;
+  LOG(INFO) << "Simple-scheduler using " << ip << " as IP address";
 
   if (webserver_ != NULL) {
     Webserver::UrlCallback backends_callback =
@@ -188,53 +178,31 @@ Status SimpleScheduler::Init() {
       RETURN_IF_ERROR(admission_controller_->Init(statestore_subscriber_));
     }
   }
+
   if (metrics_ != NULL) {
+    // This is after registering with the statestored, so we already have to synchronize
+    // access to the backend_config_ shared_ptr.
+    int num_backends = GetBackendConfig()->backend_map().size();
     total_assignments_ = metrics_->AddCounter<int64_t>(ASSIGNMENTS_KEY, 0);
     total_local_assignments_ = metrics_->AddCounter<int64_t>(LOCAL_ASSIGNMENTS_KEY, 0);
-    initialised_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
+    initialized_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
     num_fragment_instances_metric_ = metrics_->AddGauge<int64_t>(
-        NUM_BACKENDS_KEY, backend_map_.size());
+        NUM_BACKENDS_KEY, num_backends);
   }
 
   if (statestore_subscriber_ != NULL) {
-    // Figure out what our IP address is, so that each subscriber
-    // doesn't have to resolve it on every heartbeat.
-    vector<string> ipaddrs;
-    const string& hostname = backend_descriptor_.address.hostname;
-    Status status = HostnameToIpAddrs(hostname, &ipaddrs);
-    if (!status.ok()) {
-      VLOG(1) << "Failed to resolve " << hostname << ": " << status.GetDetail();
-      status.AddDetail("SimpleScheduler failed to start");
-      return status;
-    }
-    // Find a non-localhost address for this host; if one can't be
-    // found use the first address returned by HostnameToIpAddrs
-    string ipaddr = ipaddrs[0];
-    if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
-      VLOG(3) << "Only localhost addresses found for " << hostname;
-    }
-
-    backend_descriptor_.ip_address = ipaddr;
-    LOG(INFO) << "Simple-scheduler using " << ipaddr << " as IP address";
-
     if (webserver_ != NULL) {
       const TNetworkAddress& webserver_address = webserver_->http_address();
       if (IsWildcardAddress(webserver_address.hostname)) {
-        backend_descriptor_.__set_debug_http_address(
-            MakeNetworkAddress(ipaddr, webserver_address.port));
+        local_backend_descriptor_.__set_debug_http_address(
+            MakeNetworkAddress(ip, webserver_address.port));
       } else {
-        backend_descriptor_.__set_debug_http_address(webserver_address);
+        local_backend_descriptor_.__set_debug_http_address(webserver_address);
       }
-      backend_descriptor_.__set_secure_webserver(webserver_->IsSecure());
+      local_backend_descriptor_.__set_secure_webserver(webserver_->IsSecure());
     }
   }
   return Status::OK();
-}
-
-// Utility method to help sort backends by ascending network address
-bool TBackendDescriptorComparator(const TBackendDescriptor& a,
-    const TBackendDescriptor& b) {
-  return TNetworkAddressComparator(a.address, b.address);
 }
 
 void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
@@ -253,8 +221,6 @@ void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
 void SimpleScheduler::UpdateMembership(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
-  ++update_count_;
-  // TODO: Work on a copy if possible, or at least do resolution as a separate step
   // First look to see if the topic(s) we're interested in have an update
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(IMPALA_MEMBERSHIP_TOPIC);
@@ -262,74 +228,59 @@ void SimpleScheduler::UpdateMembership(
   if (topic != incoming_topic_deltas.end()) {
     const TTopicDelta& delta = topic->second;
 
-    // This function needs to handle both delta and non-delta updates. For delta
-    // updates, it is desireable to minimize the number of copies to only
-    // the added/removed items. To accomplish this, all updates are processed
-    // under a lock and applied to the shared backend maps (backend_map_ and
-    // backend_ip_map_) in place.
-    {
-      lock_guard<mutex> lock(backend_map_lock_);
-      bool backend_map_changed = false;
-      if (!delta.is_delta) {
-        backend_map_changed = true;
-        current_membership_.clear();
-        backend_map_.clear();
-        backend_ip_map_.clear();
-      }
+    // This function needs to handle both delta and non-delta updates. To minimize the
+    // time needed to hold locks, all updates are applied to a copy of backend_config_,
+    // which is then swapped into place atomically.
+    std::shared_ptr<BackendConfig> new_backend_config;
 
-      // Process new entries to the topic
-      for (const TTopicItem& item: delta.topic_entries) {
-        TBackendDescriptor be_desc;
-        // Benchmarks have suggested that this method can deserialize
-        // ~10m messages per second, so no immediate need to consider optimisation.
-        uint32_t len = item.value.size();
-        Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-            item.value.data()), &len, false, &be_desc);
-        if (!status.ok()) {
-          VLOG(2) << "Error deserializing membership topic item with key: " << item.key;
-          continue;
-        }
-        if (item.key == backend_id_ && be_desc.address != backend_descriptor_.address) {
-          // Someone else has registered this subscriber ID with a
-          // different address. We will try to re-register
-          // (i.e. overwrite their subscription), but there is likely
-          // a configuration problem.
-          LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-                                   << be_desc.address;
-        }
-
-        backend_map_changed = true;
-        list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
-        if (find(be_descs->begin(), be_descs->end(), be_desc) == be_descs->end()) {
-          backend_map_[be_desc.ip_address].push_back(be_desc);
-        }
-        backend_ip_map_[be_desc.address.hostname] = be_desc.ip_address;
-        current_membership_.insert(make_pair(item.key, be_desc));
-      }
-      // Process deletions from the topic
-      for (const string& backend_id: delta.topic_deletions) {
-        if (current_membership_.find(backend_id) != current_membership_.end()) {
-          backend_map_changed = true;
-          const TBackendDescriptor& be_desc = current_membership_[backend_id];
-          backend_ip_map_.erase(be_desc.address.hostname);
-          list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
-          be_descs->erase(
-              remove(be_descs->begin(), be_descs->end(), be_desc), be_descs->end());
-          if (be_descs->empty()) backend_map_.erase(be_desc.ip_address);
-          current_membership_.erase(backend_id);
-        }
-      }
-      // Update invalidated iterator.
-      if (backend_map_changed) next_nonlocal_backend_entry_ = backend_map_.begin();
+    if (!delta.is_delta) {
+      current_membership_.clear();
+      new_backend_config = std::make_shared<BackendConfig>();
+    } else {
+      // Make a copy
+      lock_guard<mutex> lock(backend_config_lock_);
+      new_backend_config = std::make_shared<BackendConfig>(*backend_config_);
     }
+
+    // Process new entries to the topic
+    for (const TTopicItem& item: delta.topic_entries) {
+      TBackendDescriptor be_desc;
+      // Benchmarks have suggested that this method can deserialize
+      // ~10m messages per second, so no immediate need to consider optimization.
+      uint32_t len = item.value.size();
+      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
+          item.value.data()), &len, false, &be_desc);
+      if (!status.ok()) {
+        VLOG(2) << "Error deserializing membership topic item with key: " << item.key;
+        continue;
+      }
+      if (item.key == local_backend_id_
+          && be_desc.address != local_backend_descriptor_.address) {
+        // Someone else has registered this subscriber ID with a different address. We
+        // will try to re-register (i.e. overwrite their subscription), but there is
+        // likely a configuration problem.
+        LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
+          << be_desc.address;
+      }
+
+      new_backend_config->AddBackend(be_desc);
+      current_membership_.insert(make_pair(item.key, be_desc));
+    }
+    // Process deletions from the topic
+    for (const string& backend_id: delta.topic_deletions) {
+      if (current_membership_.find(backend_id) != current_membership_.end()) {
+        new_backend_config->RemoveBackend(current_membership_[backend_id]);
+        current_membership_.erase(backend_id);
+      }
+    }
+    SetBackendConfig(new_backend_config);
 
     // If this impalad is not in our view of the membership list, we should add it and
     // tell the statestore.
-    // TODO: Inject global dependencies to make this code testable.
     bool is_offline = ExecEnv::GetInstance() &&
         ExecEnv::GetInstance()->impala_server()->IsOffline();
     if (!is_offline &&
-        current_membership_.find(backend_id_) == current_membership_.end()) {
+        current_membership_.find(local_backend_id_) == current_membership_.end()) {
       VLOG(1) << "Registering local backend with statestore";
       subscriber_topic_updates->push_back(TTopicDelta());
       TTopicDelta& update = subscriber_topic_updates->back();
@@ -337,20 +288,21 @@ void SimpleScheduler::UpdateMembership(
       update.topic_entries.push_back(TTopicItem());
 
       TTopicItem& item = update.topic_entries.back();
-      item.key = backend_id_;
-      Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
+      item.key = local_backend_id_;
+      Status status = thrift_serializer_.Serialize(
+          &local_backend_descriptor_, &item.value);
       if (!status.ok()) {
-        LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic: "
-                     << status.GetDetail();
+        LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic:"
+                     << " " << status.GetDetail();
         subscriber_topic_updates->pop_back();
       }
     } else if (is_offline &&
-        current_membership_.find(backend_id_) != current_membership_.end()) {
+        current_membership_.find(local_backend_id_) != current_membership_.end()) {
       LOG(WARNING) << "Removing offline ImpalaServer from statestore";
       subscriber_topic_updates->push_back(TTopicDelta());
       TTopicDelta& update = subscriber_topic_updates->back();
       update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
-      update.topic_deletions.push_back(backend_id_);
+      update.topic_deletions.push_back(local_backend_id_);
     }
     if (metrics_ != NULL) {
       num_fragment_instances_metric_->set_value(current_membership_.size());
@@ -358,63 +310,24 @@ void SimpleScheduler::UpdateMembership(
   }
 }
 
-Status SimpleScheduler::GetBackend(const TNetworkAddress& data_location,
-    TBackendDescriptor* backend) {
-  lock_guard<mutex> lock(backend_map_lock_);
-  if (backend_map_.size() == 0) {
-    return Status("No backends configured");
-  }
-  bool local_assignment = false;
-  BackendMap::iterator entry = backend_map_.find(data_location.hostname);
-
-  if (entry == backend_map_.end()) {
-    // backend_map_ maps ip address to backend but
-    // data_location.hostname might be a hostname.
-    // Find the ip address of the data_location from backend_ip_map_.
-    BackendIpAddressMap::const_iterator itr =
-        backend_ip_map_.find(data_location.hostname);
-    if (itr != backend_ip_map_.end()) {
-      entry = backend_map_.find(itr->second);
-    }
-  }
-
-  if (entry == backend_map_.end()) {
-    // round robin the ipaddress
-    entry = next_nonlocal_backend_entry_;
-    ++next_nonlocal_backend_entry_;
-    if (next_nonlocal_backend_entry_ == backend_map_.end()) {
-      next_nonlocal_backend_entry_ = backend_map_.begin();
-    }
-  } else {
-    local_assignment = true;
-  }
-  DCHECK(!entry->second.empty());
-  // Round-robin between impalads on the same ipaddress.
-  // Pick the first one, then move it to the back of the queue
-  *backend = entry->second.front();
-  entry->second.pop_front();
-  entry->second.push_back(*backend);
-
-  if (metrics_ != NULL) {
-    total_assignments_->Increment(1);
-    if (local_assignment) {
-      total_local_assignments_->Increment(1);
-    }
-  }
-
-  if (VLOG_FILE_IS_ON) {
-    stringstream s;
-    s << "(" << data_location;
-    s << " -> " << backend->address << ")";
-    VLOG_FILE << "SimpleScheduler assignment (data->backend):  " << s.str();
-  }
-  return Status::OK();
+SimpleScheduler::BackendConfigPtr SimpleScheduler::GetBackendConfig() const {
+  lock_guard<mutex> l(backend_config_lock_);
+  DCHECK(backend_config_.get() != NULL);
+  BackendConfigPtr backend_config = backend_config_;
+  return backend_config;
 }
 
+void SimpleScheduler::SetBackendConfig(const BackendConfigPtr& backend_config)
+{
+  lock_guard<mutex> l(backend_config_lock_);
+  backend_config_ = backend_config;
+}
+
+
 void SimpleScheduler::GetAllKnownBackends(BackendList* backends) {
-  lock_guard<mutex> lock(backend_map_lock_);
   backends->clear();
-  for (const BackendMap::value_type& backend_list: backend_map_) {
+  BackendConfigPtr backend_config = GetBackendConfig();
+  for (const BackendMap::value_type& backend_list: backend_config->backend_map()) {
     backends->insert(backends->end(), backend_list.second.begin(),
                      backend_list.second.end());
   }
@@ -423,6 +336,11 @@ void SimpleScheduler::GetAllKnownBackends(BackendList* backends) {
 Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
     QuerySchedule* schedule) {
   map<TPlanNodeId, vector<TScanRangeLocations>>::const_iterator entry;
+  RuntimeProfile::Counter* total_assignment_timer =
+      ADD_TIMER(schedule->summary_profile(), "ComputeScanRangeAssignmentTimer");
+
+  BackendConfigPtr backend_config = GetBackendConfig();
+
   for (entry = exec_request.per_node_scan_ranges.begin();
       entry != exec_request.per_node_scan_ranges.end(); ++entry) {
     const TPlanNodeId node_id = entry->first;
@@ -436,32 +354,37 @@ Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec
     const TReplicaPreference::type* node_replica_preference = node.__isset.hdfs_scan_node
         && node.hdfs_scan_node.__isset.replica_preference
         ? &node.hdfs_scan_node.replica_preference : NULL;
-    bool node_random_replica = node.__isset.hdfs_scan_node &&
-        node.hdfs_scan_node.__isset.random_replica &&
-        node.hdfs_scan_node.random_replica;
+
+    bool node_random_replica = node.__isset.hdfs_scan_node
+        && node.hdfs_scan_node.__isset.random_replica
+        && node.hdfs_scan_node.random_replica;
 
     FragmentScanRangeAssignment* assignment =
         &(*schedule->exec_params())[fragment_idx].scan_range_assignment;
-    RETURN_IF_ERROR(ComputeScanRangeAssignment(
+    RETURN_IF_ERROR(ComputeScanRangeAssignment(*backend_config,
         node_id, node_replica_preference, node_random_replica, entry->second,
-        exec_request.host_list, exec_at_coord, schedule->query_options(), assignment));
+        exec_request.host_list, exec_at_coord, schedule->query_options(),
+        total_assignment_timer, assignment));
     schedule->AddScanRanges(entry->second.size());
   }
   return Status::OK();
 }
 
 Status SimpleScheduler::ComputeScanRangeAssignment(
-    PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
-    bool node_random_replica, const vector<TScanRangeLocations>& locations,
+    const BackendConfig& backend_config, PlanNodeId node_id,
+    const TReplicaPreference::type* node_replica_preference, bool node_random_replica,
+    const vector<TScanRangeLocations>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
-    const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment) {
+    const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
+    FragmentScanRangeAssignment* assignment) {
+  SCOPED_TIMER(timer);
   // We adjust all replicas with memory distance less than base_distance to base_distance
-  // and view all replicas with equal or better distance as the same. For a full list of
-  // memory distance classes see TReplicaPreference in PlanNodes.thrift.
-  TReplicaPreference::type base_distance = TReplicaPreference::CACHE_LOCAL;
+  // and collect all replicas with equal or better distance as candidates. For a full list
+  // of memory distance classes see TReplicaPreference in PlanNodes.thrift.
+  TReplicaPreference::type base_distance = query_options.replica_preference;
+
   // The query option to disable cached reads adjusts the memory base distance to view
-  // all replicas as disk_local or worse.
-  // TODO remove in CDH6
+  // all replicas as having a distance disk_local or worse.
   if (query_options.disable_cached_reads &&
       base_distance == TReplicaPreference::CACHE_LOCAL) {
     base_distance = TReplicaPreference::DISK_LOCAL;
@@ -470,165 +393,101 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   // A preference attached to the plan node takes precedence.
   if (node_replica_preference) base_distance = *node_replica_preference;
 
-  // On otherwise equivalent disk replicas we either pick the first one, or we pick a
-  // random one. Picking random ones helps with preventing hot spots across several
-  // queries. On cached replica we will always break ties randomly.
-  bool random_non_cached_tiebreak = node_random_replica
-      || query_options.schedule_random_replica;
+  // Between otherwise equivalent backends we optionally break ties by comparing their
+  // random rank.
+  bool random_replica = query_options.schedule_random_replica || node_random_replica;
 
-  // map from datanode host to total assigned bytes.
-  unordered_map<TNetworkAddress, uint64_t> assigned_bytes_per_host;
-  unordered_set<TNetworkAddress> remote_hosts;
-  int64_t remote_bytes = 0L;
-  int64_t local_bytes = 0L;
-  int64_t cached_bytes = 0L;
+  AssignmentCtx assignment_ctx(backend_config, total_assignments_,
+      total_local_assignments_);
 
+  vector<const TScanRangeLocations*> remote_scan_range_locations;
+
+  // Loop over all scan ranges, select a backend for those with local impalads and collect
+  // all others for later processing.
   for (const TScanRangeLocations& scan_range_locations: locations) {
-    // Assign scans to replica with smallest memory distance.
     TReplicaPreference::type min_distance = TReplicaPreference::REMOTE;
-    // Assign this scan range to the host w/ the fewest assigned bytes.
-    uint64_t min_assigned_bytes = numeric_limits<uint64_t>::max();
-    const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
-    int volume_id = -1;
-    bool is_cached = false;
-    bool remote_read = false;
 
-    // Equivalent replicas have the same adjusted memory distance and the same number of
-    // assigned bytes.
-    int num_equivalent_replicas = 0;
-    for (const TScanRangeLocation& location: scan_range_locations.locations) {
-      TReplicaPreference::type memory_distance = TReplicaPreference::REMOTE;
-      const TNetworkAddress& replica_host = host_list[location.host_idx];
-      if (HasLocalBackend(replica_host)) {
-        // Adjust whether or not this replica should count as being cached based on the
-        // query option and whether it is collocated. If the DN is not collocated treat
-        // the replica as not cached (network transfer dominates anyway in this case).
-        // TODO: measure this in a cluster setup. Are remote reads better with caching?
-        if (location.is_cached) {
-          memory_distance = TReplicaPreference::CACHE_LOCAL;
-        } else {
-          memory_distance = TReplicaPreference::DISK_LOCAL;
-        }
-      } else {
-        memory_distance = TReplicaPreference::REMOTE;
-      }
-      memory_distance = max(memory_distance, base_distance);
-
-      // Named variable is needed here for template parameter deduction to work.
-      uint64_t initial_bytes = 0L;
-      uint64_t assigned_bytes =
-          *FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
-
-      bool found_new_replica = false;
-
-      // Check if we can already accept based on memory distance.
-      if (memory_distance < min_distance) {
-        min_distance = memory_distance;
-        num_equivalent_replicas = 1;
-        found_new_replica = true;
-      } else if (memory_distance == min_distance) {
-        // Check the effective memory distance of the current replica to decide whether to
-        // treat it as cached. If the actual distance has been increased to base_distance,
-        // then cached_replica will be different from is_cached.
-        bool cached_replica = memory_distance == TReplicaPreference::CACHE_LOCAL;
-        // Load based scheduling
-        if (assigned_bytes < min_assigned_bytes) {
-          num_equivalent_replicas = 1;
-          found_new_replica = true;
-        } else if (assigned_bytes == min_assigned_bytes &&
-            (random_non_cached_tiebreak || cached_replica)) {
-          // We do reservoir sampling: assume we have k equivalent replicas and encounter
-          // another equivalent one. Then we want to select the new one with probability
-          // 1/(k+1). This is achieved by rand % k+1 == 0. Now, assume the probability for
-          // one of the other replicas to be selected had been 1/k before. It will now be
-          // 1/k * k/(k+1) = 1/(k+1). Thus we achieve the goal of picking a replica
-          // uniformly at random.
-          ++num_equivalent_replicas;
-          const int r = rand();  // make debugging easier.
-          found_new_replica = (r % num_equivalent_replicas == 0);
-        }
-      }
-
-      if (found_new_replica) {
-        min_assigned_bytes = assigned_bytes;
-        data_host = &replica_host;
-        volume_id = location.volume_id;
-        is_cached = location.is_cached;
-        remote_read = min_distance == TReplicaPreference::REMOTE;
-      }
-    }  // end of for()
-
-    int64_t scan_range_length = 0;
-    if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
-      scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;
-    } else if (scan_range_locations.scan_range.__isset.kudu_key_range) {
-      // Hack so that kudu ranges are well distributed.
-      // TODO: KUDU-1133 Use the tablet size instead.
-      scan_range_length = 1000;
-    }
-
-    if (remote_read) {
-      remote_bytes += scan_range_length;
-      remote_hosts.insert(*data_host);
+    // Select backend host for the current scan range.
+    if (exec_at_coord) {
+      assignment_ctx.RecordScanRangeAssignment(local_backend_descriptor_, node_id,
+          host_list, scan_range_locations, assignment);
     } else {
-      local_bytes += scan_range_length;
-      if (is_cached) cached_bytes += scan_range_length;
-    }
-    assigned_bytes_per_host[*data_host] += scan_range_length;
+      // Collect backend candidates with smallest memory distance.
+      vector<IpAddr> backend_candidates;
+      if (base_distance < TReplicaPreference::REMOTE) {
+        for (const TScanRangeLocation& location: scan_range_locations.locations) {
+          const TNetworkAddress& replica_host = host_list[location.host_idx];
+          // Determine the adjusted memory distance to the closest backend for the replica
+          // host.
+          TReplicaPreference::type memory_distance = TReplicaPreference::REMOTE;
+          IpAddr backend_ip;
+          bool has_local_backend = assignment_ctx.backend_config().LookUpBackendIp(
+              replica_host.hostname, &backend_ip);
+          if (has_local_backend) {
+            if (location.is_cached) {
+              memory_distance = TReplicaPreference::CACHE_LOCAL;
+            } else {
+              memory_distance = TReplicaPreference::DISK_LOCAL;
+            }
+          } else {
+            memory_distance = TReplicaPreference::REMOTE;
+          }
+          memory_distance = max(memory_distance, base_distance);
 
-    // translate data host to backend host
-    DCHECK(data_host != NULL);
+          // We only need to collect backend candidates for non-remote reads, as it is the
+          // nature of remote reads that there is no backend available.
+          if (memory_distance < TReplicaPreference::REMOTE) {
+            DCHECK(has_local_backend);
+            // Check if we found a closer replica than the previous ones.
+            if (memory_distance < min_distance) {
+              min_distance = memory_distance;
+              backend_candidates.clear();
+              backend_candidates.push_back(backend_ip);
+            } else if (memory_distance == min_distance) {
+              backend_candidates.push_back(backend_ip);
+            }
+          }
+        }
+      }  // End of candidate selection.
+      DCHECK(!backend_candidates.empty() || min_distance == TReplicaPreference::REMOTE);
 
-    TNetworkAddress exec_hostport;
-    if (!exec_at_coord) {
+      // Check the effective memory distance of the candidates to decide whether to treat
+      // the scan range as cached.
+      bool cached_replica = min_distance == TReplicaPreference::CACHE_LOCAL;
+
+      // Pick backend host based on data location.
+      bool local_backend = min_distance != TReplicaPreference::REMOTE;
+
+      if (!local_backend) {
+        remote_scan_range_locations.push_back(&scan_range_locations);
+        continue;
+      }
+      // For local reads we want to break ties by backend rank in these cases:
+      // - if it is enforced via a query option.
+      // - when selecting between cached replicas. In this case there is no OS buffer
+      //   cache to worry about.
+      // Remote reads will always break ties by backend rank.
+      bool decide_local_assignment_by_rank = random_replica || cached_replica;
+      const IpAddr* backend_ip = NULL;
+      backend_ip = assignment_ctx.SelectLocalBackendHost(backend_candidates,
+          decide_local_assignment_by_rank);
       TBackendDescriptor backend;
-      RETURN_IF_ERROR(GetBackend(*data_host, &backend));
-      exec_hostport = backend.address;
-    } else {
-      exec_hostport = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
-    }
+      assignment_ctx.SelectBackendOnHost(*backend_ip, &backend);
+      assignment_ctx.RecordScanRangeAssignment(backend, node_id, host_list,
+          scan_range_locations, assignment);
+    }  // End of backend host selection.
+  }  // End of for loop over scan ranges.
 
-    PerNodeScanRanges* scan_ranges =
-        FindOrInsert(assignment, exec_hostport, PerNodeScanRanges());
-    vector<TScanRangeParams>* scan_range_params_list =
-        FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
-    // add scan range
-    TScanRangeParams scan_range_params;
-    scan_range_params.scan_range = scan_range_locations.scan_range;
-    // Explicitly set the optional fields.
-    scan_range_params.__set_volume_id(volume_id);
-    scan_range_params.__set_is_cached(is_cached);
-    scan_range_params.__set_is_remote(remote_read);
-    scan_range_params_list->push_back(scan_range_params);
+  // Assign remote scans to backends.
+  for (const TScanRangeLocations* scan_range_locations: remote_scan_range_locations) {
+    const IpAddr* backend_ip = assignment_ctx.SelectRemoteBackendHost();
+    TBackendDescriptor backend;
+    assignment_ctx.SelectBackendOnHost(*backend_ip, &backend);
+    assignment_ctx.RecordScanRangeAssignment(backend, node_id, host_list,
+        *scan_range_locations, assignment);
   }
 
-  if (VLOG_FILE_IS_ON) {
-    VLOG_FILE << "Total remote scan volume = " <<
-        PrettyPrinter::Print(remote_bytes, TUnit::BYTES);
-    VLOG_FILE << "Total local scan volume = " <<
-        PrettyPrinter::Print(local_bytes, TUnit::BYTES);
-    VLOG_FILE << "Total cached scan volume = " <<
-        PrettyPrinter::Print(cached_bytes, TUnit::BYTES);
-    if (remote_hosts.size() > 0) {
-      stringstream remote_node_log;
-      remote_node_log << "Remote data node list: ";
-      for (const TNetworkAddress& remote_host: remote_hosts) {
-        remote_node_log << remote_host << " ";
-      }
-      VLOG_FILE << remote_node_log.str();
-    }
-
-    for (FragmentScanRangeAssignment::value_type& entry: *assignment) {
-      VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
-      for (PerNodeScanRanges::value_type& per_node_scan_ranges: entry.second) {
-        stringstream str;
-        for (TScanRangeParams& params: per_node_scan_ranges.second) {
-          str << ThriftDebugString(params) << " ";
-        }
-        VLOG_FILE << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
-      }
-    }
-  }
+  if (VLOG_FILE_IS_ON) assignment_ctx.PrintAssignment(*assignment);
 
   return Status::OK();
 }
@@ -695,7 +554,6 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
 void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request,
     QuerySchedule* schedule) {
   vector<FragmentExecParams>* fragment_exec_params = schedule->exec_params();
-  TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
   DCHECK_EQ(fragment_exec_params->size(), exec_request.fragments.size());
   vector<TPlanNodeType::type> scan_node_types;
   scan_node_types.push_back(TPlanNodeType::HDFS_SCAN_NODE);
@@ -710,7 +568,7 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
     FragmentExecParams& params = (*fragment_exec_params)[i];
     if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
       // all single-node fragments run on the coordinator host
-      params.hosts.push_back(coord);
+      params.hosts.push_back(local_backend_descriptor_.address);
       continue;
     }
 
@@ -822,7 +680,7 @@ void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
     // TODO: we'll need to revisit this strategy once we can partition joins
     // (in which case this fragment might be executing a right outer join
     // with a large build table)
-    scan_hosts->push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
+    scan_hosts->push_back(local_backend_descriptor_.address);
     return;
   }
 
@@ -890,7 +748,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
       const TQueryCtx& query_ctx = schedule->request().query_ctx;
-      if(!query_ctx.__isset.parent_query_id &&
+      if (!query_ctx.__isset.parent_query_id &&
           query_ctx.__isset.tables_missing_stats &&
           !query_ctx.tables_missing_stats.empty()) {
         status.AddDetail(GetTablesMissingStatsWarning(query_ctx.tables_missing_stats));
@@ -1004,6 +862,299 @@ void SimpleScheduler::HandleLostResource(const TUniqueId& client_resource_id) {
     err_msg << "Resource " << client_resource_id << " was lost";
     Status status(err_msg.str());
     coord->Cancel(&status);
+  }
+}
+
+Status SimpleScheduler::HostnameToIpAddr(const Hostname& hostname, IpAddr* ip) {
+  // Try to resolve via the operating system.
+  vector<IpAddr> ipaddrs;
+  Status status = HostnameToIpAddrs(hostname, &ipaddrs);
+  if (!status.ok() || ipaddrs.empty()) {
+    stringstream ss;
+    ss << "Failed to resolve " << hostname << ": " << status.GetDetail();
+    return Status(ss.str());
+  }
+
+  // HostnameToIpAddrs() calls getaddrinfo() from glibc and will preserve the order of the
+  // result. RFC 3484 only specifies a partial order so we need to sort the addresses
+  // before picking the first non-localhost one.
+  sort(ipaddrs.begin(), ipaddrs.end());
+
+  // Try to find a non-localhost address, otherwise just use the first IP address
+  // returned.
+  *ip = ipaddrs[0];
+  if (!FindFirstNonLocalhost(ipaddrs, ip)) {
+    VLOG(3) << "Only localhost addresses found for " << hostname;
+  }
+  return Status::OK();
+}
+
+SimpleScheduler::BackendConfig::BackendConfig(
+    const std::vector<TNetworkAddress>& backends) {
+  // Construct backend_map and backend_ip_map.
+  for (int i = 0; i < backends.size(); ++i) {
+    IpAddr ip;
+    Status status = HostnameToIpAddr(backends[i].hostname, &ip);
+    if (!status.ok()) {
+      VLOG(1) << status.GetDetail();
+      continue;
+    }
+
+    BackendMap::iterator it = backend_map_.find(ip);
+    if (it == backend_map_.end()) {
+      it = backend_map_.insert(
+          make_pair(ip, BackendList())).first;
+      backend_ip_map_[backends[i].hostname] = ip;
+    }
+
+    TBackendDescriptor descriptor;
+    descriptor.address = MakeNetworkAddress(ip, backends[i].port);
+    descriptor.ip_address = ip;
+    it->second.push_back(descriptor);
+  }
+}
+
+void SimpleScheduler::BackendConfig::AddBackend(const TBackendDescriptor& be_desc) {
+  BackendList* be_descs = &backend_map_[be_desc.ip_address];
+  if (find(be_descs->begin(), be_descs->end(), be_desc) == be_descs->end()) {
+    be_descs->push_back(be_desc);
+  }
+  backend_ip_map_[be_desc.address.hostname] = be_desc.ip_address;
+}
+
+void SimpleScheduler::BackendConfig::RemoveBackend(const TBackendDescriptor& be_desc) {
+  backend_ip_map_.erase(be_desc.address.hostname);
+  auto be_descs_it = backend_map_.find(be_desc.ip_address);
+  if (be_descs_it != backend_map_.end()) {
+    BackendList* be_descs = &be_descs_it->second;
+    be_descs->erase(remove(be_descs->begin(), be_descs->end(), be_desc), be_descs->end());
+    if (be_descs->empty()) backend_map_.erase(be_descs_it);
+  }
+}
+
+bool SimpleScheduler::BackendConfig::LookUpBackendIp(const Hostname& hostname,
+    IpAddr* ip) const {
+  // Check if hostname is already a valid IP address.
+  if (backend_map_.find(hostname) != backend_map_.end()) {
+    if (ip) *ip = hostname;
+    return true;
+  }
+  auto it = backend_ip_map_.find(hostname);
+  if (it != backend_ip_map_.end()) {
+    if (ip) *ip = it->second;
+    return true;
+  }
+  return false;
+}
+
+SimpleScheduler::AssignmentCtx::AssignmentCtx(
+    const BackendConfig& backend_config,
+    IntCounter* total_assignments, IntCounter* total_local_assignments)
+  : backend_config_(backend_config), first_unused_backend_idx_(0),
+    total_assignments_(total_assignments),
+    total_local_assignments_(total_local_assignments) {
+  random_backend_order_.reserve(backend_map().size());
+  for (auto& v: backend_map()) random_backend_order_.push_back(&v);
+  std::mt19937 g(rand());
+  std::shuffle(random_backend_order_.begin(), random_backend_order_.end(), g);
+  // Initialize inverted map for backend rank lookups
+  int i = 0;
+  for (const BackendMap::value_type* v: random_backend_order_) {
+    random_backend_rank_[v->first] = i++;
+  }
+}
+
+const SimpleScheduler::IpAddr* SimpleScheduler::AssignmentCtx::SelectLocalBackendHost(
+    const std::vector<IpAddr>& data_locations, bool break_ties_by_rank) {
+  DCHECK(!data_locations.empty());
+  // List of candidate indexes into 'data_locations'.
+  vector<int> candidates_idxs;
+  // Find locations with minimum number of assigned bytes.
+  int64_t min_assigned_bytes = numeric_limits<int64_t>::max();
+  for (int i = 0; i < data_locations.size(); ++i) {
+    const IpAddr& backend_ip = data_locations[i];
+    int64_t assigned_bytes = 0;
+    auto handle_it = assignment_heap_.find(backend_ip);
+    if (handle_it != assignment_heap_.end()) {
+      assigned_bytes = (*handle_it->second).assigned_bytes;
+    }
+    if (assigned_bytes < min_assigned_bytes) {
+      candidates_idxs.clear();
+      min_assigned_bytes = assigned_bytes;
+    }
+    if (assigned_bytes == min_assigned_bytes) candidates_idxs.push_back(i);
+  }
+
+  DCHECK(!candidates_idxs.empty());
+  auto min_rank_idx = candidates_idxs.begin();
+  if (break_ties_by_rank) {
+    min_rank_idx = min_element(candidates_idxs.begin(), candidates_idxs.end(),
+        [&data_locations, this](const int& a, const int& b) {
+          return GetBackendRank(data_locations[a]) < GetBackendRank(data_locations[b]);
+        });
+  }
+  return &data_locations[*min_rank_idx];
+}
+
+const SimpleScheduler::IpAddr* SimpleScheduler::AssignmentCtx::SelectRemoteBackendHost() {
+  const IpAddr* candidate_ip;
+  if (HasUnusedBackends()) {
+    // Pick next unused backend.
+    candidate_ip = GetNextUnusedBackendAndIncrement();
+  } else {
+    // Pick next backend from assignment_heap. All backends must have been inserted into
+    // the heap at this point.
+    DCHECK(backend_config_.NumBackends() == assignment_heap_.size());
+    candidate_ip = &(assignment_heap_.top().ip);
+  }
+  DCHECK(candidate_ip != NULL);
+  return candidate_ip;
+}
+
+bool SimpleScheduler::AssignmentCtx::HasUnusedBackends() const {
+  return first_unused_backend_idx_ < random_backend_order_.size();
+}
+
+const SimpleScheduler::IpAddr*
+    SimpleScheduler::AssignmentCtx::GetNextUnusedBackendAndIncrement() {
+  DCHECK(HasUnusedBackends());
+  const IpAddr* ip = &(random_backend_order_[first_unused_backend_idx_++])->first;
+  DCHECK(backend_map().find(*ip) != backend_map().end());
+  return ip;
+}
+
+int SimpleScheduler::AssignmentCtx::GetBackendRank(const IpAddr& ip) const {
+  auto it = random_backend_rank_.find(ip);
+  DCHECK(it != random_backend_rank_.end());
+  return it->second;
+}
+
+void SimpleScheduler::AssignmentCtx::SelectBackendOnHost(const IpAddr& backend_ip,
+    TBackendDescriptor* backend) {
+  BackendMap::const_iterator backend_it = backend_map().find(backend_ip);
+  DCHECK(backend_it != backend_map().end());
+  const BackendList& backends_on_host = backend_it->second;
+  DCHECK(backends_on_host.size() > 0);
+  if (backends_on_host.size() == 1) {
+    *backend = *backends_on_host.begin();
+  } else {
+    BackendList::const_iterator* next_backend_on_host;
+    next_backend_on_host = FindOrInsert(&next_backend_per_host_, backend_ip,
+        backends_on_host.begin());
+    DCHECK(find(backends_on_host.begin(), backends_on_host.end(), **next_backend_on_host)
+        != backends_on_host.end());
+    *backend = **next_backend_on_host;
+    // Rotate
+    ++(*next_backend_on_host);
+    if (*next_backend_on_host == backends_on_host.end()) {
+      *next_backend_on_host = backends_on_host.begin();
+    }
+  }
+}
+
+void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
+    const TBackendDescriptor& backend, PlanNodeId node_id,
+    const vector<TNetworkAddress>& host_list,
+    const TScanRangeLocations& scan_range_locations,
+    FragmentScanRangeAssignment* assignment) {
+  int64_t scan_range_length = 0;
+  if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
+    scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;
+  } else if (scan_range_locations.scan_range.__isset.kudu_key_range) {
+    // Hack so that kudu ranges are well distributed.
+    // TODO: KUDU-1133 Use the tablet size instead.
+    scan_range_length = 1000;
+  }
+
+  IpAddr backend_ip;
+  backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip);
+  DCHECK(backend_map().find(backend_ip) != backend_map().end());
+  assignment_heap_.InsertOrUpdate(backend_ip, scan_range_length,
+      GetBackendRank(backend_ip));
+
+  // See if the read will be remote. This is not the case if the impalad runs on one of
+  // the replica's datanodes.
+  bool remote_read = true;
+  // For local reads we can set volume_id and is_cached. For remote reads HDFS will
+  // decide which replica to use so we keep those at default values.
+  int volume_id = -1;
+  bool is_cached = false;
+  for (const TScanRangeLocation& location: scan_range_locations.locations) {
+    const TNetworkAddress& replica_host = host_list[location.host_idx];
+    IpAddr replica_ip;
+    if (backend_config_.LookUpBackendIp(replica_host.hostname, &replica_ip)
+        && backend_ip == replica_ip) {
+      remote_read = false;
+      volume_id = location.volume_id;
+      is_cached = location.is_cached;
+      break;
+    }
+  }
+
+  if (remote_read) {
+    assignment_byte_counters_.remote_bytes += scan_range_length;
+  } else {
+    assignment_byte_counters_.local_bytes += scan_range_length;
+    if (is_cached) assignment_byte_counters_.cached_bytes += scan_range_length;
+  }
+
+  if (total_assignments_ != NULL) {
+    DCHECK(total_local_assignments_ != NULL);
+    total_assignments_->Increment(1);
+    if (!remote_read) total_local_assignments_->Increment(1);
+  }
+
+  PerNodeScanRanges* scan_ranges = FindOrInsert(assignment, backend.address,
+      PerNodeScanRanges());
+  vector<TScanRangeParams>* scan_range_params_list = FindOrInsert(scan_ranges, node_id,
+      vector<TScanRangeParams>());
+  // Add scan range.
+  TScanRangeParams scan_range_params;
+  scan_range_params.scan_range = scan_range_locations.scan_range;
+  scan_range_params.__set_volume_id(volume_id);
+  scan_range_params.__set_is_cached(is_cached);
+  scan_range_params.__set_is_remote(remote_read);
+  scan_range_params_list->push_back(scan_range_params);
+
+  if (VLOG_FILE_IS_ON) {
+    VLOG_FILE << "SimpleScheduler assignment to backend: " << backend.address
+        << "(" << (remote_read ? "remote" : "local") << " selection)";
+  }
+}
+
+void SimpleScheduler::AssignmentCtx::PrintAssignment(
+    const FragmentScanRangeAssignment& assignment) {
+  VLOG_FILE << "Total remote scan volume = " <<
+    PrettyPrinter::Print(assignment_byte_counters_.remote_bytes, TUnit::BYTES);
+  VLOG_FILE << "Total local scan volume = " <<
+    PrettyPrinter::Print(assignment_byte_counters_.local_bytes, TUnit::BYTES);
+  VLOG_FILE << "Total cached scan volume = " <<
+    PrettyPrinter::Print(assignment_byte_counters_.cached_bytes, TUnit::BYTES);
+
+  for (const FragmentScanRangeAssignment::value_type& entry: assignment) {
+    VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
+    for (const PerNodeScanRanges::value_type& per_node_scan_ranges: entry.second) {
+      stringstream str;
+      for (const TScanRangeParams& params: per_node_scan_ranges.second) {
+        str << ThriftDebugString(params) << " ";
+      }
+      VLOG_FILE << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
+    }
+  }
+}
+
+void SimpleScheduler::AddressableAssignmentHeap::InsertOrUpdate(const IpAddr& ip,
+    int64_t assigned_bytes, int rank) {
+  auto handle_it = backend_handles_.find(ip);
+  if (handle_it == backend_handles_.end()) {
+    AssignmentHeap::handle_type handle = backend_heap_.push({assigned_bytes, rank, ip});
+    backend_handles_.emplace(ip, handle);
+  } else {
+    // We need to rebuild the heap after every update operation. Calling decrease once is
+    // sufficient as both assignments decrease the key.
+    AssignmentHeap::handle_type handle = handle_it->second;
+    (*handle).assigned_bytes += assigned_bytes;
+    backend_heap_.decrease(handle);
   }
 }
 

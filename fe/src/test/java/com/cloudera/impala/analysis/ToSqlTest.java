@@ -469,11 +469,17 @@ public class ToSqlTest extends AnalyzerTest {
       // Table hint
       testToSql(String.format(
           "select * from functional.alltypes at %sschedule_random_replica%s", prefix,
-          suffix), "SELECT * FROM functional.alltypes at \n-- +schedule_random_replica\n"
-          );
+          suffix),
+          "SELECT * FROM functional.alltypes at \n-- +schedule_random_replica\n");
       testToSql(String.format(
           "select * from functional.alltypes %sschedule_random_replica%s", prefix,
-          suffix), "SELECT * FROM functional.alltypes \n-- +schedule_random_replica\n");
+          suffix),
+          "SELECT * FROM functional.alltypes \n-- +schedule_random_replica\n");
+      testToSql(String.format(
+          "select * from functional.alltypes %sschedule_random_replica," +
+          "schedule_disk_local%s", prefix, suffix),
+          "SELECT * FROM functional.alltypes \n-- +schedule_random_replica," +
+          "schedule_disk_local\n");
       testToSql(String.format(
           "select c1 from (select at.tinyint_col as c1 from functional.alltypes at " +
           "%sschedule_random_replica%s) s1", prefix, suffix),

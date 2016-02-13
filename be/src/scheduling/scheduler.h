@@ -44,17 +44,6 @@ class Scheduler {
   /// List of server descriptors.
   typedef std::vector<TBackendDescriptor> BackendList;
 
-  /// Return a host/port pair of known ImpalaInternalServices that is running on or nearby
-  /// the given data location
-  virtual Status GetBackend(const TNetworkAddress& data_location,
-      TBackendDescriptor* backend) = 0;
-
-  /// Return true if there is a backend located on the given data_location
-  virtual bool HasLocalBackend(const TNetworkAddress& data_location) = 0;
-
-  /// Return a list of all backends known to the scheduler
-  virtual void GetAllKnownBackends(BackendList* backends) = 0;
-
   /// Populates given query schedule whose execution is to be coordinated by coord.
   /// Assigns fragments to hosts based on scan ranges in the query exec request.
   /// If resource management is enabled, also reserves resources from the central

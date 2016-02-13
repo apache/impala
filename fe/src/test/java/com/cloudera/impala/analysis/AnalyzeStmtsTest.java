@@ -1618,8 +1618,20 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       String suffix = hintStyle[1];
       for (String alias : new String[] { "", "a" }) {
         AnalyzesOk(
-            String.format("select * from functional.alltypes %s " +
-            "%sschedule_random_replica%s", alias, prefix, suffix));
+            String.format("select * from functional.alltypes %s %sschedule_cache_local%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_disk_local%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_remote%s",
+            alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %sschedule_remote," +
+            "schedule_random_replica%s", alias, prefix, suffix));
+        AnalyzesOk(
+            String.format("select * from functional.alltypes %s %s" +
+            "schedule_random_replica,schedule_remote%s", alias, prefix, suffix));
 
         String name = alias.isEmpty() ? "functional.alltypes" : alias;
         AnalyzesOk(String.format("select * from functional.alltypes %s %sFOO%s", alias,
