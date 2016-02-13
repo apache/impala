@@ -814,8 +814,12 @@ Status PartitionedAggregationNode::Partition::Spill() {
   if (aggregated_row_stream->using_small_buffers()) {
     RETURN_IF_ERROR(aggregated_row_stream->SwitchToIoBuffers(&got_buffer));
   }
-  // Unpin the stream as soon as possible to increase the changes that the
-  // SwitchToIoBuffers() call below will succeed.
+  // Unpin the stream as soon as possible to increase the chances that the
+  // SwitchToIoBuffers() call below will succeed.  If we're repartitioning, rows that
+  // were already aggregated (rows from the input partition's aggregated stream) will
+  // need to be added to this hash partition's aggregated stream, so we need to leave
+  // the write block pinned.
+  // TODO: when not repartitioning, don't leave the write block pinned.
   DCHECK(!got_buffer || aggregated_row_stream->has_write_block())
       << aggregated_row_stream->DebugString();
   RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(false));
@@ -1256,11 +1260,11 @@ Status PartitionedAggregationNode::SpillPartition() {
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     if (hash_partitions_[i]->is_closed) continue;
     if (hash_partitions_[i]->is_spilled()) continue;
-    // TODO: In PHJ the bytes_in_mem() call also calculates the mem used by the
-    // write_block_, why do we ignore it here?
+    // Pass 'true' because we need to keep the write block pinned. See Partition::Spill().
     int64_t mem = hash_partitions_[i]->aggregated_row_stream->bytes_in_mem(true);
-    mem += hash_partitions_[i]->hash_tbl->byte_size();
+    mem += hash_partitions_[i]->hash_tbl->ByteSize();
     mem += hash_partitions_[i]->agg_fn_pool->total_reserved_bytes();
+    DCHECK_GT(mem, 0); // At least the hash table buckets should occupy memory.
     if (mem > max_freed_mem) {
       max_freed_mem = mem;
       partition_idx = i;

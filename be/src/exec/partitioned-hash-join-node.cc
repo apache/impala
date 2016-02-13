@@ -322,11 +322,6 @@ int64_t PartitionedHashJoinNode::Partition::EstimatedInMemSize() const {
   return build_rows_->byte_size() + HashTable::EstimateSize(build_rows_->num_rows());
 }
 
-int64_t PartitionedHashJoinNode::Partition::InMemSize() const {
-  DCHECK(hash_tbl_.get() != NULL);
-  return build_rows_->byte_size() + hash_tbl_->byte_size();
-}
-
 void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
   if (is_closed()) return;
   is_closed_ = true;
@@ -566,7 +561,7 @@ Status PartitionedHashJoinNode::SpillPartition(Partition** spilled_partition) {
       // IMPALA-1488: Do not spill partitions that already had matches, because we
       // are going to lose information and return wrong results.
       if (UNLIKELY(candidate->hash_tbl()->HasMatches())) continue;
-      mem += candidate->hash_tbl()->byte_size();
+      mem += candidate->hash_tbl()->ByteSize();
     }
     if (mem > max_freed_mem) {
       max_freed_mem = mem;

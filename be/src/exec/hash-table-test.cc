@@ -220,6 +220,9 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTable> hash_table;
     bool initialized = CreateHashTable(quadratic, initial_num_buckets, &hash_table);
     EXPECT_EQ(too_big, !initialized);
+    if (initialized && initial_num_buckets > 0) {
+      EXPECT_NE(hash_table->ByteSize(), 0);
+    }
 
     hash_table->Close();
   }

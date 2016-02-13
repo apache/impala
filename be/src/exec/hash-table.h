@@ -441,8 +441,8 @@ class HashTable {
   /// inserted without need to resize.
   bool CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx);
 
-  /// Returns the number of bytes allocated to the hash table
-  int64_t byte_size() const { return total_data_page_size_; }
+  /// Returns the number of bytes allocated to the hash table from the block manager.
+  int64_t ByteSize() const { return num_buckets_ * sizeof(Bucket) + total_data_page_size_; }
 
   /// Returns an iterator at the beginning of the hash table.  Advancing this iterator
   /// will traverse all elements.

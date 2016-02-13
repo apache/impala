@@ -453,10 +453,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// partition. This includes the entire build side and the hash table.
     int64_t EstimatedInMemSize() const;
 
-    /// Returns the actual size of the in memory build side. Only valid to call on
-    /// partitions after BuildPartition()
-    int64_t InMemSize() const;
-
     /// Pins the build tuples for this partition and constructs the hash_tbl_ from it.
     /// Build rows cannot be added after calling this.
     /// If the partition could not be built due to memory pressure, *built is set to false
