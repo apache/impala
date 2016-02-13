@@ -36,11 +36,6 @@ order by 1,2 limit 3
 STRING, BIGINT, DECIMAL, STRING
 ====
 ---- QUERY
-# TODO: the distributed agg tests are highly likely of becoming flaking. The memory is
-# split between the local and merge agg in an uncontrolled way, which can lead to
-# pathological cases causing the queries to fail with OOM. These cases are expected
-# to be unlikely with reasonable limits but we are explicitly trying to pick very low
-# limits (IMPALA-1305).
 set max_block_mgr_memory=275m;
 select l_orderkey, count(*)
 from lineitem
@@ -78,22 +73,25 @@ order by count(*) desc limit 5
 STRING, BIGINT
 ====
 ---- QUERY
-# Disabled due to IMPALA-1305.
 # Test query with string grouping column and string agg columns
-#set num_nodes=0;
-#set max_block_mgr_memory=80m;
-#select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
-#from lineitem
-#group by 1,2
-#order by 1,2 limit 3;
-#---- RESULTS
-#'A',3,0.05,'RAIL'
-#'A',5,0.03,'AIR'
-#'A',6,0.03,'TRUCK'
-#---- TYPES
-#STRING, BIGINT, DOUBLE, STRING
-#====
-#
+set num_nodes=0;
+set max_block_mgr_memory=60m;
+select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
+from lineitem
+group by 1,2
+order by 1,2 limit 3;
+---- RESULTS
+'A',3,0.05,'RAIL'
+'A',5,0.03,'AIR'
+'A',6,0.03,'TRUCK'
+---- TYPES
+STRING, BIGINT, DECIMAL, STRING
+---- RUNTIME_PROFILE
+# Verify that passthrough and spilling happened in the pre and merge agg.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
 # Test query with string intermediate state.
 set num_nodes=0;
 set max_block_mgr_memory=275m;
