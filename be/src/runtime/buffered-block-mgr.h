@@ -142,7 +142,9 @@ class BufferedBlockMgr {
     /// memory pressure, this block will be pinned using the buffer from 'release_block'.
     /// If 'unpin' is true, 'release_block' will be unpinned (regardless of whether or not
     /// the buffer was used for this block). If 'unpin' is false, 'release_block' is
-    /// deleted. 'release_block' must be pinned.
+    /// deleted. 'release_block' must be pinned. If an error occurs and 'unpin' was false,
+    /// 'release_block' is always deleted. If 'unpin' was true and an error occurs,
+    /// 'release_block' may be left pinned or unpinned.
     Status Pin(bool* pinned, Block* release_block = NULL, bool unpin = true);
 
     /// Unpins a block by adding it to the list of unpinned blocks maintained by the block

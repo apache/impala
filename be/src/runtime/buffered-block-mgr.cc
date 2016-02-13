@@ -608,6 +608,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
     bool unpin) {
   DCHECK(block != NULL);
   DCHECK(!block->is_deleted_);
+  Status status;
   *pinned = false;
   if (block->is_pinned_) {
     *pinned = true;
@@ -615,7 +616,8 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   }
 
   bool in_mem = false;
-  RETURN_IF_ERROR(FindBufferForBlock(block, &in_mem));
+  status = FindBufferForBlock(block, &in_mem);
+  if (!status.ok()) goto error;
   *pinned = block->is_pinned_;
 
   // Block was not evicted or had no data, nothing left to do.
@@ -642,50 +644,69 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
         *pinned = true;
         block->client_->PinBuffer(block->buffer_desc_);
         ++total_pinned_buffers_;
-        RETURN_IF_ERROR(WriteUnpinnedBlocks());
+        status = WriteUnpinnedBlocks();
+        if (!status.ok()) goto error;
       }
       return DeleteOrUnpinBlock(release_block, unpin);
     }
 
-    RETURN_IF_ERROR(TransferBuffer(block, release_block, unpin));
+    status = TransferBuffer(block, release_block, unpin);
+    if (!status.ok()) goto error;
     DCHECK(!release_block->is_pinned_);
     release_block = NULL; // Handled by transfer.
     DCHECK(block->is_pinned_);
     *pinned = true;
   }
 
-  // Read the block from disk if it was not in memory.
   DCHECK(block->write_range_ != NULL) << block->DebugString() << endl << release_block;
-  SCOPED_TIMER(disk_read_timer_);
-  // Create a ScanRange to perform the read.
-  DiskIoMgr::ScanRange* scan_range =
-      obj_pool_.Add(new DiskIoMgr::ScanRange());
-  scan_range->Reset(NULL, block->write_range_->file(), block->write_range_->len(),
-      block->write_range_->offset(), block->write_range_->disk_id(), false, block,
-      DiskIoMgr::ScanRange::NEVER_CACHE);
-  vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
-  RETURN_IF_ERROR(io_mgr_->AddScanRanges(io_request_context_, ranges, true));
 
-  // Read from the io mgr buffer into the block's assigned buffer.
-  int64_t offset = 0;
-  bool buffer_eosr;
-  do {
-    DiskIoMgr::BufferDescriptor* io_mgr_buffer;
-    RETURN_IF_ERROR(scan_range->GetNext(&io_mgr_buffer));
-    memcpy(block->buffer() + offset, io_mgr_buffer->buffer(), io_mgr_buffer->len());
-    offset += io_mgr_buffer->len();
-    buffer_eosr = io_mgr_buffer->eosr();
-    io_mgr_buffer->Return();
-  } while (!buffer_eosr);
-  DCHECK_EQ(offset, block->write_range_->len());
+  {
+    // Read the block from disk if it was not in memory.
+    SCOPED_TIMER(disk_read_timer_);
+    // Create a ScanRange to perform the read.
+    DiskIoMgr::ScanRange* scan_range =
+        obj_pool_.Add(new DiskIoMgr::ScanRange());
+    scan_range->Reset(NULL, block->write_range_->file(), block->write_range_->len(),
+        block->write_range_->offset(), block->write_range_->disk_id(), false, block,
+        DiskIoMgr::ScanRange::NEVER_CACHE);
+    vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
+    status = io_mgr_->AddScanRanges(io_request_context_, ranges, true);
+    if (!status.ok()) goto error;
+
+    // Read from the io mgr buffer into the block's assigned buffer.
+    int64_t offset = 0;
+    bool buffer_eosr;
+    do {
+      DiskIoMgr::BufferDescriptor* io_mgr_buffer;
+      status = scan_range->GetNext(&io_mgr_buffer);
+      if (!status.ok()) goto error;
+      memcpy(block->buffer() + offset, io_mgr_buffer->buffer(), io_mgr_buffer->len());
+      offset += io_mgr_buffer->len();
+      buffer_eosr = io_mgr_buffer->eosr();
+      io_mgr_buffer->Return();
+    } while (!buffer_eosr);
+    DCHECK_EQ(offset, block->write_range_->len());
+  }
 
   // Verify integrity first, because the hash was generated from encrypted data.
-  if (check_integrity_) RETURN_IF_ERROR(VerifyHash(block));
+  if (check_integrity_) {
+    status = VerifyHash(block);
+    if (!status.ok()) goto error;
+  }
 
   // Decryption is done in-place, since the buffer can't be accessed by anyone else.
-  if (encryption_) RETURN_IF_ERROR(Decrypt(block));
+  if (encryption_) {
+    status = Decrypt(block);
+    if (!status.ok()) goto error;
+  }
 
   return DeleteOrUnpinBlock(release_block, unpin);
+
+error:
+  DCHECK(!status.ok());
+  // Make sure to delete the block if we hit an error before calling DeleteOrUnpin().
+  if (release_block != NULL && !unpin) DeleteBlock(release_block);
+  return status;
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
