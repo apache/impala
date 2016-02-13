@@ -85,7 +85,7 @@ class TestUdfs(ImpalaTestSuite):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present
     on HDFS"""
     # Copy hive-exec.jar to a temporary file
-    jar_path = get_fs_path("/tmp/" + get_random_id(5) + ".jar")
+    jar_path = get_fs_path("/test-warehouse/" + get_random_id(5) + ".jar")
     hive_jar = get_fs_path("/test-warehouse/hive-exec.jar")
     check_call(["hadoop", "fs", "-cp", hive_jar, jar_path])
     drop_fn_stmt = "drop function if exists default.pi_missing_jar()"
