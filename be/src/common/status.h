@@ -21,8 +21,9 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include "common/logging.h"
+#include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
+#include "common/logging.h"
 #include "gen-cpp/Status_types.h"  // for TStatus
 #include "gen-cpp/ErrorCodes_types.h"  // for TErrorCode
 #include "gen-cpp/TCLIService_types.h" // for HS2 TStatus
@@ -82,10 +83,10 @@ class Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
 
-  inline Status(): msg_(NULL) {}
+  ALWAYS_INLINE Status(): msg_(NULL) {}
 
   // Return a default constructed Status instance in the OK case.
-  inline static Status OK() { return Status(); }
+  static ALWAYS_INLINE Status OK() { return Status(); }
 
   // Return a MEM_LIMIT_EXCEEDED error status.
   static Status MemLimitExceeded();
@@ -94,7 +95,7 @@ class Status {
   static const Status DEPRECATED_RPC;
 
   /// Copy c'tor makes copy of error detail so Status can be returned by value.
-  inline Status(const Status& status) : msg_(NULL) {
+  ALWAYS_INLINE Status(const Status& status) : msg_(NULL) {
     if (UNLIKELY(status.msg_ != NULL)) CopyMessageFrom(status);
   }
 
@@ -145,14 +146,14 @@ class Status {
   static Status Expected(const std::string& error_msg);
 
   /// same as copy c'tor
-  inline Status& operator=(const Status& status) {
+  ALWAYS_INLINE Status& operator=(const Status& status) {
     // Take the slow path if either Status objects have non-NULL messages (unless they
     // are aliases).
     if (UNLIKELY(msg_ != status.msg_)) CopyMessageFrom(status);
     return *this;
   }
 
-  inline ~Status() {
+  ALWAYS_INLINE ~Status() {
     // The UNLIKELY and inlining here are important hints for the compiler to
     // streamline the common case of Status::OK(). Use FreeMessage() which is
     // not inlined to free the message. This avoids potential code bloat due
@@ -176,7 +177,7 @@ class Status {
   /// Retains the TErrorCode value and the message
   Status& operator=(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 
-  bool ok() const { return msg_ == NULL; }
+  bool ALWAYS_INLINE ok() const { return msg_ == NULL; }
 
   bool IsCancelled() const {
     return msg_ != NULL && msg_->error() == TErrorCode::CANCELLED;

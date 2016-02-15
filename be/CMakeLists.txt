@@ -137,6 +137,11 @@ set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-DIR_COMPILE" "-DNDEBUG"
   "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG"
   "-Wno-deprecated" "-Wno-c++11-extensions" "-O1")
 
+# Flags to pass to LLVM's opt to further optimize cross-compiled IR.
+#  -inline: inline with low threshold to get rid of trivial accessor functions.
+set(LLVM_OPT_IR_FLAGS "-inline" "-inlinehint-threshold=10" "-inline-threshold=10")
+
+
 # setup doc generation with Doxygen
 find_package(Doxygen)
 if (DOXYGEN_FOUND)

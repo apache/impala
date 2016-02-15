@@ -436,12 +436,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level);
     ~Partition();
 
-    BufferedTupleStream* build_rows() { return build_rows_; }
-    BufferedTupleStream* probe_rows() { return probe_rows_; }
-    HashTable* hash_tbl() const { return hash_tbl_.get(); }
+    BufferedTupleStream* ALWAYS_INLINE build_rows() { return build_rows_; }
+    BufferedTupleStream* ALWAYS_INLINE probe_rows() { return probe_rows_; }
+    HashTable* ALWAYS_INLINE hash_tbl() const { return hash_tbl_.get(); }
 
-    bool is_closed() const { return is_closed_; }
-    bool is_spilled() const { return is_spilled_; }
+    bool ALWAYS_INLINE is_closed() const { return is_closed_; }
+    bool ALWAYS_INLINE is_spilled() const { return is_spilled_; }
 
     /// Must be called once per partition to release any resources. This should be called
     /// as soon as possible to release memory.

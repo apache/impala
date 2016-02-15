@@ -20,6 +20,8 @@
 #include <cstring>
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/impala-ir.h"
+#include "common/compiler-util.h"
 #include "common/logging.h"
 #include "runtime/buffered-block-mgr.h" // for BufferedBlockMgr::Block
 #include "runtime/descriptors.h"
@@ -96,20 +98,20 @@ class RowBatch {
   /// are uninitialized and each tuple of the row must be set, after which CommitRows()
   /// can be called to update num_rows_. Two consecutive AddRow() calls without a
   /// CommitRows() call between them have the same effect as a single call.
-  int AddRows(int n) {
+  int ALWAYS_INLINE AddRows(int n) {
     DCHECK_LE(num_rows_ + n, capacity_);
     return num_rows_;
   }
 
-  int AddRow() { return AddRows(1); }
+  int ALWAYS_INLINE AddRow() { return AddRows(1); }
 
-  void CommitRows(int n) {
+  void ALWAYS_INLINE CommitRows(int n) {
     DCHECK_GE(n, 0);
     DCHECK_LE(num_rows_ + n, capacity_);
     num_rows_ += n;
   }
 
-  void CommitLastRow() { CommitRows(1); }
+  void ALWAYS_INLINE CommitLastRow() { CommitRows(1); }
 
   /// Set function can be used to reduce the number of rows in the batch.  This is only
   /// used in the limit case where more rows were added than necessary.
@@ -122,7 +124,7 @@ class RowBatch {
   /// Returns true if the row batch has filled rows up to its capacity or has accumulated
   /// enough memory. The memory calculation includes the tuple data pool and any
   /// auxiliary memory attached to the row batch.
-  bool AtCapacity() {
+  bool ALWAYS_INLINE AtCapacity() {
     DCHECK_LE(num_rows_, capacity_);
     // Check AtCapacity() conditions enforced in MarkNeedToReturn() and AddTupleStream()
     if (need_to_return_) DCHECK_EQ(num_rows_, capacity_);
@@ -132,7 +134,7 @@ class RowBatch {
     return num_rows_ == capacity_ || mem_usage >= AT_CAPACITY_MEM_USAGE;
   }
 
-  TupleRow* GetRow(int row_idx) {
+  TupleRow* ALWAYS_INLINE GetRow(int row_idx) {
     DCHECK(tuple_ptrs_ != NULL);
     DCHECK_GE(row_idx, 0);
     DCHECK_LT(row_idx, capacity_);
@@ -216,8 +218,8 @@ class RowBatch {
   /// Utility function: returns total size of batch.
   static int GetBatchSize(const TRowBatch& batch);
 
-  int num_rows() const { return num_rows_; }
-  int capacity() const { return capacity_; }
+  int ALWAYS_INLINE num_rows() const { return num_rows_; }
+  int ALWAYS_INLINE capacity() const { return capacity_; }
 
   const RowDescriptor& row_desc() const { return row_desc_; }
 

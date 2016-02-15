@@ -55,14 +55,13 @@ set(IR_NO_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse.bc")
 set(IR_SSE_TMP_C_FILE ${IR_SSE_C_FILE}.tmp)
 set(IR_NO_SSE_TMP_C_FILE ${IR_NO_SSE_C_FILE}.tmp)
 
-# Run the clang compiler to generate IR.  Then run their opt tool to remove
-# unnamed instr.  This makes the IR verifiable and more readable.
-# We need to compile to IR twice, once with sse enabled and one without.  At runtime
-# impala will pick the correct file to load.
+# Run the clang compiler to generate IR. Then run the LLVM opt tool to apply specific
+# optimisations. We need to compile to IR twice, once with sse enabled and one without.
+# At runtime impala will pick the correct file to load.
 add_custom_command(
   OUTPUT ${IR_SSE_OUTPUT_FILE}
   COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} "-msse4.2" ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_SSE_TMP_OUTPUT_FILE}
-  COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_SSE_TMP_OUTPUT_FILE} > ${IR_SSE_OUTPUT_FILE}
+  COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_SSE_TMP_OUTPUT_FILE} > ${IR_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_SSE_TMP_OUTPUT_FILE}
   DEPENDS Exec Exprs Runtime Udf Util ${IR_INPUT_FILES}
 )
@@ -71,7 +70,7 @@ add_custom_command(
 add_custom_command(
   OUTPUT ${IR_NO_SSE_OUTPUT_FILE}
   COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_NO_SSE_TMP_OUTPUT_FILE}
-  COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_NO_SSE_TMP_OUTPUT_FILE} > ${IR_NO_SSE_OUTPUT_FILE}
+  COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_NO_SSE_TMP_OUTPUT_FILE} > ${IR_NO_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_NO_SSE_TMP_OUTPUT_FILE}
   DEPENDS Exec Exprs Runtime Udf Util ${IR_INPUT_FILES}
 )

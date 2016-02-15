@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
+#include "common/compiler-util.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/buffered-tuple-stream.inline.h"
@@ -127,22 +128,23 @@ class HashTableCtx {
   void Close();
 
   void set_level(int level);
-  int level() const { return level_; }
-  uint32_t seed(int level) { return seeds_.at(level); }
 
-  TupleRow* row() const { return row_; }
+  int ALWAYS_INLINE level() const { return level_; }
+  uint32_t ALWAYS_INLINE seed(int level) { return seeds_.at(level); }
+
+  TupleRow* ALWAYS_INLINE row() const { return row_; }
 
   /// Returns the results of the exprs at 'expr_idx' evaluated over the last row
   /// processed.
   /// This value is invalid if the expr evaluated to NULL.
   /// TODO: this is an awkward abstraction but aggregation node can take advantage of
   /// it and save some expr evaluation calls.
-  void* last_expr_value(int expr_idx) const {
+  void* ALWAYS_INLINE last_expr_value(int expr_idx) const {
     return expr_values_buffer_ + expr_values_buffer_offsets_[expr_idx];
   }
 
   /// Returns if the expr at 'expr_idx' evaluated to NULL for the last row.
-  bool last_expr_value_null(int expr_idx) const {
+  bool ALWAYS_INLINE last_expr_value_null(int expr_idx) const {
     return expr_value_null_bits_[expr_idx];
   }
 
@@ -154,7 +156,7 @@ class HashTableCtx {
   bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row, uint32_t* hash);
   bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash);
 
-  int results_buffer_size() const { return results_buffer_size_; }
+  int ALWAYS_INLINE results_buffer_size() const { return results_buffer_size_; }
 
   /// Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
@@ -483,6 +485,7 @@ class HashTable {
 
    public:
 
+    ALWAYS_INLINE
     Iterator() : table_(NULL), row_(NULL), bucket_idx_(BUCKET_NOT_FOUND), node_(NULL) { }
 
     /// Iterates to the next element. It should be called only if !AtEnd().
@@ -497,13 +500,13 @@ class HashTable {
 
     /// Iterates to the next element that does not have its matched flag set. Used in
     /// right-outer and full-outer joins.
-    void NextUnmatched();
+    void IR_ALWAYS_INLINE NextUnmatched();
 
     /// Return the current row or tuple. Callers must check the iterator is not AtEnd()
     /// before calling them.  The returned row is owned by the iterator and valid until
     /// the next call to GetRow(). It is safe to advance the iterator.
-    TupleRow* GetRow() const;
-    Tuple* GetTuple() const;
+    TupleRow* IR_ALWAYS_INLINE GetRow() const;
+    Tuple* IR_ALWAYS_INLINE GetTuple() const;
 
     /// Set the current tuple for an empty bucket. Designed to be used with the iterator
     /// returned from FindBuildRowBucket() in the case when the value is not found.  It is
@@ -523,11 +526,12 @@ class HashTable {
     void SetAtEnd();
 
     /// Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
-    bool AtEnd() const { return bucket_idx_ == BUCKET_NOT_FOUND; }
+    bool ALWAYS_INLINE AtEnd() const { return bucket_idx_ == BUCKET_NOT_FOUND; }
 
    private:
     friend class HashTable;
 
+    ALWAYS_INLINE
     Iterator(HashTable* table, TupleRow* row, int bucket_idx, DuplicateNode* node)
       : table_(table),
         row_(row),
