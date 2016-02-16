@@ -84,7 +84,7 @@ SlotDescriptor::SlotDescriptor(
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
     slot_size_(type_.GetSlotSize()),
-    field_idx_(-1),
+    llvm_field_idx_(-1),
     is_null_fn_(NULL),
     set_not_null_fn_(NULL),
     set_null_fn_(NULL) {
@@ -122,7 +122,7 @@ string SlotDescriptor::DebugString() const {
     out << " collection_item_tuple_id=" << collection_item_descriptor_->id();
   }
   out << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
-      << " slot_idx=" << slot_idx_ << " field_idx=" << field_idx_
+      << " slot_idx=" << slot_idx_ << " field_idx=" << llvm_field_idx_
       << ")";
   return out.str();
 }
@@ -601,7 +601,8 @@ Function* SlotDescriptor::GetIsNullFn(LlvmCodeGen* codegen) const {
   Value* tuple_ptr;
   Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
 
-  Value* null_byte_ptr = builder.CreateStructGEP(tuple_ptr, byte_offset, "null_byte_ptr");
+  Value* null_byte_ptr = builder.CreateStructGEP(NULL, tuple_ptr, byte_offset,
+      "null_byte_ptr");
   Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
   Value* null_mask = builder.CreateAnd(null_byte, mask, "null_mask");
   Value* is_null = builder.CreateICmpNE(null_mask, zero, "is_null");
@@ -635,8 +636,7 @@ Function* SlotDescriptor::GetUpdateNullFn(LlvmCodeGen* codegen, bool set_null) c
   Value* tuple_ptr;
   Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
 
-  Value* null_byte_ptr =
-      builder.CreateStructGEP(
+  Value* null_byte_ptr = builder.CreateStructGEP(NULL,
           tuple_ptr, null_indicator_offset_.byte_offset, "null_byte_ptr");
   Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
   Value* result = NULL;
@@ -663,53 +663,57 @@ Function* SlotDescriptor::GetUpdateNullFn(LlvmCodeGen* codegen, bool set_null) c
   return fn;
 }
 
-// The default llvm packing is identical to what we do in the FE.  Each field is aligned
-// to begin on the size for that type.
-// TODO: Understand llvm::SetTargetData which allows you to explicitly define the packing
-// rules.
 StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   // If we already generated the llvm type, just return it.
   if (llvm_struct_ != NULL) return llvm_struct_;
 
-  // For each null byte, add a byte to the struct
-  vector<Type*> struct_fields;
-  struct_fields.resize(num_null_bytes_ + slots_.size());
-  for (int i = 0; i < num_null_bytes_; ++i) {
-    struct_fields[i] = codegen->GetType(TYPE_TINYINT);
+  // Sort slots in the order they will appear in LLVM struct.
+  vector<SlotDescriptor*> sorted_slots(slots_.size());
+  for (SlotDescriptor* slot: slots_) {
+    sorted_slots[slot->slot_idx_] = slot;
   }
 
+  // For each null byte, add a byte to the struct
+  vector<Type*> struct_fields;
+  for (int i = 0; i < num_null_bytes_; ++i) {
+    struct_fields.push_back(codegen->GetType(TYPE_TINYINT));
+  }
+  int curr_struct_offset = num_null_bytes_;
+
   // Add the slot types to the struct description.
-  for (int i = 0; i < slots().size(); ++i) {
-    SlotDescriptor* slot_desc = slots()[i];
-    if (slot_desc->type().type == TYPE_CHAR) return NULL;
-    slot_desc->field_idx_ = slot_desc->slot_idx_ + num_null_bytes_;
-    DCHECK_LT(slot_desc->field_idx(), struct_fields.size());
-    struct_fields[slot_desc->field_idx()] = codegen->GetType(slot_desc->type());
+  for (SlotDescriptor* slot: sorted_slots) {
+    // IMPALA-3207: Codegen for CHAR is not yet implemented: bail out of codegen here.
+    if (slot->type().type == TYPE_CHAR) return NULL;
+    DCHECK_LE(curr_struct_offset, slot->tuple_offset());
+    if (curr_struct_offset < slot->tuple_offset()) {
+      // Need to add padding to ensure slots are aligned correctly. Clang likes to
+      // sometimes pad structs in its own way. When it does this, it sets the 'packed'
+      // flag, which means that at the LLVM level the struct type has no alignment
+      // requirements, even if it does at the C language level.
+      struct_fields.push_back(ArrayType::get(codegen->GetType(TYPE_TINYINT),
+          slot->tuple_offset() - curr_struct_offset));
+    }
+    slot->llvm_field_idx_ = struct_fields.size();
+    struct_fields.push_back(codegen->GetType(slot->type()));
+    curr_struct_offset = slot->tuple_offset() + slot->slot_size();
+  }
+  DCHECK_LE(curr_struct_offset, byte_size_);
+  if (curr_struct_offset < byte_size_) {
+    struct_fields.push_back(ArrayType::get(codegen->GetType(TYPE_TINYINT),
+        byte_size_ - curr_struct_offset));
   }
 
   // Construct the struct type.
+  // We don't mark the struct as packed but it shouldn't matter either way: LLVM should
+  // not insert any additional padding since the contents are already aligned.
   StructType* tuple_struct = StructType::get(codegen->context(),
       ArrayRef<Type*>(struct_fields));
-
-  // Verify the alignment is correct.  It is essential that the layout matches
-  // identically.  If the layout does not match, return NULL indicating the
-  // struct could not be codegen'd.  This will trigger codegen for anything using
-  // the tuple to be disabled.
-  const DataLayout* data_layout = codegen->execution_engine()->getDataLayout();
-  const StructLayout* layout = data_layout->getStructLayout(tuple_struct);
-  if (layout->getSizeInBytes() != byte_size()) {
-    DCHECK_EQ(layout->getSizeInBytes(), byte_size());
-    return NULL;
-  }
-  for (int i = 0; i < slots().size(); ++i) {
-    SlotDescriptor* slot_desc = slots()[i];
-    int field_idx = slot_desc->field_idx();
+  const DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
+  const StructLayout* layout = data_layout.getStructLayout(tuple_struct);
+  for (SlotDescriptor* slot: slots()) {
     // Verify that the byte offset in the llvm struct matches the tuple offset
-    // computed in the FE
-    if (layout->getElementOffset(field_idx) != slot_desc->tuple_offset()) {
-      DCHECK_EQ(layout->getElementOffset(field_idx), slot_desc->tuple_offset());
-      return NULL;
-    }
+    // computed in the FE.
+    DCHECK_EQ(layout->getElementOffset(slot->llvm_field_idx()), slot->tuple_offset());
   }
   llvm_struct_ = tuple_struct;
   return tuple_struct;

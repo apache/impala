@@ -247,17 +247,17 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   Value* time_of_day = NULL;
   Value* date = NULL;
   if (type_.IsStringType()) {
-    Value* ptr_ptr = builder.CreateStructGEP(val_ptr, 0, "ptr_ptr");
+    Value* ptr_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "ptr_ptr");
     ptr = builder.CreateLoad(ptr_ptr, "ptr");
-    Value* len_ptr = builder.CreateStructGEP(val_ptr, 1, "len_ptr");
+    Value* len_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "len_ptr");
     len = builder.CreateLoad(len_ptr, "len");
   } else if (type() == TYPE_TIMESTAMP) {
-    Value* time_of_day_ptr = builder.CreateStructGEP(val_ptr, 0, "time_of_day_ptr");
+    Value* time_of_day_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "time_of_day_ptr");
     // Cast boost::posix_time::time_duration to i64
     Value* time_of_day_cast =
         builder.CreateBitCast(time_of_day_ptr, codegen->GetPtrType(TYPE_BIGINT));
     time_of_day = builder.CreateLoad(time_of_day_cast, "time_of_day");
-    Value* date_ptr = builder.CreateStructGEP(val_ptr, 1, "date_ptr");
+    Value* date_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "date_ptr");
     // Cast boost::gregorian::date to i32
     Value* date_cast = builder.CreateBitCast(date_ptr, codegen->GetPtrType(TYPE_INT));
     date = builder.CreateLoad(date_cast, "date");

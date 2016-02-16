@@ -113,7 +113,7 @@ class SlotDescriptor {
   int col_pos() const { return col_path_[0]; }
   const SchemaPath& col_path() const { return col_path_; }
   /// Returns the field index in the generated llvm struct for this slot's tuple
-  int field_idx() const { return field_idx_; }
+  int llvm_field_idx() const { return llvm_field_idx_; }
   int tuple_offset() const { return tuple_offset_; }
   const NullIndicatorOffset& null_indicator_offset() const {
     return null_indicator_offset_;
@@ -160,10 +160,10 @@ class SlotDescriptor {
   /// the byte size of this slot.
   const int slot_size_;
 
-  /// the idx of the slot in the llvm codegen'd tuple struct
-  /// this is set by TupleDescriptor during codegen and takes into account
-  /// leading null bytes.
-  int field_idx_;
+  /// The idx of the slot in the llvm codegen'd tuple struct
+  /// This is set by TupleDescriptor during codegen and takes into account
+  /// leading null bytes and any padding bytes.
+  int llvm_field_idx_;
 
   /// Cached codegen'd functions
   mutable llvm::Function* is_null_fn_;

@@ -381,7 +381,7 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
   Value* data = builder.CreateGEP(args[1], offset);
 
   Value* seed = codegen->GetIntConstant(TYPE_INT, HashUtil::FNV_SEED);
-  seed = builder.CreateCall3(fixed_fn, data, dummy_len, seed);
+  seed = builder.CreateCall(fixed_fn, ArrayRef<Value*>({data, dummy_len, seed}));
 
   // Get the string data
   if (mixed) {
@@ -389,11 +389,11 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
         data, codegen->GetIntConstant(TYPE_INT, fixed_byte_size));
     Value* string_val =
         builder.CreateBitCast(string_data, codegen->GetPtrType(TYPE_STRING));
-    Value* str_ptr = builder.CreateStructGEP(string_val, 0);
-    Value* str_len = builder.CreateStructGEP(string_val, 1);
+    Value* str_ptr = builder.CreateStructGEP(NULL, string_val, 0);
+    Value* str_len = builder.CreateStructGEP(NULL, string_val, 1);
     str_ptr = builder.CreateLoad(str_ptr);
     str_len = builder.CreateLoad(str_len);
-    seed = builder.CreateCall3(string_hash_fn, str_ptr, str_len, seed);
+    seed = builder.CreateCall(string_hash_fn, ArrayRef<Value*>({str_ptr, str_len, seed}));
   }
 
   Value* result = builder.CreateGEP(args[2], counter);
@@ -426,7 +426,7 @@ int main(int argc, char **argv) {
 
   Status status;
   scoped_ptr<LlvmCodeGen> codegen;
-  status = LlvmCodeGen::LoadImpalaIR(&obj_pool, "test", &codegen);
+  status = LlvmCodeGen::CreateImpalaCodegen(&obj_pool, "test", &codegen);
   if (!status.ok()) {
     cout << "Could not start codegen.";
     return -1;

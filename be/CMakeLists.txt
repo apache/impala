@@ -191,16 +191,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 set(CLANG_INCLUDE_FLAGS)
 
 if (IMPALA_TOOLCHAIN)
-  # When the Toolchain is used we use LLVM 3.3 that was built in a different path that it
-  # is invoked from, and a GCC that resides in a different location. LVVM 3.3 relies on
-  # hard-coded path information about where to find the system headers and does not support
-  # specifying the -gcc-toolchain flag to dynamically provide this information. Because of
-  # these reasons we need to manually add the system c++ headers to the path when we
-  # compile the IR code with clang.
-  set(CLANG_BASE_FLAGS
-    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}"
-    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}/backward"
-    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}/x86_64-unknown-linux-gnu")
+  # Ensure that clang uses the gcc toolchain headers.
+  set(CLANG_BASE_FLAGS --gcc-toolchain=${GCC_ROOT})
   set(CLANG_INCLUDE_FLAGS ${CLANG_BASE_FLAGS})
 endif()
 
@@ -328,6 +320,7 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${JAVA_JVM_LIBRARY}
   kudu_client
   -lrt
+  -ldl # Needed for LLVM
 )
 
 # The above link list does not include tcmalloc. This is because the Impala JVM support

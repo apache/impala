@@ -15,11 +15,11 @@
 #include <sstream>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/PassManager.h>
+#include <llvm/IR/InstIterator.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/Transforms/Utils/UnrollLoop.h>
-#include <llvm/Support/InstIterator.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "codegen/codegen-anyval.h"
