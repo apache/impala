@@ -69,7 +69,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     hash_table_buckets_counter_(NULL) {
 }
 
-Status AggregationNode::Init(RuntimeState* state, const TPlanNode& tnode) {
+Status AggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_expr_ctxs_));
