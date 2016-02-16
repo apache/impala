@@ -1,3 +1,4 @@
+====
 ---- QUERY
 # limit in subquery
 select count(*) from (select * from alltypessmall limit 10) a

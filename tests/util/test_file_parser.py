@@ -8,6 +8,7 @@ import re
 from collections import defaultdict
 from os.path import isfile, isdir
 from tests.common.test_dimensions import TableFormatInfo
+from textwrap import dedent
 
 LOG = logging.getLogger('impala_test_suite')
 
@@ -138,7 +139,16 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
   section_start_regex = re.compile(r'(?m)^%s' % SECTION_DELIMITER)
   match = section_start_regex.search(text)
   if match is not None:
-    # Assume anything before the first section (==== tag) is a header and ignore it
+    # Assume anything before the first section (==== tag) is a header and ignore it. To
+    # ensure that test will not be skipped unintentionally we reject headers that start
+    # with what looks like a subsection.
+    header = text[:match.start()]
+    if re.match(r'^%s' % SUBSECTION_DELIMITER, header):
+      raise RuntimeError, dedent("""
+          Header must not start with '%s'. Everything before the first line matching '%s'
+          is considered header information and will be ignored. However a header must not
+          start with '%s' to prevent test cases from accidentally being ignored.""" %
+          (SUBSECTION_DELIMITER, SECTION_DELIMITER, SUBSECTION_DELIMITER))
     text = text[match.start():]
 
   # Split the test file up into sections. For each section, parse all subsections.

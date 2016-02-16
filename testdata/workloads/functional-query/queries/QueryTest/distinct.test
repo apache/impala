@@ -1,3 +1,4 @@
+====
 ---- QUERY
 # count(distinct)
 select count(distinct smallint_col, tinyint_col)

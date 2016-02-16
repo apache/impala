@@ -1,3 +1,4 @@
+====
 ---- QUERY
 select count(*) from functional.table_no_newline
 ---- RESULTS

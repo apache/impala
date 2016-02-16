@@ -1,0 +1,5 @@
+---- QUERY
+SELECT count(*) FROM functional.alltypes;
+---- RESULT
+0
+====
