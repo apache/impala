@@ -16,6 +16,7 @@
 
 #include <limits>
 #include <map>
+#include <memory>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/accumulators/accumulators.hpp>
@@ -60,6 +61,7 @@
 #include "util/network-util.h"
 #include "util/pretty-printer.h"
 #include "util/summary-util.h"
+#include "util/table-printer.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -78,6 +80,7 @@ using boost::algorithm::join;
 using boost::algorithm::token_compress_on;
 using boost::algorithm::split;
 using boost::filesystem::path;
+using std::unique_ptr;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
@@ -479,6 +482,9 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   int fragment_instance_idx = 0;
   bool has_coordinator_fragment =
       request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
+  bool filter_routing_enabled =
+      schedule->query_options().__isset.runtime_filter_mode &&
+      schedule->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL;
   // Start one fragment instance per fragment per host (number of hosts running each
   // fragment may not be constant).
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
@@ -487,27 +493,29 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
     int num_hosts = params->hosts.size();
     DCHECK_GT(num_hosts, 0);
 
-    // Build the filter routing table by iterating over all plan nodes in this fragment
-    // and collecting the filters that they either produce or consume.
-    BOOST_FOREACH(const TPlanNode& plan_node,
-        request.fragments[fragment_idx].plan.nodes) {
-      if (plan_node.__isset.hash_join_node && plan_node.__isset.runtime_filters) {
-        BOOST_FOREACH(const TRuntimeFilterDesc& filter, plan_node.runtime_filters) {
-          Filter* f = &(filter_routing_table_[filter.filter_id]);
-          f->src = plan_node.node_id;
-          // TODO: Remove hack when FE provides this information.
-          // TODO: consider only sending filter requests to ~3 backends for broadcast
-          // filters, to reduce load during aggregation.
-          bool is_broadcast = (plan_node.label_detail.find("BROADCAST") != string::npos);
-          f->pending_count = is_broadcast ? 1 : num_hosts;
-        }
-      } else if (plan_node.__isset.hdfs_scan_node && plan_node.__isset.runtime_filters) {
-        BOOST_FOREACH(const TRuntimeFilterDesc& filter, plan_node.runtime_filters) {
-          Filter* f = &(filter_routing_table_[filter.filter_id]);
-          f->dst = plan_node.node_id;
-          for (int i = fragment_instance_idx; i < fragment_instance_idx + num_hosts;
-               ++i) {
-            f->fragment_instance_idxs.push_back(i);
+    if (filter_routing_enabled) {
+      // Build the filter routing table by iterating over all plan nodes in this fragment
+      // and collecting the filters that they either produce or consume.
+      BOOST_FOREACH(const TPlanNode& plan_node,
+          request.fragments[fragment_idx].plan.nodes) {
+        if (plan_node.__isset.hash_join_node && plan_node.__isset.runtime_filters) {
+          BOOST_FOREACH(const TRuntimeFilterDesc& filter, plan_node.runtime_filters) {
+            FilterState* f = &(filter_routing_table_[filter.filter_id]);
+            f->desc = filter;
+            f->src = plan_node.node_id;
+            // TODO: consider only sending filter requests to ~3 backends for broadcast
+            // filters, to reduce load during aggregation.
+            f->pending_count = filter.is_broadcast_join ? 1 : num_hosts;
+          }
+        } else if (
+            plan_node.__isset.hdfs_scan_node && plan_node.__isset.runtime_filters) {
+          BOOST_FOREACH(const TRuntimeFilterDesc& filter, plan_node.runtime_filters) {
+            FilterState* f = &(filter_routing_table_[filter.filter_id]);
+            f->dst = plan_node.node_id;
+            for (int i = fragment_instance_idx; i < fragment_instance_idx + num_hosts;
+                 ++i) {
+              f->fragment_instance_idxs.push_back(i);
+            }
           }
         }
       }
@@ -534,11 +542,13 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   exec_complete_barrier_->Wait();
   query_events_->MarkEvent(
       Substitute("All $0 remote fragments started", fragment_instance_idx));
-  query_profile_->AddInfoString(
-      "Number of filters", Substitute("$0", filter_routing_table_.size()));
-  query_profile_->AddInfoString("Filter routing table", FilterDebugString());
 
-  if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
+  if (filter_routing_enabled) {
+    query_profile_->AddInfoString(
+        "Number of filters", Substitute("$0", filter_routing_table_.size()));
+    query_profile_->AddInfoString("Filter routing table", FilterDebugString());
+    if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
+  }
 
   Status status = Status::OK();
   const TMetricDef& def =
@@ -562,17 +572,42 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
 }
 
 string Coordinator::FilterDebugString() {
-  stringstream ss;
+  TablePrinter table_printer;
+  table_printer.AddColumn("ID", false);
+  table_printer.AddColumn("Src. Node", false);
+  table_printer.AddColumn("Dst. Node", false);
+  table_printer.AddColumn("Destinations", false);
+  table_printer.AddColumn("Pending", false);
+  table_printer.AddColumn("Broadcast", false);
+  table_printer.AddColumn("Partition filter", false);
+  table_printer.AddColumn("First arrived", false);
+  table_printer.AddColumn("Completed", false);
   lock_guard<SpinLock> l(filter_lock_);
-  ss << endl << "------ Filter routing table ------ " << endl;
   BOOST_FOREACH(const FilterRoutingTable::value_type& v, filter_routing_table_) {
-    ss << "id: " << v.first
-       << "\tsrc: " << v.second.src
-       << "\tdst: " << v.second.dst
-       << "\tnum. destinations: " << v.second.fragment_instance_idxs.size()
-       << "\tnum. pending: " << v.second.pending_count << endl;
+    vector<string> row;
+    const FilterState& state = v.second;
+    row.push_back(lexical_cast<string>(v.first));
+    row.push_back(lexical_cast<string>(state.src));
+    row.push_back(lexical_cast<string>(state.dst));
+    row.push_back(lexical_cast<string>(state.fragment_instance_idxs.size()));
+    row.push_back(lexical_cast<string>(state.pending_count));
+    row.push_back(state.desc.is_broadcast_join ? "true" : "false");
+    row.push_back(state.desc.is_bound_by_partition_columns ? "true" : "false");
+    if (state.first_arrival_time == 0L) {
+      row.push_back("N/A");
+    } else {
+      row.push_back(PrettyPrinter::Print(state.first_arrival_time, TUnit::TIME_NS));
+    }
+    if (state.completion_time == 0L) {
+      row.push_back("N/A");
+    } else {
+      row.push_back(PrettyPrinter::Print(state.completion_time, TUnit::TIME_NS));
+    }
+    table_printer.AddRow(row);
   }
-  return ss.str();
+  // Add a line break, as in all contexts this is called we need to start a new line to
+  // print it correctly.
+  return Substitute("\n$0", table_printer.ToString());
 }
 
 Status Coordinator::GetStatus() {
@@ -944,7 +979,9 @@ Status Coordinator::Wait() {
     ReportQuerySummary();
   }
 
-  query_profile_->AddInfoString("Final filter table", FilterDebugString());
+  if (filter_routing_table_.size() > 0) {
+    query_profile_->AddInfoString("Final filter table", FilterDebugString());
+  }
 
   return return_status;
 }
@@ -1847,6 +1884,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   // Make a 'master' copy that will be shared by all concurrent delivery RPC attempts.
   shared_ptr<TPublishFilterParams> rpc_params(new TPublishFilterParams());
   vector<int32_t> fragment_instance_idxs;
+  unique_ptr<BloomFilter> bloom_filter(new BloomFilter(params.bloom_filter, NULL, NULL));
   {
     lock_guard<SpinLock> l(filter_lock_);
     FilterRoutingTable::iterator it = filter_routing_table_.find(params.filter_id);
@@ -1857,6 +1895,9 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
 
     // Receiving unnecessary updates for a broadcast.
     if (it->second.pending_count == 0) return;
+    if (it->second.first_arrival_time == 0L) {
+      it->second.first_arrival_time = query_events_->ElapsedTime();
+    }
     --it->second.pending_count;
 
     if (filters_received_->value() == 0) {
@@ -1865,16 +1906,16 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     filters_received_->Add(1);
     if (it->second.bloom_filter == NULL) {
       it->second.bloom_filter =
-          obj_pool()->Add(new BloomFilter(params.bloom_filter, NULL, NULL));
+          obj_pool()->Add(bloom_filter.release());
     } else {
       // TODO: Implement BloomFilter::Or(const ThriftBloomFilter&)
-      BloomFilter bloom_filter(params.bloom_filter, NULL, NULL);
-      it->second.bloom_filter->Or(bloom_filter);
+      it->second.bloom_filter->Or(*bloom_filter);
     }
 
     if (it->second.pending_count > 0) return;
     // No more filters are pending on this filter ID. Create a distribution payload and
     // offer it to the queue.
+    it->second.completion_time = query_events_->ElapsedTime();
     fragment_instance_idxs = it->second.fragment_instance_idxs;
     it->second.bloom_filter->ToThrift(&rpc_params->bloom_filter);
   }

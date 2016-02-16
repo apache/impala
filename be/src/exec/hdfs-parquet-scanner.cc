@@ -434,8 +434,8 @@ class HdfsParquetScanner::BaseScalarColumnReader :
     RuntimeState* state = parent_->scan_node_->runtime_state();
     hash_seed_ = state->fragment_hash_seed();
 
-    // Check to see if filter expr is bound by this slot. Any filter is only valid for the
-    // top-level tuple.
+    // Check to see if any filter expr is bound by this slot. Any filter is only valid for
+    // the top-level tuple.
     HdfsScanNode* scan_node = parent_->scan_node_;
     if (slot_desc != NULL && slot_desc_->parent() == scan_node->tuple_desc()) {
       for (int i = 0; i < parent_->context_->filter_ctxs().size(); ++i) {

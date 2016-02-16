@@ -313,9 +313,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::DISABLE_STREAMING_PREAGGREGATIONS:
         query_options->__set_disable_streaming_preaggregations(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::ENABLE_RUNTIME_FILTER_PROPAGATION:
-        query_options->__set_enable_runtime_filter_propagation(
-            iequals(value, "true") || iequals(value, "1"));
+      case TImpalaQueryOptions::RUNTIME_FILTER_MODE:
+        if (iequals(value, "off") || iequals(value, "0")) {
+          query_options->__set_runtime_filter_mode(TRuntimeFilterMode::OFF);
+        } else if (iequals(value, "local") || iequals(value, "1")) {
+          query_options->__set_runtime_filter_mode(TRuntimeFilterMode::LOCAL);
+        } else if (iequals(value, "global") || iequals(value, "2")) {
+          query_options->__set_runtime_filter_mode(TRuntimeFilterMode::GLOBAL);
+        } else {
+          return Status(Substitute("Invalid runtime filter mode '$0'. Valid modes are"
+              " OFF(0), LOCAL(1) or GLOBAL(2).", value));
+        }
         break;
       case TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE: {
           int32 size = atoi(value.c_str());
@@ -327,6 +335,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_runtime_filter_wait_time_ms(time_ms);
         break;
       }
+      case TImpalaQueryOptions::DISABLE_ROW_RUNTIME_FILTERING:
+        query_options->__set_disable_row_runtime_filtering(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

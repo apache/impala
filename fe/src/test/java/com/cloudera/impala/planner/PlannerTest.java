@@ -17,6 +17,7 @@ package com.cloudera.impala.planner;
 import org.junit.Test;
 
 import com.cloudera.impala.thrift.TQueryOptions;
+import com.cloudera.impala.thrift.TRuntimeFilterMode;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {
@@ -218,7 +219,7 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testRuntimeFilterPropagation() {
     TQueryOptions options = new TQueryOptions();
-    options.setEnable_runtime_filter_propagation(true);
+    options.setRuntime_filter_mode(TRuntimeFilterMode.GLOBAL);
     runPlannerTestFile("runtime-filter-propagation", options);
   }
 }

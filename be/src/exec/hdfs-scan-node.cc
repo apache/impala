@@ -136,13 +136,19 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
         Expr::CreateExprTrees(pool_, iter->second, &conjuncts_map_[iter->first]));
   }
 
+  const TQueryOptions& query_options = runtime_state()->query_options();
   BOOST_FOREACH(const TRuntimeFilterDesc& filter, tnode.runtime_filters) {
+    if (query_options.disable_row_runtime_filtering &&
+        !filter.is_bound_by_partition_columns) {
+      continue;
+    }
+
     FilterContext filter_ctx;
     RETURN_IF_ERROR(Expr::CreateExprTree(pool_, filter.target_expr, &filter_ctx.expr));
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, false);
 
     RuntimeProfile* profile = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(),
-            Substitute("Filter $0", filter.filter_id)));
+        Substitute("Filter $0", filter.filter_id)));
     runtime_profile_->AddChild(profile);
     filter_ctx.stats = state->obj_pool()->Add(
         new FilterStats(profile, filter.is_bound_by_partition_columns));
@@ -184,7 +190,8 @@ bool HdfsScanNode::WaitForPartitionFilters(int32_t time_ms) {
       if (!ctx.filter->WaitForArrival(time_ms)) {
         all_filters_arrived = false;
       } else {
-        arrived_filter_ids.push_back(Substitute("$0", ctx.filter->filter_desc().filter_id));
+        arrived_filter_ids.push_back(
+            Substitute("$0", ctx.filter->filter_desc().filter_id));
       }
     }
   }

@@ -87,6 +87,8 @@ void SendFilterToCoordinator(TNetworkAddress address, TUpdateFilterParams params
 
 void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
     BloomFilter* bloom_filter) {
+  DCHECK_NE(state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
+      << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
   TUpdateFilterParams params;
   bool is_broadcast = false;
   {
@@ -98,7 +100,7 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
     is_broadcast = it->second->filter_desc().is_broadcast_join;
   }
 
-  if (state_->query_options().enable_runtime_filter_propagation) {
+  if (state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
     bloom_filter->ToThrift(&params.bloom_filter);
     params.filter_id = filter_id;
     params.query_id = query_ctx_.query_id;

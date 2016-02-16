@@ -93,8 +93,12 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
   BOOST_FOREACH(const TRuntimeFilterDesc& filter, tnode.runtime_filters) {
     // If filter propagation not enabled, only consider building broadcast joins (that may
     // be consumed by this fragment).
-    if (!state->query_options().enable_runtime_filter_propagation &&
+    if (state->query_options().runtime_filter_mode != TRuntimeFilterMode::GLOBAL &&
         !filter.is_broadcast_join) {
+      continue;
+    }
+    if (state->query_options().disable_row_runtime_filtering &&
+        !filter.is_bound_by_partition_columns) {
       continue;
     }
     FilterContext filter_ctx;
