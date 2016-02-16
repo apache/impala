@@ -1136,9 +1136,10 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
                             << " partition_id=" << partition_id
                             << "\n" << PrintThrift(runtime_state_->fragment_params());
 
-  // TODO: Re-enable scan-range filtering (see IMPALA-2992)
-  if (false && !PartitionPassesFilterPredicates(partition_id, FilterStats::SPLITS_KEY,
+  if (!PartitionPassesFilterPredicates(partition_id, FilterStats::SPLITS_KEY,
           filter_ctxs)) {
+    // Avoid leaking unread buffers in scan_range.
+    scan_range->Cancel(Status::CANCELLED);
     // Mark scan range as done.
     scan_ranges_complete_counter()->Add(1);
     progress_.Update(1);
