@@ -150,10 +150,12 @@ struct TQueryOptions {
   // If true, runtime filter propagation is enabled
   37: optional Types.TRuntimeFilterMode runtime_filter_mode = 1
 
-  // Size in bytes of runtime bloom filters
-  38: optional i32 runtime_bloom_filter_size = 0
+  // Size in bytes of Bloom Filters used for runtime filters. Actual size of filter will
+  // be rounded up to the nearest power of two.
+  38: optional i32 runtime_bloom_filter_size = 1048576
 
-  // Time in ms to wait until partition filters are delivered
+  // Time in ms to wait until partition filters are delivered. If 0, the default defined
+  // by the startup flag of the same name is used.
   39: optional i32 runtime_filter_wait_time_ms = 0
 
   // If true, per-row runtime filtering is disabled

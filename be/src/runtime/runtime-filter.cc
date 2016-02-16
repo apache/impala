@@ -26,28 +26,24 @@ using namespace impala;
 using namespace boost;
 using namespace strings;
 
-// 20 is BloomFilter::MinLogSpace(1ull << 20, 0.1)
-DEFINE_int32(bloom_filter_size, 1024 * 1024, "(Advanced) Sets the size in bytes of Bloom "
-    "Filters used for runtime filters in bytes. Actual size of filter will be "
-    "rounded up to the nearest power of two, and may not exceed 16MB");
-
 DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability of false "
     "positives in a runtime filter before it is disabled.");
 
 const int RuntimeFilter::SLEEP_PERIOD_MS = 20;
+
+const int32_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
+const int32_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
 
 RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state)
     : query_ctx_(query_ctx), state_(state), closed_(false) {
   memory_allocated_ =
       ADD_COUNTER(state->runtime_profile(), "BloomFilterBytes", TUnit::BYTES);
 
-  // Determine the right size - query opt takes precedence over flag.
-  int32_t query_opt_size = query_ctx_.request.query_options.runtime_bloom_filter_size;
-  static const int MAX_SIZE = 16 * 1024 * 1024; // 16MB
-  static const int MIN_SIZE = 4 * 1024; // 4K
-  uint64_t size = (query_opt_size >= MIN_SIZE && query_opt_size <= MAX_SIZE) ?
-      query_opt_size : FLAGS_bloom_filter_size;
-  log_filter_size_ = BitUtil::Log2(size);
+  // Clamp bloom filter size down to the limits {MIN,MAX}_BLOOM_FILTER_SIZE
+  int32_t bloom_filter_size = query_ctx_.request.query_options.runtime_bloom_filter_size;
+  bloom_filter_size = std::max(bloom_filter_size, MIN_BLOOM_FILTER_SIZE);
+  bloom_filter_size = std::min(bloom_filter_size, MAX_BLOOM_FILTER_SIZE);
+  log_filter_size_ = BitUtil::Log2(bloom_filter_size);
 }
 
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,

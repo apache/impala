@@ -14,6 +14,7 @@
 
 #include "service/query-options.h"
 
+#include "runtime/runtime-filter.h"
 #include "util/debug-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
@@ -318,12 +319,27 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       case TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE: {
-          int32 size = atoi(value.c_str());
-          query_options->__set_runtime_bloom_filter_size(size);
-          break;
+        int64_t size;
+        RETURN_IF_ERROR(ParseMemValue(value, "Bloom filter size", &size));
+        if (size < RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE ||
+            size > RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE) {
+          return Status(Substitute(
+              "$0 is not a valid Bloom filter size. Valid sizes are in [$1, $2].", value,
+              RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
+              RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE));
         }
+        query_options->__set_runtime_bloom_filter_size(size);
+        break;
+      }
       case TImpalaQueryOptions::RUNTIME_FILTER_WAIT_TIME_MS: {
-        int32 time_ms = atoi(value.c_str());
+        StringParser::ParseResult result;
+        const int32_t time_ms =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || time_ms < 0) {
+          return Status(
+              Substitute("$0 is not a valid wait time. Valid sizes are in [0, $1].",
+                  value, 0, numeric_limits<int32_t>::max()));
+        }
         query_options->__set_runtime_filter_wait_time_ms(time_ms);
         break;
       }
