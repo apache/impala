@@ -79,8 +79,9 @@ from tests.util.thrift_util import op_handle_to_query_id
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 # Used to short circuit a binary search of the min mem limit. Values will be considered
-# equal if they are within this ratio of each other.
-MEM_LIMIT_EQ_THRESHOLD = 0.975
+# equal if they are within this ratio or absolute amount of each other.
+MEM_LIMIT_EQ_THRESHOLD_PC = 0.975
+MEM_LIMIT_EQ_THRESHOLD_MB = 50
 
 # Regex to extract the estimated memory from an explain plan.
 MEM_ESTIMATE_PATTERN = re.compile(r"Estimated.*Memory=(\d+.?\d*)(T|G|M|K)?B")
@@ -855,7 +856,7 @@ def load_tpc_queries(workload):
   queries = list()
   query_dir = os.path.join(os.path.dirname(__file__), "..", "..",
       "testdata", "workloads", workload, "queries")
-  file_name_pattern = re.compile(r"-(q\d+)")
+  file_name_pattern = re.compile(r"-(q\d+).test$")
   for query_file in os.listdir(query_dir):
     match = file_name_pattern.search(query_file)
     if not match:
@@ -934,7 +935,7 @@ def populate_runtime_info(query, impala, use_kerberos, result_hash_log_dir,
      the corresponding runtime field may still be None if the query could not be run
      without spilling.
   """
-  LOG.info("Collecting runtime info for query: \n%s", query.sql)
+  LOG.info("Collecting runtime info for query %s: \n%s", query.name, query.sql)
   runner = QueryRunner()
   runner.impalad = impala.impalads[0]
   runner.result_hash_log_dir = result_hash_log_dir
@@ -1038,8 +1039,8 @@ def populate_runtime_info(query, impala, use_kerberos, result_hash_log_dir,
       old_required_mem_mb_without_spilling = None
     else:
       mem_limit = (lower_bound + upper_bound) / 2
-    should_break = mem_limit / float(upper_bound) > MEM_LIMIT_EQ_THRESHOLD \
-        or upper_bound - mem_limit < 50
+    should_break = mem_limit / float(upper_bound) > MEM_LIMIT_EQ_THRESHOLD_PC \
+            or upper_bound - mem_limit < MEM_LIMIT_EQ_THRESHOLD_MB
     report = get_report(desired_outcome=("NOT_SPILLED" if spill_mem else None))
     if not report:
       lower_bound = mem_limit
@@ -1074,8 +1075,8 @@ def populate_runtime_info(query, impala, use_kerberos, result_hash_log_dir,
       old_required_mem_mb_with_spilling = None
     else:
       mem_limit = (lower_bound + upper_bound) / 2
-    should_break =  mem_limit / float(upper_bound) > MEM_LIMIT_EQ_THRESHOLD \
-        or upper_bound - mem_limit < 50
+    should_break = mem_limit / float(upper_bound) > MEM_LIMIT_EQ_THRESHOLD_PC \
+        or upper_bound - mem_limit < MEM_LIMIT_EQ_THRESHOLD_MB
     report = get_report(desired_outcome="SPILLED")
     if not report or report.mem_limit_exceeded:
       lower_bound = mem_limit

@@ -88,11 +88,15 @@ def add_db_name_option(section):
 
 
 def add_cluster_options(section):
+  add_minicluster_options(section)
   add_cm_options(section)
   add_ssh_options(section)
   section.add_argument("--hadoop-user-name", default=getuser(),
       help="The user name to use when interacting with hadoop.")
 
+def add_minicluster_options(section):
+  section.add_argument('--minicluster-num-impalads', default=3, type=int,
+      metavar='num impalads', help='The number of impalads in the mini cluster.')
 
 def add_cm_options(section):
   section.add_argument('--cm-host', metavar='host name',
@@ -113,7 +117,7 @@ def create_cluster(args):
         cluster_name=args.cm_cluster_name, ssh_user=args.ssh_user, ssh_port=args.ssh_port,
         ssh_key_file=args.ssh_key_file)
   else:
-    cluster = MiniCluster()
+    cluster = MiniCluster(args.minicluster_num_impalads)
   cluster.hadoop_user_name = args.hadoop_user_name
   return cluster
 

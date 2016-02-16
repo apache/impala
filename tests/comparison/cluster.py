@@ -149,6 +149,10 @@ class Cluster(object):
 
 class MiniCluster(Cluster):
 
+  def __init__(self, num_impalads=3):
+    Cluster.__init__(self)
+    self.num_impalads = num_impalads
+
   def shell(self, cmd, unused_host_name, timeout_secs=DEFAULT_TIMEOUT):
     return local_shell(cmd, timeout_secs=timeout_secs)
 
@@ -175,7 +179,7 @@ class MiniCluster(Cluster):
     hs2_base_port = 21050
     web_ui_base_port = 25000
     impalads = [MiniClusterImpalad(hs2_base_port + p, web_ui_base_port + p)
-                for p in xrange(3)]
+                for p in xrange(self.num_impalads)]
     self._impala = Impala(self, impalads)
 
 
@@ -513,6 +517,9 @@ class Impala(Service):
       results = dict(izip(self.impalads, results))
     return results
 
+  def restart(self):
+    raise NotImplementedError()
+
 
 class CmImpala(Impala):
 
@@ -687,6 +694,17 @@ class Impalad(object):
     resp.raise_for_status()
     return resp
 
+  def get_metrics(self):
+    return self._read_web_page("/metrics")["metric_group"]["metrics"]
+
+  def get_metric(self, name):
+    """Get metric from impalad by name. Raise exception if there is no such metric.
+    """
+    for metric in self.get_metrics():
+      if metric["name"] == name:
+        return metric
+    raise Exception("Metric '%s' not found" % name);
+
   def __repr__(self):
     return "<%s host: %s>" % (type(self).__name__, self.label)
 
@@ -715,12 +733,14 @@ class MiniClusterImpalad(Impalad):
     return self._web_ui_port
 
   def find_pid(self):
-    pid = self.shell("pgrep -f 'impalad.*%s' || true" % self.hs2_port)
+    # Need to filter results to avoid pgrep picking up its parent bash script.
+    pid = self.shell("pgrep -f -a 'impalad.*%s' | grep -v pgrep | "
+        "grep -o '^[0-9]*' || true" % self.hs2_port)
     if pid:
       return int(pid)
 
   def find_process_mem_mb_limit(self):
-    raise NotImplementedError()
+    return long(self.get_metric("mem-tracker.process.limit")["value"]) / 1024 ** 2
 
   def find_core_dump_dir(self):
     raise NotImplementedError()
