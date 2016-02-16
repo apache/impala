@@ -19,13 +19,13 @@
 #include "common/status.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_set.hpp>
 
-#include <llvm/Analysis/Verifier.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
@@ -46,16 +46,18 @@ namespace llvm {
   class ConstantFolder;
   class ExecutionEngine;
   class Function;
-  class FunctionPassManager;
   class LLVMContext;
   class Module;
   class NoFolder;
-  class PassManager;
   class PointerType;
   class StructType;
   class TargetData;
   class Type;
   class Value;
+  namespace legacy {
+    class FunctionPassManager;
+    class PassManager;
+  }
 
   template<bool B, typename T, typename I>
   class IRBuilder;
@@ -88,14 +90,13 @@ class SubExprElimination;
 /// be called directly.  The test interface can be used to load any precompiled
 /// module or none at all (but this class will not validate the module).
 //
-/// This class is mostly not threadsafe.  During the Prepare() phase of the fragment
-/// execution, nodes should codegen functions, and register those functions with
-/// AddFunctionToJit().
+/// This class is not threadsafe.  During the Prepare() phase of the fragment execution,
+/// nodes should codegen functions, and register those functions with AddFunctionToJit().
 /// Afterward, FinalizeModule() should be called at which point all codegened functions
-/// are optimized. After FinalizeModule() returns, all function pointers registered with
-/// AddFunctionToJit() will be pointing to the appropriate JIT'd function.
+/// are optimized and compiled. After FinalizeModule() returns, all function pointers
+/// registered with AddFunctionToJit() will be pointing to the appropriate JIT'd function.
 //
-/// Currently, each query will create and initialize one of these
+/// Currently, each fragment instance  will create and initialize one of these
 /// objects.  This requires loading and parsing the cross compiled modules.
 /// TODO: we should be able to do this once per process and let llvm compile
 /// functions from across modules.
@@ -108,8 +109,8 @@ class SubExprElimination;
 class LlvmCodeGen {
  public:
   /// This function must be called once per process before any llvm API calls are
-  /// made.  LLVM needs to allocate data structures for multi-threading support and
-  /// to enable dynamic linking of jitted code.
+  /// made.  It is not valid to call it multiple times. LLVM needs to allocate data
+  /// structures for multi-threading support and to enable dynamic linking of jitted code.
   /// if 'load_backend', load the backend static object for llvm.  This is needed
   /// when libbackend.so is loaded from java.  llvm will be default only look in
   /// the current object and not be able to find the backend symbols
@@ -117,22 +118,15 @@ class LlvmCodeGen {
   /// side is not loading the be explicitly anymore.
   static void InitializeLlvm(bool load_backend = false);
 
-  /// Loads and parses the precompiled impala IR module
+  /// Creates a codegen instance for Impala initialized with the cross-compiled Impala IR.
   /// 'codegen' will contain the created object on success.
   /// 'id' is used for outputting the IR module for debugging.
-  static Status LoadImpalaIR(
+  static Status CreateImpalaCodegen(
       ObjectPool*, const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
-  /// Load a pre-compiled IR module from 'file'.  This creates a top level
-  /// codegen object.
-  /// codegen will contain the created object on success.
-  static Status LoadFromFile(ObjectPool*, const std::string& file, const std::string& id,
-      boost::scoped_ptr<LlvmCodeGen>* codegen);
-
-  /// Load a pre-compiled IR module from module_ir.  This creates a top level codegen
-  /// object.  codegen will contain the created object on success.
-  static Status LoadFromMemory(ObjectPool*, llvm::MemoryBuffer* module_ir,
-      const std::string& module_name, const std::string& id,
+  /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'file'.
+  /// 'codegen' will contain the created object on success.
+  static Status CreateFromFile(ObjectPool*, const std::string& file, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Removes all jit compiled dynamically linked functions from the process.
@@ -199,6 +193,9 @@ class LlvmCodeGen {
     llvm::Type* ret_type_;
     std::vector<NamedVariable> args_;
   };
+
+  /// Get host cpu attributes in format expected by EngineBuilder.
+  static void GetHostCPUAttrs(std::vector<std::string>* attrs);
 
   /// Return a pointer type to 'type'
   llvm::PointerType* GetPtrType(llvm::Type* type);
@@ -278,47 +275,17 @@ class LlvmCodeGen {
   /// otherwise, it returns the function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
 
-  /// Inlines all function calls for 'fn' that are marked as always inline.
-  /// (We can't inline all call sites since pulling in boost/other libs could have
-  /// recursion.  Instead, we just inline our functions and rely on the llvm inliner to
-  /// pick the rest.)
-  /// 'fn' is modified in place. Returns the number of functions inlined.  This is *not*
-  /// called recursively (i.e. second level function calls are not inlined). This can be
-  /// called again to inline those until this returns 0.
-  int InlineCallSites(llvm::Function* fn, bool skip_registered_fns);
-
-  /// Optimizes the function in place.  This uses a combination of llvm optimization
-  /// passes as well as some custom heuristics.  This should be called for all
-  /// functions which call Exprs.  The exprs will be inlined as much as possible,
-  /// and will do basic sub expression elimination.
-  /// This should be called before FinalizeModule for functions that want to remove
-  /// redundant exprs.  This should be called at the highest level possible to
-  /// maximize the number of redundant exprs that can be found.
-  /// TODO: we need to spend more time to output better IR.  Asking llvm to
-  /// remove redundant codeblocks on its own is too difficult for it.
-  /// TODO: this should implement the llvm FunctionPass interface and integrated
-  /// with the llvm optimization passes.
-  llvm::Function* OptimizeFunctionWithExprs(llvm::Function* fn);
-
-  /// Adds the function to be automatically jit compiled after the module is optimized.
-  /// That is, after FinalizeModule(), this will do *result_fn_ptr = JitFunction(fn);
-  //
-  /// This is useful since it is not valid to call JitFunction() before every part of the
-  /// query has finished adding their IR and it's convenient to not have to rewalk the
-  /// objects. This provides the same behavior as walking each of those objects and calling
-  /// JitFunction().
-  //
-  /// In addition, any functions not registered with AddFunctionToJit() are marked as
-  /// internal in FinalizeModule() and may be removed as part of optimization.
-  //
+  /// Adds the function to be automatically jit compiled when the codegen object is
+  /// finalized. FinalizeModule() will set fn_ptr to point to the jitted function.
+  ///
+  /// Only functions registered with AddFunctionToJit() and their dependencies are
+  /// compiled by FinalizeModule(): other functions are considered dead code and will
+  /// be removed during optimization.
+  ///
   /// This will also wrap functions returning DecimalVals in an ABI-compliant wrapper (see
   /// the comment in the .cc file for details). This is so we don't accidentally try to
   /// call non-compliant code from native code.
   void AddFunctionToJit(llvm::Function* fn, void** fn_ptr);
-
-  /// Verfies the function, e.g., checks that the IR is well-formed.  Returns false if
-  /// function is invalid.
-  bool VerifyFunction(llvm::Function* function);
 
   /// This will generate a printf call instruction to output 'message' at the builder's
   /// insert point. If 'v1' is non-NULL, it will also be passed to the printf call. Only
@@ -421,60 +388,69 @@ class LlvmCodeGen {
   /// No-op if size is zero.
   void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, int size);
 
-  /// Loads an LLVM module. 'file' should be the local path to the LLVM bitcode
-  /// file. The caller is responsible for cleaning up module.
-  static Status LoadModuleFromFile(LlvmCodeGen* codegen, const string& file,
-      llvm::Module** module);
-
   /// Codegens IR to load array[idx] and returns the loaded value. 'array' should be a
   /// C-style array (e.g. i32*) or an IR array (e.g. [10 x i32]). This function does not
   /// do bounds checking.
   llvm::Value* CodegenArrayAt(LlvmBuilder*, llvm::Value* array, int idx,
       const char* name = "");
 
-  /// Loads an LLVM module. 'module_ir' should be a reference to a memory buffer containing
-  /// LLVM bitcode. module_name is the name of the module to use when reporting errors.
-  /// The caller is responsible for cleaning up module.
-  static Status LoadModuleFromMemory(LlvmCodeGen* codegen, llvm::MemoryBuffer* module_ir,
-      std::string module_name, llvm::Module** module);
-
   /// Loads a module at 'file' and links it to the module associated with
   /// this LlvmCodeGen object. The module must be on the local filesystem.
   Status LinkModule(const std::string& file);
 
-  // Used for testing.
-  void ResetVerification() { is_corrupt_ = false; }
-
  private:
+  friend class ExprCodegenTest;
   friend class LlvmCodeGenTest;
   friend class SubExprElimination;
 
   /// Top level codegen object.  'module_id' is used for debugging when outputting the IR.
   LlvmCodeGen(ObjectPool* pool, const std::string& module_id);
 
-  /// Initializes the jitter and execution engine.
-  Status Init();
+  /// Initializes the jitter and execution engine with the given module.
+  Status Init(std::unique_ptr<llvm::Module> module);
+
+  /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'module_ir'.
+  /// 'codegen' will contain the created object on success.
+  static Status CreateFromMemory(ObjectPool* pool, llvm::MemoryBufferRef module_ir,
+      const std::string& module_name, const std::string& id,
+      boost::scoped_ptr<LlvmCodeGen>* codegen);
+
+  /// Loads an LLVM module. 'file' should be the local path to the LLVM bitcode
+  /// file. The caller is responsible for cleaning up module.
+  Status LoadModuleFromFile(const string& file, std::unique_ptr<llvm::Module>* module);
+
+  /// Loads an LLVM module. 'module_ir' should be a reference to a memory buffer containing
+  /// LLVM bitcode. module_name is the name of the module to use when reporting errors.
+  /// The caller is responsible for cleaning up module.
+  Status LoadModuleFromMemory(llvm::MemoryBufferRef module_ir, std::string module_name,
+      std::unique_ptr<llvm::Module>* module);
 
   /// Load the intrinsics impala needs.  This is a one time initialization.
   /// Values are stored in 'llvm_intrinsics_'
   Status LoadIntrinsics();
 
-  /// Get the function pointer to the JIT'd version of function.
-  /// The result is a function pointer that is dynamically linked into the process.
-  /// Returns NULL if the function is invalid.
-  /// Note that this will compile, but not optimize, function if necessary.
-  //
-  /// This function shouldn't be called after calling FinalizeModule(). Instead use
-  /// AddFunctionToJit() to register a function pointer. This is because FinalizeModule()
-  /// may remove any functions not registered in AddFunctionToJit(). As such, this
-  /// function is mostly useful for tests that do not call FinalizeModule() at all.
-  void* JitFunction(llvm::Function* function);
+  /// Internal function for unit tests: skips Impala-specific wrapper generation logic.
+  void AddFunctionToJitInternal(llvm::Function* fn, void** fn_ptr);
+
+  /// Verifies the function, e.g., checks that the IR is well-formed.  Returns false if
+  /// function is invalid.
+  bool VerifyFunction(llvm::Function* function);
+
+  // Used for testing.
+  void ResetVerification() { is_corrupt_ = false; }
 
   /// Optimizes the module. This includes pruning the module of any unused functions.
   void OptimizeModule();
 
   /// Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
+
+  /// Whether InitializeLlvm() has been called.
+  static bool llvm_initialized_;
+
+  /// Host CPU name and attributes, filled in by InitializeLlvm().
+  static std::string cpu_name_;
+  static std::vector<std::string> cpu_attrs_;
 
   /// ID used for debugging (can be e.g. the fragment instance ID)
   std::string id_;
@@ -523,21 +499,14 @@ class LlvmCodeGen {
 
   /// Top level llvm object.  Objects from different contexts do not share anything.
   /// We can have multiple instances of the LlvmCodeGen object in different threads
-  boost::scoped_ptr<llvm::LLVMContext> context_;
+  std::unique_ptr<llvm::LLVMContext> context_;
 
   /// Top level codegen object.  Contains everything to jit one 'unit' of code.
-  /// Owned by the execution_engine_.
+  /// module_ is set by Init(). module_ is owned by execution_engine_.
   llvm::Module* module_;
 
   /// Execution/Jitting engine.
-  boost::scoped_ptr<llvm::ExecutionEngine> execution_engine_;
-
-  /// Keeps track of all the functions that have been jit compiled and linked into
-  /// the process. Special care needs to be taken if we need to modify these functions.
-  std::set<llvm::Function*> jitted_functions_;
-
-  /// Lock protecting jitted_functions_
-  boost::mutex jitted_functions_lock_;
+  std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
 
   /// Keeps track of the external functions that have been included in this module
   /// e.g libc functions or non-jitted impala functions.

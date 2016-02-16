@@ -141,12 +141,12 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   Value* is_null;
   if (check_null) {
     if (is_default_null) {
-      is_null = builder.CreateCall2(is_null_string_fn, args[1], args[2]);
+      is_null = builder.CreateCall(is_null_string_fn,
+          ArrayRef<Value*>({args[1], args[2]}));
     } else {
-      is_null = builder.CreateCall4(is_null_string_fn, args[1], args[2],
-          codegen->CastPtrToLlvmPtr(codegen->ptr_type(),
-              const_cast<char*>(null_col_val)),
-          codegen->GetIntConstant(TYPE_INT, len));
+      is_null = builder.CreateCall(is_null_string_fn, ArrayRef<Value*>({args[1], args[2],
+          codegen->CastPtrToLlvmPtr(codegen->ptr_type(), const_cast<char*>(null_col_val)),
+          codegen->GetIntConstant(TYPE_INT, len)}));
     }
   } else {
     // Constant FALSE as branch condition. We rely on later optimization passes
@@ -168,11 +168,11 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
   // Codegen parse slot block
   builder.SetInsertPoint(parse_slot_block);
-  Value* slot = builder.CreateStructGEP(args[0], slot_desc->field_idx(), "slot");
+  Value* slot = builder.CreateStructGEP(NULL, args[0], slot_desc->llvm_field_idx(), "slot");
 
   if (slot_desc->type().IsVarLenStringType()) {
-    Value* ptr = builder.CreateStructGEP(slot, 0, "string_ptr");
-    Value* len = builder.CreateStructGEP(slot, 1, "string_len");
+    Value* ptr = builder.CreateStructGEP(NULL, slot, 0, "string_ptr");
+    Value* len = builder.CreateStructGEP(NULL, slot, 1, "string_len");
 
     builder.CreateStore(args[1], ptr);
     // TODO codegen memory allocation for CHAR
@@ -229,7 +229,8 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     Value* failed_value = codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_FAILURE);
 
     // Call Impala's StringTo* function
-    Value* result = builder.CreateCall3(parse_fn, args[1], args[2], parse_result_ptr);
+    Value* result = builder.CreateCall(parse_fn,
+        ArrayRef<Value*>({args[1], args[2], parse_result_ptr}));
     Value* parse_result_val = builder.CreateLoad(parse_result_ptr, "parse_result");
 
     // Check for parse error.  TODO: handle overflow
@@ -243,13 +244,13 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
     // Parse failed, set slot to null and return false
     builder.SetInsertPoint(parse_failed_block);
-    builder.CreateCall(set_null_fn, args[0]);
+    builder.CreateCall(set_null_fn, ArrayRef<Value*>({args[0]}));
     builder.CreateRet(codegen->false_value());
   }
 
   // Case where data is \N or len == 0 and it is not a string col
   builder.SetInsertPoint(set_null_block);
-  builder.CreateCall(set_null_fn, args[0]);
+  builder.CreateCall(set_null_fn, ArrayRef<Value*>({args[0]}));
   builder.CreateRet(codegen->true_value());
 
   return codegen->FinalizeFunction(fn);

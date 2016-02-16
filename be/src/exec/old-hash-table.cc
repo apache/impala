@@ -173,8 +173,8 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
   int64_t fvn_seed = HashUtil::FNV_SEED;
 
   if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
-    Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
-    Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
+    Value* dst_ptr = builder->CreateStructGEP(NULL, dst, 0, "string_ptr");
+    Value* dst_len = builder->CreateStructGEP(NULL, dst, 1, "string_len");
     Value* null_len = codegen->GetIntConstant(TYPE_INT, fvn_seed);
     Value* null_ptr = builder->CreateIntToPtr(null_len, codegen->ptr_type());
     builder->CreateStore(null_ptr, dst_ptr);
@@ -426,13 +426,15 @@ Function* OldHashTable::CodegenHashCurrentRow(RuntimeState* state) {
     if (results_buffer_size_ > 0) {
       Function* hash_fn = codegen->GetHashFunction(results_buffer_size_);
       Value* len = codegen->GetIntConstant(TYPE_INT, results_buffer_size_);
-      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result);
+      hash_result =
+          builder.CreateCall(hash_fn, ArrayRef<Value*>({data, len, hash_result}));
     }
   } else {
     if (var_result_begin_ > 0) {
       Function* hash_fn = codegen->GetHashFunction(var_result_begin_);
       Value* len = codegen->GetIntConstant(TYPE_INT, var_result_begin_);
-      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result);
+      hash_result =
+          builder.CreateCall(hash_fn, ArrayRef<Value*>({data, len, hash_result}));
     }
 
     // Hash string slots
@@ -468,7 +470,8 @@ Function* OldHashTable::CodegenHashCurrentRow(RuntimeState* state) {
         Function* null_hash_fn = codegen->GetHashFunction(sizeof(StringValue));
         Value* llvm_loc = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), loc);
         Value* len = codegen->GetIntConstant(TYPE_INT, sizeof(StringValue));
-        str_null_result = builder.CreateCall3(null_hash_fn, llvm_loc, len, hash_result);
+        str_null_result = builder.CreateCall(null_hash_fn,
+            ArrayRef<Value*>({llvm_loc, len, hash_result}));
         builder.CreateBr(continue_block);
 
         builder.SetInsertPoint(not_null_block);
@@ -477,15 +480,15 @@ Function* OldHashTable::CodegenHashCurrentRow(RuntimeState* state) {
       // Convert expr_values_buffer_ loc to llvm value
       Value* str_val = codegen->CastPtrToLlvmPtr(codegen->GetPtrType(TYPE_STRING), loc);
 
-      Value* ptr = builder.CreateStructGEP(str_val, 0, "ptr");
-      Value* len = builder.CreateStructGEP(str_val, 1, "len");
+      Value* ptr = builder.CreateStructGEP(NULL, str_val, 0, "ptr");
+      Value* len = builder.CreateStructGEP(NULL, str_val, 1, "len");
       ptr = builder.CreateLoad(ptr);
       len = builder.CreateLoad(len);
 
       // Call hash(ptr, len, hash_result);
       Function* general_hash_fn = codegen->GetHashFunction();
       Value* string_hash_result =
-          builder.CreateCall3(general_hash_fn, ptr, len, hash_result);
+          builder.CreateCall(general_hash_fn, ArrayRef<Value*>({ptr, len, hash_result}));
 
       if (stores_nulls_) {
         builder.CreateBr(continue_block);

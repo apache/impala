@@ -26,7 +26,6 @@ set(IR_NO_SSE_C_FILE $ENV{IMPALA_HOME}/be/generated-sources/impala-ir/impala-no-
 add_library(CodeGen
   codegen-anyval.cc
   llvm-codegen.cc
-  subexpr-elimination.cc
   instruction-counter.cc
   ${IR_SSE_C_FILE}
   ${IR_NO_SSE_C_FILE}

@@ -594,7 +594,7 @@ Function* HashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
   replaced = codegen->ReplaceCallSites(process_build_batch_fn, hash_fn, "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
-  return codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
+  return codegen->FinalizeFunction(process_build_batch_fn);
 }
 
 Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* hash_fn) {
@@ -653,5 +653,5 @@ Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* 
   replaced = codegen->ReplaceCallSites(process_probe_batch_fn, equals_fn, "Equals");
   DCHECK_EQ(replaced, 2);
 
-  return codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);
+  return codegen->FinalizeFunction(process_probe_batch_fn);
 }

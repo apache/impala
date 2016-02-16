@@ -93,7 +93,9 @@ inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
   return DecimalValue(result);
 }
 
-#if 5 <= __GNUC__ || __has_builtin(__builtin_add_overflow)
+// Use __builtin_add_overflow on GCC if available.
+// Avoid using on Clang: it regresses performance.
+#if 5 <= __GNUC__
 template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
@@ -143,7 +145,10 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
 }
 #endif
 
-#if 5 <= __GNUC__ || __has_builtin(__builtin_mul_overflow)
+// Use __builtin_mul_overflow on GCC if available.
+// Avoid using on Clang: it requires a function __muloti present in the Clang runtime
+// library but not the GCC runtime library and regresses performance.
+#if 5 <= __GNUC__
 template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
