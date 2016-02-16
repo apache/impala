@@ -92,13 +92,8 @@ class BitWriter {
 class BitReader {
  public:
   /// 'buffer' is the buffer to read from.  The buffer's length is 'buffer_len'.
-  BitReader(uint8_t* buffer, int buffer_len) :
-      buffer_(buffer),
-      max_bytes_(buffer_len),
-      byte_offset_(0),
-      bit_offset_(0) {
-    int num_bytes = std::min(8, max_bytes_ - byte_offset_);
-    memcpy(&buffered_values_, buffer_ + byte_offset_, num_bytes);
+  BitReader(uint8_t* buffer, int buffer_len) {
+    Reset(buffer, buffer_len);
   }
 
   BitReader() : buffer_(NULL), max_bytes_(0) {}
@@ -108,6 +103,8 @@ class BitReader {
     max_bytes_ = buffer_len;
     byte_offset_ = 0;
     bit_offset_ = 0;
+    int num_bytes = std::min(8, max_bytes_);
+    memcpy(&buffered_values_, buffer_, num_bytes);
   }
 
   /// Gets the next value from the buffer.  Returns true if 'v' could be read or false if

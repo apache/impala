@@ -68,28 +68,32 @@ TEST(BitArray, TestBool) {
 
   // Use the reader and validate
   BitReader reader(buffer, len);
-  for (int i = 0; i < 8; ++i) {
-    bool val = false;
-    bool result = reader.GetValue(1, &val);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(val, i % 2);
-  }
-
-  for (int i = 0; i < 8; ++i) {
-    bool val = false;
-    bool result = reader.GetValue(1, &val);
-    EXPECT_TRUE(result);
-    switch (i) {
-      case 0:
-      case 1:
-      case 4:
-      case 5:
-        EXPECT_EQ(val, false);
-        break;
-      default:
-        EXPECT_EQ(val, true);
-        break;
+  // Ensure it returns the same results after Reset().
+  for (int trial = 0; trial < 2; ++trial) {
+    for (int i = 0; i < 8; ++i) {
+      bool val = false;
+      bool result = reader.GetValue(1, &val);
+      EXPECT_TRUE(result);
+      EXPECT_EQ(val, i % 2);
     }
+
+    for (int i = 0; i < 8; ++i) {
+      bool val = false;
+      bool result = reader.GetValue(1, &val);
+      EXPECT_TRUE(result);
+      switch (i) {
+        case 0:
+        case 1:
+        case 4:
+        case 5:
+          EXPECT_EQ(val, false);
+          break;
+        default:
+          EXPECT_EQ(val, true);
+          break;
+      }
+    }
+    reader.Reset(buffer, len);
   }
 }
 
@@ -108,13 +112,17 @@ void TestBitArrayValues(int bit_width, int num_vals) {
   EXPECT_EQ(writer.bytes_written(), len);
 
   BitReader reader(buffer, len);
-  for (int i = 0; i < num_vals; ++i) {
-    int64_t val;
-    bool result = reader.GetValue(bit_width, &val);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(val, i % mod);
+  // Ensure it returns the same results after Reset().
+  for (int trial = 0; trial < 2; ++trial) {
+    for (int i = 0; i < num_vals; ++i) {
+      int64_t val;
+      bool result = reader.GetValue(bit_width, &val);
+      EXPECT_TRUE(result);
+      EXPECT_EQ(val, i % mod);
+    }
+    EXPECT_EQ(reader.bytes_left(), 0);
+    reader.Reset(buffer, len);
   }
-  EXPECT_EQ(reader.bytes_left(), 0);
 }
 
 TEST(BitArray, TestValues) {
@@ -148,19 +156,23 @@ TEST(BitArray, TestMixed) {
 
   parity = true;
   BitReader reader(buffer, len);
-  for (int i = 0; i < len; ++i) {
-    bool result;
-    if (i % 2 == 0) {
-      bool val;
-      result = reader.GetValue(1, &val);
-      EXPECT_EQ(val, parity);
-      parity = !parity;
-    } else {
-      int val;
-      result = reader.GetValue(10, &val);
-      EXPECT_EQ(val, i);
+  // Ensure it returns the same results after Reset().
+  for (int trial = 0; trial < 2; ++trial) {
+    for (int i = 0; i < len; ++i) {
+      bool result;
+      if (i % 2 == 0) {
+        bool val;
+        result = reader.GetValue(1, &val);
+        EXPECT_EQ(val, parity);
+        parity = !parity;
+      } else {
+        int val;
+        result = reader.GetValue(10, &val);
+        EXPECT_EQ(val, i);
+      }
+      EXPECT_TRUE(result);
     }
-    EXPECT_TRUE(result);
+    reader.Reset(buffer, len);
   }
 }
 
@@ -190,11 +202,15 @@ void ValidateRle(const vector<int>& values, int bit_width,
 
   // Verify read
   RleDecoder decoder(buffer, len, bit_width);
-  for (int i = 0; i < values.size(); ++i) {
-    uint64_t val;
-    bool result = decoder.Get(&val);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(values[i], val);
+  // Ensure it returns the same results after Reset().
+  for (int trial = 0; trial < 2; ++trial) {
+    for (int i = 0; i < values.size(); ++i) {
+      uint64_t val;
+      bool result = decoder.Get(&val);
+      EXPECT_TRUE(result);
+      EXPECT_EQ(values[i], val);
+    }
+    decoder.Reset(buffer, len, bit_width);
   }
 }
 
@@ -270,13 +286,17 @@ TEST(Rle, BitWidthZeroRepeated) {
   const int num_values = 15;
   buffer[0] = num_values << 1; // repeated indicator byte
   RleDecoder decoder(buffer, sizeof(buffer), 0);
-  uint8_t val;
-  for (int i = 0; i < num_values; ++i) {
-    bool result = decoder.Get(&val);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+  // Ensure it returns the same results after Reset().
+  for (int trial = 0; trial < 2; ++trial) {
+    uint8_t val;
+    for (int i = 0; i < num_values; ++i) {
+      bool result = decoder.Get(&val);
+      EXPECT_TRUE(result);
+      EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+    }
+    EXPECT_FALSE(decoder.Get(&val));
+    decoder.Reset(buffer, sizeof(buffer), 0);
   }
-  EXPECT_FALSE(decoder.Get(&val));
 }
 
 TEST(Rle, BitWidthZeroLiteral) {
@@ -284,14 +304,18 @@ TEST(Rle, BitWidthZeroLiteral) {
   const int num_groups = 4;
   buffer[0] = num_groups << 1 | 1; // literal indicator byte
   RleDecoder decoder = RleDecoder(buffer, sizeof(buffer), 0);
-  const int num_values = num_groups * 8;
-  uint8_t val;
-  for (int i = 0; i < num_values; ++i) {
-    bool result = decoder.Get(&val);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+  // Ensure it returns the same results after Reset().
+  for (int trial = 0; trial < 2; ++trial) {
+    const int num_values = num_groups * 8;
+    uint8_t val;
+    for (int i = 0; i < num_values; ++i) {
+      bool result = decoder.Get(&val);
+      EXPECT_TRUE(result);
+      EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+    }
+    EXPECT_FALSE(decoder.Get(&val));
+    decoder.Reset(buffer, sizeof(buffer), 0);
   }
-  EXPECT_FALSE(decoder.Get(&val));
 }
 
 // Test that writes out a repeated group and then a literal
@@ -377,17 +401,21 @@ TEST(BitRle, Overflow) {
     EXPECT_GT(num_added, 0);
 
     RleDecoder decoder(buffer, bytes_written, bit_width);
-    parity = true;
-    uint32_t v;
-    for (int i = 0; i < num_added; ++i) {
-      bool result = decoder.Get(&v);
-      EXPECT_TRUE(result);
-      EXPECT_EQ(v, parity);
-      parity = !parity;
+    // Ensure it returns the same results after Reset().
+    for (int trial = 0; trial < 2; ++trial) {
+      parity = true;
+      uint32_t v;
+      for (int i = 0; i < num_added; ++i) {
+        bool result = decoder.Get(&v);
+        EXPECT_TRUE(result);
+        EXPECT_EQ(v, parity);
+        parity = !parity;
+      }
+      // Make sure we get false when reading past end a couple times.
+      EXPECT_FALSE(decoder.Get(&v));
+      EXPECT_FALSE(decoder.Get(&v));
+      decoder.Reset(buffer, bytes_written, bit_width);
     }
-    // Make sure we get false when reading past end a couple times.
-    EXPECT_FALSE(decoder.Get(&v));
-    EXPECT_FALSE(decoder.Get(&v));
   }
 }
 
@@ -395,7 +423,7 @@ TEST(BitRle, Overflow) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }
 
