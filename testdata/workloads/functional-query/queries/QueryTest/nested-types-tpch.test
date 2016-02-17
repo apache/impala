@@ -162,6 +162,8 @@ BIGINT,BIGINT
 ---- QUERY
 # IMPALA-2376
 # Set memory limit low enough to get the below query to consistently fail.
+# TODO: change query and/or table so we can consistently check for the following error:
+# Failed to allocate buffer for collection '...'.
 set mem_limit=4m;
 select max(cnt) from customer c,
 (select count(l_returnflag) cnt from c.c_orders.o_lineitems) v;
@@ -169,7 +171,6 @@ select max(cnt) from customer c,
 BIGINT
 ---- CATCH
 Memory limit exceeded
-Failed to allocate buffer for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.
 ====
 ---- QUERY
 # IMPALA-2473: Scan query with large row size leading to oversized batches.
