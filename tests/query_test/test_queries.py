@@ -84,10 +84,6 @@ class TestQueries(ImpalaTestSuite):
   def test_union(self, vector):
     self.run_test_case('QueryTest/union', vector)
 
-  def test_very_large_strings(self, vector):
-    """Regression test for IMPALA-1619"""
-    self.run_test_case('QueryTest/large_strings', vector)
-
   def test_sort(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
@@ -170,3 +166,22 @@ class TestQueriesTextTables(ImpalaTestSuite):
   @SkipIfS3.insert
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)
+
+# Tests in this class are only run against Parquet because the tests don't exercise the
+# file format.
+class TestQueriesParquetTables(ImpalaTestSuite):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueriesParquetTables, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'parquet')
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @pytest.mark.execute_serially
+  def test_very_large_strings(self, vector):
+    """Regression test for IMPALA-1619. Doesn't need to be run on all file formats.
+       Executes serially to avoid large random spikes in mem usage."""
+    self.run_test_case('QueryTest/large_strings', vector)
