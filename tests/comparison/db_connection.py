@@ -41,7 +41,7 @@ from tempfile import gettempdir
 from threading import Lock
 from time import time
 
-from tests.comparison.common import (
+from common import (
     ArrayColumn,
     Column,
     MapColumn,

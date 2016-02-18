@@ -290,23 +290,22 @@ class QueryGenerator(object):
     column_categories = ['-' for _ in select_item_data_types]
     if require_aggregate:
       column_categories[randint(0, len(column_categories) - 1)] = 'AGG'
-    # Assign AGG randomly to some columns based on profile weights
+    # Assign AGG and ANALYTIC some columns
     for i in range(len(column_categories)):
-      if self.profile._choose_from_weights(
-          self.profile.weights('SELECT_ITEM_CATEGORY')) == 'AGG':
-        column_categories[i] = 'AGG'
+      item_category = self.profile._choose_from_weights(
+          self.profile.weights('SELECT_ITEM_CATEGORY'))
+      if item_category in ('AGG', 'ANALYTIC'):
+        column_categories[i] = item_category
     agg_present = 'AGG' in column_categories
-    # Assign ANALYTIC and BASIC to some columns based on the profile weights.
+    # Assign BASIC to the remaining columns
     for i in range(len(column_categories)):
       if column_categories[i] == '-':
-        # If AGG column is present, BASIC can only be assigned to a column if it's not a
-        # Float.
-        if self.profile._choose_from_weights(
-            self.profile.weights('SELECT_ITEM_CATEGORY')) == 'BASIC' and not (
-            select_item_data_types[i] == Float and agg_present):
-          column_categories[i] = 'BASIC'
+        if select_item_data_types[i].is_approximate() and agg_present:
+          column_categories[i] = 'AGG'
         else:
-          column_categories[i] = 'ANALYTIC'
+          # If AGG column is present, BASIC can only be assigned to a column if it's not a
+          # Float.
+          column_categories[i] = 'BASIC'
 
     select_items = []
 
