@@ -368,9 +368,8 @@ static int SaslVerifyFile(void* context, const char* file,
   return SASL_OK;
 }
 
-// This callback could be used to authorize or restrict access to certain
-// users.  Currently it is used to log a message that we successfully
-// authenticated with a user on an internal connection.
+// Authorizes authenticated users on an internal connection after validating that the
+// first components of the 'requested_user' and our principal are the same.
 //
 // conn: Sasl connection - Ignored
 // context: Ignored, always NULL
@@ -387,11 +386,31 @@ static int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
     const char* auth_identity, unsigned alen,
     const char* def_realm, unsigned urlen,
     struct propctx* propctx) {
-  // We say "principal" here becase this is for internal communication, and hence
-  // ought always be --principal or --be_principal
-  VLOG(1) << "Successfully authenticated principal \"" << string(requested_user, rlen)
-          << "\" on an internal connection";
-  return SASL_OK;
+  string requested_principal(requested_user, rlen);
+  vector<string> names;
+  split(names, requested_principal, is_any_of("/@"));
+
+  if (names.size() != 3) {
+    LOG(INFO) << "Kerberos principal should be of the form: "
+              << "<service>/<hostname>@<realm> - got: " << requested_user;
+    return SASL_BADAUTH;
+  }
+  SaslAuthProvider* internal_auth_provider = static_cast<SaslAuthProvider*>(
+      AuthManager::GetInstance()->GetInternalAuthProvider());
+
+  if (names[0] == internal_auth_provider->service_name()) {
+    // We say "principal" here becase this is for internal communication, and hence
+    // ought always be --principal or --be_principal
+    VLOG(1) << "Successfully authenticated principal \"" << requested_principal
+            << "\" on an internal connection";
+    return SASL_OK;
+  }
+
+  LOG(INFO) << "Principal \"" << requested_principal << "\" not authenticated. "
+            << "Reason: 'service' does not match from <service>/<hostname>@<realm>.\n"
+            << "Got: " << names[0]
+            << ". Expected: " << internal_auth_provider->service_name();
+  return SASL_BADAUTH;
 }
 
 // This callback could be used to authorize or restrict access to certain
