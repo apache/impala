@@ -881,8 +881,8 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
   if (tuple_data == NULL) {
     *status = Status::MemLimitExceeded();
     status->AddDetail(Substitute("Cannot perform aggregation at node with id $0."
-          " Failed to allocate $1 bytes for intermediate tuple. The memory limit"
-          " is too low to execute the query.", id_, fixed_size + varlen_size));
+        " Failed to allocate $1 bytes for intermediate tuple.", id_,
+        fixed_size + varlen_size));
     state_->SetMemLimitExceeded();
     return NULL;
   }
