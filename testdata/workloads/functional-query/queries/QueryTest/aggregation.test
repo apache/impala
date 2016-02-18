@@ -154,6 +154,15 @@ from alltypesagg where day is not null
 bigint, string, string, string, string
 ====
 ---- QUERY
+# Test for IMPALA-3018. Verify update() function of min() handles
+# zero-length string correctly.
+select min(str) from (values ('aaa' as str), ('')) as tmp
+---- RESULTS
+''
+---- TYPES
+String
+====
+---- QUERY
 # grouping by different data types, with NULLs
 select tinyint_col, count(*) from alltypesagg where day is not null group by 1 order by 1
 ---- RESULTS

@@ -127,14 +127,14 @@ namespace impala {
 // 'dst' will be set to a null string. This allows execution to continue until the
 // next time GetQueryStatus() is called (see IMPALA-2756).
 static void AllocBuffer(FunctionContext* ctx, StringVal* dst, size_t buf_len) {
-  DCHECK_GT(buf_len, 0);
   uint8_t* ptr = ctx->Allocate(buf_len);
-  if (UNLIKELY(ptr == NULL)) {
+  if (UNLIKELY(ptr == NULL && buf_len != 0)) {
     DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     *dst = StringVal::null();
   } else {
     *dst = StringVal(ptr, buf_len);
-    memset(ptr, 0, buf_len);
+    // Avoid memset() with NULL ptr as it's undefined.
+    if (LIKELY(ptr != NULL)) memset(ptr, 0, buf_len);
   }
 }
 
@@ -142,14 +142,14 @@ static void AllocBuffer(FunctionContext* ctx, StringVal* dst, size_t buf_len) {
 // 'buf_len' bytes and copies the content of StringVal 'src' into it.
 // If allocation fails, 'dst' will be set to a null string.
 static void CopyStringVal(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
-  DCHECK_GT(src.len, 0);
   uint8_t* copy = ctx->Allocate(src.len);
-  if (UNLIKELY(copy == NULL)) {
+  if (UNLIKELY(copy == NULL && src.len != 0)) {
     DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     *dst = StringVal::null();
   } else {
     *dst = StringVal(copy, src.len);
-    memcpy(dst->ptr, src.ptr, src.len);
+    // Avoid memcpy() to NULL ptr as it's undefined.
+    if (LIKELY(dst->ptr != NULL)) memcpy(dst->ptr, src.ptr, src.len);
   }
 }
 
