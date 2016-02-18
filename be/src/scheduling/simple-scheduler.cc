@@ -268,7 +268,9 @@ void SimpleScheduler::UpdateMembership(
     // backend_ip_map_) in place.
     {
       lock_guard<mutex> lock(backend_map_lock_);
+      bool backend_map_changed = false;
       if (!delta.is_delta) {
+        backend_map_changed = true;
         current_membership_.clear();
         backend_map_.clear();
         backend_ip_map_.clear();
@@ -295,6 +297,7 @@ void SimpleScheduler::UpdateMembership(
                                    << be_desc.address;
         }
 
+        backend_map_changed = true;
         list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
         if (find(be_descs->begin(), be_descs->end(), be_desc) == be_descs->end()) {
           backend_map_[be_desc.ip_address].push_back(be_desc);
@@ -305,6 +308,7 @@ void SimpleScheduler::UpdateMembership(
       // Process deletions from the topic
       for (const string& backend_id: delta.topic_deletions) {
         if (current_membership_.find(backend_id) != current_membership_.end()) {
+          backend_map_changed = true;
           const TBackendDescriptor& be_desc = current_membership_[backend_id];
           backend_ip_map_.erase(be_desc.address.hostname);
           list<TBackendDescriptor>* be_descs = &backend_map_[be_desc.ip_address];
@@ -314,7 +318,8 @@ void SimpleScheduler::UpdateMembership(
           current_membership_.erase(backend_id);
         }
       }
-      next_nonlocal_backend_entry_ = backend_map_.begin();
+      // Update invalidated iterator.
+      if (backend_map_changed) next_nonlocal_backend_entry_ = backend_map_.begin();
     }
 
     // If this impalad is not in our view of the membership list, we should add it and
