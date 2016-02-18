@@ -124,8 +124,19 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
     }
     // TODO: Avoid need for this copy.
     BloomFilter* copy = AllocateScratchBloomFilter();
+    if (copy == NULL) return;
     copy->Or(*bloom_filter);
-    filter->SetBloomFilter(copy);
+    {
+      // Take lock only to ensure no race with PublishGlobalFilter() - there's no need for
+      // coordination with readers of the filter.
+      lock_guard<SpinLock> l(runtime_filter_lock_);
+      if (filter->GetBloomFilter() == NULL) {
+        filter->SetBloomFilter(copy);
+        state_->runtime_profile()->AddInfoString(
+            Substitute("Filter $0 arrival", filter_id),
+            PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
+      }
+    }
   }
 }
 
