@@ -29,6 +29,7 @@ import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import com.cloudera.impala.thrift.TPartitionType;
@@ -409,6 +410,7 @@ public class DistributedPlanner {
       node.setChild(0, leftChildFragment.getPlanRoot());
       connectChildFragment(node, 1, rightChildFragment);
       leftChildFragment.setPlanRoot(node);
+      markFiltersWithLocalTargets(node);
       return leftChildFragment;
     } else {
       node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
@@ -505,6 +507,22 @@ public class DistributedPlanner {
       rightChildFragment.setOutputPartition(rhsJoinPartition);
 
       return joinFragment;
+    }
+  }
+
+  /**
+   * Marks the runtime filters of 'node' that have target nodes in the plan fragment
+   * containing 'node'.
+   */
+  private void markFiltersWithLocalTargets(PlanNode node) {
+    if (!(node instanceof JoinNode) || node.getRuntimeFilters().isEmpty()) return;
+    List<ScanNode> scanNodes = Lists.newArrayList();
+    node.collect(ScanNode.class, scanNodes);
+    if (!scanNodes.isEmpty()) {
+      Preconditions.checkState(scanNodes.size() == 1);
+      for (RuntimeFilter filter: node.getRuntimeFilters()) {
+        filter.setHasLocalTarget(filter.getTarget().getId() == scanNodes.get(0).getId());
+      }
     }
   }
 

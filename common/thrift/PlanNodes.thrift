@@ -91,6 +91,11 @@ struct TRuntimeFilterDesc {
 
   // SlotIds on which the target expr is bound on
   6: optional list<Types.TSlotId> target_expr_slotids
+
+  // If set, indicates that the filter should not be sent to the coordinator because it
+  // is produced by a broadcast join and the target scan node is in the same fragment
+  // as the join.
+  7: optional bool has_local_target
 }
 
 // The information contained in subclasses of ScanNode captured in two separate
