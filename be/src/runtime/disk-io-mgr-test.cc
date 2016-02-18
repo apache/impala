@@ -144,7 +144,7 @@ class DiskIoMgrTest : public testing::Test {
       ASSERT_TRUE(status.ok() || status.code() == expected_status.code());
       if (range == NULL) break;
       ValidateScanRange(range, expected_result, expected_len, expected_status);
-      ++(*num_ranges_processed);
+      num_ranges_processed->Add(1);
       ++num_ranges;
     }
   }
@@ -381,7 +381,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           }
           threads.join_all();
 
-          EXPECT_EQ(num_ranges_processed, ranges.size());
+          EXPECT_EQ(num_ranges_processed.Load(), ranges.size());
           io_mgr.UnregisterContext(reader);
           EXPECT_EQ(reader_mem_tracker.consumption(), 0);
         }
@@ -452,7 +452,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         }
 
         threads.join_all();
-        EXPECT_EQ(num_ranges_processed, len);
+        EXPECT_EQ(num_ranges_processed.Load(), len);
         io_mgr.UnregisterContext(reader);
         EXPECT_EQ(reader_mem_tracker.consumption(), 0);
       }
@@ -525,7 +525,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         ValidateSyncRead(&io_mgr, reader, complete_range, data);
         ValidateSyncRead(&io_mgr, reader, complete_range, data);
 
-        EXPECT_EQ(num_ranges_processed, ranges.size());
+        EXPECT_EQ(num_ranges_processed.Load(), ranges.size());
         io_mgr.UnregisterContext(reader);
         EXPECT_EQ(reader_mem_tracker.consumption(), 0);
       }
@@ -577,7 +577,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
           ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::OK(), 1,
               &num_ranges_processed);
         }
-        EXPECT_EQ(num_ranges_processed, num_succesful_ranges);
+        EXPECT_EQ(num_ranges_processed.Load(), num_succesful_ranges);
 
         // Start up some threads and then cancel
         thread_group threads;
@@ -735,7 +735,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     ValidateSyncRead(&io_mgr, reader, complete_range, data);
     ValidateSyncRead(&io_mgr, reader, complete_range, data);
 
-    EXPECT_EQ(num_ranges_processed, ranges.size());
+    EXPECT_EQ(num_ranges_processed.Load(), ranges.size());
     io_mgr.UnregisterContext(reader);
     EXPECT_EQ(reader_mem_tracker.consumption(), 0);
   }
@@ -908,7 +908,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
             }
           }
           threads.join_all();
-          EXPECT_EQ(num_ranges_processed, DATA_LEN * NUM_READERS);
+          EXPECT_EQ(num_ranges_processed.Load(), DATA_LEN * NUM_READERS);
           for (int i = 0; i < NUM_READERS; ++i) {
             io_mgr.UnregisterContext(readers[i]);
           }
@@ -942,7 +942,7 @@ TEST_F(DiskIoMgrTest, Buffers) {
   int64_t buffer_len = 1;
   char* buf = io_mgr.GetFreeBuffer(&buffer_len);
   EXPECT_EQ(buffer_len, min_buffer_size);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_, 1);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 1);
   io_mgr.ReturnFreeBuffer(buf, buffer_len);
   EXPECT_EQ(mem_tracker.consumption(), min_buffer_size);
 
@@ -950,7 +950,7 @@ TEST_F(DiskIoMgrTest, Buffers) {
   buffer_len = min_buffer_size;
   buf = io_mgr.GetFreeBuffer(&buffer_len);
   EXPECT_EQ(buffer_len, min_buffer_size);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_, 1);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 1);
   io_mgr.ReturnFreeBuffer(buf, buffer_len);
   EXPECT_EQ(mem_tracker.consumption(), min_buffer_size);
 
@@ -958,12 +958,12 @@ TEST_F(DiskIoMgrTest, Buffers) {
   buffer_len = min_buffer_size + 1;
   buf = io_mgr.GetFreeBuffer(&buffer_len);
   EXPECT_EQ(buffer_len, min_buffer_size * 2);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_, 2);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 2);
   EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 3);
 
   // gc unused buffer
   io_mgr.GcIoBuffers();
-  EXPECT_EQ(io_mgr.num_allocated_buffers_, 1);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 1);
   EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 2);
 
   io_mgr.ReturnFreeBuffer(buf, buffer_len);
@@ -972,13 +972,13 @@ TEST_F(DiskIoMgrTest, Buffers) {
   buffer_len = max_buffer_size;
   buf = io_mgr.GetFreeBuffer(&buffer_len);
   EXPECT_EQ(buffer_len, max_buffer_size);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_, 2);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 2);
   io_mgr.ReturnFreeBuffer(buf, buffer_len);
   EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 2 + max_buffer_size);
 
   // gc buffers
   io_mgr.GcIoBuffers();
-  EXPECT_EQ(io_mgr.num_allocated_buffers_, 0);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 0);
   EXPECT_EQ(mem_tracker.consumption(), 0);
 }
 

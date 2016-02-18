@@ -454,9 +454,14 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
     executor_.reset(NULL);
   }
-
   // Initialize the execution profile structures.
   InitExecProfile(request);
+
+  // Once remote fragments are started, they can start making ReportExecStatus RPCs,
+  // which will update the progress updater. So initialize it before starting remote
+  // fragments.
+  const string& str = Substitute("Query $0", PrintId(query_id_));
+  progress_.Init(str, schedule.num_scan_ranges());
 
   if (schedule.num_fragment_instances() > 0) {
     RETURN_IF_ERROR(StartRemoteFragments(&schedule));
@@ -469,10 +474,6 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   }
 
   PrintFragmentInstanceInfo();
-
-  const string& str = Substitute("Query $0", PrintId(query_id_));
-  progress_ = ProgressUpdater(str, schedule.num_scan_ranges());
-
   return Status::OK();
 }
 

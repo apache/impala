@@ -18,9 +18,7 @@
 
 #include <boost/thread/locks.hpp>
 
-#include "common/atomic.h"
 #include "util/spinlock.h"
-
 
 namespace impala {
 

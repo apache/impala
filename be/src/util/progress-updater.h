@@ -23,49 +23,62 @@
 
 namespace impala {
 
-/// Utility class to update progress.  This is split out so a different
+/// Utility class to update progress. This is split out so a different
 /// logging level can be set for these updates (GLOG_module)
-/// This class is thread safe.
+/// This class is thread safe after Init() is called.
 /// Example usage:
-///   ProgressUpdater updater("Task", 100, 10);  // 100 items, print every 10%
+///   ProgressUpdater updater;
+///   updater.Init("Task", 100, 10);  // 100 items, print every 10%
 ///   updater.Update(15);  // 15 done, prints 15%
 ///   updater.Update(3);   // 18 done, doesn't print
 ///   update.Update(5);    // 23 done, prints 23%
 class ProgressUpdater {
  public:
-  /// label - label that is printed with each update.
-  /// max - maximum number of work items
-  /// update_period - how often the progress is spewed expressed as a percentage
-  ProgressUpdater(const std::string& label, int64_t max, int update_period = 1);
 
   ProgressUpdater();
 
-  /// Sets the GLOG level for this progress updater.  By default, this will use
-  /// 2 but objects can override it.
+  /// Initialize this ProgressUpdater with:
+  /// 'label' - label that is printed with each update.
+  /// 'total' - maximum number of work items
+  /// 'update_period' - how often the progress is printed expressed as a percentage
+  void Init(const std::string& label, int64_t total, int update_period = 1);
+
+  /// Sets the GLOG level for this progress updater. By default, this will use 2 but
+  /// objects can override it.
   void set_logging_level(int level) { logging_level_ = level; }
 
-  /// 'delta' more of the work has been complete.  Will potentially output to
-  /// VLOG_PROGRESS
+  /// 'delta' more of the work has been complete. Will potentially output to
+  /// VLOG_PROGRESS. Init() must be called before Update().
   void Update(int64_t delta);
 
-  /// Returns if all tasks are done.
-  bool done() const { return num_complete_ >= total_; }
+  /// Returns true if all tasks are done.
+  bool done() const { return num_complete() >= total_; }
 
   int64_t total() const { return total_; }
-  int64_t num_complete() const { return num_complete_; }
+  int64_t num_complete() const { return num_complete_.Load(); }
   int64_t remaining() const { return total() - num_complete(); }
 
   /// Returns a string representation of the current progress
   std::string ToString() const;
 
  private:
+  /// Label printed with each update.
   std::string label_;
+
+  /// GLOG level for updates.
   int logging_level_;
+
+  /// Total number of work items. -1 before Init().
   int64_t total_;
+
+  /// Number of percentage points between outputs.
   int update_period_;
 
+  /// Number of completed work items.
   AtomicInt<int64_t> num_complete_;
-  int last_output_percentage_;
+
+  /// Percentage when the last output was generated.
+  AtomicInt<int> last_output_percentage_;
 };
 
 }

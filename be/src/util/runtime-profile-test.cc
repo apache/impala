@@ -222,6 +222,39 @@ TEST(CountersTest, MergeAndUpdate) {
   profile2.PrettyPrint(&dummy);
 }
 
+TEST(CountersTest, HighWaterMarkCounters) {
+  ObjectPool pool;
+  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile::HighWaterMarkCounter* bytes_counter =
+      profile.AddHighWaterMarkCounter("bytes", TUnit::BYTES);
+
+  bytes_counter->Set(10);
+  EXPECT_EQ(bytes_counter->current_value(), 10);
+  EXPECT_EQ(bytes_counter->value(), 10);
+
+  bytes_counter->Add(5);
+  EXPECT_EQ(bytes_counter->current_value(), 15);
+  EXPECT_EQ(bytes_counter->value(), 15);
+
+  bytes_counter->Set(5);
+  EXPECT_EQ(bytes_counter->current_value(), 5);
+  EXPECT_EQ(bytes_counter->value(), 15);
+
+  bytes_counter->Add(3);
+  EXPECT_EQ(bytes_counter->current_value(), 8);
+  EXPECT_EQ(bytes_counter->value(), 15);
+
+  bool success = bytes_counter->TryAdd(20, 30);
+  EXPECT_TRUE(success);
+  EXPECT_EQ(bytes_counter->current_value(), 28);
+  EXPECT_EQ(bytes_counter->value(), 28);
+
+  success = bytes_counter->TryAdd(5, 30);
+  EXPECT_FALSE(success);
+  EXPECT_EQ(bytes_counter->current_value(), 28);
+  EXPECT_EQ(bytes_counter->value(), 28);
+}
+
 TEST(CountersTest, DerivedCounters) {
   ObjectPool pool;
   RuntimeProfile profile(&pool, "Profile");

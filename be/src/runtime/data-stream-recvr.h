@@ -113,7 +113,7 @@ class DataStreamRecvr {
   /// Return true if the addition of a new batch of size 'batch_size' would exceed the
   /// total buffer limit.
   bool ExceedsLimit(int batch_size) {
-    return num_buffered_bytes_ + batch_size > total_buffer_limit_;
+    return num_buffered_bytes_.Load() + batch_size > total_buffer_limit_;
   }
 
   /// DataStreamMgr instance used to create this recvr. (Not owned)

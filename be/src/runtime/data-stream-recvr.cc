@@ -134,7 +134,7 @@ Status DataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
 
   DCHECK(!batch_queue_.empty());
   RowBatch* result = batch_queue_.front().second;
-  recvr_->num_buffered_bytes_ -= batch_queue_.front().first;
+  recvr_->num_buffered_bytes_.Add(-batch_queue_.front().first);
   VLOG_ROW << "fetched #rows=" << result->num_rows();
   batch_queue_.pop_front();
   data_removal__cv_.notify_one();
@@ -161,7 +161,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
   while (!batch_queue_.empty() && recvr_->ExceedsLimit(batch_size) && !is_cancelled_) {
     CANCEL_SAFE_SCOPED_TIMER(recvr_->buffer_full_total_timer_, &is_cancelled_);
     VLOG_ROW << " wait removal: empty=" << (batch_queue_.empty() ? 1 : 0)
-             << " #buffered=" << recvr_->num_buffered_bytes_
+             << " #buffered=" << recvr_->num_buffered_bytes_.Load()
              << " batch_size=" << batch_size << "\n";
 
     // We only want one thread running the timer at any one time. Only
@@ -209,7 +209,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
     VLOG_ROW << "added #rows=" << batch->num_rows()
              << " batch_size=" << batch_size << "\n";
     batch_queue_.push_back(make_pair(batch_size, batch));
-    recvr_->num_buffered_bytes_ += batch_size;
+    recvr_->num_buffered_bytes_.Add(batch_size);
     data_arrival_cv_.notify_one();
   }
 }

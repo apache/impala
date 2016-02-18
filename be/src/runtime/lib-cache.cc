@@ -416,6 +416,6 @@ string LibCache::MakeLocalPath(const string& hdfs_path, const string& local_dir)
   filesystem::path src(hdfs_path);
   stringstream dst;
   dst << local_dir << "/" << src.stem().native() << "." << getpid() << "."
-      << (num_libs_copied_++) << src.extension().native();
+      << (num_libs_copied_.Add(1) - 1) << src.extension().native();
   return dst.str();
 }

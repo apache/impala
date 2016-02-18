@@ -192,11 +192,11 @@ class HdfsScanNode : public ScanNode {
   void* GetCodegenFn(THdfsFileFormat::type);
 
   inline void IncNumScannersCodegenEnabled() {
-    ++num_scanners_codegen_enabled_;
+    num_scanners_codegen_enabled_.Add(1);
   }
 
   inline void IncNumScannersCodegenDisabled() {
-    ++num_scanners_codegen_disabled_;
+    num_scanners_codegen_disabled_.Add(1);
   }
 
   /// Adds a materialized row batch for the scan node.  This is called from scanner
@@ -425,10 +425,6 @@ class HdfsScanNode : public ScanNode {
   /// This is used just to help debug leaked io buffers to determine if the leak is
   /// happening in the scanners vs other parts of the execution.
   AtomicInt<int> num_owned_io_buffers_;
-
-  /// The number of times a token was offered but no scanner threads started.
-  /// This is used for diagnostics only.
-  AtomicInt<int> num_skipped_tokens_;
 
   /// Counters which track the number of scanners that have codegen enabled for the
   /// materialize and conjuncts evaluation code paths.

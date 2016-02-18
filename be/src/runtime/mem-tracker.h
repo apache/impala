@@ -221,7 +221,7 @@ class MemTracker {
       return;
     }
 
-    if (UNLIKELY(released_memory_since_gc_.UpdateAndFetch(bytes)) > GC_RELEASE_SIZE) {
+    if (UNLIKELY(released_memory_since_gc_.Add(bytes) > GC_RELEASE_SIZE)) {
       GcTcmalloc();
     }
 

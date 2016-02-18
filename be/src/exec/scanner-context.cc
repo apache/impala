@@ -103,7 +103,7 @@ void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool don
       // there are too many, we should compact.
     } else {
       (*it)->Return();
-      --parent_->scan_node_->num_owned_io_buffers_;
+      parent_->scan_node_->num_owned_io_buffers_.Add(-1);
     }
   }
   parent_->num_completed_io_buffers_ -= completed_io_buffers_.size();
@@ -161,7 +161,7 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   }
 
   DCHECK(io_buffer_ != NULL);
-  ++parent_->scan_node_->num_owned_io_buffers_;
+  parent_->scan_node_->num_owned_io_buffers_.Add(1);
   io_buffer_pos_ = reinterpret_cast<uint8_t*>(io_buffer_->buffer());
   io_buffer_bytes_left_ = io_buffer_->len();
   if (io_buffer_->len() == 0) {

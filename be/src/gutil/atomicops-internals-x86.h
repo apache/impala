@@ -125,14 +125,21 @@ inline Atomic32 Barrier_AtomicIncrement(volatile Atomic32* ptr,
   return temp + increment;
 }
 
+// On x86, the NoBarrier_CompareAndSwap() uses a locked instruction and so also
+// provides both acquire and release barriers.
 inline Atomic32 Acquire_CompareAndSwap(volatile Atomic32* ptr,
                                        Atomic32 old_value,
                                        Atomic32 new_value) {
-  Atomic32 x = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
-  return x;
+  return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
 }
 
 inline Atomic32 Release_CompareAndSwap(volatile Atomic32* ptr,
+                                       Atomic32 old_value,
+                                       Atomic32 new_value) {
+  return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+}
+
+inline Atomic32 Barrier_CompareAndSwap(volatile Atomic32* ptr,
                                        Atomic32 old_value,
                                        Atomic32 new_value) {
   return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
@@ -464,11 +471,16 @@ inline Atomic64 Release_Load(volatile const Atomic64* ptr) {
 inline Atomic64 Acquire_CompareAndSwap(volatile Atomic64* ptr,
                                        Atomic64 old_value,
                                        Atomic64 new_value) {
-  Atomic64 x = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
-  return x;
+  return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
 }
 
 inline Atomic64 Release_CompareAndSwap(volatile Atomic64* ptr,
+                                       Atomic64 old_value,
+                                       Atomic64 new_value) {
+  return NoBarrier_CompareAndSwap(ptr, old_value, new_value);
+}
+
+inline Atomic64 Barrier_CompareAndSwap(volatile Atomic64* ptr,
                                        Atomic64 old_value,
                                        Atomic64 new_value) {
   return NoBarrier_CompareAndSwap(ptr, old_value, new_value);

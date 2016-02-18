@@ -604,9 +604,6 @@ class DiskIoMgr {
   /// Returns the current status of the context.
   Status context_status(RequestContext* context) const;
 
-  /// Returns the number of unstarted scan ranges for this reader.
-  int num_unstarted_ranges(RequestContext* reader) const;
-
   void set_bytes_read_counter(RequestContext*, RuntimeProfile::Counter*);
   void set_read_timer(RequestContext*, RuntimeProfile::Counter*);
   void set_active_read_thread_counter(RequestContext*, RuntimeProfile::Counter*);
@@ -641,12 +638,6 @@ class DiskIoMgr {
 
   /// The disk ID (and therefore disk_queues_ index) used for S3 accesses.
   int RemoteS3DiskId() const { return num_local_disks() + REMOTE_S3_DISK_OFFSET; }
-
-  /// Returns the number of allocated buffers.
-  int num_allocated_buffers() const { return num_allocated_buffers_; }
-
-  /// Returns the number of buffers currently owned by all readers.
-  int num_buffers_in_readers() const { return num_buffers_in_readers_; }
 
   /// Dumps the disk IoMgr queues (for readers and disks)
   std::string DebugString();

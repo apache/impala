@@ -315,7 +315,7 @@ void RuntimeProfile::Divide(int n) {
       if (iter->second->unit() == TUnit::DOUBLE_VALUE) {
         iter->second->Set(iter->second->double_value() / n);
       } else {
-        iter->second->value_ = iter->second->value() / n;
+        iter->second->value_.Store(iter->second->value() / n);
       }
     }
   }

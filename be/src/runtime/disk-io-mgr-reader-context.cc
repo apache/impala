@@ -105,7 +105,7 @@ void DiskIoMgr::RequestContext::AddRequestRange(
       ScheduleScanRange(scan_range);
     } else {
       state.unstarted_scan_ranges()->Enqueue(scan_range);
-      ++num_unstarted_scan_ranges_;
+      num_unstarted_scan_ranges_.Add(1);
     }
     // If next_scan_range_to_start is NULL, schedule this RequestContext so that it will
     // be set. If it's not NULL, this context will be scheduled when GetNextRange() is
@@ -149,18 +149,18 @@ void DiskIoMgr::RequestContext::Reset(MemTracker* tracker) {
   state_ = Active;
   mem_tracker_ = tracker;
 
-  num_unstarted_scan_ranges_ = 0;
+  num_unstarted_scan_ranges_.Store(0);
   num_disks_with_ranges_ = 0;
-  num_used_buffers_ = 0;
-  num_buffers_in_reader_ = 0;
-  num_ready_buffers_ = 0;
-  total_range_queue_capacity_ = 0;
-  num_finished_ranges_ = 0;
-  num_remote_ranges_ = 0;
-  bytes_read_local_ = 0;
-  bytes_read_short_circuit_ = 0;
-  bytes_read_dn_cache_ = 0;
-  unexpected_remote_bytes_ = 0;
+  num_used_buffers_.Store(0);
+  num_buffers_in_reader_.Store(0);
+  num_ready_buffers_.Store(0);
+  total_range_queue_capacity_.Store(0);
+  num_finished_ranges_.Store(0);
+  num_remote_ranges_.Store(0);
+  bytes_read_local_.Store(0);
+  bytes_read_short_circuit_.Store(0);
+  bytes_read_dn_cache_.Store(0);
+  unexpected_remote_bytes_.Store(0);
   initial_queue_capacity_ = DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 
   DCHECK(ready_to_start_ranges_.empty());
@@ -181,10 +181,10 @@ string DiskIoMgr::RequestContext::DebugString() const {
   if (state_ == RequestContext::Active) ss << "Active";
   if (state_ != RequestContext::Inactive) {
     ss << " status_=" << (status_.ok() ? "OK" : status_.GetDetail())
-       << " #ready_buffers=" << num_ready_buffers_
-       << " #used_buffers=" << num_used_buffers_
-       << " #num_buffers_in_reader=" << num_buffers_in_reader_
-       << " #finished_scan_ranges=" << num_finished_ranges_
+       << " #ready_buffers=" << num_ready_buffers_.Load()
+       << " #used_buffers=" << num_used_buffers_.Load()
+       << " #num_buffers_in_reader=" << num_buffers_in_reader_.Load()
+       << " #finished_scan_ranges=" << num_finished_ranges_.Load()
        << " #disk_with_ranges=" << num_disks_with_ranges_
        << " #disks=" << num_disks_with_ranges_;
     for (int i = 0; i < disk_states_.size(); ++i) {
@@ -209,13 +209,13 @@ bool DiskIoMgr::RequestContext::Validate() const {
     return false;
   }
 
-  if (num_used_buffers_ < 0) {
-    LOG(WARNING) << "num_used_buffers_ < 0: #used=" << num_used_buffers_;
+  if (num_used_buffers_.Load() < 0) {
+    LOG(WARNING) << "num_used_buffers_ < 0: #used=" << num_used_buffers_.Load();
     return false;
   }
 
-  if (num_ready_buffers_ < 0) {
-    LOG(WARNING) << "num_ready_buffers_ < 0: #used=" << num_ready_buffers_;
+  if (num_ready_buffers_.Load() < 0) {
+    LOG(WARNING) << "num_ready_buffers_ < 0: #used=" << num_ready_buffers_.Load();
     return false;
   }
 
@@ -286,9 +286,9 @@ bool DiskIoMgr::RequestContext::Validate() const {
   }
 
   if (state_ != RequestContext::Cancelled) {
-    if (total_unstarted_ranges != num_unstarted_scan_ranges_) {
+    if (total_unstarted_ranges != num_unstarted_scan_ranges_.Load()) {
       LOG(WARNING) << "total_unstarted_ranges=" << total_unstarted_ranges
-                   << " sum_in_states=" << num_unstarted_scan_ranges_;
+                   << " sum_in_states=" << num_unstarted_scan_ranges_.Load();
       return false;
     }
   } else {

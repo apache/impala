@@ -134,7 +134,7 @@ bool HdfsOperationSet::Execute(ThreadPool<HdfsOp>* pool,
   }
   int64_t num_ops = ops_.size();
   if (num_ops == 0) return true;
-  num_ops_ += num_ops;
+  num_ops_.Add(num_ops);
 
   BOOST_FOREACH(const HdfsOp& op, ops_) {
     pool->Offer(op);
@@ -160,7 +160,7 @@ void HdfsOperationSet::AddError(const string& err, const HdfsOp* op) {
 }
 
 void HdfsOperationSet::MarkOneOpDone() {
-  if (num_ops_.UpdateAndFetch(-1) == 0) {
+  if (num_ops_.Add(-1) == 0) {
     promise_.Set(errors().size() == 0);
   }
 }

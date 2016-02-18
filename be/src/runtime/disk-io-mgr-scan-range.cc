@@ -42,14 +42,14 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
     if (is_cancelled_) {
       // Return the buffer, this range has been cancelled
       if (buffer->buffer_ != NULL) {
-        ++io_mgr_->num_buffers_in_readers_;
-        ++reader_->num_buffers_in_reader_;
+        io_mgr_->num_buffers_in_readers_.Add(1);
+        reader_->num_buffers_in_reader_.Add(1);
       }
-      --reader_->num_used_buffers_;
+      reader_->num_used_buffers_.Add(-1);
       buffer->Return();
       return false;
     }
-    ++reader_->num_ready_buffers_;
+    reader_->num_ready_buffers_.Add(1);
     ready_buffers_.push_back(buffer);
     eosr_queued_ = buffer->eosr();
 
@@ -100,10 +100,10 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 
   // Update tracking counters. The buffer has now moved from the IoMgr to the
   // caller.
-  ++io_mgr_->num_buffers_in_readers_;
-  ++reader_->num_buffers_in_reader_;
-  --reader_->num_ready_buffers_;
-  --reader_->num_used_buffers_;
+  io_mgr_->num_buffers_in_readers_.Add(1);
+  reader_->num_buffers_in_reader_.Add(1);
+  reader_->num_ready_buffers_.Add(-1);
+  reader_->num_used_buffers_.Add(-1);
 
   Status status = (*buffer)->status_;
   if (!status.ok()) {
@@ -114,10 +114,10 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 
   unique_lock<mutex> reader_lock(reader_->lock_);
   if (eosr_returned_) {
-    reader_->total_range_queue_capacity_ += ready_buffers_capacity_;
-    ++reader_->num_finished_ranges_;
-    reader_->initial_queue_capacity_ =
-        reader_->total_range_queue_capacity_ / reader_->num_finished_ranges_;
+    reader_->total_range_queue_capacity_.Add(ready_buffers_capacity_);
+    reader_->num_finished_ranges_.Add(1);
+    reader_->initial_queue_capacity_ = reader_->total_range_queue_capacity_.Load() /
+        reader_->num_finished_ranges_.Load();
   }
 
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
@@ -164,10 +164,10 @@ void DiskIoMgr::ScanRange::Cancel(const Status& status) {
 
 void DiskIoMgr::ScanRange::CleanupQueuedBuffers() {
   DCHECK(is_cancelled_);
-  io_mgr_->num_buffers_in_readers_ += ready_buffers_.size();
-  reader_->num_buffers_in_reader_ += ready_buffers_.size();
-  reader_->num_used_buffers_ -= ready_buffers_.size();
-  reader_->num_ready_buffers_ -= ready_buffers_.size();
+  io_mgr_->num_buffers_in_readers_.Add(ready_buffers_.size());
+  reader_->num_buffers_in_reader_.Add(ready_buffers_.size());
+  reader_->num_used_buffers_.Add(-ready_buffers_.size());
+  reader_->num_ready_buffers_.Add(-ready_buffers_.size());
 
   while (!ready_buffers_.empty()) {
     BufferDescriptor* buffer = ready_buffers_.front();
@@ -302,14 +302,14 @@ void DiskIoMgr::ScanRange::Close() {
     if (IsDfsPath(file())) {
       int success = hdfsFileGetReadStatistics(hdfs_file_->file(), &stats);
       if (success == 0) {
-        reader_->bytes_read_local_ += stats->totalLocalBytesRead;
-        reader_->bytes_read_short_circuit_ += stats->totalShortCircuitBytesRead;
-        reader_->bytes_read_dn_cache_ += stats->totalZeroCopyBytesRead;
+        reader_->bytes_read_local_.Add(stats->totalLocalBytesRead);
+        reader_->bytes_read_short_circuit_.Add(stats->totalShortCircuitBytesRead);
+        reader_->bytes_read_dn_cache_.Add(stats->totalZeroCopyBytesRead);
         if (stats->totalLocalBytesRead != stats->totalBytesRead) {
-          ++reader_->num_remote_ranges_;
+          reader_->num_remote_ranges_.Add(1);
           if (expected_local_) {
             int remote_bytes = stats->totalBytesRead - stats->totalLocalBytesRead;
-            reader_->unexpected_remote_bytes_ += remote_bytes;
+            reader_->unexpected_remote_bytes_.Add(remote_bytes);
             VLOG_FILE << "Unexpected remote HDFS read of "
                       << PrettyPrinter::Print(remote_bytes, TUnit::BYTES)
                       << " for file '" << file_ << "'";
@@ -448,6 +448,6 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
     COUNTER_ADD(reader_->bytes_read_counter_, bytes_read);
   }
   *read_succeeded = true;
-  ++reader_->num_used_buffers_;
+  reader_->num_used_buffers_.Add(1);
   return Status::OK();
 }

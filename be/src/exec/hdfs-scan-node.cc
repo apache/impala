@@ -277,7 +277,7 @@ Status HdfsScanNode::GetNextInternal(
   *eos = false;
   RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
-    num_owned_io_buffers_ -= materialized_batch->num_io_buffers();
+    num_owned_io_buffers_.Add(-materialized_batch->num_io_buffers());
     row_batch->AcquireState(materialized_batch);
     // Update the number of materialized rows now instead of when they are materialized.
     // This means that scanners might process and queue up more rows than are necessary
@@ -549,7 +549,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_desc->file_compression = split.file_compression;
       RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
           native_file_path, &file_desc->fs, &fs_cache));
-      ++num_unqueued_files_;
+      num_unqueued_files_.Add(1);
       per_type_files_[partition_desc->file_format()].push_back(file_desc);
     } else {
       // File already processed
@@ -787,7 +787,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   stringstream ss;
   ss << "Splits complete (node=" << id() << "):";
-  progress_ = ProgressUpdater(ss.str(), total_splits);
+  progress_.Init(ss.str(), total_splits);
   return Status::OK();
 }
 
@@ -809,8 +809,8 @@ void HdfsScanNode::Close(RuntimeState* state) {
 
   scanner_threads_.JoinAll();
 
-  num_owned_io_buffers_ -= materialized_row_batches_->Cleanup();
-  DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
+  num_owned_io_buffers_.Add(-materialized_row_batches_->Cleanup());
+  DCHECK_EQ(num_owned_io_buffers_.Load(), 0) << "ScanNode has leaked io buffers";
 
   if (reader_context_ != NULL) {
     // There may still be io buffers used by parent nodes so we can't unregister the
@@ -859,8 +859,8 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges
     int num_files_queued) {
   RETURN_IF_ERROR(
       runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
-  num_unqueued_files_ -= num_files_queued;
-  DCHECK_GE(num_unqueued_files_, 0);
+  num_unqueued_files_.Add(-num_files_queued);
+  DCHECK_GE(num_unqueued_files_.Load(), 0);
   ThreadTokenAvailableCb(runtime_state_->resource_pool());
   return Status::OK();
 }
@@ -956,7 +956,6 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   // TODO: It would be good to have a test case for that.
   if (!initial_ranges_issued_) return;
 
-  bool started_scanner = false;
   while (true) {
     // The lock must be given up between loops in order to give writers to done_,
     // all_ranges_started_ etc. a chance to grab the lock.
@@ -995,13 +994,11 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     ss << "scanner-thread(" << num_scanner_threads_started_counter_->value() << ")";
     scanner_threads_.AddThread(
         new Thread("hdfs-scan-node", ss.str(), &HdfsScanNode::ScannerThread, this));
-    started_scanner = true;
 
     if (runtime_state_->query_resource_mgr() != NULL) {
       runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
     }
   }
-  if (!started_scanner) ++num_skipped_tokens_;
 }
 
 void HdfsScanNode::ScannerThread() {
@@ -1060,7 +1057,9 @@ void HdfsScanNode::ScannerThread() {
     // Take a snapshot of num_unqueued_files_ before calling GetNextRange().
     // We don't want num_unqueued_files_ to go to zero between the return from
     // GetNextRange() and the check for when all ranges are complete.
-    int num_unqueued_files = num_unqueued_files_;
+    int num_unqueued_files = num_unqueued_files_.Load();
+    // TODO: the Load() acts as an acquire barrier.  Is this needed? (i.e. any earlier
+    // stores that need to complete?)
     AtomicUtil::MemoryBarrier();
     Status status = runtime_state_->io_mgr()->GetNextRange(reader_context_, &scan_range);
 
@@ -1307,10 +1306,9 @@ void HdfsScanNode::StopAndFinalizeCounters() {
   }
 
   // Output fraction of scanners with codegen enabled
-  ss.str(std::string());
-  ss << "Codegen enabled: " << num_scanners_codegen_enabled_ << " out of "
-     << (num_scanners_codegen_enabled_ + num_scanners_codegen_disabled_);
-  AddRuntimeExecOption(ss.str());
+  int num_enabled = num_scanners_codegen_enabled_.Load();
+  int total = num_enabled + num_scanners_codegen_disabled_.Load();
+  AddRuntimeExecOption(Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
 
   if (reader_context_ != NULL) {
     bytes_read_local_->Set(runtime_state_->io_mgr()->bytes_read_local(reader_context_));

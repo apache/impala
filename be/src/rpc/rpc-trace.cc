@@ -122,14 +122,14 @@ void RpcEventHandler::Reset(const string& method_name) {
   MethodMap::iterator it = method_map_.find(method_name);
   if (it == method_map_.end()) return;
   it->second->time_stats->Reset();
-  it->second->num_in_flight = 0L;
+  it->second->num_in_flight.Store(0L);
 }
 
 void RpcEventHandler::ResetAll() {
   lock_guard<mutex> l(method_map_lock_);
   BOOST_FOREACH(const MethodMap::value_type& method, method_map_) {
     method.second->time_stats->Reset();
-    method.second->num_in_flight = 0L;
+    method.second->num_in_flight.Store(0L);
   }
 }
 
@@ -150,7 +150,8 @@ void RpcEventHandler::ToJson(Value* server, Document* document) {
     const string& human_readable = rpc.second->time_stats->ToHumanReadable();
     Value summary(human_readable.c_str(), document->GetAllocator());
     method.AddMember("summary", summary, document->GetAllocator());
-    method.AddMember("in_flight", rpc.second->num_in_flight, document->GetAllocator());
+    method.AddMember("in_flight", rpc.second->num_in_flight.Load(),
+        document->GetAllocator());
     Value server_name(server_name_.c_str(), document->GetAllocator());
     method.AddMember("server_name", server_name, document->GetAllocator());
     methods.PushBack(method, document->GetAllocator());
@@ -174,7 +175,7 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
       it = method_map_.insert(make_pair(descriptor->name, descriptor)).first;
     }
   }
-  ++(it->second->num_in_flight);
+  it->second->num_in_flight.Add(1);
   // TODO: Consider pooling these
   InvocationContext* ctxt_ptr =
       new InvocationContext(MonotonicMillis(), cnxn_ctx, it->second);
@@ -193,6 +194,6 @@ void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) 
            << PrettyPrinter::Print(elapsed_time * 1000L * 1000L, TUnit::TIME_NS);
   MethodDescriptor* descriptor = rpc_ctx->method_descriptor;
   delete rpc_ctx;
-  --descriptor->num_in_flight;
+  descriptor->num_in_flight.Add(-1);
   descriptor->time_stats->Update(elapsed_time);
 }

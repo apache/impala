@@ -322,8 +322,9 @@ class DiskIoMgr::RequestContext {
     }
 
     int num_threads_in_op() const {
-      int v = num_threads_in_op_;
-      __sync_synchronize();
+      int v = num_threads_in_op_.Load();
+      // TODO: determine whether this barrier is necessary for any callsites.
+      AtomicUtil::MemoryBarrier();
       return v;
     }
 
@@ -360,21 +361,19 @@ class DiskIoMgr::RequestContext {
     /// reader per disk that are in the unlocked hdfs read code section. This is updated
     /// by multiple threads without a lock so we need to use an atomic int.
     void IncrementRequestThreadAndDequeue() {
-      ++num_threads_in_op_;
+      num_threads_in_op_.Add(1);
       is_on_queue_ = false;
     }
 
     void DecrementRequestThread() {
-      --num_threads_in_op_;
+      num_threads_in_op_.Add(-1);
     }
 
     /// Decrement request thread count and do final cleanup if this is the last
     /// thread. RequestContext lock must be taken before this.
     void DecrementRequestThreadAndCheckDone(RequestContext* context) {
-      --num_threads_in_op_;
-      // We don't need to worry about reordered loads here because updating
-      // num_threads_in_request_ uses an atomic, which is a barrier.
-      if (!is_on_queue_ && num_threads_in_op_ == 0 && !done_) {
+      num_threads_in_op_.Add(-1); // Also acts as a barrier.
+      if (!is_on_queue_ && num_threads_in_op_.Load() == 0 && !done_) {
         // This thread is the last one for this reader on this disk, do final cleanup
         context->DecrementDiskRefCount();
         done_ = true;
@@ -389,7 +388,7 @@ class DiskIoMgr::RequestContext {
       done_ = true;
       num_remaining_ranges_ = 0;
       is_on_queue_ = false;
-      num_threads_in_op_ = 0;
+      num_threads_in_op_.Store(0);
       next_scan_range_to_start_ = NULL;
     }
 

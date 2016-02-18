@@ -323,14 +323,14 @@ DiskIoMgr::~DiskIoMgr() {
   DCHECK(request_context_cache_.get() == NULL ||
       request_context_cache_->ValidateAllInactive())
       << endl << DebugString();
-  DCHECK_EQ(num_buffers_in_readers_, 0);
+  DCHECK_EQ(num_buffers_in_readers_.Load(), 0);
 
   // Delete all allocated buffers
   int num_free_buffers = 0;
   for (int idx = 0; idx < free_buffers_.size(); ++idx) {
     num_free_buffers += free_buffers_[idx].size();
   }
-  DCHECK_EQ(num_allocated_buffers_, num_free_buffers);
+  DCHECK_EQ(num_allocated_buffers_.Load(), num_free_buffers);
   GcIoBuffers();
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
@@ -396,8 +396,8 @@ void DiskIoMgr::UnregisterContext(RequestContext* reader) {
 
   // All the disks are done with clean, validate nothing is leaking.
   unique_lock<mutex> reader_lock(reader->lock_);
-  DCHECK_EQ(reader->num_buffers_in_reader_, 0) << endl << reader->DebugString();
-  DCHECK_EQ(reader->num_used_buffers_, 0) << endl << reader->DebugString();
+  DCHECK_EQ(reader->num_buffers_in_reader_.Load(), 0) << endl << reader->DebugString();
+  DCHECK_EQ(reader->num_used_buffers_.Load(), 0) << endl << reader->DebugString();
 
   DCHECK(reader->Validate()) << endl << reader->DebugString();
   request_context_cache_->ReturnContext(reader);
@@ -454,7 +454,7 @@ void DiskIoMgr::set_disks_access_bitmap(RequestContext* r,
 }
 
 int64_t DiskIoMgr::queue_size(RequestContext* reader) const {
-  return reader->num_ready_buffers_;
+  return reader->num_ready_buffers_.Load();
 }
 
 Status DiskIoMgr::context_status(RequestContext* context) const {
@@ -462,28 +462,24 @@ Status DiskIoMgr::context_status(RequestContext* context) const {
   return context->status_;
 }
 
-int DiskIoMgr::num_unstarted_ranges(RequestContext* reader) const {
-  return reader->num_unstarted_scan_ranges_;
-}
-
 int64_t DiskIoMgr::bytes_read_local(RequestContext* reader) const {
-  return reader->bytes_read_local_;
+  return reader->bytes_read_local_.Load();
 }
 
 int64_t DiskIoMgr::bytes_read_short_circuit(RequestContext* reader) const {
-  return reader->bytes_read_short_circuit_;
+  return reader->bytes_read_short_circuit_.Load();
 }
 
 int64_t DiskIoMgr::bytes_read_dn_cache(RequestContext* reader) const {
-  return reader->bytes_read_dn_cache_;
+  return reader->bytes_read_dn_cache_.Load();
 }
 
 int DiskIoMgr::num_remote_ranges(RequestContext* reader) const {
-  return reader->num_remote_ranges_;
+  return reader->num_remote_ranges_.Load();
 }
 
 int64_t DiskIoMgr::unexpected_remote_bytes(RequestContext* reader) const {
-  return reader->unexpected_remote_bytes_;
+  return reader->unexpected_remote_bytes_.Load();
 }
 
 int64_t DiskIoMgr::GetReadThroughput() {
@@ -563,7 +559,7 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
       break;
     }
 
-    if (reader->num_unstarted_scan_ranges_ == 0 &&
+    if (reader->num_unstarted_scan_ranges_.Load() == 0 &&
         reader->ready_to_start_ranges_.empty() && reader->cached_ranges_.empty()) {
       // All ranges are done, just return.
       break;
@@ -632,8 +628,8 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
       ReturnFreeBuffer(buffer_desc);
     }
     buffer_desc->buffer_ = NULL;
-    --num_buffers_in_readers_;
-    --reader->num_buffers_in_reader_;
+    num_buffers_in_readers_.Add(-1);
+    reader->num_buffers_in_reader_.Add(-1);
   } else {
     // A NULL buffer means there was an error in which case there is no buffer
     // to return.
@@ -685,7 +681,7 @@ char* DiskIoMgr::GetFreeBuffer(int64_t* buffer_size) {
   unique_lock<mutex> lock(free_buffers_lock_);
   char* buffer = NULL;
   if (free_buffers_[idx].empty()) {
-    ++num_allocated_buffers_;
+    num_allocated_buffers_.Add(1);
     if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
       ImpaladMetrics::IO_MGR_NUM_BUFFERS->Increment(1L);
     }
@@ -716,7 +712,7 @@ void DiskIoMgr::GcIoBuffers() {
          iter != free_buffers_[idx].end(); ++iter) {
       int64_t buffer_size = (1 << idx) * min_buffer_size_;
       process_mem_tracker_->Release(buffer_size);
-      --num_allocated_buffers_;
+      num_allocated_buffers_.Add(-1);
       delete[] *iter;
 
       ++buffers_freed;
@@ -756,7 +752,7 @@ void DiskIoMgr::ReturnFreeBuffer(char* buffer, int64_t buffer_size) {
     }
   } else {
     process_mem_tracker_->Release(buffer_size);
-    --num_allocated_buffers_;
+    num_allocated_buffers_.Add(-1);
     delete[] buffer;
     if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
       ImpaladMetrics::IO_MGR_NUM_BUFFERS->Increment(-1L);
@@ -843,11 +839,11 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
       // read next. Populate that.  We want to have one range waiting to minimize
       // wait time in GetNextRange.
       ScanRange* new_range = request_disk_state->unstarted_scan_ranges()->Dequeue();
-      --(*request_context)->num_unstarted_scan_ranges_;
+      (*request_context)->num_unstarted_scan_ranges_.Add(-1);
       (*request_context)->ready_to_start_ranges_.Enqueue(new_range);
       request_disk_state->set_next_scan_range_to_start(new_range);
 
-      if ((*request_context)->num_unstarted_scan_ranges_ == 0) {
+      if ((*request_context)->num_unstarted_scan_ranges_.Load() == 0) {
         // All the ranges have been started, notify everyone blocked on GetNextRange.
         // Only one of them will get work so make sure to return NULL to the other
         // caller threads.
@@ -1046,10 +1042,10 @@ void DiskIoMgr::ReadRange(DiskQueue* disk_queue, RequestContext* reader,
   }
 
   buffer = GetFreeBuffer(&buffer_size);
-  ++reader->num_used_buffers_;
+  reader->num_used_buffers_.Add(1);
 
   // Validate more invariants.
-  DCHECK_GT(reader->num_used_buffers_, 0);
+  DCHECK_GT(reader->num_used_buffers_.Load(), 0);
   DCHECK(range != NULL);
   DCHECK(reader != NULL);
   DCHECK(buffer != NULL);

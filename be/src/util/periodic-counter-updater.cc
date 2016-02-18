@@ -37,7 +37,7 @@ PeriodicCounterUpdater::PeriodicCounterUpdater() : done_(0) {
 }
 
 PeriodicCounterUpdater::~PeriodicCounterUpdater() {
-  done_.Swap(1);
+  done_.Store(1);
   update_thread_->join();
 }
 
@@ -126,7 +126,7 @@ void PeriodicCounterUpdater::StopTimeSeriesCounter(
 }
 
 void PeriodicCounterUpdater::UpdateLoop() {
-  while (done_.Read() == 0) {
+  while (done_.Load() == 0) {
     system_time before_time = get_system_time();
     SleepForMs(FLAGS_periodic_counter_update_period_ms);
     posix_time::time_duration elapsed = get_system_time() - before_time;

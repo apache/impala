@@ -92,26 +92,32 @@ class RuntimeProfile {
     virtual ~Counter(){}
 
     virtual void Add(int64_t delta) {
-      value_ += delta;
+      value_.Add(delta);
     }
 
     /// Use this to update if the counter is a bitmap
     void BitOr(int64_t delta) {
-      value_ |= delta;
+      int64_t old;
+      do {
+        old = value_.Load();
+        if (LIKELY((old | delta) == old)) return; // Bits already set, avoid atomic.
+      } while (UNLIKELY(!value_.CompareAndSwap(old, old | delta)));
     }
 
-    virtual void Set(int64_t value) { value_ = value; }
+    virtual void Set(int64_t value) { value_.Store(value); }
 
-    virtual void Set(int value) { value_ = value; }
+    virtual void Set(int value) { value_.Store(value); }
 
     virtual void Set(double value) {
-      value_ = *reinterpret_cast<int64_t*>(&value);
+      DCHECK_EQ(sizeof(value), sizeof(int64_t));
+      value_.Store(*reinterpret_cast<int64_t*>(&value));
     }
 
-    virtual int64_t value() const { return value_; }
+    virtual int64_t value() const { return value_.Load(); }
 
     virtual double double_value() const {
-      return *reinterpret_cast<const double*>(&value_);
+      int64_t v = value_.Load();
+      return *reinterpret_cast<const double*>(&v);
     }
 
     TUnit::type unit() const { return unit_; }
@@ -130,32 +136,43 @@ class RuntimeProfile {
     HighWaterMarkCounter(TUnit::type unit) : Counter(unit) {}
 
     virtual void Add(int64_t delta) {
-      int64_t new_val = current_value_.UpdateAndFetch(delta);
-      value_.UpdateMax(new_val);
+      int64_t new_val = current_value_.Add(delta);
+      UpdateMax(new_val);
     }
 
     /// Tries to increase the current value by delta. If current_value() + delta
     /// exceeds max, return false and current_value is not changed.
     bool TryAdd(int64_t delta, int64_t max) {
       while (true) {
-        int64_t old_val = current_value_;
+        int64_t old_val = current_value_.Load();
         int64_t new_val = old_val + delta;
         if (UNLIKELY(new_val > max)) return false;
         if (LIKELY(current_value_.CompareAndSwap(old_val, new_val))) {
-          value_.UpdateMax(new_val);
+          UpdateMax(new_val);
           return true;
         }
       }
     }
 
     virtual void Set(int64_t v) {
-      current_value_ = v;
-      value_.UpdateMax(v);
+      current_value_.Store(v);
+      UpdateMax(v);
     }
 
-    int64_t current_value() const { return current_value_; }
+    int64_t current_value() const { return current_value_.Load(); }
 
    private:
+    /// Set 'value_' to 'v' if 'v' is larger than 'value_'. The entire operation is
+    /// atomic.
+    void UpdateMax(int64_t v) {
+      while (true) {
+        int64_t old_max = value_.Load();
+        int64_t new_max = std::max(old_max, v);
+        if (new_max == old_max) break; // Avoid atomic update.
+        if (LIKELY(value_.CompareAndSwap(old_max, new_max))) break;
+      }
+    }
+
     /// The current value of the counter. value_ in the super class represents
     /// the high water mark.
     AtomicInt<int64_t> current_value_;
@@ -202,7 +219,7 @@ class RuntimeProfile {
       int64_t old_val = 0;
       if (it != counter_value_map_.end()) {
         old_val = it->second;
-        it->second = new_counter->value_;
+        it->second = new_counter->value();
       } else {
         counter_value_map_[new_counter] = new_counter->value();
       }
@@ -211,10 +228,10 @@ class RuntimeProfile {
         double old_double_val = *reinterpret_cast<double*>(&old_val);
         current_double_sum_ += (new_counter->double_value() - old_double_val);
         double result_val = current_double_sum_ / (double) counter_value_map_.size();
-        value_ = *reinterpret_cast<int64_t*>(&result_val);
+        value_.Store(*reinterpret_cast<int64_t*>(&result_val));
       } else {
-        current_int_sum_ += (new_counter->value_ - old_val);
-        value_ = current_int_sum_ / counter_value_map_.size();
+        current_int_sum_ += (new_counter->value() - old_val);
+        value_.Store(current_int_sum_ / counter_value_map_.size());
       }
     }
 

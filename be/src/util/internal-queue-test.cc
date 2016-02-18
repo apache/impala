@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include "common/atomic.h"
 #include "util/internal-queue.h"
 
 #include "common/names.h"
@@ -152,7 +153,7 @@ void ProducerThread(InternalQueue<IntNode>* queue, int num_inserts,
     vector<IntNode>* nodes, AtomicInt<int32_t>* counter, bool* failed) {
   for (int i = 0; i < num_inserts && !*failed; ++i) {
     // Get the next index to queue.
-    AtomicInt<int32_t> value = (*counter)++;
+    int32_t value = counter->Add(1) - 1;
     nodes->at(value).value = value;
     queue->Enqueue(&nodes->at(value));
     if (i % VALIDATE_INTERVAL == 0) {
@@ -215,7 +216,7 @@ TEST(InternalQueue, TestSingleProducerSingleConsumer) {
   ASSERT_TRUE(queue.empty());
   ASSERT_EQ(results.size(), nodes.size());
 
-  counter = 0;
+  counter.Store(0);
   results.clear();
   thread producer_thread(ProducerThread, &queue, nodes.size(), &nodes, &counter, &failed);
   thread consumer_thread(ConsumerThread, &queue, nodes.size(), 1, &results, &failed);

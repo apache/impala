@@ -97,8 +97,8 @@ void QueryResourceMgr::InitVcoreAcquisition(int32_t init_vcores) {
   // inspects immediately after exiting Expand(), and if true, exits before touching any
   // of the class-wide state (because the destructor may have finished before this point).
 
-  thread_in_expand_.reset(new AtomicInt<int16_t>());
-  early_exit_.reset(new AtomicInt<int16_t>());
+  thread_in_expand_.reset(new AtomicInt<int32_t>());
+  early_exit_.reset(new AtomicInt<int32_t>());
   acquire_vcore_thread_.reset(
       new Thread("resource-mgmt", Substitute("acquire-cpu-$0", PrintId(query_id_)),
           bind<void>(mem_fn(&QueryResourceMgr::AcquireVcoreResources), this,
@@ -170,8 +170,8 @@ Status QueryResourceMgr::RequestMemExpansion(int64_t requested_bytes,
 }
 
 void QueryResourceMgr::AcquireVcoreResources(
-    shared_ptr<AtomicInt<int16_t> > thread_in_expand,
-    shared_ptr<AtomicInt<int16_t> > early_exit) {
+    shared_ptr<AtomicInt<int32_t> > thread_in_expand,
+    shared_ptr<AtomicInt<int32_t> > early_exit) {
   // Take a copy because we'd like to print it in some cases after the destructor.
   TUniqueId reservation_id = reservation_id_;
   VLOG_QUERY << "Starting Vcore acquisition for: " << reservation_id;
@@ -188,18 +188,18 @@ void QueryResourceMgr::AcquireVcoreResources(
     VLOG_QUERY << "Expanding VCore allocation: " << reservation_id_;
 
     // First signal that we are about to enter a blocking Expand() call.
-    thread_in_expand->FetchAndUpdate(1L);
+    thread_in_expand->Add(1L);
 
     // TODO: Could cause problems if called during or after a system-wide shutdown
     llama::TAllocatedResource resource;
     llama::TUniqueId expansion_id;
     Status status = ExecEnv::GetInstance()->resource_broker()->Expand(reservation_id,
         res, -1, &expansion_id, &resource);
-    thread_in_expand->FetchAndUpdate(-1L);
+    thread_in_expand->Add(-1L);
     // If signalled to exit quickly by the destructor, exit the loop now. It's important
     // to do so without accessing any class variables since they may no longer be valid.
     // Need to check after setting thread_in_expand to avoid a race.
-    if (early_exit->FetchAndUpdate(0L) != 0) {
+    if (early_exit->Add(0L) != 0) {
       VLOG_QUERY << "Fragment finished during Expand(): " << reservation_id;
       break;
     }
@@ -261,8 +261,8 @@ QueryResourceMgr::~QueryResourceMgr() {
   // First, set the early exit flag. Then check to see if the thread is in Expand(). If
   // so, the acquisition thread is guaranteed to see early_exit_ == 1L once it finishes
   // Expand(), and will exit immediately. It's therefore safe not to wait for it.
-  early_exit_->FetchAndUpdate(1L);
-  if (thread_in_expand_->FetchAndUpdate(0L) == 0L) {
+  early_exit_->Add(1L);
+  if (thread_in_expand_->Add(0L) == 0L) {
     acquire_vcore_thread_->Join();
   }
 }

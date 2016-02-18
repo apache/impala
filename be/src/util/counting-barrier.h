@@ -28,7 +28,7 @@ class CountingBarrier {
 
   /// Sends one notification, decrementing the number of pending notifications by one.
   void Notify() {
-    if (count_.UpdateAndFetch(-1) == 0) promise_.Set(true);
+    if (count_.Add(-1) == 0) promise_.Set(true);
   }
 
   /// Blocks until all notifications are received.
