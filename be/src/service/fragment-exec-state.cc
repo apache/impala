@@ -44,6 +44,7 @@ Status FragmentMgr::FragmentExecState::Cancel() {
 Status FragmentMgr::FragmentExecState::Prepare() {
   Status status = executor_.Prepare(exec_params_);
   if (!status.ok()) ReportStatusCb(status, NULL, true);
+  prepare_promise_.Set(status);
   return status;
 }
 
@@ -120,7 +121,17 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
 
 void FragmentMgr::FragmentExecState::PublishFilter(int32_t filter_id,
     const TBloomFilter& thrift_bloom_filter) {
-  // TODO: Could be racy wrt Prepare(), after IMPALA-1599.
+  // Defensively protect against blocking forever in case there's some problem with
+  // Prepare().
+  static const int WAIT_MS = 30000;
+  bool timed_out = false;
+  // Wait until Prepare() is done, so we know that the filter bank is set up.
+  Status prepare_status = prepare_promise_.Get(WAIT_MS, &timed_out);
+  if (timed_out) {
+    LOG(ERROR) << "Unexpected timeout in PublishFilter()";
+    return;
+  }
+  if (!prepare_status.ok()) return;
   executor_.runtime_state()->filter_bank()->PublishGlobalFilter(filter_id,
       thrift_bloom_filter);
 }

@@ -44,8 +44,8 @@ class CountingBarrier {
   DISALLOW_COPY_AND_ASSIGN(CountingBarrier);
 };
 
-/// Helper class to ensure that ExecRemoteFragment() always notifies the coordinator's
-/// barrier on exit.
+/// Helper class to always notify a CountingBarrier on scope exit, so users don't have to
+/// worry about notifying on every possible path out of a scope.
 class NotifyBarrierOnExit {
  public:
   NotifyBarrierOnExit(CountingBarrier* b) : barrier(b) {

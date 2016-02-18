@@ -84,6 +84,9 @@ class FragmentMgr::FragmentExecState {
   /// if set to anything other than OK, execution has terminated w/ an error
   Status exec_status_;
 
+  /// Set once Prepare() has returned with exec_status_.
+  Promise<Status> prepare_promise_;
+
   /// Update 'exec_status_' w/ 'status', if the former is not already an error.
   /// Returns the value of 'exec_status_' after this method completes.
   Status UpdateStatus(const Status& status);
