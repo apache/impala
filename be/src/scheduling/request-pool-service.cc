@@ -48,7 +48,7 @@ DEFINE_string(llama_site_path, "", "Path to the Llama configuration file "
 // are the same as the default values for pools defined via the fair scheduler
 // allocation file and Llama configurations.
 // TODO: Remove?
-DEFINE_int64(default_pool_max_requests, 200, "Maximum number of concurrent outstanding "
+DEFINE_int64(default_pool_max_requests, -1, "Maximum number of concurrent outstanding "
     "requests allowed to run before queueing incoming requests. A negative value "
     "indicates no limit. 0 indicates no requests will be admitted. Ignored if "
     "fair_scheduler_config_path and llama_site_path are set.");

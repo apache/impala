@@ -179,7 +179,7 @@ public class TestRequestPoolService {
     createPoolService(ALLOCATION_FILE_EMPTY, LLAMA_CONFIG_FILE_EMPTY);
     Assert.assertEquals("root.userA", poolService_.assignToPool("", "userA"));
     Assert.assertTrue(poolService_.hasAccess("root.userA", "userA"));
-    checkPoolConfigResult("root", 200, 200, -1);
+    checkPoolConfigResult("root", -1, 200, -1);
   }
 
   @Test
@@ -227,10 +227,10 @@ public class TestRequestPoolService {
     Assert.assertTrue(poolService_.hasAccess("root.queueC", "root"));
 
     // Test pool limits
-    checkPoolConfigResult("root", 200, 200, -1);
-    checkPoolConfigResult("root.queueA", 200, 200, 100000 * ByteUnits.MEGABYTE);
-    checkPoolConfigResult("root.queueB", 200, 200, -1);
-    checkPoolConfigResult("root.queueC", 200, 200, 128 * ByteUnits.MEGABYTE);
+    checkPoolConfigResult("root", -1, 200, -1);
+    checkPoolConfigResult("root.queueA", -1, 200, 100000 * ByteUnits.MEGABYTE);
+    checkPoolConfigResult("root.queueB", -1, 200, -1);
+    checkPoolConfigResult("root.queueC", -1, 200, 128 * ByteUnits.MEGABYTE);
   }
 
   private void checkModifiedConfigResults() throws IOException {

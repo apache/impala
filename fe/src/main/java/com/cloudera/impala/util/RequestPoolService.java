@@ -87,8 +87,8 @@ public class RequestPoolService {
       "llama.am.throttling.maximum.placed.reservations";
 
   // Default value for the maximum.placed.reservations property. Note that this value
-  // differs from the current Llama default of 10000 which is too high.
-  final static int LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT = 200;
+  // differs from the current Llama default of 10000.
+  final static int LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT = -1;
 
   // Key for the default maximum number of queued requests ("queued reservations")
   // property. The per-pool key name is this key with the pool name appended, e.g.
