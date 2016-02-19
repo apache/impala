@@ -868,29 +868,26 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Drops the partition from its HdfsTable.
-   * If the HdfsTable does not exist, an exception is thrown.
-   * If the partition having the given partition spec does not exist, null is returned.
-   * Otherwise, the table with an updated catalog version is returned.
+   * Drops the partition specified in 'partitionSpec' from 'tbl'. Throws a
+   * CatalogException if 'tbl' is not an HdfsTable. If the partition having the given
+   * partition spec does not exist, null is returned. Otherwise, the modified table is
+   * returned.
    */
-  public Table dropPartition(TableName tableName, List<TPartitionKeyValue> partitionSpec)
+  public Table dropPartition(Table tbl, List<TPartitionKeyValue> partitionSpec)
       throws CatalogException {
+    Preconditions.checkNotNull(tbl);
     Preconditions.checkNotNull(partitionSpec);
-    Table tbl = getOrLoadTable(tableName.getDb(), tableName.getTbl());
-    if (tbl == null) {
-      throw new TableNotFoundException("Table not found: " + tableName.getTbl());
-    }
+    Preconditions.checkState(Thread.holdsLock(tbl));
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an Hdfs table");
     }
     HdfsTable hdfsTable = (HdfsTable) tbl;
-    hdfsTable.dropPartition(partitionSpec);
+    if (hdfsTable.dropPartition(partitionSpec) == null) return null;
     return hdfsTable;
   }
 
   /**
-   * Adds the partition to its HdfsTable. Returns the table with an updated catalog
-   * version.
+   * Adds a partition to its HdfsTable and returns the modified table.
    */
   public Table addPartition(HdfsPartition partition) throws CatalogException {
     Preconditions.checkNotNull(partition);

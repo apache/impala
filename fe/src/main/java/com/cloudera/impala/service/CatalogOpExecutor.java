@@ -1676,7 +1676,7 @@ public class CatalogOpExecutor {
     } finally {
       msClient.release();
     }
-    return catalog_.dropPartition(tableName, partitionSpec);
+    return catalog_.dropPartition(tbl, partitionSpec);
   }
 
   /**
