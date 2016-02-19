@@ -46,16 +46,20 @@ OS_MAPPING = {
   "ubuntu14.04" : "ec2-package-ubuntu-14-04"
 }
 
+def try_get_release_label():
+  """Gets the right package label from the OS version. Return None if not found."""
+  try:
+    return get_release_label()
+  except:
+    return None
+
 def get_release_label():
-  """Gets the right package label from the OS version"""
+  """Gets the right package label from the OS version. Raise exception if not found."""
   release = "".join(map(lambda x: x.lower(), sh.lsb_release("-irs").split()))
   for k, v in OS_MAPPING.iteritems():
     if re.search(k, release):
       return v
 
-  print("Pre-built toolchain archives not available for your platform.")
-  print("Clone and build native toolchain from source using this repository:")
-  print("    https://github.com/cloudera/native-toolchain")
   raise Exception("Could not find package label for OS version: {0}.".format(release))
 
 def download_package(destination, product, version, compiler):
@@ -98,6 +102,10 @@ def bootstrap(packages):
   if not os.path.exists(destination):
     os.makedirs(destination)
 
+  if not try_get_release_label():
+    check_custom_toolchain(destination, packages)
+    return
+
   # Detect the compiler
   compiler = "gcc-{0}".format(os.environ["IMPALA_GCC_VERSION"])
 
@@ -114,6 +122,24 @@ def package_directory(toolchain_root, pkg_name, pkg_version):
 def version_file_path(toolchain_root, pkg_name, pkg_version):
   return os.path.join(package_directory(toolchain_root, pkg_name, pkg_version),
       "toolchain_package_version.txt")
+
+def check_custom_toolchain(toolchain_root, packages):
+  missing = []
+  for p in packages:
+    pkg_name, pkg_version = unpack_name_and_version(p)
+    pkg_dir = package_directory(toolchain_root, pkg_name, pkg_version)
+    if not os.path.isdir(pkg_dir):
+      missing.append((p, pkg_dir))
+
+  if missing:
+    print("The following packages are not in their expected locations.")
+    for p, pkg_dir in missing:
+      print("  %s (expected directory %s to exist)" % (p, pkg_dir))
+    print("Pre-built toolchain archives not available for your platform.")
+    print("Clone and build native toolchain from source using this repository:")
+    print("    https://github.com/cloudera/native-toolchain")
+    raise Exception("Toolchain bootstrap failed: required packages were missing")
+
 
 def check_for_existing_package(toolchain_root, pkg_name, pkg_version, compiler):
   """Return true if toolchain_root already contains the package with the correct
