@@ -365,10 +365,13 @@ class Coordinator {
     TRuntimeFilterDesc desc;
 
     TPlanNodeId src;
-    TPlanNodeId dst;
+    TPlanNodeId target;
 
-    // Index into fragment_instance_states_
-    std::vector<int> fragment_instance_idxs;
+    // Index into fragment_instance_states_ for source fragment instances.
+    boost::unordered_set<int> src_fragment_instance_idxs;
+
+    // Index into fragment_instance_states_ for target fragment instances.
+    boost::unordered_set<int> target_fragment_instance_idxs;
 
     /// Number of remaining backends to hear from before filter is complete.
     int pending_count;
@@ -393,8 +396,18 @@ class Coordinator {
   typedef boost::unordered_map<int32_t, FilterState> FilterRoutingTable;
   FilterRoutingTable filter_routing_table_;
 
-  RuntimeProfile::Counter* filters_received_;
+  /// Set to true when all calls to UpdateFilterRoutingTable() have finished, and it's
+  /// safe to concurrently read from filter_routing_table_.
+  bool filter_routing_table_complete_;
 
+  /// Total number of filter updates received (always 0 if filter mode is not
+  /// GLOBAL). Excludes repeated broadcast filter updates.
+  RuntimeProfile::Counter* filter_updates_received_;
+
+  /// The filtering mode for this query. Set in StartRemoteFragments().
+  TRuntimeFilterMode::type filter_mode_;
+
+  /// Returns a pretty-printed table of the current filter state.
   std::string FilterDebugString();
 
   /// Fill in rpc_params based on parameters.
@@ -518,6 +531,13 @@ class Coordinator {
   /// and then waiting for all of the RPCs to complete. Returns an error if there was any
   /// error starting the fragments.
   Status StartRemoteFragments(QuerySchedule* schedule);
+
+  /// Build the filter routing table by iterating over all plan nodes and collecting the
+  /// filters that they either produce or consume. The source and target fragment
+  /// instance indexes for filters are numbered in the range
+  /// [start_fragment_instance_idx .. start_fragment_instance_idx + num_hosts]
+  void UpdateFilterRoutingTable(const std::vector<TPlanNode>& plan_nodes, int num_hosts,
+      int start_fragment_instance_idx);
 };
 
 }

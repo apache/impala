@@ -86,27 +86,17 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
   DCHECK_NE(state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
       << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
   TUpdateFilterParams params;
-  bool is_broadcast = false;
+  bool has_local_target = false;
   {
     lock_guard<SpinLock> l(runtime_filter_lock_);
     RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
     DCHECK(it != produced_filters_.end()) << "Tried to update unregistered filter: "
                                           << filter_id;
     it->second->SetBloomFilter(bloom_filter);
-    is_broadcast = it->second->filter_desc().is_broadcast_join;
+    has_local_target = it->second->filter_desc().has_local_target;
   }
 
-  if (state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
-    bloom_filter->ToThrift(&params.bloom_filter);
-    params.filter_id = filter_id;
-    params.query_id = query_ctx_.query_id;
-
-    ExecEnv::GetInstance()->rpc_pool()->Offer(bind<void>(
-        SendFilterToCoordinator, query_ctx_.coord_address, params,
-        ExecEnv::GetInstance()->impalad_client_cache()));
-  }
-
-  if (is_broadcast) {
+  if (has_local_target) {
     // Do a short circuit publication by pushing the same BloomFilter to the consumer
     // side.
     RuntimeFilter* filter;
@@ -133,6 +123,14 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
             PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
       }
     }
+  } else if (state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
+      bloom_filter->ToThrift(&params.bloom_filter);
+      params.filter_id = filter_id;
+      params.query_id = query_ctx_.query_id;
+
+      ExecEnv::GetInstance()->rpc_pool()->Offer(bind<void>(
+          SendFilterToCoordinator, query_ctx_.coord_address, params,
+          ExecEnv::GetInstance()->impalad_client_cache()));
   }
 }
 
