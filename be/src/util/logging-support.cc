@@ -14,6 +14,10 @@
 
 #include "util/logging-support.h"
 
+#include <boost/foreach.hpp>
+#include <glob.h>
+#include <sys/stat.h>
+
 #include "common/logging.h"
 
 #include "common/names.h"
@@ -88,6 +92,52 @@ TLogLevel::type FlagToTLogLevel(int flag) {
     case 2: return TLogLevel::VLOG_2;
     case 3:
     default: return TLogLevel::VLOG_3;
+  }
+}
+
+void LoggingSupport::DeleteOldLogs(const string& path_pattern, int max_log_files) {
+  // Ignore bad input or disable log rotation
+  if (max_log_files <= 0) return;
+
+  // Map capturing mtimes, oldest files first
+  typedef map<time_t, string> LogFileMap;
+
+  LogFileMap log_file_mtime;
+  glob_t result;
+  int glob_ret = glob(path_pattern.c_str(), GLOB_TILDE, NULL, &result);
+  if (glob_ret != 0) {
+    LOG(ERROR) << "glob failed in LoggingSupport::DeleteOldLogs on " << path_pattern
+               << " with ret = " << glob_ret;
+    globfree(&result);
+    return;
+  }
+
+  for (size_t i = 0; i < result.gl_pathc; ++i) {
+    // Get the mtime for each match
+    struct stat stat_val;
+    if (stat(result.gl_pathv[i], &stat_val) != 0) {
+      LOG(ERROR) << "Could not read last-modified-timestamp for log file "
+                 << result.gl_pathv[i] << ", will not delete (error was: "
+                 << strerror(errno) << ")";
+      continue;
+    }
+    log_file_mtime[stat_val.st_mtime] = result.gl_pathv[i];
+  }
+  globfree(&result);
+
+  // Iterate over the map and remove oldest log files first when too many
+  // log files exist
+  if (log_file_mtime.size() <= max_log_files) return;
+  int files_to_delete = log_file_mtime.size() - max_log_files;
+  DCHECK_GT(files_to_delete, 0);
+  BOOST_FOREACH(LogFileMap::const_reference val, log_file_mtime) {
+    if (unlink(val.second.c_str()) == 0) {
+      LOG(INFO) << "Old log file deleted during log rotation: " << val.second;
+    } else {
+      LOG(ERROR) << "Failed to delete old log file: "
+                 << val.second << "(error was: " << strerror(errno) << ")";
+    }
+    if (--files_to_delete == 0) break;
   }
 }
 

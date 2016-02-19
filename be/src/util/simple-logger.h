@@ -23,12 +23,13 @@
 namespace impala {
 
 /// A class that provides basic thread-safe support for logging to a file. Supports
-/// creation of the log file and log directories as well as rolling the log file when
-/// it has reached a specified number of entries.
+/// creation of the log file and log directories, rolling the log file when it
+/// has reached a specified number of entries, and deletion of old files when a
+/// threshold number of files is exceeded.
 class SimpleLogger {
  public:
   SimpleLogger(const std::string& log_dir_, const std::string& log_file_name_prefix_,
-      uint64_t max_entries_per_file);
+      uint64_t max_entries_per_file, int max_log_files = 0);
 
   /// Initializes the logging directory and creates the initial log file. If the log dir
   /// does not already exist, it will be created. This function is not thread safe and
@@ -62,6 +63,9 @@ class SimpleLogger {
   /// file will be rolled
   uint64_t max_entries_per_file_;
 
+  /// Maximum number of log files to keep. If 0, all files are retained.
+  int max_log_files_;
+
   /// Log files are written to this stream.
   std::ofstream log_file_;
 
@@ -75,6 +79,9 @@ class SimpleLogger {
   /// Flushes the log file to disk (closes and reopens the file). Must be called with the
   /// log_file_lock_ held.
   Status FlushInternal();
+
+  /// Deletes all log files except the max_log_files_ newest.
+  void RotateLogFiles();
 };
 }
 #endif

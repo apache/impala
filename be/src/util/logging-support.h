@@ -27,5 +27,14 @@ void InitJvmLoggingSupport();
 /// Helper function to convert a command line logging flag value (input as an int) to the
 /// matching TLogLevel enum value.
 TLogLevel::type FlagToTLogLevel(int flag);
+
+class LoggingSupport {
+ public:
+  /// Helper function for log rotation that deletes all files matching the path pattern
+  /// except for the max_log_files newest. If max_log_files is <= 0, no files will
+  /// be deleted.
+  static void DeleteOldLogs(const std::string& path_pattern, int max_log_files);
+};
+
 }
 #endif

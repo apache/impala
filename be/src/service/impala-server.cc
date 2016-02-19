@@ -140,6 +140,9 @@ DEFINE_string(profile_log_dir, "", "The directory in which profile log files are
     " written. If blank, defaults to <log_file_dir>/profiles");
 DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of the "
     "profile log file before a new one is created");
+DEFINE_int32(max_profile_log_files, 10, "Maximum number of profile log files to "
+    "retain. The most recent log files are retained. If set to 0, all log files "
+    "are retained.");
 
 DEFINE_int32(cancellation_thread_pool_size, 5,
     "(Advanced) Size of the thread-pool processing cancellations due to node failure");
@@ -547,7 +550,8 @@ Status ImpalaServer::InitProfileLogging() {
     FLAGS_profile_log_dir = ss.str();
   }
   profile_logger_.reset(new SimpleLogger(FLAGS_profile_log_dir,
-      PROFILE_LOG_FILE_PREFIX, FLAGS_max_profile_log_file_size));
+      PROFILE_LOG_FILE_PREFIX, FLAGS_max_profile_log_file_size,
+      FLAGS_max_profile_log_files));
   RETURN_IF_ERROR(profile_logger_->Init());
   profile_log_file_flush_thread_.reset(new Thread("impala-server", "log-flush-thread",
       &ImpalaServer::LogFileFlushThread, this));
