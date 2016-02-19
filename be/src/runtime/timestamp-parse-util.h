@@ -364,65 +364,8 @@ class TimestampParser {
   /// d -- the date value where the results of the parsing will be placed
   /// t -- the time value where the results of the parsing will be placed
   /// Returns true if the date/time was successfully parsed.
-  static inline bool Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
-      boost::gregorian::date* d, boost::posix_time::time_duration* t) {
-    DCHECK(TimestampParser::initialized_);
-    DCHECK(dt_ctx.toks.size() > 0);
-    DCHECK(d != NULL);
-    DCHECK(t != NULL);
-    DateTimeParseResult dt_result;
-    int day_offset = 0;
-    if (UNLIKELY(str == NULL || len <= 0 ||
-        !ParseDateTime(str, len, dt_ctx, &dt_result))) {
-      *d = boost::gregorian::date();
-      *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
-      return false;
-    }
-    if (dt_ctx.has_time_toks) {
-      *t = boost::posix_time::time_duration(dt_result.hour, dt_result.minute,
-          dt_result.second, dt_result.fraction);
-      *t -= dt_result.tz_offset;
-      if (t->is_negative()) {
-        *t += boost::posix_time::hours(24);
-        day_offset = -1;
-      } else if (t->hours() >= 24) {
-        *t -= boost::posix_time::hours(24);
-        day_offset = 1;
-      }
-    } else {
-      *t = boost::posix_time::time_duration(0, 0, 0, 0);
-    }
-    if (dt_ctx.has_date_toks) {
-      bool is_valid_date = true;
-      try {
-        DCHECK(-1 <= day_offset && day_offset <= 1);
-        if ((dt_result.year == 1400 && dt_result.month == 1 && dt_result.day == 1 &&
-            day_offset == -1) || (dt_result.year == 9999 && dt_result.month == 12 &&
-            dt_result.day == 31 && day_offset == 1)) {
-          // Have to check lower/upper bound explicitly.
-          // Tried boost::gregorian::date::is_not_a_date_time() but it doesn't
-          // complain value is out of range for "'1400-01-01' - 1 day" and
-          // "'9999-12-31' + 1 day".
-          is_valid_date = false;
-        } else {
-          *d = boost::gregorian::date(dt_result.year, dt_result.month, dt_result.day);
-          *d += boost::gregorian::date_duration(day_offset);
-        }
-      } catch (boost::exception& e) {
-        is_valid_date = false;
-      }
-      if (!is_valid_date) {
-        VLOG_ROW << "Invalid date: " << dt_result.year << "-" << dt_result.month << "-"
-                 << dt_result.day;
-        *d = boost::gregorian::date();
-        *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
-        return false;
-      }
-    } else {
-      *d = boost::gregorian::date();
-    }
-    return true;
-  }
+  static bool Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
+      boost::gregorian::date* d, boost::posix_time::time_duration* t);
 
   /// Format the date/time values using the given format context. Note that a string
   /// terminator will be appended to the string.

@@ -95,4 +95,25 @@ ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
   return os << timestamp_value.DebugString();
 }
 
+ptime TimestampValue::UnixTimeToPtime(time_t unix_time) const {
+  /// Unix times are represented internally in boost as 32 bit ints which limits the
+  /// range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
+  /// libc functions will be used instead.
+  tm temp_tm;
+  if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
+    if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == NULL)) {
+      return ptime(not_a_date_time);
+    }
+  } else {
+    if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == NULL)) {
+      return ptime(not_a_date_time);
+    }
+  }
+  try {
+    return ptime_from_tm(temp_tm);
+  } catch (std::exception& e) {
+    return ptime(not_a_date_time);
+  }
+}
+
 }

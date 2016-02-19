@@ -17,6 +17,11 @@
 
 namespace assign = boost::assign;
 using boost::unordered_map;
+using boost::gregorian::date;
+using boost::gregorian::date_duration;
+using boost::posix_time::hours;
+using boost::posix_time::not_a_date_time;
+using boost::posix_time::time_duration;
 
 namespace impala {
 
@@ -86,6 +91,66 @@ void TimestampParser::Init() {
   }
   // Flag that the parser is ready.
   TimestampParser::initialized_ = true;
+}
+
+bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
+    date* d, time_duration* t) {
+  DCHECK(TimestampParser::initialized_);
+  DCHECK(dt_ctx.toks.size() > 0);
+  DCHECK(d != NULL);
+  DCHECK(t != NULL);
+  DateTimeParseResult dt_result;
+  int day_offset = 0;
+  if (UNLIKELY(str == NULL || len <= 0 ||
+          !ParseDateTime(str, len, dt_ctx, &dt_result))) {
+    *d = date();
+    *t = time_duration(not_a_date_time);
+    return false;
+  }
+  if (dt_ctx.has_time_toks) {
+    *t = time_duration(dt_result.hour, dt_result.minute,
+        dt_result.second, dt_result.fraction);
+    *t -= dt_result.tz_offset;
+    if (t->is_negative()) {
+      *t += hours(24);
+      day_offset = -1;
+    } else if (t->hours() >= 24) {
+      *t -= hours(24);
+      day_offset = 1;
+    }
+  } else {
+    *t = time_duration(0, 0, 0, 0);
+  }
+  if (dt_ctx.has_date_toks) {
+    bool is_valid_date = true;
+    try {
+      DCHECK(-1 <= day_offset && day_offset <= 1);
+      if ((dt_result.year == 1400 && dt_result.month == 1 && dt_result.day == 1 &&
+           day_offset == -1) ||
+          (dt_result.year == 9999 && dt_result.month == 12 && dt_result.day == 31 &&
+           day_offset == 1)) {
+        // Have to check lower/upper bound explicitly.
+        // Tried date::is_not_a_date_time() but it doesn't complain value is out of range
+        // for "'1400-01-01' - 1 day" and "'9999-12-31' + 1 day".
+        is_valid_date = false;
+      } else {
+        *d = date(dt_result.year, dt_result.month, dt_result.day);
+        *d += date_duration(day_offset);
+      }
+    } catch (boost::exception& e) {
+      is_valid_date = false;
+    }
+    if (!is_valid_date) {
+      VLOG_ROW << "Invalid date: " << dt_result.year << "-" << dt_result.month << "-"
+               << dt_result.day;
+      *d = date();
+      *t = time_duration(not_a_date_time);
+      return false;
+    }
+  } else {
+    *d = date();
+  }
+  return true;
 }
 
 }

@@ -259,26 +259,7 @@ class TimestampValue {
   /// The time zone of the resulting ptime is determined by
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the value
   /// will be in the local time zone. If the flag is false, the value will be in UTC.
-  boost::posix_time::ptime UnixTimeToPtime(time_t unix_time) const {
-    /// Unix times are represented internally in boost as 32 bit ints which limits the
-    /// range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
-    /// libc functions will be used instead.
-    tm temp_tm;
-    if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
-      if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == NULL)) {
-        return boost::posix_time::ptime(boost::posix_time::not_a_date_time);
-      }
-    } else {
-      if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == NULL)) {
-        return boost::posix_time::ptime(boost::posix_time::not_a_date_time);
-      }
-    }
-    try {
-      return boost::posix_time::ptime_from_tm(temp_tm);
-    } catch (std::exception& e) {
-      return boost::posix_time::ptime(boost::posix_time::not_a_date_time);
-    }
-  }
+  boost::posix_time::ptime UnixTimeToPtime(time_t unix_time) const;
 };
 
 /// This function must be called 'hash_value' to be picked up by boost.

@@ -2396,3 +2396,22 @@ false
 ---- TYPES
 BOOLEAN
 ====
+---- QUERY
+# IMPALA-2184: Codegen does not catch exceptions in FROM_UNIXTIME()
+# Make sure codegen is enabled
+set EXEC_SINGLE_NODE_ROWS_THRESHOLD=0;
+select min(from_unixtime(ts))
+from (values (1429705108399870 as ts), (1429704907057354)) invalid_timestamps;
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-2184/IMPALA-2868
+select CAST(1312822084003 as timestamp) FROM alltypestiny GROUP BY 1
+---- RESULTS
+NULL
+---- TYPES
+timestamp
+====
