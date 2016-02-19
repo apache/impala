@@ -194,9 +194,9 @@
     </dependency>
 
     <dependency>
-      <groupId>net.sf.squirrel-sql.thirdparty-non-maven</groupId>
+      <groupId>net.sourceforge.czt.dev</groupId>
       <artifactId>java-cup</artifactId>
-      <version>0.11a</version>
+      <version>0.11-a-czt02-20150912.002524-39</version>
     </dependency>
 
     <!-- Moved above Hive, because Hive bundles its own Thrift version
@@ -385,9 +385,9 @@
       </plugin>
 
       <plugin>
-        <groupId>net.sourceforge.czt</groupId>
-        <artifactId>maven-cup-plugin</artifactId>
-        <version>1.6.4</version>
+        <groupId>net.sourceforge.czt.dev</groupId>
+        <artifactId>cup-maven-plugin</artifactId>
+        <version>1.6-20150912.002559-50</version>
         <executions>
           <execution>
             <id>cup</id>
@@ -395,14 +395,14 @@
             <goals>
               <goal>generate</goal>
             </goals>
-            <configuration>
-              <extension>y</extension>
-              <parserOutput>SqlParser</parserOutput>
-              <symbolOutput>SqlParserSymbols</symbolOutput>
-              <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
-            </configuration>
           </execution>
         </executions>
+        <configuration>
+          <cupDefinition>sql-parser.cup</cupDefinition>
+          <className>SqlParser</className>
+          <symbolsName>SqlParserSymbols</symbolsName>
+          <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
+        </configuration>
       </plugin>
 
       <plugin>
@@ -633,6 +633,19 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
+
+    <!-- This is needed for java-cup. TODO add the plugin to our maven repo -->
+    <repository>
+      <id>sonatype-nexus-snapshots</id>
+      <name>Sonatype Nexus Snapshots</name>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
   </repositories>
 
   <pluginRepositories>
@@ -661,6 +674,19 @@
       </releases>
       <snapshots>
         <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+
+    <!-- This is needed for the cup maven plugin. TODO add the plugin to our maven repo -->
+    <pluginRepository>
+      <id>sonatype-nexus-snapshots</id>
+      <name>Sonatype Nexus Snapshots</name>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
       </snapshots>
     </pluginRepository>
   </pluginRepositories>

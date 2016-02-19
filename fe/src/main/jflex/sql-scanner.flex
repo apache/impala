@@ -46,7 +46,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
   // uses "and" as a display name and not "&&".
   // Please keep the puts sorted alphabetically by keyword (where the order
   // does not affect the desired error reporting)
-  private static final Map<String, Integer> keywordMap =
+  public static final Map<String, Integer> keywordMap =
       new LinkedHashMap<String, Integer>();
   static {
     keywordMap.put("&&", new Integer(SqlParserSymbols.KW_AND));

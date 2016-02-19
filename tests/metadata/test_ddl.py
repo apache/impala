@@ -213,9 +213,13 @@ class TestDdlStatements(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_create_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
-    self._create_db('ddl_test_db', sync=True)
-    self.run_test_case('QueryTest/create', vector, use_db='ddl_test_db',
-        multiple_impalad=self._use_multiple_impalad(vector))
+    test_db_name = 'ddl_test_db'
+    self._create_db(test_db_name, sync=True)
+    try:
+      self.run_test_case('QueryTest/create', vector, use_db=test_db_name,
+          multiple_impalad=self._use_multiple_impalad(vector))
+    finally:
+      self.cleanup_db(test_db_name)
 
   @SkipIfS3.hive
   @SkipIfIsilon.hive

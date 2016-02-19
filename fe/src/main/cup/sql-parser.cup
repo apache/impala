@@ -382,6 +382,7 @@ nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
 nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
 nonterminal StructField struct_field_def;
+nonterminal String ident_or_keyword;
 nonterminal ColumnDef column_def, view_column_def;
 nonterminal ArrayList<ColumnDef> column_def_list, view_column_def_list;
 nonterminal ArrayList<ColumnDef> partition_column_defs, view_column_defs;
@@ -2601,8 +2602,11 @@ type ::=
   {: RESULT = new StructType(fields); :}
   ;
 
+// Recognize identifiers and keywords as struct-field names such
+// that we can parse type strings from the Hive Metastore which
+// may have unquoted identifiers corresponding to keywords.
 struct_field_def ::=
-  IDENT:name COLON type:t comment_val:comment
+  ident_or_keyword:name COLON type:t comment_val:comment
   {: RESULT = new StructField(name, t, comment); :}
   ;
 
@@ -2618,4 +2622,351 @@ struct_field_def_list ::=
     list.add(field_def);
     RESULT = list;
   :}
+  ;
+
+ident_or_keyword ::=
+  IDENT:r
+  {: RESULT = r.toString(); :}
+  | KW_ADD:r
+  {: RESULT = r.toString(); :}
+  | KW_AGGREGATE:r
+  {: RESULT = r.toString(); :}
+  | KW_ALL:r
+  {: RESULT = r.toString(); :}
+  | KW_ALTER:r
+  {: RESULT = r.toString(); :}
+  | KW_ANALYTIC:r
+  {: RESULT = r.toString(); :}
+  | KW_AND:r
+  {: RESULT = r.toString(); :}
+  | KW_ANTI:r
+  {: RESULT = r.toString(); :}
+  | KW_API_VERSION:r
+  {: RESULT = r.toString(); :}
+  | KW_ARRAY:r
+  {: RESULT = r.toString(); :}
+  | KW_AS:r
+  {: RESULT = r.toString(); :}
+  | KW_ASC:r
+  {: RESULT = r.toString(); :}
+  | KW_AVRO:r
+  {: RESULT = r.toString(); :}
+  | KW_BETWEEN:r
+  {: RESULT = r.toString(); :}
+  | KW_BIGINT:r
+  {: RESULT = r.toString(); :}
+  | KW_BINARY:r
+  {: RESULT = r.toString(); :}
+  | KW_BOOLEAN:r
+  {: RESULT = r.toString(); :}
+  | KW_BY:r
+  {: RESULT = r.toString(); :}
+  | KW_CACHED:r
+  {: RESULT = r.toString(); :}
+  | KW_CASCADE:r
+  {: RESULT = r.toString(); :}
+  | KW_CASE:r
+  {: RESULT = r.toString(); :}
+  | KW_CAST:r
+  {: RESULT = r.toString(); :}
+  | KW_CHANGE:r
+  {: RESULT = r.toString(); :}
+  | KW_CHAR:r
+  {: RESULT = r.toString(); :}
+  | KW_CLASS:r
+  {: RESULT = r.toString(); :}
+  | KW_CLOSE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_COLUMN:r
+  {: RESULT = r.toString(); :}
+  | KW_COLUMNS:r
+  {: RESULT = r.toString(); :}
+  | KW_COMMENT:r
+  {: RESULT = r.toString(); :}
+  | KW_COMPUTE:r
+  {: RESULT = r.toString(); :}
+  | KW_CREATE:r
+  {: RESULT = r.toString(); :}
+  | KW_CROSS:r
+  {: RESULT = r.toString(); :}
+  | KW_CURRENT:r
+  {: RESULT = r.toString(); :}
+  | KW_DATA:r
+  {: RESULT = r.toString(); :}
+  | KW_DATABASE:r
+  {: RESULT = r.toString(); :}
+  | KW_DATABASES:r
+  {: RESULT = r.toString(); :}
+  | KW_DATE:r
+  {: RESULT = r.toString(); :}
+  | KW_DATETIME:r
+  {: RESULT = r.toString(); :}
+  | KW_DECIMAL:r
+  {: RESULT = r.toString(); :}
+  | KW_DELIMITED:r
+  {: RESULT = r.toString(); :}
+  | KW_DESC:r
+  {: RESULT = r.toString(); :}
+  | KW_DESCRIBE:r
+  {: RESULT = r.toString(); :}
+  | KW_DISTINCT:r
+  {: RESULT = r.toString(); :}
+  | KW_DIV:r
+  {: RESULT = r.toString(); :}
+  | KW_DOUBLE:r
+  {: RESULT = r.toString(); :}
+  | KW_DROP:r
+  {: RESULT = r.toString(); :}
+  | KW_ELSE:r
+  {: RESULT = r.toString(); :}
+  | KW_END:r
+  {: RESULT = r.toString(); :}
+  | KW_ESCAPED:r
+  {: RESULT = r.toString(); :}
+  | KW_EXISTS:r
+  {: RESULT = r.toString(); :}
+  | KW_EXPLAIN:r
+  {: RESULT = r.toString(); :}
+  | KW_EXTENDED:r
+  {: RESULT = r.toString(); :}
+  | KW_EXTERNAL:r
+  {: RESULT = r.toString(); :}
+  | KW_FALSE:r
+  {: RESULT = r.toString(); :}
+  | KW_FIELDS:r
+  {: RESULT = r.toString(); :}
+  | KW_FILEFORMAT:r
+  {: RESULT = r.toString(); :}
+  | KW_FILES:r
+  {: RESULT = r.toString(); :}
+  | KW_FINALIZE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_FIRST:r
+  {: RESULT = r.toString(); :}
+  | KW_FLOAT:r
+  {: RESULT = r.toString(); :}
+  | KW_FOLLOWING:r
+  {: RESULT = r.toString(); :}
+  | KW_FOR:r
+  {: RESULT = r.toString(); :}
+  | KW_FORMAT:r
+  {: RESULT = r.toString(); :}
+  | KW_FORMATTED:r
+  {: RESULT = r.toString(); :}
+  | KW_FROM:r
+  {: RESULT = r.toString(); :}
+  | KW_FULL:r
+  {: RESULT = r.toString(); :}
+  | KW_FUNCTION:r
+  {: RESULT = r.toString(); :}
+  | KW_FUNCTIONS:r
+  {: RESULT = r.toString(); :}
+  | KW_GRANT:r
+  {: RESULT = r.toString(); :}
+  | KW_GROUP:r
+  {: RESULT = r.toString(); :}
+  | KW_HAVING:r
+  {: RESULT = r.toString(); :}
+  | KW_IF:r
+  {: RESULT = r.toString(); :}
+  | KW_ILIKE:r
+  {: RESULT = r.toString(); :}
+  | KW_IN:r
+  {: RESULT = r.toString(); :}
+  | KW_INCREMENTAL:r
+  {: RESULT = r.toString(); :}
+  | KW_INIT_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_INNER:r
+  {: RESULT = r.toString(); :}
+  | KW_INPATH:r
+  {: RESULT = r.toString(); :}
+  | KW_INSERT:r
+  {: RESULT = r.toString(); :}
+  | KW_INT:r
+  {: RESULT = r.toString(); :}
+  | KW_INTERMEDIATE:r
+  {: RESULT = r.toString(); :}
+  | KW_INTERVAL:r
+  {: RESULT = r.toString(); :}
+  | KW_INTO:r
+  {: RESULT = r.toString(); :}
+  | KW_INVALIDATE:r
+  {: RESULT = r.toString(); :}
+  | KW_IREGEXP:r
+  {: RESULT = r.toString(); :}
+  | KW_IS:r
+  {: RESULT = r.toString(); :}
+  | KW_JOIN:r
+  {: RESULT = r.toString(); :}
+  | KW_LAST:r
+  {: RESULT = r.toString(); :}
+  | KW_LEFT:r
+  {: RESULT = r.toString(); :}
+  | KW_LIKE:r
+  {: RESULT = r.toString(); :}
+  | KW_LIMIT:r
+  {: RESULT = r.toString(); :}
+  | KW_LINES:r
+  {: RESULT = r.toString(); :}
+  | KW_LOAD:r
+  {: RESULT = r.toString(); :}
+  | KW_LOCATION:r
+  {: RESULT = r.toString(); :}
+  | KW_MAP:r
+  {: RESULT = r.toString(); :}
+  | KW_MERGE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_METADATA:r
+  {: RESULT = r.toString(); :}
+  | KW_NOT:r
+  {: RESULT = r.toString(); :}
+  | KW_NULL:r
+  {: RESULT = r.toString(); :}
+  | KW_NULLS:r
+  {: RESULT = r.toString(); :}
+  | KW_OFFSET:r
+  {: RESULT = r.toString(); :}
+  | KW_ON:r
+  {: RESULT = r.toString(); :}
+  | KW_OR:r
+  {: RESULT = r.toString(); :}
+  | KW_ORDER:r
+  {: RESULT = r.toString(); :}
+  | KW_OUTER:r
+  {: RESULT = r.toString(); :}
+  | KW_OVER:r
+  {: RESULT = r.toString(); :}
+  | KW_OVERWRITE:r
+  {: RESULT = r.toString(); :}
+  | KW_PARQUET:r
+  {: RESULT = r.toString(); :}
+  | KW_PARQUETFILE:r
+  {: RESULT = r.toString(); :}
+  | KW_PARTITION:r
+  {: RESULT = r.toString(); :}
+  | KW_PARTITIONED:r
+  {: RESULT = r.toString(); :}
+  | KW_PARTITIONS:r
+  {: RESULT = r.toString(); :}
+  | KW_PRECEDING:r
+  {: RESULT = r.toString(); :}
+  | KW_PREPARE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_PRODUCED:r
+  {: RESULT = r.toString(); :}
+  | KW_PURGE:r
+  {: RESULT = r.toString(); :}
+  | KW_RANGE:r
+  {: RESULT = r.toString(); :}
+  | KW_RCFILE:r
+  {: RESULT = r.toString(); :}
+  | KW_RECOVER:r
+  {: RESULT = r.toString(); :}
+  | KW_REFRESH:r
+  {: RESULT = r.toString(); :}
+  | KW_REGEXP:r
+  {: RESULT = r.toString(); :}
+  | KW_RENAME:r
+  {: RESULT = r.toString(); :}
+  | KW_REPLACE:r
+  {: RESULT = r.toString(); :}
+  | KW_REPLICATION:r
+  {: RESULT = r.toString(); :}
+  | KW_RESTRICT:r
+  {: RESULT = r.toString(); :}
+  | KW_RETURNS:r
+  {: RESULT = r.toString(); :}
+  | KW_REVOKE:r
+  {: RESULT = r.toString(); :}
+  | KW_RIGHT:r
+  {: RESULT = r.toString(); :}
+  | KW_RLIKE:r
+  {: RESULT = r.toString(); :}
+  | KW_ROLE:r
+  {: RESULT = r.toString(); :}
+  | KW_ROLES:r
+  {: RESULT = r.toString(); :}
+  | KW_ROW:r
+  {: RESULT = r.toString(); :}
+  | KW_ROWS:r
+  {: RESULT = r.toString(); :}
+  | KW_SCHEMA:r
+  {: RESULT = r.toString(); :}
+  | KW_SCHEMAS:r
+  {: RESULT = r.toString(); :}
+  | KW_SELECT:r
+  {: RESULT = r.toString(); :}
+  | KW_SEMI:r
+  {: RESULT = r.toString(); :}
+  | KW_SEQUENCEFILE:r
+  {: RESULT = r.toString(); :}
+  | KW_SERDEPROPERTIES:r
+  {: RESULT = r.toString(); :}
+  | KW_SERIALIZE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_SET:r
+  {: RESULT = r.toString(); :}
+  | KW_SHOW:r
+  {: RESULT = r.toString(); :}
+  | KW_SMALLINT:r
+  {: RESULT = r.toString(); :}
+  | KW_STORED:r
+  {: RESULT = r.toString(); :}
+  | KW_STRAIGHT_JOIN:r
+  {: RESULT = r.toString(); :}
+  | KW_STRING:r
+  {: RESULT = r.toString(); :}
+  | KW_STRUCT:r
+  {: RESULT = r.toString(); :}
+  | KW_SYMBOL:r
+  {: RESULT = r.toString(); :}
+  | KW_TABLE:r
+  {: RESULT = r.toString(); :}
+  | KW_TABLES:r
+  {: RESULT = r.toString(); :}
+  | KW_TBLPROPERTIES:r
+  {: RESULT = r.toString(); :}
+  | KW_TERMINATED:r
+  {: RESULT = r.toString(); :}
+  | KW_TEXTFILE:r
+  {: RESULT = r.toString(); :}
+  | KW_THEN:r
+  {: RESULT = r.toString(); :}
+  | KW_TIMESTAMP:r
+  {: RESULT = r.toString(); :}
+  | KW_TINYINT:r
+  {: RESULT = r.toString(); :}
+  | KW_TRUNCATE:r
+  {: RESULT = r.toString(); :}
+  | KW_STATS:r
+  {: RESULT = r.toString(); :}
+  | KW_TO:r
+  {: RESULT = r.toString(); :}
+  | KW_TRUE:r
+  {: RESULT = r.toString(); :}
+  | KW_UNBOUNDED:r
+  {: RESULT = r.toString(); :}
+  | KW_UNCACHED:r
+  {: RESULT = r.toString(); :}
+  | KW_UNION:r
+  {: RESULT = r.toString(); :}
+  | KW_UPDATE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_USE:r
+  {: RESULT = r.toString(); :}
+  | KW_USING:r
+  {: RESULT = r.toString(); :}
+  | KW_VALUES:r
+  {: RESULT = r.toString(); :}
+  | KW_VARCHAR:r
+  {: RESULT = r.toString(); :}
+  | KW_VIEW:r
+  {: RESULT = r.toString(); :}
+  | KW_WHEN:r
+  {: RESULT = r.toString(); :}
+  | KW_WHERE:r
+  {: RESULT = r.toString(); :}
+  | KW_WITH:r
+  {: RESULT = r.toString(); :}
   ;

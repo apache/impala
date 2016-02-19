@@ -24,10 +24,10 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -2592,6 +2592,7 @@ public class ParserTest {
     TypeDefsParseOk("DOUBLE", "REAL");
     TypeDefsParseOk("STRING");
     TypeDefsParseOk("CHAR(1)", "CHAR(20)");
+    TypeDefsParseOk("VARCHAR(1)", "VARCHAR(20)");
     TypeDefsParseOk("BINARY");
     TypeDefsParseOk("DECIMAL");
     TypeDefsParseOk("TIMESTAMP");
@@ -2617,6 +2618,16 @@ public class ParserTest {
     TypeDefsParseOk("STRUCT<f:TINYINT>");
     TypeDefsParseOk("STRUCT<a:TINYINT, b:BIGINT, c:DOUBLE>");
     TypeDefsParseOk("STRUCT<a:TINYINT COMMENT 'x', b:BIGINT, c:DOUBLE COMMENT 'y'>");
+
+    // Test that struct-field names can be identifiers or keywords even if unquoted.
+    // This behavior is needed to parse type strings from the Hive Metastore which
+    // may have unquoted identifiers corresponding to keywords.
+    for (String keyword: SqlScanner.keywordMap.keySet()) {
+      // Skip keywords that are not valid field/column names in the Metastore.
+      if (!MetaStoreUtils.validateName(keyword)) continue;
+      String structType = "STRUCT<" + keyword + ":INT>";
+      TypeDefsParseOk(structType);
+    }
 
     TypeDefsError("CHAR()");
     TypeDefsError("CHAR(1, 1)");

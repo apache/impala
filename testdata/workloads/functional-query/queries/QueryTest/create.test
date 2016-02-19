@@ -955,3 +955,34 @@ create table ddl_test_db.rand_ctas_t as select rand() from functional.alltypes;
 drop table if exists ddl_test_db.rand_ctas_t;
 ---- RESULTS
 ====
+---- QUERY
+# IMPALA-2820: Test keywords as struct-field names. All field names below are
+# Impala keywords, but only some of them are quoted to show that a mix of
+# quoted/unquoted identifiers is possible.
+create table ddl_test_db.struct_keywords (
+  s struct<table:int,`comment`:string,`select`:decimal(8,2)>,
+  a array<struct<`replace`:boolean,`location`:varchar(10)>>,
+  m map<string,struct<`fields`:int,from:timestamp>>
+)
+partitioned by (year int, month int);
+describe ddl_test_db.struct_keywords;
+---- RESULTS
+'s','struct<\n  table:int,\n  comment:string,\n  select:decimal(8,2)\n>',''
+'a','array<struct<\n  replace:boolean,\n  location:varchar(10)\n>>',''
+'m','map<string,struct<\n  fields:int,\n  from:timestamp\n>>',''
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select
+  s.`table`, s.`comment`, s.`select`,
+  a.`replace`, a.`location`,
+  m.key, m.`fields`, m.`from`,
+  year, month
+from ddl_test_db.struct_keywords t, t.a, t.m
+---- RESULTS
+---- TYPES
+INT, STRING, DECIMAL, BOOLEAN, STRING, STRING, INT, TIMESTAMP, INT, INT
+====
