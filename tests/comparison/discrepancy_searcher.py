@@ -82,8 +82,9 @@ class QueryResultComparator(object):
        summarizes the outcome.
     '''
     comparison_result = ComparisonResult(query, self.ref_db_type)
-    (ref_sql, ref_exception, ref_data_set), (test_sql, test_exception, test_data_set) = \
-        self.query_executor.fetch_query_results(query)
+    (ref_sql, ref_exception, ref_data_set, ref_cursor_description), (test_sql,
+        test_exception, test_data_set, test_cursor_description) = \
+            self.query_executor.fetch_query_results(query)
 
     comparison_result.ref_sql = ref_sql
     comparison_result.test_sql = test_sql
@@ -137,7 +138,10 @@ class QueryResultComparator(object):
     # Standardize data (round FLOATs) in each column, and sort the data set
     for data_set in (ref_data_set, test_data_set):
       for row_idx, row in enumerate(data_set):
-        data_set[row_idx] = [self.standardize_data(data) for data in row]
+        data_set[row_idx] = []
+        for col_idx, col in enumerate(row):
+          data_set[row_idx].append(self.standardize_data(col,
+              ref_cursor_description[col_idx], test_cursor_description[col_idx]))
       # TODO: If the query has an ORDER BY clause, sorting should only be done within
       #       subsets of rows that have the same order by values.
       data_set.sort(cmp=self.row_sort_cmp)
@@ -169,11 +173,14 @@ class QueryResultComparator(object):
 
     return comparison_result
 
-  def standardize_data(self, data):
+  def standardize_data(self, data, ref_col_description, test_col_description):
     '''Return a val that is suitable for comparison.'''
     # For float data we need to round otherwise differences in precision will cause errors
     if isinstance(data, float):
       return round(data, self.DECIMAL_PLACES)
+    if isinstance(data, Decimal):
+      if ref_col_description[5] is not None and test_col_description[5] is not None:
+        return round(data, min(ref_col_description[5], test_col_description[5]))
     return data
 
   def row_sort_cmp(self, ref_row, test_row):
@@ -284,6 +291,7 @@ class QueryExecutor(object):
       query_thread.daemon = True
       query_thread.sql = ''
       query_thread.data_set = None
+      query_thread.cursor_description = None
       query_thread.exception = None
       query_thread.start()
       query_threads.append(query_thread)
@@ -310,8 +318,10 @@ class QueryExecutor(object):
         query_thread.exception = QueryTimeout(
             'Query timed out after %s seconds' % self.query_timeout_seconds)
 
-    return [(query_thread.sql, query_thread.exception, query_thread.data_set)
-            for query_thread in query_threads]
+    return [(query_thread.sql,
+        query_thread.exception,
+        query_thread.data_set,
+        query_thread.cursor_description) for query_thread in query_threads]
 
   def _fetch_sql_results(self, query, cursor, sql_writer, log_file):
     '''Execute the query using the cursor and set the result or exception on the local
@@ -350,6 +360,7 @@ class QueryExecutor(object):
       row_limit = self.TOO_MUCH_DATA / col_count
       data_set = list()
       current_thread().data_set = data_set
+      current_thread().cursor_description = cursor.description
       LOG.debug("Fetching results from %s", cursor.db_type)
       while True:
         batch = cursor.fetchmany(batch_size)
