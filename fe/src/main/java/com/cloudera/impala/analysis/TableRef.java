@@ -397,15 +397,9 @@ public class TableRef implements ParseNode {
       if (hint.equalsIgnoreCase("SCHEDULE_CACHE_LOCAL")) {
         analyzer.setHasPlanHints();
         replicaPreference_ = TReplicaPreference.CACHE_LOCAL;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_CACHE_RACK")) {
-        analyzer.setHasPlanHints();
-        replicaPreference_ = TReplicaPreference.CACHE_RACK;
       } else if (hint.equalsIgnoreCase("SCHEDULE_DISK_LOCAL")) {
         analyzer.setHasPlanHints();
         replicaPreference_ = TReplicaPreference.DISK_LOCAL;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_DISK_RACK")) {
-        analyzer.setHasPlanHints();
-        replicaPreference_ = TReplicaPreference.DISK_RACK;
       } else if (hint.equalsIgnoreCase("SCHEDULE_REMOTE")) {
         analyzer.setHasPlanHints();
         replicaPreference_ = TReplicaPreference.REMOTE;

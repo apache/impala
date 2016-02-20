@@ -1614,13 +1614,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
             String.format("select * from functional.alltypes %s %sschedule_cache_local%s",
             alias, prefix, suffix));
         AnalyzesOk(
-            String.format("select * from functional.alltypes %s %sschedule_cache_rack%s",
-            alias, prefix, suffix));
-        AnalyzesOk(
             String.format("select * from functional.alltypes %s %sschedule_disk_local%s",
-            alias, prefix, suffix));
-        AnalyzesOk(
-            String.format("select * from functional.alltypes %s %sschedule_disk_rack%s",
             alias, prefix, suffix));
         AnalyzesOk(
             String.format("select * from functional.alltypes %s %sschedule_remote%s",

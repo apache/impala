@@ -279,6 +279,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
         query_options->__set_optimize_partition_key_scans(atoi(value.c_str()));
+        break;
       case TImpalaQueryOptions::REPLICA_PREFERENCE:
         if (iequals(value, "cache_local") || iequals(value, "0")) {
           if (query_options->disable_cached_reads) {
@@ -286,22 +287,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
                 " REPLICA_PREFERENCE = CACHE_LOCAL");
           }
           query_options->__set_replica_preference(TReplicaPreference::CACHE_LOCAL);
-        } else if (iequals(value, "cache_rack") || iequals(value, "1")) {
-          if (query_options->disable_cached_reads)
-            return Status("Conflicting settings: DISABLE_CACHED_READS = true and"
-                " REPLICA_PREFERENCE = CACHE_RACK");
-          query_options->__set_replica_preference(TReplicaPreference::CACHE_RACK);
         } else if (iequals(value, "disk_local") || iequals(value, "2")) {
           query_options->__set_replica_preference(TReplicaPreference::DISK_LOCAL);
-        } else if (iequals(value, "disk_rack") || iequals(value, "3")) {
-          query_options->__set_replica_preference(TReplicaPreference::DISK_RACK);
         } else if (iequals(value, "remote") || iequals(value, "4")) {
           query_options->__set_replica_preference(TReplicaPreference::REMOTE);
         } else {
-          return Status(Substitute("Invalid replica memory distance policy '$0'. Valid"
-              " values are CACHE_LOCAL(0), CACHE_RACK(1), DISK_LOCAL(2), DISK_RACK(3),"
-              " REMOTE(4)",
-              value));
+          return Status(Substitute("Invalid replica memory distance preference '$0'."
+              "Valid values are CACHE_LOCAL(0), DISK_LOCAL(2), REMOTE(4)", value));
         }
         break;
       case TImpalaQueryOptions::RANDOM_REPLICA:
