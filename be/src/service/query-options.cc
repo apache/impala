@@ -18,6 +18,7 @@
 #include "util/debug-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
+#include "util/string-parser.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 #include <sstream>
@@ -347,6 +348,20 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_disable_row_runtime_filtering(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::MAX_NUM_RUNTIME_FILTERS: {
+        StringParser::ParseResult status;
+        int val = StringParser::StringToInt<int>(value.c_str(), value.size(), &status);
+        if (status != StringParser::PARSE_SUCCESS) {
+          return Status(Substitute("Invalid number of runtime filters: '$0'.",
+              value.c_str()));
+        }
+        if (val < 0) {
+          return Status(Substitute("Invalid number of runtime filters: '$0'. "
+              "Only positive values are allowed.", val));
+        }
+        query_options->__set_max_num_runtime_filters(val);
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

@@ -3471,7 +3471,6 @@ order by promotions, total
 |  |
 |  22:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF008 <- s_store_sk
 |  |
 |  |--15:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3495,7 +3494,7 @@ order by promotions, total
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF007 -> ss_customer_sk, RF008 -> ss_store_sk, RF009 -> ss_sold_date_sk, RF010 -> ss_item_sk
+|     runtime filters: RF010 -> ss_item_sk, RF009 -> ss_sold_date_sk, RF007 -> ss_customer_sk
 |
 13:AGGREGATE [FINALIZE]
 |  output: sum(ss_ext_sales_price)
@@ -3550,7 +3549,7 @@ order by promotions, total
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 files=120 size=21.31MB
-   runtime filters: RF001 -> ss_customer_sk, RF002 -> ss_store_sk, RF003 -> ss_sold_date_sk, RF004 -> ss_promo_sk, RF005 -> ss_item_sk
+   runtime filters: RF005 -> ss_item_sk, RF004 -> ss_promo_sk, RF003 -> ss_sold_date_sk, RF001 -> ss_customer_sk, RF002 -> ss_store_sk
 ====
 # TPCDS-Q88
 select  *
@@ -3651,7 +3650,6 @@ from
 |  |
 |  62:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF021 <- s_store_sk
 |  |
 |  |--59:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3659,7 +3657,6 @@ from
 |  |
 |  61:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF022 <- household_demographics.hd_demo_sk
 |  |
 |  |--57:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
@@ -3675,7 +3672,7 @@ from
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF021 -> ss_store_sk, RF022 -> ss_hdemo_sk, RF023 -> ss_sold_time_sk
+|     runtime filters: RF023 -> ss_sold_time_sk
 |
 69:NESTED LOOP JOIN [CROSS JOIN]
 |
@@ -3684,7 +3681,6 @@ from
 |  |
 |  54:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF018 <- s_store_sk
 |  |
 |  |--51:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3692,7 +3688,6 @@ from
 |  |
 |  53:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF019 <- household_demographics.hd_demo_sk
 |  |
 |  |--49:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
@@ -3708,7 +3703,7 @@ from
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF018 -> ss_store_sk, RF019 -> ss_hdemo_sk, RF020 -> ss_sold_time_sk
+|     runtime filters: RF020 -> ss_sold_time_sk
 |
 68:NESTED LOOP JOIN [CROSS JOIN]
 |
@@ -3717,7 +3712,6 @@ from
 |  |
 |  46:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF015 <- s_store_sk
 |  |
 |  |--43:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3725,7 +3719,6 @@ from
 |  |
 |  45:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF016 <- household_demographics.hd_demo_sk
 |  |
 |  |--41:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
@@ -3741,7 +3734,7 @@ from
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF015 -> ss_store_sk, RF016 -> ss_hdemo_sk, RF017 -> ss_sold_time_sk
+|     runtime filters: RF017 -> ss_sold_time_sk
 |
 67:NESTED LOOP JOIN [CROSS JOIN]
 |
@@ -3750,7 +3743,6 @@ from
 |  |
 |  38:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF012 <- s_store_sk
 |  |
 |  |--35:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3758,7 +3750,6 @@ from
 |  |
 |  37:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF013 <- household_demographics.hd_demo_sk
 |  |
 |  |--33:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
@@ -3774,7 +3765,7 @@ from
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF012 -> ss_store_sk, RF013 -> ss_hdemo_sk, RF014 -> ss_sold_time_sk
+|     runtime filters: RF014 -> ss_sold_time_sk
 |
 66:NESTED LOOP JOIN [CROSS JOIN]
 |
@@ -3783,7 +3774,6 @@ from
 |  |
 |  30:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF009 <- s_store_sk
 |  |
 |  |--27:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3791,7 +3781,6 @@ from
 |  |
 |  29:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF010 <- household_demographics.hd_demo_sk
 |  |
 |  |--25:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
@@ -3807,7 +3796,7 @@ from
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF009 -> ss_store_sk, RF010 -> ss_hdemo_sk, RF011 -> ss_sold_time_sk
+|     runtime filters: RF011 -> ss_sold_time_sk
 |
 65:NESTED LOOP JOIN [CROSS JOIN]
 |
@@ -3816,7 +3805,6 @@ from
 |  |
 |  22:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF006 <- s_store_sk
 |  |
 |  |--19:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3824,7 +3812,6 @@ from
 |  |
 |  21:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF007 <- household_demographics.hd_demo_sk
 |  |
 |  |--17:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
@@ -3840,7 +3827,7 @@ from
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF006 -> ss_store_sk, RF007 -> ss_hdemo_sk, RF008 -> ss_sold_time_sk
+|     runtime filters: RF008 -> ss_sold_time_sk
 |
 64:NESTED LOOP JOIN [CROSS JOIN]
 |
@@ -3849,7 +3836,6 @@ from
 |  |
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF003 <- s_store_sk
 |  |
 |  |--11:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
@@ -3873,14 +3859,13 @@ from
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|     runtime filters: RF003 -> ss_store_sk, RF004 -> ss_hdemo_sk, RF005 -> ss_sold_time_sk
+|     runtime filters: RF005 -> ss_sold_time_sk, RF004 -> ss_hdemo_sk
 |
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF000 <- s_store_sk
 |
 |--03:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
@@ -3904,5 +3889,5 @@ from
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 files=120 size=21.31MB
-   runtime filters: RF000 -> ss_store_sk, RF001 -> ss_hdemo_sk, RF002 -> ss_sold_time_sk
+   runtime filters: RF002 -> ss_sold_time_sk, RF001 -> ss_hdemo_sk
 ====

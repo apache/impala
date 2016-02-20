@@ -197,7 +197,10 @@ enum TImpalaQueryOptions {
   RUNTIME_FILTER_WAIT_TIME_MS,
 
   // If true, disable application of runtime filters to individual rows.
-  DISABLE_ROW_RUNTIME_FILTERING
+  DISABLE_ROW_RUNTIME_FILTERING,
+
+  // Maximum number of runtime filters allowed per query.
+  MAX_NUM_RUNTIME_FILTERS
 }
 
 // The summary of an insert.

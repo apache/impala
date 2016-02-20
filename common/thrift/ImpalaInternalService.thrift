@@ -160,6 +160,9 @@ struct TQueryOptions {
 
   // If true, per-row runtime filtering is disabled
   40: optional bool disable_row_runtime_filtering = false
+
+  // Maximum number of runtime filters allowed per query
+  41: optional i32 max_num_runtime_filters = 10
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

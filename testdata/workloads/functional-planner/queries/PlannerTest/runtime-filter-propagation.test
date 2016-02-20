@@ -880,7 +880,7 @@ where c_custkey = v.o_orderkey
 |  02:SINGULAR ROW SRC
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # Two-way join query where the build side is optimized into an empty set
 select straight_join 1

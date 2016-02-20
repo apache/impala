@@ -410,7 +410,7 @@ public class DistributedPlanner {
       node.setChild(0, leftChildFragment.getPlanRoot());
       connectChildFragment(node, 1, rightChildFragment);
       leftChildFragment.setPlanRoot(node);
-      for (RuntimeFilter filter: node.getRuntimeFilters()) filter.setHasLocalTarget();
+      for (RuntimeFilter filter: node.getRuntimeFilters()) filter.computeHasLocalTarget();
       return leftChildFragment;
     } else {
       node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);

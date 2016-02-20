@@ -77,10 +77,10 @@ public class Planner {
         ctx_.getQueryOptions().setNum_scanner_threads(1);
       }
     } else if (
-        ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
+      ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
       // Always compute filters, even if the BE won't always use all of them.
       RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
-          singleNodePlan);
+          singleNodePlan, ctx_.getQueryOptions().getMax_num_runtime_filters());
       ctx_.getRootAnalyzer().getTimeline().markEvent(
           "Runtime filters computed");
     }

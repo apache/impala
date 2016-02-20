@@ -15,6 +15,7 @@
 package com.cloudera.impala.planner;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,9 @@ public final class RuntimeFilterGenerator {
   // can be applied at the corresponding scan nodes.
   private final Map<TupleId, List<RuntimeFilter>> runtimeFiltersByTid_ =
       Maps.newHashMap();
+
+  // List of runtime filters generated
+  private final List<RuntimeFilter> runtimeFilters_ = Lists.newArrayList();
 
   // Generator for filter ids
   private final IdGenerator<RuntimeFilterId> filterIdGenerator =
@@ -245,6 +249,18 @@ public final class RuntimeFilterGenerator {
     public Map<TupleId, List<SlotId>> getTargetSlots() { return targetSlotsByTid_; }
     public RuntimeFilterId getFilterId() { return id_; }
 
+    /**
+     * Estimates the selectivity of a runtime filter as the cardinality of the
+     * associated source join node over the cardinality of that join node's left
+     * child.
+     */
+    public double getSelectivity() {
+      if (src_.getCardinality() == -1 || src_.getChild(0).getCardinality() == -1) {
+        return -1;
+      }
+      return src_.getCardinality() / (double) src_.getChild(0).getCardinality();
+    }
+
     public void setFilterTarget(ScanNode node, Analyzer analyzer) {
       target_ = node;
       // Check if all the slots of targetExpr_ are bound by partition columns
@@ -274,7 +290,7 @@ public final class RuntimeFilterGenerator {
 
     public void setIsBroadcast(boolean isBroadcast) { isBroadcastJoin_ = isBroadcast; }
 
-    public void setHasLocalTarget() {
+    public void computeHasLocalTarget() {
       Preconditions.checkNotNull(src_.getFragment());
       Preconditions.checkNotNull(target_.getFragment());
       hasLocalTarget_ = src_.getFragment().getId().equals(target_.getFragment().getId());
@@ -291,24 +307,48 @@ public final class RuntimeFilterGenerator {
 
     public String debugString() {
       StringBuilder output = new StringBuilder();
-      output.append("FilterID: " + id_ + " ");
-      output.append("Operator constructing the filter: " +
-          src_.getId() + " ");
-      output.append("Operator applying the filter: " + target_.getId() +
-          " ");
-      output.append("SrcExpr: " + getSrcExpr().debugString() +  " ");
-      output.append("TargetExpr: " + getTargetExpr().debugString());
-      return output.toString();
+      return output.append("FilterID: " + id_ + " ")
+          .append("Source: " + src_.getId() + " ")
+          .append("Target: " + target_.getId() + " ")
+          .append("SrcExpr: " + getSrcExpr().debugString() +  " ")
+          .append("TargetExpr: " + getTargetExpr().debugString())
+          .append("Selectivity: " + getSelectivity())
+          .toString();
     }
   }
 
   /**
    * Generates and assigns runtime filters to a query plan tree.
    */
-  public static void generateRuntimeFilters(Analyzer analyzer, PlanNode plan) {
+  public static void generateRuntimeFilters(Analyzer analyzer, PlanNode plan,
+      int maxNumFilters) {
+    Preconditions.checkArgument(maxNumFilters >= 0);
     RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator();
     filterGenerator.generateFilters(analyzer, plan);
+    List<RuntimeFilter> filters = filterGenerator.getRuntimeFilters();
+    if (filters.size() > maxNumFilters) {
+      // If more than 'maxNumFilters' were generated, sort them by increasing selectivity
+      // and keep the 'maxNumFilters' most selective.
+      Collections.sort(filters, new Comparator<RuntimeFilter>() {
+          public int compare(RuntimeFilter a, RuntimeFilter b) {
+            double aSelectivity =
+                a.getSelectivity() == -1 ? Double.MAX_VALUE : a.getSelectivity();
+            double bSelectivity =
+                b.getSelectivity() == -1 ? Double.MAX_VALUE : b.getSelectivity();
+            double diff = aSelectivity - bSelectivity;
+            return (diff < 0.0 ? -1 : (diff > 0.0 ? 1 : 0));
+          }
+        }
+      );
+    }
+    for (RuntimeFilter filter:
+         filters.subList(0, Math.min(filters.size(), maxNumFilters))) {
+      LOG.trace("Runtime filter: " + filter.debugString());
+      filter.assignToPlanNodes();
+    }
   }
+
+  public List<RuntimeFilter> getRuntimeFilters() { return runtimeFilters_; }
 
   /**
    * Generates the runtime filters for a query by recursively traversing the single-node
@@ -414,7 +454,7 @@ public final class RuntimeFilterGenerator {
         filter.setTargetExpr(targetExpr.substitute(smap, analyzer, true));
       }
       filter.setFilterTarget(scanNode, analyzer);
-      filter.assignToPlanNodes();
+      runtimeFilters_.add(filter);
     }
   }
 }
