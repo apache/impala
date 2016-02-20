@@ -68,11 +68,13 @@ select 1 from functional_seq_snap.complextypes_fileformat
 not implemented: Scan of table 'functional_seq_snap.complextypes_fileformat' in format 'SEQUENCE_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
-# Scanning all partitions fails because one of them is text.
+# Scanning all partitions fails because there are partitions with a file format for which
+# complex types are not supported. The error message is abbreviated because it is
+# non-deterministic which partition will be checked first. Complete error messages
+# can be seen in tests below.
 select s.f1 from functional.complextypes_multifileformat t, t.a
 ---- PLAN
-not implemented: Scan of partition 'p=1' in format 'TEXT' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+not implemented: Scan of partition
 ====
 # Scanning an HBase table with complex-types columns is ok as long as no complex-typed
 # columns are selected.
@@ -98,6 +100,7 @@ Complex types are supported for these file formats: PARQUET.
 # p=1 text
 # p=2 parquet
 # p=3 avro
+# p=4 rc
 # Scanning a text partition of a multi-format table with complex types fails.
 select 1 from functional.complextypes_multifileformat where p = 1
 ---- PLAN
