@@ -35,10 +35,10 @@ class DataStreamRecvr::SenderQueue {
  public:
   SenderQueue(DataStreamRecvr* parent_recvr, int num_senders, RuntimeProfile* profile);
 
-  // Return the next batch form this sender queue. Sets the returned batch in cur_batch_.
+  // Return the next batch from this sender queue. Sets the returned batch in cur_batch_.
   // A returned batch that is not filled to capacity does *not* indicate
   // end-of-stream.
-  // The call blocks until another batch arrives or all senders close
+  // The call blocks until another batch arrives or all senders close.
   // their channels. The returned batch is owned by the sender queue. The caller
   // must acquire data from the returned batch before the next call to GetBatch().
   Status GetBatch(RowBatch** next_batch);
@@ -243,12 +243,15 @@ void DataStreamRecvr::SenderQueue::Cancel() {
 }
 
 void DataStreamRecvr::SenderQueue::Close() {
+  lock_guard<mutex> l(lock_);
+  // Note that the queue must be cancelled first before it can be closed or we may
+  // risk running into a race which can leak row batches. Please see IMPALA-3034.
+  DCHECK(is_cancelled_);
   // Delete any batches queued in batch_queue_
   for (RowBatchQueue::iterator it = batch_queue_.begin();
       it != batch_queue_.end(); ++it) {
     delete it->second;
   }
-
   current_batch_.reset();
 }
 
@@ -335,13 +338,13 @@ void DataStreamRecvr::CancelStream() {
 }
 
 void DataStreamRecvr::Close() {
-  for (int i = 0; i < sender_queues_.size(); ++i) {
-    sender_queues_[i]->Close();
-  }
   // Remove this receiver from the DataStreamMgr that created it.
   // TODO: log error msg
   mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
   mgr_ = NULL;
+  for (int i = 0; i < sender_queues_.size(); ++i) {
+    sender_queues_[i]->Close();
+  }
   merger_.reset();
   mem_tracker_->UnregisterFromParent();
   mem_tracker_.reset();

@@ -120,7 +120,7 @@ class RuntimeFilterBank {
   /// Fragment instance's runtime state.
   RuntimeState* state_;
 
-  /// Object pool to track allocated Bloom filters
+  /// Object pool to track allocated Bloom filters.
   ObjectPool obj_pool_;
 
   /// True iff Close() has been called. Used to prevent races between
@@ -157,7 +157,7 @@ class RuntimeFilter {
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
   void SetBloomFilter(BloomFilter* bloom_filter) {
-    DCHECK(bloom_filter_ == NULL || filter_desc().is_broadcast_join);
+    DCHECK(bloom_filter_ == NULL);
     // TODO: Barrier required here to ensure compiler does not both inline and re-order
     // this assignment. Not an issue for correctness (as assignment is atomic), but
     // potentially confusing.

@@ -30,7 +30,7 @@ BloomFilter::BloomFilter(const int log_heap_space, RuntimeState* state,
     BufferedBlockMgr::Client* client)
     :  // Since log_heap_space is in bytes, we need to convert it to cache lines. There
        // are 64 = 2^6 bytes in a cache line.
-      log_num_buckets_(std::max(1, log_heap_space - 6)),
+      log_num_buckets_(std::max(1, log_heap_space - LOG_BUCKET_WORD_BITS)),
       // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
       // that is too large.
       directory_mask_((1ull << std::min(63, log_num_buckets_)) - 1),

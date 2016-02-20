@@ -91,10 +91,11 @@ class BloomFilter {
   static double FalsePositiveProb(const size_t ndv, const int log_heap_space);
 
   /// Returns amount of heap space used, in bytes
-  int64_t GetHeapSpaceUsed() const { return sizeof(Bucket) * (1ll << log_num_buckets_); }
+  int64_t GetHeapSpaceUsed() const { return sizeof(Bucket) * (1LL << log_num_buckets_); }
 
   static int64_t GetExpectedHeapSpaceUsed(uint32_t log_heap_size) {
-    return sizeof(Bucket) * (1ll << (log_heap_size - LOG_BUCKET_WORD_BITS));
+    DCHECK_GE(log_heap_size, LOG_BUCKET_WORD_BITS);
+    return sizeof(Bucket) * (1LL << (log_heap_size - LOG_BUCKET_WORD_BITS));
   }
 
  private:

@@ -121,7 +121,6 @@ class DataStreamTest : public testing::Test {
   virtual void SetUp() {
     CreateRowDesc();
     CreateTupleComparator();
-    CreateRowBatch();
 
     next_instance_id_.lo = 0;
     next_instance_id_.hi = 0;
@@ -185,7 +184,6 @@ class DataStreamTest : public testing::Test {
   DescriptorTbl* desc_tbl_;
   const RowDescriptor* row_desc_;
   TupleRowComparator* less_than_;
-  MemTracker dummy_mem_tracker_;
   ExecEnv exec_env_;
   RuntimeState runtime_state_;
   TUniqueId next_instance_id_;

@@ -33,6 +33,8 @@ TEST(MemTestTest, SingleTrackerNoLimit) {
   t.Release(15);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_FALSE(t.LimitExceeded());
+  // Clean up.
+  t.Release(5);
 }
 
 TEST(MemTestTest, SingleTrackerWithLimit) {
@@ -47,6 +49,8 @@ TEST(MemTestTest, SingleTrackerWithLimit) {
   t.Release(15);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_FALSE(t.LimitExceeded());
+  // Clean up.
+  t.Release(5);
 }
 
 TEST(MemTestTest, ConsumptionMetric) {
@@ -98,6 +102,9 @@ TEST(MemTestTest, ConsumptionMetric) {
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_FALSE(t.LimitExceeded());
+  // Clean up.
+  metric.Increment(-15);
+  t.Consume(-1);
 }
 
 TEST(MemTestTest, TrackerHierarchy) {
@@ -139,6 +146,10 @@ TEST(MemTestTest, TrackerHierarchy) {
   EXPECT_TRUE(c2.AnyLimitExceeded());
   EXPECT_EQ(p.consumption(), 100);
   EXPECT_FALSE(p.LimitExceeded());
+
+  // Clean up.
+  c1.Release(40);
+  c2.Release(60);
 }
 
 class GcFunctionHelper {
@@ -198,6 +209,9 @@ TEST(MemTestTest, GcFunctions) {
   EXPECT_EQ(t.consumption(), 11);
   EXPECT_FALSE(t.LimitExceeded());
   EXPECT_EQ(t.consumption(), 10);
+
+  //Clean up.
+  t.Release(10);
 }
 
 }

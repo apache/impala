@@ -37,7 +37,7 @@ const int32_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
 RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state)
     : query_ctx_(query_ctx), state_(state), closed_(false) {
   memory_allocated_ =
-      ADD_COUNTER(state->runtime_profile(), "BloomFilterBytes", TUnit::BYTES);
+      state->runtime_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES);
 
   // Clamp bloom filter size down to the limits {MIN,MAX}_BLOOM_FILTER_SIZE
   int32_t bloom_filter_size = query_ctx_.request.query_options.runtime_bloom_filter_size;
@@ -148,12 +148,12 @@ void RuntimeFilterBank::PublishGlobalFilter(uint32_t filter_id,
     // Already showed up from local filter.
     return;
   }
-  if (!state_->query_mem_tracker()->TryConsume(
-          BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space))) {
-    // Silently fail to publish the filter if there's not enough memory for it.
-    return;
-  }
+  uint32_t required_space =
+      BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space);
+  // Silently fail to publish the filter if there's not enough memory for it.
+  if (!state_->query_mem_tracker()->TryConsume(required_space)) return;
   BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(thrift_filter, NULL, NULL));
+  DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
   memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
   it->second->SetBloomFilter(bloom_filter);
   state_->runtime_profile()->AddInfoString(Substitute("Filter $0 arrival", filter_id),
@@ -182,20 +182,8 @@ bool RuntimeFilterBank::ShouldDisableFilter(uint64_t max_ndv) {
 void RuntimeFilterBank::Close() {
   lock_guard<SpinLock> l(runtime_filter_lock_);
   closed_ = true;
-  BOOST_FOREACH(RuntimeFilterMap::value_type v, produced_filters_) {
-    const BloomFilter* bloom_filter = v.second->GetBloomFilter();
-    if (bloom_filter != NULL) {
-      state_->query_mem_tracker()->Release(bloom_filter->GetHeapSpaceUsed());
-    }
-  }
-
-  BOOST_FOREACH(RuntimeFilterMap::value_type v, consumed_filters_) {
-    const BloomFilter* bloom_filter = v.second->GetBloomFilter();
-    if (bloom_filter != NULL) {
-      state_->query_mem_tracker()->Release(bloom_filter->GetHeapSpaceUsed());
-    }
-  }
   obj_pool_.Clear();
+  state_->query_mem_tracker()->Release(memory_allocated_->value());
 }
 
 bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {

@@ -183,11 +183,13 @@ class PlanFragmentExecutor {
   /// 2. status_lock_
   boost::mutex status_lock_;
 
+  /// 'runtime_state_' has to be before 'sink_' as 'sink_' relies on the object pool
+  /// of 'runtime_state_'.
+  boost::scoped_ptr<RuntimeState> runtime_state_;
   /// Output sink for rows sent to this fragment. May not be set, in which case rows are
   /// returned via GetNext's row batch
   /// Created in Prepare (if required), owned by this object.
   boost::scoped_ptr<DataSink> sink_;
-  boost::scoped_ptr<RuntimeState> runtime_state_;
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_batch_;
 
