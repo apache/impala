@@ -212,8 +212,9 @@ class DataStreamMgr {
   RendezvousMap pending_rendezvous_;
 
   /// Map from the time, in ms, that a stream should be evicted from closed_stream_cache
-  /// to its RecvrId. Used to evict old streams from cache efficiently.
-  typedef std::map<int64_t, RecvrId> ClosedStreamMap;
+  /// to its RecvrId. Used to evict old streams from cache efficiently. multimap in case
+  /// there are multiple streams with the same eviction time.
+  typedef std::multimap<int64_t, RecvrId> ClosedStreamMap;
   ClosedStreamMap closed_stream_expirations_;
 
   /// Cache of recently closed RecvrIds. Used to allow straggling senders to fail fast by

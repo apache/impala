@@ -192,6 +192,7 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
       closed_stream_cache_.erase(it->second);
       closed_stream_expirations_.erase(it++);
     }
+    DCHECK_EQ(closed_stream_cache_.size(), closed_stream_expirations_.size());
     int32_t after = closed_stream_cache_.size();
     if (before != after) {
       VLOG_QUERY << "Reduced stream ID cache from " << before << " items, to " << after
