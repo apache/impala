@@ -75,6 +75,13 @@ DEFINE_int32(max_page_header_size, 8*1024*1024, "max parquet page header size in
 // upper bound.
 const int MAX_DICT_HEADER_SIZE = 100;
 
+// The number of rows between checks to see if a filter is not effective, and should be
+// disabled. Must be a power of two.
+const int ROWS_PER_FILTER_SELECTIVITY_CHECK = 16 * 1024;
+static_assert(
+    !(ROWS_PER_FILTER_SELECTIVITY_CHECK & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)),
+    "ROWS_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
+
 // TODO: refactor error reporting across all scanners to be more consistent (e.g. make
 // sure file name is always included, errors are reported exactly once)
 // TODO: rename these macros so its easier to tell them apart
@@ -431,28 +438,6 @@ class HdfsParquetScanner::BaseScalarColumnReader :
       decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())) {
     DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
 
-    RuntimeState* state = parent_->scan_node_->runtime_state();
-    hash_seed_ = state->fragment_hash_seed();
-
-    // Check to see if any filter expr is bound by this slot. Any filter is only valid for
-    // the top-level tuple.
-    HdfsScanNode* scan_node = parent_->scan_node_;
-    if (slot_desc != NULL && slot_desc_->parent() == scan_node->tuple_desc()) {
-      for (int i = 0; i < parent_->context_->filter_ctxs().size(); ++i) {
-        const FilterContext* ctx = &parent_->context_->filter_ctxs()[i];
-        DCHECK(ctx->filter != NULL);
-        const TRuntimeFilterDesc& desc = ctx->filter->filter_desc();
-        if (desc.target_expr_slotids.size() != 1) continue;
-        if (desc.target_expr_slotids[0] != slot_desc->id()) continue;
-        // TODO: Better check for non-slotref exprs?
-        if (ctx->expr->root()->type() != slot_desc->type()) continue;
-        filter_ctxs_.push_back(ctx);
-        filter_enabled_.push_back(true);
-      }
-      filter_rows_total_possible_.resize(filter_ctxs_.size(), 0);
-      filter_rows_considered_.resize(filter_ctxs_.size(), 0);
-      filter_rows_rejected_.resize(filter_ctxs_.size(), 0);
-    }
   }
 
   virtual ~BaseScalarColumnReader() { }
@@ -483,12 +468,6 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   /// Called once when the scanner is complete for final cleanup.
   void Close() {
     if (decompressor_.get() != NULL) decompressor_->Close();
-    for (int i = 0; i < filter_rows_considered_.size(); ++i) {
-      const FilterStats* stats = filter_ctxs_[i]->stats;
-      stats->IncrCounters(FilterStats::ROWS_KEY,
-          filter_rows_total_possible_[i], filter_rows_considered_[i],
-          filter_rows_rejected_[i]);
-    }
   }
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
@@ -514,15 +493,6 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   // Class members that are accessed for every column should be included up here so they
   // fit in as few cache lines as possible.
 
-  /// Cached runtime filter contexts, one for each filter that applies to this column.
-  /// TODO: When using expressions to evaluate filters (not just slot refs), will need to
-  /// clone the expressions (and therefore the FilterCtxt) here instead of sharing it.
-  vector<const FilterContext*> filter_ctxs_;
-
-  /// filter_enabled_[i] is true if filter in filter_ctxs_ should be applied, false if it
-  /// was ineffective and was disabled.
-  vector<bool> filter_enabled_;
-
   /// Pointer to start of next value in data page
   uint8_t* data_;
 
@@ -537,22 +507,6 @@ class HdfsParquetScanner::BaseScalarColumnReader :
 
   /// Num values remaining in the current data page
   int num_buffered_values_;
-
-  /// Cache of hash_seed_ to use with bitmap_filter_.
-  uint32_t hash_seed_;
-
-  /// Track statistics of each filter (one for each filter in filter_ctxs_) per column
-  /// reader so that expensive aggregation can be performed once, during Close().
-
-  /// Total number of rows to which each filter was applied
-  vector<int64_t> filter_rows_considered_;
-
-  /// Total number of rows that each filter rejected.
-  vector<int64_t> filter_rows_rejected_;
-
-  /// Total number of rows that each filter could have been applied to (if it were
-  /// available from row 0).
-  vector<int64_t> filter_rows_total_possible_;
 
   // Less frequently used members that are not accessed in inner loop should go below
   // here so they do not occupy precious cache line space.
@@ -751,35 +705,6 @@ class HdfsParquetScanner::ScalarColumnReader :
     }
     if (NeedsConversion()) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
 
-    for (int i = 0; i < filter_ctxs_.size(); ++i) {
-      if (!filter_enabled_[i]) continue;
-      ++filter_rows_total_possible_[i];
-      // Check filter effectiveness every 16K rows.
-      if (UNLIKELY(filter_rows_total_possible_[i] % (16 * 1024) == 0)) {
-        double reject_ratio =
-            filter_rows_rejected_[i] / static_cast<double>(filter_rows_considered_[i]);
-        if (reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
-          filter_enabled_[i] = false;
-          continue;
-        }
-      }
-      if (*conjuncts_passed) {
-        ++filter_rows_considered_[i];
-        // TODO: At this point we don't have a tuple to evaluate
-        // parent_->scan_node_->filter_exprs[...]->GetValue() over. For now, all filter
-        // exprs are slot refs, but if the expression becomes more complex we will need to
-        // synthesise a tuple here.
-        const RuntimeFilter* filter = filter_ctxs_[i]->filter;
-        if (!filter->Eval<T>(reinterpret_cast<T*>(slot), slot_desc()->type())) {
-          *conjuncts_passed = false;
-          ++filter_rows_rejected_[i];
-          break;
-        }
-        // TODO: We should track selectivity per filter (since there may be many for a
-        // single scan). That should probably be in the parent scan node for consistency
-        // across file formats.
-      }
-    }
     return NextLevels<IN_COLLECTION>();
   }
 
@@ -947,6 +872,17 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
 
   scan_node_->IncNumScannersCodegenDisabled();
 
+  for (int i = 0; i < context->filter_ctxs().size(); ++i) {
+    const FilterContext* ctx = &context->filter_ctxs()[i];
+    DCHECK(ctx->filter != NULL);
+    const TRuntimeFilterDesc& desc = ctx->filter->filter_desc();
+    filter_ctxs_.push_back(ctx);
+    filter_enabled_.push_back(true);
+  }
+  filter_rows_total_possible_.resize(filter_ctxs_.size(), 0);
+  filter_rows_considered_.resize(filter_ctxs_.size(), 0);
+  filter_rows_rejected_.resize(filter_ctxs_.size(), 0);
+
   return Status::OK();
 }
 
@@ -985,6 +921,13 @@ void HdfsParquetScanner::Close() {
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
   assemble_rows_timer_.Stop();
   assemble_rows_timer_.ReleaseCounter();
+
+  for (int i = 0; i < filter_ctxs_.size(); ++i) {
+    const FilterStats* stats = filter_ctxs_[i]->stats;
+    stats->IncrCounters(FilterStats::ROWS_KEY,
+        filter_rows_total_possible_[i], filter_rows_considered_[i],
+        filter_rows_rejected_[i]);
+  }
 
   HdfsScanner::Close();
 }
@@ -1768,6 +1711,33 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
     if (UNLIKELY(!continue_execution)) break;
   }
   *materialize_tuple &= conjuncts_passed;
+
+  if (!IN_COLLECTION && *materialize_tuple) {
+    TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&tuple);
+    for (int i = 0; i < filter_ctxs_.size(); ++i) {
+      if (!filter_enabled_[i]) continue;
+      ++filter_rows_total_possible_[i];
+      // Check filter effectiveness every ROWS_PER_FILTER_SELECTIVITY_CHECK rows.
+      if (UNLIKELY(
+          !(filter_rows_total_possible_[i] & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
+        double reject_ratio =
+            filter_rows_rejected_[i] / static_cast<double>(filter_rows_considered_[i]);
+        if (reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
+          filter_enabled_[i] = false;
+          continue;
+        }
+      }
+      ++filter_rows_considered_[i];
+      const RuntimeFilter* filter = filter_ctxs_[i]->filter;
+      void* e = filter_ctxs_[i]->expr->GetValue(tuple_row_mem);
+      if (!filter->Eval<void>(e, filter_ctxs_[i]->expr->root()->type())) {
+        ++filter_rows_rejected_[i];
+        *materialize_tuple = false;
+        break;
+      }
+    }
+  }
+
   return continue_execution;
 }
 

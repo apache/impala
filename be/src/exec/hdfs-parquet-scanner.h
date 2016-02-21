@@ -275,9 +275,8 @@ struct HdfsFileDesc;
 ///
 /// HdfsParquetScanner is able to apply runtime filters that arrive before or during
 /// scanning. Filters are applied at both the row group (see AssembleRows()) and row (see
-/// ScalarColumnReader::ReadSlot()) scope. If all filter predicates do not pass, the row
-/// or row group will be excluded from output. Only partition-colum filters are applied at
-/// AssembleRows(), and only single-column filters are applied at ReadSlot(). The
+/// ReadRow()) scope. If all filter predicates do not pass, the row or row group will be
+/// excluded from output. Only partition-column filters are applied at AssembleRows(). The
 /// FilterContexts for these filters are cloned from the parent scan node and attached to
 /// the ScannerContext.
 class HdfsParquetScanner : public HdfsScanner {
@@ -380,6 +379,27 @@ class HdfsParquetScanner : public HdfsScanner {
   template<typename T, bool MATERIALIZED> friend class ScalarColumnReader;
   class BoolColumnReader;
   friend class BoolColumnReader;
+
+  /// Cached runtime filter contexts, one for each filter that applies to this column.
+  vector<const FilterContext*> filter_ctxs_;
+
+  /// filter_enabled_[i] is true if filter in filter_ctxs_ should be applied, false if it
+  /// was ineffective and was disabled.
+  vector<bool> filter_enabled_;
+
+  /// Track statistics of each filter (one for each filter in filter_ctxs_) per scanner so
+  /// that expensive aggregation up to the scan node can be performed once, during
+  /// Close().
+
+  /// Total number of rows to which each filter was applied
+  vector<int64_t> filter_rows_considered_;
+
+  /// Total number of rows that each filter rejected.
+  vector<int64_t> filter_rows_rejected_;
+
+  /// Total number of rows that each filter could have been applied to (if it were
+  /// available from row 0).
+  vector<int64_t> filter_rows_total_possible_;
 
   /// Column reader for each materialized columns for this file.
   std::vector<ColumnReader*> column_readers_;
