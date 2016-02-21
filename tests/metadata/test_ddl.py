@@ -23,7 +23,7 @@ from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal, SkipIfOldAggsJoins
 from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
 
 # Validates DDL statements (create, drop)
@@ -217,6 +217,18 @@ class TestDdlStatements(ImpalaTestSuite):
     self._create_db(test_db_name, sync=True)
     try:
       self.run_test_case('QueryTest/create', vector, use_db=test_db_name,
+          multiple_impalad=self._use_multiple_impalad(vector))
+    finally:
+      self.cleanup_db(test_db_name)
+
+  @SkipIfOldAggsJoins.nested_types
+  @pytest.mark.execute_serially
+  def test_create_table_nested_types(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
+    test_db_name = 'ddl_test_db'
+    self._create_db(test_db_name, sync=True)
+    try:
+      self.run_test_case('QueryTest/create-nested', vector, use_db=test_db_name,
           multiple_impalad=self._use_multiple_impalad(vector))
     finally:
       self.cleanup_db(test_db_name)
