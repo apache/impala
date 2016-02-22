@@ -410,7 +410,7 @@ public class DistributedPlanner {
       node.setChild(0, leftChildFragment.getPlanRoot());
       connectChildFragment(node, 1, rightChildFragment);
       leftChildFragment.setPlanRoot(node);
-      markFiltersWithLocalTargets(node);
+      for (RuntimeFilter filter: node.getRuntimeFilters()) filter.setHasLocalTarget();
       return leftChildFragment;
     } else {
       node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
@@ -507,22 +507,6 @@ public class DistributedPlanner {
       rightChildFragment.setOutputPartition(rhsJoinPartition);
 
       return joinFragment;
-    }
-  }
-
-  /**
-   * Marks the runtime filters of 'node' that have target nodes in the plan fragment
-   * containing 'node'.
-   */
-  private void markFiltersWithLocalTargets(PlanNode node) {
-    if (!(node instanceof JoinNode) || node.getRuntimeFilters().isEmpty()) return;
-    List<ScanNode> scanNodes = Lists.newArrayList();
-    node.collect(ScanNode.class, scanNodes);
-    if (!scanNodes.isEmpty()) {
-      Preconditions.checkState(scanNodes.size() == 1);
-      for (RuntimeFilter filter: node.getRuntimeFilters()) {
-        filter.setHasLocalTarget(filter.getTarget().getId() == scanNodes.get(0).getId());
-      }
     }
   }
 

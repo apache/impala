@@ -274,8 +274,10 @@ public final class RuntimeFilterGenerator {
 
     public void setIsBroadcast(boolean isBroadcast) { isBroadcastJoin_ = isBroadcast; }
 
-    public void setHasLocalTarget(boolean hasLocalTarget) {
-      hasLocalTarget_ = hasLocalTarget;
+    public void setHasLocalTarget() {
+      Preconditions.checkNotNull(src_.getFragment());
+      Preconditions.checkNotNull(target_.getFragment());
+      hasLocalTarget_ = src_.getFragment().getId().equals(target_.getFragment().getId());
     }
 
     /**
