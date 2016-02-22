@@ -933,22 +933,14 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   // Unpin two blocks here, to ensure that backing storage is allocated in tmp file.
-  for (int i = 0; i < 2; ++i) {
-    EXPECT_OK(blocks[i]->Unpin());
-  }
+  UnpinBlocks(blocks);
   WaitForWrites(block_mgr);
   // Repin the blocks
-  for (int i = 0; i < 2; ++i) {
-    bool pinned;
-    EXPECT_OK(blocks[i]->Pin(&pinned));
-    EXPECT_TRUE(pinned);
-  }
+  PinBlocks(blocks);
   // Remove the backing storage so that future writes will fail
   int num_files = clear_scratch_dir();
-  EXPECT_TRUE(num_files > 0);
-  for (int i = 0; i < 2; ++i) {
-    EXPECT_OK(blocks[i]->Unpin());
-  }
+  EXPECT_GT(num_files, 0);
+  UnpinBlocks(blocks, true);
   WaitForWrites(block_mgr);
   // Subsequent calls should fail.
   DeleteBlocks(blocks);
@@ -974,7 +966,7 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   WaitForWrites(block_mgr);
   // Remove temporary files - subsequent operations will fail.
   int num_files = clear_scratch_dir();
-  EXPECT_TRUE(num_files > 0);
+  EXPECT_GT(num_files, 0);
   // Current implementation will fail here because it tries to expand the tmp file
   // immediately. This behavior is not contractual but we want to know if it changes
   // accidentally.
