@@ -1,0 +1,313 @@
+====
+---- QUERY
+####################################################
+# Test case 1: broadcast join.
+# Without filtering, expect 7300 / 3 = 2433 rows per scan fragment.
+# With filtering, expect 618 / 3 = 206 rows to be read from 3 files (one per scan).
+####################################################
+
+# Basic filtering use case: filter p's partition columns thanks to an implicit
+# relationship between join column and build-side predicates.
+SET RUNTIME_FILTER_MODE=OFF;
+select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
+on p.month = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+620
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 2.43K .*
+====
+---- QUERY
+# Now turn on local filtering: we expect to see a reduction in scan volume.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
+on p.month = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+620
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 7 \(7\).*
+====
+
+
+---- QUERY
+####################################################
+# Test case 2: shuffle join - test for filter propagation (or lack thereof in LOCAL mode).
+# Without filtering, expect 7300 / 3 = 2433 rows per scan fragment.
+# With filtering, expect 618 / 3 = 206 rows to be read from 3 files (one per scan).
+####################################################
+
+# Local mode. Filters won't be propagated to scan, so scans will read all rows.
+# Still give enough time for filters to show up (even if they won't)
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
+on p.month = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+620
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 2.43K .*
+====
+---- QUERY
+# Shuffle join, global mode. Expect filters to be propagated.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
+on p.month = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+620
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 7 \(7\).*
+====
+
+
+---- QUERY
+####################################################
+# Test case 3: two-hop filter chain with BROADCAST
+# joins.
+# Without filtering in left-most scan, expect 7300 / 3 = 2433 rows.
+# With filtering, expect 0 rows as all files are rejected by the partition
+# column filter.
+####################################################
+
+# Local mode. Only the left-most scan will receive its filter, but since the scan of 'b'
+# will not, the lack of predicates means there is no filter effect.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypes b
+    join [BROADCAST] alltypestiny c
+    where c.month = 13 and b.year = c.year and a.month = b.month
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 0 .*
+====
+---- QUERY
+# Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
+# to left-most scan.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypes b
+    join [BROADCAST] alltypestiny c
+    where c.month = 13 and b.year = c.year and a.month = b.month
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 8 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 4: complex filter expressions. The join predicate matches nothing, but
+# isn't simplified by the planner before execution.
+# With local filtering, expect 0 rows, as all are rejected by partition pruning.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=10000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on greatest(a.month, 1000) = greatest(b.month, 2000)
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 0 .*
+row_regex: .*Files rejected: 8 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 5: filters with local target don't get broadcast.
+####################################################
+
+# Local mode. Coordinator should report 0 filter updates received.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on a.month = b.month + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 0 .*
+====
+---- QUERY
+# Global mode. Coordinator should report 0 filter updates received.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on a.month = b.month + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 0 .*
+row_regex: .*Files rejected: 8 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 6: filters with non-local target get broadcast in GLOBAL mode only.
+####################################################
+
+# Local mode. Coordinator should report 0 filter updates received.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [SHUFFLE] alltypestiny b
+    on a.month = b.month + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 0 .*
+====
+---- QUERY
+# Global mode. Coordinator should report 1 filter update per backend.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [SHUFFLE] alltypestiny b
+    on a.month = b.month + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 3 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 7: filters with target exprs bound by > 1 slotref.
+# Expect all but one partition to be filtered out by join expr.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on a.month + a.year = b.year + 1;
+---- RESULTS
+2480
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 7 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 8: filters do not pass through LOJ.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    LEFT OUTER join alltypestiny b
+    on a.month = b.year
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+row_regex: .*RowsReturned: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 9: filters do pass through ROJ.
+# All partitions will be filtered out by the join condition.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    RIGHT OUTER join alltypestiny b
+    on a.month = b.year
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 8 .*
+====
+
+---- QUERY
+####################################################
+# Test case 10: filters do not pass through FOJ.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    FULL OUTER join alltypestiny b
+    on a.month = b.year
+---- RESULTS
+7308
+---- RUNTIME_PROFILE
+row_regex: .*RowsReturned: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 11: filters with high expected FP rate get disabled.
+# Set the filter size to small, and scan a fact table with high NDV on the build side. The
+# filter will be disabled due to a high expected FP rate.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+set RUNTIME_BLOOM_FILTER_SIZE=4096;
+with build as (
+    select id from alltypes UNION ALL select id + 10000 from alltypes
+    UNION ALL select id + 20000 from alltypes)
+select STRAIGHT_JOIN count(*) from alltypes a
+    join (select id FROM build UNION ALL select id + 100000 FROM build) b
+    on a.id = b.id
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+row_regex: .*Build-Side Runtime-Filter Disabled \(FP Rate Too High\).*
+row_regex: .*Rows rejected: 0 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 12: join predicates with NULL values.
+# Build-side selects one row from alltypes agg where day IS NULL, and joins with all rows
+# in probe side with day IS NULL.
+# Expect with filtering that 1K rows are returned, with an average of 333 per scan node
+# per fragment instance, and three files rejected per scan.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypesagg a
+    join alltypesagg b
+    on a.day <=> b.day
+    where b.int_col IS NULL and b.id = 0 and b.day IS DISTINCT FROM 1
+---- RESULTS
+1000
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 3 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 13: coordinator fragment produces filters
+# In this esoteric query plan, the coordinator fragment has a hash
+# join in its root, which produces filters for the scan of t1.
+####################################################
+
+set RUNTIME_FILTER_WAIT_TIME_MS=5000;
+set RUNTIME_FILTER_MODE=GLOBAL;
+with t1 as (select month x, bigint_col y from alltypes limit 7300),
+     t2 as (select int_col x, bigint_col y from alltypestiny limit 2)
+     select count(*) from t1, t2 where t1.x = t2.x
+---- RESULTS
+620
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 7 .*
+====

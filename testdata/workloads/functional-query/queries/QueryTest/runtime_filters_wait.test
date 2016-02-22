@@ -1,0 +1,16 @@
+====
+---- QUERY
+####################################################
+# Regression test for IMPALA-3078: Don't wait for global filters
+# that will never arrive in local mode. Set wait-time to 10 minutes,
+# but fail the test if the query took more than a minute (see test
+# driver which runs this script for timeout detection).
+####################################################
+
+set RUNTIME_FILTER_WAIT_TIME_MS=600000;
+set RUNTIME_FILTER_MODE=LOCAL;
+select count(*) from alltypes p join [SHUFFLE] alltypestiny b
+on p.month = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+620
+====

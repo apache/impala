@@ -78,7 +78,7 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   section_names = valid_section_names
   if section_names is None:
     section_names = ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP', 'CATCH', 'ERRORS',
-        'USER', 'RUNTIME_PROFILE']
+                     'USER', 'RUNTIME_PROFILE']
   return parse_test_file(file_name, section_names, encoding=encoding,
       skip_unknown_sections=False)
 
@@ -163,7 +163,7 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
     parsed_sections = collections.defaultdict(str)
     for sub_section in re.split(r'(?m)^%s' % SUBSECTION_DELIMITER, section[1:]):
       # Skip empty subsections
-      if not sub_section:
+      if not sub_section.strip():
         continue
 
       lines = sub_section.split('\n')
@@ -177,7 +177,7 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       if subsection_name not in valid_section_names:
         if skip_unknown_sections or not subsection_name:
           print sub_section
-          print 'Unknown section %s' % subsection_name
+          print 'Unknown section \'%s\'' % subsection_name
           continue
         else:
           raise RuntimeError, 'Unknown subsection: %s' % subsection_name

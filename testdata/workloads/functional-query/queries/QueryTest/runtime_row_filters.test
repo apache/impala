@@ -1,0 +1,247 @@
+====
+---- QUERY
+####################################################
+# Test case 1: broadcast join.
+# Basic filtering use case: p's partition columns thanks to an implicit relationship
+# between join column and build-side predicates.
+# Without filtering, expect 7300 / 3 = 2433 rows.
+# With filtering, expect 618 / 3 = 206 rows.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=OFF;
+select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
+on p.id = b.id and b.month = 1 and b.string_col = "1"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 2.43K .*
+====
+---- QUERY
+# Now turn on local filtering: we expect to see a reduction in scan volume.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
+on p.id = b.id and b.month = 1 and b.string_col = "1"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: .*Rows rejected: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 2: shuffle join - test for filter propagation (or lack thereof in LOCAL mode).
+# Without filtering, expect 7300 / 3 = 2433 rows.
+# With filtering, expect 618 / 3 = 206 rows.
+####################################################
+
+# Local mode. Filters won't be propagated to scan, so scans will read all rows.
+# Still give enough time for filters to show up (even if they won't)
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
+on p.id = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 2.43K .*
+====
+---- QUERY
+# Shuffle join, global mode. Expect filters to be propagated.
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
+on p.id = b.int_col and b.month = 1 and b.string_col = "1"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: .*Rows rejected: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 3: two-hop filter chain with BROADCAST
+# joins.
+# Without filtering in left-most scan, expect 7300 / 3 = 2433 rows.
+# With filtering, expect 0 rows.
+####################################################
+
+# Local mode. Only the left-most scan will receive its filter, but since the scan of 'b'
+# will not, the lack of predicates means there is no filter effect.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypes b
+    join [BROADCAST] alltypestiny c
+    where c.month = 13 and b.id = c.id and a.year = b.year
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 0 .*
+====
+---- QUERY
+# Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
+# to left-most scan.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypes b
+    join [BROADCAST] alltypestiny c
+    where c.month = 13 and b.id = c.id and a.year = b.year
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Files rejected: 8 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 4: complex filter expressions. The join predicate matches nothing, but
+# isn't simplified by the planner before execution.
+# Without filtering in left-most scan, expect 7300 / 3 = 2433 rows.
+# With filtering, expect 0 rows.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=10000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on substr(a.date_string_col, 1, 2) = substr(b.date_string_col, 1, 0)
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Rows rejected: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 5: filters with local target don't get broadcast
+####################################################
+
+# Local mode. Coordinator should report 0 filter updates received.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on a.id = b.id + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 0 .*
+row_regex: .*Rows rejected: 2.43K .*
+====
+---- QUERY
+# Global mode. Coordinator should report 0 filter updates received.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on a.id = b.id + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 0 .*
+row_regex: .*Rows rejected: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 6: filters with non-local target get broadcast in GLOBAL mode only.
+####################################################
+
+# Local mode. Coordinator should report 0 filter updates received.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [SHUFFLE] alltypestiny b
+    on a.id = b.id + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 0 .*
+====
+---- QUERY
+# Global mode. Coordinator should report 1 filter updates per backend.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [SHUFFLE] alltypestiny b
+    on a.id = b.id + 10000;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 3 .*
+====
+
+---- QUERY
+####################################################
+# Test case 7: filters with target exprs bound by > 1 slotref
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=LOCAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST] alltypestiny b
+    on a.id + a.int_col = b.id;
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+row_regex: .*Rows rejected: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 8: filters do not pass through LOJ.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    LEFT OUTER join alltypestiny b
+        on a.id + a.int_col = b.id;
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+row_regex: .*RowsReturned: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 9: filters do pass through ROJ.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    RIGHT OUTER join alltypestiny b
+        on a.id + a.int_col = b.id;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+row_regex: .*Rows rejected: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 9: filters do not pass through FOJ.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(*) from alltypes a
+    FULL OUTER join alltypestiny b
+        on a.id + a.int_col = b.id;
+---- RESULTS
+7304
+---- RUNTIME_PROFILE
+row_regex: .*RowsReturned: 2.43K .*
+====
