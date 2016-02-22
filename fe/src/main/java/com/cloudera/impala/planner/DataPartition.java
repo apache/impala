@@ -44,7 +44,7 @@ public class DataPartition {
   // for hash partition: exprs used to compute hash value
   private List<Expr> partitionExprs_;
 
-  public DataPartition(TPartitionType type, List<Expr> exprs) {
+  private DataPartition(TPartitionType type, List<Expr> exprs) {
     Preconditions.checkNotNull(exprs);
     Preconditions.checkState(!exprs.isEmpty());
     Preconditions.checkState(type == TPartitionType.HASH_PARTITIONED
@@ -53,7 +53,7 @@ public class DataPartition {
     partitionExprs_ = exprs;
   }
 
-  public DataPartition(TPartitionType type) {
+  private DataPartition(TPartitionType type) {
     Preconditions.checkState(type == TPartitionType.UNPARTITIONED
         || type == TPartitionType.RANDOM);
     type_ = type;
@@ -65,6 +65,10 @@ public class DataPartition {
 
   public final static DataPartition RANDOM =
       new DataPartition(TPartitionType.RANDOM);
+
+  public static DataPartition hashPartitioned(List<Expr> exprs) {
+    return new DataPartition(TPartitionType.HASH_PARTITIONED, exprs);
+  }
 
   public boolean isPartitioned() { return type_ != TPartitionType.UNPARTITIONED; }
   public boolean isHashPartitioned() { return type_ == TPartitionType.HASH_PARTITIONED; }

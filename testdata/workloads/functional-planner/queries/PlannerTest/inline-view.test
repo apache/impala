@@ -513,14 +513,9 @@ from (select distinct * from functional.testtbl) x
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
-06:AGGREGATE [FINALIZE]
-|  group by: x.id, x.name, x.zip
-|
-05:EXCHANGE [HASH(x.id,x.name,x.zip)]
-|
-02:AGGREGATE [STREAMING]
+02:AGGREGATE [FINALIZE]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 04:AGGREGATE [FINALIZE]

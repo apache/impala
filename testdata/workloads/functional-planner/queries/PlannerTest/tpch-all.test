@@ -1566,29 +1566,23 @@ order by
    predicates: NOT o_comment LIKE '%special%requests%'
    runtime filters: RF000 -> o_custkey
 ---- DISTRIBUTEDPLAN
-12:MERGING-EXCHANGE [UNPARTITIONED]
+10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) DESC, c_count DESC
 |
 05:SORT
 |  order by: count(*) DESC, c_count DESC
 |
-11:AGGREGATE [FINALIZE]
+09:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: c_count
 |
-10:EXCHANGE [HASH(c_count)]
+08:EXCHANGE [HASH(c_count)]
 |
 04:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: count(o_orderkey)
 |
-09:AGGREGATE [FINALIZE]
-|  output: count:merge(o_orderkey)
-|  group by: c_custkey
-|
-08:EXCHANGE [HASH(c_custkey)]
-|
-03:AGGREGATE [STREAMING]
+03:AGGREGATE [FINALIZE]
 |  output: count(o_orderkey)
 |  group by: c_custkey
 |

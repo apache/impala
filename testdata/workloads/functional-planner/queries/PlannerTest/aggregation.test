@@ -913,3 +913,153 @@ select 1 from functional.alltypestiny having count(*) > 0
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ====
+# Grouping aggregation where input is partitioned on grouping expr.
+# Planner should not redundantly repartition the data that was already partitioned on
+# the required key by the join.
+select straight_join c_custkey, count(*)
+from tpch_parquet.customer inner join [shuffle] tpch_parquet.orders on c_custkey = o_custkey
+where c_nationkey = 16
+group by 1
+having count(*) < 150000
+limit 1000000
+---- DISTRIBUTEDPLAN
+06:EXCHANGE [UNPARTITIONED]
+|  limit: 1000000
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: c_custkey
+|  having: count(*) < 150000
+|  limit: 1000000
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c_custkey = o_custkey
+|  runtime filters: RF000 <- o_custkey
+|
+|--05:EXCHANGE [HASH(o_custkey)]
+|  |
+|  01:SCAN HDFS [tpch_parquet.orders]
+|     partitions=1/1 files=2 size=54.93MB
+|
+04:EXCHANGE [HASH(c_custkey)]
+|
+00:SCAN HDFS [tpch_parquet.customer]
+   partitions=1/1 files=1 size=12.47MB
+   predicates: c_nationkey = 16
+   runtime filters: RF000 -> c_custkey
+====
+# Distinct aggregation where input is partitioned on distinct expr.
+# Planner should not redundantly repartition the data that was already partitioned on
+# the required key by the join.
+select col from (
+  select straight_join count(distinct c_custkey) col
+  from tpch_parquet.orders inner join [shuffle] tpch_parquet.customer on c_custkey = o_custkey) v
+where col > 50
+limit 50
+---- DISTRIBUTEDPLAN
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(c_custkey)
+|  having: count(c_custkey) > 50
+|  limit: 50
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+04:AGGREGATE
+|  output: count(c_custkey)
+|
+03:AGGREGATE
+|  group by: c_custkey
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|
+|--06:EXCHANGE [HASH(c_custkey)]
+|  |
+|  01:SCAN HDFS [tpch_parquet.customer]
+|     partitions=1/1 files=1 size=12.47MB
+|
+05:EXCHANGE [HASH(o_custkey)]
+|
+00:SCAN HDFS [tpch_parquet.orders]
+   partitions=1/1 files=2 size=54.93MB
+   runtime filters: RF000 -> o_custkey
+====
+# Distinct grouping aggregation where input is partitioned on distinct and grouping exprs.
+# Planner should not redundantly repartition the data that was already partitioned on
+# the required key by the join.
+select straight_join c_custkey, count(distinct c_custkey)
+from tpch_parquet.orders inner join [shuffle] tpch_parquet.customer on c_custkey = o_custkey
+group by 1
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [UNPARTITIONED]
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(c_custkey)
+|  group by: c_custkey
+|
+03:AGGREGATE
+|  group by: c_custkey, c_custkey
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|
+|--06:EXCHANGE [HASH(c_custkey)]
+|  |
+|  01:SCAN HDFS [tpch_parquet.customer]
+|     partitions=1/1 files=1 size=12.47MB
+|
+05:EXCHANGE [HASH(o_custkey)]
+|
+00:SCAN HDFS [tpch_parquet.orders]
+   partitions=1/1 files=2 size=54.93MB
+   runtime filters: RF000 -> o_custkey
+====
+# Complex aggregation when two joins and an agg end up in same fragment.
+select l_orderkey, l_returnflag, count(*) from (
+  select straight_join *
+  from tpch_parquet.lineitem
+  inner join [shuffle] tpch_parquet.orders
+    on l_orderkey = o_orderkey and l_returnflag = o_clerk
+  inner join [broadcast] tpch_parquet.customer
+    on o_custkey = c_custkey and c_phone = o_comment
+) v
+group by 1, 2
+having count(*) > 10
+limit 10
+---- DISTRIBUTEDPLAN
+09:EXCHANGE [UNPARTITIONED]
+|  limit: 10
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_returnflag
+|  having: count(*) > 10
+|  limit: 10
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey, o_comment = c_phone
+|  runtime filters: RF000 <- c_custkey, RF001 <- c_phone
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpch_parquet.customer]
+|     partitions=1/1 files=1 size=12.47MB
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey, l_returnflag = o_clerk
+|  runtime filters: RF002 <- o_orderkey, RF003 <- o_clerk
+|
+|--07:EXCHANGE [HASH(o_orderkey,o_clerk)]
+|  |
+|  01:SCAN HDFS [tpch_parquet.orders]
+|     partitions=1/1 files=2 size=54.93MB
+|     runtime filters: RF000 -> o_custkey, RF001 -> o_comment
+|
+06:EXCHANGE [HASH(l_orderkey,l_returnflag)]
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=195.85MB
+   runtime filters: RF002 -> l_orderkey, RF003 -> l_returnflag
+====

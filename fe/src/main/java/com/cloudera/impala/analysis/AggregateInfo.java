@@ -709,7 +709,7 @@ public class AggregateInfo extends AggregateInfoBase {
     if (groupingExprs_.isEmpty()) {
       return DataPartition.UNPARTITIONED;
     } else {
-      return new DataPartition(TPartitionType.HASH_PARTITIONED, groupingExprs_);
+      return DataPartition.hashPartitioned(groupingExprs_);
     }
   }
 

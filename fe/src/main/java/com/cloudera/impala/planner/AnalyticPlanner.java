@@ -357,8 +357,7 @@ public class AnalyticPlanner {
         // create required input partition
         DataPartition inputPartition = DataPartition.UNPARTITIONED;
         if (!partitionExprs.isEmpty()) {
-          inputPartition =
-              new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
+          inputPartition = DataPartition.hashPartitioned(partitionExprs);
         }
         sortNode.setInputPartition(inputPartition);
       }
