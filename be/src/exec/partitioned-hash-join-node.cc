@@ -1755,7 +1755,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   }
   process_probe_batch_fn_level0 =
       codegen->OptimizeFunctionWithExprs(process_probe_batch_fn_level0);
-  if (process_probe_batch_fn == NULL) {
+  if (process_probe_batch_fn_level0 == NULL) {
     return Status("PartitionedHashJoinNode::CodegenProcessProbeBatch(): codegen'd "
         "level-zero ProcessProbeBatch() function failed verification, see log");
   }
