@@ -32,6 +32,15 @@ clockid_t OsInfo::fast_clock_ = CLOCK_MONOTONIC;
 std::string OsInfo::clock_name_ =
     "Unknown clocksource, clockid_t defaulting to CLOCK_MONOTONIC";
 
+// CLOCK_MONOTONIC_COARSE was added in Linux 2.6.32. For now we still want to support
+// older kernels by falling back to CLOCK_MONOTONIC.
+#ifndef CLOCK_MONOTONIC_COARSE
+#define HAVE_CLOCK_MONOTONIC_COARSE true
+#else
+#define HAVE_CLOCK_MONOTONIC_COARSE false
+#define CLOCK_MONOTONIC_COARSE (-1)
+#endif
+
 void OsInfo::Init() {
   DCHECK(!initialized_);
   // Read from /proc/version
@@ -49,7 +58,7 @@ void OsInfo::Init() {
     std::string clocksource;
     clocksource_file >> clocksource;
     clock_name_ = "clocksource: '" + clocksource + "', clockid_t: ";
-    if (clocksource != "tsc") {
+    if (HAVE_CLOCK_MONOTONIC_COARSE && clocksource != "tsc") {
       clock_name_ += "CLOCK_MONOTONIC_COARSE";
       fast_clock_ = CLOCK_MONOTONIC_COARSE;
     } else {
