@@ -227,6 +227,16 @@ struct THdfsFileDesc {
   5: required list<THdfsFileBlock> file_blocks
 }
 
+// Represents an HDFS partition's location in a compressed format. 'prefix_index'
+// represents the portion of the partition's location that comes before the last N
+// directories, where N is the number of partitioning columns. 'prefix_index' is an index
+// into THdfsTable.partition_prefixes, or -1 if this location has not been compressed.
+// 'suffix' is the rest of the partition location.
+struct THdfsPartitionLocation {
+  1: required i32 prefix_index = -1
+  2: required string suffix
+}
+
 // Represents an HDFS partition
 struct THdfsPartition {
   1: required byte lineDelim
@@ -238,7 +248,7 @@ struct THdfsPartition {
   7: list<Exprs.TExpr> partitionKeyExprs
   8: required i32 blockSize
   9: optional list<THdfsFileDesc> file_desc
-  10: optional string location
+  10: optional THdfsPartitionLocation location
 
   // The access level Impala has on this partition (READ_WRITE, READ_ONLY, etc).
   11: optional TAccessLevel access_level
@@ -284,6 +294,10 @@ struct THdfsTable {
   // Indicates that this table's partitions reside on more than one filesystem.
   // TODO: remove once INSERT across filesystems is supported.
   8: optional bool multiple_filesystems
+
+  // The prefixes of locations of partitions in this table. See THdfsPartitionLocation for
+  // the description of how a prefix is computed.
+  9: optional list<string> partition_prefixes
 }
 
 struct THBaseTable {

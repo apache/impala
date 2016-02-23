@@ -222,7 +222,8 @@ class TableDescriptor {
 /// Metadata for a single partition inside an Hdfs table.
 class HdfsPartitionDescriptor {
  public:
-  HdfsPartitionDescriptor(const THdfsPartition& thrift_partition, ObjectPool* pool);
+  HdfsPartitionDescriptor(const THdfsTable& thrift_table,
+      const THdfsPartition& thrift_partition, ObjectPool* pool);
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
@@ -249,6 +250,8 @@ class HdfsPartitionDescriptor {
   char collection_delim_;
   char escape_char_;
   int block_size_;
+  // TODO: use the same representation as the Catalog does, in which common prefixes are
+  // stripped.
   std::string location_;
   int64_t id_;
 

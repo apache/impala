@@ -14,9 +14,9 @@
 
 package com.cloudera.impala.util;
 
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -33,23 +33,23 @@ import com.google.common.collect.Lists;
  */
 public class ListMap<T> {
   // Maps from Integer to T.
-  private List<T> list_ = Lists.newArrayList();
+  private ArrayList<T> list_ = Lists.newArrayList();
   // Maps from T to Integer.
   private final Map<T, Integer> map_ = Maps.newHashMap();
 
-  public List<T> getList() { return list_; }
+  public ArrayList<T> getList() { return list_; }
   public int size() { return list_.size(); }
 
   /**
    * Map from Integer index to T object.
    */
-  public T getEntry(Integer index) { return list_.get(index); }
+  public T getEntry(int index) { return list_.get(index); }
 
   /**
    * Map from T t to Integer index. If the mapping from t doesn't
    * exist, then create a new mapping from t to a unique index.
    */
-  public Integer getIndex(T t) {
+  public int getIndex(T t) {
     Integer index = map_.get(t);
     if (index == null) {
       // No match was found, add a new entry.
@@ -64,10 +64,8 @@ public class ListMap<T> {
    * Populate the bi-map from the given list.  Does not perform a copy
    * of the list.
    */
-  public void populate(List<T> list) {
+  public void populate(ArrayList<T> list) {
     Preconditions.checkState(list_.isEmpty() && map_.isEmpty());
-    // Require list to be an ArrayList so that getEntry() is fast.
-    Preconditions.checkState(list instanceof ArrayList<?>);
     list_ = list;
     for (int i = 0; i < list_.size(); ++i) {
       map_.put(list_.get(i), i);

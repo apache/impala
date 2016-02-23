@@ -139,7 +139,7 @@ class TestHdfsEncryption(ImpalaTestSuite):
   @SkipIfS3.hdfs_client
   @SkipIfIsilon.hdfs_encryption
   @pytest.mark.execute_serially
-  def test_alter_table_drop_partition_encrypt(self):
+  def test_drop_partition_encrypt(self):
     """Verifies if alter <tbl> drop partition purge works in case
     where the Trash dir and partition dir are in different encryption
     zones. Check CDH-31350 for details"""

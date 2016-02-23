@@ -54,6 +54,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsPartition;
+import com.cloudera.impala.thrift.THdfsPartitionLocation;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TLineageGraph;
@@ -138,10 +139,10 @@ public class PlannerTestBase {
   }
 
   /**
-   * Look up the partition corresponding to the plan node (identified by
-   * nodeId) and a file split.
+   * Look up the table corresponding to the plan node (identified by
+   * nodeId).
    */
-  private THdfsPartition findPartition(int nodeId, THdfsFileSplit split) {
+  private THdfsTable findTable(int nodeId) {
     TPlanNode node = planMap_.get(nodeId);
     Preconditions.checkNotNull(node);
     Preconditions.checkState(node.node_id == nodeId && node.isSetHdfs_scan_node());
@@ -154,7 +155,15 @@ public class PlannerTestBase {
     Preconditions.checkNotNull(tableDesc);
     Preconditions.checkState(tableDesc.id == tupleDesc.tableId &&
         tableDesc.isSetHdfsTable());
-    THdfsTable hdfsTable = tableDesc.getHdfsTable();
+    return tableDesc.getHdfsTable();
+  }
+
+  /**
+   * Look up the partition corresponding to the plan node (identified by
+   * nodeId) and a file split.
+   */
+  private THdfsPartition findPartition(int nodeId, THdfsFileSplit split) {
+    THdfsTable hdfsTable = findTable(nodeId);
     THdfsPartition partition = hdfsTable.getPartitions().get(split.partition_id);
     Preconditions.checkNotNull(partition);
     Preconditions.checkState(partition.id == split.partition_id);
@@ -163,7 +172,7 @@ public class PlannerTestBase {
 
   /**
    * Verify that all THdfsPartitions included in the descriptor table are referenced by
-   * at least one scan range or part of an inserted table.  PrintScanRangeLocations
+   * at least one scan range or part of an inserted table.  printScanRangeLocations()
    * will implicitly verify the converse (it'll fail if a scan range references a
    * table/partition descriptor that is not present).
    */
@@ -217,7 +226,7 @@ public class PlannerTestBase {
   /**
    * Construct a string representation of the scan ranges for this request.
    */
-  private StringBuilder PrintScanRangeLocations(TQueryExecRequest execRequest) {
+  private StringBuilder printScanRangeLocations(TQueryExecRequest execRequest) {
     StringBuilder result = new StringBuilder();
     if (execRequest.per_node_scan_ranges == null) {
       return result;
@@ -234,8 +243,15 @@ public class PlannerTestBase {
         result.append("  ");
         if (locations.scan_range.isSetHdfs_file_split()) {
           THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
-          THdfsPartition partition = findPartition(entry.getKey(), split);
-          Path filePath = new Path(partition.getLocation(), split.file_name);
+          THdfsTable table = findTable(entry.getKey());
+          THdfsPartition partition = table.getPartitions().get(split.partition_id);
+          THdfsPartitionLocation location = partition.getLocation();
+          String file_location = location.getSuffix();
+          if (location.prefix_index != -1) {
+            file_location =
+                table.getPartition_prefixes().get(location.prefix_index) + file_location;
+          }
+          Path filePath = new Path(file_location, split.file_name);
           filePath = cleanseFilePath(filePath);
           result.append("HDFS SPLIT " + filePath.toString() + " "
               + Long.toString(split.offset) + ":" + Long.toString(split.length));
@@ -485,7 +501,7 @@ public class PlannerTestBase {
         testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
       }
       locationsStr =
-          PrintScanRangeLocations(execRequest.query_exec_request).toString();
+          printScanRangeLocations(execRequest.query_exec_request).toString();
     }
 
     // compare scan range locations

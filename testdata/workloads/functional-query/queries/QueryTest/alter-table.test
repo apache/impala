@@ -831,3 +831,143 @@ show databases like 'test_alter_property_length_db'
 ---- TYPES
 STRING,STRING
 ====
+---- QUERY
+-- Change table location after a partition has been created in the original table location
+create table alter_table_test_db.change_loc (s string) partitioned by (i int);
+insert into alter_table_test_db.change_loc partition (i=1) values ('a');
+alter table alter_table_test_db.change_loc
+  set location '$FILESYSTEM_PREFIX/test-warehouse/alter_table_test_db.db/garbage';
+select * from alter_table_test_db.change_loc;
+---- RESULTS
+'a',1
+---- TYPES
+STRING,INT
+====
+---- QUERY
+-- ALTER TABLE .. SET LOCATION works when setting the location of a partition to be the
+-- the same as a partition of a different table with a different number of clustering
+-- columns.
+create table alter_table_test_db.table_one_part (s string) partitioned by (i int);
+create table alter_table_test_db.table_many_part (s string) partitioned by
+  (i0 int, i1 int, i2 int, i3 int, i4 int, i5 int, i6 int, i7 int, i8 int, i9 int);
+insert into alter_table_test_db.table_one_part partition (i=0) values ('a');
+insert into alter_table_test_db.table_one_part partition (i=1) values ('b');
+insert into alter_table_test_db.table_many_part partition
+  (i0=0, i1=1, i2=2, i3=3, i4=4, i5=5, i6=6, i7=7, i8=8, i9=9) values ('c');
+insert into alter_table_test_db.table_many_part partition
+  (i0=10, i1=11, i2=12, i3=13, i4=14, i5=15, i6=16, i7=17, i8=18, i9=19) values ('d');
+alter table alter_table_test_db.table_one_part partition (i=1)
+  set location '$FILESYSTEM_PREFIX/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19';
+alter table alter_table_test_db.table_many_part partition
+  (i0=10, i1=11, i2=12, i3=13, i4=14, i5=15, i6=16, i7=17, i8=18, i9=19)
+  set location '$FILESYSTEM_PREFIX/test-warehouse/alter_table_test_db.db/table_one_part/i=0/';
+select i,s from alter_table_test_db.table_one_part order by i;
+---- RESULTS
+0,'a'
+1,'d'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, s
+from alter_table_test_db.table_many_part order by i0;
+---- RESULTS
+0,1,2,3,4,5,6,7,8,9,'c'
+10,11,12,13,14,15,16,17,18,19,'a'
+---- TYPES
+INT,INT,INT,INT,INT,INT,INT,INT,INT,INT,STRING
+====
+---- QUERY
+show partitions alter_table_test_db.table_one_part
+---- RESULTS
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
+'Total',-1,2,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show partitions alter_table_test_db.table_many_part
+---- RESULTS
+'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
+'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'Total','','','','','','','','','',-1,2,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+-- Refreshing the tables does not create invalid partition locations
+refresh alter_table_test_db.table_one_part;
+refresh alter_table_test_db.table_many_part;
+select i,s from alter_table_test_db.table_one_part order by i;
+---- RESULTS
+0,'a'
+1,'d'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, s
+from alter_table_test_db.table_many_part order by i0;
+---- RESULTS
+0,1,2,3,4,5,6,7,8,9,'c'
+10,11,12,13,14,15,16,17,18,19,'a'
+---- TYPES
+INT,INT,INT,INT,INT,INT,INT,INT,INT,INT,STRING
+====
+---- QUERY
+show partitions alter_table_test_db.table_one_part
+---- RESULTS
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
+'Total',-1,2,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show partitions alter_table_test_db.table_many_part
+---- RESULTS
+'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
+'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'Total','','','','','','','','','',-1,2,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+-- Altering the table location does not alter the partition locations
+alter table alter_table_test_db.table_one_part set location '$FILESYSTEM_PREFIX/garbage/';
+alter table alter_table_test_db.table_many_part set location '$FILESYSTEM_PREFIX/garbage/';
+select i,s from alter_table_test_db.table_one_part order by i;
+---- RESULTS
+0,'a'
+1,'d'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, s
+from alter_table_test_db.table_many_part order by i0;
+---- RESULTS
+0,1,2,3,4,5,6,7,8,9,'c'
+10,11,12,13,14,15,16,17,18,19,'a'
+---- TYPES
+INT,INT,INT,INT,INT,INT,INT,INT,INT,INT,STRING
+====
+---- QUERY
+show partitions alter_table_test_db.table_one_part
+---- RESULTS
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
+'Total',-1,2,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show partitions alter_table_test_db.table_many_part
+---- RESULTS
+'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
+'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'Total','','','','','','','','','',-1,2,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====

@@ -65,6 +65,7 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsPartition;
+import com.cloudera.impala.thrift.THdfsPartitionLocation;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -174,9 +175,11 @@ public class HdfsTable extends Table {
   // replicas of the block.
   private final ListMap<TNetworkAddress> hostIndex_ = new ListMap<TNetworkAddress>();
 
+  private HdfsPartitionLocationCompressor partitionLocationCompressor_;
+
   // Map of file names to file descriptors for each partition location (directory).
-  private Map<String, Map<String, FileDescriptor>> perPartitionFileDescMap_ =
-      Maps.newHashMap();
+  private Map<String, Map<String, FileDescriptor>>
+      perPartitionFileDescMap_ = Maps.newHashMap();
 
   // Total number of Hdfs files in this table. Set in load().
   private long numHdfsFiles_;
@@ -246,6 +249,13 @@ public class HdfsTable extends Table {
       blocks.addAll(b);
       locations.addAll(l);
     }
+  }
+
+  public HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
+      Db db, String name, String owner) {
+    super(id, msTbl, db, name, owner);
+    partitionLocationCompressor_ =
+        new HdfsPartitionLocationCompressor(numClusteringCols_);
   }
 
   static {
@@ -461,11 +471,6 @@ public class HdfsTable extends Table {
     }
   }
 
-  public HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
-      Db db, String name, String owner) {
-    super(id, msTbl, db, name, owner);
-  }
-
   @Override
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.TABLE;
@@ -478,6 +483,9 @@ public class HdfsTable extends Table {
     return nameToPartitionMap_;
   }
   public Set<Long> getNullPartitionIds(int i) { return nullPartitionIds_.get(i); }
+  public HdfsPartitionLocationCompressor getPartitionLocationCompressor() {
+    return partitionLocationCompressor_;
+  }
   public Set<Long> getPartitionIds() { return partitionIds_; }
   public TreeMap<LiteralExpr, HashSet<Long>> getPartitionValueMap(int i) {
     return partitionValuesMap_.get(i);
@@ -818,10 +826,10 @@ public class HdfsTable extends Table {
           !FileSystemUtil.isPathOnFileSystem(new Path(getLocation()), fs);
       updatePartitionFds(partDirPath, isMarkedCached,
           fileFormatDescriptor.getFileFormat(), perFsFileBlocks);
-      HdfsPartition partition = new HdfsPartition(this, msPartition, keyValues,
-          fileFormatDescriptor,
-          perPartitionFileDescMap_.get(partDirPath.toString()).values(),
-          getAvailableAccessLevel(fs, partDirPath));
+      HdfsPartition partition =
+          new HdfsPartition(this, msPartition, keyValues, fileFormatDescriptor,
+              perPartitionFileDescMap_.get(partDirPath.toString()).values(),
+              getAvailableAccessLevel(fs, partDirPath));
       partition.checkWellFormed();
       return partition;
     } catch (IOException e) {
@@ -1253,6 +1261,7 @@ public class HdfsTable extends Table {
     }
     // The number of clustering columns is the number of partition keys.
     numClusteringCols_ = msTbl.getPartitionKeys().size();
+    partitionLocationCompressor_.setClusteringColumns(numClusteringCols_);
     clearColumns();
     // Add all columns to the table. Ordering is important: partition columns first,
     // then all other columns.
@@ -1373,8 +1382,8 @@ public class HdfsTable extends Table {
     totalHdfsBytes_ -= partition.getSize();
     Preconditions.checkState(numHdfsFiles_ >= 0 && totalHdfsBytes_ >= 0);
     updatePartitionFds(partDirPath, isMarkedCached, fileFormat, perFsFileBlocks);
-    List<FileDescriptor> fileDescs =
-        Lists.newArrayList(perPartitionFileDescMap_.get(partDirPath.toString()).values());
+    List<FileDescriptor> fileDescs = Lists.newArrayList(
+        perPartitionFileDescMap_.get(partDirPath.toString()).values());
     partition.setFileDescriptors(fileDescs);
     totalHdfsBytes_ += partition.getSize();
     numHdfsFiles_ += fileDescs.size();
@@ -1397,11 +1406,12 @@ public class HdfsTable extends Table {
     try {
       FileSystem fs = partitionPath.getFileSystem(CONF);
       if (!fs.exists(partitionPath)) {
-        perPartitionFileDescMap_.put(partPathStr,
-            Maps.<String, FileDescriptor>newHashMap());
+        perPartitionFileDescMap_.put(
+            partPathStr, Maps.<String, FileDescriptor>newHashMap());
         return;
       }
-      Map<String, FileDescriptor> fileDescMap = perPartitionFileDescMap_.get(partPathStr);
+      Map<String, FileDescriptor> fileDescMap =
+          perPartitionFileDescMap_.get(partPathStr);
       Map<String, FileDescriptor> newFileDescMap = Maps.newHashMap();
       // Get all the files in the partition directory
       for (FileStatus fileStatus: fs.listStatus(partitionPath)) {
@@ -1446,11 +1456,15 @@ public class HdfsTable extends Table {
       throws TableLoadingException {
     super.loadFromThrift(thriftTable);
     THdfsTable hdfsTable = thriftTable.getHdfs_table();
+    Preconditions.checkState(hdfsTable.getPartition_prefixes() instanceof ArrayList<?>);
+    partitionLocationCompressor_ = new HdfsPartitionLocationCompressor(
+        numClusteringCols_, (ArrayList<String>)hdfsTable.getPartition_prefixes());
     hdfsBaseDir_ = hdfsTable.getHdfsBaseDir();
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
     multipleFileSystems_ = hdfsTable.multiple_filesystems;
-    hostIndex_.populate(hdfsTable.getNetwork_addresses());
+    Preconditions.checkState(hdfsTable.getNetwork_addresses() instanceof ArrayList<?>);
+    hostIndex_.populate((ArrayList<TNetworkAddress>)hdfsTable.getNetwork_addresses());
     resetPartitions();
 
     try {
@@ -1522,6 +1536,7 @@ public class HdfsTable extends Table {
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
       hdfsTable.setNetwork_addresses(hostIndex_.getList());
     }
+    hdfsTable.setPartition_prefixes(partitionLocationCompressor_.getPrefixes());
     return hdfsTable;
   }
 

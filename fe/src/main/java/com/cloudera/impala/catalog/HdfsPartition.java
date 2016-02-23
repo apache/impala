@@ -41,6 +41,7 @@ import com.cloudera.impala.thrift.THdfsCompression;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
+import com.cloudera.impala.thrift.THdfsPartitionLocation;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionStats;
 import com.cloudera.impala.thrift.TTableStats;
@@ -266,7 +267,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   private final HdfsStorageDescriptor fileFormatDescriptor_;
   private List<FileDescriptor> fileDescriptors_;
-  private String location_;
+  private HdfsPartitionLocationCompressor.Location location_;
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
   private boolean isDirty_ = false;
   // True if this partition is marked as cached. Does not necessarily mean the data is
@@ -290,7 +291,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * Returns true if the partition resides at a location which can be cached (e.g. HDFS).
    */
   public boolean isCacheable() {
-    return FileSystemUtil.isPathCacheable(new Path(location_));
+    return FileSystemUtil.isPathCacheable(new Path(getLocation()));
   }
 
   /**
@@ -377,7 +378,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * Returns the storage location (HDFS path) of this partition. Should only be called
    * for partitioned tables.
    */
-  public String getLocation() { return location_; }
+  public String getLocation() {
+    return (location_ != null) ? location_.toString() : null;
+  }
   public long getId() { return id_; }
   public HdfsTable getTable() { return table_; }
   public void setNumRows(long numRows) { numRows_ = numRows; }
@@ -397,7 +400,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fileFormatDescriptor_.getFileFormat().serializationLib());
   }
 
-  public void setLocation(String location) { location_ = location; }
+  public void setLocation(String place) {
+    location_ = table_.getPartitionLocationCompressor().new Location(place);
+  }
 
   public org.apache.hadoop.hive.metastore.api.SerDeInfo getSerdeInfo() {
     return cachedMsPartitionDescriptor_.sdSerdeInfo;
@@ -534,7 +539,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     // Update the serde library class based on the currently used file format.
     org.apache.hadoop.hive.metastore.api.StorageDescriptor storageDescriptor =
         new org.apache.hadoop.hive.metastore.api.StorageDescriptor(
-            table_.getNonPartitionFieldSchemas(), location_,
+            table_.getNonPartitionFieldSchemas(),
+            getLocation(),
             cachedMsPartitionDescriptor_.sdInputFormat,
             cachedMsPartitionDescriptor_.sdOutputFormat,
             cachedMsPartitionDescriptor_.sdCompressed,
@@ -557,7 +563,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       Collection<HdfsPartition.FileDescriptor> fileDescriptors, long id,
-      String location, TAccessLevel accessLevel) {
+      HdfsPartitionLocationCompressor.Location location, TAccessLevel accessLevel) {
     table_ = table;
     if (msPartition == null) {
       cachedMsPartitionDescriptor_ = null;
@@ -597,8 +603,11 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       Collection<HdfsPartition.FileDescriptor> fileDescriptors,
       TAccessLevel accessLevel) {
     this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
-        partitionIdCounter_.getAndIncrement(), msPartition != null ?
-            msPartition.getSd().getLocation() : table.getLocation(), accessLevel);
+        partitionIdCounter_.getAndIncrement(),
+        table.getPartitionLocationCompressor().new Location(msPartition != null
+                ? msPartition.getSd().getLocation()
+                : table.getLocation()),
+        accessLevel);
   }
 
   public static HdfsPartition defaultPartition(
@@ -690,8 +699,12 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     TAccessLevel accessLevel = thriftPartition.isSetAccess_level() ?
         thriftPartition.getAccess_level() : TAccessLevel.READ_WRITE;
+    HdfsPartitionLocationCompressor.Location location = thriftPartition.isSetLocation()
+        ? table.getPartitionLocationCompressor().new Location(
+              thriftPartition.getLocation())
+        : null;
     HdfsPartition partition = new HdfsPartition(table, null, literalExpr, storageDesc,
-        fileDescriptors, id, thriftPartition.getLocation(), accessLevel);
+        fileDescriptors, id, location, accessLevel);
     if (thriftPartition.isSetStats()) {
       partition.setNumRows(thriftPartition.getStats().getNum_rows());
     }
@@ -735,7 +748,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fileFormatDescriptor_.getEscapeChar(),
         fileFormatDescriptor_.getFileFormat().toThrift(), thriftExprs,
         fileFormatDescriptor_.getBlockSize());
-    thriftHdfsPart.setLocation(location_);
+    if (location_ != null) thriftHdfsPart.setLocation(location_.toThrift());
     thriftHdfsPart.setStats(new TTableStats(numRows_));
     thriftHdfsPart.setAccess_level(accessLevel_);
     thriftHdfsPart.setIs_marked_cached(isMarkedCached_);

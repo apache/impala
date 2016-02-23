@@ -35,6 +35,27 @@ using boost::algorithm::join;
 using namespace llvm;
 using namespace strings;
 
+// In 'thrift_partition', the location is stored in a compressed format that references
+// the 'partition_prefixes' of 'thrift_table'. This function decompresses that format into
+// a string and stores it in 'result'. If 'location' is not set in the THdfsPartition,
+// 'result' is set to the empty string.
+static void DecompressLocation(const impala::THdfsTable& thrift_table,
+    const impala::THdfsPartition& thrift_partition, string* result) {
+  if (!thrift_partition.__isset.location) {
+    result->clear();
+    return;
+  }
+  *result = thrift_partition.location.suffix;
+  if (thrift_partition.location.prefix_index != -1) {
+    // -1 means an uncompressed location
+    DCHECK_GE(thrift_partition.location.prefix_index, 0);
+    DCHECK_LT(
+        thrift_partition.location.prefix_index, thrift_table.partition_prefixes.size());
+    *result =
+        thrift_table.partition_prefixes[thrift_partition.location.prefix_index] + *result;
+  }
+}
+
 namespace impala {
 
 const int RowDescriptor::INVALID_IDX;
@@ -142,21 +163,20 @@ string TableDescriptor::DebugString() const {
   return out.str();
 }
 
-HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_partition,
-    ObjectPool* pool)
+HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsTable& thrift_table,
+    const THdfsPartition& thrift_partition, ObjectPool* pool)
   : line_delim_(thrift_partition.lineDelim),
     field_delim_(thrift_partition.fieldDelim),
     collection_delim_(thrift_partition.collectionDelim),
     escape_char_(thrift_partition.escapeChar),
     block_size_(thrift_partition.blockSize),
-    location_(thrift_partition.location),
     id_(thrift_partition.id),
     exprs_prepared_(false),
     exprs_opened_(false),
     exprs_closed_(false),
     file_format_(thrift_partition.fileFormat),
     object_pool_(pool) {
-
+  DecompressLocation(thrift_table, thrift_partition, &location_);
   for (int i = 0; i < thrift_partition.partitionKeyExprs.size(); ++i) {
     ExprContext* ctx;
     // TODO: Move to dedicated Init method and treat Status return correctly
@@ -216,7 +236,8 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
   map<int64_t, THdfsPartition>::const_iterator it;
   for (it = tdesc.hdfsTable.partitions.begin(); it != tdesc.hdfsTable.partitions.end();
        ++it) {
-    HdfsPartitionDescriptor* partition = new HdfsPartitionDescriptor(it->second, pool);
+    HdfsPartitionDescriptor* partition =
+        new HdfsPartitionDescriptor(tdesc.hdfsTable, it->second, pool);
     object_pool_->Add(partition);
     partition_descriptors_[it->first] = partition;
   }

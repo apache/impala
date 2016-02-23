@@ -310,7 +310,7 @@ class TestDdlStatements(ImpalaTestSuite):
   @SkipIfS3.hdfs_client # S3: missing coverage: alter table drop partition
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
-  def test_alter_table_drop_partition_with_purge(self, vector):
+  def test_drop_partition_with_purge(self, vector):
     """Verfies whether alter <tbl> drop partition purge actually skips trash"""
     ALTER_PURGE_DB = "alter_purge_db"
     # Create a sample database alter_purge_db and table t1 in it

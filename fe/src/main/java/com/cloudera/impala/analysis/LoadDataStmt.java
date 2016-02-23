@@ -193,7 +193,7 @@ public class LoadDataStmt extends StatementBase {
         partition = hdfsTable.getPartition(partitionSpec_.getPartitionSpecKeyValues());
         location = partition.getLocation();
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
-          throw new AnalysisException(noWriteAccessErrorMsg + partition.getLocation());
+          throw new AnalysisException(noWriteAccessErrorMsg + location);
         }
       } else {
         // "default" partition
