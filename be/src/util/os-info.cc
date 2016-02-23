@@ -34,11 +34,11 @@ std::string OsInfo::clock_name_ =
 
 // CLOCK_MONOTONIC_COARSE was added in Linux 2.6.32. For now we still want to support
 // older kernels by falling back to CLOCK_MONOTONIC.
-#ifndef CLOCK_MONOTONIC_COARSE
+#ifdef CLOCK_MONOTONIC_COARSE
 #define HAVE_CLOCK_MONOTONIC_COARSE true
 #else
 #define HAVE_CLOCK_MONOTONIC_COARSE false
-#define CLOCK_MONOTONIC_COARSE (-1)
+#define CLOCK_MONOTONIC_COARSE CLOCK_MONOTONIC
 #endif
 
 void OsInfo::Init() {
