@@ -821,6 +821,8 @@ revoke_privilege_stmt ::=
 privilege_spec ::=
   privilege:priv KW_ON server_ident:server_kw
   {: RESULT = PrivilegeSpec.createServerScopedPriv(priv); :}
+  | privilege:priv KW_ON server_ident:server_kw IDENT:server_name
+  {: RESULT = PrivilegeSpec.createServerScopedPriv(priv, server_name); :}
   | privilege:priv KW_ON KW_DATABASE IDENT:db_name
   {: RESULT = PrivilegeSpec.createDbScopedPriv(priv, db_name); :}
   | privilege:priv KW_ON KW_TABLE table_name:tbl_name

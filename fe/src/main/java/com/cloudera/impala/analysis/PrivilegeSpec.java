@@ -48,11 +48,13 @@ public class PrivilegeSpec implements ParseNode {
   private String serverName_;
 
   private PrivilegeSpec(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
-      String dbName, TableName tableName, HdfsUri uri, List<String> columnNames) {
+      String serverName, String dbName, TableName tableName, HdfsUri uri,
+      List<String> columnNames) {
     Preconditions.checkNotNull(scope);
     Preconditions.checkNotNull(privilegeLevel);
     privilegeLevel_ = privilegeLevel;
     scope_ = scope;
+    serverName_ = serverName;
     tableName_ = tableName;
     dbName_ = (tableName_ != null ? tableName_.getDb() : dbName);
     uri_ = uri;
@@ -60,21 +62,26 @@ public class PrivilegeSpec implements ParseNode {
   }
 
   public static PrivilegeSpec createServerScopedPriv(TPrivilegeLevel privilegeLevel) {
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.SERVER, null, null, null,
-        null);
+    return createServerScopedPriv(privilegeLevel, null);
+  }
+
+  public static PrivilegeSpec createServerScopedPriv(TPrivilegeLevel privilegeLevel,
+      String serverName) {
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.SERVER, serverName, null,
+        null, null, null);
   }
 
   public static PrivilegeSpec createDbScopedPriv(TPrivilegeLevel privilegeLevel,
       String dbName) {
     Preconditions.checkNotNull(dbName);
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.DATABASE, dbName, null,
-        null, null);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.DATABASE, null, dbName,
+        null, null, null);
   }
 
   public static PrivilegeSpec createTableScopedPriv(TPrivilegeLevel privilegeLevel,
       TableName tableName) {
     Preconditions.checkNotNull(tableName);
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.TABLE, null, tableName,
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.TABLE, null, null, tableName,
         null, null);
   }
 
@@ -82,14 +89,15 @@ public class PrivilegeSpec implements ParseNode {
         TableName tableName, List<String> columnNames) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(columnNames);
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.COLUMN, null, tableName,
-        null, columnNames);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.COLUMN, null, null,
+        tableName, null, columnNames);
   }
 
   public static PrivilegeSpec createUriScopedPriv(TPrivilegeLevel privilegeLevel,
       HdfsUri uri) {
     Preconditions.checkNotNull(uri);
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.URI, null, null, uri, null);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.URI, null, null, null, uri,
+        null);
   }
 
   public List<TPrivilege> toThrift() {
@@ -142,7 +150,9 @@ public class PrivilegeSpec implements ParseNode {
     StringBuilder sb = new StringBuilder(privilegeLevel_.toString());
     sb.append(" ON ");
     sb.append(scope_.toString());
-    if (scope_ == TPrivilegeScope.DATABASE) {
+    if (scope_ == TPrivilegeScope.SERVER && serverName_ != null) {
+      sb.append(" " + serverName_);
+    } else if (scope_ == TPrivilegeScope.DATABASE) {
       sb.append(" " + dbName_);
     } else if (scope_ == TPrivilegeScope.TABLE) {
       sb.append(" " + tableName_.toString());
@@ -159,7 +169,12 @@ public class PrivilegeSpec implements ParseNode {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    serverName_ = analyzer.getAuthzConfig().getServerName();
+    String configServerName = analyzer.getAuthzConfig().getServerName();
+    if (serverName_ != null && !serverName_.equals(configServerName)) {
+      throw new AnalysisException(String.format("Specified server name '%s' does not " +
+          "match the configured server name '%s'", serverName_, configServerName));
+    }
+    serverName_ = configServerName;
     Preconditions.checkState(!Strings.isNullOrEmpty(serverName_));
     Preconditions.checkNotNull(scope_);
 

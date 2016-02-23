@@ -666,6 +666,34 @@ scope, database, table, column, uri, privilege, grant_option, create_time
 STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+====
+---- QUERY
+# Test 'grant all on server' with explicit server name specified.
+create role grant_revoke_test_ALL_SERVER1
+---- RESULTS
+====
+---- QUERY
+grant all on server server1 to grant_revoke_test_ALL_SERVER1
+====
+---- QUERY
+grant role grant_revoke_test_ALL_SERVER1 to group $GROUP_NAME
+====
+---- QUERY
+drop database grant_rev_db cascade
+====
+---- QUERY
+create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_db.db'
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER1 from group $GROUP_NAME
+====
+---- QUERY
+create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_db.db'
+---- CATCH
+does not have privileges to execute 'CREATE' on: grant_rev_db
+====
+---- QUERY
 # Cleanup test roles
 drop role grant_revoke_test_ALL_SERVER;
 drop role grant_revoke_test_SELECT_INSERT_TEST_TBL;
