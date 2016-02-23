@@ -383,23 +383,31 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Cached runtime filter contexts, one for each filter that applies to this column.
   vector<const FilterContext*> filter_ctxs_;
 
-  /// filter_enabled_[i] is true if filter in filter_ctxs_ should be applied, false if it
-  /// was ineffective and was disabled.
-  vector<bool> filter_enabled_;
+  struct LocalFilterStats {
+    /// Total number of rows to which each filter was applied
+    int64_t considered;
+
+    /// Total number of rows that each filter rejected.
+    int64_t rejected;
+
+    /// Total number of rows that each filter could have been applied to (if it were
+    /// available from row 0).
+    int64_t total_possible;
+
+    /// Use known-width type to act as logical boolean.  Set to 1 if corresponding filter
+    /// in filter_ctxs_ should be applied, 0 if it was ineffective and was disabled.
+    uint8_t enabled;
+
+    /// Padding to ensure structs do not straddle cache-line boundary.
+    uint8_t padding[7];
+
+    LocalFilterStats() : considered(0), rejected(0), total_possible(0), enabled(1) { }
+  };
 
   /// Track statistics of each filter (one for each filter in filter_ctxs_) per scanner so
   /// that expensive aggregation up to the scan node can be performed once, during
   /// Close().
-
-  /// Total number of rows to which each filter was applied
-  vector<int64_t> filter_rows_considered_;
-
-  /// Total number of rows that each filter rejected.
-  vector<int64_t> filter_rows_rejected_;
-
-  /// Total number of rows that each filter could have been applied to (if it were
-  /// available from row 0).
-  vector<int64_t> filter_rows_total_possible_;
+  vector<LocalFilterStats> filter_stats_;
 
   /// Column reader for each materialized columns for this file.
   std::vector<ColumnReader*> column_readers_;

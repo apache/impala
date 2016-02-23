@@ -877,12 +877,8 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
     DCHECK(ctx->filter != NULL);
     const TRuntimeFilterDesc& desc = ctx->filter->filter_desc();
     filter_ctxs_.push_back(ctx);
-    filter_enabled_.push_back(true);
   }
-  filter_rows_total_possible_.resize(filter_ctxs_.size(), 0);
-  filter_rows_considered_.resize(filter_ctxs_.size(), 0);
-  filter_rows_rejected_.resize(filter_ctxs_.size(), 0);
-
+  filter_stats_.resize(filter_ctxs_.size());
   return Status::OK();
 }
 
@@ -924,9 +920,9 @@ void HdfsParquetScanner::Close() {
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;
-    stats->IncrCounters(FilterStats::ROWS_KEY,
-        filter_rows_total_possible_[i], filter_rows_considered_[i],
-        filter_rows_rejected_[i]);
+    const LocalFilterStats& local = filter_stats_[i];
+    stats->IncrCounters(FilterStats::ROWS_KEY, local.total_possible,
+        local.considered, local.rejected);
   }
 
   HdfsScanner::Close();
@@ -1687,7 +1683,8 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
   DCHECK(!column_readers.empty());
   bool continue_execution = true;
   bool conjuncts_passed = true;
-  for (int c = 0; c < column_readers.size(); ++c) {
+  int size = column_readers.size();
+  for (int c = 0; c < size; ++c) {
     ColumnReader* col_reader = column_readers[c];
     if (!IN_COLLECTION) {
       DCHECK(*materialize_tuple);
@@ -1714,24 +1711,25 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
 
   if (!IN_COLLECTION && *materialize_tuple) {
     TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&tuple);
-    for (int i = 0; i < filter_ctxs_.size(); ++i) {
-      if (!filter_enabled_[i]) continue;
-      ++filter_rows_total_possible_[i];
+    int num_filters = filter_ctxs_.size();
+    for (int i = 0; i < num_filters; ++i) {
+      LocalFilterStats* stats = &filter_stats_[i];
+      if (!stats->enabled) continue;
+      ++stats->total_possible;
       // Check filter effectiveness every ROWS_PER_FILTER_SELECTIVITY_CHECK rows.
       if (UNLIKELY(
-          !(filter_rows_total_possible_[i] & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
-        double reject_ratio =
-            filter_rows_rejected_[i] / static_cast<double>(filter_rows_considered_[i]);
+          !(stats->total_possible & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
+        double reject_ratio = stats->rejected / static_cast<double>(stats->considered);
         if (reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
-          filter_enabled_[i] = false;
+          stats->enabled = 0;
           continue;
         }
       }
-      ++filter_rows_considered_[i];
+      ++stats->considered;
       const RuntimeFilter* filter = filter_ctxs_[i]->filter;
       void* e = filter_ctxs_[i]->expr->GetValue(tuple_row_mem);
       if (!filter->Eval<void>(e, filter_ctxs_[i]->expr->root()->type())) {
-        ++filter_rows_rejected_[i];
+        ++stats->rejected;
         *materialize_tuple = false;
         break;
       }
