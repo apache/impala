@@ -26,8 +26,8 @@ import com.cloudera.impala.analysis.AnalyticWindow.Boundary;
 import com.cloudera.impala.analysis.AnalyticWindow.BoundaryType;
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -671,7 +671,9 @@ public class AnalyticExpr extends Expr {
       }
       fnCall_.setIsAnalyticFnCall(true);
       fnCall_.analyzeNoThrow(analyzer);
-      type_ = fnCall_.getReturnType();
+      // Use getType() instead if getReturnType() because wildcard decimals
+      // have only been resolved in the former.
+      type_ = fnCall_.getType();
       analyticFnName = getFnCall().getFnName();
     }
 

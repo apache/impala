@@ -33,13 +33,13 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -854,6 +854,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "select count(t1.int_col_1) as int_col_1 from t t1 where t1.int_col_1 is null "
         + "group by t1.int_col_1 union all "
         + "select min(t1.day) over () from functional.alltypesagg t1");
+    // IMPALA-2532: Resolve wildcard decimals returned from first_value().
+    AnalyzesOk("select 1 in " +
+        "(first_value(cast(int_col AS DECIMAL)) " +
+        " over (order by int_col rows between 2 preceding and 1 preceding)) " +
+        "from functional.alltypestiny");
     // IMPALA-1354: Constant expressions in order by and partition by exprs
     AnalysisError(
         "select rank() over (order by 1) from functional.alltypestiny",
