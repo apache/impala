@@ -45,7 +45,8 @@ OS_MAPPING = {
   "suselinux11": "ec2-package-sles-11",
   "suselinux12": "ec2-package-sles-12",
   "ubuntu12.04" : "ec2-package-ubuntu-12-04",
-  "ubuntu14.04" : "ec2-package-ubuntu-14-04"
+  "ubuntu14.04" : "ec2-package-ubuntu-14-04",
+  "ubuntu15.04" : "ec2-package-ubuntu-14-04"
 }
 
 def try_get_release_label():
