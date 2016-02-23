@@ -563,7 +563,14 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where int_col is null");
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
     AnalyzesOk("select * from functional.alltypes where null is not null");
-    AnalyzesOk("select 1 from functional.allcomplextypes where int_map_col is null");
+    AnalysisError("select 1 from functional.allcomplextypes where int_map_col is null",
+        "IS NULL predicate does not support complex types: int_map_col IS NULL");
+    AnalysisError("select * from functional.allcomplextypes where complex_struct_col " +
+        "is null", "IS NULL predicate does not support complex types: " +
+            "complex_struct_col IS NULL");
+    AnalysisError("select * from functional.allcomplextypes where nested_struct_col " +
+        "is not null", "IS NOT NULL predicate does not support complex types: " +
+            "nested_struct_col IS NOT NULL");
   }
 
   @Test

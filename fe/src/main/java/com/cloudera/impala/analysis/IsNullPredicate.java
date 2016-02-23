@@ -120,6 +120,12 @@ public class IsNullPredicate extends Predicate {
       uncheckedCastChild(ScalarType.BOOLEAN, 0);
     }
 
+    if (getChild(0).getType().isComplexType()) {
+      String errorMsg = (isNotNull_ ? "IS NOT NULL" : "IS NULL") +
+         " predicate does not support complex types: ";
+      throw new AnalysisException(errorMsg + toSqlImpl());
+    }
+
     if (isNotNull_) {
       fn_ = getBuiltinFunction(
           analyzer, IS_NOT_NULL, collectChildReturnTypes(), CompareMode.IS_IDENTICAL);
