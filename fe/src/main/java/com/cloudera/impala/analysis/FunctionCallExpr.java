@@ -66,7 +66,7 @@ public class FunctionCallExpr extends Expr {
     fnName_ = fnName;
     params_ = params;
     isMergeAggFn_ = isMergeAggFn;
-    if (params.exprs() != null) children_.addAll(params.exprs());
+    if (params.exprs() != null) children_ = params_.exprs();
   }
 
   /**
@@ -119,8 +119,14 @@ public class FunctionCallExpr extends Expr {
     isAnalyticFnCall_ = other.isAnalyticFnCall_;
     isInternalFnCall_ = other.isInternalFnCall_;
     isMergeAggFn_ = other.isMergeAggFn_;
-    // No need to deep clone the params, its exprs are already in children_.
-    params_ = other.params_;
+    // Clone the params in a way that keeps the children_ and the params.exprs()
+    // in sync. The children have already been cloned in the super c'tor.
+    if (other.params_.isStar()) {
+      Preconditions.checkState(children_.isEmpty());
+      params_ = FunctionParams.createStarParam();
+    } else {
+      params_ = new FunctionParams(other.params_.isDistinct(), children_);
+    }
     label_ = other.label_;
   }
 

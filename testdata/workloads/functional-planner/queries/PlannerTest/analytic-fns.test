@@ -2161,3 +2161,23 @@ on (a.id = b.id and b.int_col < 10)
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
 ====
+# IMPALA-2832: Test proper cloning of analytic function call exprs in a CTAS.
+create table impala_2832 as select
+first_value(int_col) over (order by int_col rows between current row and current row),
+first_value(bigint_col) over (order by int_col rows between current row and current row)
+from functional.alltypes
+---- PLAN
+WRITE TO HDFS [default.impala_2832, OVERWRITE=false]
+|  partitions=1
+|
+02:ANALYTIC
+|  functions: last_value(int_col), last_value(bigint_col)
+|  order by: int_col ASC
+|  window: ROWS BETWEEN CURRENT ROW AND CURRENT ROW
+|
+01:SORT
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

@@ -22,7 +22,7 @@ import com.cloudera.impala.util.Visitor;
 import com.google.common.base.Predicate;
 
 public class TreeNode<NodeType extends TreeNode<NodeType>> {
-  protected ArrayList<NodeType> children_;
+  protected List<NodeType> children_;
 
   protected TreeNode() {
     this.children_ = new ArrayList<NodeType>();
@@ -30,10 +30,6 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
 
   public NodeType getChild(int i) {
     return hasChild(i) ? children_.get(i) : null;
-  }
-
-  public boolean hasChild(int i) {
-    return children_.size() > i;
   }
 
   public void addChild(NodeType n) {
@@ -44,13 +40,9 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     children_.addAll(l);
   }
 
-  public void setChild(int index, NodeType n) {
-    children_.set(index, n);
-  }
-
-  public ArrayList<NodeType> getChildren() {
-    return children_;
-  }
+  public boolean hasChild(int i) { return children_.size() > i; }
+  public void setChild(int index, NodeType n) { children_.set(index, n); }
+  public List<NodeType> getChildren() { return children_; }
 
   /**
    * Count the total number of nodes in this tree. Leaf node will return 1.
