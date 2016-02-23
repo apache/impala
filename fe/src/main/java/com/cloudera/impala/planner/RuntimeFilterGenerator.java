@@ -411,7 +411,7 @@ public final class RuntimeFilterGenerator {
           }
         }
         Preconditions.checkState(exprSlots.size() == smap.size());
-        filter.setTargetExpr(targetExpr.substitute(smap, analyzer, false));
+        filter.setTargetExpr(targetExpr.substitute(smap, analyzer, true));
       }
       filter.setFilterTarget(scanNode, analyzer);
       filter.assignToPlanNodes();
