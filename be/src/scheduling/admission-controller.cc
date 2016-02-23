@@ -98,12 +98,14 @@ const string POOL_MAX_QUEUED_METRIC_KEY_FORMAT =
 const string QUERY_EVENT_SUBMIT_FOR_ADMISSION = "Submit for admission";
 const string QUERY_EVENT_COMPLETED_ADMISSION = "Completed admission";
 
-// Profile info string for admission result
+// Profile info strings
 const string PROFILE_INFO_KEY_ADMISSION_RESULT = "Admission result";
 const string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY = "Admitted immediately";
 const string PROFILE_INFO_VAL_ADMIT_QUEUED = "Admitted (queued)";
 const string PROFILE_INFO_VAL_REJECTED = "Rejected";
 const string PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
+const string PROFILE_INFO_KEY_QUEUE_DETAIL = "Admission queue details";
+const string PROFILE_INFO_VAL_QUEUE_DETAIL = "waited $0 ms, reason: $1";
 
 // Error status string formats
 // $0 = pool, $1 = rejection reason (see REASON_XXX below)
@@ -472,6 +474,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   bool timed_out;
   queue_node.is_admitted.Get(queue_wait_timeout_ms, &timed_out);
   int64_t wait_time_ms = MonotonicMillis() - wait_start_ms;
+  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
+      Substitute(PROFILE_INFO_VAL_QUEUE_DETAIL, wait_time_ms, not_admitted_reason));
 
   // Take the lock in order to check the result of is_admitted as there could be a race
   // with the timeout. If the Get() timed out, then we need to dequeue the request.
