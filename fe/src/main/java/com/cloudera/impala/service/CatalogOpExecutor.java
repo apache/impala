@@ -22,10 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -71,8 +67,8 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.catalog.IncompleteTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.catalog.PartitionStatsUtil;
 import com.cloudera.impala.catalog.PartitionNotFoundException;
+import com.cloudera.impala.catalog.PartitionStatsUtil;
 import com.cloudera.impala.catalog.Role;
 import com.cloudera.impala.catalog.RolePrivilege;
 import com.cloudera.impala.catalog.RowFormat;
@@ -94,7 +90,6 @@ import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
 import com.cloudera.impala.thrift.TAlterTableChangeColParams;
 import com.cloudera.impala.thrift.TAlterTableDropColParams;
 import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
-import com.cloudera.impala.thrift.TAlterTableOrViewRenameParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetCachedParams;
 import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
@@ -126,7 +121,6 @@ import com.cloudera.impala.thrift.TDropStatsParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
@@ -1518,7 +1512,7 @@ public class CatalogOpExecutor {
       if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
         fs.setName(newCol.getColumnName());
         Type type = Type.fromThrift(newCol.getColumnType());
-        fs.setType(type.toString().toLowerCase());
+        fs.setType(type.toSql().toLowerCase());
         // Don't overwrite the existing comment unless a new comment is given
         if (newCol.getComment() != null) {
           fs.setComment(newCol.getComment());
