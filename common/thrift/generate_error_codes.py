@@ -223,7 +223,10 @@ error_codes = (
    "File appears corrupted. file=$0"),
 
   ("COMPRESSED_FILE_TRUNCATED", 71,
-   "Unexpected end of compressed file. File may be truncated. file=$0")
+   "Unexpected end of compressed file. File may be truncated. file=$0"),
+
+  ("DATASTREAM_SENDER_TIMEOUT", 72, "Sender timed out waiting for receiver fragment "
+   "instance: $0")
 )
 
 import sys

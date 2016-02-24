@@ -55,7 +55,7 @@ using namespace apache::thrift::protocol;
 
 DEFINE_int32(port, 20001, "port on which to run Impala test backend");
 DECLARE_string(principal);
-DECLARE_int32(datastream_timeout_ms);
+DECLARE_int32(datastream_sender_timeout_ms);
 
 // We reserve contiguous memory for senders in SetUp. If a test uses more
 // senders, a DCHECK will fail and you should increase this value.
@@ -114,8 +114,8 @@ class DataStreamTest : public testing::Test {
     exec_env_.InitForFeTests();
     runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
 
-    // Stop tests that rely on mismatched sender / receiver pairs timing out.
-    FLAGS_datastream_timeout_ms = 250;
+    // Stop tests that rely on mismatched sender / receiver pairs timing out from failing.
+    FLAGS_datastream_sender_timeout_ms = 250;
   }
 
   virtual void SetUp() {
@@ -526,26 +526,25 @@ class DataStreamTest : public testing::Test {
 };
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {
-  // starting a sender w/o a corresponding receiver does not result in an error because
-  // we cannot distinguish whether a receiver was never created or the receiver
-  // willingly tore down the stream
-  // case 1: entire query result fits in single buffer, close() returns ok
+  // starting a sender w/o a corresponding receiver results in an error. No bytes should
+  // be sent.
+  // case 1: entire query result fits in single buffer
   TUniqueId dummy_id;
   GetNextInstanceId(&dummy_id);
   StartSender(TPartitionType::UNPARTITIONED, TOTAL_DATA_SIZE + 1024);
   JoinSenders();
-  EXPECT_OK(sender_info_[0].status);
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
+  EXPECT_EQ(sender_info_[0].status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
+  EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
 }
 
 TEST_F(DataStreamTest, UnknownSenderLargeResult) {
-  // case 2: query result requires multiple buffers, send() returns ok
+  // case 2: query result requires multiple buffers
   TUniqueId dummy_id;
   GetNextInstanceId(&dummy_id);
   StartSender();
   JoinSenders();
-  EXPECT_OK(sender_info_[0].status);
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
+  EXPECT_EQ(sender_info_[0].status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
+  EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
 }
 
 TEST_F(DataStreamTest, Cancel) {

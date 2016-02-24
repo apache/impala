@@ -158,14 +158,23 @@ class DataStreamMgr {
   boost::shared_ptr<DataStreamRecvr> FindRecvr(const TUniqueId& fragment_instance_id,
       PlanNodeId node_id, bool acquire_lock = true);
 
-  /// Calls FindRecvr(), but if NULL is returned, wait for up to 60s for the receiver to
-  /// be registered.  Senders may initialise and start sending row batches before a
-  /// receiver is ready. To accommodate this, we allow senders to establish a rendezvous
-  /// between them and the receiver. When the receiver arrives, it triggers the
-  /// rendezvous, and all waiting senders can proceed. A sender that waits for too long
-  /// (60s by default) will eventually time out and abort.
+  /// Calls FindRecvr(), but if NULL is returned, wait for up to
+  /// FLAGS_datastream_sender_timeout_ms for the receiver to be registered.  Senders may
+  /// initialise and start sending row batches before a receiver is ready. To accommodate
+  /// this, we allow senders to establish a rendezvous between them and the receiver. When
+  /// the receiver arrives, it triggers the rendezvous, and all waiting senders can
+  /// proceed. A sender that waits for too long (120s by default) will eventually time out
+  /// and abort. The output parameter 'already_unregistered' distinguishes between the two
+  /// cases in which this method returns NULL:
+  ///
+  /// 1. *already_unregistered == true: the receiver had previously arrived and was
+  /// already closed
+  ///
+  /// 2. *already_unregistered == false: the receiver has yet to arrive when this method
+  /// returns, and the timeout has expired
   boost::shared_ptr<DataStreamRecvr> FindRecvrOrWait(
-      const TUniqueId& fragment_instance_id, PlanNodeId node_id);
+      const TUniqueId& fragment_instance_id, PlanNodeId node_id,
+      bool* already_unregistered);
 
   /// Remove receiver block for fragment_instance_id/node_id from the map.
   Status DeregisterRecvr(const TUniqueId& fragment_instance_id, PlanNodeId node_id);

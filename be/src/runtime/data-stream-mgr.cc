@@ -35,10 +35,18 @@
 using namespace apache::thrift;
 using std::boolalpha;
 
-DEFINE_int32(datastream_timeout_ms, 60000, "(Advanced) The time, in ms, that can elapse"
-    " before a plan fragment will time-out trying to send the initial row batch.");
+DEFINE_int32(datastream_sender_timeout_ms, 120000, "(Advanced) The time, in ms, that can "
+    "elapse  before a plan fragment will time-out trying to send the initial row batch.");
 
-const int32_t STREAM_EXPIRATION_TIME_MS = 30 * 1000;
+/// This parameter controls the minimum amount of time a closed stream ID will stay in
+/// closed_stream_cache_ before it is evicted. It needs to be set sufficiently high that
+/// it will outlive all the calls to FindRecvrOrWait() for that stream ID, to distinguish
+/// between was-here-but-now-gone and never-here states for the receiver. If the stream ID
+/// expires before a call to FindRecvrOrWait(), the sender will see an error which will
+/// lead to query cancellation. Setting this value higher will increase the size of the
+/// stream cache (which is roughly 48 bytes per receiver).
+/// TODO: We don't need millisecond precision here.
+const int32_t STREAM_EXPIRATION_TIME_MS = 300 * 1000;
 
 namespace impala {
 
@@ -84,12 +92,15 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::CreateRecvr(RuntimeState* state,
 }
 
 shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
-    const TUniqueId& fragment_instance_id, PlanNodeId node_id) {
+    const TUniqueId& fragment_instance_id, PlanNodeId node_id,
+    bool* already_unregistered) {
   RefCountedPromise* promise = NULL;
   RecvrId promise_key = make_pair(fragment_instance_id, node_id);
+  *already_unregistered = false;
   {
     lock_guard<SpinLock> l(lock_);
     if (closed_stream_cache_.find(promise_key) != closed_stream_cache_.end()) {
+      *already_unregistered = true;
       return shared_ptr<DataStreamRecvr>();
     }
     shared_ptr<DataStreamRecvr> rcvr = FindRecvr(fragment_instance_id, node_id, false);
@@ -104,13 +115,12 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
   num_senders_waiting_->Increment(1L);
   total_senders_waited_->Increment(1L);
   shared_ptr<DataStreamRecvr> recvr =
-      promise->promise->Get(FLAGS_datastream_timeout_ms, &timed_out);
+      promise->promise->Get(FLAGS_datastream_sender_timeout_ms, &timed_out);
   num_senders_waiting_->Increment(-1L);
   const string& time_taken = PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
   if (timed_out) {
     LOG(INFO) << "Datastream sender timed-out waiting for recvr for fragment instance: "
-              << fragment_instance_id << " (time-out was: " << time_taken << "). "
-              << "If query was cancelled, this is not an error.";
+              << fragment_instance_id << " (time-out was: " << time_taken << "). ";
   } else {
     VLOG_RPC << "Datastream sender waited for " << time_taken
              << ", and did not time-out.";
@@ -151,17 +161,22 @@ Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
   VLOG_ROW << "AddData(): fragment_instance_id=" << fragment_instance_id
            << " node=" << dest_node_id
            << " size=" << RowBatch::GetBatchSize(thrift_batch);
-  shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id);
+  bool already_unregistered;
+  shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
+      &already_unregistered);
   if (recvr.get() == NULL) {
-    // The receiver may remove itself from the receiver map via DeregisterRecvr()
-    // at any time without considering the remaining number of senders.
-    // As a consequence, FindRecvrOrWait() may return an innocuous NULL if a thread
-    // calling DeregisterRecvr() beat the thread calling FindRecvr()
-    // in acquiring lock_.
-    // TODO: Rethink the lifecycle of DataStreamRecvr to distinguish
-    // errors from receiver-initiated teardowns.
-    return Status::OK();
+    // The receiver may remove itself from the receiver map via DeregisterRecvr() at any
+    // time without considering the remaining number of senders.  As a consequence,
+    // FindRecvrOrWait() may return NULL if a thread calling DeregisterRecvr() beat the
+    // thread calling FindRecvr() in acquiring lock_. We detect this case by checking
+    // already_unregistered - if true then the receiver was already closed deliberately,
+    // and there's no unexpected error here. If already_unregistered is false,
+    // FindRecvrOrWait() timed out, which is unexpected and suggests a query setup error;
+    // we return DATASTREAM_SENDER_TIMEOUT to trigger tear-down of the query.
+    return already_unregistered ? Status::OK() :
+        Status(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
   }
+  DCHECK(!already_unregistered);
   recvr->AddBatch(thrift_batch, sender_id);
   return Status::OK();
 }
@@ -170,16 +185,10 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int sender_id) {
   VLOG_FILE << "CloseSender(): fragment_instance_id=" << fragment_instance_id
             << ", node=" << dest_node_id;
-  shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id);
-  if (recvr.get() != NULL) {
-    // The receiver may remove itself from the receiver map via DeregisterRecvr() at any
-    // time without considering the remaining number of senders.  As a consequence,
-    // FindRecvrOrWait() may return an innocuous NULL if a thread calling
-    // DeregisterRecvr() beat the thread calling FindRecvr() in acquiring lock_.
-    // TODO: Rethink the lifecycle of DataStreamRecvr to distinguish errors from
-    // receiver-initiated teardowns.
-    recvr->RemoveSender(sender_id);
-  }
+  bool unused;
+  shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
+      &unused);
+  if (recvr.get() != NULL) recvr->RemoveSender(sender_id);
 
   {
     // Remove any closed streams that have been in the cache for more than
