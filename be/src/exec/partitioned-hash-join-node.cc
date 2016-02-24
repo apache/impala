@@ -396,6 +396,15 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
       parent_->AddRuntimeExecOption("Spilled");
     }
   }
+
+  if (parent_->can_add_runtime_filters_) {
+    // Disabling runtime filter push down because not all rows will be included in the
+    // filter due to a spilled partition.
+    parent_->can_add_runtime_filters_ = false;
+    parent_->AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (Spilling)");
+    VLOG(2) << "Disabling runtime filter construction because a partition will spill.";
+  }
+
   is_spilled_ = true;
   return Status::OK();
 }
@@ -488,13 +497,6 @@ not_built:
   if (hash_tbl_.get() != NULL) {
     hash_tbl_->Close();
     hash_tbl_.reset();
-  }
-  if (parent_->can_add_runtime_filters_) {
-    // Disabling runtime filter push down because not all rows will be included in the
-    // filter due to a spilled partition.
-    parent_->can_add_runtime_filters_ = false;
-    parent_->AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (Spilling)");
-    VLOG(2) << "Disabling runtime filter construction because a partition will spill.";
   }
   return Status::OK();
 }
@@ -1192,6 +1194,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   if (input_partition_ == NULL && can_add_runtime_filters_) {
     uint64_t num_build_rows = 0;
     BOOST_FOREACH(Partition* partition, hash_partitions_) {
+      DCHECK(!partition->is_spilled()) << "Runtime filters enabled despite spilling";
       const uint64_t partition_num_rows = partition->build_rows()->num_rows();
       num_build_rows += partition_num_rows;
     }
@@ -1225,6 +1228,9 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       // partition (clean up the hash table, unpin build).
       if (!built) RETURN_IF_ERROR(partition->Spill(true));
     }
+
+    DCHECK(!can_add_runtime_filters_ || !partition->is_spilled())
+        << "Runtime filters enabled despite spilling";
   }
 
   // Collect all the spilled partitions that don't have an IO buffer. We need to reserve
