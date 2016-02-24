@@ -943,3 +943,29 @@ select straight_join 1 from functional.alltypestiny t1 join functional.alltypest
    partitions=4/4 files=4 size=460B
    runtime filters: RF000 -> t1.id + t1.id, RF001 -> t1.id, RF002 -> t1.id
 ====
+# IMPALA-3074: Generated runtime filter has multiple candidate target nodes not all of
+# which are valid due to type mismatch between the associated source and target
+# exprs.
+select straight_join 1 from functional.alltypestiny a1
+  inner join functional.alltypestiny a3 ON a3.smallint_col = a1.int_col
+  inner join functional.alltypes a4 ON a4.smallint_col = a3.smallint_col
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a3.smallint_col = a4.smallint_col
+|  runtime filters: RF000 <- a4.smallint_col
+|
+|--02:SCAN HDFS [functional.alltypes a4]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a1.int_col = a3.smallint_col
+|  runtime filters: RF001 <- a3.smallint_col
+|
+|--01:SCAN HDFS [functional.alltypestiny a3]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a3.smallint_col
+|
+00:SCAN HDFS [functional.alltypestiny a1]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF001 -> a1.int_col
+====

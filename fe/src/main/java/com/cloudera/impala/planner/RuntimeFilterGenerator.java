@@ -451,8 +451,21 @@ public final class RuntimeFilterGenerator {
           }
         }
         Preconditions.checkState(exprSlots.size() == smap.size());
-        filter.setTargetExpr(targetExpr.substitute(smap, analyzer, true));
+        try {
+          filter.setTargetExpr(targetExpr.substitute(smap, analyzer, true));
+        } catch (Exception e) {
+          // An exception is thrown if we cannot generate a target expr from this
+          // scan node that has the same type as the lhs expr of the join predicate
+          // from which the runtime filter was generated. We skip that scan node and will
+          // try to assign the filter to a different scan node.
+          //
+          // TODO: Investigate if we can generate a type-compatible source/target expr
+          // pair from that scan node instead of skipping it.
+          continue;
+        }
       }
+      Preconditions.checkState(
+          filter.getTargetExpr().getType().matchesType(filter.getSrcExpr().getType()));
       filter.setFilterTarget(scanNode, analyzer);
       runtimeFilters_.add(filter);
     }
