@@ -1,0 +1,10 @@
+====
+---- QUERY
+select count(*)
+from tpch.lineitem
+  inner join tpch.orders on l_orderkey = o_orderkey
+---- RESULTS
+6001215
+---- CATCH
+Sender timed out waiting for receiver fragment instance
+====

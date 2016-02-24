@@ -72,4 +72,6 @@ DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redacti
 DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "
     "to fail once every n allocations where n is the value of this flag. Effective in "
     "debug builds only.");
+DEFINE_int32(stress_datastream_recvr_delay_ms, 0, "A stress option that causes data "
+    "stream receiver registration to be delayed. Effective in debug builds only.");
 #endif
