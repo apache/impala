@@ -66,6 +66,11 @@ public class UnionNode extends PlanNode {
   public void addConstExprList(List<Expr> exprs) { constExprLists_.add(exprs); }
 
   /**
+   * Returns true if this UnionNode has only constant exprs.
+   */
+  public boolean isConstantUnion() { return resultExprLists_.isEmpty(); }
+
+  /**
    * Add a child tree plus its corresponding resolved resultExprs.
    */
   public void addChild(PlanNode node, List<Expr> baseTblResultExprs) {

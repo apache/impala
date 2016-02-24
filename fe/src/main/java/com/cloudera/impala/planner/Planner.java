@@ -224,6 +224,21 @@ public class Planner {
   }
 
   /**
+   * Returns true if the fragments are for a trivial, coordinator-only query:
+   * Case 1: Only an EmptySetNode, e.g. query has a limit 0.
+   * Case 2: Query has only constant exprs.
+   */
+  private static boolean isTrivialCoordOnlyPlan(List<PlanFragment> fragments) {
+    Preconditions.checkNotNull(fragments);
+    Preconditions.checkState(!fragments.isEmpty());
+    if (fragments.size() > 1) return false;
+    PlanNode root = fragments.get(0).getPlanRoot();
+    if (root instanceof EmptySetNode) return true;
+    if (root instanceof UnionNode && ((UnionNode) root).isConstantUnion()) return true;
+    return false;
+  }
+
+  /**
    * Estimates the per-host memory and CPU requirements for the given plan fragments,
    * and sets the results in request.
    * Optionally excludes the requirements for unpartitioned fragments.
@@ -258,8 +273,15 @@ public class Planner {
     // Do not ask for more cores than are in the RuntimeEnv.
     maxPerHostVcores = Math.min(maxPerHostVcores, RuntimeEnv.INSTANCE.getNumCores());
 
-    // Legitimately set costs to zero if there are only unpartitioned fragments
-    // and excludeUnpartitionedFragments is true.
+    // Special case for some trivial coordinator-only queries (IMPALA-3053, IMPALA-1092).
+    if (isTrivialCoordOnlyPlan(fragments)) {
+      maxPerHostMem = 1024;
+      maxPerHostVcores = 1;
+    }
+
+    // Set costs to zero if there are only unpartitioned fragments and
+    // excludeUnpartitionedFragments is true.
+    // TODO: handle this case with a better indication for unknown, e.g. -1 or not set.
     if (maxPerHostMem == Long.MIN_VALUE || maxPerHostVcores == Integer.MIN_VALUE) {
       boolean allUnpartitioned = true;
       for (PlanFragment fragment: fragments) {

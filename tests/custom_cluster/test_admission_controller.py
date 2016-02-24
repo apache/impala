@@ -62,12 +62,16 @@ _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTB
 # Key in the query profile for the query options.
 PROFILE_QUERY_OPTIONS_KEY = "Query Options (non default): "
 
-def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
-  proc_limit_flag = ("-mem_limit=%s" % (mem_limit)) if mem_limit > 0 else ""
+def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
+    proc_mem_limit = None):
+  if proc_mem_limit is not None:
+    proc_limit_flag = "-mem_limit=%s" % (proc_mem_limit)
+  else:
+    proc_limit_flag = ""
   return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
       "-default_pool_max_queued %s -default_pool_mem_limit %s "
       "-disable_admission_control=false %s" %\
-      (max_requests, max_queued, mem_limit, proc_limit_flag))
+      (max_requests, max_queued, pool_max_mem, proc_limit_flag))
 
 
 def impalad_admission_ctrl_config_args(additional_args=""):
@@ -241,6 +245,25 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Check HS2 query in queueB gets the process-wide default query options
     self.__check_hs2_query_opts("root.queueB", None,\
         ['MEM_LIMIT=200000000', 'REQUEST_POOL=root.queueB', batch_size])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(1, 1, 1234, 1024 * 1024 * 1024),
+      statestored_args=_STATESTORED_ARGS)
+  def test_trivial_coord_query_limits(self):
+    """Tests that trivial coordinator only queries have negligible resource requirements.
+    """
+    # Queries with only constant exprs or limit 0 should be admitted.
+    self.execute_query_expect_success(self.client, "select 1")
+    self.execute_query_expect_success(self.client,
+        "select * from functional.alltypes limit 0")
+
+    non_trivial_queries = [
+        "select * from functional.alltypesagg limit 1",
+        "select * from functional.alltypestiny"]
+    for query in non_trivial_queries:
+      ex = self.execute_query_expect_failure(self.client, query)
+      assert "memory needed 4.00 GB is greater than pool max mem resources" in str(ex)
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
@@ -643,7 +666,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES * 30,
-        MAX_NUM_QUEUED_QUERIES, MEM_TEST_LIMIT),
+        MAX_NUM_QUEUED_QUERIES, MEM_TEST_LIMIT, MEM_TEST_LIMIT),
       statestored_args=_STATESTORED_ARGS)
   def test_mem_limit(self, vector):
     # Impala may set the proc mem limit lower than we think depending on the overcommit
