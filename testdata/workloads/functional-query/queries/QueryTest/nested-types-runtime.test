@@ -421,3 +421,32 @@ select id, pos from complextypestbl t1 full outer join t1.int_array t2
 ---- TYPES
 bigint,bigint
 ====
+---- QUERY
+# IMPALA-3065/IMPALA-3062: Test a join on a nested collection whose
+# parent tuple is outer joined. This test covers the case where the
+# outer joined collection is on the probe side of the outer join.
+# To reliably reproduce one of the problematic cases, we need
+# > batch_size matches for at least one probe row.
+select straight_join count(o.pos) from tpch_nested_parquet.customer c1
+right outer join tpch_nested_parquet.customer c2
+  on c1.c_custkey % 2 = c2.c_custkey % 2
+inner join c1.c_orders o
+where c1.c_custkey < 10 and c2.c_custkey < 10000
+---- RESULTS
+329960
+---- TYPES
+bigint
+====
+---- QUERY
+# IMPALA-3065/IMPALA-3062: Test a join on a nested collection whose
+# parent tuple is outer joined. This test covers the case where the
+# outer joined collection is on the build side of the outer join.
+select count(a.pos) from complextypestbl t1
+full outer join complextypestbl t2
+  on t1.id = t2.id
+inner join t2.int_array a
+---- RESULTS
+10
+---- TYPES
+bigint
+====

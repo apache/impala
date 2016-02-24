@@ -94,16 +94,6 @@ public class CollectionTableRef extends TableRef {
         // InlineViews are currently not supported as a parent ref.
         Preconditions.checkState(!(parentRef instanceof InlineViewRef));
         correlatedTupleIds_.add(parentRef.getId());
-      } else if (getJoinOp().isCrossJoin() || getJoinOp().isInnerJoin()
-          || getJoinOp() == JoinOperator.LEFT_SEMI_JOIN) {
-        // Generate a predicate to filter out empty collections directly
-        // in the parent scan. This is a performance optimization to avoid
-        // processing empty collections inside a subplan that would yield
-        // an empty result set.
-        IsNotEmptyPredicate isNotEmptyPred =
-            new IsNotEmptyPredicate(collectionExpr_.clone());
-        isNotEmptyPred.analyze(analyzer);
-        analyzer.registerConjuncts(isNotEmptyPred, false);
       }
     }
     if (!isRelative()) {
@@ -115,6 +105,11 @@ public class CollectionTableRef extends TableRef {
     }
     isAnalyzed_ = true;
     analyzeHints(analyzer);
+
+    // TODO: For joins on nested collections some join ops can be simplified
+    // due to the containment relationship of the parent and child. For example,
+    // a FULL OUTER JOIN would become a LEFT OUTER JOIN, or a RIGHT SEMI JOIN
+    // would become an INNER or CROSS JOIN.
     analyzeJoin(analyzer);
   }
 

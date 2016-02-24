@@ -172,6 +172,12 @@ public class SelectStmt extends QueryStmt {
       throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
 
+    // Generate !empty() predicates to filter out empty collections.
+    // Skip this step when analyzing a WITH-clause because CollectionTableRefs
+    // do not register collection slots in their parent in that context
+    // (see CollectionTableRef.analyze()).
+    if (!analyzer.isWithClause()) registerIsNotEmptyPredicates(analyzer);
+
     // analyze plan hints from select list
     selectList_.analyzePlanHints(analyzer);
 
@@ -282,6 +288,50 @@ public class SelectStmt extends QueryStmt {
     }
 
     if (aggInfo_ != null) LOG.debug("post-analysis " + aggInfo_.debugString());
+  }
+
+  /**
+   * Generates and registers !empty() predicates to filter out empty collections directly
+   * in the parent scan of collection table refs. This is a performance optimization to
+   * avoid the expensive processing of empty collections inside a subplan that would
+   * yield an empty result set.
+   *
+   * For correctness purposes, the predicates are generated in cases where we can ensure
+   * that they will be assigned only to the parent scan, and no other plan node.
+   *
+   * The conditions are as follows:
+   * - collection table ref is relative and non-correlated
+   * - collection table ref represents the rhs of an inner/cross/semi join
+   * - collection table ref's parent tuple is not outer joined
+   *
+   * TODO: In some cases, it is possible to generate !empty() predicates for a correlated
+   * table ref, but in general, that is not correct for non-trivial query blocks.
+   * For example, if the block with the correlated ref has an aggregation then adding a
+   * !empty() predicate would incorrectly discard rows from the final result set.
+   * TODO: Evaluating !empty() predicates at non-scan nodes interacts poorly with our BE
+   * projection of collection slots. For example, rows could incorrectly be filtered if
+   * a !empty() predicate is assigned to a plan node that comes after the unnest of the
+   * collection that also performs the projection.
+   */
+  private void registerIsNotEmptyPredicates(Analyzer analyzer) throws AnalysisException {
+    for (TableRef tblRef: tableRefs_) {
+      Preconditions.checkState(tblRef.isResolved());
+      if (!(tblRef instanceof CollectionTableRef)) continue;
+      CollectionTableRef ref = (CollectionTableRef) tblRef;
+      // Skip non-relative and correlated refs.
+      if (!ref.isRelative() || ref.isCorrelated()) continue;
+      // Skip outer and anti joins.
+      if (ref.getJoinOp().isOuterJoin() || ref.getJoinOp().isAntiJoin()) continue;
+      // Do not generate a predicate if the parent tuple is outer joined.
+      if (analyzer.isOuterJoined(ref.getResolvedPath().getRootDesc().getId())) continue;
+      IsNotEmptyPredicate isNotEmptyPred =
+          new IsNotEmptyPredicate(ref.getCollectionExpr().clone());
+      isNotEmptyPred.analyze(analyzer);
+      // Register the predicate as an On-clause conjunct because it should only
+      // affect the result of this join and not the whole FROM clause.
+      analyzer.registerOnClauseConjuncts(
+          Lists.<Expr>newArrayList(isNotEmptyPred), ref);
+    }
   }
 
   /**

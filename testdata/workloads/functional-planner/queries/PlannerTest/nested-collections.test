@@ -82,7 +82,7 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |     partitions=1/1 files=1 size=111.08MB
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
    runtime filters: RF000 -> c_nationkey, RF001 -> c.c_comment, RF002 -> c_comment, RF003 -> c.c_nationkey
 ====
 # Test subplans: Cross join of parent and relative ref.
@@ -132,6 +132,7 @@ where b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates: !empty(a.int_array_col)
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Left anti join of parent and relative ref without On-clause.
@@ -168,8 +169,6 @@ where a.id < 10
    predicates: a.id < 10
 ====
 # Test subplans: Right anti join of parent and relative ref without On-clause.
-# TODO: Transform the join op into a CROSS JOIN.
-# in this context?
 select b.item from functional.allcomplextypes a right anti join a.int_array_col b
 where b.item % 2 = 0
 ---- PLAN
@@ -219,8 +218,6 @@ where a.id < 10
    predicates: a.id < 10
 ====
 # Test subplans: Right outer join of parent and relative ref without On-clause.
-# TODO: Transform the join op into a CROSS JOIN.
-# in this context?
 select a.id, b.item from functional.allcomplextypes a right outer join a.int_array_col b
 where b.item % 2 = 0
 ---- PLAN
@@ -237,7 +234,6 @@ where b.item % 2 = 0
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Full outer join of parent and relative ref without On-clause.
-# TODO: Transform the join op into an INNER JOIN.
 select a.id, b.item from functional.allcomplextypes a full outer join a.int_array_col b
 where b.item % 2 = 0 and a.id < 10
 ---- PLAN
@@ -293,7 +289,6 @@ where a.id < 10
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi right semi join of parent and relative ref.
-# TODO: Transform the join op into an INNER JOIN.
 select b.item from functional.allcomplextypes a
   right semi join a.int_array_col b on (a.id < b.item and a.id < 10)
 where b.item % 2 = 0
@@ -309,7 +304,7 @@ where b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
-   predicates: a.id < 10
+   predicates: a.id < 10, !empty(a.int_array_col)
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi left anti join of parent and relative ref.
@@ -332,7 +327,6 @@ where a.id < 10
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi right anti join of parent and relative ref.
-# TODO: Transform the join op into an INNER JOIN.
 select b.item from functional.allcomplextypes a
   right anti join a.int_array_col b on (a.id < b.item and a.id < 10)
 where b.item % 2 = 0
@@ -371,7 +365,6 @@ where a.id < 10
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi right outer join of parent and relative ref.
-# TODO: Transform the join op into an INNER JOIN.
 select a.id, b.item from functional.allcomplextypes a
   right outer join a.int_array_col b on (a.id < b.item and a.id < 10)
 where b.item % 2 = 0
@@ -391,7 +384,6 @@ where b.item % 2 = 0
    predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi full outer join of parent and relative ref.
-# TODO: Transform the join op into LEFT OUTER JOIN.
 select a.id, b.item from functional.allcomplextypes a
   full outer join a.int_array_col b on (a.id < b.item and a.id < 10)
 where b.item % 2 = 0
@@ -447,11 +439,10 @@ where a.id < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
-   predicates: !empty(a.struct_array_col), a.id % 2 = 0, a.id < 10
+   predicates: a.id % 2 = 0, !empty(a.struct_array_col), a.id < 10
    predicates on b: b.f1 % 2 = 0, b.f1 < 10
 ====
 # Test subplans: Right-semi equi-join of parent and relative ref.
-# TODO: Transform the join op into an INNER JOIN.
 select b.f1, b.f2 from functional.allcomplextypes a
   right semi join a.struct_array_col b
     on (a.id < 10 and b.f1 = a.id and b.f1 < a.year)
@@ -468,7 +459,7 @@ where b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
-   predicates: a.id < 10, a.id % 2 = 0
+   predicates: a.id < 10, !empty(a.struct_array_col), a.id % 2 = 0
    predicates on b: b.f1 < 10, b.f1 % 2 = 0
 ====
 # Test subplans: Left-anti equi-join of parent and relative ref.
@@ -492,7 +483,6 @@ where a.id < 10
    predicates on b: b.f1 % 2 = 0, b.f1 < 10
 ====
 # Test subplans: Right-anti equi-join of parent and relative ref.
-# TODO: Transform the join op into an INNER JOIN.
 select b.f1, b.f2 from functional.allcomplextypes a
   right anti join a.struct_array_col b
     on (a.id < 10 and b.f1 = a.id and b.f1 < a.year)
@@ -533,7 +523,6 @@ where a.id < 10
    predicates on b: b.f1 % 2 = 0, b.f1 < 10
 ====
 # Test subplans: Right-outer equi-join of parent and relative ref.
-# TODO: Transform the join op into an INNER JOIN.
 select b.f1, b.f2 from functional.allcomplextypes a
   right outer join a.struct_array_col b
     on (a.id < 10 and b.f1 = a.id and b.f1 < a.year)
@@ -554,7 +543,6 @@ where b.f1 % 2 = 0
    predicates on b: b.f1 % 2 = 0
 ====
 # Test subplans: Full-outer equi-join of parent and relative ref.
-# TODO: Transform the join op into an LEFT OUTER JOIN.
 select b.f1, b.f2 from functional.allcomplextypes a
   full outer join a.struct_array_col b
     on (b.f1 = a.id and b.f1 < a.year)
@@ -689,11 +677,9 @@ inner join functional.alltypes d on (b.id = d.id)
 |
 08:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: b.id = a.id
-|  other predicates: !empty(a.struct_array_col)
 |
 |--00:SCAN HDFS [functional.allcomplextypes a]
 |     partitions=0/0 files=0 size=0B
-|     predicates: !empty(a.struct_array_col)
 |     predicates on e: e.f1 < 10
 |
 01:SCAN HDFS [functional.alltypestiny b]
@@ -775,7 +761,7 @@ where b.item < 10 and c.int_col > 30
 |
 10:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: c.id = b.item
-|  other predicates: !empty(a.int_array_col), !empty(a.int_map_col), b.item < 10, c.int_col > 30
+|  other predicates: b.item < 10, c.int_col > 30
 |
 |--01:SUBPLAN
 |  |
@@ -787,7 +773,6 @@ where b.item < 10 and c.int_col > 30
 |  |
 |  00:SCAN HDFS [functional.allcomplextypes a]
 |     partitions=0/0 files=0 size=0B
-|     predicates: !empty(a.int_array_col), !empty(a.int_map_col)
 |     predicates on b: b.item < 10
 |
 05:SCAN HDFS [functional.alltypessmall c]
@@ -1225,7 +1210,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: !empty(c.c_orders), c_custkey < 10
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
@@ -1322,7 +1307,7 @@ where c.c_custkey = o.o_orderkey and c.c_custkey = o.o_shippriority
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: !empty(c.c_orders), c.c_custkey = c.c_nationkey
    predicates on o: !empty(o.o_lineitems), o.o_orderkey = o.o_shippriority
    predicates on l: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
@@ -1429,11 +1414,9 @@ inner join t2.int_array_col
 |
 05:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id
-|  other predicates: !empty(t2.int_array_col)
 |
 |--01:SCAN HDFS [functional.allcomplextypes t2]
 |     partitions=0/0 files=0 size=0B
-|     predicates: !empty(t2.int_array_col)
 |
 00:SCAN HDFS [functional.allcomplextypes t1]
    partitions=0/0 files=0 size=0B
@@ -1539,7 +1522,7 @@ where c.c_custkey in
 |  04:UNNEST [c.c_orders o2]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # IMPALA-2412: Test join ordering in nested subplans. Same as above
 # but with a few inner joins.
@@ -1583,7 +1566,7 @@ where c.c_custkey in
 |  04:UNNEST [c.c_orders o2]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
    predicates: !empty(c.c_orders)
 ====
 # IMPALA-2412: Test join ordering in nested subplans.
@@ -1625,7 +1608,7 @@ where c.c_custkey in
 |  04:UNNEST [c.c_orders o2]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=554.13MB
 ====
 # IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
 # the ON clause and there are predicates in the WHERE clause that can be assigned to
@@ -1726,13 +1709,66 @@ inner join o.o_lineitems
 |  |  05:UNNEST [o.o_lineitems]
 |  |
 |  07:NESTED LOOP JOIN [RIGHT OUTER JOIN]
-|  |  predicates: !empty(o.o_lineitems)
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
-   predicates on o: !empty(o.o_lineitems)
+   partitions=1/1 files=4 size=554.13MB
+====
+# IMPALA-3065/IMPALA-3062: Test correct assignment of !empty() predicates.
+# Predicates should not be generated if the parent tuple is outer joined.
+select 1 from tpch_nested_parquet.customer c1
+inner join c1.c_orders
+right outer join tpch_nested_parquet.customer c2
+  on c1.c_custkey = c2.c_custkey
+---- PLAN
+06:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: c1.c_custkey = c2.c_custkey
+|  runtime filters: RF000 <- c2.c_custkey
+|
+|--05:SCAN HDFS [tpch_nested_parquet.customer c2]
+|     partitions=1/1 files=4 size=554.13MB
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c1.c_orders]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c1]
+   partitions=1/1 files=4 size=554.13MB
+   runtime filters: RF000 -> c1.c_custkey
+====
+# IMPALA-3065/IMPALA-3062: Test correct assignment of !empty() predicates.
+# Predicates should not be generated if the parent tuple is outer joined.
+select 1 from tpch_nested_parquet.customer c1
+full outer join tpch_nested_parquet.customer c2
+  on c1.c_custkey = c2.c_custkey
+inner join c1.c_orders o1
+left semi join c2.c_orders o2
+---- PLAN
+08:SUBPLAN
+|
+|--06:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |
+|  |--04:UNNEST [c2.c_orders o2]
+|  |
+|  05:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c1.c_orders o1]
+|
+07:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: c1.c_custkey = c2.c_custkey
+|
+|--01:SCAN HDFS [tpch_nested_parquet.customer c2]
+|     partitions=1/1 files=4 size=554.13MB
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c1]
+   partitions=1/1 files=4 size=554.13MB
 ====

@@ -34,7 +34,6 @@ import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TDescribeOutputStyle;
 import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.google.common.base.Preconditions;
