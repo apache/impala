@@ -421,6 +421,7 @@ where b.tinyint_col > 20
 ---- PLAN
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = c.int_col
+|  other predicates: a.tinyint_col < 10
 |  runtime filters: RF000 <- c.int_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
@@ -428,7 +429,7 @@ where b.tinyint_col > 20
 |
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
-|  other predicates: a.tinyint_col < 10, b.tinyint_col > 20
+|  other predicates: b.tinyint_col > 20
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
@@ -495,6 +496,7 @@ where a.bool_col = false and a.float_col < b.float_col
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = c.tinyint_col
+|  other predicates: b.int_col > 10
 |  runtime filters: RF000 <- c.tinyint_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
@@ -503,7 +505,6 @@ where a.bool_col = false and a.float_col < b.float_col
 05:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: a.int_col < 10
-|  other predicates: b.int_col > 10
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
@@ -544,6 +545,7 @@ where x != y
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: b.smallint_col = c.smallint_col
+|  other predicates: b.id < 10
 |  runtime filters: RF000 <- c.smallint_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
@@ -551,7 +553,7 @@ where x != y
 |
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
-|  other predicates: a.int_col < b.int_col, b.id < 10
+|  other predicates: a.int_col < b.int_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
@@ -705,4 +707,130 @@ where (
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.id
+====
+# IMPALA-3071: Test correct assignment of non-join conjuncts belonging to the On-clause
+# of an inner join that follows an outer join.
+select 1 from functional.alltypestiny a
+left outer join functional.alltypestiny b
+  on a.id = b.id
+inner join functional.alltypestiny c
+  on b.id = c.id and b.int_col < 0 and a.int_col > 10
+---- PLAN
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = c.id
+|  other predicates: b.int_col < 0
+|  runtime filters: RF000 <- c.id
+|
+|--02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     predicates: b.int_col < 0
+|     runtime filters: RF000 -> b.id
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+   predicates: a.int_col > 10
+====
+# IMPALA-3071: Same as above but with a right outer join.
+select 1 from functional.alltypestiny a
+right outer join functional.alltypestiny b
+  on a.id = b.id
+inner join functional.alltypestiny c
+  on b.id = c.id and b.int_col < 0 and a.int_col > 10
+---- PLAN
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = c.id
+|  other predicates: a.int_col > 10
+|  runtime filters: RF000 <- c.id
+|
+|--02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF001 <- b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     predicates: b.int_col < 0
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+   predicates: a.int_col > 10
+   runtime filters: RF000 -> a.id, RF001 -> a.id
+====
+# IMPALA-3071: Same as above but with a full outer join.
+select 1 from functional.alltypestiny a
+full outer join functional.alltypestiny b
+  on a.id = b.id
+inner join functional.alltypestiny c
+  on b.id = c.id and b.int_col < 0 and a.int_col > 10
+---- PLAN
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = c.id
+|  other predicates: b.int_col < 0, a.int_col > 10
+|  runtime filters: RF000 <- c.id
+|
+|--02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|     predicates: b.int_col < 0
+|     runtime filters: RF000 -> b.id
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+   predicates: a.int_col > 10
+====
+# IMPALA-3071: Test that the inner join On-clause predicate is placed
+# precisely at the correct outer join (not before or after).
+select 1 from functional.alltypestiny a
+left outer join functional.alltypestiny b
+  on a.id = b.id
+left outer join functional.alltypestiny c
+  on b.id = c.id
+inner join functional.alltypestiny d
+  on b.int_col < 0 and a.int_col > 10
+full outer join functional.alltypestiny e
+  on d.id = e.id
+---- PLAN
+09:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: e.id = d.id
+|
+|--08:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: b.int_col < 0, a.int_col > 10
+|  |
+|  |--03:SCAN HDFS [functional.alltypestiny d]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  07:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: c.id = b.id
+|  |  runtime filters: RF000 <- b.id
+|  |
+|  |--06:HASH JOIN [LEFT OUTER JOIN]
+|  |  |  hash predicates: a.id = b.id
+|  |  |
+|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |     partitions=4/4 files=4 size=460B
+|  |  |     predicates: b.int_col < 0
+|  |  |
+|  |  00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 files=4 size=460B
+|  |     predicates: a.int_col > 10
+|  |
+|  02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> c.id
+|
+04:SCAN HDFS [functional.alltypestiny e]
+   partitions=4/4 files=4 size=460B
 ====

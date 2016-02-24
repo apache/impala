@@ -231,6 +231,10 @@ public class Analyzer {
     // by its right-hand side table ref)
     public final Map<ExprId, TableRef> sjClauseByConjunct = Maps.newHashMap();
 
+    // map from registered conjunct to its containing inner join On clause (represented
+    // by its right-hand side table ref)
+    public final Map<ExprId, TableRef> ijClauseByConjunct = Maps.newHashMap();
+
     // map from slot id to the analyzer/block in which it was registered
     public final Map<SlotId, Analyzer> blockBySlot = Maps.newHashMap();
 
@@ -942,6 +946,9 @@ public class Analyzer {
       if (rhsRef.getJoinOp().isSemiJoin()) {
         globalState_.sjClauseByConjunct.put(conjunct.getId(), rhsRef);
       }
+      if (rhsRef.getJoinOp().isInnerJoin()) {
+        globalState_.ijClauseByConjunct.put(conjunct.getId(), rhsRef);
+      }
       markConstantConjunct(conjunct, false);
     }
   }
@@ -1099,6 +1106,10 @@ public class Analyzer {
     return globalState_.ojClauseByConjunct.containsKey(e.getId());
   }
 
+  public boolean isIjConjunct(Expr e) {
+    return globalState_.ijClauseByConjunct.containsKey(e.getId());
+  }
+
   public TableRef getFullOuterJoinRef(Expr e) {
     return globalState_.fullOuterJoinedConjuncts.get(e.getId());
   }
@@ -1141,7 +1152,8 @@ public class Analyzer {
     e.getIds(tids, null);
     if (tids.isEmpty()) return false;
     if (tids.size() > 1 || isOjConjunct(e) || isFullOuterJoined(e)
-        || (isOuterJoined(tids.get(0)) && !e.isOnClauseConjunct())
+        || (isOuterJoined(tids.get(0))
+            && (!e.isOnClauseConjunct() || isIjConjunct(e)))
         || (isAntiJoinedConjunct(e) && !isSemiJoined(tids.get(0)))) {
       return true;
     }
@@ -1292,11 +1304,13 @@ public class Analyzer {
         TableRef tblRef = globalState_.ojClauseByConjunct.get(e.getId());
         if (tblRef.getJoinOp().isFullOuterJoin()) return false;
       } else {
-        // non-OJ On-clause predicate: not okay if tid is nullable and the
-        // predicate tests for null
-        if (globalState_.outerJoinedTupleIds.containsKey(tid)
-            && isTrueWithNullSlots(e)) {
-          return false;
+        // Non-OJ On-clause conjunct.
+        if (isOuterJoined(tid)) {
+          // If the conjunct references an outer-joined tuple, then evaluate the
+          // conjunct at the join that the On-clause belongs to.
+          TableRef onClauseTableRef = globalState_.ijClauseByConjunct.get(e.getId());
+          Preconditions.checkNotNull(onClauseTableRef);
+          return tupleIds.containsAll(onClauseTableRef.getAllTupleIds());
         }
         // If this single tid conjunct is from the On-clause of an anti-join, check if we
         // can assign it to this node.
