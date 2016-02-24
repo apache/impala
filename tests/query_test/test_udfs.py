@@ -5,6 +5,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.skip import SkipIfLocal
 from tests.common.skip import SkipIfS3
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, IS_S3
@@ -86,6 +87,7 @@ class TestUdfs(ImpalaTestSuite):
       self.client.execute("drop database if exists java_udfs_test cascade")
       self.client.execute("drop database if exists udf_test cascade")
 
+  @SkipIfLocal.multiple_impalad
   def test_hive_udfs_missing_jar(self, vector):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present
     on HDFS"""
