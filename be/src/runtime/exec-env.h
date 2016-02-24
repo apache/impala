@@ -17,35 +17,35 @@
 #define IMPALA_RUNTIME_EXEC_ENV_H
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/thread/thread.hpp>
 
+// NOTE: try not to add more headers here: exec-env.h is included in many many files.
 #include "common/status.h"
-#include "runtime/backend-client.h"
-#include "util/cgroups-mgr.h"
-#include "util/hdfs-bulk-ops.h" // For declaration of HdfsOpThreadPool
-#include "resourcebroker/resource-broker.h"
+#include "runtime/client-cache-types.h"
+#include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
 
 namespace impala {
 
+class CallableThreadPool;
+class CgroupsMgr;
 class DataStreamMgr;
 class DiskIoMgr;
+class FragmentMgr;
+class Frontend;
 class HBaseTableFactory;
 class HdfsFsCache;
+class ImpalaServer;
 class LibCache;
+class MemTracker;
+class MetricGroup;
+class QueryResourceMgr;
+class RequestPoolService;
+class ResourceBroker;
 class Scheduler;
 class StatestoreSubscriber;
 class TestExecEnv;
-class Webserver;
-class MetricGroup;
-class MemTracker;
 class ThreadResourceMgr;
-class CgroupsManager;
-class ImpalaServer;
-class RequestPoolService;
-class FragmentMgr;
-class Frontend;
 class TmpFileMgr;
+class Webserver;
 
 /// Execution environment for queries/plan fragments.
 /// Contains all required global structures, and handles to

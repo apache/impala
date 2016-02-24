@@ -20,11 +20,12 @@
 #include "exec/row-batch-cache.h"
 #include "exprs/expr.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/bitmap.h"
 #include "util/debug-util.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "common/names.h"
 

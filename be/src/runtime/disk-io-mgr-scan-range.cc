@@ -121,7 +121,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   }
 
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
-  if (reader_->state_ == RequestContext::Cancelled) {
+  if (reader_->state_ == DiskIoRequestContext::Cancelled) {
     reader_->blocked_ranges_.Remove(this);
     Cancel(reader_->status_);
     (*buffer)->Return();
@@ -230,7 +230,7 @@ void DiskIoMgr::ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64
   mtime_ = mtime;
 }
 
-void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
+void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, DiskIoRequestContext* reader) {
   DCHECK(hdfs_file_ == NULL);
   io_mgr_ = io_mgr;
   reader_ = reader;

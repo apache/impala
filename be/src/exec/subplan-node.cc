@@ -18,6 +18,7 @@
 #include "exec/unnest-node.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/runtime-profile-counters.h"
 
 namespace impala {
 

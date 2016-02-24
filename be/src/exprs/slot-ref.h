@@ -16,6 +16,7 @@
 #define IMPALA_EXPRS_SLOTREF_H
 
 #include "exprs/expr.h"
+#include "runtime/descriptors.h"
 
 namespace impala {
 

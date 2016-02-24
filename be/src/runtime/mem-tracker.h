@@ -29,7 +29,7 @@
 #include "util/debug-util.h"
 #include "util/internal-queue.h"
 #include "util/metrics.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
 
 #include "gen-cpp/Types_types.h" // for TUniqueId

@@ -16,7 +16,6 @@
 #ifndef IMPALA_RUNTIME_DESCRIPTORS_H
 #define IMPALA_RUNTIME_DESCRIPTORS_H
 
-#include <vector>
 #include <tr1/unordered_map>
 #include <vector>
 #include <boost/scoped_ptr.hpp>

@@ -24,6 +24,7 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "util/codec.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

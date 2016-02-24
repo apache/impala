@@ -24,6 +24,7 @@
 #include "exec/text-converter.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/tuple-row.h"
 #include "util/codec.h"
 #include "util/decompress.h"
 #include "util/cpu-info.h"

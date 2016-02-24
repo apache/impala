@@ -29,6 +29,7 @@
 namespace impala {
 
 class Expr;
+class ExprContext;
 class RowBatch;
 class RowDescriptor;
 class MemTracker;

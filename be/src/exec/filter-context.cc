@@ -14,6 +14,8 @@
 
 #include "exec/filter-context.h"
 
+#include "util/runtime-profile-counters.h"
+
 using namespace impala;
 using namespace strings;
 

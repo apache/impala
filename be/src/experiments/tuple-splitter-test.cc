@@ -24,7 +24,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "util/cpu-info.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #define PRINT_RESULT 0
 

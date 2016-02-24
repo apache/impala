@@ -16,7 +16,6 @@
 #ifndef IMPALA_EXEC_PARTITIONED_AGGREGATION_NODE_H
 #define IMPALA_EXEC_PARTITIONED_AGGREGATION_NODE_H
 
-#include <functional>
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/exec-node.h"

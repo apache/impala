@@ -20,6 +20,8 @@
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
+#include "runtime/mem-tracker.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

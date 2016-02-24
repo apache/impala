@@ -31,6 +31,7 @@
 #include "runtime/backend-client.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
+#include "util/thread-pool.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-util.h"
 

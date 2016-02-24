@@ -66,7 +66,7 @@ class HdfsAvroTableWriter : public HdfsTableWriter {
   virtual Status Init();
   virtual Status Finalize() { return Flush(); }
   virtual Status InitNewFile() { return WriteFileHeader(); }
-  virtual void Close() { mem_pool_->FreeAll(); }
+  virtual void Close();
   virtual uint64_t default_block_size() const { return 0; }
   virtual std::string file_extension() const { return "avro"; }
 

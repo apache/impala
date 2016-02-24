@@ -18,6 +18,7 @@
 
 #include "common/status.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 
 using namespace strings;

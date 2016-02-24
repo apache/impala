@@ -55,9 +55,13 @@
 #include "codegen/mcjit-mem-mgr.h"
 #include "impala-ir/impala-ir-names.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/mem-pool.h"
+#include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 #include "util/cpu-info.h"
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
+#include "util/runtime-profile-counters.h"
 #include "util/test-info.h"
 
 #include "common/names.h"

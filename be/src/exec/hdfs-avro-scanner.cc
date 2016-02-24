@@ -26,7 +26,7 @@
 #include "runtime/runtime-state.h"
 #include "util/codec.h"
 #include "util/decompress.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

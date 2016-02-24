@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <sstream>
+
 #include "exprs/compound-predicates.h"
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/runtime-state.h"
+
+#include "common/names.h"
 
 using namespace impala;
 using namespace llvm;
@@ -33,6 +37,12 @@ BooleanVal AndPredicate::GetBooleanVal(ExprContext* context, TupleRow* row) {
   return BooleanVal(true);
 }
 
+string AndPredicate::DebugString() const {
+  stringstream out;
+  out << "AndPredicate(" << Expr::DebugString() << ")";
+  return out.str();
+}
+
 // (<> || true) is true, (false || NULL) is NULL
 BooleanVal OrPredicate::GetBooleanVal(ExprContext* context, TupleRow* row) {
   DCHECK_EQ(children_.size(), 2);
@@ -44,6 +54,12 @@ BooleanVal OrPredicate::GetBooleanVal(ExprContext* context, TupleRow* row) {
 
   if (val1.is_null || val2.is_null) return BooleanVal::null();
   return BooleanVal(false);
+}
+
+string OrPredicate::DebugString() const {
+  stringstream out;
+  out << "OrPredicate(" << Expr::DebugString() << ")";
+  return out.str();
 }
 
 // IR codegen for compound and/or predicates.  Compound predicate has non trivial 

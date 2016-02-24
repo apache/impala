@@ -15,7 +15,6 @@
 #include "exec/kudu-testutil.h"
 
 #include "common/init.h"
-#include "common/object-pool.h"
 #include "codegen/llvm-codegen.h"
 #include "exec/kudu-table-sink.h"
 #include "exec/kudu-util.h"
@@ -26,8 +25,10 @@
 #include "gutil/stl_util.h"
 #include "kudu/client/row_result.h"
 #include "runtime/descriptors.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/tuple-row.h"
 #include "service/fe-support.h"
 #include "testutil/desc-tbl-builder.h"
 #include "testutil/test-macros.h"

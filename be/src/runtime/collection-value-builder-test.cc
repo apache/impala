@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include "runtime/collection-value-builder.h"
+#include "runtime/mem-tracker.h"
 #include "testutil/desc-tbl-builder.h"
 #include "testutil/gtest-util.h"
 

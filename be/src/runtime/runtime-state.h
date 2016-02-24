@@ -16,40 +16,34 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_STATE_H
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
 
-/// needed for scoped_ptr to work on ObjectPool
-#include "common/object-pool.h"
-
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <vector>
 #include <string>
-/// stringstream is a typedef, so can't forward declare it.
-#include <sstream>
 
-#include "scheduling/query-resource-mgr.h"
+// NOTE: try not to add more headers here: runtime-state.h is included in many many files.
+#include "common/global-types.h"  // for PlanNodeId
+#include "runtime/client-cache-types.h"
 #include "runtime/exec-env.h"
-#include "runtime/descriptors.h"  // for PlanNodeId
-#include "runtime/disk-io-mgr.h"  // for DiskIoMgr::RequestContext
-#include "runtime/mem-tracker.h"
-#include "runtime/runtime-filter.h"
 #include "runtime/thread-resource-mgr.h"
-#include "gen-cpp/PlanNodes_types.h"
-#include "gen-cpp/Types_types.h"  // for TUniqueId
-#include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryOptions
-#include "util/auth-util.h"
+#include "util/auth-util.h" // for GetEffectiveUser()
 #include "util/runtime-profile.h"
 
 namespace impala {
 
 class BufferedBlockMgr;
+class DataStreamRecvr;
 class DescriptorTbl;
-class ObjectPool;
-class Status;
-class ExecEnv;
+class DiskIoRequestContext;
 class Expr;
 class LlvmCodeGen;
+class MemTracker;
+class ObjectPool;
+class RuntimeFilterBank;
+class Status;
 class TimestampValue;
-class DataStreamRecvr;
+class TQueryOptions;
+class TUniqueId;
 
 /// Counts how many rows an INSERT query has added to a particular partition
 /// (partitions are identified by their partition keys: k1=v1/k2=v2
@@ -140,7 +134,7 @@ class RuntimeState {
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
-  std::vector<DiskIoMgr::RequestContext*>* reader_contexts() { return &reader_contexts_; }
+  std::vector<DiskIoRequestContext*>* reader_contexts() { return &reader_contexts_; }
 
   void set_fragment_root_id(PlanNodeId id) {
     DCHECK_EQ(root_node_id_, -1) << "Should not set this twice.";
@@ -151,7 +145,7 @@ class RuntimeState {
   /// See comment on root_node_id_. We add one to prevent having a hash seed of 0.
   uint32_t fragment_hash_seed() const { return root_node_id_ + 1; }
 
-  RuntimeFilterBank* filter_bank() { return &filter_bank_; }
+  RuntimeFilterBank* filter_bank() { return filter_bank_.get(); }
 
   PartitionStatusMap* per_partition_status() { return &per_partition_status_; }
 
@@ -348,7 +342,7 @@ class RuntimeState {
   QueryResourceMgr* query_resource_mgr_;
 
   /// Reader contexts that need to be closed when the fragment is closed.
-  std::vector<DiskIoMgr::RequestContext*> reader_contexts_;
+  std::vector<DiskIoRequestContext*> reader_contexts_;
 
   /// BufferedBlockMgr object used to allocate and manage blocks of input data in memory
   /// with a fixed memory budget.
@@ -366,7 +360,7 @@ class RuntimeState {
 
   /// Manages runtime filters that are either produced or consumed (or both!) by plan
   /// nodes that share this runtime state.
-  RuntimeFilterBank filter_bank_;
+  boost::scoped_ptr<RuntimeFilterBank> filter_bank_;
 
   /// prohibit copies
   RuntimeState(const RuntimeState&);

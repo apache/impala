@@ -85,18 +85,14 @@
 #ifndef IMPALA_EXPRS_EXPR_H
 #define IMPALA_EXPRS_EXPR_H
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
+#include "common/global-types.h"
 #include "common/status.h"
 #include "impala-ir/impala-ir-functions.h"
-#include "runtime/descriptors.h"
-#include "runtime/decimal-value.h"
-#include "runtime/lib-cache.h"
-#include "runtime/tuple.h"
-#include "runtime/tuple-row.h"
-#include "runtime/string-value.h"
-#include "runtime/timestamp-value.h"
+#include "runtime/types.h"
 #include "udf/udf.h"
 #include "udf/udf-internal.h" // for CollectionVal
 
@@ -111,15 +107,19 @@ namespace llvm {
 
 namespace impala {
 
-class Expr;
+class ExprContext;
 class IsNullExpr;
+class LibCacheEntry;
 class LlvmCodeGen;
+class MemTracker;
 class ObjectPool;
 class RowDescriptor;
 class RuntimeState;
 class TColumnValue;
 class TExpr;
 class TExprNode;
+class Tuple;
+class TupleRow;
 
 /// This is the superclass of all expr evaluation nodes.
 class Expr {
@@ -343,7 +343,7 @@ class Expr {
       FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
 
   /// Cache entry for the library implementing this function.
-  LibCache::LibCacheEntry* cache_entry_;
+  LibCacheEntry* cache_entry_;
 
   /// Function description.
   TFunction fn_;
@@ -399,11 +399,7 @@ class Expr {
   int InlineConstants(LlvmCodeGen* codegen, llvm::Function* fn);
 
   /// Simple debug string that provides no expr subclass-specific information
-  std::string DebugString(const std::string& expr_name) const {
-    std::stringstream out;
-    out << expr_name << "(" << Expr::DebugString() << ")";
-    return out.str();
-  }
+  std::string DebugString(const std::string& expr_name) const;
 
  private:
   friend class ExprContext;

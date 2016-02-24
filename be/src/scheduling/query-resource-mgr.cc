@@ -22,6 +22,7 @@
 #include "runtime/exec-env.h"
 #include "resourcebroker/resource-broker.h"
 #include "util/bit-util.h"
+#include "util/cgroups-mgr.h"
 #include "util/container-util.h"
 #include "util/network-util.h"
 #include "util/promise.h"

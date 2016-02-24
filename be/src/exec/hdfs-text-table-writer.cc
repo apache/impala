@@ -17,6 +17,7 @@
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -24,6 +25,7 @@
 #include "util/codec.h"
 #include "util/compress.h"
 #include "util/hdfs-util.h"
+#include "util/runtime-profile-counters.h"
 
 #include <hdfs.h>
 #include <stdlib.h>

@@ -17,6 +17,8 @@
 
 #include <string.h>
 #include <iostream>
+#include <boost/thread/lock_guard.hpp>
+
 #include "util/spinlock.h"
 
 namespace impala {

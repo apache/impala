@@ -18,6 +18,7 @@
 
 #include "exec/hdfs-scanner.h"
 #include "exec/parquet-common.h"
+#include "util/runtime-profile-counters.h"
 
 namespace impala {
 

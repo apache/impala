@@ -18,6 +18,8 @@
 
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "resourcebroker/resource-broker.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "service/impala-server.h"
@@ -25,6 +27,7 @@
 #include "service/query-options.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/runtime-profile-counters.h"
 #include "util/time.h"
 
 #include "gen-cpp/CatalogService.h"

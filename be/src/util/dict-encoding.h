@@ -24,7 +24,6 @@
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 #include "util/rle-encoding.h"
-#include "util/runtime-profile.h"
 
 namespace impala {
 

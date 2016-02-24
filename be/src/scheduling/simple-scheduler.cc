@@ -24,6 +24,7 @@
 
 #include "common/logging.h"
 #include "util/metrics.h"
+#include "resourcebroker/resource-broker.h"
 #include "runtime/exec-env.h"
 #include "runtime/coordinator.h"
 #include "service/impala-server.h"

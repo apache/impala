@@ -19,6 +19,8 @@
 #include "gen-cpp/Exprs_types.h"
 
 #include "common/names.h"
+#include "runtime/descriptors.h"
+#include "runtime/tuple-row.h"
 
 namespace impala {
 

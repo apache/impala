@@ -25,14 +25,12 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
-#include "runtime/string-buffer.h"
 #include "util/avro-util.h"
 #include "util/counting-barrier.h"
 #include "util/progress-updater.h"
@@ -164,7 +162,7 @@ class HdfsScanNode : public ScanNode {
 
   int skip_header_line_count() const { return skip_header_line_count_; }
 
-  DiskIoMgr::RequestContext* reader_context() { return reader_context_; }
+  DiskIoRequestContext* reader_context() { return reader_context_; }
 
   typedef std::map<TupleId, std::vector<ExprContext*> > ConjunctsMap;
   const ConjunctsMap& conjuncts_map() const { return conjuncts_map_; }
@@ -325,7 +323,7 @@ class HdfsScanNode : public ScanNode {
   const int tuple_id_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.
-  DiskIoMgr::RequestContext* reader_context_;
+  DiskIoRequestContext* reader_context_;
 
   /// Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;

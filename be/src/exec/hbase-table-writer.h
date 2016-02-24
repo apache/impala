@@ -25,10 +25,11 @@
 #include "common/status.h"
 #include "runtime/runtime-state.h"
 #include "runtime/descriptors.h"
-#include "runtime/row-batch.h"
 #include "runtime/hbase-table.h"
 
 namespace impala {
+
+class RowBatch;
 
 /// Class to write RowBatches to an HBase table using the java HTable client.
 /// This class should only be called from a single sink and should not be

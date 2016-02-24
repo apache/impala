@@ -47,6 +47,7 @@ IntVal TestGetConstant(
 #include "common/init.h"
 #include "exprs/expr-context.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "service/fe-support.h"
 #include "udf/udf-internal.h"

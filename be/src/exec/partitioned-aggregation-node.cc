@@ -32,6 +32,7 @@
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -40,7 +41,7 @@
 #include "runtime/tuple-row.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"

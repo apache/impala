@@ -20,6 +20,7 @@
 
 #include "service/fragment-exec-state.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "util/impalad-metrics.h"
 #include "util/uid-util.h"
 

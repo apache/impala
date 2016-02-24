@@ -24,6 +24,7 @@
 #include <tr1/memory>
 #include <vector>
 
+#include "common/object-pool.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/exec-env.h"
 #include "testutil/desc-tbl-builder.h"

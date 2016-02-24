@@ -17,8 +17,10 @@
 #include "exec/subplan-node.h"
 #include "exprs/expr-context.h"
 #include "exprs/slot-ref.h"
+#include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "util/runtime-profile.h"
+#include "runtime/tuple-row.h"
+#include "util/runtime-profile-counters.h"
 
 namespace impala {
 

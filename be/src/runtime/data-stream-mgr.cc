@@ -25,6 +25,7 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"
+#include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
 
 #include "gen-cpp/ImpalaInternalService.h"

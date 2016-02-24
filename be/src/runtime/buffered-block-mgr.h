@@ -592,7 +592,7 @@ class BufferedBlockMgr {
 
   /// DiskIoMgr handles to read and write blocks.
   DiskIoMgr* io_mgr_;
-  DiskIoMgr::RequestContext* io_request_context_;
+  DiskIoRequestContext* io_request_context_;
 
   /// If true, a disk write failed and all API calls return.
   /// Status::CANCELLED. Set to true if there was an error writing a block, or if

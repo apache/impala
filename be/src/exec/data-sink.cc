@@ -27,6 +27,7 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "runtime/data-stream-sender.h"
+#include "runtime/mem-tracker.h"
 #include "util/container-util.h"
 
 #include "common/names.h"

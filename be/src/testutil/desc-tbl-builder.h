@@ -16,6 +16,7 @@
 #define IMPALA_TESTUTIL_ROW_DESC_BUILDER_H_
 
 #include "runtime/runtime-state.h"
+#include "runtime/types.h"
 
 namespace impala {
 

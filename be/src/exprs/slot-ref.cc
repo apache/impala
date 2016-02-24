@@ -20,8 +20,12 @@
 #include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/collection-value.h"
+#include "runtime/decimal-value.h"
+#include "runtime/multi-precision.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/tuple-row.h"
 
 #include "common/names.h"
 

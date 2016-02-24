@@ -19,6 +19,7 @@
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/runtime-state.h"
+#include "util/runtime-profile-counters.h"
 
 using namespace impala;
 using namespace llvm;

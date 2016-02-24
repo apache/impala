@@ -18,16 +18,16 @@
 
 #include <string>
 
-#include "gen-cpp/ImpalaInternalService_types.h"
-
 namespace impala {
 
-  /// Returns a reference to the "effective user" from the specified session. Queries
-  /// are run and authorized on behalf of the effective user. When a delegated_user is
-  /// specified (is not empty), the effective user is the delegated_user. This is because
-  /// the connected_user is acting as a "proxy user" for the delegated_user. When
-  /// delegated_user is empty, the effective user is the connected user.
-  const std::string& GetEffectiveUser(const TSessionState& session);
+class TSessionState;
+
+/// Returns a reference to the "effective user" from the specified session. Queries
+/// are run and authorized on behalf of the effective user. When a delegated_user is
+/// specified (is not empty), the effective user is the delegated_user. This is because
+/// the connected_user is acting as a "proxy user" for the delegated_user. When
+/// delegated_user is empty, the effective user is the connected user.
+const std::string& GetEffectiveUser(const TSessionState& session);
 
 } // namespace impala
 #endif

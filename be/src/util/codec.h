@@ -17,8 +17,6 @@
 #define IMPALA_UTIL_CODEC_H
 
 #include "common/status.h"
-#include "runtime/mem-pool.h"
-#include "util/runtime-profile.h"
 
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/Descriptors_types.h"

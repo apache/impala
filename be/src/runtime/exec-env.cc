@@ -22,6 +22,7 @@
 
 #include "common/logging.h"
 #include "resourcebroker/resource-broker.h"
+#include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
 #include "runtime/data-stream-mgr.h"
@@ -38,6 +39,7 @@
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
+#include "util/hdfs-bulk-ops.h"
 #include "util/mem-info.h"
 #include "util/metrics.h"
 #include "util/network-util.h"

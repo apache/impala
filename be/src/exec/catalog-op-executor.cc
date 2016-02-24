@@ -22,6 +22,7 @@
 #include "service/impala-server.h"
 #include "service/hs2-util.h"
 #include "util/string-parser.h"
+#include "util/runtime-profile-counters.h"
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"

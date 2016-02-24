@@ -20,6 +20,7 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "rpc/thrift-util.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/runtime-filter-bank.h"
 #include "util/bloom-filter.h"
 #include "runtime/backend-client.h"
 

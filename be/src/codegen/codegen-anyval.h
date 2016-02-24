@@ -16,6 +16,8 @@
 #define IMPALA_CODEGEN_CODEGEN_ANYVAL_H
 
 #include "codegen/llvm-codegen.h"
+#include "runtime/descriptors.h"
+#include "runtime/multi-precision.h"
 
 namespace llvm {
 class Type;

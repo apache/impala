@@ -26,7 +26,7 @@
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/cpu-info.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "testutil/desc-tbl-builder.h"
 
 #include "common/names.h"

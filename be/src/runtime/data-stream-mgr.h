@@ -27,7 +27,7 @@
 #include "common/status.h"
 #include "common/object-pool.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
-#include "runtime/mem-tracker.h"
+#include "util/metrics.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 
+#include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
@@ -23,7 +24,7 @@
 #include "runtime/tuple.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/text-converter.inline.h"
 

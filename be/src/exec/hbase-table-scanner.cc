@@ -23,7 +23,9 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/tuple.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

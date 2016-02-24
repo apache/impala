@@ -25,7 +25,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
 #include "util/time.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "util/pretty-printer.h"
 
 #include "common/names.h"

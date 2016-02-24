@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "runtime/runtime-state.h"
+
 #include <iostream>
 #include <jni.h>
 #include <sstream>
@@ -27,11 +29,11 @@
 #include "exprs/expr.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/descriptors.h"
-#include "runtime/runtime-state.h"
-#include "runtime/timestamp-value.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
-#include "runtime/runtime-filter.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/runtime-filter-bank.h"
+#include "runtime/timestamp-value.h"
 #include "util/bitmap.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -75,7 +77,7 @@ RuntimeState::RuntimeState(const TExecPlanFragmentParams& fragment_params,
     is_cancelled_(false),
     query_resource_mgr_(NULL),
     root_node_id_(-1),
-    filter_bank_(fragment_ctx().query_ctx, this) {
+    filter_bank_(new RuntimeFilterBank(fragment_ctx().query_ctx, this)) {
   Status status = Init(exec_env);
   DCHECK(status.ok()) << status.GetDetail();
 }
@@ -90,7 +92,7 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     is_cancelled_(false),
     query_resource_mgr_(NULL),
     root_node_id_(-1),
-    filter_bank_(query_ctx, this) {
+    filter_bank_(new RuntimeFilterBank(query_ctx, this)) {
   fragment_params_.fragment_instance_ctx.__set_query_ctx(query_ctx);
   fragment_params_.fragment_instance_ctx.query_ctx.request.query_options
       .__set_batch_size(DEFAULT_BATCH_SIZE);

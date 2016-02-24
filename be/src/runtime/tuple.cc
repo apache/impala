@@ -29,6 +29,7 @@
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

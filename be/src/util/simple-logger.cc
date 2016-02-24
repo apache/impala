@@ -18,6 +18,7 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
+#include <boost/thread/lock_guard.hpp>
 
 #include "common/names.h"
 #include "util/logging-support.h"

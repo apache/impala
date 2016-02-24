@@ -21,6 +21,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-search.h"
 #include "util/codec.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

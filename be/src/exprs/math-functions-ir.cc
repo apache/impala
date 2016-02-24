@@ -27,10 +27,6 @@
 
 #include "common/names.h"
 
-using boost::algorithm::is_any_of;
-using boost::algorithm::join;
-using boost::algorithm::split;
-using boost::algorithm::to_lower;
 using std::uppercase;
 
 namespace impala {

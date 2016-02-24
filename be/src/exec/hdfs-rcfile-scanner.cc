@@ -29,6 +29,7 @@
 #include "runtime/string-value.h"
 #include "util/codec.h"
 #include "util/string-parser.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 

@@ -25,7 +25,7 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"

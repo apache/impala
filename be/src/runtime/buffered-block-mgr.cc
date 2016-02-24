@@ -17,7 +17,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/tmp-file-mgr.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
 #include "util/impalad-metrics.h"

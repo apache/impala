@@ -26,9 +26,13 @@
 #include "util/uid-util.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "util/runtime-profile-counters.h"
 #include "write-stream.inline.h"
 
 #include "common/names.h"
@@ -161,6 +165,10 @@ Status HdfsAvroTableWriter::Init() {
   DCHECK(compressor_.get() != NULL);
 
   return Status::OK();
+}
+
+void HdfsAvroTableWriter::Close() {
+  mem_pool_->FreeAll();
 }
 
 Status HdfsAvroTableWriter::AppendRowBatch(RowBatch* batch,

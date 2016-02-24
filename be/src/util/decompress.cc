@@ -15,6 +15,7 @@
 #include <boost/assign/list_of.hpp>
 #include "util/decompress.h"
 #include "exec/read-write-util.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "common/logging.h"
 #include "gen-cpp/Descriptors_types.h"

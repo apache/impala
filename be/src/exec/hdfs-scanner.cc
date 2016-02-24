@@ -38,7 +38,7 @@
 #include "util/bitmap.h"
 #include "util/codec.h"
 #include "util/debug-util.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "util/sse-util.h"
 #include "util/string-parser.h"
 #include "gen-cpp/PlanNodes_types.h"

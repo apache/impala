@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <avro/schema.h>
-
 #include "util/avro-util.h"
+
+#include <avro/schema.h>
+#include <sstream>
 
 using namespace std;
 

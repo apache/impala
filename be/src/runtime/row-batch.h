@@ -27,7 +27,6 @@
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
-#include "runtime/mem-tracker.h"
 
 namespace impala {
 

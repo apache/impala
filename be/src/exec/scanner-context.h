@@ -23,7 +23,6 @@
 #include "common/status.h"
 #include "exec/filter-context.h"
 #include "runtime/disk-io-mgr.h"
-#include "runtime/row-batch.h"
 
 namespace impala {
 

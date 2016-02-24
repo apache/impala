@@ -41,6 +41,7 @@
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "scheduling/simple-scheduler.h"

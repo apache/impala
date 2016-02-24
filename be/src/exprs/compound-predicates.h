@@ -47,11 +47,7 @@ class AndPredicate: public CompoundPredicate {
   friend class Expr;
   AndPredicate(const TExprNode& node) : CompoundPredicate(node) { }
 
-  virtual std::string DebugString() const {
-    std::stringstream out;
-    out << "AndPredicate(" << Expr::DebugString() << ")";
-    return out.str();
-  }
+  virtual std::string DebugString() const;
 
  private:
   friend class OpcodeRegistry;
@@ -70,11 +66,7 @@ class OrPredicate: public CompoundPredicate {
   friend class Expr;
   OrPredicate(const TExprNode& node) : CompoundPredicate(node) { }
 
-  virtual std::string DebugString() const {
-    std::stringstream out;
-    out << "OrPredicate(" << Expr::DebugString() << ")";
-    return out.str();
-  }
+  virtual std::string DebugString() const;
 
  private:
   friend class OpcodeRegistry;

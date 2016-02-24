@@ -14,6 +14,8 @@
 
 #include "util/auth-util.h"
 
+#include "gen-cpp/ImpalaInternalService_types.h"
+
 using namespace std;
 
 namespace impala {

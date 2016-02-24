@@ -28,10 +28,10 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 
+#include "common/hdfs.h"
 #include "common/status.h"
 #include "common/global-types.h"
 #include "util/progress-updater.h"

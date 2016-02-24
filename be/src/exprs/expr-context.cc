@@ -16,6 +16,7 @@
 
 #include <sstream>
 
+#include "common/object-pool.h"
 #include "exprs/expr.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/mem-pool.h"

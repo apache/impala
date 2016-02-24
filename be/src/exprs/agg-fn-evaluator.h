@@ -200,7 +200,7 @@ class AggFnEvaluator {
   impala_udf::AnyVal* staging_merge_input_val_;
 
   /// Cache entry for the library containing the function ptrs.
-  LibCache::LibCacheEntry* cache_entry_;
+  LibCacheEntry* cache_entry_;
 
   /// Function ptrs for the different phases of the aggregate function.
   void* init_fn_;

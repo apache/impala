@@ -23,10 +23,13 @@
 #include "exprs/expr.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-filter.h"
+#include "runtime/runtime-filter-bank.h"
 #include "runtime/runtime-state.h"
+#include "runtime/tuple-row.h"
 #include "util/debug-util.h"
 #include "util/bloom-filter.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 

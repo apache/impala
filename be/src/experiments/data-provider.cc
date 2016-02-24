@@ -5,6 +5,8 @@
 #include <math.h>
 #include <iostream>
 
+#include "util/runtime-profile-counters.h"
+
 #include "common/names.h"
 
 using boost::minstd_rand;

@@ -23,6 +23,7 @@
 #include "runtime/tuple.h"
 #include "text-converter.h"
 #include "util/string-parser.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

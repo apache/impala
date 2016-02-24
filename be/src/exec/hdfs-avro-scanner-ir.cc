@@ -16,6 +16,7 @@
 
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/read-write-util.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/string-value.inline.h"
 
 using namespace impala;

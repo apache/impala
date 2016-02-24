@@ -16,7 +16,7 @@
 #define IMPALA_BACKEND_CLIENT_H
 
 #include "runtime/client-cache.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/ImpalaInternalService.h"
 
@@ -63,9 +63,6 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
   RuntimeProfile::ConcurrentTimerCounter* transmit_csw_;
 };
 
-class ImpalaBackendClient;
-typedef ClientCache<ImpalaBackendClient> ImpalaBackendClientCache;
-typedef ClientConnection<ImpalaBackendClient> ImpalaBackendConnection;
 }
 
 #endif // IMPALA_BACKEND_CLIENT_H

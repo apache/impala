@@ -18,11 +18,15 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "runtime/hbase-table-factory.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/raw-value.h"
+#include "runtime/tuple.h"
+#include "runtime/tuple-row.h"
 #include "util/bit-util.h"
 #include "util/jni-util.h"
-#include "exprs/expr.h"
 
 #include "common/names.h"
 

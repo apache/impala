@@ -57,6 +57,9 @@
 #include "gen-cpp/Data_types.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
+#include "runtime/raw-value.h"
+#include "runtime/tuple.h"
+#include "runtime/tuple-row.h"
 #include "udf/udf.h"
 #include "udf/udf-internal.h"
 
@@ -726,6 +729,12 @@ Status Expr::GetFnContextError(ExprContext* ctx) {
     if (fn_ctx->has_error()) return Status(fn_ctx->error_msg());
   }
   return Status::OK();
+}
+
+string Expr::DebugString(const string& expr_name) const {
+  stringstream out;
+  out << expr_name << "(" << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

@@ -15,6 +15,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"

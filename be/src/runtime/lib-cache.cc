@@ -29,14 +29,15 @@
 #include "common/names.h"
 
 namespace filesystem = boost::filesystem;
-using namespace impala;
 
 DEFINE_string(local_library_dir, "/tmp",
               "Local directory to copy UDF libraries from HDFS into");
 
+namespace impala {
+
 scoped_ptr<LibCache> LibCache::instance_;
 
-struct LibCache::LibCacheEntry {
+struct LibCacheEntry {
   // Lock protecting all fields in this entry
   boost::mutex lock;
 
@@ -53,7 +54,7 @@ struct LibCache::LibCacheEntry {
   bool check_needs_refresh;
 
   // The type of this file.
-  LibType type;
+  LibCache::LibType type;
 
   // The path on the local file system for this library.
   std::string local_path;
@@ -117,7 +118,7 @@ Status LibCache::InitInternal() {
   return Status::OK();
 }
 
-LibCache::LibCacheEntry::~LibCacheEntry() {
+LibCacheEntry::~LibCacheEntry() {
   if (shared_object_handle != NULL) {
     DCHECK_EQ(use_count, 0);
     DCHECK(should_remove);
@@ -417,4 +418,6 @@ string LibCache::MakeLocalPath(const string& hdfs_path, const string& local_dir)
   dst << local_dir << "/" << src.stem().native() << "." << getpid() << "."
       << (num_libs_copied_.Add(1) - 1) << src.extension().native();
   return dst.str();
+}
+
 }

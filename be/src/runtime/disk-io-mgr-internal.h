@@ -22,6 +22,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "runtime/disk-io-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "util/cpu-info.h"
@@ -50,10 +51,10 @@ struct DiskIoMgr::DiskQueue {
   boost::condition_variable work_available;
 
   /// list of all request contexts that have work queued on this disk
-  std::list<RequestContext*> request_contexts;
+  std::list<DiskIoRequestContext*> request_contexts;
 
   /// Enqueue the request context to the disk queue.  The DiskQueue lock must not be taken.
-  inline void EnqueueContext(RequestContext* worker) {
+  inline void EnqueueContext(DiskIoRequestContext* worker) {
     {
       boost::unique_lock<boost::mutex> disk_lock(lock);
       /// Check that the reader is not already on the queue
@@ -75,14 +76,14 @@ struct DiskIoMgr::DiskQueue {
 /// A scan range for the reader is on one of five states:
 /// 1) PerDiskState's unstarted_ranges: This range has only been queued
 ///    and nothing has been read from it.
-/// 2) RequestContext's ready_to_start_ranges_: This range is about to be started.
+/// 2) DiskIoRequestContext's ready_to_start_ranges_: This range is about to be started.
 ///    As soon as the reader picks it up, it will move to the in_flight_ranges
 ///    queue.
 /// 3) PerDiskState's in_flight_ranges: This range is being processed and will
 ///    be read from the next time a disk thread picks it up in GetNextRequestRange()
 /// 4) ScanRange's outgoing ready buffers is full. We can't read for this range
 ///    anymore. We need the caller to pull a buffer off which will put this in
-///    the in_flight_ranges queue. These ranges are in the RequestContext's
+///    the in_flight_ranges queue. These ranges are in the DiskIoRequestContext's
 ///    blocked_ranges_ queue.
 /// 5) ScanRange is cached and in the cached_ranges_ queue.
 //
@@ -111,15 +112,21 @@ struct DiskIoMgr::DiskQueue {
 /// the entire range is written when the write request is handled. (In other words, writes
 /// are not broken up.)
 //
-/// When a RequestContext is processed by a disk thread in GetNextRequestRange(), a write
-/// range is always removed from the list of unstarted write ranges and appended to the
-/// in_flight_ranges_ queue. This is done to alternate reads and writes - a read that is
-/// scheduled (by calling GetNextRange()) is always followed by a write (if one exists).
-/// And since at most one WriteRange can be present in in_flight_ranges_ at any time
-/// (once a write range is returned from GetNetxRequestRange() it is completed and not
-/// re-enqueued), a scan range scheduled via a call to GetNextRange() can be queued up
+/// When a DiskIoRequestContext is processed by a disk thread in GetNextRequestRange(),
+/// a write range is always removed from the list of unstarted write ranges and appended
+/// to the in_flight_ranges_ queue. This is done to alternate reads and writes - a read
+/// that is scheduled (by calling GetNextRange()) is always followed by a write (if one
+/// exists).  And since at most one WriteRange can be present in in_flight_ranges_ at any
+/// time (once a write range is returned from GetNetxRequestRange() it is completed an
+/// not re-enqueued), a scan range scheduled via a call to GetNextRange() can be queued up
 /// behind at most one write range.
-class DiskIoMgr::RequestContext {
+class DiskIoRequestContext {
+  using DiskQueue = DiskIoMgr::DiskQueue;
+  using RequestRange = DiskIoMgr::RequestRange;
+  using ScanRange = DiskIoMgr::ScanRange;
+  using WriteRange = DiskIoMgr::WriteRange;
+  using RequestType = DiskIoMgr::RequestType;
+
  public:
   enum State {
     /// Reader is initialized and maps to a client
@@ -135,7 +142,7 @@ class DiskIoMgr::RequestContext {
     Inactive,
   };
 
-  RequestContext(DiskIoMgr* parent, int num_disks);
+  DiskIoRequestContext(DiskIoMgr* parent, int num_disks);
 
   /// Resets this object.
   void Reset(MemTracker* tracker);
@@ -162,10 +169,10 @@ class DiskIoMgr::RequestContext {
   /// Adds range to in_flight_ranges, scheduling this reader on the disk threads
   /// if necessary.
   /// Reader lock must be taken before this.
-  void ScheduleScanRange(DiskIoMgr::ScanRange* range) {
+  void ScheduleScanRange(ScanRange* range) {
     DCHECK_EQ(state_, Active);
     DCHECK(range != NULL);
-    RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
+    DiskIoRequestContext::PerDiskState& state = disk_states_[range->disk_id()];
     state.in_flight_ranges()->Enqueue(range);
     state.ScheduleContext(this, range->disk_id());
   }
@@ -175,7 +182,7 @@ class DiskIoMgr::RequestContext {
 
   /// Adds request range to disk queue for this request context. Currently,
   /// schedule_immediately must be false is RequestRange is a write range.
-  void AddRequestRange(DiskIoMgr::RequestRange* range, bool schedule_immediately);
+  void AddRequestRange(RequestRange* range, bool schedule_immediately);
 
   /// Returns the default queue capacity for scan ranges. This is updated
   /// as the reader processes ranges.
@@ -338,11 +345,15 @@ class DiskIoMgr::RequestContext {
       return &in_flight_ranges_;
     }
 
-    InternalQueue<ScanRange>* unstarted_scan_ranges() { return &unstarted_scan_ranges_; }
+    InternalQueue<ScanRange>* unstarted_scan_ranges() {
+      return &unstarted_scan_ranges_;
+    }
     InternalQueue<WriteRange>* unstarted_write_ranges() {
       return &unstarted_write_ranges_;
     }
-    InternalQueue<RequestRange>* in_flight_ranges() { return &in_flight_ranges_; }
+    InternalQueue<RequestRange>* in_flight_ranges() {
+      return &in_flight_ranges_;
+    }
 
     PerDiskState() {
       Reset();
@@ -350,7 +361,7 @@ class DiskIoMgr::RequestContext {
 
     /// Schedules the request context on this disk if it's not already on the queue.
     /// Context lock must be taken before this.
-    void ScheduleContext(RequestContext* context, int disk_id) {
+    void ScheduleContext(DiskIoRequestContext* context, int disk_id) {
       if (!is_on_queue_ && !done_) {
         is_on_queue_ = true;
         context->parent_->disk_queues_[disk_id]->EnqueueContext(context);
@@ -371,7 +382,7 @@ class DiskIoMgr::RequestContext {
 
     /// Decrement request thread count and do final cleanup if this is the last
     /// thread. RequestContext lock must be taken before this.
-    void DecrementRequestThreadAndCheckDone(RequestContext* context) {
+    void DecrementRequestThreadAndCheckDone(DiskIoRequestContext* context) {
       num_threads_in_op_.Add(-1); // Also acts as a barrier.
       if (!is_on_queue_ && num_threads_in_op_.Load() == 0 && !done_) {
         // This thread is the last one for this reader on this disk, do final cleanup
@@ -416,7 +427,7 @@ class DiskIoMgr::RequestContext {
     /// For each disks, the number of request ranges that have not been fully read.
     /// In the non-cancellation path, this will hit 0, and done will be set to true
     /// by the disk thread. This is undefined in the cancellation path (the various
-    /// threads notice by looking at the RequestContext's state_).
+    /// threads notice by looking at the DiskIoRequestContext's state_).
     int num_remaining_ranges_;
 
     /// Queue of ranges that have not started being read.  This list is exclusive

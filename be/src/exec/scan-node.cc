@@ -16,6 +16,8 @@
 
 #include <boost/bind.hpp>
 
+#include "util/runtime-profile-counters.h"
+
 #include "common/names.h"
 
 namespace impala {

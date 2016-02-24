@@ -50,10 +50,10 @@ class RuntimeState;
 /// TODO:
 /// - refresh libraries
 /// - better cached module management.
+struct LibCacheEntry;
+
 class LibCache {
  public:
-  struct LibCacheEntry;
-
   enum LibType {
     TYPE_SO,      // Shared object
     TYPE_IR,      // IR intermediate

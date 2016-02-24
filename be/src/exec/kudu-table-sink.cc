@@ -22,6 +22,9 @@
 #include "exprs/expr-context.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gutil/gscoped_ptr.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/row-batch.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

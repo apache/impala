@@ -29,10 +29,13 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
+#include "resourcebroker/resource-broker.h"
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-filter-bank.h"
 #include "runtime/mem-tracker.h"
+#include "scheduling/query-resource-mgr.h"
 #include "util/cgroups-mgr.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -589,7 +592,7 @@ void PlanFragmentExecutor::Close() {
           runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
     }
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
-    for (DiskIoMgr::RequestContext* context: *runtime_state_->reader_contexts()) {
+    for (DiskIoRequestContext* context: *runtime_state_->reader_contexts()) {
       runtime_state_->io_mgr()->UnregisterContext(context);
     }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());

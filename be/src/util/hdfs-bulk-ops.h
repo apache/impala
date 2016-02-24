@@ -21,6 +21,7 @@
 #include "common/hdfs.h"
 #include "common/atomic.h"
 #include "common/status.h"
+#include "util/hdfs-bulk-ops-defs.h"
 #include "util/thread-pool.h"
 #include "util/counting-barrier.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -35,8 +36,6 @@ enum HdfsOpType {
   DELETE_THEN_CREATE,
   CHMOD
 };
-
-class HdfsOperationSet;
 
 /// Container class that encapsulates a single HDFS operation. Used only internally by
 /// HdfsOperationSet, but visible because it parameterises HdfsOpThreadPool.
@@ -80,8 +79,6 @@ class HdfsOp {
   /// Records an error if it happens during an operation.
   void AddError(const string& error_msg) const;
 };
-
-typedef ThreadPool<HdfsOp> HdfsOpThreadPool;
 
 /// Creates a new HdfsOp-processing thread pool.
 HdfsOpThreadPool* CreateHdfsOpThreadPool(const std::string& name, uint32_t num_threads,

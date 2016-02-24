@@ -20,7 +20,7 @@
 #include "common/object-pool.h"
 #include "util/cpu-info.h"
 #include "util/periodic-counter-updater.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "util/streaming-sampler.h"
 #include "util/thread.h"
 #include "util/time.h"

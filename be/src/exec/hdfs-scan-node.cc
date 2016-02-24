@@ -39,8 +39,11 @@
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "runtime/string-buffer.h"
+#include "scheduling/query-resource-mgr.h"
 #include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
@@ -49,7 +52,7 @@
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/periodic-counter-updater.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 

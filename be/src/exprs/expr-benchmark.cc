@@ -26,6 +26,7 @@
 #include "rpc/thrift-server.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "runtime/mem-tracker.h"
 #include "service/impala-server.h"
 
 #include "common/names.h"

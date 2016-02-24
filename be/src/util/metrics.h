@@ -24,8 +24,8 @@
 #include <boost/thread/locks.hpp>
 
 #include "common/logging.h"
-#include "common/status.h"
 #include "common/object-pool.h"
+#include "common/status.h"
 #include "util/debug-util.h"
 #include "util/json-util.h"
 #include "util/pretty-printer.h"

@@ -14,6 +14,7 @@
 
 #include "util/periodic-counter-updater.h"
 
+#include "util/runtime-profile-counters.h"
 #include "util/time.h"
 
 #include "common/names.h"

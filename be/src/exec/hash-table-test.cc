@@ -30,9 +30,10 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/test-env.h"
+#include "runtime/tuple-row.h"
 #include "service/fe-support.h"
 #include "util/cpu-info.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "util/test-info.h"
 
 #include "common/names.h"

@@ -22,6 +22,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
 
+#include "runtime/client-cache-types.h"
 #include "util/metrics.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-util.h"
@@ -182,9 +183,6 @@ class ClientCacheHelper {
   Status CreateClient(const TNetworkAddress& address, ClientFactory factory_method,
       ClientKey* client_key);
 };
-
-template<class T>
-class ClientCache;
 
 /// A scoped client connection to help manage clients from a client cache. Clients of this
 /// class should use DoRpc() to actually make RPC calls.

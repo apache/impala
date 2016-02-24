@@ -44,7 +44,7 @@
 #include "util/error-util.h"
 #include "util/dict-encoding.h"
 #include "util/rle-encoding.h"
-#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 #include "rpc/thrift-util.h"
 
 #include "common/names.h"

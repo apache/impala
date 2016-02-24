@@ -21,23 +21,22 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 
 #include "statestore/statestore.h"
 #include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-client.h"
-#include "util/thread.h"
 #include "util/metrics.h"
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
 
 namespace impala {
 
-class TimeoutFailureDetector;
 class Status;
-class TNetworkAddress;
+class TimeoutFailureDetector;
+class Thread;
 class ThriftServer;
+class TNetworkAddress;
 
 typedef ClientCache<StatestoreServiceClient> StatestoreClientCache;
 

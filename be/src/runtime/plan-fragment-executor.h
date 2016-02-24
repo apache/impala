@@ -24,6 +24,7 @@
 #include "common/status.h"
 #include "common/object-pool.h"
 #include "runtime/runtime-state.h"
+#include "util/runtime-profile-counters.h"
 #include "util/thread.h"
 
 namespace impala {

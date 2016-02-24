@@ -17,6 +17,7 @@
 #include "exprs/in-predicate.h"
 
 #include "exprs/anyval-util.h"
+#include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 
 #include "common/names.h"

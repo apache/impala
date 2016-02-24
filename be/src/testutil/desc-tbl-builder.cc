@@ -15,7 +15,7 @@
 #include "testutil/desc-tbl-builder.h"
 #include "util/bit-util.h"
 
-
+#include "common/object-pool.h"
 #include "runtime/descriptors.h"
 
 #include "common/names.h"

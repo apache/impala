@@ -19,9 +19,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/lexical_cast.hpp>
-
-#include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "gen-cpp/Status_types.h"  // for TStatus
