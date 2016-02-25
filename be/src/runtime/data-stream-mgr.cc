@@ -94,7 +94,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::CreateRecvr(RuntimeState* state,
 shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
     const TUniqueId& fragment_instance_id, PlanNodeId node_id,
     bool* already_unregistered) {
-  RefCountedPromise* promise = NULL;
+  RendezvousPromise* promise = NULL;
   RecvrId promise_key = make_pair(fragment_instance_id, node_id);
   *already_unregistered = false;
   {
@@ -106,16 +106,17 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
     shared_ptr<DataStreamRecvr> rcvr = FindRecvr(fragment_instance_id, node_id, false);
     if (rcvr.get() != NULL) return rcvr;
     // Find the rendezvous, creating a new one if one does not already exist.
-    promise = &pending_rendezvous_[promise_key];
-    promise->IncRefCount();
+    RefCountedPromise* ref_counted_promise = &pending_rendezvous_[promise_key];
+    promise = ref_counted_promise->promise;
+    ref_counted_promise->IncRefCount();
   }
   bool timed_out = false;
   MonotonicStopWatch sw;
   sw.Start();
   num_senders_waiting_->Increment(1L);
   total_senders_waited_->Increment(1L);
-  shared_ptr<DataStreamRecvr> recvr =
-      promise->promise->Get(FLAGS_datastream_sender_timeout_ms, &timed_out);
+  shared_ptr<DataStreamRecvr> rcvr =
+      promise->Get(FLAGS_datastream_sender_timeout_ms, &timed_out);
   num_senders_waiting_->Increment(-1L);
   const string& time_taken = PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
   if (timed_out) {
@@ -130,9 +131,11 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
     lock_guard<SpinLock> l(lock_);
     // If we are the last to leave, remove the rendezvous from the pending map. Any new
     // incoming senders will add a new entry to the map themselves.
-    if (promise->DecRefCount() == 0) pending_rendezvous_.erase(promise_key);
+    if (pending_rendezvous_[promise_key].DecRefCount() == 0) {
+      pending_rendezvous_.erase(promise_key);
+    }
   }
-  return recvr;
+  return rcvr;
 }
 
 shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvr(
