@@ -27,6 +27,7 @@ DECLARE_string(webserver_password_file);
 DECLARE_string(webserver_certificate_file);
 DECLARE_string(webserver_private_key_file);
 DECLARE_string(webserver_private_key_password_cmd);
+DECLARE_string(webserver_x_frame_options);
 
 #include "common/names.h"
 
@@ -296,14 +297,29 @@ TEST(Webserver, NoFrameEmbeddingTest) {
   const string FRAME_TEST_PATH = "/frames_test";
   Webserver webserver(FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
-  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw-text.tmpl", callback);
+  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback);
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
       FRAME_TEST_PATH, &contents, 200));
 
-  // Confirm that the embedded frame isn't rendered
-  ASSERT_TRUE(contents.str().find("Metrics") == string::npos);
+  // Confirm that there is an HTTP header to deny framing
+  ASSERT_FALSE(contents.str().find("X-Frame-Options: DENY") == string::npos);
+}
+TEST(Webserver, FrameAllowEmbeddingTest) {
+  const string FRAME_TEST_PATH = "/frames_test";
+  ScopedFlagSetter<string> webserver_x_frame_options(&FLAGS_webserver_x_frame_options,
+      "ALLOWALL");
+  Webserver webserver(FLAGS_webserver_port);
+  Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
+  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback);
+  ASSERT_OK(webserver.Start());
+  stringstream contents;
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
+      FRAME_TEST_PATH, &contents, 200));
+
+  // Confirm that there is an HTTP header to allow framing
+  ASSERT_FALSE(contents.str().find("X-Frame-Options: ALLOWALL") == string::npos);
 }
 
 const string STRING_WITH_NULL = "123456789\0ABCDE";

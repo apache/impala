@@ -92,6 +92,9 @@ DEFINE_string(webserver_password_file, "",
     "(Optional) Location of .htpasswd file containing user names and hashed passwords for"
     " debug webserver authentication");
 
+DEFINE_string(webserver_x_frame_options, "DENY", 
+    "webserver will add X-Frame-Options HTTP header with this value");
+
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
 
@@ -138,11 +141,12 @@ string BuildHeaderString(ResponseCode response, ContentType content_type) {
   static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0 $1\r\n"
       "Content-Type: text/$2\r\n"
       "Content-Length: %d\r\n"
-      "X-Frame-Options: DENY\r\n"
+      "X-Frame-Options: $3\r\n"
       "\r\n";
 
   return Substitute(RESPONSE_TEMPLATE, response, response == OK ? "OK" : "Not found",
-      content_type == HTML ? "html" : "plain");
+      content_type == HTML ? "html" : "plain",
+      FLAGS_webserver_x_frame_options.c_str());
 }
 
 Webserver::Webserver()
