@@ -78,7 +78,7 @@ echo "Extracting tarball"
 tar -C ${SNAPSHOT_STAGING_DIR} -xzf ${SNAPSHOT_FILE}
 
 if [ ! -f ${SNAPSHOT_STAGING_DIR}/test-warehouse/githash.txt ]; then
-  echo "The test-warehouse snapshot does not containa githash, aborting load"
+  echo "The test-warehouse snapshot does not contain a githash.txt file, aborting load"
   exit 1
 fi
 
