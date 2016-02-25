@@ -101,6 +101,7 @@ void HBaseTableSink::Close(RuntimeState* state) {
     hbase_table_writer_.reset(NULL);
   }
   Expr::Close(output_expr_ctxs_, state);
+  DataSink::Close(state);
   closed_ = true;
 }
 

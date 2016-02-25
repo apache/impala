@@ -135,8 +135,15 @@ string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
 
 Status DataSink::Prepare(RuntimeState* state) {
   expr_mem_tracker_.reset(
-      new MemTracker(-1, -1, "Data sink", state->instance_mem_tracker(), false));
+      new MemTracker(-1, -1, "Data sink expr", state->instance_mem_tracker(), false));
   return Status::OK();
+}
+
+void DataSink::Close(RuntimeState* state) {
+  if (expr_mem_tracker_.get() != NULL) {
+    expr_mem_tracker_->UnregisterFromParent();
+    expr_mem_tracker_.reset();
+  }
 }
 
 }  // namespace impala

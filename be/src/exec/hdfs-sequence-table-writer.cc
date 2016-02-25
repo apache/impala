@@ -69,7 +69,7 @@ Status HdfsSequenceTableWriter::Init() {
     }
     RETURN_IF_ERROR(Codec::GetHadoopCodecClassName(codec, &codec_name_));
     RETURN_IF_ERROR(Codec::CreateCompressor(
-        mem_pool_, true, codec_name_, &compressor_));
+        mem_pool_.get(), true, codec_name_, &compressor_));
     DCHECK(compressor_.get() != NULL);
   }
 
@@ -302,6 +302,12 @@ Status HdfsSequenceTableWriter::Flush() {
   out_.Clear();
   unflushed_rows_ = 0;
   return Status::OK();
+}
+
+void HdfsSequenceTableWriter::Close() {
+  // TODO: double check there is no memory leak.
+  parent_->mem_tracker()->Release(approx_block_size_);
+  mem_pool_->FreeAll();
 }
 
 } // namespace impala

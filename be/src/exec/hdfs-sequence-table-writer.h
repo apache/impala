@@ -48,7 +48,7 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   virtual Status Init();
   virtual Status Finalize() { return Flush(); }
   virtual Status InitNewFile() { return WriteFileHeader(); }
-  virtual void Close() { return; }
+  virtual void Close();
   virtual uint64_t default_block_size() const { return 0; }
   virtual std::string file_extension() const { return "seq"; }
 
@@ -90,7 +90,7 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   WriteStream row_buf_;
 
   /// memory pool used by codec to allocate output buffer
-  MemPool* mem_pool_;
+  boost::scoped_ptr<MemPool> mem_pool_;
 
   /// true if compression is enabled
   bool compress_flag_;

@@ -448,6 +448,10 @@ void DataStreamSender::Close(RuntimeState* state) {
     channels_[i]->Close(state);
   }
   Expr::Close(partition_expr_ctxs_, state);
+  if (mem_tracker_.get() != NULL) {
+    mem_tracker_->UnregisterFromParent();
+    mem_tracker_.reset();
+  }
   closed_ = true;
 }
 

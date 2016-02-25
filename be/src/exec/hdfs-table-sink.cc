@@ -625,6 +625,11 @@ void HdfsTableSink::Close(RuntimeState* state) {
   }
   Expr::Close(output_expr_ctxs_, state);
   Expr::Close(partition_key_expr_ctxs_, state);
+  if (mem_tracker_.get() != NULL) {
+    mem_tracker_->UnregisterFromParent();
+    mem_tracker_.reset();
+  }
+  DataSink::Close(state);
   closed_ = true;
 }
 
