@@ -365,11 +365,7 @@ class Plan {
 
   const TQueryOptions& query_options() const { return query_options_; }
 
-  void SetReplicaPreference(TReplicaPreference::type p) {
-    query_options_.replica_preference = p;
-  }
-
-  void SetRandomReplica(bool b) { query_options_.random_replica = b; }
+  void SetRandomReplica(bool b) { query_options_.schedule_random_replica = b; }
   void SetDisableCachedReads(bool b) { query_options_.disable_cached_reads = b; }
   const Cluster& cluster() const { return schema_.cluster(); }
 

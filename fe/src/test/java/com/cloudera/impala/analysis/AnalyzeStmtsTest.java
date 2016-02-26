@@ -1611,20 +1611,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       String suffix = hintStyle[1];
       for (String alias : new String[] { "", "a" }) {
         AnalyzesOk(
-            String.format("select * from functional.alltypes %s %sschedule_cache_local%s",
-            alias, prefix, suffix));
-        AnalyzesOk(
-            String.format("select * from functional.alltypes %s %sschedule_disk_local%s",
-            alias, prefix, suffix));
-        AnalyzesOk(
-            String.format("select * from functional.alltypes %s %sschedule_remote%s",
-            alias, prefix, suffix));
-        AnalyzesOk(
-            String.format("select * from functional.alltypes %s %sschedule_remote," +
-            "random_replica%s", alias, prefix, suffix));
-        AnalyzesOk(
-            String.format("select * from functional.alltypes %s %srandom_replica," +
-            "schedule_remote%s", alias, prefix, suffix));
+            String.format("select * from functional.alltypes %s " +
+            "%sschedule_random_replica%s", alias, prefix, suffix));
 
         String name = alias.isEmpty() ? "functional.alltypes" : alias;
         AnalyzesOk(String.format("select * from functional.alltypes %s %sFOO%s", alias,
@@ -1633,24 +1621,24 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
         // Table hints not supported for HBase tables
         AnalyzesOk(String.format("select * from functional_hbase.alltypes %s " +
-              "%srandom_replica%s", alias, prefix, suffix),
+              "%sschedule_random_replica%s", alias, prefix, suffix),
             "Table hints only supported for Hdfs tables");
         // Table hints not supported for catalog views
         AnalyzesOk(String.format("select * from functional.alltypes_view %s " +
-              "%srandom_replica%s", alias, prefix, suffix),
+              "%sschedule_random_replica%s", alias, prefix, suffix),
             "Table hints not supported for inline view and collections");
         // Table hints not supported for with clauses
         AnalyzesOk(String.format("with t as (select 1) select * from t %s " +
-              "%srandom_replica%s", alias, prefix, suffix),
+              "%sschedule_random_replica%s", alias, prefix, suffix),
             "Table hints not supported for inline view and collections");
       }
       // Table hints not supported for inline views
       AnalyzesOk(String.format("select * from (select tinyint_col * 2 as c1 from " +
-          "functional.alltypes) as v1 %srandom_replica%s", prefix, suffix),
+          "functional.alltypes) as v1 %sschedule_random_replica%s", prefix, suffix),
           "Table hints not supported for inline view and collections");
       // Table hints not supported for collection tables
       AnalyzesOk(String.format("select item from functional.allcomplextypes, " +
-          "allcomplextypes.int_array_col %srandom_replica%s", prefix, suffix),
+          "allcomplextypes.int_array_col %sschedule_random_replica%s", prefix, suffix),
           "Table hints not supported for inline view and collections");
     }
   }

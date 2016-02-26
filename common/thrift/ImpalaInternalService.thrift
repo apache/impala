@@ -133,17 +133,12 @@ struct TQueryOptions {
   // produce different results than the scan based approach in some edge cases.
   32: optional bool optimize_partition_key_scans = 0
 
-  // Specify the prefered locality level of replicas during scan scheduling.
-  // Replicas with an equal or better locality will be preferred.
-  33: optional PlanNodes.TReplicaPreference replica_preference =
-      PlanNodes.TReplicaPreference.CACHE_LOCAL
-
   // Configure whether scheduling of scans over multiple non-cached replicas will break
   // ties between multiple, otherwise equivalent locations at random or deterministically.
   // The former will pick a random replica, the latter will use the replica order from the
   // metastore. This setting will not affect tie-breaking for cached replicas. Instead,
   // they will always break ties randomly.
-  34: optional bool random_replica = 0
+  34: optional bool schedule_random_replica = 0
 
   // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
   // the number of rows * number of operators in the conjuncts exceeds this threshold.

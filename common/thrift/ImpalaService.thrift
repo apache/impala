@@ -172,13 +172,8 @@ enum TImpalaQueryOptions {
   // produce different results than the scan based approach in some edge cases.
   OPTIMIZE_PARTITION_KEY_SCANS,
 
-  // Prefered memory distance of replicas. This parameter determines the pool of replicas
-  // among which scans will be scheduled in terms of the distance of the replica storage
-  // from the impalad.
-  REPLICA_PREFERENCE,
-
   // Determines tie breaking policy when picking locations.
-  RANDOM_REPLICA,
+  SCHEDULE_RANDOM_REPLICA,
 
   // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
   // the number of rows * number of operators in the conjuncts exceeds this threshold.

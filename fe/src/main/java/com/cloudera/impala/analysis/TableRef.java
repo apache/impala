@@ -394,16 +394,7 @@ public class TableRef implements ParseNode {
       analyzer.addWarning("Table hints only supported for Hdfs tables");
     }
     for (String hint: tableHints_) {
-      if (hint.equalsIgnoreCase("SCHEDULE_CACHE_LOCAL")) {
-        analyzer.setHasPlanHints();
-        replicaPreference_ = TReplicaPreference.CACHE_LOCAL;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_DISK_LOCAL")) {
-        analyzer.setHasPlanHints();
-        replicaPreference_ = TReplicaPreference.DISK_LOCAL;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_REMOTE")) {
-        analyzer.setHasPlanHints();
-        replicaPreference_ = TReplicaPreference.REMOTE;
-      } else if (hint.equalsIgnoreCase("RANDOM_REPLICA")) {
+      if (hint.equalsIgnoreCase("SCHEDULE_RANDOM_REPLICA")) {
         analyzer.setHasPlanHints();
         randomReplica_ = true;
       } else {

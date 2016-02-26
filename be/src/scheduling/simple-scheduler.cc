@@ -451,8 +451,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment) {
   // We adjust all replicas with memory distance less than base_distance to base_distance
   // and view all replicas with equal or better distance as the same. For a full list of
-  // memory distance classes see TReplicaPreference in ImpalaInternalService.thrift.
-  TReplicaPreference::type base_distance = query_options.replica_preference;
+  // memory distance classes see TReplicaPreference in PlanNodes.thrift.
+  TReplicaPreference::type base_distance = TReplicaPreference::CACHE_LOCAL;
   // The query option to disable cached reads adjusts the memory base distance to view
   // all replicas as disk_local or worse.
   // TODO remove in CDH6
@@ -467,7 +467,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   // On otherwise equivalent disk replicas we either pick the first one, or we pick a
   // random one. Picking random ones helps with preventing hot spots across several
   // queries. On cached replica we will always break ties randomly.
-  bool random_non_cached_tiebreak = node_random_replica || query_options.random_replica;
+  bool random_non_cached_tiebreak = node_random_replica
+      || query_options.schedule_random_replica;
 
   // map from datanode host to total assigned bytes.
   unordered_map<TNetworkAddress, uint64_t> assigned_bytes_per_host;
