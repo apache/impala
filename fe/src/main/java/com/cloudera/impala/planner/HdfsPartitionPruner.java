@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BetweenPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.CompoundPredicate;
@@ -204,6 +205,9 @@ public class HdfsPartitionPruner {
         if (!(expr.getChild(i).isLiteral())) return false;
       }
       return true;
+    } else if (expr instanceof BetweenPredicate) {
+      return canEvalUsingPartitionMd(((BetweenPredicate) expr).getRewrittenPredicate(),
+          analyzer);
     }
     return false;
   }
@@ -399,8 +403,8 @@ public class HdfsPartitionPruner {
    * Evaluate a slot binding predicate on a partition key using the partition
    * key values; return the matching partition ids. An empty set is returned
    * if there are no matching partitions. This function can evaluate the following
-   * types of predicates: BinaryPredicate, CompoundPredicate, IsNullPredicate, and
-   * InPredicate.
+   * types of predicates: BinaryPredicate, CompoundPredicate, IsNullPredicate,
+   * InPredicate, and BetweenPredicate.
    */
   private HashSet<Long> evalSlotBindingFilter(Expr expr) {
     Preconditions.checkNotNull(expr);
@@ -423,6 +427,8 @@ public class HdfsPartitionPruner {
       return evalInPredicate(expr);
     } else if (expr instanceof IsNullPredicate) {
       return evalIsNullPredicate(expr);
+    } else if (expr instanceof BetweenPredicate) {
+      return evalSlotBindingFilter(((BetweenPredicate) expr).getRewrittenPredicate());
     }
     return null;
   }

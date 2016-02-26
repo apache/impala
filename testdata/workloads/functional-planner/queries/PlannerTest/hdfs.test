@@ -325,6 +325,18 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
 ====
+# disjunction between predicates with complex constant exprs
+select * from functional.alltypes
+where year = 2009 and (month between 5+1 and 8-1 or month between 9-2 and 1+7)
+---- PLAN
+00:SCAN HDFS [functional.alltypes]
+   partitions=3/24 files=3 size=60.43KB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+====
 # slot binding still determined
 select * from functional.alltypes where year - 1 = 2009
 ---- PLAN
