@@ -85,6 +85,7 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     now_(new TimestampValue(query_ctx.now_string.c_str(),
         query_ctx.now_string.size())),
     exec_env_(ExecEnv::GetInstance()),
+    codegen_expr_(false),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
