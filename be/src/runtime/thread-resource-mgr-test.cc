@@ -45,7 +45,8 @@ TEST(ThreadResourceMgr, BasicTest) {
   NotifiedCounter counter1, counter2;
 
   ThreadResourceMgr::ResourcePool* c1 = mgr.RegisterPool();
-  c1->SetThreadAvailableCb(bind<void>(mem_fn(&NotifiedCounter::Notify), &counter1, _1));
+  int callback1 = c1->AddThreadAvailableCb(bind<void>(mem_fn(&NotifiedCounter::Notify),
+      &counter1, _1));
   c1->AcquireThreadToken();
   c1->AcquireThreadToken();
   c1->AcquireThreadToken();
@@ -77,7 +78,8 @@ TEST(ThreadResourceMgr, BasicTest) {
 
   // Register a new consumer, quota is cut in half
   ThreadResourceMgr::ResourcePool* c2 = mgr.RegisterPool();
-  c2->SetThreadAvailableCb(bind<void>(mem_fn(&NotifiedCounter::Notify), &counter2, _1));
+  int callback2 = c2->AddThreadAvailableCb(bind<void>(mem_fn(&NotifiedCounter::Notify),
+      &counter2, _1));
   EXPECT_FALSE(c1->TryAcquireThreadToken());
   EXPECT_EQ(c1->num_threads(), 3);
   c1->AcquireThreadToken();
@@ -85,10 +87,78 @@ TEST(ThreadResourceMgr, BasicTest) {
   EXPECT_EQ(c1->num_required_threads(), 2);
   EXPECT_EQ(c1->num_optional_threads(), 2);
 
+  c1->RemoveThreadAvailableCb(callback1);
   mgr.UnregisterPool(c1);
+  c2->RemoveThreadAvailableCb(callback2);
   mgr.UnregisterPool(c2);
   EXPECT_EQ(counter1.counter(), 3);
   EXPECT_EQ(counter2.counter(), 1);
+}
+
+TEST(ThreadResourceMgr, MultiCallbacks) {
+  ThreadResourceMgr mgr(6);
+  NotifiedCounter counter1, counter2, counter3;
+
+  ThreadResourceMgr::ResourcePool* c1 = mgr.RegisterPool();
+  int callback1 = c1->AddThreadAvailableCb(
+      bind<void>(mem_fn(&NotifiedCounter::Notify), &counter1, _1));
+  int callback2 = c1->AddThreadAvailableCb(
+      bind<void>(mem_fn(&NotifiedCounter::Notify), &counter2, _1));
+
+  // Round-robin between two callbacks.
+  c1->AcquireThreadToken();
+  c1->AcquireThreadToken();
+  c1->AcquireThreadToken();
+
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 1);
+  EXPECT_EQ(counter2.counter(), 1);
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 2);
+  EXPECT_EQ(counter2.counter(), 2);
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 3);
+  EXPECT_EQ(counter2.counter(), 3);
+
+  // Remove callback 2. Only callback 1 will be called.
+  c1->AcquireThreadToken();
+  c1->AcquireThreadToken();
+  c1->AcquireThreadToken();
+  c1->RemoveThreadAvailableCb(callback2);
+
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 4);
+  EXPECT_EQ(counter2.counter(), 3);
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 5);
+  EXPECT_EQ(counter2.counter(), 3);
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 6);
+  EXPECT_EQ(counter2.counter(), 3);
+
+  // Also remove callback 1. No callback will be called.
+  c1->AcquireThreadToken();
+  c1->AcquireThreadToken();
+  c1->AcquireThreadToken();
+  c1->RemoveThreadAvailableCb(callback1);
+
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 6);
+  EXPECT_EQ(counter2.counter(), 3);
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 6);
+  EXPECT_EQ(counter2.counter(), 3);
+  c1->ReleaseThreadToken(true);
+  EXPECT_EQ(counter1.counter(), 6);
+  EXPECT_EQ(counter2.counter(), 3);
+
+  // Also verify UnregisterPool() will invoke the callback.
+  ThreadResourceMgr::ResourcePool* c2 = mgr.RegisterPool();
+  c2->AddThreadAvailableCb(
+      bind<void>(mem_fn(&NotifiedCounter::Notify), &counter3, _1));
+  EXPECT_EQ(counter3.counter(), 0);
+  mgr.UnregisterPool(c1);
+  EXPECT_EQ(counter3.counter(), 1);
 }
 
 }

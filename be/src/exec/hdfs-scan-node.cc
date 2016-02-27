@@ -113,6 +113,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       done_(false),
       all_ranges_started_(false),
       counters_running_(false),
+      thread_avail_cb_id_(-1),
       rm_callback_id_(-1) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
@@ -695,7 +696,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
         runtime_state_->query_options().num_scanner_threads);
   }
 
-  runtime_state_->resource_pool()->SetThreadAvailableCb(
+  thread_avail_cb_id_ = runtime_state_->resource_pool()->AddThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
 
   if (runtime_state_->query_resource_mgr() != NULL) {
@@ -797,7 +798,9 @@ void HdfsScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SetDone();
 
-  state->resource_pool()->SetThreadAvailableCb(NULL);
+  if (thread_avail_cb_id_ != -1) {
+    state->resource_pool()->RemoveThreadAvailableCb(thread_avail_cb_id_);
+  }
   if (state->query_resource_mgr() != NULL && rm_callback_id_ != -1) {
     state->query_resource_mgr()->RemoveVcoreAvailableCb(rm_callback_id_);
   }
@@ -979,6 +982,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     if (!is_reserved) {
       if (runtime_state_->query_resource_mgr() != NULL &&
           runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
+        pool->ReleaseThreadToken(false);
         break;
       }
     }

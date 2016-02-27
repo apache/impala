@@ -149,3 +149,14 @@ group by id) v2;
 ---- TYPES
 TINYINT,INT,BIGINT
 ====
+====
+---- QUERY
+# Regression test for IMPALA-561: Multiple scan nodes in a plan fragment.
+select count(*)
+from functional.alltypes a1
+left join functional.alltypes a2 on a2.tinyint_col >= 1
+---- RESULTS
+47961000
+---- TYPES
+BIGINT
+====
