@@ -52,6 +52,7 @@
 using boost::algorithm::is_any_of;
 using boost::algorithm::replace_all;
 using boost::algorithm::split;
+using boost::algorithm::trim;
 using boost::mt19937;
 using boost::uniform_int;
 using namespace apache::thrift;
@@ -90,6 +91,10 @@ DEFINE_string(ldap_bind_pattern, "", "If set, Impala will try to bind to LDAP wi
      " of <ldap_bind_pattern>, but where the string #UID is replaced by the user ID. Use"
      " to control the bind name precisely; do not set --ldap_domain or --ldap_baseDN with"
      " this option");
+DEFINE_string(internal_principals_whitelist, "hdfs", "(Advanced) Comma-separated list of "
+    " additional usernames authorized to access Impala's internal APIs. Defaults to "
+    "'hdfs' which is the system user that in certain deployments must access "
+    "catalog server APIs.");
 
 namespace impala {
 
@@ -372,7 +377,7 @@ static int SaslVerifyFile(void* context, const char* file,
 // first components of the 'requested_user' and our principal are the same.
 //
 // conn: Sasl connection - Ignored
-// context: Ignored, always NULL
+// context: Always NULL except for testing.
 // requested_user: The identity/username to authorize
 // rlen: Length of above
 // auth_identity: "The identity associated with the secret"
@@ -381,7 +386,7 @@ static int SaslVerifyFile(void* context, const char* file,
 // urlen: Length of above
 // propctx: Auxiliary properties - Ignored
 // Return: SASL_OK
-static int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
+int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
     const char* requested_user, unsigned rlen,
     const char* auth_identity, unsigned alen,
     const char* def_realm, unsigned urlen,
@@ -395,21 +400,36 @@ static int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
               << "<service>/<hostname>@<realm> - got: " << requested_user;
     return SASL_BADAUTH;
   }
-  SaslAuthProvider* internal_auth_provider = static_cast<SaslAuthProvider*>(
-      AuthManager::GetInstance()->GetInternalAuthProvider());
-
-  if (names[0] == internal_auth_provider->service_name()) {
-    // We say "principal" here becase this is for internal communication, and hence
-    // ought always be --principal or --be_principal
-    VLOG(1) << "Successfully authenticated principal \"" << requested_principal
-            << "\" on an internal connection";
-    return SASL_OK;
+  SaslAuthProvider* internal_auth_provider;
+  if (context == NULL) {
+    internal_auth_provider = static_cast<SaslAuthProvider*>(
+        AuthManager::GetInstance()->GetInternalAuthProvider());
+  } else {
+    // Branch should only be taken for testing, where context is used to inject an auth
+    // provider.
+    internal_auth_provider = static_cast<SaslAuthProvider*>(context);
   }
 
+  vector<string> whitelist;
+  split(whitelist, FLAGS_internal_principals_whitelist, is_any_of(","));
+  whitelist.push_back(internal_auth_provider->service_name());
+  for (string& s: whitelist) {
+    trim(s);
+    if (s.empty()) continue;
+    if (names[0] == s) {
+      // We say "principal" here becase this is for internal communication, and hence
+      // ought always be --principal or --be_principal
+      VLOG(1) << "Successfully authenticated principal \"" << requested_principal
+              << "\" on an internal connection";
+      return SASL_OK;
+    }
+  }
+  string expected_names = FLAGS_internal_principals_whitelist.empty() ? "" :
+      Substitute(" or one of $0", FLAGS_internal_principals_whitelist);
   LOG(INFO) << "Principal \"" << requested_principal << "\" not authenticated. "
             << "Reason: 'service' does not match from <service>/<hostname>@<realm>.\n"
             << "Got: " << names[0]
-            << ". Expected: " << internal_auth_provider->service_name();
+            << ". Expected: " << internal_auth_provider->service_name() << expected_names;
   return SASL_BADAUTH;
 }
 

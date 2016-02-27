@@ -19,12 +19,15 @@
 #include "util/network-util.h"
 #include "util/thread.h"
 
+#include <ldap.h>
+
 DECLARE_bool(enable_ldap_auth);
 DECLARE_string(ldap_uri);
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
+DECLARE_string(internal_principals_whitelist);
 
 // These are here so that we can grab them early in main() - the kerberos
 // init can clobber KRB5_KTNAME in PrincipalSubstitution.
@@ -34,6 +37,12 @@ static const char *env_princ = NULL;
 #include "common/names.h"
 
 namespace impala {
+
+int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
+    const char* requested_user, unsigned rlen,
+    const char* auth_identity, unsigned alen,
+    const char* def_realm, unsigned urlen,
+    struct propctx* propctx);
 
 TEST(Auth, PrincipalSubstitution) {
   string hostname;
@@ -46,6 +55,43 @@ TEST(Auth, PrincipalSubstitution) {
   ASSERT_EQ("service_name", sa.service_name());
   ASSERT_EQ(hostname, sa.hostname());
   ASSERT_EQ("some.realm", sa.realm());
+}
+
+void AuthOk(const string& name, SaslAuthProvider* sa) {
+  EXPECT_EQ(SASL_OK,
+      SaslAuthorizeInternal(NULL, (void*)sa, name.c_str(), name.size(), NULL, 0, NULL, 0,
+          NULL));
+}
+
+void AuthFails(const string& name, SaslAuthProvider* sa) {
+  EXPECT_EQ(SASL_BADAUTH,
+      SaslAuthorizeInternal(NULL, (void*)sa, name.c_str(), name.size(), NULL, 0, NULL, 0,
+          NULL));
+}
+
+TEST(Auth, AuthorizeInternalPrincipals) {
+  SaslAuthProvider sa(true);  // false means it's external
+  ASSERT_OK(sa.InitKerberos("service_name/localhost@some.realm", "/etc/hosts"));
+
+  AuthOk("service_name/localhost@some.realm", &sa);
+  AuthFails("unknown/localhost@some.realm", &sa);
+
+  FLAGS_internal_principals_whitelist = "hdfs1,hdfs2";
+  AuthOk("hdfs1/localhost@some.realm", &sa);
+  AuthOk("hdfs2/localhost@some.realm", &sa);
+  AuthFails("hdfs/localhost@some.realm", &sa);
+
+  AuthFails("hdfs1@some.realm", &sa);
+  AuthFails("/localhost@some.realm", &sa);
+
+  FLAGS_internal_principals_whitelist = "";
+  AuthFails("", &sa);
+
+  FLAGS_internal_principals_whitelist = ",";
+  AuthFails("", &sa);
+
+  FLAGS_internal_principals_whitelist = " ,";
+  AuthFails("", &sa);
 }
 
 TEST(Auth, ValidAuthProviders) {
