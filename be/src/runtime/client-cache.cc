@@ -84,7 +84,7 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
   // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does not
   // clean up internal buffers it reopens. To work around this issue, create a new client
   // instead.
-  ClientKey* old_client_key = client_key;
+  ClientKey old_client_key = *client_key;
   if (metrics_enabled_) total_clients_metric_->Increment(-1);
   Status status = CreateClient(client_impl->address(), factory_method, client_key);
   // Only erase the existing client from the map if creation of the new one succeeded.
@@ -96,7 +96,7 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
   } else {
     // Restore the client used before the failed re-opening attempt, so the caller can
     // properly release it.
-    *client_key = *old_client_key;
+    *client_key = old_client_key;
   }
   return status;
 }
