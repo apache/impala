@@ -133,6 +133,10 @@ class BloomFilter {
   RuntimeState* const state_;
   BufferedBlockMgr::Client* const client_;
 
+  int64_t directory_size() const {
+    return 1uLL << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
+  }
+
   DISALLOW_COPY_AND_ASSIGN(BloomFilter);
 };
 
