@@ -33,11 +33,8 @@ namespace impala {
 /// TODO: Add metrics to track the number of tables outstanding
 class HBaseTableFactory {
  public:
-  ~HBaseTableFactory();
-
-  /// JNI setup. Create global references to classes, and find method ids.
-  /// This call can cause connections to HBase and Zookeeper to be created.
-  static Status Init();
+  HBaseTableFactory();
+  virtual ~HBaseTableFactory();
 
   /// create an HTable java object for the given table name.
   /// It is the caller's responsibility to close the HBaseTable using
@@ -46,12 +43,19 @@ class HBaseTableFactory {
                   boost::scoped_ptr<HBaseTable>* hbase_table);
 
  private:
-  /// Connection jobject. Initialized in Init().
-  static jobject connection_;
+  /// Connection jobject. Initialized in GetConnection(). The connection_ pointer value
+  /// is protected by connection_lock_: the Connection object can be shared between
+  /// threads.
+  boost::mutex connection_lock_;
+  jobject connection_;
 
   /// Connection class and methods.
-  static jclass connection_cl_;
-  static jmethodID connection_close_id_;
+  jclass connection_cl_;
+  jmethodID connection_close_id_;
+
+  /// Opens the connections to HBase and Zookeeper on the first call.
+  /// Returns the existing connection on subsequent calls.
+  Status GetConnection(jobject* connection);
 };
 
 }  // namespace impala

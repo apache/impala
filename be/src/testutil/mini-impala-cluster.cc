@@ -26,6 +26,7 @@
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
+#include "runtime/hbase-table.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "util/jni-util.h"
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(HBaseTableFactory::Init());
+  EXIT_IF_ERROR(HBaseTable::InitJNI());
   EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
 

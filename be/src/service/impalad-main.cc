@@ -23,7 +23,7 @@
 #include "common/init.h"
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
-#include "runtime/hbase-table-factory.h"
+#include "runtime/hbase-table.h"
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "runtime/coordinator.h"
@@ -57,7 +57,7 @@ int ImpaladMain(int argc, char** argv) {
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(HBaseTableFactory::Init());
+  EXIT_IF_ERROR(HBaseTable::InitJNI());
   EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
 
