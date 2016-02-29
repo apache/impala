@@ -49,6 +49,7 @@
 
 #include "common/logging.h"
 #include "codegen/codegen-anyval.h"
+#include "codegen/codegen-symbol-emitter.h"
 #include "codegen/impala-ir-data.h"
 #include "codegen/instruction-counter.h"
 #include "codegen/mcjit-mem-mgr.h"
@@ -72,10 +73,15 @@ DEFINE_bool(print_llvm_ir_instruction_count, false,
 DEFINE_bool(disable_optimization_passes, false,
     "if true, disables llvm optimization passes (used for testing)");
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
+DEFINE_bool(perf_map, false,
+    "if true, generate /tmp/perf-<pid>.map file for linux perf symbols. "
+    "This is not recommended for production use because it may affect performance.");
 DEFINE_string(unopt_module_dir, "",
     "if set, saves unoptimized generated IR modules to the specified directory.");
 DEFINE_string(opt_module_dir, "",
     "if set, saves optimized generated IR modules to the specified directory.");
+DEFINE_string(asm_module_dir, "",
+    "if set, saves disassembly for generated IR modules to the specified directory.");
 DECLARE_string(local_library_dir);
 
 namespace impala {
@@ -99,6 +105,7 @@ void LlvmCodeGen::InitializeLlvm(bool load_backend) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
+  llvm::InitializeNativeTargetDisassembler();
   llvm_initialized_ = true;
 
   if (load_backend) {
@@ -114,6 +121,9 @@ void LlvmCodeGen::InitializeLlvm(bool load_backend) {
   GetHostCPUAttrs(&cpu_attrs_);
   LOG(INFO) << "CPU flags for runtime code generation: "
             << boost::algorithm::join(cpu_attrs_, ",");
+
+  // Write an empty map file for perf to find.
+  if (FLAGS_perf_map) CodegenSymbolEmitter::WritePerfMap();
 }
 
 LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& id) :
@@ -349,12 +359,29 @@ Status LlvmCodeGen::Init(unique_ptr<Module> module) {
   true_value_ = ConstantInt::get(context(), APInt(1, true, true));
   false_value_ = ConstantInt::get(context(), APInt(1, false, true));
 
+  SetupJITListeners();
+
   RETURN_IF_ERROR(LoadIntrinsics());
 
   return Status::OK();
 }
 
+void LlvmCodeGen::SetupJITListeners() {
+  bool need_symbol_emitter = !FLAGS_asm_module_dir.empty() || FLAGS_perf_map;
+  if (!need_symbol_emitter) return;
+  symbol_emitter_.reset(new CodegenSymbolEmitter(id_));
+  execution_engine_->RegisterJITEventListener(symbol_emitter_.get());
+  symbol_emitter_->set_emit_perf_map(FLAGS_perf_map);
+
+  if (!FLAGS_asm_module_dir.empty()) {
+    symbol_emitter_->set_asm_path(Substitute("$0/$1.asm", FLAGS_asm_module_dir, id_));
+  }
+}
+
 LlvmCodeGen::~LlvmCodeGen() {
+  // Execution engine executes callback on event listener, so tear down engine first.
+  execution_engine_.reset();
+  symbol_emitter_.reset();
 }
 
 void LlvmCodeGen::EnableOptimizations(bool enable) {

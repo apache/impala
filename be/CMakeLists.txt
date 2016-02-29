@@ -150,6 +150,12 @@ if (IMPALA_TOOLCHAIN)
   # -Werror: compile warnings should be errors when using the toolchain compiler.
   SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
 endif()
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+  # -g: emit debug symbols in IR. These increase IR size, but are useful for debugging
+  #     codegened code and interpreting codegen disassembly dumps. In some cases (e.g.
+  #     reading optimised disassembly, it would be useful to have in the release build.
+  SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-g")
+endif()
 
 # Flags to pass to LLVM's opt to further optimize cross-compiled IR.
 #  -inline: inline with low threshold to get rid of trivial accessor functions.

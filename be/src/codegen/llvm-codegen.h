@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+
 #include <boost/unordered_set.hpp>
 
 #include <llvm/IR/DerivedTypes.h>
@@ -69,6 +69,7 @@ namespace llvm {
 namespace impala {
 
 class CodegenAnyVal;
+class CodegenSymbolEmitter;
 class SubExprElimination;
 
 /// LLVM code generator.  This is the top level object to generate jitted code.
@@ -439,6 +440,10 @@ class LlvmCodeGen {
   /// anyway (they must be explicitly invoked) so it is dead code.
   static void StripGlobalCtorsDtors(llvm::Module* module);
 
+  // Setup any JIT listeners to process generated machine code object, e.g. to generate
+  // perf symbol map or disassembly.
+  void SetupJITListeners();
+
   /// Load the intrinsics impala needs.  This is a one time initialization.
   /// Values are stored in 'llvm_intrinsics_'
   Status LoadIntrinsics();
@@ -569,6 +574,11 @@ class LlvmCodeGen {
   /// llvm constants to help with code gen verbosity
   llvm::Value* true_value_;
   llvm::Value* false_value_;
+
+  /// The symbol emitted associated with 'execution_engine_'. Methods on
+  /// 'symbol_emitter_' are called by 'execution_engine_' when code is emitted or freed.
+  /// The lifetime of the symbol emitter must be longer than 'execution_engine_'.
+  boost::scoped_ptr<CodegenSymbolEmitter> symbol_emitter_;
 };
 
 }
