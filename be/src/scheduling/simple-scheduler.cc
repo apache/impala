@@ -320,7 +320,9 @@ void SimpleScheduler::UpdateMembership(
 
     // If this impalad is not in our view of the membership list, we should add it and
     // tell the statestore.
-    bool is_offline = ExecEnv::GetInstance()->impala_server()->IsOffline();
+    // TODO: Inject global dependencies to make this code testable.
+    bool is_offline = ExecEnv::GetInstance() &&
+        ExecEnv::GetInstance()->impala_server()->IsOffline();
     if (!is_offline &&
         current_membership_.find(backend_id_) == current_membership_.end()) {
       VLOG(1) << "Registering local backend with statestore";
@@ -349,18 +351,6 @@ void SimpleScheduler::UpdateMembership(
       num_fragment_instances_metric_->set_value(current_membership_.size());
     }
   }
-}
-
-Status SimpleScheduler::GetBackends(
-    const vector<TNetworkAddress>& data_locations, BackendList* backendports) {
-  backendports->clear();
-  for (int i = 0; i < data_locations.size(); ++i) {
-    TBackendDescriptor backend;
-    GetBackend(data_locations[i], &backend);
-    backendports->push_back(backend);
-  }
-  DCHECK_EQ(data_locations.size(), backendports->size());
-  return Status::OK();
 }
 
 Status SimpleScheduler::GetBackend(const TNetworkAddress& data_location,
@@ -509,16 +499,11 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
         // the replica as not cached (network transfer dominates anyway in this case).
         // TODO: measure this in a cluster setup. Are remote reads better with caching?
         if (location.is_cached) {
-          is_cached = true;
           memory_distance = TReplicaPreference::CACHE_LOCAL;
         } else {
-          is_cached = false;
           memory_distance = TReplicaPreference::DISK_LOCAL;
         }
-        remote_read = false;
       } else {
-        is_cached = false;
-        remote_read = true;
         memory_distance = TReplicaPreference::REMOTE;
       }
       memory_distance = max(memory_distance, base_distance);
@@ -562,6 +547,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
         min_assigned_bytes = assigned_bytes;
         data_host = &replica_host;
         volume_id = location.volume_id;
+        is_cached = location.is_cached;
+        remote_read = min_distance == TReplicaPreference::REMOTE;
       }
     }  // end of BOOST_FOREACH
 

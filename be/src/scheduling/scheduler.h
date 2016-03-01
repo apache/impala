@@ -44,14 +44,8 @@ class Scheduler {
   /// List of server descriptors.
   typedef std::vector<TBackendDescriptor> BackendList;
 
-  /// Given a list of host / port pairs that represent data locations,
-  /// fills in hostports with host/port pairs of known ImpalaInternalServices
-  /// (that are running on those hosts or nearby).
-  virtual Status GetBackends(const std::vector<TNetworkAddress>& data_locations,
-      BackendList* backends) = 0;
-
-  /// Return a host/port pair of known ImpalaInternalServices that is running on or
-  /// nearby the given data location
+  /// Return a host/port pair of known ImpalaInternalServices that is running on or nearby
+  /// the given data location
   virtual Status GetBackend(const TNetworkAddress& data_location,
       TBackendDescriptor* backend) = 0;
 

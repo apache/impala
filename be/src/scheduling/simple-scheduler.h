@@ -38,6 +38,8 @@ namespace impala {
 class ResourceBroker;
 class Coordinator;
 
+class SchedulerWrapper;
+
 /// Performs simple scheduling by matching between a list of backends configured
 /// either from the statestore, or from a static list of addresses, and a list
 /// of target data locations.
@@ -61,17 +63,6 @@ class SimpleScheduler : public Scheduler {
   SimpleScheduler(const std::vector<TNetworkAddress>& backends, MetricGroup* metrics,
       Webserver* webserver, ResourceBroker* resource_broker,
       RequestPoolService* request_pool_service);
-
-  /// Returns a list of backends such that the impalad at backends[i] should be used to
-  /// read data from data_locations[i].
-  /// For each data_location, we choose a backend whose host matches the data_location in
-  /// a round robin fashion and insert it into backends.
-  /// If no match is found for a data location, assign the data location in round-robin
-  /// order to any of the backends.
-  /// If the set of available backends is updated between calls, round-robin state is
-  /// reset.
-  virtual Status GetBackends(const std::vector<TNetworkAddress>& data_locations,
-      BackendList* backends);
 
   /// Return a backend such that the impalad at backend.address should be used to read
   /// data from the given data_loation
@@ -258,6 +249,7 @@ class SimpleScheduler : public Scheduler {
   int FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
       const TQueryExecRequest& exec_request);
 
+  friend class impala::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomNonCached);
 };
