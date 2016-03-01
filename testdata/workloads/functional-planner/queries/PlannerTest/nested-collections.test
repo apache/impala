@@ -663,7 +663,6 @@ inner join functional.alltypes d on (b.id = d.id)
 |
 10:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: b.int_col = c.int_col
-|  other join predicates: b.int_col = c.int_col
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
@@ -747,7 +746,6 @@ where b.item < 10 and c.int_col > 30
 ---- PLAN
 12:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: d.value = e.id
-|  other join predicates: (d.value = e.id)
 |
 |--06:SCAN HDFS [functional.alltypestiny e]
 |     partitions=4/4 files=4 size=460B
@@ -1772,4 +1770,22 @@ left semi join c2.c_orders o2
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c1]
    partitions=1/1 files=4 size=577.87MB
+====
+# IMPALA-3084: Test correct assignment of NULL checking predicates
+# referencing outer-joined nested collections.
+select * from tpch_nested_parquet.customer c
+left outer join c.c_orders o
+where o.o_orderkey is null and o.o_orderstatus <=> o_orderpriority
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  predicates: o.o_orderkey IS NULL, o.o_orderstatus IS NOT DISTINCT FROM o_orderpriority
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.13MB
 ====

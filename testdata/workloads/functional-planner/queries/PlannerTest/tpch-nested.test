@@ -316,7 +316,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: c_mktsegment = 'BUILDING', !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -355,7 +355,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: c_mktsegment = 'BUILDING', !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -393,17 +393,17 @@ order by
 |
 01:SUBPLAN
 |
-|--08:NESTED LOOP JOIN [CROSS JOIN]
+|--08:SUBPLAN
+|  |
+|  |--06:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |
+|  |  |--04:SINGULAR ROW SRC
+|  |  |
+|  |  05:UNNEST [o.o_lineitems]
+|  |
+|  07:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--02:SINGULAR ROW SRC
-|  |
-|  04:SUBPLAN
-|  |
-|  |--07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  |
-|  |  |--05:SINGULAR ROW SRC
-|  |  |
-|  |  06:UNNEST [o.o_lineitems]
 |  |
 |  03:UNNEST [c.c_orders o]
 |
@@ -431,17 +431,17 @@ order by
 |
 01:SUBPLAN
 |
-|--08:NESTED LOOP JOIN [CROSS JOIN]
+|--08:SUBPLAN
+|  |
+|  |--06:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |
+|  |  |--04:SINGULAR ROW SRC
+|  |  |
+|  |  05:UNNEST [o.o_lineitems]
+|  |
+|  07:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--02:SINGULAR ROW SRC
-|  |
-|  04:SUBPLAN
-|  |
-|  |--07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  |
-|  |  |--05:SINGULAR ROW SRC
-|  |  |
-|  |  06:UNNEST [o.o_lineitems]
 |  |
 |  03:UNNEST [c.c_orders o]
 |
@@ -610,7 +610,7 @@ where
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [FINALIZE]
@@ -622,7 +622,7 @@ where
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ====
 # TPCH-Q7
@@ -2279,19 +2279,24 @@ limit 100
 |--16:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  |  join predicates: l3.l_suppkey != l1.l_suppkey
 |  |
-|  |--14:SINGULAR ROW SRC
+|  |--15:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
+|  |  |
+|  |  |--12:SINGULAR ROW SRC
+|  |  |
+|  |  13:UNNEST [o.o_lineitems l2]
 |  |
-|  15:UNNEST [o.o_lineitems l3]
+|  14:UNNEST [o.o_lineitems l3]
 |
 17:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |  runtime filters: RF000 <- n_nationkey
 |
-|--12:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
 |     partitions=1/1 files=1 size=4.18KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
-13:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: l1.l_suppkey = s_suppkey
 |
 |--00:SCAN HDFS [tpch_nested_parquet.supplier s]
@@ -2300,18 +2305,13 @@ limit 100
 |
 02:SUBPLAN
 |
-|--11:NESTED LOOP JOIN [CROSS JOIN]
+|--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--03:SINGULAR ROW SRC
 |  |
 |  05:SUBPLAN
 |  |
-|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
-|  |  |
-|  |  |--08:UNNEST [o.o_lineitems l2]
-|  |  |
-|  |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |--08:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
 |  |  |--06:SINGULAR ROW SRC
 |  |  |
@@ -2348,9 +2348,14 @@ limit 100
 |--16:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  |  join predicates: l3.l_suppkey != l1.l_suppkey
 |  |
-|  |--14:SINGULAR ROW SRC
+|  |--15:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
+|  |  |
+|  |  |--12:SINGULAR ROW SRC
+|  |  |
+|  |  13:UNNEST [o.o_lineitems l2]
 |  |
-|  15:UNNEST [o.o_lineitems l3]
+|  14:UNNEST [o.o_lineitems l3]
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
@@ -2358,11 +2363,11 @@ limit 100
 |
 |--22:EXCHANGE [BROADCAST]
 |  |
-|  12:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
 |     partitions=1/1 files=1 size=4.18KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
-13:HASH JOIN [INNER JOIN, BROADCAST]
+11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l1.l_suppkey = s_suppkey
 |
 |--21:EXCHANGE [BROADCAST]
@@ -2373,18 +2378,13 @@ limit 100
 |
 02:SUBPLAN
 |
-|--11:NESTED LOOP JOIN [CROSS JOIN]
+|--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--03:SINGULAR ROW SRC
 |  |
 |  05:SUBPLAN
 |  |
-|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
-|  |  |
-|  |  |--08:UNNEST [o.o_lineitems l2]
-|  |  |
-|  |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |--08:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
 |  |  |--06:SINGULAR ROW SRC
 |  |  |
@@ -2441,23 +2441,23 @@ order by
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |
-07:NESTED LOOP JOIN [INNER JOIN]
+07:SUBPLAN
+|
+|--05:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |
+|  |--03:SINGULAR ROW SRC
+|  |
+|  04:UNNEST [c.c_orders]
+|
+06:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: c_acctbal > avg(c_acctbal)
 |
-|--06:AGGREGATE [FINALIZE]
+|--02:AGGREGATE [FINALIZE]
 |  |  output: avg(c_acctbal)
 |  |
-|  05:SCAN HDFS [tpch_nested_parquet.customer c]
+|  01:SCAN HDFS [tpch_nested_parquet.customer c]
 |     partitions=1/1 files=4 size=577.87MB
 |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-|
-01:SUBPLAN
-|
-|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
-|  |
-|  |--02:SINGULAR ROW SRC
-|  |
-|  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=577.87MB
@@ -2479,7 +2479,15 @@ order by
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |
-07:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+07:SUBPLAN
+|
+|--05:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |
+|  |--03:SINGULAR ROW SRC
+|  |
+|  04:UNNEST [c.c_orders]
+|
+06:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  predicates: c_acctbal > avg(c_acctbal)
 |
 |--12:EXCHANGE [BROADCAST]
@@ -2489,20 +2497,12 @@ order by
 |  |
 |  10:EXCHANGE [UNPARTITIONED]
 |  |
-|  06:AGGREGATE
+|  02:AGGREGATE
 |  |  output: avg(c_acctbal)
 |  |
-|  05:SCAN HDFS [tpch_nested_parquet.customer c]
+|  01:SCAN HDFS [tpch_nested_parquet.customer c]
 |     partitions=1/1 files=4 size=577.87MB
 |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-|
-01:SUBPLAN
-|
-|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
-|  |
-|  |--02:SINGULAR ROW SRC
-|  |
-|  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=577.87MB

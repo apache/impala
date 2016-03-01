@@ -94,8 +94,8 @@ public class HdfsScanNode extends ScanNode {
   // Partitions that are filtered in for scanning by the key ranges
   private final List<HdfsPartition> partitions_;
 
-  private TReplicaPreference replicaPreference_;
-  private boolean randomReplica_;
+  private final TReplicaPreference replicaPreference_;
+  private final boolean randomReplica_;
 
   // Total number of files from partitions_
   private long totalFiles_ = 0;
@@ -274,7 +274,7 @@ public class HdfsScanNode extends ScanNode {
       // predicates based on slot equivalences and enforce slot equivalences by
       // generating new predicates.
       List<Expr> collectionConjuncts =
-          analyzer.getUnassignedConjuncts(Lists.newArrayList(itemTid), false);
+          analyzer.getUnassignedConjuncts(Lists.newArrayList(itemTid));
       ArrayList<Expr> bindingPredicates = analyzer.getBoundPredicates(itemTid);
       for (Expr boundPred: bindingPredicates) {
         if (!collectionConjuncts.contains(boundPred)) collectionConjuncts.add(boundPred);

@@ -108,8 +108,13 @@ public class TableRef implements ParseNode {
   // at the end of analyze() call.
   protected boolean isAnalyzed_;
 
-  // all (logical) TupleIds referenced in the On clause
-  protected List<TupleId> onClauseTupleIds_ = Lists.newArrayList();
+  // Lists of table ref ids and materialized tuple ids of the full sequence of table
+  // refs up to and including this one. These ids are cached during analysis because
+  // we may alter the chain of table refs during plan generation, but we still rely
+  // on the original list of ids for correct predicate assignment.
+  // Populated in analyzeJoin().
+  protected List<TupleId> allTableRefIds_ = Lists.newArrayList();
+  protected List<TupleId> allMaterializedTupleIds_ = Lists.newArrayList();
 
   // All physical tuple ids that this table ref is correlated with:
   // Tuple ids of root descriptors from outer query blocks that this table ref
@@ -160,7 +165,8 @@ public class TableRef implements ParseNode {
     // table refs is the responsibility of the statement.
     leftTblRef_ = null;
     isAnalyzed_ = other.isAnalyzed_;
-    onClauseTupleIds_ = Lists.newArrayList(other.onClauseTupleIds_);
+    allTableRefIds_ = Lists.newArrayList(other.allTableRefIds_);
+    allMaterializedTupleIds_ = Lists.newArrayList(other.allMaterializedTupleIds_);
     correlatedTupleIds_ = Lists.newArrayList(other.correlatedTupleIds_);
     desc_ = other.desc_;
   }
@@ -312,7 +318,6 @@ public class TableRef implements ParseNode {
     return distrMode_ == DistributionMode.PARTITIONED;
   }
   public DistributionMode getDistributionMode() { return distrMode_; }
-  public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
   public List<TupleId> getCorrelatedTupleIds() { return correlatedTupleIds_; }
   public boolean isAnalyzed() { return isAnalyzed_; }
   public boolean isResolved() { return !getClass().equals(TableRef.class); }
@@ -345,32 +350,21 @@ public class TableRef implements ParseNode {
   }
 
   /**
-   * Return the list of tuple ids materialized by the full sequence of
-   * table refs up to this one.
+   * Returns the list of tuple ids materialized by the full sequence of
+   * table refs up to and including this one.
    */
   public List<TupleId> getAllMaterializedTupleIds() {
-    if (leftTblRef_ != null) {
-      List<TupleId> result =
-          Lists.newArrayList(leftTblRef_.getAllMaterializedTupleIds());
-      result.addAll(getMaterializedTupleIds());
-      return result;
-    } else {
-      return getMaterializedTupleIds();
-    }
+    Preconditions.checkState(isAnalyzed_);
+    return allMaterializedTupleIds_;
   }
 
   /**
-   * Return the list of tuple ids of the full sequence of table refs up to this one.
+   * Return the list of table ref ids of the full sequence of table refs up to
+   * and including this one.
    */
-  public List<TupleId> getAllTupleIds() {
+  public List<TupleId> getAllTableRefIds() {
     Preconditions.checkState(isAnalyzed_);
-    if (leftTblRef_ != null) {
-      List<TupleId> result = leftTblRef_.getAllTupleIds();
-      result.add(desc_.getId());
-      return result;
-    } else {
-      return Lists.newArrayList(desc_.getId());
-    }
+    return allTableRefIds_;
   }
 
   protected void analyzeHints(Analyzer analyzer) throws AnalysisException {
@@ -437,12 +431,24 @@ public class TableRef implements ParseNode {
   }
 
   /**
-   * Analyze the join clause.
+   * Analyzes the join clause. Populates allTableRefIds_ and allMaterializedTupleIds_.
    * The join clause can only be analyzed after the left table has been analyzed
    * and the TupleDescriptor (desc) of this table has been created.
    */
   public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(leftTblRef_ == null || leftTblRef_.isAnalyzed_);
     Preconditions.checkState(desc_ != null);
+
+    // Populate the lists of all table ref and materialized tuple ids.
+    allTableRefIds_.clear();
+    allMaterializedTupleIds_.clear();
+    if (leftTblRef_ != null) {
+      allTableRefIds_.addAll(leftTblRef_.getAllTableRefIds());
+      allMaterializedTupleIds_.addAll(leftTblRef_.getAllMaterializedTupleIds());
+    }
+    allTableRefIds_.add(getId());
+    allMaterializedTupleIds_.addAll(getMaterializedTupleIds());
+
     if (joinOp_ == JoinOperator.CROSS_JOIN) {
       // A CROSS JOIN is always a broadcast join, regardless of the join hints
       distrMode_ = DistributionMode.BROADCAST;
@@ -487,11 +493,11 @@ public class TableRef implements ParseNode {
     }
     if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN
         || joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
-      analyzer.registerOuterJoinedTids(leftTblRef_.getAllTupleIds(), this);
+      analyzer.registerOuterJoinedTids(leftTblRef_.getAllTableRefIds(), this);
     }
     // register the tuple ids of a full outer join
     if (joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
-      analyzer.registerFullOuterJoinedTids(leftTblRef_.getAllTupleIds(), this);
+      analyzer.registerFullOuterJoinedTids(leftTblRef_.getAllTableRefIds(), this);
       analyzer.registerFullOuterJoinedTids(getId().asList(), this);
     }
     // register the tuple id of the rhs of a left semi join
@@ -536,7 +542,6 @@ public class TableRef implements ParseNode {
         e.getIds(tupleIds, null);
         onClauseTupleIds.addAll(tupleIds);
       }
-      onClauseTupleIds_.addAll(onClauseTupleIds);
     } else if (!isRelative() && !isCorrelated()
         && (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin())) {
       throw new AnalysisException(
@@ -649,8 +654,9 @@ public class TableRef implements ParseNode {
       onClause_.reset();
     }
     leftTblRef_ = null;
-    onClauseTupleIds_.clear();
-    desc_ = null;
+    allTableRefIds_.clear();
+    allMaterializedTupleIds_.clear();
     correlatedTupleIds_.clear();
+    desc_ = null;
   }
 }

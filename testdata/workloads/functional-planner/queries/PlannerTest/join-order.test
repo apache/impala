@@ -792,19 +792,19 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |  output: count(*)
 |
 10:HASH JOIN [INNER JOIN]
-|  hash predicates: t5.id = t6.id
-|  runtime filters: RF000 <- t6.id
-|
-|--05:SCAN HDFS [functional.alltypestiny t6]
-|     partitions=4/4 files=4 size=460B
-|
-09:HASH JOIN [INNER JOIN]
 |  hash predicates: t4.id = t5.id
-|  runtime filters: RF001 <- t5.id
+|  runtime filters: RF000 <- t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF000 -> t5.id
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: t4.id = t6.id
+|  runtime filters: RF001 <- t6.id
+|
+|--05:SCAN HDFS [functional.alltypestiny t6]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> t6.id
 |
 08:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t4.id = t3.id
@@ -911,20 +911,20 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  runtime filters: RF001 <- t4.id
 |
 |--09:HASH JOIN [INNER JOIN]
-|  |  hash predicates: t3.id = t4.id
-|  |  runtime filters: RF002 <- t4.id
-|  |
-|  |--03:SCAN HDFS [functional.alltypessmall t4]
-|  |     partitions=4/4 files=4 size=6.32KB
-|  |     runtime filters: RF000 -> t4.id
-|  |
-|  08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t3.id
-|  |  runtime filters: RF003 <- t3.id
+|  |  runtime filters: RF002 <- t3.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypesagg t3]
 |  |     partitions=11/11 files=11 size=814.73KB
-|  |     runtime filters: RF000 -> t3.id, RF002 -> t3.id
+|  |     runtime filters: RF000 -> t3.id
+|  |
+|  08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t4.id
+|  |  runtime filters: RF003 <- t4.id
+|  |
+|  |--03:SCAN HDFS [functional.alltypessmall t4]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF000 -> t4.id, RF002 -> t4.id
 |  |
 |  07:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.id = t1.id
@@ -964,20 +964,20 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  hash predicates: t5.id = t4.id
 |
 |--09:HASH JOIN [INNER JOIN]
-|  |  hash predicates: t3.id = t4.id
-|  |  runtime filters: RF001 <- t4.id
-|  |
-|  |--03:SCAN HDFS [functional.alltypessmall t4]
-|  |     partitions=4/4 files=4 size=6.32KB
-|  |     runtime filters: RF000 -> t4.id
-|  |
-|  08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t3.id
-|  |  runtime filters: RF002 <- t3.id
+|  |  runtime filters: RF001 <- t3.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypesagg t3]
 |  |     partitions=11/11 files=11 size=814.73KB
-|  |     runtime filters: RF000 -> t3.id, RF001 -> t3.id
+|  |     runtime filters: RF000 -> t3.id
+|  |
+|  08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t4.id
+|  |  runtime filters: RF002 <- t4.id
+|  |
+|  |--03:SCAN HDFS [functional.alltypessmall t4]
+|  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF000 -> t4.id, RF001 -> t4.id
 |  |
 |  07:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.id = t1.id

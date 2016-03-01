@@ -1274,7 +1274,7 @@ public class Analyzer {
   public boolean canEvalFullOuterJoinedConjunct(Expr e, List<TupleId> tids) {
     TableRef fullOuterJoin = getFullOuterJoinRef(e);
     if (fullOuterJoin == null) return true;
-    return tids.containsAll(fullOuterJoin.getAllTupleIds());
+    return tids.containsAll(fullOuterJoin.getAllTableRefIds());
   }
 
   /**
@@ -1330,7 +1330,7 @@ public class Analyzer {
           // conjunct at the join that the On-clause belongs to.
           TableRef onClauseTableRef = globalState_.ijClauseByConjunct.get(e.getId());
           Preconditions.checkNotNull(onClauseTableRef);
-          return tupleIds.containsAll(onClauseTableRef.getAllTupleIds());
+          return tupleIds.containsAll(onClauseTableRef.getAllTableRefIds());
         }
         // If this single tid conjunct is from the On-clause of an anti-join, check if we
         // can assign it to this node.
@@ -1349,10 +1349,10 @@ public class Analyzer {
       // this is not outer-joined; ignore
       if (rhsRef == null) continue;
       // check whether the last join to outer-join 'tid' is materialized by tupleIds
-      boolean contains = tupleIds.containsAll(rhsRef.getAllTupleIds());
+      boolean contains = tupleIds.containsAll(rhsRef.getAllTableRefIds());
       LOG.trace("canEval: contains=" + (contains ? "true " : "false ")
-          + Id.printIds(tupleIds) + " " + Id.printIds(rhsRef.getAllTupleIds()));
-      if (!tupleIds.containsAll(rhsRef.getAllTupleIds())) return false;
+          + Id.printIds(tupleIds) + " " + Id.printIds(rhsRef.getAllTableRefIds()));
+      if (!tupleIds.containsAll(rhsRef.getAllTableRefIds())) return false;
     }
     return true;
   }
@@ -1367,8 +1367,8 @@ public class Analyzer {
     List<TupleId> tids = Lists.newArrayList();
     e.getIds(tids, null);
     if (tids.size() > 1) {
-      return nodeTupleIds.containsAll(antiJoinRef.getAllTupleIds())
-          && antiJoinRef.getAllTupleIds().containsAll(nodeTupleIds);
+      return nodeTupleIds.containsAll(antiJoinRef.getAllTableRefIds())
+          && antiJoinRef.getAllTableRefIds().containsAll(nodeTupleIds);
     }
     // A single tid conjunct that is anti-joined can be safely assigned to a
     // node below the anti join that specified it.
@@ -2442,7 +2442,7 @@ public class Analyzer {
   public int decrementCallDepth() { return --callDepth_; }
   public int getCallDepth() { return callDepth_; }
 
-  private boolean hasMutualValueTransfer(SlotId slotA, SlotId slotB) {
+  public boolean hasMutualValueTransfer(SlotId slotA, SlotId slotB) {
     return hasValueTransfer(slotA, slotB) && hasValueTransfer(slotB, slotA);
   }
 

@@ -756,15 +756,14 @@ public class SingleNodePlanner {
           // table ref ids to the left and including the last outer/semi join.
           // TODO: Think about when we can allow re-ordering across semi/outer joins
           // in subplans.
-          requiredTblRefIds.addAll(lastSemiOrOuterJoin.getAllTupleIds());
+          requiredTblRefIds.addAll(lastSemiOrOuterJoin.getAllTableRefIds());
         }
         if (!subplanTids.containsAll(requiredTids)) {
           isParentRef = false;
-          // For outer and semi joins, we also need to ensure that the On-clause
-          // conjuncts can be evaluated, so add those required table ref ids,
-          // excluding the id of ref itself.
+          // Outer and semi joins are placed at a fixed position in the join order.
+          // They require that all tables to their left are materialized.
           if (ref.getJoinOp().isOuterJoin() || ref.getJoinOp().isSemiJoin()) {
-            requiredTblRefIds.addAll(ref.getOnClauseTupleIds());
+            requiredTblRefIds.addAll(ref.getAllTableRefIds());
             requiredTblRefIds.remove(ref.getId());
           }
           subplanRefs.add(new SubplanRef(ref, requiredTids, requiredTblRefIds));
@@ -1391,14 +1390,23 @@ public class SingleNodePlanner {
       TableRef rhsTblRef = analyzer.getTableRef(rhsId);
       Preconditions.checkNotNull(rhsTblRef);
       for (SlotDescriptor slotDesc: rhsTblRef.getDesc().getSlots()) {
-        List<SlotId> lhsSlotIds = analyzer.getEquivSlots(slotDesc.getId(), lhsTblRefIds);
-        if (!lhsSlotIds.isEmpty()) {
-          // construct a BinaryPredicates in order to get correct casting;
-          // we only do this for one of the equivalent slots, all the other implied
-          // equalities are redundant
-          BinaryPredicate pred =
-              analyzer.createInferredEqPred(lhsSlotIds.get(0), slotDesc.getId());
-          result.add(pred);
+        SlotId rhsSid = slotDesc.getId();
+        // List of slots that participate in a value transfer with rhsSid and are belong
+        // to a tuple in lhsTblRefIds. The value transfer is not necessarily mutual.
+        List<SlotId> lhsSlotIds = analyzer.getEquivSlots(rhsSid, lhsTblRefIds);
+        for (SlotId lhsSid: lhsSlotIds) {
+          // A mutual value transfer between lhsSid and rhsSid is required for correctly
+          // generating an inferred predicate. Otherwise, the predicate might incorrectly
+          // eliminate rows that would have been non-matches of an outer or anti join.
+          if (analyzer.hasMutualValueTransfer(lhsSid, rhsSid)) {
+            // construct a BinaryPredicates in order to get correct casting;
+            // we only do this for one of the equivalent slots, all the other implied
+            // equalities are redundant
+            BinaryPredicate pred =
+                analyzer.createInferredEqPred(lhsSid, rhsSid);
+            result.add(pred);
+            break;
+          }
         }
       }
     }

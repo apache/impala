@@ -46,7 +46,7 @@ public class SingularRowSrcTableRef extends TableRef {
     super.setLeftTblRef(leftTblRef);
     tblRefIds_.clear();
     tupleIds_.clear();
-    tblRefIds_.addAll(leftTblRef_.getAllTupleIds());
+    tblRefIds_.addAll(leftTblRef_.getAllTableRefIds());
     tupleIds_.addAll(leftTblRef_.getAllMaterializedTupleIds());
   }
 
@@ -54,7 +54,7 @@ public class SingularRowSrcTableRef extends TableRef {
   public TupleId getId() { return tblRefIds_.get(tblRefIds_.size() - 1); }
 
   @Override
-  public List<TupleId> getAllTupleIds() { return tblRefIds_; }
+  public List<TupleId> getAllTableRefIds() { return tblRefIds_; }
 
   @Override
   public List<TupleId> getAllMaterializedTupleIds() { return tupleIds_; }
