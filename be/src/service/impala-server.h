@@ -606,6 +606,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// webpages.
     vector<TPlanFragment> fragments;
 
+    // If true, this query has no more rows to return
+    bool all_rows_returned;
+
+    // The most recent time this query was actively being processed, in Unix milliseconds.
+    int64_t last_active_time;
+
     /// Initialise from an exec_state. If copy_profile is true, print the query
     /// profile to a string and copy that into this.profile (which is expensive),
     /// otherwise leave this.profile empty.

@@ -98,6 +98,10 @@ class ImpaladService(BaseImpalaService):
     num = len(result['backends'])
     return None if num is None else int(num)
 
+  def get_in_flight_queries(self, timeout=30, interval=1):
+    result = json.loads(self.read_debug_webpage('queries?json', timeout, interval))
+    return result['in_flight_queries']
+
   def get_num_in_flight_queries(self, timeout=30, interval=1):
     LOG.info("Getting num_in_flight_queries from %s:%s" %
         (self.hostname, self.webserver_port))

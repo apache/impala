@@ -26,6 +26,7 @@
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/redactor.h"
 #include "util/summary-util.h"
+#include "util/time.h"
 #include "util/url-coding.h"
 
 #include "common/names.h"
@@ -275,6 +276,20 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
         document->GetAllocator());
     value->AddMember("last_event", last_event, document->GetAllocator());
   }
+
+  // Waiting to be closed.
+  bool waiting = record.query_state == beeswax::QueryState::EXCEPTION ||
+      record.all_rows_returned;
+  value->AddMember("waiting", waiting, document->GetAllocator());
+  value->AddMember("executing", !waiting, document->GetAllocator());
+
+  int64_t waiting_time = impala::UnixMillis() - record.last_active_time;
+  string waiting_time_str = "";
+  if (waiting_time > 0) {
+    waiting_time_str = PrettyPrinter::Print(waiting_time, TUnit::TIME_MS);
+  }
+  Value val_waiting_time(waiting_time_str.c_str(), document->GetAllocator());
+  value->AddMember("waiting_time", val_waiting_time, document->GetAllocator());
 }
 
 void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
@@ -290,14 +305,28 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
   }
 
   Value in_flight_queries(kArrayType);
+  int64_t num_waiting_queries = 0;
   BOOST_FOREACH(const QueryStateRecord& record, sorted_query_records) {
     Value record_json(kObjectType);
     QueryStateToJson(record, &record_json, document);
+
+    if (record_json["waiting"].GetBool()) ++num_waiting_queries;
+
     in_flight_queries.PushBack(record_json, document->GetAllocator());
   }
   document->AddMember("in_flight_queries", in_flight_queries, document->GetAllocator());
   document->AddMember("num_in_flight_queries",
       static_cast<uint64_t>(sorted_query_records.size()),
+      document->GetAllocator());
+  document->AddMember("num_executing_queries",
+      sorted_query_records.size() - num_waiting_queries,
+      document->GetAllocator());
+  document->AddMember("num_waiting_queries", num_waiting_queries,
+      document->GetAllocator());
+  document->AddMember("waiting-tooltip", "These queries are no longer executing, either "
+      "because they encountered an error or because they have returned all of their "
+      "results, but they are still active so that their results can be inspected. To "
+      "free the resources they are using, they must be closed.",
       document->GetAllocator());
 
   Value completed_queries(kArrayType);

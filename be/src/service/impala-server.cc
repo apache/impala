@@ -1599,6 +1599,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
 
   // Save the query fragments so that the plan can be visualised.
   fragments = exec_state.exec_request().query_exec_request.fragments;
+  all_rows_returned = exec_state.eos();
+  last_active_time = exec_state.last_active();
 }
 
 bool ImpalaServer::QueryStateRecord::operator() (

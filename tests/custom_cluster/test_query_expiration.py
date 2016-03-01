@@ -24,6 +24,16 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 class TestQueryExpiration(CustomClusterTestSuite):
   """Tests query expiration logic"""
 
+  def _check_num_executing(self, impalad, expected):
+    in_flight_queries = impalad.service.get_in_flight_queries()
+    actual = 0
+    for query in in_flight_queries:
+      if query["executing"]:
+        actual += 1
+      else:
+        assert query["waiting"]
+    assert actual == expected
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=6")
   def test_query_expiration(self, vector):
@@ -38,6 +48,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     # Set a huge timeout, to check that the server bounds it by --idle_query_timeout
     client.execute("SET QUERY_TIMEOUT_S=1000")
     handle3 = client.execute_async("SELECT SLEEP(3000000)")
+    self._check_num_executing(impalad, 3)
 
     before = time()
     sleep(4)
@@ -45,6 +56,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     # Query with timeout of 1 should have expired, other query should still be running.
     assert num_expired + 1 == impalad.service.get_metric_value(
       'impala-server.num-queries-expired')
+    self._check_num_executing(impalad, 2)
     impalad.service.wait_for_metric_value('impala-server.num-queries-expired',
                                           num_expired + 3)
 
@@ -62,6 +74,8 @@ class TestQueryExpiration(CustomClusterTestSuite):
     # Confirm that no extra expirations happened
     assert impalad.service.get_metric_value('impala-server.num-queries-expired') \
         == num_expired + 3
+    self._check_num_executing(impalad, 0)
+
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=0")
