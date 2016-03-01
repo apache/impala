@@ -93,9 +93,8 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
     if (FLAGS_enable_rm) {
-      LOG(ERROR) << "If resource management is enabled, -fair_scheduler_allocation_path "
+      LOG(FATAL) << "If resource management is enabled, -fair_scheduler_allocation_path "
                  << "is required.";
-      exit(1);
     }
     default_pool_only_ = true;
     bool is_percent; // not used
@@ -103,9 +102,8 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
         &is_percent, MemInfo::physical_mem());
     // -1 indicates an error occurred
     if (bytes_limit < 0) {
-      LOG(ERROR) << "Unable to parse default pool mem limit from '"
+      LOG(FATAL) << "Unable to parse default pool mem limit from '"
                  << FLAGS_default_pool_mem_limit << "'.";
-      exit(1);
     }
     // 0 indicates no limit or not set
     if (bytes_limit == 0) {

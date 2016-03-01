@@ -246,8 +246,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
-      LOG(ERROR) << "Aborting Impala Server startup due to improper configuration";
-      exit(1);
+      LOG(FATAL) << "Aborting Impala Server startup due to improper configuration";
     }
   }
 
@@ -255,9 +254,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
-      LOG(ERROR) << "Aborting Impala Server startup due to improperly "
+      LOG(FATAL) << "Aborting Impala Server startup due to improperly "
                  << "configured scratch directories.";
-      exit(1);
     }
   }
 
@@ -267,15 +265,13 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 
   if (!InitAuditEventLogging().ok()) {
-    LOG(ERROR) << "Aborting Impala Server startup due to failure initializing "
+    LOG(FATAL) << "Aborting Impala Server startup due to failure initializing "
                << "audit event logging";
-    exit(1);
   }
 
   if (!InitLineageLogging().ok()) {
-    LOG(ERROR) << "Aborting Impala Server startup due to failure initializing "
+    LOG(FATAL) << "Aborting Impala Server startup due to failure initializing "
                << "lineage logging";
-    exit(1);
   }
 
   if (!FLAGS_authorized_proxy_user_config.empty()) {
@@ -289,10 +285,9 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       BOOST_FOREACH(const string& config, proxy_user_config) {
         size_t pos = config.find("=");
         if (pos == string::npos) {
-          LOG(ERROR) << "Invalid proxy user configuration. No mapping value specified "
+          LOG(FATAL) << "Invalid proxy user configuration. No mapping value specified "
                      << "for the proxy user. For more information review usage of the "
                      << "--authorized_proxy_user_config flag: " << config;
-          exit(1);
         }
         string proxy_user = config.substr(0, pos);
         string config_str = config.substr(pos + 1);
@@ -388,8 +383,7 @@ Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
   if (!status.ok()) {
     LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_lineage_event) {
-      LOG(ERROR) << "Shutting down Impala Server due to abort_on_failed_lineage_event=true";
-      exit(1);
+      LOG(FATAL) << "Shutting down Impala Server due to abort_on_failed_lineage_event=true";
     }
   }
   return status;
@@ -480,8 +474,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   if (!status.ok()) {
     LOG(ERROR) << "Unable to record audit event record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_audit_event) {
-      LOG(ERROR) << "Shutting down Impala Server due to abort_on_failed_audit_event=true";
-      exit(1);
+      LOG(FATAL) << "Shutting down Impala Server due to abort_on_failed_audit_event=true";
     }
   }
   return status;
@@ -648,9 +641,8 @@ void ImpalaServer::AuditEventLoggerFlushThread() {
     if (!status.ok()) {
       LOG(ERROR) << "Error flushing audit event log: " << status.GetDetail();
       if (FLAGS_abort_on_failed_audit_event) {
-        LOG(ERROR) << "Shutting down Impala Server due to "
+        LOG(FATAL) << "Shutting down Impala Server due to "
                    << "abort_on_failed_audit_event=true";
-        exit(1);
       }
     }
   }
@@ -663,9 +655,8 @@ void ImpalaServer::LineageLoggerFlushThread() {
     if (!status.ok()) {
       LOG(ERROR) << "Error flushing lineage event log: " << status.GetDetail();
       if (FLAGS_abort_on_failed_lineage_event) {
-        LOG(ERROR) << "Shutting down Impala Server due to "
+        LOG(FATAL) << "Shutting down Impala Server due to "
                    << "abort_on_failed_lineage_event=true";
-        exit(1);
       }
     }
   }
@@ -1150,9 +1141,8 @@ void ImpalaServer::InitializeConfigVariables() {
       &set_query_options);
   if (!status.ok()) {
     // Log error and exit if the default query options are invalid.
-    LOG(ERROR) << "Invalid default query options. Please check -default_query_options.\n"
+    LOG(FATAL) << "Invalid default query options. Please check -default_query_options.\n"
                << status.GetDetail();
-    exit(1);
   }
   LOG(INFO) << "Default query options:" << ThriftDebugString(default_query_options_);
 

@@ -30,6 +30,7 @@
 #include <llvm/Linker.h>
 #include <llvm/PassManager.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/Host.h>
 #include "llvm/Support/InstIterator.h"
 #include <llvm/Support/NoFolder.h>
@@ -79,9 +80,16 @@ namespace impala {
 static mutex llvm_initialization_lock;
 static bool llvm_initialized = false;
 
+static void LlvmCodegenHandleError(void* user_data, const std::string& reason,
+    bool gen_crash_diag) {
+  LOG(FATAL) << "LLVM hit fatal error: " << reason.c_str();
+}
+
 void LlvmCodeGen::InitializeLlvm(bool load_backend) {
   mutex::scoped_lock initialization_lock(llvm_initialization_lock);
   if (llvm_initialized) return;
+  llvm::remove_fatal_error_handler();
+  llvm::install_fatal_error_handler(LlvmCodegenHandleError);
   // This allocates a global llvm struct and enables multithreading.
   // There is no real good time to clean this up but we only make it once.
   bool result = llvm::llvm_start_multithreaded();

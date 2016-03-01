@@ -267,12 +267,11 @@ class Status {
     } \
   } while (false)
 
+// LOG(FATAL) will call abort().
 #define EXIT_WITH_ERROR(msg) \
   do { \
-    LOG(ERROR) << msg; \
-    exit(1); \
+    LOG(FATAL) << msg << ". Impalad exiting.\n"; \
   } while (false)
-
 }
 
 #endif

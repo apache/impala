@@ -78,7 +78,7 @@
       const char* c_stack = \
           reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
       VLOG(1) << string(c_stack); \
-     return; \
+      return; \
     } \
   } while (false)
 
@@ -91,8 +91,7 @@
       jboolean is_copy; \
       const char* c_stack = \
           reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
-      LOG(ERROR) << string(c_stack); \
-     exit(1); \
+      LOG(FATAL) << string(c_stack); \
     } \
   } while (false)
 
@@ -100,23 +99,6 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) return JniUtil::GetJniExceptionMsg(env);\
-  } while (false)
-
-#define EXIT_IF_JNIERROR(stmt) \
-  do { \
-    if ((stmt) != JNI_OK) { \
-      cerr << #stmt << " resulted in a jni error"; \
-      exit(1); \
-    } \
-  } while (false)
-
-#define RETURN_IF_JNIERROR(stmt) \
-  do { \
-    if ((stmt) != JNI_OK) { \
-      stringstream out; \
-      out << #stmt << " resulted in a jni error";      \
-      return Status(out.str()); \
-    } \
   } while (false)
 
 /// C linkage for helper functions in hdfsJniHelper.h
