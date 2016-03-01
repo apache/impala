@@ -101,6 +101,7 @@ const string QUERY_EVENT_COMPLETED_ADMISSION = "Completed admission";
 // Profile info strings
 const string PROFILE_INFO_KEY_ADMISSION_RESULT = "Admission result";
 const string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY = "Admitted immediately";
+const string PROFILE_INFO_VAL_QUEUED = "Queued";
 const string PROFILE_INFO_VAL_ADMIT_QUEUED = "Admitted (queued)";
 const string PROFILE_INFO_VAL_REJECTED = "Rejected";
 const string PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
@@ -319,7 +320,7 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
 
   // Case 1:
   PoolStats* stats = GetPoolStats(pool_name);
-  VLOG_ROW << "Checking agg mem in pool=" << pool_name << " : " << stats->DebugString()
+  VLOG_RPC << "Checking agg mem in pool=" << pool_name << " : " << stats->DebugString()
            << " cluster_mem_needed=" << PrintBytes(cluster_mem_needed)
            << " pool_max_mem=" << PrintBytes(pool_max_mem);
   if (stats->EffectiveMemReserved() + cluster_mem_needed > pool_max_mem) {
@@ -433,10 +434,11 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     pool_config_map_[pool_name] = pool_cfg;
     PoolStats* stats = GetPoolStats(pool_name);
     stats->UpdateConfigMetrics(pool_cfg);
-    VLOG_QUERY << "Schedule for id=" << schedule->query_id()
-               << " in pool_name=" << pool_name << " PoolConfig: max_requests="
-               << max_requests << " max_queued=" << max_queued
-               << " max_mem=" << PrintBytes(max_mem);
+    VLOG_QUERY << "Schedule for id=" << schedule->query_id() << " in pool_name="
+               << pool_name << " cluster_mem_needed="
+               << PrintBytes(schedule->GetClusterMemoryEstimate())
+               << " PoolConfig: max_requests=" << max_requests << " max_queued="
+               << max_queued << " max_mem=" << PrintBytes(max_mem);
     VLOG_QUERY << "Stats: " << stats->DebugString();
     RETURN_IF_ERROR(RejectImmediately(schedule, pool_cfg));
     pools_for_updates_.insert(pool_name);
@@ -444,12 +446,12 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     if (CanAdmitRequest(*schedule, pool_cfg, false, &not_admitted_reason)) {
       DCHECK_EQ(stats->local_stats().num_queued, 0);
       VLOG_QUERY << "Admitted query id=" << schedule->query_id();
-      VLOG_RPC << "Final: " << stats->DebugString();
       stats->Admit(*schedule);
       UpdateHostMemAdmitted(*schedule, schedule->GetPerHostMemoryEstimate());
       schedule->set_is_admitted(true);
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
           PROFILE_INFO_VAL_ADMIT_IMMEDIATELY);
+      VLOG_RPC << "Final: " << stats->DebugString();
       return Status::OK();
     }
 
@@ -458,6 +460,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     stats->Queue(*schedule);
     queue->Enqueue(&queue_node);
   }
+
+  // Update the profile info before waiting. These properties will be updated with
+  // their final state after being dequeued.
+  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
+      PROFILE_INFO_VAL_QUEUED);
+  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
+      not_admitted_reason);
 
   int64_t queue_wait_timeout_ms = FLAGS_queue_wait_timeout_ms;
   if (pool_cfg.__isset.queue_timeout_ms) {

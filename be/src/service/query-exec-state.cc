@@ -429,7 +429,6 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       exec_request_.query_options, &summary_profile_, query_events_));
   coord_.reset(new Coordinator(exec_env_, query_events_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
-  summary_profile_.AddInfoString("Request Pool", schedule_->request_pool());
   if (FLAGS_enable_rm) {
     if (status.ok()) {
       stringstream reservation_request_ss;

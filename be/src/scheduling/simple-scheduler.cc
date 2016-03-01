@@ -868,6 +868,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
       schedule->request().query_ctx, &resolved_pool));
   schedule->set_request_pool(resolved_pool);
+  schedule->summary_profile()->AddInfoString("Request Pool", resolved_pool);
 
   if (ExecEnv::GetInstance()->impala_server()->IsOffline()) {
     return Status("This Impala server is offline. Please retry your query later.");
