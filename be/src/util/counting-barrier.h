@@ -34,6 +34,10 @@ class CountingBarrier {
   /// Blocks until all notifications are received.
   void Wait() { promise_.Get(); }
 
+  /// Blocks until all notifications are received, or until 'timeout_ms' passes, in which
+  /// case '*timed_out' will be true.
+  void Wait(int64_t timeout_ms, bool* timed_out) { promise_.Get(timeout_ms, timed_out); }
+
  private:
   /// Used to signal waiters when all notifications are received.
   Promise<bool> promise_;

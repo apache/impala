@@ -87,6 +87,10 @@ const int COMPRESSED_TEXT_COMPRESSION_RATIO = 11;
 // Determines how many unexpected remote bytes trigger an error in the runtime state
 const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 
+// Amount of time to block waiting for GetNext() to release scanner threads between
+// checking if a scanner thread should yield itself back to the global thread pool.
+const int SCANNER_THREAD_WAIT_TIME_MS = 20;
+
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
@@ -97,6 +101,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       hdfs_table_(NULL),
       unknown_disk_id_warned_(false),
       initial_ranges_issued_(false),
+      ranges_issued_barrier_(1),
       scanner_thread_bytes_required_(0),
       max_compressed_text_file_length_(NULL),
       disks_accessed_bitmap_(TUnit::UNIT, 0),
@@ -190,6 +195,7 @@ bool HdfsScanNode::WaitForRuntimeFilters(int32_t time_ms) {
   }
   int32_t end = MonotonicMillis();
   const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
+
   if (arrived_filter_ids.size() == filter_ctxs_.size()) {
     runtime_profile()->AddInfoString("Runtime filters",
         Substitute("All filters arrived. Waited $0", wait_time));
@@ -208,8 +214,11 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   if (!initial_ranges_issued_) {
-    // We do this in GetNext() to ensure that all execution time predicates have
-    // been generated (e.g. probe side bitmap filters).
+    // We do this in GetNext() to maximise the amount of work we can do while waiting for
+    // runtime filters to show up. The scanner threads have already started (in Open()),
+    // so we need to tell them there is work to do.
+    // TODO: This is probably not worth splitting the organisational cost of splitting
+    // initialisation across two places. Move to before the scanner threads start.
     initial_ranges_issued_ = true;
 
     int32 wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
@@ -239,6 +248,10 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
         matching_per_type_files[THdfsFileFormat::AVRO]));
     RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
         matching_per_type_files[THdfsFileFormat::PARQUET]));
+
+    // Release the scanner threads
+    ranges_issued_barrier_.Notify();
+
     if (progress_.done()) SetDone();
   }
 
@@ -657,8 +670,10 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 }
 
 // This function initiates the connection to hdfs and starts up the initial scanner
-// threads. The scanner subclasses are passed the initial splits.  Scanners are expected
-// to queue up a non-zero number of those splits to the io mgr (via the ScanNode).
+// threads. The scanner subclasses are passed the initial splits. Scanners are expected to
+// queue up a non-zero number of those splits to the io mgr (via the ScanNode). Scan
+// ranges are not issued until the first GetNext() call; scanner threads will block on
+// ranges_issued_barrier_ until ranges are issued.
 Status HdfsScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
 
@@ -1029,6 +1044,11 @@ void HdfsScanNode::ScannerThread() {
         // of resource constraints.
       }
     }
+
+    bool unused = false;
+    // Wake up every SCANNER_THREAD_COUNTERS to yield scanner threads back if unused, or
+    // to return if there's an error.
+    ranges_issued_barrier_.Wait(SCANNER_THREAD_WAIT_TIME_MS, &unused);
 
     DiskIoMgr::ScanRange* scan_range;
     // Take a snapshot of num_unqueued_files_ before calling GetNextRange().

@@ -34,6 +34,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
 #include "util/avro-util.h"
+#include "util/counting-barrier.h"
 #include "util/progress-updater.h"
 #include "util/spinlock.h"
 #include "util/thread.h"
@@ -358,6 +359,9 @@ class HdfsScanNode : public ScanNode {
   /// the first call to GetNext(). The token manager, in a different thread, will read
   /// this variable.
   bool initial_ranges_issued_;
+
+  /// Released when initial ranges are issued in the first call to GetNext().
+  CountingBarrier ranges_issued_barrier_;
 
   /// The estimated memory required to start up a new scanner thread. If the memory
   /// left (due to limits) is less than this value, we won't start up optional
