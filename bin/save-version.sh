@@ -17,7 +17,7 @@
 # Note: for internal (aka pre-release) versions, the version should have
 # "-INTERNAL" appended. Parts of the code will look for this to distinguish
 # between released and internal versions.
-VERSION=2.5.0-cdh5-INTERNAL
+VERSION=2.6.0-cdh5-INTERNAL
 GIT_HASH=$(git rev-parse HEAD)
 BUILD_TIME=`date`
 HEADER="# Generated version information from save-version.sh"
