@@ -915,7 +915,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     }
 
     // Finish up the current batch.
-    {
+    if (probe_batch_pos_ != -1) {
       // Putting SCOPED_TIMER in ProcessProbeBatch() causes weird exception handling IR
       // in the xcompiled function, so call it here instead.
       int rows_added = 0;
@@ -938,10 +938,11 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       DCHECK(status.ok());
       out_batch->CommitRows(rows_added);
       num_rows_returned_ += rows_added;
+      if (out_batch->AtCapacity() || ReachedLimit()) break;
+
+      DCHECK(current_probe_row_ == NULL);
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
-    if (out_batch->AtCapacity() || ReachedLimit()) break;
-    DCHECK(current_probe_row_ == NULL);
 
     // Try to continue from the current probe side input.
     if (input_partition_ == NULL) {
