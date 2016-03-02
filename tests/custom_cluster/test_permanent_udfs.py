@@ -18,6 +18,7 @@ import pytest
 import subprocess
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import get_fs_path
 
 class TestUdfPersistence(CustomClusterTestSuite):
@@ -148,6 +149,9 @@ class TestUdfPersistence(CustomClusterTestSuite):
         db=self.HIVE_IMPALA_INTEGRATION_DB))
     assert stdout is not None and result in str(stdout.data)
 
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
+  @SkipIfLocal.hive
   @pytest.mark.execute_serially
   def test_java_udfs_hive_integration(self):
     ''' This test checks the integration between Hive and Impala on
