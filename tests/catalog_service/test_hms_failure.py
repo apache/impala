@@ -24,6 +24,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfIsilon
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.util.filesystem_utils import IS_ISILON, IS_LOCAL
 
 class TestHiveMetaStoreFailure(ImpalaTestSuite):
   @classmethod
@@ -45,16 +46,21 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
     super(TestHiveMetaStoreFailure, cls).setup_class()
 
   @classmethod
+  def run_hive_server(cls):
+    script = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')
+    run_cmd = [script]
+    if IS_LOCAL or IS_ISILON:
+      run_cmd.append('-only_metastore')
+    check_call(run_cmd, close_fds=True)
+
+  @classmethod
   def teardown_class(cls):
     # Make sure the metastore is running even if the test aborts somewhere unexpected
     # before restarting the metastore itself.
-    run_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')
-    check_call([run_cmd], close_fds=True)
+    cls.run_hive_server()
     cls.client.execute("invalidate metadata")
     super(TestHiveMetaStoreFailure, cls).teardown_class()
 
-  # TODO: remove skip once IMPALA-3108 is resolved
-  @SkipIfIsilon.hive
   @pytest.mark.execute_serially
   def test_hms_service_dies(self, vector):
     """Regression test for IMPALA-823 to verify the catalog service works properly when
@@ -75,9 +81,7 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
       print str(e)
       assert "Failed to load metadata for table: %s. Running 'invalidate metadata %s' "\
           "may resolve this problem." % (tbl_name, tbl_name) in str(e)
-
-    run_cmd = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')
-    check_call([run_cmd], close_fds=True)
+    self.run_hive_server()
 
     self.client.execute("invalidate metadata %s" % tbl_name)
     self.client.execute("describe %s" % tbl_name)
