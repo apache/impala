@@ -7,19 +7,13 @@ select
   o_orderkey,
   o_orderdate,
   o_totalprice,
-  sum(l_quantity)
+  sum_quantity
 from
   customer c,
   c.c_orders o,
-  o.o_lineitems l
+  (select sum(l_quantity) sum_quantity from o.o_lineitems) l
 where
-  (select sum(l_quantity) from o.o_lineitems) > 300
-group by
-  c_name,
-  c_custkey,
-  o_orderkey,
-  o_orderdate,
-  o_totalprice
+  sum_quantity > 300
 order by
   o_totalprice desc,
   o_orderdate

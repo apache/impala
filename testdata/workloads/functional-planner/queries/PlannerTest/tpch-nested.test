@@ -1926,105 +1926,75 @@ select
   o_orderkey,
   o_orderdate,
   o_totalprice,
-  sum(l_quantity)
+  sum_quantity
 from
   customer c,
   c.c_orders o,
-  o.o_lineitems l
+  (select sum(l_quantity) sum_quantity from o.o_lineitems) l
 where
-  (select sum(l_quantity) from o.o_lineitems) > 300
-group by
-  c_name,
-  c_custkey,
-  o_orderkey,
-  o_orderdate,
-  o_totalprice
+  sum_quantity > 300
 order by
   o_totalprice desc,
   o_orderdate
 limit 100
 ---- PLAN
-13:TOP-N [LIMIT=100]
+10:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
-|
-12:AGGREGATE [FINALIZE]
-|  output: sum(l_quantity)
-|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
 |
 01:SUBPLAN
 |
-|--11:NESTED LOOP JOIN [CROSS JOIN]
+|--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
 |  04:SUBPLAN
 |  |
-|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  |  |
-|  |  |--08:AGGREGATE [FINALIZE]
-|  |  |  |  output: sum(l_quantity)
-|  |  |  |  having: sum(l_quantity) > 300
-|  |  |  |
-|  |  |  07:UNNEST [o.o_lineitems]
-|  |  |
-|  |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |--08:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
 |  |  |--05:SINGULAR ROW SRC
 |  |  |
-|  |  06:UNNEST [o.o_lineitems l]
+|  |  07:AGGREGATE [FINALIZE]
+|  |  |  output: sum(l_quantity)
+|  |  |  having: sum(l_quantity) > 300
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
 |  |
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
    predicates: !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems)
 ---- DISTRIBUTEDPLAN
-16:MERGING-EXCHANGE [UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |  limit: 100
 |
-13:TOP-N [LIMIT=100]
+10:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
-|
-15:AGGREGATE [FINALIZE]
-|  output: sum:merge(l_quantity)
-|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
-|
-14:EXCHANGE [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)]
-|
-12:AGGREGATE [STREAMING]
-|  output: sum(l_quantity)
-|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
 |
 01:SUBPLAN
 |
-|--11:NESTED LOOP JOIN [CROSS JOIN]
+|--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
 |  04:SUBPLAN
 |  |
-|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  |  |
-|  |  |--08:AGGREGATE [FINALIZE]
-|  |  |  |  output: sum(l_quantity)
-|  |  |  |  having: sum(l_quantity) > 300
-|  |  |  |
-|  |  |  07:UNNEST [o.o_lineitems]
-|  |  |
-|  |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |--08:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
 |  |  |--05:SINGULAR ROW SRC
 |  |  |
-|  |  06:UNNEST [o.o_lineitems l]
+|  |  07:AGGREGATE [FINALIZE]
+|  |  |  output: sum(l_quantity)
+|  |  |  having: sum(l_quantity) > 300
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
 |  |
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
    predicates: !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems)
 ====
 # TPCH-Q19
 # Q19 - Discounted Revenue Query
