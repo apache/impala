@@ -22,6 +22,7 @@ from tests.common.test_vector import *
 from tests.common.test_dimensions import *
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.skip import SkipIfIsilon
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 
 class TestHiveMetaStoreFailure(ImpalaTestSuite):
@@ -52,6 +53,8 @@ class TestHiveMetaStoreFailure(ImpalaTestSuite):
     cls.client.execute("invalidate metadata")
     super(TestHiveMetaStoreFailure, cls).teardown_class()
 
+  # TODO: remove skip once IMPALA-3108 is resolved
+  @SkipIfIsilon.hive
   @pytest.mark.execute_serially
   def test_hms_service_dies(self, vector):
     """Regression test for IMPALA-823 to verify the catalog service works properly when
