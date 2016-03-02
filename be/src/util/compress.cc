@@ -19,6 +19,7 @@
 // Codec libraries
 #include <zlib.h>
 #include <bzlib.h>
+#undef DISALLOW_COPY_AND_ASSIGN // Snappy redefines this.
 #include <snappy.h>
 #include <lz4.h>
 

@@ -20,10 +20,7 @@
 #include <string.h>
 #include <sstream>
 
-using std::string;
-using std::stringstream;
-using std::vector;
-using std::ostream;
+#include "common/names.h"
 
 namespace impala {
 
@@ -193,6 +190,15 @@ size_t ErrorCount(const ErrorLogMap& errors) {
   size_t general_errors = cit != errors.end() ?
       errors.find(TErrorCode::GENERAL)->second.messages.size() - 1 : 0;
   return errors.size() + general_errors;
+}
+
+string ErrorMsg::GetFullMessageDetails() const {
+  stringstream ss;
+  ss << message_ << "\n";
+  for(size_t i = 0, end = details_.size(); i < end; ++i) {
+    ss << details_[i] << "\n";
+  }
+  return ss.str();
 }
 
 }

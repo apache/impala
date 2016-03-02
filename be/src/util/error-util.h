@@ -19,8 +19,6 @@
 
 #include <string>
 #include <vector>
-#include <boost/cstdint.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/ErrorCodes_types.h"
@@ -125,14 +123,7 @@ class ErrorMsg {
 
   /// Produce a string representation of the error message that includes the formatted
   /// message of the original error and the attached detail strings.
-  std::string GetFullMessageDetails() const {
-    std::stringstream ss;
-    ss << message_ << "\n";
-    for(size_t i=0, end=details_.size(); i < end; ++i) {
-      ss << details_[i] << "\n";
-    }
-    return ss.str();
-  }
+  std::string GetFullMessageDetails() const;
 
 private:
   TErrorCode::type error_;

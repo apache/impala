@@ -72,6 +72,11 @@ SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
 #
 # Debug information is stored as dwarf2 to be as compatible as possible
 SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb -gdwarf-2")
+if (IMPALA_TOOLCHAIN)
+  # -Werror: compile warnings should be errors when using the toolchain compiler.
+  #   Only enable for debug builds because this is what we test in pre-commit tests.
+  SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG} -Werror")
+endif()
 SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
