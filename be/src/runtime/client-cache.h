@@ -346,11 +346,6 @@ class ClientCache {
 };
 
 /// Common cache / connection types
-
-class ImpalaInternalServiceClient;
-typedef ClientCache<ImpalaInternalServiceClient> ImpalaInternalServiceClientCache;
-typedef ClientConnection<ImpalaInternalServiceClient> ImpalaInternalServiceConnection;
-
 class CatalogServiceClient;
 typedef ClientCache<CatalogServiceClient> CatalogServiceClientCache;
 typedef ClientConnection<CatalogServiceClient> CatalogServiceConnection;

@@ -124,9 +124,11 @@ class DataStreamSender : public DataSink {
 
   RuntimeProfile* profile_; // Allocated from pool_
   RuntimeProfile::Counter* serialize_batch_timer_;
-  RuntimeProfile::Counter* thrift_transmit_timer_;
+  /// The concurrent wall time spent sending data over the network.
+  RuntimeProfile::ConcurrentTimerCounter* thrift_transmit_timer_;
   RuntimeProfile::Counter* bytes_sent_counter_;
   RuntimeProfile::Counter* uncompressed_bytes_counter_;
+  RuntimeProfile::Counter* total_sent_rows_counter_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
   /// Throughput per time spent in TransmitData

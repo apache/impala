@@ -141,7 +141,7 @@ ExecEnv::ExecEnv()
   : metrics_(new MetricGroup("impala-metrics")),
     stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
-        new ImpalaInternalServiceClientCache(
+        new ImpalaBackendClientCache(
             "", !FLAGS_ssl_client_ca_certificate.empty())),
     catalogd_client_cache_(
         new CatalogServiceClientCache(
@@ -197,11 +197,9 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
   : metrics_(new MetricGroup("impala-metrics")),
     stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
-        new ImpalaInternalServiceClientCache(
-            "", !FLAGS_ssl_client_ca_certificate.empty())),
+        new ImpalaBackendClientCache("", !FLAGS_ssl_client_ca_certificate.empty())),
     catalogd_client_cache_(
-        new CatalogServiceClientCache(
-            "", !FLAGS_ssl_client_ca_certificate.empty())),
+        new CatalogServiceClientCache("", !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),

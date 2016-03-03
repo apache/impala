@@ -17,7 +17,9 @@
 #define IMPALA_UTIL_STOPWATCH_H
 
 #include <boost/cstdint.hpp>
+#include <boost/thread/lock_guard.hpp>
 #include <util/os-info.h>
+#include <util/spinlock.h>
 #include <util/time.h>
 #include <time.h>
 
@@ -27,6 +29,9 @@ namespace impala {
   ScopedStopWatch<MonotonicStopWatch> \
   MACRO_CONCAT(STOP_WATCH, __COUNTER__)(c)
 
+#define SCOPED_CONCURRENT_STOP_WATCH(c) \
+  ScopedStopWatch<ConcurrentStopWatch> \
+  MACRO_CONCAT(CONCURRENT_STOP_WATCH, __COUNTER__)(c)
 
 /// Utility class to measure time.  This is measured using the cpu tick counter which
 /// is very low overhead but can be inaccurate if the thread is switched away.  This
@@ -172,6 +177,54 @@ class MonotonicStopWatch {
     }
     return end - start_;
   }
+};
+
+/// Utility class to measure multiple threads concurrent wall time.
+/// If a thread is already running, the following thread won't reset the stop watch.
+/// The stop watch is stopped only when all threads finish their work.
+class ConcurrentStopWatch {
+ public:
+  ConcurrentStopWatch() : busy_threads_(0), last_lap_start_(0) {}
+
+  void Start() {
+    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    if (busy_threads_ == 0) {
+      msw_.Start();
+    }
+    ++busy_threads_;
+  }
+
+  void Stop() {
+    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    DCHECK_GT(busy_threads_, 0);
+    --busy_threads_;
+    if (busy_threads_ == 0) {
+      msw_.Stop();
+    }
+  }
+
+  /// Returns delta wall time since last time LapTime() is called.
+  uint64_t LapTime() {
+    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    uint64_t now = msw_.TotalElapsedTime();
+    uint64_t lap_duration = now - last_lap_start_;
+    last_lap_start_ = now;
+    return lap_duration;
+  }
+
+  uint64_t TotalRunningTime() const {  return msw_.TotalElapsedTime(); }
+
+ private:
+  MonotonicStopWatch msw_;
+
+  /// Lock with busy_threads_.
+  SpinLock thread_counter_lock_;
+
+  /// Track how many threads are currently busy.
+  int busy_threads_;
+
+  /// Track when the last time LapTime() is called so we can calculate lap time.
+  uint64_t last_lap_start_;
 };
 
 /// Utility class that starts the stop watch in the constructor and stops the watch when

@@ -71,7 +71,7 @@ class FragmentMgr::FragmentExecState {
  private:
   TPlanFragmentInstanceCtx fragment_instance_ctx_;
   PlanFragmentExecutor executor_;
-  ImpalaInternalServiceClientCache* client_cache_;
+  ImpalaBackendClientCache* client_cache_;
   TExecPlanFragmentParams exec_params_;
 
   /// the thread executing this plan fragment

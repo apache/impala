@@ -19,6 +19,7 @@
 #include "gutil/strings/substitute.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
+#include "runtime/backend-client.h"
 #include "service/impala-server.h"
 #include "util/bloom-filter.h"
 
@@ -65,9 +66,9 @@ namespace {
 /// Sends a filter to the coordinator. Executed asynchronously in the context of
 /// ExecEnv::rpc_pool().
 void SendFilterToCoordinator(TNetworkAddress address, TUpdateFilterParams params,
-    ImpalaInternalServiceClientCache* client_cache) {
+    ImpalaBackendClientCache* client_cache) {
   Status status;
-  ImpalaInternalServiceConnection coord(client_cache, address, &status);
+  ImpalaBackendConnection coord(client_cache, address, &status);
   if (!status.ok()) {
     // Failing to send a filter is not a query-wide error - the remote fragment will
     // continue regardless.
@@ -76,7 +77,7 @@ void SendFilterToCoordinator(TNetworkAddress address, TUpdateFilterParams params
     return;
   }
   TUpdateFilterResult res;
-  status = coord.DoRpc(&ImpalaInternalServiceClient::UpdateFilter, params, &res);
+  status = coord.DoRpc(&ImpalaBackendClient::UpdateFilter, params, &res);
 }
 
 }

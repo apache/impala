@@ -53,7 +53,6 @@ class RowDescriptor;
 class PlanFragmentExecutor;
 class ObjectPool;
 class RuntimeState;
-class ImpalaInternalServiceClient;
 class Expr;
 class ExprContext;
 class ExecEnv;

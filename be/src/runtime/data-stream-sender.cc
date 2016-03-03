@@ -28,6 +28,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/client-cache.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/backend-client.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "rpc/thrift-client.h"
@@ -110,7 +111,7 @@ class DataStreamSender::Channel {
   DataStreamSender* parent_;
   int buffer_size_;
 
-  ImpalaInternalServiceClientCache* client_cache_;
+  ImpalaBackendClientCache* client_cache_;
 
   const RowDescriptor& row_desc_;
   TNetworkAddress address_;
@@ -196,16 +197,17 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
   params.__set_eos(false);
   params.__set_sender_id(parent_->sender_id_);
 
-  ImpalaInternalServiceConnection client(client_cache_, address_, &rpc_status_);
+  ImpalaBackendConnection client(client_cache_, address_, &rpc_status_);
   if (!rpc_status_.ok()) return;
 
   TTransmitDataResult res;
-  {
-    SCOPED_TIMER(parent_->thrift_transmit_timer_);
-    rpc_status_ =
-        client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &res);
-    if (!rpc_status_.ok()) return;
-  }
+  client->SetTransmitDataCounter(parent_->thrift_transmit_timer_);
+  rpc_status_ =
+      client.DoRpc(&ImpalaBackendClient::TransmitData, params, &res);
+  client->ResetTransmitDataCounter();
+  if (!rpc_status_.ok()) return;
+  COUNTER_ADD(parent_->profile_->total_time_counter(),
+      parent_->thrift_transmit_timer_->LapTime());
 
   if (res.status.status_code != TErrorCode::OK) {
     rpc_status_ = res.status;
@@ -277,7 +279,7 @@ Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
   RETURN_IF_ERROR(GetSendStatus());
 
   Status client_cnxn_status;
-  ImpalaInternalServiceConnection client(client_cache_, address_, &client_cnxn_status);
+  ImpalaBackendConnection client(client_cache_, address_, &client_cnxn_status);
   RETURN_IF_ERROR(client_cnxn_status);
 
   TTransmitDataParams params;
@@ -289,7 +291,7 @@ Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
   TTransmitDataResult res;
 
   VLOG_RPC << "calling TransmitData(eos=true) to terminate channel.";
-  rpc_status_ = client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &res);
+  rpc_status_ = client.DoRpc(&ImpalaBackendClient::TransmitData, params, &res);
   if (!rpc_status_.ok()) {
     stringstream msg;
     msg << "TransmitData(eos=true) to " << address_ << " failed:\n" << rpc_status_.msg().msg();
@@ -320,6 +322,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     serialize_batch_timer_(NULL),
     thrift_transmit_timer_(NULL),
     bytes_sent_counter_(NULL),
+    total_sent_rows_counter_(NULL),
     dest_node_id_(sink.dest_node_id) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
@@ -377,7 +380,8 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
   serialize_batch_timer_ =
       ADD_TIMER(profile(), "SerializeBatchTime");
-  thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime(*)");
+  thrift_transmit_timer_ = profile()->AddConcurrentTimerCounter("TransmitDataRPCTime",
+      TUnit::TIME_NS);
   network_throughput_ =
       profile()->AddDerivedCounter("NetworkThroughput(*)", TUnit::BYTES_PER_SECOND,
           bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
@@ -387,6 +391,7 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
            bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
                          profile()->total_time_counter()));
 
+  total_sent_rows_counter_= ADD_COUNTER(profile(), "RowsReturned", TUnit::UNIT);
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
@@ -398,7 +403,6 @@ Status DataStreamSender::Open(RuntimeState* state) {
 }
 
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
-  SCOPED_TIMER(profile_->total_time_counter());
   DCHECK(!closed_);
   DCHECK(!flushed_);
 
@@ -442,6 +446,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }
   }
+  COUNTER_ADD(total_sent_rows_counter_, batch->num_rows());
   RETURN_IF_ERROR(state->CheckQueryState());
   return Status::OK();
 }
@@ -475,6 +480,7 @@ void DataStreamSender::Close(RuntimeState* state) {
 Status DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers) {
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
+    SCOPED_TIMER(profile_->total_time_counter());
     SCOPED_TIMER(serialize_batch_timer_);
     RETURN_IF_ERROR(src->Serialize(dest));
     int bytes = RowBatch::GetBatchSize(*dest);

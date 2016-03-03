@@ -24,6 +24,7 @@
 #include "util/runtime-profile.h"
 #include "util/streaming-sampler.h"
 #include "util/thread.h"
+#include "util/time.h"
 
 #include "common/names.h"
 
@@ -532,11 +533,165 @@ TEST(CountersTest, StreamingSampler) {
   ValidateSampler(sampler, 7, 1000, 2);
 }
 
+// Test class to test ConcurrentStopWatch and RuntimeProfile::ConcurrentTimerCounter
+// don't double count in multithread environment.
+class TimerCounterTest {
+ public:
+  TimerCounterTest()
+    : timercounter_(TUnit::TIME_NS) {}
+
+  struct DummyWorker {
+    thread* thread_handle;
+    bool done;
+
+    DummyWorker()
+      : thread_handle(NULL), done(false) {}
+
+    ~DummyWorker() {
+      Stop();
+    }
+
+    void Stop() {
+      if (!done && thread_handle != NULL) {
+        done = true;
+        thread_handle->join();
+        delete thread_handle;
+        thread_handle = NULL;
+      }
+    }
+  };
+
+  void Run(DummyWorker* worker) {
+    SCOPED_CONCURRENT_STOP_WATCH(&csw_);
+    SCOPED_CONCURRENT_COUNTER(&timercounter_);
+    while (!worker->done) {
+      SleepForMs(10);
+      // Each test case should be no more than one second.
+      // Consider test failed if timer is more than 3 seconds.
+      if (csw_.TotalRunningTime() > 3000000000) {
+        EXPECT_FALSE(false);
+      }
+    }
+  }
+
+  // Start certain number of worker threads. If interval is set, it will add some delay
+  // between creating worker thread.
+  void StartWorkers(int num, int interval) {
+    workers_.reserve(num);
+    for (int i = 0; i < num; ++i) {
+      workers_.push_back(DummyWorker());
+      DummyWorker& worker = workers_.back();
+      worker.thread_handle = new thread(&TimerCounterTest::Run, this, &worker);
+      SleepForMs(interval);
+    }
+  }
+
+  // Stop specified thread by index. if index is -1, stop all threads
+  void StopWorkers(int thread_index = -1) {
+    if (thread_index >= 0) {
+      workers_[thread_index].Stop();
+    } else {
+      for (int i = 0; i < workers_.size(); ++i) {
+        workers_[i].Stop();
+      }
+    }
+  }
+
+  void Reset() {
+    workers_.clear();
+  }
+
+  // Allow some timer inaccuracy (1ms) since thread join could take some time.
+  static const int MAX_TIMER_ERROR_NS = 1000000;
+  vector<DummyWorker> workers_;
+  ConcurrentStopWatch csw_;
+  RuntimeProfile::ConcurrentTimerCounter timercounter_;
+};
+
+void ValidateTimerValue(const TimerCounterTest& timer, int64_t start) {
+  int64_t expected_value = MonotonicNanos() - start;
+  int64_t stopwatch_value = timer.csw_.TotalRunningTime();
+  EXPECT_TRUE(stopwatch_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
+      stopwatch_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+
+  int64_t timer_value = timer.timercounter_.value();
+  EXPECT_TRUE(timer_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
+      timer_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+}
+
+void ValidateLapTime(TimerCounterTest* timer, int64_t expected_value) {
+  int64_t stopwatch_value = timer->csw_.LapTime();
+  EXPECT_TRUE(stopwatch_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
+      stopwatch_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+
+  int64_t timer_value = timer->timercounter_.LapTime();
+  EXPECT_TRUE(timer_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
+      timer_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+}
+
+TEST(TimerCounterTest, CountersTestOneThread) {
+  TimerCounterTest tester;
+  uint64_t start = MonotonicNanos();
+  tester.StartWorkers(1, 0);
+  SleepForMs(250);
+  ValidateTimerValue(tester, start);
+  tester.StopWorkers(-1);
+  ValidateTimerValue(tester, start);
+}
+
+TEST(TimerCounterTest, CountersTestTwoThreads) {
+  TimerCounterTest tester;
+  uint64_t start = MonotonicNanos();
+  tester.StartWorkers(2, 5);
+  SleepForMs(250);
+  ValidateTimerValue(tester, start);
+  tester.StopWorkers(-1);
+  ValidateTimerValue(tester, start);
+}
+
+TEST(TimerCounterTest, CountersTestRandom) {
+  TimerCounterTest tester;
+  uint64_t start = MonotonicNanos();
+  ValidateTimerValue(tester, start);
+  // First working period
+  tester.StartWorkers(5, 5);
+  ValidateTimerValue(tester, start);
+  SleepForMs(200);
+  tester.StopWorkers(2);
+  ValidateTimerValue(tester, start);
+  SleepForMs(50);
+  tester.StopWorkers(4);
+  ValidateTimerValue(tester, start);
+  SleepForMs(300);
+  tester.StopWorkers(-1);
+  ValidateTimerValue(tester, start);
+  tester.Reset();
+
+  ValidateLapTime(&tester, MonotonicNanos() - start);
+  uint64_t first_run_end = MonotonicNanos();
+  // Adding some idle time. concurrent stopwatch and timer should not count the idle time.
+  SleepForMs(100);
+  start += MonotonicNanos() - first_run_end;
+
+  // Second working period
+  tester.StartWorkers(2, 0);
+  // We just get lap time after first run finish. so at start of second run, expect lap time == 0
+  ValidateLapTime(&tester, 0);
+  uint64_t lap_time_start = MonotonicNanos();
+  SleepForMs(100);
+  ValidateTimerValue(tester, start);
+  SleepForMs(100);
+  tester.StopWorkers(-1);
+  ValidateTimerValue(tester, start);
+  ValidateLapTime(&tester, MonotonicNanos() - lap_time_start);
+}
+
 }
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitThreading();
   impala::CpuInfo::Init();
+  impala::OsInfo::Init();
   return RUN_ALL_TESTS();
 }

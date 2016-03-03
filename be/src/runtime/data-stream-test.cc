@@ -30,6 +30,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/client-cache.h"
 #include "runtime/raw-value.inline.h"
+#include "runtime/backend-client.h"
 #include "service/fe-support.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
@@ -613,7 +614,7 @@ TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   // RPC does not cause an error (the receiver will still be called, since it is only
   // Close()'d, not deleted from the data stream manager).
   Status rpc_status;
-  ImpalaInternalServiceConnection client(exec_env_.impalad_client_cache(),
+  ImpalaBackendConnection client(exec_env_.impalad_client_cache(),
       MakeNetworkAddress("localhost", FLAGS_port), &rpc_status);
   EXPECT_TRUE(rpc_status.ok());
   TTransmitDataParams params;
@@ -625,8 +626,7 @@ TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   params.__set_sender_id(0);
 
   TTransmitDataResult result;
-  rpc_status =
-      client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &result);
+  rpc_status = client.DoRpc(&ImpalaBackendClient::TransmitData, params, &result);
 
   // Finally, stream_recvr destructor happens here. Before fix for IMPALA-2931, this
   // would have resulted in a crash.

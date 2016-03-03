@@ -21,6 +21,7 @@
 #include "rpc/thrift-util.h"
 #include "gutil/strings/substitute.h"
 #include "util/bloom-filter.h"
+#include "runtime/backend-client.h"
 
 #include "common/names.h"
 
@@ -64,7 +65,7 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   Status exec_status = UpdateStatus(status);
 
   Status coord_status;
-  ImpalaInternalServiceConnection coord(client_cache_, coord_address(), &coord_status);
+  ImpalaBackendConnection coord(client_cache_, coord_address(), &coord_status);
   if (!coord_status.ok()) {
     stringstream s;
     s << "Couldn't get a client for " << coord_address() <<"\tReason: "
@@ -113,8 +114,7 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   Status rpc_status;
   // Try to send the RPC 3 times before failing.
   for (int i = 0; i < 3; ++i) {
-    rpc_status =
-        coord.DoRpc(&ImpalaInternalServiceClient::ReportExecStatus, params, &res);
+    rpc_status = coord.DoRpc(&ImpalaBackendClient::ReportExecStatus, params, &res);
     if (rpc_status.ok()) {
       rpc_status = Status(res.status);
       break;

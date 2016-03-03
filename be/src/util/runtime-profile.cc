@@ -447,6 +447,7 @@ const string* RuntimeProfile::GetInfoString(const string& key) const {
 
 ADD_COUNTER_IMPL(AddCounter, Counter);
 ADD_COUNTER_IMPL(AddHighWaterMarkCounter, HighWaterMarkCounter);
+ADD_COUNTER_IMPL(AddConcurrentTimerCounter, ConcurrentTimerCounter);
 
 RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
     const string& name, TUnit::type unit,

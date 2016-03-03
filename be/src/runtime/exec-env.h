@@ -22,7 +22,7 @@
 
 #include "common/status.h"
 #include "exprs/timestamp-functions.h"
-#include "runtime/client-cache.h"
+#include "runtime/backend-client.h"
 #include "util/cgroups-mgr.h"
 #include "util/hdfs-bulk-ops.h" // For declaration of HdfsOpThreadPool
 #include "resourcebroker/resource-broker.h"
@@ -75,7 +75,7 @@ class ExecEnv {
   }
 
   DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
-  ImpalaInternalServiceClientCache* impalad_client_cache() {
+  ImpalaBackendClientCache* impalad_client_cache() {
     return impalad_client_cache_.get();
   }
   CatalogServiceClientCache* catalogd_client_cache() {
@@ -129,7 +129,7 @@ class ExecEnv {
   boost::scoped_ptr<ResourceBroker> resource_broker_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
-  boost::scoped_ptr<ImpalaInternalServiceClientCache> impalad_client_cache_;
+  boost::scoped_ptr<ImpalaBackendClientCache> impalad_client_cache_;
   boost::scoped_ptr<CatalogServiceClientCache> catalogd_client_cache_;
   boost::scoped_ptr<HBaseTableFactory> htable_factory_;
   boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;

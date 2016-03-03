@@ -46,6 +46,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
+#include "runtime/backend-client.h"
 #include "runtime/parallel-executor.h"
 #include "scheduling/scheduler.h"
 #include "exec/data-sink.h"
@@ -1334,7 +1335,7 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_par
   int64_t start = MonotonicMillis();
 
   Status client_connect_status;
-  ImpalaInternalServiceConnection backend_client(exec_env_->impalad_client_cache(),
+  ImpalaBackendConnection backend_client(exec_env_->impalad_client_cache(),
       exec_state->impalad_address(), &client_connect_status);
   if (!client_connect_status.ok()) {
     exec_state->SetInitialStatus(client_connect_status);
@@ -1342,7 +1343,7 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_par
   }
 
   TExecPlanFragmentResult thrift_result;
-  Status rpc_status = backend_client.DoRpc(&ImpalaInternalServiceClient::ExecPlanFragment,
+  Status rpc_status = backend_client.DoRpc(&ImpalaBackendClient::ExecPlanFragment,
       rpc_params, &thrift_result);
 
   exec_state->SetRpcLatency(MonotonicMillis() - start);
@@ -1422,7 +1423,7 @@ void Coordinator::CancelRemoteFragments() {
     // if we get an error while trying to get a connection to the backend,
     // keep going
     Status status;
-    ImpalaInternalServiceConnection backend_client(
+    ImpalaBackendConnection backend_client(
         exec_env_->impalad_client_cache(), exec_state->impalad_address(), &status);
     if (!status.ok()) continue;
 
@@ -1434,7 +1435,7 @@ void Coordinator::CancelRemoteFragments() {
                << exec_state->fragment_instance_id() << " backend="
                << exec_state->impalad_address();
     Status rpc_status = backend_client.DoRpc(
-        &ImpalaInternalServiceClient::CancelPlanFragment, params, &res);
+        &ImpalaBackendClient::CancelPlanFragment, params, &res);
     if (!rpc_status.ok()) {
       exec_state->status()->MergeStatus(rpc_status);
       stringstream msg;
@@ -1944,7 +1945,7 @@ namespace {
 void DistributeFilters(shared_ptr<TPublishFilterParams> params, TNetworkAddress impalad,
     TUniqueId fragment_instance_id) {
   Status status;
-  ImpalaInternalServiceConnection backend_client(
+  ImpalaBackendConnection backend_client(
       ExecEnv::GetInstance()->impalad_client_cache(), impalad, &status);
   if (!status.ok()) return;
   // Make a local copy of the shared 'master' set of parameters
@@ -1952,7 +1953,7 @@ void DistributeFilters(shared_ptr<TPublishFilterParams> params, TNetworkAddress 
   local_params.dst_instance_id = fragment_instance_id;
   local_params.__set_bloom_filter(params->bloom_filter);
   TPublishFilterResult res;
-  backend_client.DoRpc(&ImpalaInternalServiceClient::PublishFilter, local_params, &res);
+  backend_client.DoRpc(&ImpalaBackendClient::PublishFilter, local_params, &res);
 };
 
 }

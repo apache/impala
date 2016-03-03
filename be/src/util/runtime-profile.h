@@ -58,6 +58,9 @@ namespace impala {
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c) \
     ThreadCounterMeasurement \
       MACRO_CONCAT(SCOPED_THREAD_COUNTER_MEASUREMENT, __COUNTER__)(c)
+  #define SCOPED_CONCURRENT_COUNTER(c) \
+    ScopedStopWatch<RuntimeProfile::ConcurrentTimerCounter> \
+      MACRO_CONCAT(SCOPED_CONCURRENT_COUNTER, __COUNTER__)(c)
 #else
   #define ADD_COUNTER(profile, name, unit) NULL
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) NULL
@@ -69,6 +72,7 @@ namespace impala {
   #define COUNTER_SET(c, v)
   #define ADD_THREAD_COUNTERS(profile, prefix) NULL
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c)
+  #define SCOPED_CONCURRENT_COUNTER(c)
 #endif
 
 class ObjectPool;
@@ -370,6 +374,44 @@ class RuntimeProfile {
     StreamingCounterSampler samples_;
   };
 
+  /// Counter whose value comes from an internal ConcurrentStopWatch to track multiple threads
+  /// concurrent running time.
+  class ConcurrentTimerCounter : public Counter {
+   public:
+    ConcurrentTimerCounter(TUnit::type unit) : Counter(unit) {}
+
+    virtual int64_t value() const { return csw_.TotalRunningTime(); }
+
+    void Start() { csw_.Start(); }
+
+    void Stop() { csw_.Stop(); }
+
+    /// Returns lap time for caller who wants delta update of concurrent running time.
+    uint64_t LapTime() { return csw_.LapTime(); }
+
+    /// The value for this counter should come from internal ConcurrentStopWatch.
+    /// Set() and Add() should not be used.
+    virtual void Set(double value) {
+      DCHECK(false);
+    }
+
+    virtual void Set(int64_t value) {
+      DCHECK(false);
+    }
+
+    virtual void Set(int value) {
+      DCHECK(false);
+    }
+
+    virtual void Add(int64_t delta) {
+      DCHECK(false);
+    }
+
+   private:
+    ConcurrentStopWatch csw_;
+  };
+
+
   /// Create a runtime profile object with 'name'.  Counters and merged profile are
   /// allocated from pool.
   /// If is_averaged_profile is true, the counters in this profile will be derived
@@ -429,6 +471,9 @@ class RuntimeProfile {
   /// Adds a high water mark counter to the runtime profile. Otherwise, same behavior
   /// as AddCounter()
   HighWaterMarkCounter* AddHighWaterMarkCounter(const std::string& name,
+      TUnit::type unit, const std::string& parent_counter_name = "");
+
+  ConcurrentTimerCounter* AddConcurrentTimerCounter(const std::string& name,
       TUnit::type unit, const std::string& parent_counter_name = "");
 
   /// Add a derived counter with 'name'/'unit'. The counter is owned by the
