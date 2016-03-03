@@ -486,6 +486,10 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
       keytab_file_, principal_);
 
   bool first_time = true;
+  std::random_device rd;
+  mt19937 generator(rd());
+  uniform_int<> dist(0, 300);
+
   while (true) {
     LOG(INFO) << "Registering " << principal_ << ", keytab file " << keytab_file_;
     string kinit_output;
@@ -509,8 +513,6 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
     // Sleep for the renewal interval, minus a random time between 0-5 minutes to help
     // avoid a storm at the KDC. Additionally, never sleep less than a minute to
     // reduce KDC stress due to frequent renewals.
-    mt19937 generator;
-    uniform_int<> dist(0, 300);
     SleepForMs(1000 * max((60 * FLAGS_kerberos_reinit_interval) - dist(generator), 60));
   }
 }
