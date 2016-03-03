@@ -114,7 +114,7 @@ class DataStreamMgr {
   IntCounter* num_senders_timedout_;
 
   /// protects all fields below
-  SpinLock lock_;
+  boost::mutex lock_;
 
   /// map from hash value of fragment instance id/node id pair to stream receivers;
   /// Ownership of the stream revcr is shared between this instance and the caller of

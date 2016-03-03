@@ -80,7 +80,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::CreateRecvr(RuntimeState* state,
           fragment_instance_id, dest_node_id, num_senders, is_merging, buffer_size,
           profile));
   size_t hash_value = GetHashValue(fragment_instance_id, dest_node_id);
-  lock_guard<SpinLock> l(lock_);
+  lock_guard<mutex> l(lock_);
   fragment_recvr_set_.insert(make_pair(fragment_instance_id, dest_node_id));
   receiver_map_.insert(make_pair(hash_value, recvr));
 
@@ -98,7 +98,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
   RecvrId promise_key = make_pair(fragment_instance_id, node_id);
   *already_unregistered = false;
   {
-    lock_guard<SpinLock> l(lock_);
+    lock_guard<mutex> l(lock_);
     if (closed_stream_cache_.find(promise_key) != closed_stream_cache_.end()) {
       *already_unregistered = true;
       return shared_ptr<DataStreamRecvr>();
@@ -128,7 +128,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
   }
   if (timed_out) num_senders_timedout_->Increment(1L);
   {
-    lock_guard<SpinLock> l(lock_);
+    lock_guard<mutex> l(lock_);
     // If we are the last to leave, remove the rendezvous from the pending map. Any new
     // incoming senders will add a new entry to the map themselves.
     if (pending_rendezvous_[promise_key].DecRefCount() == 0) {
@@ -196,7 +196,7 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
   {
     // Remove any closed streams that have been in the cache for more than
     // STREAM_EXPIRATION_TIME_MS.
-    lock_guard<SpinLock> l(lock_);
+    lock_guard<mutex> l(lock_);
     ClosedStreamMap::iterator it = closed_stream_expirations_.begin();
     int64_t now = MonotonicMillis();
     int32_t before = closed_stream_cache_.size();
@@ -220,7 +220,7 @@ Status DataStreamMgr::DeregisterRecvr(
   VLOG_QUERY << "DeregisterRecvr(): fragment_instance_id=" << fragment_instance_id
              << ", node=" << node_id;
   size_t hash_value = GetHashValue(fragment_instance_id, node_id);
-  lock_guard<SpinLock> l(lock_);
+  lock_guard<mutex> l(lock_);
   pair<RecvrMap::iterator, RecvrMap::iterator> range =
       receiver_map_.equal_range(hash_value);
   while (range.first != range.second) {
@@ -250,7 +250,7 @@ Status DataStreamMgr::DeregisterRecvr(
 
 void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
   VLOG_QUERY << "cancelling all streams for fragment=" << fragment_instance_id;
-  lock_guard<SpinLock> l(lock_);
+  lock_guard<mutex> l(lock_);
   FragmentRecvrSet::iterator i =
       fragment_recvr_set_.lower_bound(make_pair(fragment_instance_id, 0));
   while (i != fragment_recvr_set_.end() && i->first == fragment_instance_id) {
