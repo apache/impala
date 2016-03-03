@@ -189,8 +189,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
 
   @SkipIfLocal.mem_usage_different
   def test_low_mem_limit_q21(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q21', self.MIN_MEM_FOR_TPCH['Q21'],
-            xfail_mem_limit="IMPALA-2728: TPC-H Q21 memory limit test is flaky")
+    self.low_memory_limit_test(vector, 'tpch-q21', self.MIN_MEM_FOR_TPCH['Q21'])
 
   def test_low_mem_limit_q22(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q22', self.MIN_MEM_FOR_TPCH['Q22'])
