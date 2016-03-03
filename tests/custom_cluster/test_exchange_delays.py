@@ -25,8 +25,8 @@ class TestExchangeDelays(CustomClusterTestSuite):
     return 'functional-query'
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000"
-        " --datastream_sender_timeout_ms=500")
+  @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=10000"
+        " --datastream_sender_timeout_ms=5000")
   def test_exchange_small_delay(self, vector):
     """Test delays in registering data stream receivers where the first one or two
     batches will time out before the receiver registers, but subsequent batches will
