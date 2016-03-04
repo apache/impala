@@ -1163,6 +1163,29 @@ public class CatalogOpExecutor {
       }
 
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
+      Db db = catalog_.getDb(params.getTable_name().db_name);
+      if (db == null) {
+        if (params.if_exists) return;
+        throw new CatalogException("Database does not exist: " +
+            params.getTable_name().db_name);
+      }
+      Table existingTbl = db.getTable(params.getTable_name().table_name);
+      if (existingTbl == null) {
+        if (params.if_exists) return;
+        throw new CatalogException("Table/View does not exist: " + tableName);
+      }
+      // Check to make sure we don't drop a view with "drop table" statement and
+      // vice versa. is_table field is marked optional in TDropTableOrViewParams to
+      // maintain catalog api compatibility.
+      // TODO: Remove params.isSetIs_table() check once catalog api compatibility is
+      // fixed.
+      if (params.isSetIs_table() && ((params.is_table && existingTbl instanceof View)
+          || (!params.is_table && !(existingTbl instanceof View)))) {
+        if (params.if_exists) return;
+        String errorMsg = "DROP " + (params.is_table ? "TABLE " : "VIEW ") +
+            "not allowed on a " + (params.is_table ? "view: " : "table: ") + tableName;
+        throw new CatalogException(errorMsg);
+      }
       try {
         msClient.getHiveClient().dropTable(
             tableName.getDb(), tableName.getTbl(), true, params.if_exists, params.purge);

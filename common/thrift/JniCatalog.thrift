@@ -552,6 +552,9 @@ struct TDropTableOrViewParams {
 
   // If true, underlying data is purged using -skipTrash
   3: required bool purge
+
+  // Set to true for tables and false for views
+  4: optional bool is_table
 }
 
 // Parameters of TRUNCATE commands

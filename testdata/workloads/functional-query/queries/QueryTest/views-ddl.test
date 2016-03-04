@@ -171,6 +171,32 @@ drop view if exists ddl_test_db.bad_view
 ---- RESULTS
 ====
 ---- QUERY
+# Test 'if exists' does not drop a table with same name
+create table ddl_test_db.drop_tbl_test(a int)
+---- RESULTS
+====
+---- QUERY
+drop view if exists ddl_test_db.drop_tbl_test
+---- RESULTS
+====
+---- QUERY
+# Test drop table 'if exists' does not drop a view with same name.
+# We try to drop a table with name complex_view and it should should
+# still be listed in the subsequent show tables output (as a view).
+drop table if exists ddl_test_db.complex_view
+---- RESULTS
+====
+---- QUERY
+# Test that the table is present
+show tables in ddl_test_db
+---- RESULTS
+'drop_tbl_test'
+'complex_view'
+'parquet_view'
+'simple_view'
+'view_view'
+====
+---- QUERY
 # Test renaming a view
 alter view ddl_test_db.view_view rename to ddl_test_db.view_on_view
 ---- RESULTS
@@ -184,6 +210,7 @@ alter view ddl_test_db.parquet_view rename to ddl_test_db.new_parquet_view
 # Test that the view was renamed
 show tables in ddl_test_db
 ---- RESULTS
+'drop_tbl_test'
 'complex_view'
 'new_parquet_view'
 'simple_view'

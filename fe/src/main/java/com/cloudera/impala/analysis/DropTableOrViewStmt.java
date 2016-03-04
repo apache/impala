@@ -67,6 +67,7 @@ public class DropTableOrViewStmt extends StatementBase {
     params.setTable_name(new TTableName(getDb(), getTbl()));
     params.setIf_exists(ifExists_);
     params.setPurge(purgeTable_);
+    params.setIs_table(dropTable_);
     return params;
   }
 
