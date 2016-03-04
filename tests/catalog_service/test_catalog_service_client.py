@@ -33,6 +33,9 @@ from tests.util.thrift_util import create_transport
 
 LOG = logging.getLogger('test_catalog_service_client')
 
+# TODO: Add a test that asserts correct/compatible responses
+# to create/drop function requests. For example, BDR relies
+# on a stable catalog Thrift API.
 class TestCatalogServiceClient(ImpalaTestSuite):
   TEST_DB = 'catalog_service_client_test_db'
 

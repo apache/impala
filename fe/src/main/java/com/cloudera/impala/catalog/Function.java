@@ -371,7 +371,11 @@ public class Function implements CatalogObject {
     }
     function.setBinaryType(fn.getBinary_type());
     function.setHasVarArgs(fn.isHas_var_args());
-    function.setIsPersistent(fn.isIs_persistent());
+    if (fn.isSetIs_persistent()) {
+      function.setIsPersistent(fn.isIs_persistent());
+    } else {
+      function.setIsPersistent(false);
+    }
     return function;
   }
 

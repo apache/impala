@@ -1365,21 +1365,54 @@ void ImpalaServer::CatalogUpdateCallback(
 
 Status ImpalaServer::ProcessCatalogUpdateResult(
     const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers) {
-  // If this this update result contains a catalog object to add or remove, directly apply
-  // the update to the local impalad's catalog cache. Otherwise, wait for a statestore
+  // If this update result contains catalog objects to add or remove, directly apply the
+  // updates to the local impalad's catalog cache. Otherwise, wait for a statestore
   // heartbeat that contains this update version.
-  if ((catalog_update_result.__isset.updated_catalog_objects ||
-      catalog_update_result.__isset.removed_catalog_objects)) {
+  if (catalog_update_result.__isset.updated_catalog_object_DEPRECATED ||
+      catalog_update_result.__isset.removed_catalog_object_DEPRECATED ||
+      catalog_update_result.__isset.updated_catalog_objects ||
+      catalog_update_result.__isset.removed_catalog_objects) {
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(true);
     update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
 
+    // Check that the response either exclusively uses the single updated/removed field
+    // or the corresponding list versions of the fields, but not a mix.
+    // The non-list version of the fields are maintained for backwards compatibility,
+    // e.g., BDR relies on a stable catalog API.
+    if ((catalog_update_result.__isset.updated_catalog_object_DEPRECATED ||
+         catalog_update_result.__isset.removed_catalog_object_DEPRECATED)
+        &&
+        (catalog_update_result.__isset.updated_catalog_objects ||
+         catalog_update_result.__isset.removed_catalog_objects)) {
+      stringstream err;
+      err << "Failed to process malformed catalog update response:\n"
+          << "__isset.updated_catalog_object_DEPRECATED="
+          << catalog_update_result.__isset.updated_catalog_object_DEPRECATED << "\n"
+          << "__isset.removed_catalog_object_DEPRECATED="
+          << catalog_update_result.__isset.updated_catalog_object_DEPRECATED << "\n"
+          << "__isset.updated_catalog_objects="
+          << catalog_update_result.__isset.updated_catalog_objects << "\n"
+          << "__isset.removed_catalog_objects="
+          << catalog_update_result.__isset.removed_catalog_objects;
+      return Status(TErrorCode::INTERNAL_ERROR, err.str());
+    }
+
+    if (catalog_update_result.__isset.updated_catalog_object_DEPRECATED) {
+      update_req.updated_objects.push_back(
+          catalog_update_result.updated_catalog_object_DEPRECATED);
+    }
+    if (catalog_update_result.__isset.removed_catalog_object_DEPRECATED) {
+      update_req.removed_objects.push_back(
+          catalog_update_result.removed_catalog_object_DEPRECATED);
+    }
     if (catalog_update_result.__isset.updated_catalog_objects) {
       update_req.__set_updated_objects(catalog_update_result.updated_catalog_objects);
     }
     if (catalog_update_result.__isset.removed_catalog_objects) {
       update_req.__set_removed_objects(catalog_update_result.removed_catalog_objects);
     }
+
      // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;
     Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);

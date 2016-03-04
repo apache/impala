@@ -214,5 +214,5 @@ struct TFunction {
   10: optional TAggregateFunction aggregate_fn
 
   // True for builtins or user-defined functions persisted by the catalog
-  11: required bool is_persistent
+  11: optional bool is_persistent
 }
