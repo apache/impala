@@ -284,7 +284,7 @@ fi
 
 export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
-: {IMPALA_BUILD_THREADS=$(nproc)}
+: ${IMPALA_BUILD_THREADS:=$(nproc)}
 export IMPALA_BUILD_THREADS
 
 # Some environments (like the packaging build) might not have $USER set.  Fix that here.
