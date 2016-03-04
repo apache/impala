@@ -49,6 +49,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
+import com.cloudera.impala.service.BackendConfig;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDescribeDbParams;
@@ -108,7 +109,8 @@ public class JniFrontend {
    */
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
       String sentryConfigFile, String authPolicyProviderClass, int impalaLogLevel,
-      int otherLogLevel) throws InternalException {
+      int otherLogLevel, boolean allowAuthToLocal) throws InternalException {
+    BackendConfig.setAuthToLocal(allowAuthToLocal);
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
 

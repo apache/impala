@@ -27,6 +27,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.cloudera.impala.common.ByteUnits;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TPoolConfig;
 import com.cloudera.impala.thrift.TResolveRequestPoolParams;
@@ -233,7 +234,8 @@ public class TestRequestPoolService {
     checkPoolConfigResult("root.queueC", -1, 200, 128 * ByteUnits.MEGABYTE);
   }
 
-  private void checkModifiedConfigResults() throws IOException {
+  private void checkModifiedConfigResults()
+      throws InternalException, IOException {
     // Test pool resolution: now there's a queueC
     Assert.assertEquals("root.queueA", poolService_.assignToPool("queueA", "userA"));
     Assert.assertNull(poolService_.assignToPool("queueX", "userA"));

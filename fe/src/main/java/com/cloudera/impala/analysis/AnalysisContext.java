@@ -32,6 +32,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TLineageGraph;
@@ -384,7 +385,8 @@ public class AnalysisContext {
    * analyze() must have already been called. Throws an AuthorizationException if the
    * user doesn't have sufficient privileges to run this statement.
    */
-  public void authorize(AuthorizationChecker authzChecker) throws AuthorizationException {
+  public void authorize(AuthorizationChecker authzChecker)
+      throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(analysisResult_);
     Analyzer analyzer = getAnalyzer();
     // Process statements for which column-level privilege requests may be registered.
@@ -451,7 +453,7 @@ public class AnalysisContext {
    * this request. Also, checks if the request references a system database.
    */
   private void authorizePrivilegeRequest(AuthorizationChecker authzChecker,
-    PrivilegeRequest request) throws AuthorizationException {
+    PrivilegeRequest request) throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(request);
     String dbName = null;
     if (request.getAuthorizeable() != null) {
@@ -474,7 +476,8 @@ public class AnalysisContext {
    * sufficient privileges.
    */
   private void authorizeTableAccess(AuthorizationChecker authzChecker,
-      List<PrivilegeRequest> requests) throws AuthorizationException {
+      List<PrivilegeRequest> requests)
+      throws AuthorizationException, InternalException {
     Preconditions.checkState(!requests.isEmpty());
     Analyzer analyzer = getAnalyzer();
     boolean hasTableSelectPriv = true;

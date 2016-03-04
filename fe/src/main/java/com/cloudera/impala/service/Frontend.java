@@ -249,7 +249,7 @@ public class Frontend {
    * result argument.
    */
   private void createCatalogOpRequest(AnalysisContext.AnalysisResult analysis,
-      TExecRequest result) {
+      TExecRequest result) throws InternalException {
     TCatalogOpRequest ddl = new TCatalogOpRequest();
     TResultSetMetadata metadata = new TResultSetMetadata();
     if (analysis.isUseStmt()) {
@@ -614,7 +614,7 @@ public class Frontend {
    * the given user. If pattern is null, it matches all columns.
    */
   public List<Column> getColumns(Table table, PatternMatcher columnPattern,
-      User user) {
+      User user) throws InternalException {
     Preconditions.checkNotNull(table);
     List<Column> columns = Lists.newArrayList();
     for (Column column: table.getColumnsInHiveOrder()) {
@@ -635,7 +635,7 @@ public class Frontend {
    * Returns all databases that match the pattern and
    * are accessible to the given user. If pattern is null, matches all dbs.
    */
-  public List<Db> getDbs(String dbPattern, User user) {
+  public List<Db> getDbs(String dbPattern, User user) throws InternalException {
     List<Db> dbs = impaladCatalog_.getDbs(dbPattern);
     // If authorization is enabled, filter out the databases the user does not
     // have permissions on.
@@ -652,7 +652,8 @@ public class Frontend {
   /**
    * Check whether database is accessible to given user.
    */
-  private boolean isAccessibleToUser(Db db, User user) {
+  private boolean isAccessibleToUser(Db db, User user)
+      throws InternalException {
     if (db.getName().toLowerCase().equals(Catalog.DEFAULT_DB.toLowerCase())) {
       // Default DB should always be shown.
       return true;

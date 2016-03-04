@@ -283,7 +283,7 @@ public class RequestPoolService {
 
   @VisibleForTesting
   TResolveRequestPoolResult resolveRequestPool(
-      TResolveRequestPoolParams resolvePoolParams) {
+      TResolveRequestPoolParams resolvePoolParams) throws InternalException {
     String requestedPool = resolvePoolParams.getRequested_pool();
     String user = resolvePoolParams.getUser();
     TResolveRequestPoolResult result = new TResolveRequestPoolResult();
@@ -410,7 +410,7 @@ public class RequestPoolService {
    */
   @VisibleForTesting
   String assignToPool(String requestedPool, String user)
-      throws IOException {
+      throws InternalException, IOException {
     Preconditions.checkState(running_.get());
     Preconditions.checkNotNull(requestedPool);
     Preconditions.checkArgument(!Strings.isNullOrEmpty(user));
@@ -432,14 +432,16 @@ public class RequestPoolService {
    * @return True if the user has access to the pool.
    */
   @VisibleForTesting
-  boolean hasAccess(String pool, String user) {
+  boolean hasAccess(String pool, String user) throws InternalException {
     Preconditions.checkState(running_.get());
     Preconditions.checkArgument(!Strings.isNullOrEmpty(pool));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(user));
     // Convert the user name to a short name (e.g. 'user1@domain' to 'user1') because
     // the UserGroupInformation will check group membership which should always be done
     // on the short name of the principal.
-    String shortName = new User(user).getShortName();
+    String shortName;
+    User requestingUser = new User(user);
+    shortName = requestingUser.getShortName();
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(shortName);
     return allocationConf_.get().hasAccess(pool, QueueACL.SUBMIT_APPLICATIONS, ugi);
   }

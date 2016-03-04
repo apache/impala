@@ -28,10 +28,19 @@ public class BackendConfig {
   // the default FLAGS_read_size used by the IO manager in the backend.
   private final long READ_SIZE;
 
+  // This is overriden by JniFrontend/JniCatalog classes with user set configuration.
+  // TODO: Read this from backend instead of using static variables.
+  private static boolean allowAuthToLocalRules_ = false;
+
   private BackendConfig() {
     // TODO: Populate these by making calls to the backend instead of default constants.
     READ_SIZE = 8 * 1024 * 1024L;
   }
 
   public long getReadSize() { return READ_SIZE; }
+
+  public static boolean isAuthToLocalEnabled() { return allowAuthToLocalRules_; }
+  public static void setAuthToLocal(boolean authToLocal) {
+    allowAuthToLocalRules_ = authToLocal;
+  }
 }

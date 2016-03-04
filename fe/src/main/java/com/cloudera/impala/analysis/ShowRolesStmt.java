@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TShowRolesParams;
 import com.google.common.base.Preconditions;
 
@@ -50,7 +51,7 @@ public class ShowRolesStmt extends AuthorizationStmt {
     }
   }
 
-  public TShowRolesParams toThrift() {
+  public TShowRolesParams toThrift() throws InternalException {
     TShowRolesParams params = new TShowRolesParams();
     params.setRequesting_user(requestingUser_.getShortName());
     params.setIs_show_current_roles(isShowCurrentRoles_);

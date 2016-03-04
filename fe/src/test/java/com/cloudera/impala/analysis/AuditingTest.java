@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
@@ -327,7 +328,7 @@ public class AuditingTest extends AnalyzerTest {
 
   @Test
   public void TestAccessEventsOnAuthFailure() throws AuthorizationException,
-      AnalysisException {
+      AnalysisException, InternalException {
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
     AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(

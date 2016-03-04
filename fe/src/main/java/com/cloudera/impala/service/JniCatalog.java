@@ -33,6 +33,7 @@ import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
+import com.cloudera.impala.service.BackendConfig;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDdlExecRequest;
@@ -75,8 +76,9 @@ public class JniCatalog {
   }
 
   public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
-      String sentryServiceConfig, int impalaLogLevel, int otherLogLevel)
-      throws InternalException {
+      String sentryServiceConfig, int impalaLogLevel, int otherLogLevel,
+      boolean allowAuthToLocal) throws InternalException {
+    BackendConfig.setAuthToLocal(allowAuthToLocal);
     Preconditions.checkArgument(numMetadataLoadingThreads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.

@@ -21,15 +21,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.apache.hadoop.conf.Configuration;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -49,6 +54,7 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
@@ -65,6 +71,7 @@ import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.util.SentryPolicyService;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 @RunWith(Parameterized.class)
 public class AuthorizationTest {
@@ -153,6 +160,16 @@ public class AuthorizationTest {
     ImpaladTestCatalog sentryServiceCatalog =
         new ImpaladTestCatalog(sentryServiceAuthzConfig);
     testCtxs_.add(new TestContext(sentryServiceAuthzConfig, sentryServiceCatalog));
+  }
+
+  @BeforeClass
+  public static void setUp() throws Exception {
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    RuntimeEnv.INSTANCE.reset();
   }
 
   public AuthorizationTest(TestContext ctx) throws Exception {
@@ -421,7 +438,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestSelect() throws AuthorizationException, AnalysisException {
+  public void TestSelect() throws ImpalaException {
     // Can select from table that user has privileges on.
     AuthzOk("select * from functional.alltypesagg");
 
@@ -535,7 +552,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestUnion() throws AuthorizationException, AnalysisException {
+  public void TestUnion() throws ImpalaException {
     AuthzOk("select * from functional.alltypesagg union all " +
         "select * from functional.alltypesagg");
 
@@ -553,7 +570,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestInsert() throws AuthorizationException, AnalysisException {
+  public void TestInsert() throws ImpalaException {
     AuthzOk("insert into functional_parquet.alltypes " +
         "partition(month,year) select * from functional_seq_snap.alltypes");
 
@@ -613,7 +630,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestWithClause() throws AuthorizationException, AnalysisException {
+  public void TestWithClause() throws ImpalaException {
     // User has SELECT privileges on table in WITH-clause view.
     AuthzOk("with t as (select * from functional.alltypesagg) select * from t");
     // User doesn't have SELECT privileges on table in WITH-clause view.
@@ -648,7 +665,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestExplain() throws AuthorizationException, AnalysisException {
+  public void TestExplain() throws ImpalaException {
     AuthzOk("explain select * from functional.alltypesagg");
     AuthzOk("explain insert into functional_parquet.alltypes " +
         "partition(month,year) select * from functional_seq_snap.alltypes");
@@ -727,7 +744,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestUseDb() throws AnalysisException, AuthorizationException {
+  public void TestUseDb() throws ImpalaException {
     // Positive cases (user has privileges on these tables).
     AuthzOk("use functional");
     AuthzOk("use tpcds");
@@ -804,7 +821,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestCreateTable() throws AnalysisException, AuthorizationException {
+  public void TestCreateTable() throws ImpalaException {
     AuthzOk("create table tpch.new_table (i int)");
     AuthzOk("create table tpch.new_lineitem like tpch.lineitem");
     // Create table IF NOT EXISTS, user has permission and table exists.
@@ -903,7 +920,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestCreateView() throws AuthorizationException, AnalysisException {
+  public void TestCreateView() throws ImpalaException {
     AuthzOk("create view tpch.new_view as select * from functional.alltypesagg");
     AuthzOk("create view tpch.new_view (a, b, c) as " +
         "select int_col, string_col, timestamp_col from functional.alltypesagg");
@@ -1003,7 +1020,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestDropDatabase() throws AnalysisException, AuthorizationException {
+  public void TestDropDatabase() throws ImpalaException {
     // User has permissions.
     AuthzOk("drop database tpch");
     AuthzOk("drop database tpch cascade");
@@ -1057,7 +1074,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestDropTable() throws AnalysisException, AuthorizationException {
+  public void TestDropTable() throws ImpalaException {
     // Drop table (user has permission).
     AuthzOk("drop table tpch.lineitem");
     AuthzOk("drop table if exists tpch.lineitem");
@@ -1093,7 +1110,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestDropView() throws AnalysisException, AuthorizationException {
+  public void TestDropView() throws ImpalaException {
     // Drop view (user has permission).
     AuthzOk("drop view functional_seq_snap.alltypes_view");
     AuthzOk("drop view if exists functional_seq_snap.alltypes_view");
@@ -1126,7 +1143,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestTruncate() throws AuthorizationException, AnalysisException {
+  public void TestTruncate() throws ImpalaException {
     AuthzOk("truncate table functional_parquet.alltypes");
 
     // User doesn't have INSERT permissions in the target table.
@@ -1147,7 +1164,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestAlterTable() throws AnalysisException, AuthorizationException {
+  public void TestAlterTable() throws ImpalaException {
     // User has permissions to modify tables.
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes REPLACE COLUMNS (c1 int)");
@@ -1274,7 +1291,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestAlterView() throws AnalysisException, AuthorizationException {
+  public void TestAlterView() throws ImpalaException {
     AuthzOk("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
         "functional_seq_snap.v1");
 
@@ -1330,7 +1347,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestComputeStatsTable() throws AnalysisException, AuthorizationException {
+  public void TestComputeStatsTable() throws ImpalaException {
     AuthzOk("compute stats functional_seq_snap.alltypes");
 
     AuthzError("compute stats functional.alltypes",
@@ -1344,7 +1361,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestDropStats() throws AnalysisException, AuthorizationException {
+  public void TestDropStats() throws ImpalaException {
     AuthzOk("drop stats functional_seq_snap.alltypes");
 
     AuthzError("drop stats functional.alltypes",
@@ -1358,7 +1375,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestDescribeDb() throws AuthorizationException, AnalysisException {
+  public void TestDescribeDb() throws ImpalaException {
     AuthzOk("describe database functional_seq_snap");
 
     // Database doesn't exist.
@@ -1370,7 +1387,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestDescribe() throws AuthorizationException, AnalysisException {
+  public void TestDescribe() throws ImpalaException {
     AuthzOk("describe functional.alltypesagg");
     AuthzOk("describe functional.alltypes");
     AuthzOk("describe functional.complex_view");
@@ -1406,7 +1423,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestLoad() throws AuthorizationException, AnalysisException {
+  public void TestLoad() throws ImpalaException {
     // User has permission on table and URI.
     AuthzOk("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
         " into table functional.alltypes partition(month=10, year=2009)");
@@ -1453,7 +1470,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestShowPermissions() throws AuthorizationException, AnalysisException {
+  public void TestShowPermissions() throws ImpalaException {
     AuthzOk("show tables in functional");
     AuthzOk("show databases");
     AuthzOk("show tables in _impala_builtins");
@@ -1657,11 +1674,10 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestShortUsernameUsed() throws AnalysisException,
-      AuthorizationException {
+  public void TestShortUsernameUsed() throws Exception {
     // Different long variations of the same username.
     List<User> users = Lists.newArrayList(
-        new User(USER.getName() + "/abc.host.com"),
+        new User(USER.getName() + "/abc.host.com@"),
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
@@ -1677,14 +1693,84 @@ public class AuthorizationTest {
           "User '%s' does not have privileges to execute 'SELECT' on: default.alltypes",
           user);
     }
-    // If the first character is '/' or '@', the short username should be the same as
+    // If the first character is '/', the short username should be the same as
     // the full username.
     assertEquals("/" + USER.getName(), new User("/" + USER.getName()).getShortName());
-    assertEquals("@" + USER.getName(), new User("@" + USER.getName()).getShortName());
   }
 
   @Test
-  public void TestFunction() throws ImpalaException {
+  public void TestShortUsernameWithAuthToLocal() throws ImpalaException {
+    // We load the auth_to_local configs from core-site.xml in the test mode even if
+    // kerberos is disabled. We use the following configuration for tests
+    //   <property>
+    //     <name>hadoop.security.auth_to_local</name>
+    //     <value>RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/
+    //       RULE:[1:$1]
+    //       RULE:[2:$1]
+    //       DEFAULT
+    //     </value>
+    //   </property>
+    AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
+        AUTHZ_POLICY_FILE, "",
+        LocalGroupResourceAuthorizationProvider.class.getName());
+    ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig);
+
+    // This test relies on the auth_to_local rule -
+    // "RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/"
+    // which converts any principal of type authtest/<hostname>@REALM.COM to user
+    // auth_to_local_user. We have a sentry privilege in place that grants 'SELECT'
+    // privilege on tpcds.* to user auth_to_local_user. To test the integration, we try
+    // running the query with authtest/hostname@REALM.COM user which is converted to user
+    // 'auth_to_local_user' and the authz should pass.
+    User.setRulesForTesting(
+        new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
+    User user = new User("authtest/hostname@REALM.COM");
+    AnalysisContext context = new AnalysisContext(catalog,
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()), authzConfig);
+    Frontend fe = new Frontend(authzConfig, catalog);
+
+    // Can select from table that user has privileges on.
+    AuthzOk(fe, context, "select * from tpcds.customer");
+    // Does not have privileges to execute a query
+    AuthzError(fe, context, "select * from functional.alltypes",
+        "User '%s' does not have privileges to execute 'SELECT' on: functional.alltypes",
+        user);
+
+    // Unit tests for User#getShortName()
+    // Different auth_to_local rules to apply on the username.
+    List<String> rules = Lists.newArrayList(
+        // Expects user@REALM and returns 'usera' (appends a in the end)
+        "RULE:[1:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g",
+        // Same as above but expects user/host@REALM
+        "RULE:[2:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g");
+
+    // Map from the user to the expected getShortName() output after applying
+    // the corresponding rule from 'rules' list.
+    List<Map.Entry<User, String>> users = Lists.newArrayList(
+        Maps.immutableEntry(new User(USER.getName() + "@REALM.COM"), USER.getName()
+            + "a"),
+        Maps.immutableEntry(new User(USER.getName() + "/abc.host.com@REALM.COM"),
+            USER.getName() + "a"));
+
+    for (int idx = 0; idx < users.size(); ++idx) {
+      Map.Entry<User, String> userObj = users.get(idx);
+      assertEquals(userObj.getKey().getShortNameForTesting(rules.get(idx)),
+          userObj.getValue());
+    }
+
+    // Test malformed rules. RuleParser throws an IllegalArgumentException.
+    String malformedRule = "{((()";
+    try {
+      user.getShortNameForTesting(malformedRule);
+    } catch (IllegalArgumentException e) {
+      Assert.assertTrue(e.getMessage().contains("Invalid rule"));
+      return;
+    }
+    Assert.fail("No exception caught while using getShortName() on a malformed rule");
+  }
+
+  @Test
+  public void TestFunction() throws Exception {
     // First try with the less privileged user.
     User currentUser = USER;
     AnalysisContext context = new AnalysisContext(ctx_.catalog,
@@ -1771,7 +1857,8 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestServerNameAuthorized() throws AnalysisException {
+  public void TestServerNameAuthorized()
+      throws AnalysisException, InternalException {
     if (ctx_.authzConfig.isFileBasedPolicy()) {
       // Authorization config that has a different server name from policy file.
       TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig(
@@ -1781,7 +1868,8 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestNoPermissionsWhenPolicyFileDoesNotExist() throws AnalysisException {
+  public void TestNoPermissionsWhenPolicyFileDoesNotExist()
+      throws AnalysisException, InternalException {
     // Test doesn't make sense except for file based policies.
     if (!ctx_.authzConfig.isFileBasedPolicy()) return;
 
@@ -1894,8 +1982,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestLocalGroupPolicyProvider() throws AnalysisException,
-      AuthorizationException {
+  public void TestLocalGroupPolicyProvider() throws ImpalaException {
     if (!ctx_.authzConfig.isFileBasedPolicy()) return;
     // Use an authorization configuration that uses the
     // LocalGroupResourceAuthorizationProvider.
@@ -1930,7 +2017,7 @@ public class AuthorizationTest {
   }
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
-      throws AnalysisException {
+      throws AnalysisException, InternalException {
     Frontend fe = new Frontend(authzConfig, ctx_.catalog);
     AnalysisContext ac = new AnalysisContext(new ImpaladTestCatalog(),
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()), authzConfig);
@@ -1947,18 +2034,16 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to access: functional.*", user);
   }
 
-  private void AuthzOk(String stmt) throws AuthorizationException,
-      AnalysisException {
+  private void AuthzOk(String stmt) throws ImpalaException {
     AuthzOk(analysisContext_, stmt);
   }
 
-  private void AuthzOk(AnalysisContext context, String stmt)
-      throws AuthorizationException, AnalysisException {
+  private void AuthzOk(AnalysisContext context, String stmt) throws ImpalaException {
     AuthzOk(fe_, context, stmt);
   }
 
   private static void AuthzOk(Frontend fe, AnalysisContext context, String stmt)
-      throws AuthorizationException, AnalysisException {
+      throws ImpalaException {
     context.analyze(stmt);
     context.authorize(fe.getAuthzChecker());
   }
@@ -1968,17 +2053,19 @@ public class AuthorizationTest {
    * string matches.
    */
   private void AuthzError(String stmt, String expectedErrorString)
-      throws AnalysisException {
+      throws AnalysisException, InternalException {
     AuthzError(analysisContext_, stmt, expectedErrorString, USER);
   }
 
   private void AuthzError(AnalysisContext analysisContext,
-      String stmt, String expectedErrorString, User user) throws AnalysisException {
+      String stmt, String expectedErrorString, User user)
+      throws AnalysisException, InternalException {
     AuthzError(fe_, analysisContext, stmt, expectedErrorString, user);
   }
 
   private static void AuthzError(Frontend fe, AnalysisContext analysisContext,
-      String stmt, String expectedErrorString, User user) throws AnalysisException {
+      String stmt, String expectedErrorString, User user)
+      throws AnalysisException, InternalException {
     Preconditions.checkNotNull(expectedErrorString);
     try {
       try {

@@ -32,6 +32,7 @@ import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.AuthorizationPolicy;
+import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -108,7 +109,7 @@ public class AuthorizationChecker {
    * that is in the AuthorizationProvider to properly resolve Hadoop groups or
    * local group mappings.
    */
-  public Set<String> getUserGroups(User user) {
+  public Set<String> getUserGroups(User user) throws InternalException {
     return provider_.getGroupMapping().getGroups(user.getShortName());
   }
 
@@ -117,7 +118,7 @@ public class AuthorizationChecker {
    * the user does not have sufficient privileges.
    */
   public void checkAccess(User user, PrivilegeRequest privilegeRequest)
-      throws AuthorizationException {
+      throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(privilegeRequest);
 
     if (!hasAccess(user, privilegeRequest)) {
@@ -145,7 +146,8 @@ public class AuthorizationChecker {
    * Returns true if the given user has permission to execute the given
    * request, false otherwise. Always returns true if authorization is disabled.
    */
-  public boolean hasAccess(User user, PrivilegeRequest request) {
+  public boolean hasAccess(User user, PrivilegeRequest request)
+      throws InternalException {
     Preconditions.checkNotNull(user);
     Preconditions.checkNotNull(request);
 

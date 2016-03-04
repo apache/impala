@@ -76,6 +76,11 @@ DEFINE_string(minidump_path, "/tmp/impala-minidumps", "Directory to write minidu
 DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
     "Older files are removed first. Set to 0 to keep all minidump files.");
 
+DEFINE_bool(load_auth_to_local_rules, false, "If true, load auth_to_local configuration "
+    "from hdfs' core-site.xml. When enabled, impalad reads the rules from the property "
+    "hadoop.security.auth_to_local and applies them to translate the Kerberos principal "
+    "to its corresponding local user name for authorization.");
+
 // Stress option for testing failed memory allocation. Debug builds only.
 #ifndef NDEBUG
 DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "

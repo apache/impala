@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.Role;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TShowGrantRoleParams;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -36,7 +37,7 @@ public class ShowGrantRoleStmt extends AuthorizationStmt {
     privilegeSpec_ = privilegeSpec;
   }
 
-  public TShowGrantRoleParams toThrift() {
+  public TShowGrantRoleParams toThrift() throws InternalException {
     TShowGrantRoleParams params = new TShowGrantRoleParams();
     params.setRole_name(roleName_);
     params.setRequesting_user(requestingUser_.getShortName());
