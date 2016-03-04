@@ -121,7 +121,9 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
   const string& time_taken = PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
   if (timed_out) {
     LOG(INFO) << "Datastream sender timed-out waiting for recvr for fragment instance: "
-              << fragment_instance_id << " (time-out was: " << time_taken << "). ";
+              << fragment_instance_id << " (time-out was: " << time_taken << "). "
+              << "Increase --datastream_sender_timeout_ms if you see this message "
+              << "frequently.";
   } else {
     VLOG_RPC << "Datastream sender waited for " << time_taken
              << ", and did not time-out.";

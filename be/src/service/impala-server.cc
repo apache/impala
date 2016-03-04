@@ -1111,7 +1111,7 @@ void ImpalaServer::ReportExecStatus(
         params.fragment_instance_idx, PrintId(params.fragment_instance_id),
         params.done);
     return_val.status.error_msgs.push_back(err);
-    VLOG_QUERY << err;
+    // TODO: Re-enable logging when this only happens once per fragment.
     return;
   }
   exec_state->coord()->UpdateFragmentExecStatus(params).SetTStatus(&return_val);
