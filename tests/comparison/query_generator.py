@@ -19,7 +19,7 @@ from logging import getLogger
 from random import shuffle, choice, randint, randrange
 
 from common import TableExprList, ValExpr, ValExprList, Table, Column
-from query_profile import HiveProfile
+from query_profile import DefaultProfile
 from funcs import (
     AGG_FUNCS,
     AggFunc,
@@ -31,17 +31,13 @@ from funcs import (
     Func,
     FUNCS,
     PartitionByClause,
-    Trim,
     WindowBoundary,
     WindowClause)
 from db_types import (
-    Char,
     Boolean,
     Int,
     Float,
-    String,
-    TYPES,
-    VarChar)
+    TYPES)
 from query import (
     FromClause,
     GroupByClause,
@@ -387,7 +383,7 @@ class QueryGenerator(object):
     '''
     signatures = self._funcs_to_allowed_signatures(FUNCS)
     root_signatures = self._find_matching_signatures(
-        signatures, return_type=return_type, allow_subquery=allow_subquery)
+        signatures, returns=return_type, allow_subquery=allow_subquery)
     root_signature = self.profile.choose_func_signature(root_signatures)
     func = root_signature.func(root_signature)   # An instance of a function
     max_children = self.profile.choose_nested_expr_count()
@@ -400,8 +396,8 @@ class QueryGenerator(object):
         null_args = subquery_not_allowed_null_args
       else:
         null_args = subquery_allowed_null_args
-      null_args = [(func, idx) for idx, arg in enumerate(func.args)
-                   if type(arg) != list and arg.val is None]
+      null_args.extend((func, idx) for idx, arg in enumerate(func.args)
+                       if type(arg) != list and arg.val is None)
       while max_children \
           and (subquery_allowed_null_args or subquery_not_allowed_null_args):
         idx = randrange(
@@ -414,7 +410,7 @@ class QueryGenerator(object):
         parent_func, parent_arg_idx = null_args.pop()
         child_signatures = self._find_matching_signatures(
             signatures,
-            return_type=parent_func.args[parent_arg_idx].type,
+            returns=parent_func.args[parent_arg_idx].type,
             allow_subquery=(allow_subquery and null_args == subquery_allowed_null_args))
         child_signature = self.profile.choose_func_signature(child_signatures)
         child_func = child_signature.func(child_signature)
@@ -437,15 +433,26 @@ class QueryGenerator(object):
 
   def _find_matching_signatures(self,
       signatures,
-      return_type=None,
+      returns=None,
       accepts=None,
+      accepts_only=None,
       allow_subquery=False):
+    '''Returns the subset of signatures matching the given criteria.
+         returns: The signature must return this type.
+         accepts: The signature must have at least one argument of this type.
+         accepts_only: The signature must have arguments of only this type.
+         allow_subquery: If False, the signature cannot contain a subquery.
+    '''
     matching_signatures = list()
     for signature in signatures:
-      if return_type and not issubclass(signature.return_type, return_type):
+      if returns and not issubclass(signature.return_type, returns):
         continue
       if accepts and not any(not arg.is_subquery and issubclass(arg.type, accepts)
                              for arg in signature.args):
+        continue
+      if accepts_only and (not signature.args or any(
+          not arg.is_subquery and not issubclass(arg.type, accepts_only)
+          for arg in signature.args)):
         continue
       if not allow_subquery and any(arg.is_subquery for arg in signature.args):
         continue
@@ -1071,7 +1078,12 @@ class QueryGenerator(object):
           if table_expr.joinable_cols_by_type)
       if not candidate_table_exprs:
         raise Exception('No tables have any joinable types')
-    table_expr = self._create_table_expr(candidate_table_exprs)
+      required_type = self.profile.choose_type(
+          candidate_table_exprs.joinable_cols_by_type)
+    else:
+      required_type = None
+    table_expr = self._create_table_expr(candidate_table_exprs,
+        required_type=required_type)
     table_expr.alias = self.get_next_id()
     from_clause = FromClause(table_expr)
 
@@ -1127,15 +1139,6 @@ class QueryGenerator(object):
       candidate_table_exprs.extend(candidate_table_exprs.collections)
       if join_type == 'CROSS':
         table_expr = self._create_table_expr(candidate_table_exprs)
-      elif not self.profile.only_use_equality_join_predicates():
-        table_expr = self._create_table_expr(candidate_table_exprs)
-        join_clause = JoinClause(join_type, table_expr)
-        predicate = self._create_func_tree(Boolean, allow_subquery=False)
-        predicate = self._populate_func_with_vals(
-            predicate,
-            table_exprs=from_clause.visible_table_exprs)
-        join_clause.boolean_expr = predicate
-        return join_clause
       else:
         available_join_expr_types = set(from_clause.table_exprs.joinable_cols_by_type) \
             & set(candidate_table_exprs.col_types)
@@ -1160,15 +1163,17 @@ class QueryGenerator(object):
           table_expr, join_table_expr_candidates)
       return join_clause
 
-  def _have_joinable_cols_in_common(self, table_expr, other_table_expr):
+  def _get_joinable_cols_in_common(self, table_expr, other_table_expr):
     common_col_types = set(table_expr.joinable_cols_by_type) \
         & set(other_table_expr.joinable_cols_by_type)
-    return len(common_col_types) > 0
+    return common_col_types
+
+  _has_joinable_cols_in_common = _get_joinable_cols_in_common
 
   def _create_single_join_condition(self, cur_table_expr, available_table_exprs):
     candidates = []
     for possible_table_expr in available_table_exprs:
-      if self._have_joinable_cols_in_common(cur_table_expr, possible_table_expr):
+      if self._has_joinable_cols_in_common(cur_table_expr, possible_table_expr):
         candidates.append(possible_table_expr)
 
     if not candidates:
@@ -1184,31 +1189,77 @@ class QueryGenerator(object):
     return Equals.create_from_args(left_col, right_col)
 
   def _create_relational_join_condition(self,
-      left_table_expr, possible_right_table_exprs):
-    candidates = []
-    for right_table_expr in possible_right_table_exprs:
-      if self._have_joinable_cols_in_common(left_table_expr, right_table_expr):
-        candidates.append(right_table_expr)
-    if not candidates:
-      raise Exception('Tables have no joinable columns in common')
-    right_table_expr = choice(candidates)
-    common_col_types = set(left_table_expr.joinable_cols_by_type) \
-        & set(right_table_expr.joinable_cols_by_type)
+      right_table_expr, possible_left_table_exprs):
+    assert possible_left_table_exprs
 
-    predicates = list()
-    for _ in xrange(1 + self.profile.choose_nested_expr_count()):
-      predicate = self._create_single_join_condition(left_table_expr, [right_table_expr])
-      if not predicate:
-        raise Exception('Tables have no joinable columns in common')
-      predicates.append(predicate)
-    while len(predicates) > 1:
-      predicates.append(And.create_from_args(predicates.pop(), predicates.pop()))
-    return predicates[0]
+    table_exprs_by_col_types = defaultdict(list)
+    candidiate_table_exprs = list()
+
+    for left_table_expr in possible_left_table_exprs:
+      joinable_col_types = self._get_joinable_cols_in_common(
+          right_table_expr, left_table_expr)
+      if joinable_col_types:
+        for col_type in joinable_col_types:
+          table_exprs_by_col_types[col_type].append(left_table_expr)
+          candidiate_table_exprs.append(left_table_expr)
+    if not table_exprs_by_col_types:
+      raise Exception('Tables have no joinable columns in common')
+
+    root_predicate, relational_predicates = self._create_boolean_func_tree(
+        require_relational_func=True,
+        relational_col_types=table_exprs_by_col_types.keys())
+
+    for predicate in relational_predicates:
+      left_table_expr = choice(candidiate_table_exprs)
+      joinable_col_types = self._get_joinable_cols_in_common(
+          right_table_expr, left_table_expr)
+
+      left_null_args = self._populate_null_args_list(
+          predicate, tuple(joinable_col_types), arg_stop_idx=1)
+      arg_idx, func = choice(left_null_args)
+      arg_type = func.args[arg_idx].type
+      func.args[arg_idx] = choice(left_table_expr.cols_by_type[arg_type])
+
+      right_null_args = self._populate_null_args_list(
+          predicate, tuple(joinable_col_types), arg_start_idx=1)
+      arg_idx, func = choice(right_null_args)
+      arg_type = func.args[arg_idx].type
+      func.args[arg_idx] = choice(right_table_expr.cols_by_type[arg_type])
+
+    table_exprs = TableExprList(possible_left_table_exprs)
+    table_exprs.append(right_table_expr)
+    self._populate_func_with_vals(root_predicate, table_exprs=table_exprs)
+    return root_predicate
+
+  def _populate_null_args_list(self,
+      func,
+      allowed_types,  # Only allow args of this type in the result list.
+      arg_start_idx=0,  # Start at this arg index, only applies to "func".
+      arg_stop_idx=None,  # Stop at this arg index, only applies to "func".
+      null_args=None):  # Used internally for recursion.
+    '''Walks through func and creates a list of function arguments that are null. The
+       returned list contains tuples with values (arg index, parent func).
+    '''
+    if arg_stop_idx is None:
+      arg_stop_idx = len(func.args)
+    if arg_stop_idx < arg_start_idx:
+      raise Exception("'arg_stop_idx' (%s) cannot be less than 'arg_start_idx' (%s)"
+          % (arg_stop_idx, arg_start_idx))
+    if null_args is None:
+      null_args = list()
+    for idx in xrange(arg_start_idx, arg_stop_idx):
+      arg = func.args[idx]
+      if arg.is_constant and issubclass(arg.type, allowed_types):
+        assert arg.val is None
+        null_args.append((idx, func))
+      elif arg.is_func:
+        self._populate_null_args_list(arg, allowed_types, null_args=null_args)
+    return null_args
 
   def _create_where_clause(self,
       table_exprs,
       table_alias_prefix):
-    predicate = self._create_func_tree(Boolean, allow_subquery=True)
+    predicate, _ = self._create_boolean_func_tree(allow_subquery=True)
     predicate = self._populate_func_with_vals(
         predicate,
         table_exprs=table_exprs,
@@ -1222,9 +1273,9 @@ class QueryGenerator(object):
     if self.profile.only_use_aggregates_in_having_clause():
       predicate = self._create_agg_func_tree(Boolean)
     else:
-      predicate = self._create_func_tree(Boolean, allow_subquery=False)
+      predicate, _ = self._create_boolean_func_tree()
     predicate = self._populate_func_with_vals(
-        predicate, table_exprs=table_exprs, val_exprs=basic_select_item_exprs)
+        predicate, val_exprs=basic_select_item_exprs)
     # https://issues.cloudera.org/browse/IMPALA-1423
     # Make sure any cols used have a table identifier. As of this writing the only
     # single table FROM clauses don't use table aliases. Setting a table alias
@@ -1289,6 +1340,131 @@ class QueryGenerator(object):
     #       "SUM(a) + b + 1" where b is a GROUP BY field.
     return exprs_to_funcs
 
+  def _create_boolean_func_tree(self, require_relational_func=False,
+      relational_col_types=None, allow_subquery=False):
+    '''Creates a function that returns a Boolean. The returned value is a
+       Tuple<Function, List<Function>> where the first function is the root of the tree
+       and the list contains relational functions (though other relational functions
+       may also be in the tree). The root function's arguments may be other functions
+       depending on the query profile in use. The leaf arguments of the tree will all be
+       set to a NULL literal.
+
+       If 'require_relational_func' is True, at least one function in the tree will be
+       a relational function such as Equals, LessThanOrEquals, etc.
+       'relational_col_types' can be used to restrict the signature of the chosen
+       relational function to the given types.
+    '''
+    # To create a realistic expression, the nodes nearest the root of the tree will be
+    # ANDs and ORs, their children will be relational functions, then other number of
+    # functions requested by the profile will be added as children of the relational
+    # functions. There is no requirement that all children of ANDs and ORs will be
+    # relational functions so a wide variety of queries should be generated.
+
+    # Determine the number of non-leaf nodes in the tree.
+    if require_relational_func:
+      # Just assume this is for a JOIN.
+      func_count = self.profile.choose_join_condition_count()
+      if func_count <= 0:
+        raise Exception("Relational condition count must be greater than zero")
+    else:
+      func_count = self.profile.choose_nested_expr_count() + 1
+
+    and_or_fill_ratio = self.profile.choose_conjunct_disjunct_fill_ratio()
+    and_or_count = int(and_or_fill_ratio * func_count)
+    if and_or_count == func_count and require_relational_func:
+      # Leave a space for a relational function.
+      and_or_count -= 1
+
+    relational_fill_ratio = self.profile.choose_relational_func_fill_ratio()
+    relational_count = int(relational_fill_ratio * (func_count - and_or_count))
+    if relational_count > and_or_count + 1:
+      # Reduce the AND/OR count to the number of boolean spaces that are guaranteed to
+      # exist.
+      relational_count = and_or_count + 1
+    elif relational_count == 0 and require_relational_func:
+      relational_count = 1
+
+    root_func = None   # The root of the function tree.
+    relational_funcs = list()  # These will be in the tree somewhere.
+
+    # After a root function is chosen, each additional function will be chosen based on
+    # the types required by the leaves (existing unused function args). For example if
+    # the current tree is
+    #      And
+    #     /   \
+    #   And  Equals(Int, Int)
+    # Then the next function chosen must either return a Boolean or an Int. The dict
+    # below tracks which arg types are available.
+    #
+    # In the example above, assuming Equals was chosen as a relational function, the
+    # children of Equals must preserve the Int arg if the caller requested Ints using
+    # 'relational_col_types'.
+    null_args_by_type = defaultdict(list)
+
+    signatures = self._funcs_to_allowed_signatures(FUNCS)
+
+    if not relational_col_types:
+      relational_col_types = tuple()
+
+    for _ in xrange(func_count):
+      is_relational = False
+
+      if and_or_count > 0:
+        and_or_count -= 1
+        func_class = self.profile.choose_conjunct_disjunct()
+        signature = self.profile.choose_func_signature(func_class.signatures())
+      elif relational_count > 0:
+        relational_count -= 1
+        is_relational = True
+        if self.profile.only_use_equality_join_predicates():
+          signature = self.profile.choose_func_signature(self._find_matching_signatures(
+              Equals.signatures(), accepts_only=tuple(relational_col_types)))
+        else:
+          relational_signatures = self._find_matching_signatures(
+              signatures, accepts_only=tuple(relational_col_types), returns=Boolean)
+          signature = self.profile.choose_relational_func_signature(relational_signatures)
+      else:
+        if not root_func or Boolean in null_args_by_type:
+          # Prefer to replace Boolean leaves to get a more realistic expression.
+          return_type = Boolean
+        else:
+          return_type = choice(null_args_by_type.keys())
+        # Rather than track if this is a child of a relational function, in which case
+        # the arg type needs to be preserved, just always assume that this is a child of
+        # a relational function.
+        accepts = return_type if return_type in relational_col_types else None
+        signature = self.profile.choose_func_signature(self._find_matching_signatures(
+            signatures, returns=return_type, accepts=accepts,
+            allow_subquery=allow_subquery))
+
+      func = signature.func(signature)
+      if root_func:
+        null_args = null_args_by_type[signature.return_type]
+        shuffle(null_args)
+        parent_func, parent_arg_idx = null_args.pop()
+        parent_func.args[parent_arg_idx] = func
+        if not null_args:
+          del null_args_by_type[signature.return_type]
+      else:
+        root_func = func
+
+      if is_relational:
+        relational_funcs.append(func)
+
+      for idx, arg in enumerate(func.args):
+        if signature.args[idx].is_subquery:
+          continue
+        null_args = null_args_by_type[arg.type]
+        null_args.append((func, idx))
+      if not null_args_by_type:
+        # Subqueries might not provide leaves, so stopping early may be necessary. Ex
+        # WHERE EXISTS(...).
+        assert func.contains_subquery
+        break
+
+    return root_func, relational_funcs
+
+
 if __name__ == '__main__':
   '''Generate some queries for manual inspection. The query won't run anywhere because the
      tables used are fake. To make real queries, we'd need to connect to a database and
@@ -1300,15 +1476,17 @@ if __name__ == '__main__':
   for table_idx in xrange(5):
     table = Table('table_%s' % table_idx)
     tables.append(table)
+    cols = table.cols
     for col_idx in xrange(3):
       col_type = choice(data_types)
       col = Column(table, '%s_col_%s' % (col_type.__name__.lower(), col_idx), col_type)
-      table.cols.append(col)
+      cols.append(col)
+    table.cols = cols
 
-  query_profile = HiveProfile()
+  query_profile = DefaultProfile()
   query_generator = QueryGenerator(query_profile)
   from model_translator import SqlWriter
-  sql_writer = SqlWriter.create(dialect='HIVE')
+  sql_writer = SqlWriter.create(dialect='IMPALA')
   ref_writer = SqlWriter.create(dialect='POSTGRESQL',
       nulls_order_asc=query_profile.nulls_order_asc())
   for _ in range(3000):

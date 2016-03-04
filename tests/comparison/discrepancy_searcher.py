@@ -25,7 +25,7 @@ from logging import getLogger
 from math import isinf, isnan
 from os import getenv, symlink, unlink
 from os.path import join as join_path
-from random import choice
+from random import choice, randint
 from string import ascii_lowercase, digits
 from subprocess import call
 from tempfile import gettempdir
@@ -120,6 +120,10 @@ class QueryResultComparator(object):
         known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1418')
       elif 'Unsupported predicate with subquery' in error_message:
         known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1950')
+      elif 'RIGHT OUTER JOIN type with no equi-join' in error_message:
+        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-3063')
+      elif 'Operation is in ERROR_STATE' in error_message:
+        known_error = KnownError('Mem limit exceeded')
       if known_error:
         comparison_result.exception = known_error
       else:
@@ -267,6 +271,50 @@ class QueryExecutor(object):
     # "CREATE VIEW <name> AS ...", this will be the value of "<name>".
     self._table_or_view_name = None
 
+  def set_impala_query_optons(self, cursor):
+    opts = """
+        SET MEM_LIMIT={mem_limit};
+        SET BATCH_SIZE={batch_size};
+        SET DISABLE_CODEGEN={disable_codegen};
+        SET DISABLE_OUTERMOST_TOPN={disable_outermost_topn};
+        SET DISABLE_ROW_RUNTIME_FILTERING={disable_row_runtime_filtering};
+        SET DISABLE_STREAMING_PREAGGREGATIONS={disable_streaming_preaggregations};
+        SET DISABLE_UNSAFE_SPILLS={disable_unsafe_spills};
+        SET EXEC_SINGLE_NODE_ROWS_THRESHOLD={exec_single_node_rows_threshold};
+        SET MAX_BLOCK_MGR_MEMORY={max_block_mgr_memory};
+        SET MAX_IO_BUFFERS={max_io_buffers};
+        SET MAX_SCAN_RANGE_LENGTH={max_scan_range_length};
+        SET NUM_NODES={num_nodes};
+        SET NUM_SCANNER_THREADS={num_scanner_threads};
+        SET OPTIMIZE_PARTITION_KEY_SCANS={optimize_partition_key_scans};
+        SET RUNTIME_BLOOM_FILTER_SIZE={runtime_bloom_filter_size};
+        SET RUNTIME_FILTER_MODE={runtime_filter_mode};
+        SET RUNTIME_FILTER_WAIT_TIME_MS={runtime_filter_wait_time_ms};
+        SET SCAN_NODE_CODEGEN_THRESHOLD={scan_node_codegen_threshold}""".format(
+            mem_limit=randint(1024 ** 3, 10 * 1024 ** 3),
+            batch_size=randint(1, 4096),
+            disable_codegen=choice((0, 1)),
+            disable_outermost_topn=choice((0, 1)),
+            disable_row_runtime_filtering=choice((0, 1)),
+            disable_streaming_preaggregations=choice((0, 1)),
+            disable_unsafe_spills=choice((0, 1)),
+            exec_single_node_rows_threshold=randint(1, 100000000),
+            max_block_mgr_memory=randint(1, 100000000),
+            max_io_buffers=randint(1, 100000000),
+            max_scan_range_length=randint(1, 100000000),
+            num_nodes=randint(3, 3),
+            num_scanner_threads=randint(1, 100),
+            optimize_partition_key_scans=choice((0, 1)),
+            random_replica=choice((0, 1)),
+            replica_preference=choice(("CACHE_LOCAL", "DISK_LOCAL", "REMOTE")),
+            runtime_bloom_filter_size=randint(4096, 16777216),
+            runtime_filter_mode=choice(("OFF", "LOCAL", "GLOBAL")),
+            runtime_filter_wait_time_ms=randint(1, 100000000),
+            scan_node_codegen_threshold=randint(1, 100000000))
+    LOG.debug(opts)
+    for opt in opts.strip().split(";"):
+      cursor.execute(opt)
+
   def fetch_query_results(self, query):
     '''Concurrently execute the query using each cursor and return a list of tuples
        containing the result information for each cursor. The tuple format is
@@ -284,6 +332,8 @@ class QueryExecutor(object):
     query_threads = list()
     for sql_writer, cursor, log_file \
         in izip(self.sql_writers, self.cursors, self.query_logs):
+      if cursor.db_type == IMPALA:
+        self.set_impala_query_optons(cursor)
       query_thread = Thread(
           target=self._fetch_sql_results,
           args=[query, cursor, sql_writer, log_file],
@@ -457,6 +507,51 @@ class KnownError(Exception):
   def __init__(self, jira_url):
     Exception.__init__(self, 'Known issue: ' + jira_url)
     self.jira_url = jira_url
+
+
+class FrontendExceptionSearcher(object):
+
+  def __init__(self, query_profile, ref_conn, test_conn):
+    '''query_profile should be an instance of one of the profiles in query_profile.py'''
+    self.query_profile = query_profile
+    self.ref_conn = ref_conn
+    self.test_conn = test_conn
+    self.ref_sql_writer = SqlWriter.create(dialect=ref_conn.db_type)
+    self.test_sql_writer = SqlWriter.create(dialect=test_conn.db_type)
+    with ref_conn.cursor() as ref_cursor:
+      with test_conn.cursor() as test_cursor:
+        self.common_tables = DbCursor.describe_common_tables([ref_cursor, test_cursor])
+        if not self.common_tables:
+          raise Exception("Unable to find a common set of tables in both databases")
+
+  def search(self, number_of_test_queries):
+    query_generator = QueryGenerator(self.query_profile)
+
+    def on_ref_db_error(e, sql):
+      LOG.warn("Error generating explain plan for reference db:\n%s\n%s" % (e, sql))
+
+    def on_test_db_error(e, sql):
+      LOG.error("Error generating explain plan for test db:\n%s" % sql)
+      raise e
+
+    for idx in xrange(number_of_test_queries):
+      LOG.info("Explaining query #%s" % (idx + 1))
+      query = query_generator.create_query(self.common_tables)
+      if not self._explain_query(self.ref_conn, self.ref_sql_writer, query,
+          on_ref_db_error):
+        continue
+      self._explain_query(self.test_conn, self.test_sql_writer, query,
+          on_test_db_error)
+
+  def _explain_query(self, conn, writer, query, exception_handler):
+    sql = writer.write_query(query)
+    try:
+      with conn.cursor() as cursor:
+        cursor.execute("EXPLAIN %s" % sql)
+        return True
+    except Exception as e:
+      exception_handler(e, sql)
+      return False
 
 
 class QueryResultDiffSearcher(object):
@@ -662,6 +757,9 @@ if __name__ == '__main__':
       help='Exit after running the given number of queries.')
   parser.add_argument('--exclude-types', default='',
       help='A comma separated list of data types to exclude while generating queries.')
+  parser.add_argument('--explain-only', action='store_true',
+      help="Don't run the queries only explain them to see if there was an error in "
+      "planning.")
   profiles = dict()
   for profile in PROFILES:
     profile_name = profile.__name__
@@ -687,9 +785,13 @@ if __name__ == '__main__':
         args, args.test_db_type, db_name=args.db_name)
   # Create an instance of profile class (e.g. DefaultProfile)
   query_profile = profiles[args.profile]()
-  diff_searcher = QueryResultDiffSearcher(query_profile, ref_conn, test_conn)
-  query_timeout_seconds = args.timeout
-  search_results = diff_searcher.search(
-      args.query_count, args.stop_on_mismatch, args.stop_on_crash, query_timeout_seconds)
-  print(search_results)
-  sys.exit(search_results.mismatch_count)
+  if args.explain_only:
+    searcher = FrontendExceptionSearcher(query_profile, ref_conn, test_conn)
+    searcher.search(args.query_count)
+  else:
+    diff_searcher = QueryResultDiffSearcher(query_profile, ref_conn, test_conn)
+    query_timeout_seconds = args.timeout
+    search_results = diff_searcher.search(
+        args.query_count, args.stop_on_mismatch, args.stop_on_crash, query_timeout_seconds)
+    print(search_results)
+    sys.exit(search_results.mismatch_count)
