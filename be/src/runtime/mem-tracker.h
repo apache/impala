@@ -390,7 +390,7 @@ class MemTracker {
   static AtomicInt<int64_t> released_memory_since_gc_;
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
-  SpinLock gc_lock_;
+  boost::mutex gc_lock_;
 
   /// Protects request_to_mem_trackers_ and pool_to_mem_trackers_
   static boost::mutex static_mem_trackers_lock_;
