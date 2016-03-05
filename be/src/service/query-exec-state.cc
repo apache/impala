@@ -427,7 +427,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   }
   schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
       exec_request_.query_options, &summary_profile_, query_events_));
-  coord_.reset(new Coordinator(exec_env_, query_events_));
+  coord_.reset(new Coordinator(exec_request_.query_options, exec_env_, query_events_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
   if (FLAGS_enable_rm) {
     if (status.ok()) {

@@ -91,7 +91,8 @@ struct DebugOptions;
 /// cancellation of local and all remote fragments is atomic.
 class Coordinator {
  public:
-  Coordinator(ExecEnv* exec_env, RuntimeProfile::EventSequence* events);
+  Coordinator(const TQueryOptions& query_options, ExecEnv* exec_env,
+      RuntimeProfile::EventSequence* events);
   ~Coordinator();
 
   /// Initiate asynchronous execution of a query with the given schedule. Returns as soon
@@ -404,8 +405,8 @@ class Coordinator {
   /// GLOBAL). Excludes repeated broadcast filter updates.
   RuntimeProfile::Counter* filter_updates_received_;
 
-  /// The filtering mode for this query. Set in StartRemoteFragments().
-  TRuntimeFilterMode::type filter_mode_;
+  /// The filtering mode for this query. Set in constructor.
+  const TRuntimeFilterMode::type filter_mode_;
 
   /// Returns a pretty-printed table of the current filter state.
   std::string FilterDebugString();

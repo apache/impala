@@ -306,7 +306,8 @@ int64_t Coordinator::FragmentInstanceState::UpdateNumScanRangesCompleted() {
   return delta;
 }
 
-Coordinator::Coordinator(ExecEnv* exec_env, RuntimeProfile::EventSequence* events)
+Coordinator::Coordinator(const TQueryOptions& query_options, ExecEnv* exec_env,
+    RuntimeProfile::EventSequence* events)
   : exec_env_(exec_env),
     has_called_wait_(false),
     returned_all_results_(false),
@@ -315,7 +316,8 @@ Coordinator::Coordinator(ExecEnv* exec_env, RuntimeProfile::EventSequence* event
     num_remaining_fragment_instances_(0),
     obj_pool_(new ObjectPool()),
     query_events_(events),
-    filter_routing_table_complete_(false) {
+    filter_routing_table_complete_(false),
+    filter_mode_(query_options.runtime_filter_mode) {
 }
 
 Coordinator::~Coordinator() {
@@ -538,7 +540,6 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   int fragment_instance_idx = 0;
   bool has_coordinator_fragment =
       request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
-  filter_mode_ = schedule->query_options().runtime_filter_mode;
   // Start one fragment instance per fragment per host (number of hosts running each
   // fragment may not be constant).
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
