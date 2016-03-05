@@ -44,8 +44,8 @@ class RuntimeState;
 /// fragments update the bloom filters by calling UpdateFilterFromLocal()
 /// (UpdateFilterFromLocal() may only be called once per filter ID per filter bank). The
 /// bloom_filter that is passed into UpdateFilterFromLocal() must have been allocated by
-/// AllocateScratchBloomFilter(); this allows RuntimeFilterBank to manage all memory
-/// associated with filters.
+/// AllocateScratchBloomFilter() (or be NULL); this allows RuntimeFilterBank to manage all
+/// memory associated with filters.
 ///
 /// Filters are aggregated at the coordinator, and then made available to consumers after
 /// PublishGlobalFilter() has been called.
@@ -65,7 +65,8 @@ class RuntimeFilterBank {
   RuntimeFilter* RegisterFilter(const TRuntimeFilterDesc& filter_desc, bool is_producer);
 
   /// Updates a filter's bloom_filter with 'bloom_filter' which has been produced by some
-  /// operator in the local fragment instance.
+  /// operator in the local fragment instance. 'bloom_filter' may be NULL, representing a
+  /// full filter that contains all elements.
   void UpdateFilterFromLocal(uint32_t filter_id, BloomFilter* bloom_filter);
 
   /// Makes a bloom_filter (aggregated globally from all producer fragments) available for
@@ -104,7 +105,7 @@ class RuntimeFilterBank {
   const TQueryCtx query_ctx_;
 
   /// Lock protecting produced_filters_ and consumed_filters_.
-  SpinLock runtime_filter_lock_;
+  boost::mutex runtime_filter_lock_;
 
   /// Map from filter id to a RuntimeFilter.
   typedef boost::unordered_map<uint32_t, RuntimeFilter*> RuntimeFilterMap;
@@ -147,8 +148,8 @@ class RuntimeFilter {
     registration_time_ = MonotonicMillis();
   }
 
-  /// Returns NULL if no calls to SetBloomFilter() have been made yet.
-  const BloomFilter* GetBloomFilter() const { return bloom_filter_; }
+  /// Returns true if SetBloomFilter() has been called.
+  bool HasBloomFilter() const { return arrival_time_ != 0; }
 
   const TRuntimeFilterDesc& filter_desc() const { return filter_desc_; }
 
@@ -176,11 +177,16 @@ class RuntimeFilter {
   /// false otherwise.
   bool WaitForArrival(int32_t timeout_ms) const;
 
+  /// Returns true if the filter returns true for all elements, i.e. Eval(v) returns true
+  /// for all v.
+  inline bool AlwaysTrue() const;
+
   /// Frequency with which to check for filter arrival in WaitForArrival()
   static const int SLEEP_PERIOD_MS;
 
  private:
-  /// Membership bloom_filter.
+  /// Membership bloom_filter. May be NULL even after arrival_time_ is set. This is a
+  /// compact way of representing a full Bloom filter that contains every element.
   BloomFilter* bloom_filter_;
 
   /// Descriptor of the filter.
@@ -189,7 +195,7 @@ class RuntimeFilter {
   /// Time, in ms, that the filter was registered.
   int64_t registration_time_;
 
-  /// Time, in ms, that the global fiter arrived.
+  /// Time, in ms, that the global fiter arrived. Set in SetBloomFilter().
   int64_t arrival_time_;
 };
 

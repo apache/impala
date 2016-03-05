@@ -27,8 +27,6 @@
 
 namespace impala {
 
-class RuntimeState;
-
 /// A BloomFilter stores sets of items and offers a query operation indicating whether or
 /// not that item is in the set.  BloomFilters use much less space than other compact data
 /// structures, but they are less accurate: for a small percentage of elements, the query
@@ -50,17 +48,17 @@ class RuntimeState;
 /// bits).
 class BloomFilter {
  public:
-  /// Consumes at most (1 << log_heap_space) bytes on the heap. If state is non-NULL,
-  /// client is also non-NULL and the constructor and destructor call
-  /// BufferedBlockMgr::ConsumeMemory() and ReleaseMemory().
-  BloomFilter(
-      const int log_heap_space, RuntimeState* state, BufferedBlockMgr::Client* client);
-  BloomFilter(const TBloomFilter& thrift, RuntimeState* state,
-      BufferedBlockMgr::Client* client);
+  /// Consumes at most (1 << log_heap_space) bytes on the heap.
+  BloomFilter(const int log_heap_space);
+  BloomFilter(const TBloomFilter& thrift);
   ~BloomFilter();
 
-  /// Serializes this filter as Thrift.
-  void ToThrift(TBloomFilter* thrift) const;
+  /// Representation of a filter which allows all elements to pass.
+  static BloomFilter* ALWAYS_TRUE_FILTER;
+
+  /// Converts 'filter' to its corresponding Thrift representation. If the first argument
+  /// is NULL, it is interpreted as a complete filter which contains all elements.
+  static void ToThrift(const BloomFilter* filter, TBloomFilter* thrift);
 
   /// Adds an element to the BloomFilter. The function used to generate 'hash' need not
   /// have good uniformity, but it should have low collision probability. For instance, if
@@ -126,16 +124,12 @@ class BloomFilter {
   typedef BucketWord Bucket[BUCKET_WORDS];
   Bucket* directory_;
 
-  /// Used only for tracking memory. If both are non-NULL,
-  /// BufferedBlockMgr::{Acquire,Release}Memory() are called when this object allocates
-  /// and frees heap memory. These objects pointed to by state_ and client_ are not owned
-  /// by this BloomFilter.
-  RuntimeState* const state_;
-  BufferedBlockMgr::Client* const client_;
-
   int64_t directory_size() const {
     return 1uLL << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
   }
+
+  /// Serializes this filter as Thrift.
+  void ToThrift(TBloomFilter* thrift) const;
 
   DISALLOW_COPY_AND_ASSIGN(BloomFilter);
 };

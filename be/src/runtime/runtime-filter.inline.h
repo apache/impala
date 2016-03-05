@@ -27,7 +27,7 @@
 namespace impala {
 
 inline const RuntimeFilter* RuntimeFilterBank::GetRuntimeFilter(uint32_t filter_id) {
-  boost::lock_guard<SpinLock> l(runtime_filter_lock_);
+  boost::lock_guard<boost::mutex> l(runtime_filter_lock_);
   RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
   if (it == consumed_filters_.end()) return NULL;
   return it->second;
@@ -51,6 +51,10 @@ inline bool RuntimeFilter::Eval(T* val, const ColumnType& col_type) const {
   uint32_t h = RawValue::GetHashValue(val, col_type,
       RuntimeFilterBank::DefaultHashSeed());
   return bloom_filter_->Find(h);
+}
+
+inline bool RuntimeFilter::AlwaysTrue() const  {
+  return HasBloomFilter() && bloom_filter_ == BloomFilter::ALWAYS_TRUE_FILTER;
 }
 
 }

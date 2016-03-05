@@ -556,6 +556,10 @@ struct TBloomFilter {
   // string for efficiency of (de)serialisation. See BloomFilter::Bucket and
   // BloomFilter::directory_.
   2: binary directory
+
+  // If true, this filter allows all elements to pass (i.e. its selectivity is 1). If
+  // true, 'directory' and 'log_heap_space' are not meaningful.
+  4: required bool always_true
 }
 
 struct TUpdateFilterResult {

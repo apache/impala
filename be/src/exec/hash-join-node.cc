@@ -58,7 +58,7 @@ HashJoinNode::HashJoinNode(
   match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
   match_all_build_ =
     (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
-  can_add_runtime_filters_ = FLAGS_enable_probe_side_filtering;
+  runtime_filters_enabled_ = FLAGS_enable_probe_side_filtering;
 }
 
 Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
@@ -233,7 +233,7 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // We only do this if the build side is sufficiently small.
   // TODO: Better heuristic? Currently we simply compare the size of the HT with a
   // constant value.
-  if (can_add_runtime_filters_) {
+  if (runtime_filters_enabled_) {
     if (!state->filter_bank()->ShouldDisableFilter(hash_tbl_->size())) {
       AddRuntimeExecOption("Build-Side Filter Built");
       hash_tbl_->AddBloomFilters();

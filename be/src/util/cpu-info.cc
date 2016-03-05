@@ -21,6 +21,7 @@
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <fstream>
+#include <gutil/strings/substitute.h>
 #include <mmintrin.h>
 #include <sstream>
 #include <stdlib.h>
@@ -34,6 +35,7 @@
 using boost::algorithm::contains;
 using boost::algorithm::trim;
 using std::max;
+using strings::Substitute;
 
 DECLARE_bool(abort_on_config_error);
 DEFINE_int32(num_cores, 0, "(Advanced) If > 0, it sets the number of cores available to"
@@ -46,6 +48,7 @@ bool CpuInfo::initialized_ = false;
 int64_t CpuInfo::hardware_flags_ = 0;
 int64_t CpuInfo::original_hardware_flags_;
 long CpuInfo::cache_sizes_[L3_CACHE + 1];
+long CpuInfo::cache_line_sizes_[L3_CACHE + 1];
 int64_t CpuInfo::cycles_per_ms_;
 int CpuInfo::num_cores_ = 1;
 string CpuInfo::model_name_ = "unknown";
@@ -124,11 +127,21 @@ void CpuInfo::Init() {
   for (size_t i = 0; i < 3; ++i) {
     cache_sizes_[i] = data[i];
   }
+  size_t linesize;
+  size_t sizeof_linesize = sizeof(linesize);
+  sysctlbyname("hw.cachelinesize", &linesize, &sizeof_linesize, NULL, 0);
+  for (size_t i = 0; i < 3; ++i) cache_line_sizes_[i] = linesize;
 #else
   // Call sysconf to query for the cache sizes
   cache_sizes_[0] = sysconf(_SC_LEVEL1_DCACHE_SIZE);
   cache_sizes_[1] = sysconf(_SC_LEVEL2_CACHE_SIZE);
   cache_sizes_[2] = sysconf(_SC_LEVEL3_CACHE_SIZE);
+
+  cache_line_sizes_[0] = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+  // See bloom-filter.cc for one dependency.
+  DCHECK_EQ(cache_line_sizes_[0], 64) << "Impala expects 64-byte L1 cache lines";
+  cache_line_sizes_[1] = sysconf(_SC_LEVEL2_CACHE_LINESIZE);
+  cache_line_sizes_[2] = sysconf(_SC_LEVEL3_CACHE_LINESIZE);
 #endif
 
   if (max_mhz != 0) {
@@ -171,15 +184,21 @@ void CpuInfo::EnableFeature(long flag, bool enable) {
 string CpuInfo::DebugString() {
   DCHECK(initialized_);
   stringstream stream;
-  int64_t L1 = CacheSize(L1_CACHE);
-  int64_t L2 = CacheSize(L2_CACHE);
-  int64_t L3 = CacheSize(L3_CACHE);
+  string L1 = Substitute("L1 Cache: $0 (Line: $1)",
+      PrettyPrinter::Print(CacheSize(L1_CACHE), TUnit::BYTES),
+      PrettyPrinter::Print(CacheLineSize(L1_CACHE), TUnit::BYTES));
+  string L2 = Substitute("L1 Cache: $0 (Line: $1)",
+      PrettyPrinter::Print(CacheSize(L2_CACHE), TUnit::BYTES),
+      PrettyPrinter::Print(CacheLineSize(L2_CACHE), TUnit::BYTES));
+  string L3 = Substitute("L1 Cache: $0 (Line: $1)",
+      PrettyPrinter::Print(CacheSize(L3_CACHE), TUnit::BYTES),
+      PrettyPrinter::Print(CacheLineSize(L3_CACHE), TUnit::BYTES));
   stream << "Cpu Info:" << endl
          << "  Model: " << model_name_ << endl
          << "  Cores: " << num_cores_ << endl
-         << "  L1 Cache: " << PrettyPrinter::Print(L1, TUnit::BYTES) << endl
-         << "  L2 Cache: " << PrettyPrinter::Print(L2, TUnit::BYTES) << endl
-         << "  L3 Cache: " << PrettyPrinter::Print(L3, TUnit::BYTES) << endl
+         << "  " << L1 << endl
+         << "  " << L2 << endl
+         << "  " << L3 << endl
          << "  Hardware Supports:" << endl;
   for (int i = 0; i < num_flags; ++i) {
     if (IsSupported(flag_mappings[i].flag)) {

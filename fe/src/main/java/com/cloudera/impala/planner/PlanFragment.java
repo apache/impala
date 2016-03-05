@@ -127,8 +127,6 @@ public class PlanFragment {
    */
   public void finalize(Analyzer analyzer)
       throws InternalException, NotImplementedException {
-    if (planRoot_ != null) computeCanAddSlotFilters(planRoot_);
-
     if (destNode_ != null) {
       Preconditions.checkState(sink_ == null);
       // we're streaming to an exchange node
@@ -180,73 +178,7 @@ public class PlanFragment {
     return dataPartition_ == DataPartition.UNPARTITIONED ? 1 : planRoot_.getNumNodes();
   }
 
-  /**
-   * Returns true and sets node.canAddPredicate, if we can add single-slot filters at
-   * execution time (i.e. after Prepare() to the plan tree rooted at this node.
-   * That is, 'node' can add filters that can be evaluated at nodes below.
-   *
-   * We compute this by walking the tree bottom up.
-   *
-   * TODO: move this to PlanNode.init() which is normally responsible for computing
-   * internal state of PlanNodes. We cannot do this currently since we need the
-   * distrubutionMode() set on HashJoin nodes. Once we call init() properly for
-   * repartitioned joins, this logic can move to init().
-   */
-  private boolean computeCanAddSlotFilters(PlanNode node) {
-    if (node instanceof HashJoinNode) {
-      HashJoinNode hashJoinNode = (HashJoinNode)node;
-      boolean childResult = computeCanAddSlotFilters(node.getChild(0));
-      if (!childResult) return false;
-      if (hashJoinNode.getJoinOp().equals(JoinOperator.FULL_OUTER_JOIN) ||
-          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_OUTER_JOIN) ||
-          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_ANTI_JOIN) ||
-          hashJoinNode.getJoinOp().equals(JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN)) {
-        // It is not correct to push through an outer or anti join on the probe side.
-        // We cannot filter those rows out.
-        return false;
-      }
-      // We can't push down predicates for partitioned joins yet.
-      // TODO: this can be hugely helpful to avoid network traffic. Implement this.
-      if (hashJoinNode.getDistributionMode() == DistributionMode.PARTITIONED) {
-        return false;
-      }
-
-      List<BinaryPredicate> joinConjuncts = hashJoinNode.getEqJoinConjuncts();
-      // We can only add these filters for conjuncts of the form:
-      // <probe_slot> = *. If the hash join has any equal join conjuncts in this form,
-      // mark the hash join node.
-      for (Expr c: joinConjuncts) {
-        if (c.getChild(0) instanceof SlotRef) {
-          hashJoinNode.setAddProbeFilters(true);
-          break;
-        }
-      }
-      // Even if this join cannot add predicates, return true so the parent node can.
-      return true;
-    } else if (node instanceof HdfsScanNode) {
-      // Since currently only the Parquet scanner employs the slot filter optimization,
-      // we enable it only if the majority format is Parquet. Otherwise we are adding
-      // the overhead of creating the SlotFilters in the build side in queries not on
-      // Parquet data.
-      // TODO: Modify the other scanners to exploit the slot filter optimization.
-      HdfsScanNode scanNode = (HdfsScanNode) node;
-      Preconditions.checkNotNull(scanNode.desc_);
-      Preconditions.checkNotNull(scanNode.desc_.getTable() instanceof HdfsTable);
-      HdfsTable table = (HdfsTable) scanNode.desc_.getTable();
-      if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
-        return true;
-      } else {
-        return false;
-      }
-    } else {
-      for (PlanNode child : node.getChildren()) {
-        computeCanAddSlotFilters(child);
-      }
-      return false;
-    }
-  }
-
-  /**
+ /**
    * Estimates the per-node number of distinct values of exprs based on the data
    * partition of this fragment and its number of nodes. Returns -1 for an invalid
    * estimate, e.g., because getNumDistinctValues() failed on one of the exprs.

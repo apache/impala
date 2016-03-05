@@ -53,7 +53,7 @@ class CpuInfo {
     DCHECK(initialized_);
     return hardware_flags_;
   }
-  
+
   /// Returns whether of not the cpu supports this flag
   inline static bool IsSupported(long flag) {
     DCHECK(initialized_);
@@ -70,6 +70,12 @@ class CpuInfo {
     return cache_sizes_[level];
   }
 
+  /// Returns the size of a line in the cache at this level.
+  static long CacheLineSize(CacheLevel level) {
+    DCHECK(initialized_);
+    return cache_line_sizes_[level];
+  }
+
   /// Returns the number of cpu cycles per millisecond
   static int64_t cycles_per_ms() {
     DCHECK(initialized_);
@@ -77,13 +83,13 @@ class CpuInfo {
   }
 
   /// Returns the number of cores (including hyper-threaded) on this machine.
-  static int num_cores() { 
+  static int num_cores() {
     DCHECK(initialized_);
-    return num_cores_; 
+    return num_cores_;
   }
 
   /// Returns the model name of the cpu (e.g. Intel i7-2600)
-  static std::string model_name() { 
+  static std::string model_name() {
     DCHECK(initialized_);
     return model_name_;
   }
@@ -95,6 +101,7 @@ class CpuInfo {
   static int64_t hardware_flags_;
   static int64_t original_hardware_flags_;
   static long cache_sizes_[L3_CACHE + 1];
+  static long cache_line_sizes_[L3_CACHE + 1];
   static int64_t cycles_per_ms_;
   static int num_cores_;
   static std::string model_name_;

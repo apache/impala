@@ -38,7 +38,7 @@ namespace impala {
 // We can construct (and destruct) Bloom filters with different spaces.
 TEST(BloomFilter, Constructor) {
   for (int i = 0; i < 30; ++i) {
-    BloomFilter bf(i, nullptr, nullptr);
+    BloomFilter bf(i);
   }
 }
 
@@ -46,7 +46,7 @@ TEST(BloomFilter, Constructor) {
 TEST(BloomFilter, Insert) {
   srand(0);
   for (int i = 13; i < 17; ++i) {
-    BloomFilter bf(i, nullptr, nullptr);
+    BloomFilter bf(i);
     for (int k = 0; k < (1 << 15); ++k) {
       bf.Insert(MakeRand());
     }
@@ -57,7 +57,7 @@ TEST(BloomFilter, Insert) {
 TEST(BloomFilter, Find) {
   srand(0);
   for (int i = 13; i < 17; ++i) {
-    BloomFilter bf(i, nullptr, nullptr);
+    BloomFilter bf(i);
     for (int k = 0; k < (1 << 15); ++k) {
       const uint64_t to_insert = MakeRand();
       bf.Insert(to_insert);
@@ -71,7 +71,7 @@ TEST(BloomFilter, CumulativeFind) {
   srand(0);
   for (int i = 5; i < 11; ++i) {
     std::vector<uint32_t> inserted;
-    BloomFilter bf(i, nullptr, nullptr);
+    BloomFilter bf(i);
     for (int k = 0; k < (1 << 10); ++k) {
       const uint32_t to_insert = MakeRand();
       inserted.push_back(to_insert);
@@ -104,7 +104,7 @@ TEST(BloomFilter, FindInvalid) {
       double fpp = 1.0 / (1 << log_fpp);
       const size_t ndv = 1 << log_ndv;
       const int log_heap_space = BloomFilter::MinLogSpace(ndv, fpp);
-      BloomFilter bf(log_heap_space, nullptr, nullptr);
+      BloomFilter bf(log_heap_space);
       // Fill up a BF with exactly as much ndv as we planned for it:
       for (size_t i = 0; i < ndv; ++i) {
         bf.Insert(shuffled_insert[i]);
@@ -187,7 +187,7 @@ TEST(BloomFilter, MinSpaceForFpp) {
 }
 
 TEST(BloomFilter, Thrift) {
-  BloomFilter bf(BloomFilter::MinLogSpace(100, 0.01), NULL, NULL);
+  BloomFilter bf(BloomFilter::MinLogSpace(100, 0.01));
   for (int i = 0; i < 10; ++i) bf.Insert(i);
   // Check no unexpected new false positives.
   set<int> missing_ints;
@@ -196,16 +196,20 @@ TEST(BloomFilter, Thrift) {
   }
 
   TBloomFilter to_thrift;
-  bf.ToThrift(&to_thrift);
+  BloomFilter::ToThrift(&bf, &to_thrift);
+  EXPECT_EQ(to_thrift.always_true, false);
 
-  BloomFilter from_thrift(to_thrift, NULL, NULL);
+  BloomFilter from_thrift(to_thrift);
   for (int i = 0; i < 10; ++i) ASSERT_TRUE(from_thrift.Find(i));
   for (int missing: missing_ints) ASSERT_FALSE(from_thrift.Find(missing));
+
+  BloomFilter::ToThrift(NULL, &to_thrift);
+  EXPECT_EQ(to_thrift.always_true, true);
 }
 
 TEST(BloomFilter, Or) {
-  BloomFilter bf1(BloomFilter::MinLogSpace(100, 0.01), NULL, NULL);
-  BloomFilter bf2(BloomFilter::MinLogSpace(100, 0.01), NULL, NULL);
+  BloomFilter bf1(BloomFilter::MinLogSpace(100, 0.01));
+  BloomFilter bf2(BloomFilter::MinLogSpace(100, 0.01));
   for (int i = 60; i < 80; ++i) bf2.Insert(i);
 
   for (int i = 0; i < 10; ++i) bf1.Insert(i);

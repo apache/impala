@@ -1136,7 +1136,7 @@ bool HdfsScanNode::PartitionPassesFilterPredicates(int32_t partition_id,
 
     // Not quite right because bitmap could arrive after Eval(), but we're ok with
     // off-by-one errors.
-    bool processed = ctx.filter->GetBloomFilter();
+    bool processed = ctx.filter->HasBloomFilter();
     bool passed_filter = ctx.filter->Eval<void>(e, ctx.expr->root()->type());
     ctx.stats->IncrCounters(stats_name, 1, processed, !passed_filter);
     if (!passed_filter)  return false;

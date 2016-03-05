@@ -14,3 +14,25 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ====
+
+
+---- QUERY
+####################################################
+# Regression test for IMPALA-3141: Disabled filters should send dummy filters
+# to unblock waiters. Filters are disabled by setting the filter size to be very
+# small, and having a large enough build input to trigger the false-positive check.
+# Note: build side has a low NDV, so if the FP estimate changes to take NDV into
+# account this test will need to be updated.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=600000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+set RUNTIME_BLOOM_FILTER_SIZE=4096;
+select STRAIGHT_JOIN count(*) from alltypes a JOIN [BROADCAST]
+  (select c.id from alltypes c CROSS JOIN alltypes d LIMIT 40000) b
+  on a.id = b.id
+---- RESULTS
+40000
+---- RUNTIME_PROFILE
+row_regex: .*Build-Side Runtime-Filter Disabled \(FP Rate Too High\).*
+====

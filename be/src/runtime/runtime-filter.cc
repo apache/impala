@@ -49,7 +49,7 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,
     bool is_producer) {
   RuntimeFilter* ret = obj_pool_.Add(new RuntimeFilter(filter_desc));
-  lock_guard<SpinLock> l(runtime_filter_lock_);
+  lock_guard<mutex> l(runtime_filter_lock_);
   if (is_producer) {
     DCHECK(produced_filters_.find(filter_desc.filter_id) == produced_filters_.end());
     produced_filters_[filter_desc.filter_id] = ret;
@@ -88,7 +88,7 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
   TUpdateFilterParams params;
   bool has_local_target = false;
   {
-    lock_guard<SpinLock> l(runtime_filter_lock_);
+    lock_guard<mutex> l(runtime_filter_lock_);
     RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
     DCHECK(it != produced_filters_.end()) << "Tried to update unregistered filter: "
                                           << filter_id;
@@ -101,72 +101,65 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
     // side.
     RuntimeFilter* filter;
     {
-      lock_guard<SpinLock> l(runtime_filter_lock_);
+      lock_guard<mutex> l(runtime_filter_lock_);
       RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
       if (it == consumed_filters_.end()) return;
       filter = it->second;
       // Check if the filter already showed up.
-      if (filter->GetBloomFilter() != NULL) return;
+      DCHECK(!filter->HasBloomFilter());
     }
-    // TODO: Avoid need for this copy.
-    BloomFilter* copy = AllocateScratchBloomFilter();
-    if (copy == NULL) return;
-    copy->Or(*bloom_filter);
-    {
-      // Take lock only to ensure no race with PublishGlobalFilter() - there's no need for
-      // coordination with readers of the filter.
-      lock_guard<SpinLock> l(runtime_filter_lock_);
-      if (filter->GetBloomFilter() == NULL) {
-        filter->SetBloomFilter(copy);
-        state_->runtime_profile()->AddInfoString(
-            Substitute("Filter $0 arrival", filter_id),
-            PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
-      }
-    }
+    filter->SetBloomFilter(bloom_filter);
+    state_->runtime_profile()->AddInfoString(
+        Substitute("Filter $0 arrival", filter_id),
+        PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
   } else if (state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
-      bloom_filter->ToThrift(&params.bloom_filter);
-      params.filter_id = filter_id;
-      params.query_id = query_ctx_.query_id;
+    BloomFilter::ToThrift(bloom_filter, &params.bloom_filter);
+    params.filter_id = filter_id;
+    params.query_id = query_ctx_.query_id;
 
-      ExecEnv::GetInstance()->rpc_pool()->Offer(bind<void>(
-          SendFilterToCoordinator, query_ctx_.coord_address, params,
-          ExecEnv::GetInstance()->impalad_client_cache()));
+    ExecEnv::GetInstance()->rpc_pool()->Offer(bind<void>(
+        SendFilterToCoordinator, query_ctx_.coord_address, params,
+        ExecEnv::GetInstance()->impalad_client_cache()));
   }
 }
 
 void RuntimeFilterBank::PublishGlobalFilter(uint32_t filter_id,
     const TBloomFilter& thrift_filter) {
-  lock_guard<SpinLock> l(runtime_filter_lock_);
+  lock_guard<mutex> l(runtime_filter_lock_);
   if (closed_) return;
   RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
   DCHECK(it != consumed_filters_.end()) << "Tried to publish unregistered filter: "
                                         << filter_id;
-  if (it->second->filter_desc().is_broadcast_join &&
-      it->second->GetBloomFilter() != NULL) {
-    // Already showed up from local filter.
-    return;
+  if (thrift_filter.always_true) {
+    it->second->SetBloomFilter(BloomFilter::ALWAYS_TRUE_FILTER);
+  } else {
+    uint32_t required_space =
+        BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space);
+    // Silently fail to publish the filter (replacing it with a 0-byte complete one) if
+    // there's not enough memory for it.
+    if (!state_->query_mem_tracker()->TryConsume(required_space)) {
+      VLOG_QUERY << "No memory for global filter: " << filter_id
+                 << " (fragment instance: " << state_->fragment_instance_id() << ")";
+      it->second->SetBloomFilter(BloomFilter::ALWAYS_TRUE_FILTER);
+    } else {
+      BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(thrift_filter));
+      DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
+      memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
+      it->second->SetBloomFilter(bloom_filter);
+    }
   }
-  uint32_t required_space =
-      BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space);
-  // Silently fail to publish the filter if there's not enough memory for it.
-  if (!state_->query_mem_tracker()->TryConsume(required_space)) return;
-  BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(thrift_filter, NULL, NULL));
-  DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
-  memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
-  it->second->SetBloomFilter(bloom_filter);
   state_->runtime_profile()->AddInfoString(Substitute("Filter $0 arrival", filter_id),
       PrettyPrinter::Print(it->second->arrival_delay(), TUnit::TIME_MS));
 }
 
 BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter() {
-  lock_guard<SpinLock> l(runtime_filter_lock_);
+  lock_guard<mutex> l(runtime_filter_lock_);
   if (closed_) return NULL;
 
   // Track required space
   uint32_t required_space = BloomFilter::GetExpectedHeapSpaceUsed(log_filter_size_);
   if (!state_->query_mem_tracker()->TryConsume(required_space)) return NULL;
-  BloomFilter* bloom_filter =
-      obj_pool_.Add(new BloomFilter(log_filter_size_, NULL, NULL));
+  BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(log_filter_size_));
   DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
   memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
   return bloom_filter;
@@ -178,18 +171,17 @@ bool RuntimeFilterBank::ShouldDisableFilter(uint64_t max_ndv) {
 }
 
 void RuntimeFilterBank::Close() {
-  lock_guard<SpinLock> l(runtime_filter_lock_);
+  lock_guard<mutex> l(runtime_filter_lock_);
   closed_ = true;
   obj_pool_.Clear();
   state_->query_mem_tracker()->Release(memory_allocated_->value());
 }
 
 bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
-  if (GetBloomFilter() != NULL) return true;
-  while ((MonotonicMillis() - registration_time_) < timeout_ms) {
+  do {
+    if (HasBloomFilter()) return true;
     SleepForMs(SLEEP_PERIOD_MS);
-    if (GetBloomFilter() != NULL) return true;
-  }
+  } while ((MonotonicMillis() - registration_time_) < timeout_ms);
 
-  return false;
+  return HasBloomFilter();
 }

@@ -66,7 +66,7 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     process_probe_batch_fn_level0_(NULL) {
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
 
-  can_add_runtime_filters_ =
+  runtime_filters_enabled_ =
       FLAGS_enable_phj_probe_side_filtering && tnode.runtime_filters.size() > 0;
 }
 
@@ -128,7 +128,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   // Disable probe-side filters if we are inside a subplan because no node
   // inside the subplan can use them.
-  if (IsInSubplan()) can_add_runtime_filters_ = false;
+  if (IsInSubplan()) runtime_filters_enabled_ = false;
 
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   runtime_state_ = state;
@@ -400,10 +400,10 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
     }
   }
 
-  if (parent_->can_add_runtime_filters_) {
+  if (parent_->runtime_filters_enabled_) {
     // Disabling runtime filter push down because not all rows will be included in the
     // filter due to a spilled partition.
-    parent_->can_add_runtime_filters_ = false;
+    parent_->runtime_filters_enabled_ = false;
     parent_->AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (Spilling)");
     VLOG(2) << "Disabling runtime filter construction because a partition will spill.";
   }
@@ -505,7 +505,7 @@ not_built:
 }
 
 bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
-  if (!can_add_runtime_filters_) return false;
+  if (!runtime_filters_enabled_) return false;
   DCHECK(ht_ctx_.get() != NULL);
   for (int i = 0; i < filters_.size(); ++i) {
     filters_[i].local_bloom_filter = state->filter_bank()->AllocateScratchBloomFilter();
@@ -513,19 +513,20 @@ bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
   return true;
 }
 
-bool PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state) {
-  if (can_add_runtime_filters_) {
-    // Add all the bloom filters to the runtime state.
-    // TODO: DCHECK(!is_in_subplan());
+void PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state) {
+  if (runtime_filters_enabled_) {
     AddRuntimeExecOption("Build-Side Runtime-Filter Produced");
-    BOOST_FOREACH(const FilterContext& ctx, filters_) {
-      if (ctx.local_bloom_filter == NULL) continue;
-      state->filter_bank()->UpdateFilterFromLocal(ctx.filter->filter_desc().filter_id,
-          ctx.local_bloom_filter);
-    }
-    return true;
   }
-  return false;
+
+  // Add all the bloom filters to the runtime state. If runtime filters are disabled,
+  // publish a complete Bloom filter (which rejects no values) to allow plan nodes that
+  // are waiting for these filters to make progress.
+  BOOST_FOREACH(const FilterContext& ctx, filters_) {
+    BloomFilter* filter = runtime_filters_enabled_ ?
+        ctx.local_bloom_filter : BloomFilter::ALWAYS_TRUE_FILTER;
+    state->filter_bank()->UpdateFilterFromLocal(
+        ctx.filter->filter_desc().filter_id, filter);
+  }
 }
 
 bool PartitionedHashJoinNode::AppendRowStreamFull(BufferedTupleStream* stream,
@@ -1195,7 +1196,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
 
   // Decide whether probe filters will be built.
-  if (input_partition_ == NULL && can_add_runtime_filters_) {
+  if (input_partition_ == NULL && runtime_filters_enabled_) {
     uint64_t num_build_rows = 0;
     BOOST_FOREACH(Partition* partition, hash_partitions_) {
       DCHECK(!partition->is_spilled()) << "Runtime filters enabled despite spilling";
@@ -1209,10 +1210,10 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     // TODO: Better heuristic.
     if (state->filter_bank()->ShouldDisableFilter(num_build_rows)) {
       AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
-      can_add_runtime_filters_ = false;
+      runtime_filters_enabled_ = false;
     }
   } else {
-    can_add_runtime_filters_ = false;
+    runtime_filters_enabled_ = false;
   }
 
   // First loop over the partitions and build hash tables for the partitions that did
@@ -1227,13 +1228,13 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     if (!partition->is_spilled()) {
       bool built = false;
       DCHECK(partition->build_rows()->is_pinned());
-      RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_runtime_filters_));
+      RETURN_IF_ERROR(partition->BuildHashTable(state, &built, runtime_filters_enabled_));
       // If we did not have enough memory to build this hash table, we need to spill this
       // partition (clean up the hash table, unpin build).
       if (!built) RETURN_IF_ERROR(partition->Spill(true));
     }
 
-    DCHECK(!can_add_runtime_filters_ || !partition->is_spilled())
+    DCHECK(!runtime_filters_enabled_ || !partition->is_spilled())
         << "Runtime filters enabled despite spilling";
   }
 

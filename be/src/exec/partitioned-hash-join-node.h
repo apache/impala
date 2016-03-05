@@ -257,7 +257,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   bool AllocateRuntimeFilters(RuntimeState* state);
 
   /// Publish the runtime filters to the fragment-local RuntimeFilterBank.
-  bool PublishRuntimeFilters(RuntimeState* state);
+  void PublishRuntimeFilters(RuntimeState* state);
 
   /// Codegen function to create output row. Assumes that the probe row is non-NULL.
   Status CodegenCreateOutputRow(LlvmCodeGen* codegen, llvm::Function** fn);

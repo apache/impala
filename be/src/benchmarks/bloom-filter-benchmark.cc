@@ -99,7 +99,7 @@ namespace initialize {
 void Benchmark(int batch_size, void* data) {
   int * d = reinterpret_cast<int*>(data);
   for (int i = 0; i < batch_size; ++i) {
-    BloomFilter bf(*d, nullptr, nullptr);
+    BloomFilter bf(*d);
   }
 }
 
@@ -109,8 +109,7 @@ void Benchmark(int batch_size, void* data) {
 namespace insert {
 
 struct TestData {
-  explicit TestData(int log_heap_size)
-      : bf(log_heap_size, nullptr, nullptr), data(1ull << 20) {
+  explicit TestData(int log_heap_size) : bf(log_heap_size), data(1ull << 20) {
     for (size_t i = 0; i < data.size(); ++i) {
       data[i] = MakeRand();
     }
@@ -137,7 +136,7 @@ namespace find {
 
 struct TestData {
   TestData(int log_heap_size, size_t size)
-      : bf(log_heap_size, nullptr, nullptr),
+      : bf(log_heap_size),
         vec_mask((1ull << static_cast<int>(floor(log2(size))))-1),
         present(size),
         absent(size),

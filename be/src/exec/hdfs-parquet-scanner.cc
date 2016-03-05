@@ -877,7 +877,7 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
     DCHECK(ctx->filter != NULL);
-    filter_ctxs_.push_back(ctx);
+    if (!ctx->filter->AlwaysTrue()) filter_ctxs_.push_back(ctx);
   }
   filter_stats_.resize(filter_ctxs_.size());
   return Status::OK();
@@ -1748,18 +1748,19 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
     for (int i = 0; i < num_filters; ++i) {
       LocalFilterStats* stats = &filter_stats_[i];
       if (!stats->enabled) continue;
+      const RuntimeFilter* filter = filter_ctxs_[i]->filter;
       ++stats->total_possible;
       // Check filter effectiveness every ROWS_PER_FILTER_SELECTIVITY_CHECK rows.
       if (UNLIKELY(
           !(stats->total_possible & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
         double reject_ratio = stats->rejected / static_cast<double>(stats->considered);
-        if (reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
+        if (filter->AlwaysTrue() ||
+            reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
           stats->enabled = 0;
           continue;
         }
       }
       ++stats->considered;
-      const RuntimeFilter* filter = filter_ctxs_[i]->filter;
       void* e = filter_ctxs_[i]->expr->GetValue(tuple_row_mem);
       if (!filter->Eval<void>(e, filter_ctxs_[i]->expr->root()->type())) {
         ++stats->rejected;

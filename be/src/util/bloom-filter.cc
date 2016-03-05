@@ -26,31 +26,22 @@ using namespace std;
 
 namespace impala {
 
-BloomFilter::BloomFilter(const int log_heap_space, RuntimeState* state,
-    BufferedBlockMgr::Client* client)
-    :  // Since log_heap_space is in bytes, we need to convert it to cache lines. There
-       // are 64 = 2^6 bytes in a cache line.
+BloomFilter* BloomFilter::ALWAYS_TRUE_FILTER = NULL;
+
+BloomFilter::BloomFilter(const int log_heap_space)
+    : // Since log_heap_space is in bytes, we need to convert it to cache lines. There
+      // are 64 = 2^6 bytes in a cache line.
       log_num_buckets_(std::max(1, log_heap_space - LOG_BUCKET_WORD_BITS)),
       // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
       // that is too large.
       directory_mask_((1ull << std::min(63, log_num_buckets_)) - 1),
-      directory_(NULL),
-      state_(state),
-      client_(client) {
+      directory_(NULL) {
   // Since we use 32 bits in the arguments of Insert() and Find(), log_num_buckets_
   // must be limited.
   DCHECK(log_num_buckets_ <= 32)
       << "Bloom filter too large. log_heap_space: " << log_heap_space;
-  DCHECK_EQ(client_ == NULL, state_ == NULL);
   // Each bucket has 64 = 2^6 bytes:
   const size_t alloc_size = directory_size();
-  if (state_) {
-    const bool consume_success = state_->block_mgr()->ConsumeMemory(client_, alloc_size);
-    DCHECK(consume_success) << "ConsumeMemory failed. log_heap_space: "
-                            << log_heap_space
-                            << " log_num_buckets_: " << log_num_buckets_
-                            << " alloc_size: " << alloc_size;
-  }
   const int malloc_failed =
       posix_memalign(reinterpret_cast<void**>(&directory_), 64, alloc_size);
   DCHECK_EQ(malloc_failed, 0) << "Malloc failed. log_heap_space: " << log_heap_space
@@ -59,16 +50,14 @@ BloomFilter::BloomFilter(const int log_heap_space, RuntimeState* state,
   memset(directory_, 0, alloc_size);
 }
 
-BloomFilter::BloomFilter(const TBloomFilter& thrift, RuntimeState* state,
-    BufferedBlockMgr::Client* client)
-    : BloomFilter(thrift.log_heap_space, state, client) {
+BloomFilter::BloomFilter(const TBloomFilter& thrift)
+    : BloomFilter(thrift.log_heap_space) {
   DCHECK_EQ(thrift.directory.size(), directory_size());
   memcpy(directory_, &thrift.directory[0], thrift.directory.size());
 }
 
 BloomFilter::~BloomFilter() {
   if (directory_) {
-    if (state_) state_->block_mgr()->ReleaseMemory(client_, directory_size());
     free(directory_);
     directory_ = NULL;
   }
@@ -78,6 +67,16 @@ void BloomFilter::ToThrift(TBloomFilter* thrift) const {
   thrift->log_heap_space = log_num_buckets_ + LOG_BUCKET_BYTE_SIZE;
   string tmp(reinterpret_cast<const char*>(directory_), directory_size());
   thrift->directory.swap(tmp);
+  thrift->always_true = false;
+}
+
+void BloomFilter::ToThrift(const BloomFilter* filter, TBloomFilter* thrift) {
+  DCHECK(thrift != NULL);
+  if (filter == NULL) {
+    thrift->always_true = true;
+    return;
+  }
+  filter->ToThrift(thrift);
 }
 
 void BloomFilter::Or(const BloomFilter& other) {
