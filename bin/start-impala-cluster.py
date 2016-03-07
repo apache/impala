@@ -212,6 +212,12 @@ def build_rm_args(instance_num):
   return RM_ARGS % (llama_address, cgroup_path, fs_cfg_path)
 
 def start_impalad_instances(cluster_size):
+  # The default memory limit for an impalad is 80% of the total system memory. On a
+  # mini-cluster with 3 impalads that means 240%. Since having an impalad be OOM killed
+  # is very annoying, the mem limit will be reduced. This can be overridden using the
+  # --impalad_args flag. virtual_memory().total returns the total physical memory.
+  mem_limit = int(0.8 * psutil.virtual_memory().total / cluster_size)
+
   # Start each impalad instance and optionally redirect the output to a log file.
   for i in range(cluster_size):
     if i == 0:
@@ -229,8 +235,9 @@ def start_impalad_instances(cluster_size):
 
     # impalad args from the --impalad_args flag. Also replacing '#ID' with the instance.
     param_args = (" ".join(options.impalad_args)).replace("#ID", str(i))
-    args = "%s %s %s %s %s" %\
-          (build_impalad_logging_args(i, service_name), build_jvm_args(i),
+    args = "--mem_limit=%s %s %s %s %s %s" %\
+          (mem_limit,  # Goes first so --impalad_args will override it.
+           build_impalad_logging_args(i, service_name), build_jvm_args(i),
            build_impalad_port_args(i), param_args,
            build_rm_args(i))
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
