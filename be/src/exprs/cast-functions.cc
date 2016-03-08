@@ -19,6 +19,7 @@
 #include "exprs/anyval-util.h"
 #include "exprs/decimal-functions.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 #include "string-functions.h"

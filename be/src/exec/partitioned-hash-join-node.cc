@@ -26,8 +26,11 @@
 #include "exprs/slot-ref.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
+#include "util/bloom-filter.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 

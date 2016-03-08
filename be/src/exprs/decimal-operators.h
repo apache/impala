@@ -150,38 +150,7 @@ class DecimalOperators {
   /// is required.
   template <typename T>
   static T RoundDelta(const DecimalValue<T>& v, int src_scale, int target_scale,
-      const DecimalRoundOp& op) {
-    if (op == TRUNCATE) return 0;
-
-    // Adding more digits, rounding does not apply. New digits are just 0.
-    if (src_scale <= target_scale) return 0;
-
-    // No need to round for floor() and the value is positive or ceil() and the value
-    // is negative.
-    if (v.value() > 0 && op == FLOOR) return 0;
-    if (v.value() < 0 && op == CEIL) return 0;
-
-    // We are removing the decimal places. Extract the value of the digits we are
-    // dropping. For example, going from scale 5->2, means we want the last 3 digits.
-    int delta_scale = src_scale - target_scale;
-    DCHECK_GT(delta_scale, 0);
-
-    // 10^delta_scale
-    T trailing_base = DecimalUtil::GetScaleMultiplier<T>(delta_scale);
-    T trailing_digits = v.value() % trailing_base;
-
-    // If the trailing digits are zero, never round.
-    if (trailing_digits == 0) return 0;
-
-    // Trailing digits are non-zero.
-    if (op == CEIL) return 1;
-    if (op == FLOOR) return -1;
-
-    DCHECK_EQ(op, ROUND);
-    // TODO: > or greater than or equal. i.e. should .500 round up?
-    if (abs(trailing_digits) < trailing_base / 2) return 0;
-    return v.value() < 0 ? -1 : 1;
-  }
+      const DecimalRoundOp& op);
 };
 
 }

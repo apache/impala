@@ -26,7 +26,6 @@
 #include "util/uid-util.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
-#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"

@@ -25,6 +25,7 @@
 #include "exprs/anyval-util.h"
 
 #include "runtime/tuple-row.h"
+#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "util/path-builder.h"
 #include "runtime/string-value.inline.h"
@@ -135,7 +136,7 @@ void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
 }
 
 StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
-    TimestampValue tv, const StringVal& fmt) {
+    const TimestampValue& tv, const StringVal& fmt) {
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {

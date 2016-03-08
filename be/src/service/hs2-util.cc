@@ -15,7 +15,8 @@
 #include "service/hs2-util.h"
 
 #include "common/logging.h"
-#include "runtime/raw-value.h"
+#include "runtime/decimal-value.inline.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/types.h"
 
 #include <gutil/strings/substitute.h>

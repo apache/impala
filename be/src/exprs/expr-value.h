@@ -19,6 +19,7 @@
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
+#include "util/decimal-util.h"
 
 namespace impala {
 

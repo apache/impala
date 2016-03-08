@@ -16,7 +16,6 @@
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/raw-value.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"

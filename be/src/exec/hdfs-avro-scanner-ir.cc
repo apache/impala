@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/read-write-util.h"
-#include <algorithm>
+#include "runtime/string-value.inline.h"
 
 using namespace impala;
 

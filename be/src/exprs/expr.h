@@ -93,7 +93,6 @@
 #include "runtime/descriptors.h"
 #include "runtime/decimal-value.h"
 #include "runtime/lib-cache.h"
-#include "runtime/raw-value.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "runtime/string-value.h"

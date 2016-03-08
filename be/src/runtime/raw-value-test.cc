@@ -14,7 +14,7 @@
 
 #include <gtest/gtest.h>
 #include <sstream>
-#include "runtime/raw-value.h"
+#include "runtime/raw-value.inline.h"
 
 #include "common/names.h"
 

@@ -57,7 +57,6 @@
 #include "gen-cpp/Data_types.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
-#include "runtime/raw-value.h"
 #include "udf/udf.h"
 #include "udf/udf-internal.h"
 

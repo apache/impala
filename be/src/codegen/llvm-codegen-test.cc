@@ -18,7 +18,6 @@
 #include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
-#include "runtime/raw-value.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
 #include "util/path-builder.h"

@@ -16,17 +16,10 @@
 #ifndef IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 #define IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
-#include <boost/thread/thread.hpp>
+#include <string>
 
-#include "runtime/string-value.h"
-#include "runtime/timestamp-value.h"
 #include "udf/udf.h"
-
-using namespace impala_udf;
 
 using namespace impala_udf;
 
@@ -34,6 +27,8 @@ namespace impala {
 
 class Expr;
 class OpcodeRegistry;
+class StringValue;
+class TimestampValue;
 class TupleRow;
 
 /// TODO: Reconsider whether this class needs to exist.
@@ -74,8 +69,8 @@ class TimestampFunctions {
   static StringVal FromTimestamp(FunctionContext* context, const TimestampVal& date,
       const StringVal& fmt);
 
-  static StringVal StringValFromTimestamp(FunctionContext* context, TimestampValue tv,
-      const StringVal& fmt);
+  static StringVal StringValFromTimestamp(FunctionContext* context,
+      const TimestampValue& tv, const StringVal& fmt);
   static BigIntVal UnixFromString(FunctionContext* context, const StringVal& sv);
 
   /// Return a timestamp string from a unix time_t
@@ -113,8 +108,8 @@ class TimestampFunctions {
   static StringVal ToDate(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal DateDiff(FunctionContext* context, const TimestampVal& ts_val1,
       const TimestampVal& ts_val2);
-  static string ShortDayName(FunctionContext* context, const TimestampVal& ts);
-  static string ShortMonthName(FunctionContext* context, const TimestampVal& ts);
+  static std::string ShortDayName(FunctionContext* context, const TimestampVal& ts);
+  static std::string ShortMonthName(FunctionContext* context, const TimestampVal& ts);
 
   /// Return verbose string version of current time of day
   /// e.g. Mon Dec 01 16:25:05 2003 EST.

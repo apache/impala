@@ -19,7 +19,7 @@
 #include <gtest/gtest.h>
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
-#include "runtime/decimal-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"

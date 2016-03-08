@@ -17,7 +17,9 @@
 #include <sstream>
 
 #include "exprs/expr.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/mem-pool.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 

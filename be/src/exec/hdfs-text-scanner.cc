@@ -23,7 +23,6 @@
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "runtime/row-batch.h"
-#include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "util/codec.h"
 #include "util/decompress.h"

@@ -24,7 +24,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
-#include "runtime/raw-value.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/client-cache.h"
 #include "runtime/mem-tracker.h"

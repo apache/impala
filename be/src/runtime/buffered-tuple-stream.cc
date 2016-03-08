@@ -20,6 +20,7 @@
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
+#include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
 #include "util/debug-util.h"

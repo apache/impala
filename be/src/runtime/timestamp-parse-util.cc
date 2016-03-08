@@ -13,7 +13,15 @@
 // limitations under the License.
 
 #include "runtime/timestamp-parse-util.h"
+
 #include <boost/assign/list_of.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/foreach.hpp>
+#include <boost/unordered_map.hpp>
+
+#include "runtime/string-value.inline.h"
+#include "util/string-parser.h"
 
 namespace assign = boost::assign;
 using boost::unordered_map;
@@ -25,8 +33,34 @@ using boost::posix_time::time_duration;
 
 namespace impala {
 
+/// Stores the results of parsing a date/time string.
+struct DateTimeParseResult {
+  int year;
+  int month;
+  int day;
+  int hour;
+  int minute;
+  int second;
+  int32_t fraction;
+  boost::posix_time::time_duration tz_offset;
+
+  DateTimeParseResult()
+    : year(0),
+      month(0),
+      day(0),
+      hour(0),
+      minute(0),
+      second(0),
+      fraction(0),
+      tz_offset(0,0,0,0) {
+  }
+};
+
 bool TimestampParser::initialized_ = false;
-unordered_map<StringValue, int> TimestampParser::REV_MONTH_INDEX;
+
+/// Lazily initialized pseudo-constant hashmap for mapping month names to an index.
+static unordered_map<StringValue, int> REV_MONTH_INDEX;
+
 DateTimeFormatContext TimestampParser::DEFAULT_SHORT_DATE_TIME_CTX;
 DateTimeFormatContext TimestampParser::DEFAULT_SHORT_ISO_DATE_TIME_CTX;
 DateTimeFormatContext TimestampParser::DEFAULT_DATE_CTX;
@@ -93,6 +127,172 @@ void TimestampParser::Init() {
   TimestampParser::initialized_ = true;
 }
 
+bool TimestampParser::ParseFormatTokens(DateTimeFormatContext* dt_ctx) {
+  DCHECK(dt_ctx != NULL);
+  DCHECK(dt_ctx->fmt != NULL);
+  DCHECK(dt_ctx->fmt_len > 0);
+  DCHECK(dt_ctx->toks.size() == 0);
+  const char* str_begin = dt_ctx->fmt;
+  const char* str_end = str_begin + dt_ctx->fmt_len;
+  const char* str = str_begin;
+  // Parse the tokens from the format string
+  while (str < str_end) {
+    if (isdigit(*str)) return false;
+    // Ignore T|Z|non aA-zZ chars but track them as separators (required for printing).
+    if ((*str == 'T') || (*str == 'Z') || (!isalpha(*str))) {
+      if (dt_ctx->has_time_toks && IsValidTZOffset(str, str_end)) {
+        // TZ offset must come at the end of the format.
+        dt_ctx->toks.push_back(DateTimeFormatToken(TZ_OFFSET, str - str_begin,
+            str_end - str, str));
+        break;
+      }
+      dt_ctx->toks.push_back(DateTimeFormatToken(SEPARATOR, str - str_begin, 1, str));
+      ++str;
+      continue;
+    }
+    // Not a separator, verify that the previous token is either a separator or has
+    // length >1, i.e., it is not a variable length token.
+    if (!dt_ctx->toks.empty()) {
+      const DateTimeFormatToken& prev = dt_ctx->toks.back();
+      if (UNLIKELY(prev.type != SEPARATOR && prev.len == 1)) return false;
+    }
+    DateTimeFormatTokenType tok_type = UNKNOWN;
+    switch (*str) {
+      case 'y': tok_type = YEAR; break;
+      case 'M': tok_type = MONTH_IN_YEAR; break;
+      case 'd': tok_type = DAY_IN_MONTH; break;
+      case 'H': tok_type = HOUR_IN_DAY; break;
+      case 'm': tok_type = MINUTE_IN_HOUR; break;
+      case 's': tok_type = SECOND_IN_MINUTE; break;
+      case 'S': tok_type = FRACTION; break;
+      // Error on aA-zZ reserved characters that are not used yet.
+      default: return false;
+    }
+    dt_ctx->has_date_toks |= tok_type < HOUR_IN_DAY;
+    dt_ctx->has_time_toks |= tok_type >= HOUR_IN_DAY;
+    // Get the token group length
+    int tok_len = 1;
+    char tok_chr = *str;
+    const char* curr_tok_chr = str + 1;
+    while (curr_tok_chr < str_end) {
+      if (*curr_tok_chr != tok_chr) break;
+      ++tok_len;
+      ++curr_tok_chr;
+    }
+    if (tok_type == MONTH_IN_YEAR) {
+      if (UNLIKELY(tok_len > 3)) return false;
+      if (tok_len == 3) tok_type = MONTH_IN_YEAR_SLT;
+    }
+    // In an output scenario, fmt_out_len is used to determine the print buffer size.
+    // If the format uses short token groups e.g. yyyy-MM-d, there must to be enough
+    // room in the buffer for wider values e.g. 2013-12-16.
+    if (tok_len == 1) ++dt_ctx->fmt_out_len;
+    DateTimeFormatToken tok(tok_type, str - str_begin, tok_len, str);
+    str += tok.len;
+    dt_ctx->toks.push_back(tok);
+  }
+  return dt_ctx->has_date_toks || dt_ctx->has_time_toks;
+}
+
+bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
+    boost::posix_time::time_duration* t) {
+  DCHECK(TimestampParser::initialized_);
+  DCHECK(d != NULL);
+  DCHECK(t != NULL);
+  if (UNLIKELY(str == NULL || len <= 0)) {
+    *d = boost::gregorian::date();
+    *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
+    return false;
+  }
+  // Remove leading white space.
+  while (len > 0 && isspace(*str)) {
+    ++str;
+    --len;
+  }
+  // Strip the trailing blanks.
+  while (len > 0 && isspace(str[len - 1])) --len;
+  // Strip if there is a 'Z' suffix
+  if (len > 0 && str[len - 1] == 'Z') {
+    --len;
+  } else if (len > DEFAULT_TIME_FMT_LEN && (str[4] == '-' || str[2] == ':')) {
+    // Strip timezone offset if it seems like a valid timestamp string.
+    int curr_pos = DEFAULT_TIME_FMT_LEN;
+    // Timezone offset will be at least two bytes long, no need to check last
+    // two bytes.
+    while (curr_pos < len - 2) {
+      if (str[curr_pos] == '+' || str[curr_pos] == '-') {
+        len = curr_pos;
+        break;
+      }
+      ++curr_pos;
+    }
+  }
+
+  // Only process what we have to.
+  if (len > DEFAULT_DATE_TIME_FMT_LEN) len = DEFAULT_DATE_TIME_FMT_LEN;
+  // Determine the default formatting context that's required for parsing.
+  DateTimeFormatContext* dt_ctx = NULL;
+  if (LIKELY(len >= DEFAULT_TIME_FMT_LEN)) {
+    // This string starts with a date component
+    if (str[4] == '-') {
+      switch (len) {
+        case DEFAULT_DATE_FMT_LEN: {
+          dt_ctx = &DEFAULT_DATE_CTX;
+          break;
+        }
+        case DEFAULT_SHORT_DATE_TIME_FMT_LEN:  {
+          switch (str[10]) {
+            case ' ': dt_ctx = &DEFAULT_SHORT_DATE_TIME_CTX; break;
+            case 'T': dt_ctx = &DEFAULT_SHORT_ISO_DATE_TIME_CTX; break;
+          }
+          break;
+        }
+        case DEFAULT_DATE_TIME_FMT_LEN: {
+          switch (str[10]) {
+            case ' ': dt_ctx = &DEFAULT_DATE_TIME_CTX[9]; break;
+            case 'T': dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX[9]; break;
+          }
+          break;
+        }
+        default: {
+          // There is likely a fractional component that's below the expected 9 chars.
+          // We will need to work out which default context to use that corresponds to
+          // the fractional length in the string.
+          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)) {
+            switch (str[10]) {
+              case ' ': {
+                dt_ctx =
+                    &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+                break;
+              }
+              case 'T': {
+                dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX
+                    [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+                break;
+              }
+            }
+          }
+          break;
+        }
+      }
+    } else if (str[2] == ':') {
+      if (len > DEFAULT_TIME_FRAC_FMT_LEN) len = DEFAULT_TIME_FRAC_FMT_LEN;
+      if (len > DEFAULT_TIME_FMT_LEN && str[8] == '.') {
+        dt_ctx = &DEFAULT_TIME_FRAC_CTX[len - DEFAULT_TIME_FMT_LEN - 1];
+      } else {
+        dt_ctx = &DEFAULT_TIME_CTX;
+      }
+    }
+  }
+  if (LIKELY(dt_ctx != NULL)) {
+    return Parse(str, len, *dt_ctx, d, t);
+  } else {
+    *d = boost::gregorian::date();
+    *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
+    return false;
+  }
+}
+
 bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
     date* d, time_duration* t) {
   DCHECK(TimestampParser::initialized_);
@@ -152,5 +352,207 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
   }
   return true;
 }
+
+int TimestampParser::Format(const DateTimeFormatContext& dt_ctx,
+    const boost::gregorian::date& d, const boost::posix_time::time_duration& t,
+    int len, char* buff) {
+  DCHECK(TimestampParser::initialized_);
+  DCHECK(dt_ctx.toks.size() > 0);
+  DCHECK(len > dt_ctx.fmt_out_len);
+  DCHECK(buff != NULL);
+  if (dt_ctx.has_date_toks && d.is_special()) return -1;
+  if (dt_ctx.has_time_toks && t.is_special()) return -1;
+  char* str = buff;
+  BOOST_FOREACH(const DateTimeFormatToken& tok, dt_ctx.toks) {
+    int32_t num_val = -1;
+    const char* str_val = NULL;
+    int str_val_len = 0;
+    switch (tok.type) {
+      case YEAR: {
+        num_val = d.year();
+        if (tok.len <= 3) num_val %= 100;
+        break;
+      }
+      case MONTH_IN_YEAR: num_val = d.month().as_number(); break;
+      case MONTH_IN_YEAR_SLT: {
+        str_val = d.month().as_short_string();
+        str_val_len = 3;
+        break;
+      }
+      case DAY_IN_MONTH: num_val = d.day(); break;
+      case HOUR_IN_DAY: num_val = t.hours(); break;
+      case MINUTE_IN_HOUR: num_val = t.minutes(); break;
+      case SECOND_IN_MINUTE: num_val = t.seconds(); break;
+      case FRACTION: {
+        num_val = t.fractional_seconds();
+        if (num_val > 0) for (int j = tok.len; j < 9; ++j) num_val /= 10;
+        break;
+      }
+      case SEPARATOR: {
+        str_val = tok.val;
+        str_val_len = tok.len;
+        break;
+      }
+      case TZ_OFFSET: {
+        break;
+      }
+      default: DCHECK(false) << "Unknown date/time format token";
+    }
+    if (num_val > -1) {
+      str += sprintf(str, "%0*d", tok.len, num_val);
+    } else {
+      memcpy(str, str_val, str_val_len);
+      str += str_val_len;
+    }
+  }
+  /// Terminate the string
+  *str = '\0';
+  return str - buff;
+}
+
+bool TimestampParser::ParseDateTime(const char* str, int str_len,
+    const DateTimeFormatContext& dt_ctx, DateTimeParseResult* dt_result) {
+  DCHECK(dt_ctx.fmt_len > 0);
+  DCHECK(dt_ctx.toks.size() > 0);
+  DCHECK(dt_result != NULL);
+  if (str_len <= 0 || str_len < dt_ctx.fmt_len || str == NULL) return false;
+  StringParser::ParseResult status;
+  // Keep track of the number of characters we need to shift token positions by.
+  // Variable-length tokens will result in values > 0;
+  int shift_len = 0;
+  BOOST_FOREACH(const DateTimeFormatToken& tok, dt_ctx.toks) {
+    const char* tok_val = str + tok.pos + shift_len;
+    if (tok.type == SEPARATOR) {
+      if (UNLIKELY(*tok_val != *tok.val)) return false;
+      continue;
+    }
+    int tok_len = tok.len;
+    const char* str_end = str + str_len;
+    // In case of single-character tokens we scan ahead to the next separator.
+    if (UNLIKELY(tok_len == 1)) {
+      while ((tok_val + tok_len < str_end) && isdigit(*(tok_val + tok_len))) {
+        ++tok_len;
+        ++shift_len;
+      }
+    }
+    switch (tok.type) {
+      case YEAR: {
+        dt_result->year = StringParser::StringToInt<int>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        if (UNLIKELY(dt_result->year < 1 || dt_result->year > 9999)) return false;
+        if (tok_len < 4 && dt_result->year < 99) dt_result->year += 2000;
+        break;
+      }
+      case MONTH_IN_YEAR: {
+        dt_result->month = StringParser::StringToInt<int>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        if (UNLIKELY(dt_result->month < 1 || dt_result->month > 12)) return false;
+        break;
+      }
+      case MONTH_IN_YEAR_SLT: {
+        char raw_buff[tok.len];
+        std::transform(tok_val, tok_val + tok.len, raw_buff, ::tolower);
+        StringValue buff(raw_buff, tok.len);
+        boost::unordered_map<StringValue, int>::const_iterator iter =
+            REV_MONTH_INDEX.find(buff);
+        if (UNLIKELY(iter == REV_MONTH_INDEX.end())) return false;
+        dt_result->month = iter->second;
+        break;
+      }
+      case DAY_IN_MONTH: {
+        dt_result->day = StringParser::StringToInt<int>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        // TODO: Validate that the value of day is correct for the given month.
+        if (UNLIKELY(dt_result->day < 1 || dt_result->day > 31)) return false;
+        break;
+      }
+      case HOUR_IN_DAY: {
+        dt_result->hour = StringParser::StringToInt<int>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        if (UNLIKELY(dt_result->hour < 0 || dt_result->hour > 23)) return false;
+        break;
+      }
+      case MINUTE_IN_HOUR: {
+        dt_result->minute = StringParser::StringToInt<int>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        if (UNLIKELY(dt_result->minute < 0 || dt_result->minute > 59)) return false;
+        break;
+      }
+      case SECOND_IN_MINUTE: {
+        dt_result->second = StringParser::StringToInt<int>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        if (UNLIKELY(dt_result->second < 0 || dt_result->second > 59)) return false;
+        break;
+      }
+      case FRACTION: {
+        dt_result->fraction =
+            StringParser::StringToInt<int32_t>(tok_val, tok_len, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
+        // A user may specify a time of 04:30:22.1238, the parser will return 1238 for
+        // the fractional portion. This does not represent the intended value of
+        // 123800000, therefore the number must be scaled up.
+        for (int i = tok_len; i < 9; ++i) dt_result->fraction *= 10;
+        break;
+      }
+      case TZ_OFFSET: {
+        if (tok_val[0] != '+' && tok_val[0] != '-') return false;
+        int sign = tok_val[0] == '-' ? -1 : 1;
+        int minute = 0;
+        int hour = StringParser::StringToInt<int>(tok_val + 1, 2, &status);
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status ||
+            hour < 0 || hour > 23)) {
+          return false;
+        }
+        switch (tok_len) {
+          case 6: {
+            // +hh:mm
+            minute = StringParser::StringToInt<int>(tok_val + 4, 2, &status);
+            break;
+          }
+          case 5: {
+            // +hh:mm
+            minute = StringParser::StringToInt<int>(tok_val + 3, 2, &status);
+            break;
+          }
+          case 3: {
+            // +hh
+            break;
+          }
+          default: {
+            // Invalid timezone offset length.
+            return false;
+          }
+        }
+        if (UNLIKELY(StringParser::PARSE_SUCCESS != status ||
+            minute < 0 || minute > 59)) {
+          return false;
+        }
+        dt_result->tz_offset = boost::posix_time::time_duration(sign * hour,
+            sign * minute, 0, 0);
+        break;
+      }
+      default: DCHECK(false) << "Unknown date/time format token";
+    }
+  }
+  return true;
+}
+
+bool TimestampParser::IsValidTZOffset(const char* str_begin, const char* str_end) {
+  if (*str_begin == '+' || *str_begin == '-') {
+    ++str_begin;
+    switch(str_end - str_begin) {
+      case 5:   // hh:mm
+        return strncmp(str_begin, "hh:mm", 5) == 0;
+      case 4:   // hhmm
+        return strncmp(str_begin, "hhmm", 4) == 0;
+      case 2:   // hh
+        return strncmp(str_begin, "hh", 2) == 0;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
 
 }

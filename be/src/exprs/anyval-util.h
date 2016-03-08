@@ -17,8 +17,10 @@
 #define IMPALA_EXPRS_ANYVAL_UTIL_H
 
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
+#include "util/decimal-util.h"
 #include "util/hash-util.h"
 
 #include "common/names.h"

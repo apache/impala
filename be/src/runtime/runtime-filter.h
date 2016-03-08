@@ -16,17 +16,20 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_FILTER_H
 #define IMPALA_RUNTIME_RUNTIME_FILTER_H
 
-#include "runtime/raw-value.h"
-#include "runtime/types.h"
-#include "util/bloom-filter.h"
-#include "util/spinlock.h"
+#include <boost/unordered_map.hpp>
 
-#include <boost/thread.hpp>
+#include "common/object-pool.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/PlanNodes_types.h"
+#include "runtime/types.h"
+#include "util/runtime-profile.h"
+#include "util/spinlock.h"
 
 namespace impala {
 
 class BloomFilter;
 class RuntimeFilter;
+class RuntimeState;
 
 /// RuntimeFilters are produced and consumed by plan nodes at run time to propagate
 /// predicates across the plan tree dynamically. Each fragment instance manages its
@@ -78,12 +81,7 @@ class RuntimeFilterBank {
   /// clients and subsequently accessed without synchronization. Concurrent calls to
   /// PublishGlobalFilter() will update a filter's bloom filter atomically, without the
   /// need for client synchronization.
-  const RuntimeFilter* GetRuntimeFilter(uint32_t filter_id) {
-    boost::lock_guard<SpinLock> l(runtime_filter_lock_);
-    RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
-    if (it == consumed_filters_.end()) return NULL;
-    return it->second;
-  }
+  inline const RuntimeFilter* GetRuntimeFilter(uint32_t filter_id);
 
   /// Returns a bloom_filter that can be used by an operator to produce a local filter,
   /// which may then be used in UpdateFilterFromLocal(). The memory returned is owned by
@@ -156,14 +154,7 @@ class RuntimeFilter {
 
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
-  void SetBloomFilter(BloomFilter* bloom_filter) {
-    DCHECK(bloom_filter_ == NULL);
-    // TODO: Barrier required here to ensure compiler does not both inline and re-order
-    // this assignment. Not an issue for correctness (as assignment is atomic), but
-    // potentially confusing.
-    bloom_filter_ = bloom_filter;
-    arrival_time_ = MonotonicMillis();
-  }
+  inline void SetBloomFilter(BloomFilter* bloom_filter);
 
   /// Returns false iff the bloom_filter filter has been set via SetBloomFilter() and
   /// hash[val] is not in that bloom_filter. Otherwise returns true. Is safe to call
@@ -171,15 +162,7 @@ class RuntimeFilter {
   ///
   /// Templatized in preparation for templatized hashes.
   template<typename T>
-  inline bool Eval(T* val, const ColumnType& col_type) const {
-    // Safe to read bloom_filter_ concurrently with any ongoing SetBloomFilter() thanks
-    // to a) the atomicity of / pointer assignments and b) the x86 TSO memory model.
-    if (bloom_filter_ == NULL) return true;
-
-    uint32_t h = RawValue::GetHashValue(val, col_type,
-        RuntimeFilterBank::DefaultHashSeed());
-    return bloom_filter_->Find(h);
-  }
+  inline bool Eval(T* val, const ColumnType& col_type) const;
 
   /// Returns the amount of time waited since registration for the filter to
   /// arrive. Returns 0 if filter has not yet arrived.

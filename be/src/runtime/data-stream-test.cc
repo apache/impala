@@ -29,7 +29,7 @@
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "runtime/client-cache.h"
-#include "runtime/raw-value.h"
+#include "runtime/raw-value.inline.h"
 #include "service/fe-support.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"

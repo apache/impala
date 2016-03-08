@@ -21,6 +21,7 @@
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
 #include "util/bit-util.h"
+#include "util/decimal-util.h"
 
 /// This file contains common elements between the parquet Writer and Scanner.
 namespace impala {

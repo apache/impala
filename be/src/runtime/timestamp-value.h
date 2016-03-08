@@ -23,7 +23,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <gflags/gflags.h>
 
-#include "runtime/timestamp-parse-util.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
@@ -33,6 +32,8 @@
 DECLARE_bool(use_local_tz_for_unix_timestamp_conversions);
 
 namespace impala {
+
+struct DateTimeFormatContext;
 
 /// Represents either a (1) date and time, (2) a date with an undefined time, or (3)
 /// a time with an undefined date. In all cases, times have up to nanosecond resolution
@@ -137,17 +138,7 @@ class TimestampValue {
   bool HasDateOrTime() const { return HasDate() || HasTime(); }
   bool HasDateAndTime() const { return HasDate() && HasTime(); }
 
-  std::string DebugString() const {
-    std::stringstream ss;
-    if (HasDate()) {
-      ss << boost::gregorian::to_iso_extended_string(date_);
-    }
-    if (HasTime()) {
-      if (HasDate()) ss << " ";
-      ss << boost::posix_time::to_simple_string(time_);
-    }
-    return ss.str();
-  }
+  std::string DebugString() const;
 
   /// Formats the timestamp using the given date/time context and places the result in the
   /// string buffer. The size of the buffer should be at least dt_ctx.fmt_out_len + 1. A
@@ -156,7 +147,7 @@ class TimestampValue {
   /// len -- the length of the buffer
   /// buff -- the buffer that will hold the result
   /// Returns the number of characters copied in to the buffer (minus the terminator)
-  int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff);
+  int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff) const;
 
   /// Converts to Unix time (seconds since the Unix epoch) representation. The time
   /// zone interpretation of the TimestampValue instance is determined by

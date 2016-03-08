@@ -19,7 +19,6 @@
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
-#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"

@@ -77,6 +77,50 @@ inline bool StringValue::Eq(const StringValue& other) const {
   return StringCompare(this->ptr, this->len, other.ptr, other.len, this->len) == 0;
 }
 
+inline bool StringValue::operator==(const StringValue& other) const {
+  return Eq(other);
+}
+
+inline bool StringValue::Ne(const StringValue& other) const {
+  return !Eq(other);
+}
+
+inline bool StringValue::operator!=(const StringValue& other) const {
+  return Ne(other);
+}
+
+inline bool StringValue::Le(const StringValue& other) const {
+  return Compare(other) <= 0;
+}
+
+inline bool StringValue::operator<=(const StringValue& other) const {
+  return Le(other);
+}
+
+inline bool StringValue::Ge(const StringValue& other) const {
+  return Compare(other) >= 0;
+}
+
+inline bool StringValue::operator>=(const StringValue& other) const {
+  return Ge(other);
+}
+
+inline bool StringValue::Lt(const StringValue& other) const {
+  return Compare(other) < 0;
+}
+
+inline bool StringValue::operator<(const StringValue& other) const {
+  return Lt(other);
+}
+
+inline bool StringValue::Gt(const StringValue& other) const {
+  return Compare(other) > 0;
+}
+
+inline bool StringValue::operator>(const StringValue& other) const {
+  return Gt(other);
+}
+
 inline StringValue StringValue::Substring(int start_pos) const {
   return StringValue(ptr + start_pos, len - start_pos);
 }

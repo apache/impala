@@ -42,7 +42,7 @@
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/exec-env.h"
-#include "runtime/raw-value.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "scheduling/simple-scheduler.h"
 #include "service/query-exec-state.h"

@@ -21,6 +21,7 @@
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/collection-value.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 
 #include "common/names.h"
 

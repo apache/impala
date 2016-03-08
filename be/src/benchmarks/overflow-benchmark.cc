@@ -17,7 +17,7 @@
 #include <sstream>
 #include <vector>
 
-#include "runtime/decimal-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"

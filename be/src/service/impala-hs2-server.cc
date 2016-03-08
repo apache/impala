@@ -38,6 +38,7 @@
 #include "util/debug-util.h"
 #include "rpc/thrift-util.h"
 #include "util/impalad-metrics.h"
+#include "util/string-parser.h"
 #include "service/hs2-util.h"
 
 #include "common/names.h"

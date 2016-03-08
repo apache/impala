@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "runtime/runtime-filter.h"
+#include "runtime/runtime-filter.inline.h"
 
 #include <gutil/strings/substitute.h>
 

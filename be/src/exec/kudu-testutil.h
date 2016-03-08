@@ -15,6 +15,7 @@
 #ifndef IMPALA_EXEC_KUDU_TESTUTIL_H
 #define IMPALA_EXEC_KUDU_TESTUTIL_H
 
+#include <boost/assign/list_of.hpp>
 #include <gtest/gtest.h>
 #include <kudu/client/client.h>
 #include <kudu/util/slice.h>

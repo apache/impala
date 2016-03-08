@@ -18,7 +18,6 @@
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "runtime/decimal-value.h"
-#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"

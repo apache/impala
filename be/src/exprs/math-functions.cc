@@ -23,6 +23,7 @@
 #include "exprs/operators.h"
 #include "util/string-parser.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 
 #include "common/names.h"
 

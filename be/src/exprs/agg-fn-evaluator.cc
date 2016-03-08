@@ -23,7 +23,9 @@
 #include "exprs/expr-context.h"
 #include "exprs/anyval-util.h"
 #include "runtime/lib-cache.h"
+#include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
 

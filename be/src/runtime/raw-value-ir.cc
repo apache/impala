@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "runtime/raw-value.h"
+#include "runtime/raw-value.inline.h"
+
+#include "runtime/decimal-value.inline.h"
 
 using namespace impala;
 

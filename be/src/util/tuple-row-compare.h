@@ -19,6 +19,7 @@
 #include "exec/sort-exec-exprs.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "runtime/descriptors.h"

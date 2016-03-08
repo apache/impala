@@ -24,7 +24,6 @@
 #include "util/bit-util.h"
 #include "util/jni-util.h"
 #include "exprs/expr.h"
-#include "runtime/raw-value.h"
 
 #include "common/names.h"
 

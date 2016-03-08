@@ -67,41 +67,41 @@ struct StringValue {
   /// this < other: -1
   /// this == other: 0
   /// this > other: 1
-  int Compare(const StringValue& other) const;
+  inline int Compare(const StringValue& other) const;
 
   /// ==
-  bool Eq(const StringValue& other) const;
-  bool operator==(const StringValue& other) const { return Eq(other); }
+  inline bool Eq(const StringValue& other) const;
+  inline bool operator==(const StringValue& other) const;
   /// !=
-  bool Ne(const StringValue& other) const { return !Eq(other); }
-  bool operator!=(const StringValue& other) const { return Ne(other); }
+  inline bool Ne(const StringValue& other) const;
+  inline bool operator!=(const StringValue& other) const;
   /// <=
-  bool Le(const StringValue& other) const { return Compare(other) <= 0; }
-  bool operator<=(const StringValue& other) const { return Le(other); }
+  inline bool Le(const StringValue& other) const;
+  inline bool operator<=(const StringValue& other) const;
   /// >=
-  bool Ge(const StringValue& other) const { return Compare(other) >= 0; }
-  bool operator>=(const StringValue& other) const { return Ge(other); }
+  inline bool Ge(const StringValue& other) const;
+  inline bool operator>=(const StringValue& other) const;
   /// <
-  bool Lt(const StringValue& other) const { return Compare(other) < 0; }
-  bool operator<(const StringValue& other) const { return Lt(other); }
+  inline bool Lt(const StringValue& other) const;
+  inline bool operator<(const StringValue& other) const;
   /// >
-  bool Gt(const StringValue& other) const { return Compare(other) > 0; }
-  bool operator>(const StringValue& other) const { return Gt(other); }
+  inline bool Gt(const StringValue& other) const;
+  inline bool operator>(const StringValue& other) const;
 
   std::string DebugString() const;
 
   /// Returns the substring starting at start_pos until the end of string.
-  StringValue Substring(int start_pos) const;
+  inline StringValue Substring(int start_pos) const;
 
   /// Returns the substring starting at start_pos with given length.
   /// If new_len < 0 then the substring from start_pos to end of string is returned. If
   /// new_len > len, len is extended to new_len.
   /// TODO: len should never be extended. This is not a trivial fix because UrlParser
   /// depends on the current behavior.
-  StringValue Substring(int start_pos, int new_len) const;
+  inline StringValue Substring(int start_pos, int new_len) const;
 
   /// Trims leading and trailing spaces.
-  StringValue Trim() const;
+  inline StringValue Trim() const;
 
   void ToStringVal(impala_udf::StringVal* sv) const {
     *sv = impala_udf::StringVal(reinterpret_cast<uint8_t*>(ptr), len);

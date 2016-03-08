@@ -21,7 +21,7 @@
 
 #include "runtime/row-batch.h"
 #include "runtime/data-stream-recvr.h"
-#include "runtime/raw-value.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"

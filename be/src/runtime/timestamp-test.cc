@@ -14,12 +14,15 @@
 
 #include <algorithm>
 #include <cstring>
-#include <vector>
 #include <boost/assign/list_of.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <gtest/gtest.h>
 
 #include "common/init.h"
-#include "runtime/raw-value.h"
+#include "common/status.h"
+#include "runtime/raw-value.inline.h"
+#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 

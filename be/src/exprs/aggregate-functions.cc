@@ -24,9 +24,9 @@
 #include <boost/random/uniform_int.hpp>
 
 #include "common/logging.h"
-#include "runtime/decimal-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
-#include "runtime/string-value.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "exprs/anyval-util.h"
 #include "exprs/hll-bias.h"
