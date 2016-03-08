@@ -21,6 +21,7 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 
+#include "common/init.h"
 #include "common/logging.h"
 #include "exprs/aggregate-functions.h"
 #include "runtime/multi-precision.h"
@@ -163,8 +164,7 @@ TEST(HistogramTest, TestString) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitGoogleLoggingSafe(argv[0]);
-  impala::DecimalUtil::InitMaxUnscaledDecimal16();
   ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

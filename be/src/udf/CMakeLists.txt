@@ -29,10 +29,5 @@ add_library(ImpalaUdf udf.cc udf-ir.cc udf-test-harness.cc)
 add_dependencies(ImpalaUdf thrift-deps)
 set_target_properties(ImpalaUdf PROPERTIES COMPILE_FLAGS "-DIMPALA_UDF_SDK_BUILD")
 
-ADD_EXECUTABLE(udf-test udf-test.cc)
-TARGET_LINK_LIBRARIES(udf-test ${UDF_TEST_LINK_LIBS})
-ADD_TEST(udf-test "${EXECUTABLE_OUTPUT_PATH}/udf-test")
-
-ADD_EXECUTABLE(uda-test uda-test.cc)
-TARGET_LINK_LIBRARIES(uda-test ${UDF_TEST_LINK_LIBS})
-ADD_TEST(uda-test "${EXECUTABLE_OUTPUT_PATH}/uda-test")
+ADD_UDF_TEST(udf-test)
+ADD_UDF_TEST(uda-test)

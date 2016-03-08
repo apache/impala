@@ -16,6 +16,7 @@
 #include <iostream>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "common/init.h"
 #include "common/logging.h"
 #include "runtime/multi-precision.h"
 #include "testutil/test-udfs.h"
@@ -277,7 +278,7 @@ TEST(UdfTest, MemTest) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitGoogleLoggingSafe(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

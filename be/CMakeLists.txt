@@ -349,14 +349,11 @@ if (NOT IMPALA_TOOLCHAIN AND NOT BUILD_SHARED_LIBS)
     ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES})
 endif()
 
-# Replace Udf with ImpalaUdf for $UDF_TEST_LINK_LIBS
-set (UDF_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} ImpalaUdf)
-list(REMOVE_ITEM UDF_TEST_LINK_LIBS Udf)
-
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.
+# TODO: build time for tests is no longer small, but our dependencies are now very
+# complicated and hard to isolate
 set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
-set (UDF_TEST_LINK_LIBS ${UDF_TEST_LINK_LIBS} gtest)
 
 MESSAGE(STATUS "Compiler Flags: ${CMAKE_CXX_FLAGS}")
 
@@ -376,6 +373,21 @@ FUNCTION(ADD_BE_TEST TEST_NAME)
   get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
   ADD_EXECUTABLE(${TEST_NAME} ${TEST_NAME}.cc)
   TARGET_LINK_LIBRARIES(${TEST_NAME} ${IMPALA_TEST_LINK_LIBS})
+  set(CMAKE_EXE_LINKER_FLAGS "--start-group")
+  ADD_TEST(${TEST_NAME} "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}")
+  ADD_DEPENDENCIES(be-test ${TEST_NAME})
+ENDFUNCTION()
+
+# Similar utility function for tests that use the UDF SDK
+FUNCTION(ADD_UDF_TEST TEST_NAME)
+  # This gets the directory where the test is from (e.g. 'exprs' or 'runtime')
+  get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+  ADD_EXECUTABLE(${TEST_NAME} ${TEST_NAME}.cc)
+  # Set ImpalaUdf as the first link library for UDF tests. This will cause its test
+  # definitions to be linked instead of subsequent non-test definitions. Otherwise the
+  # test definitions of MemTracker, etc. will be used in the udf.cc compilation unit, but
+  # the Runtime method implementations will be linked. See IMPALA-3132.
+  TARGET_LINK_LIBRARIES(${TEST_NAME} ImpalaUdf ${IMPALA_TEST_LINK_LIBS})
   set(CMAKE_EXE_LINKER_FLAGS "--start-group")
   ADD_TEST(${TEST_NAME} "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}")
   ADD_DEPENDENCIES(be-test ${TEST_NAME})
