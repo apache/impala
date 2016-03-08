@@ -1,0 +1,24 @@
+====
+---- QUERY
+create table simple (id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
+TBLPROPERTIES(
+ 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+ 'kudu.table_name' = 'simple',
+ 'kudu.master_addresses' = '127.0.0.1',
+ 'kudu.key_columns' = 'id',
+ 'kudu.num_tablet_replicas' = '2'
+)
+---- RESULTS
+====
+---- QUERY
+show table stats simple
+---- RESULTS
+-1,'','8000000A',regex:.*?:\d+,2
+-1,'8000000A','8000001E',regex:.*?:\d+,2
+-1,'8000001E','',regex:.*?:\d+,2
+---- TYPES
+INT,STRING,STRING,STRING,INT
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+====

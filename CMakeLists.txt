@@ -306,6 +306,13 @@ set(LIBS ${LIBS} ${AVRO_STATIC_LIB})
 message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
 message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
 
+# find Kudu client
+find_package(kuduClient REQUIRED PATHS ${KUDU_CLIENT_CMAKE_MODULE} $ENV{KUDU_CLIENT_CMAKE_MODULE})
+include_directories(${KUDU_CLIENT_INCLUDE_DIR})
+
+# KuduClient can use GLOG
+add_definitions(-DKUDU_HEADERS_USE_GLOG)
+
 # find jni headers and libs
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})

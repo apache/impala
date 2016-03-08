@@ -1,4 +1,4 @@
-file_format: text,seq,rc,avro,parquet,hbase
+file_format: text,seq,rc,avro,parquet,hbase,kudu
 dataset: functional
 compression_codec: none,def,gzip,bzip,snap,lzo
 compression_type: none,block,record

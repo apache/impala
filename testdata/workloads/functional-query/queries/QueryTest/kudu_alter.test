@@ -1,0 +1,42 @@
+====
+---- QUERY
+create table simple (id int, name string, valf float, vali bigint)
+TBLPROPERTIES(
+ 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+ 'kudu.table_name' = 'query_test_simple',
+ 'kudu.split_keys' = '[[10], [30]]',
+ 'kudu.master_addresses' = '127.0.0.1',
+ 'kudu.key_columns' = 'id'
+)
+---- RESULTS
+====
+---- QUERY
+-- Alter master address to a different location
+alter table simple set tblproperties (
+  'kudu.master_addresses' = '192.168.0.1'
+)
+---- RESULTS
+====
+---- QUERY
+-- Show that new address is picked up
+describe formatted simple
+---- RESULTS: VERIFY_IS_SUBSET
+'','kudu.master_addresses','192.168.0.1         '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+alter table simple set tblproperties ('kudu.master_addresses' = '127.0.0.1')
+---- RESULTS
+====
+---- QUERY
+alter table simple rename to simple_new;
+---- RESULTS
+====
+---- QUERY
+select count(*) from simple_new;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

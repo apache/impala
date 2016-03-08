@@ -116,6 +116,7 @@ function load-data {
   WORKLOAD=${1}
   EXPLORATION_STRATEGY=${2:-"core"}
   TABLE_FORMATS=${3:-}
+  FORCE_LOAD=${4:-}
 
   MSG="Loading workload '$WORKLOAD'"
   ARGS=("--workloads $WORKLOAD")
@@ -136,6 +137,9 @@ function load-data {
   if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh $WORKLOAD; then
     ARGS+=("--force")
     echo "Force loading $WORKLOAD because a schema change was detected"
+  elif [ "${FORCE_LOAD}" = "force" ]; then
+    ARGS+=("--force")
+    echo "Force loading."
   fi
   LOG_FILE=${LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
@@ -355,6 +359,9 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
       load-data "functional-query" "core" "hbase/none"
 fi
 
+# Tests depend on the kudu data being clean, so load the data from scratch.
+run-step "Loading Kudu data" load-kudu.log \
+      load-data "functional-query" "core" "kudu/none/none" force
 run-step "Loading Hive UDFs" build-and-copy-hive-udfs.log \
     build-and-copy-hive-udfs
 run-step "Running custom post-load steps" custom-post-load-steps.log \

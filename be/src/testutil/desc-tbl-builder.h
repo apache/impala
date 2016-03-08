@@ -38,6 +38,11 @@ class DescriptorTblBuilder {
   DescriptorTblBuilder(ObjectPool* object_pool);
 
   TupleDescBuilder& DeclareTuple();
+
+  // Allows to set a TableDescriptor on TDescriptorTable.
+  // Only one can be set.
+  void SetTableDescriptor(const TTableDescriptor& table_desc);
+
   DescriptorTbl* Build();
 
  private:
@@ -45,6 +50,7 @@ class DescriptorTblBuilder {
   ObjectPool* obj_pool_;
 
   std::vector<TupleDescBuilder*> tuples_descs_;
+  TDescriptorTable thrift_desc_tbl_;
 
   TTupleDescriptor BuildTuple(
       const std::vector<ColumnType>& slot_types, TDescriptorTable* thrift_desc_tbl,

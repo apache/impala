@@ -1,0 +1,155 @@
+update functional_kudu.testtbl set name = 'peter' where zip > 94549
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: zip >= 94550
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: zip >= 94550
+====
+# Predicate on key
+update functional_kudu.testtbl set name = 'peter' where zip > 94549 and id = 5
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: zip >= 94550, id = 5
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: zip >= 94550, id = 5
+====
+# Mixing predicate and value assignment
+update functional_kudu.testtbl set zip = 94546 where zip > 94549
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: zip >= 94550
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: zip >= 94550
+====
+update a
+set a.name = b.name
+from functional_kudu.testtbl a join functional.testtbl b on a.id = b.id
+where a.id = 10
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|
+|--01:SCAN HDFS [functional.testtbl b]
+|     partitions=1/1 files=0 size=0B
+|     predicates: b.id = 10
+|
+00:SCAN KUDU [functional_kudu.testtbl a]
+   kudu predicates: a.id = 10
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.testtbl b]
+|     partitions=1/1 files=0 size=0B
+|     predicates: b.id = 10
+|
+00:SCAN KUDU [functional_kudu.testtbl a]
+   kudu predicates: a.id = 10
+====
+update a
+set a.name = 'values'
+from functional_kudu.testtbl a join (values(1 as ids, 2, 3) ) b on a.id = b.ids
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: ids = a.id
+|
+|--00:SCAN KUDU [functional_kudu.testtbl a]
+|
+01:UNION
+   constant-operands=1
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ids = a.id
+|
+|--03:EXCHANGE [UNPARTITIONED]
+|  |
+|  00:SCAN KUDU [functional_kudu.testtbl a]
+|
+01:UNION
+   constant-operands=1
+====
+update a
+set a.name = 'values'
+from functional_kudu.testtbl a
+where a.zip in (select zip from functional.testtbl limit 10)
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.zip = zip
+|  runtime filters: RF000 <- zip
+|
+|--01:SCAN HDFS [functional.testtbl]
+|     partitions=1/1 files=0 size=0B
+|     limit: 10
+|
+00:SCAN KUDU [functional_kudu.testtbl a]
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: a.zip = zip
+|  runtime filters: RF000 <- zip
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  03:EXCHANGE [UNPARTITIONED]
+|  |  limit: 10
+|  |
+|  01:SCAN HDFS [functional.testtbl]
+|     partitions=1/1 files=0 size=0B
+|     limit: 10
+|
+00:SCAN KUDU [functional_kudu.testtbl a]
+====
+update functional_kudu.testtbl set zip = 94546 where false
+---- PLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:EMPTYSET
+---- DISTRIBUTEDPLAN
+UPDATE KUDU [functional_kudu.testtbl]
+|  check keys exist: false
+|
+00:EMPTYSET
+====

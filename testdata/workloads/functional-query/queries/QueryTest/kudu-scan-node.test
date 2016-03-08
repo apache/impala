@@ -1,0 +1,63 @@
+====
+---- QUERY
+# Make sure LIMIT is enforced.
+select * from dimtbl order by id limit 1;
+---- RESULTS
+1001,'Name1',94611
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+# Make sure that we can list the columns to be scanned in any order, that predicates
+# work and that we can have predicates on columns not referenced elsewhere.
+select zip, id from dimtbl where id >= 1000 and 1002 >= id and 94611 = zip and
+'Name1' = name order by id;
+---- RESULTS
+94611,1001
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-2740, a NULL value from a previously filtered row would
+# carry over into the next unfiltered row (the result below would incorrectly be 2,NULL).
+USE kududb_test;
+CREATE TABLE impala_2740 (key INT, value INT)
+    TBLPROPERTIES(
+        'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+        'kudu.table_name' = 'impala_2740',
+        'kudu.master_addresses' = '127.0.0.1',
+        'kudu.key_columns' = 'key');
+INSERT INTO impala_2740 VALUES (1, NULL), (2, -2);
+SELECT * FROM impala_2740 WHERE key != 1;
+---- RESULTS
+2,-2
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Regression test for IMPALA-2635, the Kudu scanner hangs waiting for data from scanner
+# threads that are never started. The union and both scans land in the same fragment which
+# is run on all impalads. However, for the t1 table there is only as single scan range,
+# so two of the scan instances get empty scan ranges.
+CREATE TABLE impala_2635_t1 (id BIGINT, name STRING)
+    TBLPROPERTIES(
+        'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+        'kudu.table_name' = 'impala_2635_t1',
+        'kudu.master_addresses' = '127.0.0.1',
+        'kudu.key_columns' = 'id');
+CREATE TABLE impala_2635_t2 (id BIGINT, name STRING)
+    DISTRIBUTE BY HASH(id) INTO 16 BUCKETS
+    TBLPROPERTIES(
+        'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+        'kudu.table_name' = 'impala_2635_t2',
+        'kudu.master_addresses' = '127.0.0.1',
+        'kudu.key_columns' = 'id');
+INSERT INTO impala_2635_t1 VALUES (0, 'Foo');
+INSERT INTO impala_2635_t2 VALUES (1, 'Blah');
+SELECT * FROM impala_2635_t1 UNION ALL SELECT * FROM impala_2635_t2;
+---- RESULTS
+0,'Foo'
+1,'Blah'
+---- TYPES
+BIGINT, STRING
+====

@@ -152,6 +152,45 @@ struct THdfsCachingOp {
   3: optional i16 replication
 }
 
+// Enum listing all possible DISTRIBUTE BY types
+enum TDistributeType {
+  HASH,
+  RANGE,
+}
+
+// Parameters needed for hash distribution
+struct TDistributeByHashParam {
+  1: required list<string> columns
+  2: required i32 num_buckets
+}
+
+struct TRangeLiteral {
+  1: optional i64 int_literal
+  2: optional double float_literal
+  3: optional string string_literal
+  4: optional bool bool_literal
+}
+
+struct TRangeLiteralList {
+  1: required list<TRangeLiteral> values
+}
+
+// A range distribution is identified by a list of columns and a series of split rows.
+struct TDistributeByRangeParam {
+  1: required list<string> columns
+  2: required list<TRangeLiteralList> split_rows;
+}
+
+// Parameters for the DISTRIBUTE BY clause. The actual distribution is identified by
+// the type parameter.
+struct TDistributeParam {
+  // Set if type is set to HASH
+  1: optional TDistributeByHashParam by_hash_param;
+
+  // Set if type is set to RANGE
+  2: optional TDistributeByRangeParam by_range_param;
+}
+
 // Parameters for ALTER TABLE rename commands
 struct TAlterTableOrViewRenameParams {
   // The new table name
@@ -388,6 +427,10 @@ struct TCreateTableParams {
 
   // If set, the table will be cached after creation with details specified in cache_op.
   13: optional THdfsCachingOp cache_op
+
+  // If set, the table is automatically distributed according to this parameter.
+  // Kudu-only.
+  14: optional list<TDistributeParam> distribute_by;
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

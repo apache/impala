@@ -29,7 +29,7 @@ import com.cloudera.impala.thrift.TTableSinkType;
  */
 public class HBaseTableSink extends TableSink {
   public HBaseTableSink(Table targetTable) {
-    super(targetTable);
+    super(targetTable, Op.INSERT);
   }
 
   @Override
@@ -48,8 +48,8 @@ public class HBaseTableSink extends TableSink {
   @Override
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
-    TTableSink tTableSink =
-        new TTableSink(targetTable_.getId().asInt(), TTableSinkType.HBASE);
+    TTableSink tTableSink = new TTableSink(targetTable_.getId().asInt(),
+        TTableSinkType.HBASE, sinkOp_.toThrift());
     result.table_sink = tTableSink;
     return result;
   }

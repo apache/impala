@@ -46,6 +46,7 @@ public class BaseTableRef extends TableRef {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
     Preconditions.checkNotNull(getPrivilegeRequirement());
     desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;

@@ -50,6 +50,20 @@ TEST(BlockingQueueTest, TestGetFromShutdownQueue) {
   ASSERT_FALSE(test_queue.BlockingGet(&i));
 }
 
+TEST(BlockingQueueTest, TestPutWithTimeout) {
+  int64_t i;
+  BlockingQueue<int64_t> test_queue(2);
+  int64_t timeout_micros = 100 * 1000L; // 100 msecs
+  ASSERT_TRUE(test_queue.BlockingPutWithTimeout(1, timeout_micros));
+  ASSERT_TRUE(test_queue.BlockingPutWithTimeout(2, timeout_micros));
+  boost::system_time now_plus_timeout = boost::get_system_time() +
+      boost::posix_time::microseconds(timeout_micros);
+  ASSERT_FALSE(test_queue.BlockingPutWithTimeout(3, timeout_micros));
+  ASSERT_LE(now_plus_timeout, boost::get_system_time());
+  ASSERT_TRUE(test_queue.BlockingGet(&i));
+  ASSERT_TRUE(test_queue.BlockingPutWithTimeout(3, timeout_micros));
+}
+
 class MultiThreadTest {
  public:
   MultiThreadTest()

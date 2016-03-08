@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.cloudera.impala.catalog.KuduTable;
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.Token;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -189,9 +190,18 @@ public class ToSqlUtils {
         msTable.getSd().getInputFormat());
     String location = isHbaseTable ? null : msTable.getSd().getLocation();
     Map<String, String> serdeParameters = msTable.getSd().getSerdeInfo().getParameters();
+
+    String storageHandlerClassName = table.getStorageHandlerClassName();
+    if (table instanceof KuduTable) {
+      // Kudu tables don't use LOCATION syntax
+      location = null;
+      format = null;
+      // Kudu tables cannot use the Hive DDL syntax for the storage handler
+      storageHandlerClassName = null;
+    }
     return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
         partitionColsSql, properties, serdeParameters, isExternal, false, rowFormat,
-        format, compression, table.getStorageHandlerClassName(), location);
+        format, compression, storageHandlerClassName, location);
   }
 
   /**

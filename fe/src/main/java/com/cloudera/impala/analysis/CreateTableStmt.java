@@ -21,12 +21,13 @@ import java.util.Set;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
+import com.cloudera.impala.util.KuduUtil;
 import org.apache.hadoop.fs.permission.FsAction;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -59,6 +60,7 @@ public class CreateTableStmt extends StatementBase {
   private final Map<String, String> serdeProperties_;
   private final HdfsCachingOp cachingOp_;
   private HdfsUri location_;
+  private final List<DistributeParam> distributeParams_;
 
   // Set during analysis
   private String owner_;
@@ -84,27 +86,28 @@ public class CreateTableStmt extends StatementBase {
       List<ColumnDef> partitionColumnDefs, boolean isExternal, String comment,
       RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsUri location,
       HdfsCachingOp cachingOp, boolean ifNotExists, Map<String, String> tblProperties,
-      Map<String, String> serdeProperties) {
+      Map<String, String> serdeProperties, List<DistributeParam> distributeParams) {
     Preconditions.checkNotNull(columnDefs);
     Preconditions.checkNotNull(partitionColumnDefs);
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
     Preconditions.checkNotNull(tableName);
 
-    this.columnDefs_ = Lists.newArrayList(columnDefs);
-    this.comment_ = comment;
-    this.isExternal_ = isExternal;
-    this.ifNotExists_ = ifNotExists;
-    this.fileFormat_ = fileFormat;
-    this.location_ = location;
-    this.cachingOp_ = cachingOp;
-    this.partitionColDefs_ = Lists.newArrayList(partitionColumnDefs);
-    this.rowFormat_ = rowFormat;
-    this.tableName_ = tableName;
-    this.tblProperties_ = tblProperties;
-    this.serdeProperties_ = serdeProperties;
+    columnDefs_ = Lists.newArrayList(columnDefs);
+    comment_ = comment;
+    isExternal_ = isExternal;
+    ifNotExists_ = ifNotExists;
+    fileFormat_ = fileFormat;
+    location_ = location;
+    cachingOp_ = cachingOp;
+    partitionColDefs_ = Lists.newArrayList(partitionColumnDefs);
+    rowFormat_ = rowFormat;
+    tableName_ = tableName;
+    tblProperties_ = tblProperties;
+    serdeProperties_ = serdeProperties;
     unescapeProperties(tblProperties_);
     unescapeProperties(serdeProperties_);
+    distributeParams_ = distributeParams;
   }
 
   /**
@@ -123,6 +126,7 @@ public class CreateTableStmt extends StatementBase {
     tableName_ = other.tableName_;
     tblProperties_ = other.tblProperties_;
     serdeProperties_ = other.serdeProperties_;
+    distributeParams_ = other.distributeParams_;
   }
 
   @Override
@@ -182,6 +186,11 @@ public class CreateTableStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     if (tblProperties_ != null) params.setTable_properties(tblProperties_);
     if (serdeProperties_ != null) params.setSerde_properties(serdeProperties_);
+    if (distributeParams_ != null) {
+      for (DistributeParam d : distributeParams_) {
+        params.addToDistribute_by(d.toThrift());
+      }
+    }
     return params;
   }
 
@@ -218,6 +227,13 @@ public class CreateTableStmt extends StatementBase {
 
     // Check that all the column names are valid and unique.
     analyzeColumnDefs(analyzer);
+
+    if (getTblProperties() != null && KuduTable.KUDU_STORAGE_HANDLER.equals(
+        getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER))) {
+      analyzeKuduTable(analyzer);
+    } else if (distributeParams_ != null) {
+      throw new AnalysisException("Only Kudu tables can use DISTRIBUTE BY clause.");
+    }
 
     if (fileFormat_ == THdfsFileFormat.AVRO) {
       columnDefs_ = analyzeAvroSchema(analyzer);
@@ -332,6 +348,32 @@ public class CreateTableStmt extends StatementBase {
         AvroSchemaUtils.reconcileSchemas(columnDefs_, avroCols, warning);
     if (warning.length() > 0) analyzer.addWarning(warning.toString());
     return reconciledColDefs;
+  }
+
+  private void analyzeKuduTable(Analyzer analyzer) throws AnalysisException {
+    // Validate that Kudu table is correctly specified.
+    if (!KuduTable.tableParamsAreValid(getTblProperties())) {
+      throw new AnalysisException("Kudu table is missing parameters " +
+          String.format("in table properties. Please verify if %s, %s, and %s are "
+                  + "present and have valid values.",
+              KuduTable.KEY_TABLE_NAME, KuduTable.KEY_MASTER_ADDRESSES,
+              KuduTable.KEY_KEY_COLUMNS));
+    }
+
+    // Kudu table cannot be a cached table
+    if (cachingOp_ != null) {
+      throw new AnalysisException("A Kudu table cannot be cached in HDFS.");
+    }
+
+    if (distributeParams_ != null) {
+      List<String> keyColumns = KuduUtil.parseKeyColumnsAsList(
+          getTblProperties().get(KuduTable.KEY_KEY_COLUMNS));
+      for (DistributeParam d : distributeParams_) {
+        // If the columns are not set, default to all key columns
+        if (d.getColumns() == null) d.setColumns(keyColumns);
+        d.analyze(analyzer);
+      }
+    }
   }
 
   private Byte analyzeRowFormatValue(String value) throws AnalysisException {

@@ -4,6 +4,9 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
+# Kill Kudu
+$IMPALA_HOME/testdata/bin/stop-kudu.sh
+
 # Kill HBase, then MiniLlama (which includes a MiniDfs, a Yarn RM several NMs).
 $IMPALA_HOME/testdata/bin/kill-sentry-service.sh
 $IMPALA_HOME/testdata/bin/kill-hive-server.sh

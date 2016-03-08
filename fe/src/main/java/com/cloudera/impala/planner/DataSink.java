@@ -19,10 +19,10 @@ import java.util.List;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TExplainLevel;
-import com.google.common.base.Preconditions;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.
@@ -52,26 +52,6 @@ public abstract class DataSink {
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
   public long getPerHostMemCost() { return perHostMemCost_; }
-
-  /**
-   * Returns an output sink appropriate for writing to the given table.
-   */
-  public static DataSink createDataSink(Table table, List<Expr> partitionKeyExprs,
-      boolean overwrite) {
-    if (table instanceof HdfsTable) {
-      return new HdfsTableSink(table, partitionKeyExprs, overwrite);
-    } else if (table instanceof HBaseTable) {
-      // Partition clause doesn't make sense for an HBase table.
-      Preconditions.checkState(partitionKeyExprs.isEmpty());
-      // HBase doesn't have a way to perform INSERT OVERWRITE
-      Preconditions.checkState(overwrite == false);
-      // Create the HBaseTableSink and return it.
-      return new HBaseTableSink(table);
-    } else {
-      throw new UnsupportedOperationException(
-          "Cannot create data sink into table of type: " + table.getClass().getName());
-    }
-  }
 
   /**
    * Estimates the cost of executing this DataSink. Currently only sets perHostMemCost.

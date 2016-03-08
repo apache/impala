@@ -39,6 +39,19 @@ if [ -z $IMPALA_HOME ]; then
   fi
 fi
 
+# Set a default value for Kudu binary distribution, this is temporary only
+# TODO: replace with packaged path once beta is there
+export KUDU_HOME=${KUDU_HOME:-"$IMPALA_HOME/../kudu"}
+export KUDU_CLIENT_ROOT=${KUDU_CLIENT_ROOT:-"$KUDU_HOME/kudu-cli-export"}
+export KUDU_CLIENT_CMAKE_MODULE=${KUDU_CLIENT_CMAKE_MODULE:-"$KUDU_CLIENT_ROOT/usr/local/share/kuduClient"}
+export KUDU_BIN_HOME=${KUDU_BIN_HOME:-"$IMPALA_HOME/../kudu-bin"}
+export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
+export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
+# TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
+#       to nightly changes from Kudu. The version below is the last released version but
+#       before release this needs to be updated to the version about to be released.
+export KUDU_JAVA_VERSION=0.6.0
+
 : ${DISABLE_IMPALA_TOOLCHAIN=0}
 : ${IMPALA_TOOLCHAIN=$IMPALA_HOME/toolchain}
 : ${USE_SYSTEM_GCC=0}

@@ -310,6 +310,7 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}
   ${JAVA_JVM_LIBRARY}
+  kudu_client
   -lrt
 )
 

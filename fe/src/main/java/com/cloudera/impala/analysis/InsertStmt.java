@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import com.cloudera.impala.planner.TableSink;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,7 @@ import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
@@ -116,9 +119,12 @@ public class InsertStmt extends StatementBase {
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
+  // For tables with primary keys, indicates if duplicate key errors are ignored.
+  private final boolean ignoreDuplicates_;
+
   public InsertStmt(WithClause withClause, TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, List<String> planHints,
-      QueryStmt queryStmt, List<String> columnPermutation) {
+      QueryStmt queryStmt, List<String> columnPermutation, boolean ignoreDuplicates) {
     withClause_ = withClause;
     targetTableName_ = targetTable;
     originalTableName_ = targetTableName_;
@@ -129,6 +135,7 @@ public class InsertStmt extends StatementBase {
     needsGeneratedQueryStatement_ = (queryStmt == null);
     columnPermutation_ = columnPermutation;
     table_ = null;
+    ignoreDuplicates_ = ignoreDuplicates;
   }
 
   /**
@@ -146,6 +153,7 @@ public class InsertStmt extends StatementBase {
     needsGeneratedQueryStatement_ = other.needsGeneratedQueryStatement_;
     columnPermutation_ = other.columnPermutation_;
     table_ = other.table_;
+    ignoreDuplicates_ = other.ignoreDuplicates_;
   }
 
   @Override
@@ -384,6 +392,16 @@ public class InsertStmt extends StatementBase {
               "partition column (%s) is not supported: %s", col.getName(),
               targetTableName_));
         }
+      }
+    }
+
+    if (table_ instanceof KuduTable) {
+      if (overwrite_) {
+        throw new AnalysisException("INSERT OVERWRITE not supported for Kudu tables.");
+      }
+      if (partitionKeyValues_ != null && !partitionKeyValues_.isEmpty()) {
+        throw new AnalysisException(
+            "Partition specifications are not supported for Kudu tables.");
       }
     }
 
@@ -649,7 +667,8 @@ public class InsertStmt extends StatementBase {
   public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
-    return DataSink.createDataSink(table_, partitionKeyExprs_, overwrite_);
+    return TableSink.create(table_, TableSink.Op.INSERT, partitionKeyExprs_,
+        ImmutableList.<Integer>of(), overwrite_, ignoreDuplicates_);
   }
 
   /**
@@ -671,6 +690,7 @@ public class InsertStmt extends StatementBase {
     if (overwrite_) {
       strBuilder.append("OVERWRITE ");
     } else {
+      if (ignoreDuplicates_) strBuilder.append("IGNORE ");
       strBuilder.append("INTO ");
     }
     strBuilder.append("TABLE " + originalTableName_);

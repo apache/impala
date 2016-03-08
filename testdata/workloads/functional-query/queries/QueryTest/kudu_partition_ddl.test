@@ -1,0 +1,205 @@
+====
+---- QUERY
+-- Test allowing range distribution on a subset of the primary keys
+create table simple_range_with_key_projection ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE(name) SPLIT ROWS (('abc'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_range_with_key_projection',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- RESULTS
+====
+---- QUERY
+-- Test error handling for creating split rows on a non-key column
+create table simple_range_non_key_col ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE(name) SPLIT ROWS (('abc'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_range_non_key_col',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id'
+ )
+---- CATCH
+must specify only primary key columns for range partition component
+====
+---- QUERY
+-- Test error handling for split rows and wrong type
+create table simple_hash ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE(id) SPLIT ROWS (('abc'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- CATCH
+Expected int32 literal for column 'id' got 'abc'
+====
+---- QUERY
+-- Test error handling for split rows with two many components
+create table simple_hash ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE(col_does_not_exist, id) SPLIT ROWS ((1, 'abc'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- CATCH
+Unknown column: col_does_not_exist
+====
+---- QUERY
+-- Test error handling for distribute clauses
+create table simple_hash ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE(col_does_not_exist) SPLIT ROWS ((1))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- CATCH
+Unknown column: col_does_not_exist
+====
+---- QUERY
+-- Test HASH partitioning
+create table simple_hash ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY HASH(id) INTO 4 BUCKETS, HASH(name) INTO 2 BUCKETS
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- RESULTS
+====
+---- QUERY
+show table stats simple_hash
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','0000000000000001',regex:.*?:\d+,1
+-1,'0000000000000001','00000001',regex:.*?:\d+,1
+-1,'00000001','0000000100000001',regex:.*?:\d+,1
+-1,'0000000100000001','00000002',regex:.*?:\d+,1
+-1,'00000002','0000000200000001',regex:.*?:\d+,1
+-1,'0000000200000001','00000003',regex:.*?:\d+,1
+-1,'00000003','0000000300000001',regex:.*?:\d+,1
+-1,'0000000300000001','',regex:.*?:\d+,1
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test HASH and RANGE partitioning
+create table simple_hash_range ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY HASH(id) INTO 4 BUCKETS, RANGE(id, name) SPLIT ROWS ((10, 'martin'), (20, 'Peter'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash_range',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- RESULTS
+====
+---- QUERY
+show table stats simple_hash_range
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','000000008000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000008000000A6D617274696E','00000000800000145065746572',regex:.*?:\d+,1
+-1,'00000000800000145065746572','00000001',regex:.*?:\d+,1
+-1,'00000001','000000018000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000018000000A6D617274696E','00000001800000145065746572',regex:.*?:\d+,1
+-1,'00000001800000145065746572','00000002',regex:.*?:\d+,1
+-1,'00000002','000000028000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000028000000A6D617274696E','00000002800000145065746572',regex:.*?:\d+,1
+-1,'00000002800000145065746572','00000003',regex:.*?:\d+,1
+-1,'00000003','000000038000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000038000000A6D617274696E','00000003800000145065746572',regex:.*?:\d+,1
+-1,'00000003800000145065746572','',regex:.*?:\d+,1
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+create table simple_hash_range_ctas
+DISTRIBUTE BY HASH(id) INTO 4 BUCKETS, RANGE(id, name) SPLIT ROWS ((10, 'martin'), (20, 'Peter'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash_range_ctas',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+as select * from simple_hash
+---- RESULTS
+'Inserted 0 row(s)'
+====
+---- QUERY
+show table stats simple_hash_range_ctas
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','000000008000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000008000000A6D617274696E','00000000800000145065746572',regex:.*?:\d+,1
+-1,'00000000800000145065746572','00000001',regex:.*?:\d+,1
+-1,'00000001','000000018000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000018000000A6D617274696E','00000001800000145065746572',regex:.*?:\d+,1
+-1,'00000001800000145065746572','00000002',regex:.*?:\d+,1
+-1,'00000002','000000028000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000028000000A6D617274696E','00000002800000145065746572',regex:.*?:\d+,1
+-1,'00000002800000145065746572','00000003',regex:.*?:\d+,1
+-1,'00000003','000000038000000A6D617274696E',regex:.*?:\d+,1
+-1,'000000038000000A6D617274696E','00000003800000145065746572',regex:.*?:\d+,1
+-1,'00000003800000145065746572','',regex:.*?:\d+,1
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test HASH defaults to all columns
+create table simple_hash_all_columns ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY HASH INTO 4 BUCKETS
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_hash_all_columns',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- RESULTS
+====
+---- QUERY
+show table stats simple_hash_all_columns
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','00000001',regex:.*?:\d+,1
+-1,'00000001','00000002',regex:.*?:\d+,1
+-1,'00000002','00000003',regex:.*?:\d+,1
+-1,'00000003','',regex:.*?:\d+,1
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test RANGE defaults to all columns
+create table simple_range_all_columns ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((1, 'a'), (2, 'b'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'simple_range_all_columns',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id, name'
+ )
+---- RESULTS
+====
+---- QUERY
+show table stats simple_range_all_columns
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','8000000161',regex:.*?:\d+,1
+-1,'8000000161','8000000262',regex:.*?:\d+,1
+-1,'8000000262','',regex:.*?:\d+,1
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====

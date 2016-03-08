@@ -207,7 +207,11 @@ error_codes = (
 
   ("BTS_BLOCK_OVERFLOW", 66, "Cannot process row that is bigger than the IO size "
    "(row_size=$0, null_indicators_size=$1). To run this query, increase the IO size "
-   "(--read_size option).")
+   "(--read_size option)."),
+
+  ("KUDU_IMPALA_TYPE_MISSING", 67, "Kudu type $0 is not available in Impala."),
+
+  ("IMPALA_KUDU_TYPE_MISSING", 68, "Impala type $0 is not available in Kudu.")
 )
 
 import sys

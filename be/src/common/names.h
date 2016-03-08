@@ -104,6 +104,9 @@ using std::ostringstream;
 
 #ifdef _GLIBCXX_ALGORITHM
 using std::swap;
+using std::min;
+using std::max;
+using std::sort;
 #endif
 
 #ifdef BOOST_THREAD_THREAD_COMMON_HPP

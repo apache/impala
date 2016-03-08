@@ -22,11 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import com.cloudera.impala.thrift.TDistributeParam;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -62,6 +59,7 @@ import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DataSource;
+import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
@@ -83,6 +81,9 @@ import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.catalog.delegates.DdlDelegate;
+import com.cloudera.impala.catalog.delegates.KuduDdlDelegate;
+import com.cloudera.impala.catalog.delegates.UnsupportedOpDelegate;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.InternalException;
@@ -126,7 +127,6 @@ import com.cloudera.impala.thrift.TDropStatsParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
@@ -1131,6 +1131,17 @@ public class CatalogOpExecutor {
 
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
+
+      // Forward the DDL operation to the specified storage backend.
+      try {
+        org.apache.hadoop.hive.metastore.api.Table msTbl = getExistingTable(
+            tableName.getDb(), tableName.getTbl()).getMetaStoreTable();
+        DdlDelegate handler = createDdlDelegate(msTbl);
+        handler.dropTable();
+      } catch (TableNotFoundException | DatabaseNotFoundException e) {
+        // Do nothing
+      }
+
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().dropTable(
@@ -1298,7 +1309,8 @@ public class CatalogOpExecutor {
     org.apache.hadoop.hive.metastore.api.Table tbl =
         createMetaStoreTable(params);
     LOG.debug(String.format("Creating table %s", tableName));
-    return createTable(tbl, params.if_not_exists, params.getCache_op(), response);
+    return createTable(tbl, params.if_not_exists, params.getCache_op(),
+        params.getDistribute_by(), response);
   }
 
   /**
@@ -1324,7 +1336,7 @@ public class CatalogOpExecutor {
         new org.apache.hadoop.hive.metastore.api.Table();
     setViewAttributes(params, view);
     LOG.debug(String.format("Creating view %s", tableName));
-    createTable(view, params.if_not_exists, null, response);
+    createTable(view, params.if_not_exists, null, null, response);
   }
 
   /**
@@ -1401,7 +1413,7 @@ public class CatalogOpExecutor {
     // Set the row count of this table to unknown.
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
     LOG.debug(String.format("Creating table %s LIKE %s", tblName, srcTblName));
-    createTable(tbl, params.if_not_exists, null, response);
+    createTable(tbl, params.if_not_exists, null, null, response);
   }
 
   /**
@@ -1414,10 +1426,12 @@ public class CatalogOpExecutor {
    * Returns true if a new table was created as part of this call, false otherwise.
    */
   private boolean createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
-      boolean ifNotExists, THdfsCachingOp cacheOp, TDdlExecResponse response)
+      boolean ifNotExists, THdfsCachingOp cacheOp, List<TDistributeParam> distribute_by,
+      TDdlExecResponse response)
       throws ImpalaException {
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     synchronized (metastoreDdlLock_) {
+
       try {
         msClient.getHiveClient().createTable(newTable);
         // If this table should be cached, and the table location was not specified by
@@ -1443,6 +1457,24 @@ public class CatalogOpExecutor {
         msClient.release();
       }
 
+      // Forward the operation to a specific storage backend. If the operation fails,
+      // delete the just created hive table to avoid inconsistencies.
+      try {
+        createDdlDelegate(newTable).setDistributeParams(distribute_by).createTable();
+      } catch (ImpalaRuntimeException e) {
+        MetaStoreClient c = catalog_.getMetaStoreClient();
+        try {
+          c.getHiveClient().dropTable(newTable.getDbName(), newTable.getTableName(),
+              false, ifNotExists);
+        } catch (Exception hE) {
+          throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
+              "dropTable"), hE);
+        } finally {
+          c.release();
+        }
+        throw e;
+      }
+
       // Submit the cache request and update the table metadata.
       if (cacheOp != null && cacheOp.isSet_cached()) {
         short replication = cacheOp.isSetReplication() ? cacheOp.getReplication() :
@@ -1457,6 +1489,15 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(newTbl, response.result);
     }
     return true;
+  }
+
+  /**
+   * Instantiate the appropriate DDL delegate for the table. If no known delegate is
+   * available for the table, returns a UnsupportedOpDelegate instance.
+   */
+  private DdlDelegate createDdlDelegate(org.apache.hadoop.hive.metastore.api.Table tab) {
+    if (KuduDdlDelegate.canHandle(tab)) return new KuduDdlDelegate(tab);
+    return new UnsupportedOpDelegate();
   }
 
   /**
