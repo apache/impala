@@ -92,6 +92,7 @@ class DbPopulator(object):
     self.min_row_count = None
     self.max_row_count = None
     self.allowed_storage_formats = None
+    self.randomization_seed = None
 
   def populate_db(self, table_count, postgresql_conn=None):
     '''Create tables with a random number of cols.
@@ -119,6 +120,7 @@ class DbPopulator(object):
         text_table.schema_location = None
         self._prepare_table_storage(text_table, self.db_name)
       table_data_generator = TextTableDataGenerator()
+      table_data_generator.randomization_seed = self.randomization_seed
       table_data_generator.table = text_table
       table_data_generator.row_count = randint(self.min_row_count, self.max_row_count)
       table_and_generators.append((table, table_data_generator))
@@ -294,6 +296,7 @@ if __name__ == '__main__':
 
   populator = DbPopulator()
   if command == 'populate':
+    populator.randomization_seed = args.randomization_seed
     populator.cluster = cluster
     populator.db_name = args.db_name
     populator.min_col_count = args.min_column_count
