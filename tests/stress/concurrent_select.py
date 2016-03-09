@@ -599,9 +599,13 @@ class StressRunner(object):
           if "Invalid session id" in error_msg:
             self._num_successive_errors.value = 0
             continue
-          # The server may fail to respond to clients if the load is high.
-          if "Connection timed out" in error_msg or "ECONNRESET" in error_msg \
-              or "couldn't get a client" in error_msg:
+          # The server may fail to respond to clients if the load is high. An error
+          # message with "connect()...Connection timed out" comes from the impalad so
+          # that will not be ignored.
+          if ("Connection timed out" in error_msg and "connect()" not in error_msg) \
+              or "ECONNRESET" in error_msg \
+              or "couldn't get a client" in error_msg \
+              or "timeout: timed out" in error_msg:
             self._num_successive_errors.value = 0
             continue
           increment(self._num_successive_errors)
@@ -689,6 +693,7 @@ class QueryRunner(object):
     self.impalad_conn = None
     self.use_kerberos = False
     self.result_hash_log_dir = gettempdir()
+    self.check_if_mem_was_spilled = False
 
   def connect(self):
     self.impalad_conn = self.impalad.impala.connect(impalad=self.impalad)
@@ -745,9 +750,12 @@ class QueryRunner(object):
         if report.non_mem_limit_error or report.mem_limit_exceeded:
           return report
         report.runtime_secs = time() - start_time
-        report.profile = cursor.get_profile()
-        report.mem_was_spilled = \
-            QueryRunner.SPILLED_PATTERN.search(report.profile) is not None
+        if self.check_if_mem_was_spilled:
+          # Producing a query profile can be somewhat expensive. A v-tune profile of
+          # impalad showed 10% of cpu time spent generating query profiles.
+          report.profile = cursor.get_profile()
+          report.mem_was_spilled = \
+              QueryRunner.SPILLED_PATTERN.search(report.profile) is not None
     except Exception as error:
       # A mem limit error would have been caught above, no need to check for that here.
       report.non_mem_limit_error = error
@@ -960,9 +968,17 @@ def populate_runtime_info(query, impala, use_kerberos, result_hash_log_dir,
      'sql') will be populated by this method. 'required_mem_mb_without_spilling' and
      the corresponding runtime field may still be None if the query could not be run
      without spilling.
+
+     'samples' and 'max_conflicting_samples' control the reliability of the collected
+     information. The problem is that memory spilling or usage may differ (by a large
+     amount) from run to run due to races during execution. The parameters provide a way
+     to express "X out of Y runs must have resulted in the same outcome". Increasing the
+     number of samples and decreasing the tolerance (max conflicts) increases confidence
+     but also increases the time to collect the data.
   """
   LOG.info("Collecting runtime info for query %s: \n%s", query.name, query.sql)
   runner = QueryRunner()
+  runner.check_if_mem_was_spilled = True
   runner.impalad = impala.impalads[0]
   runner.result_hash_log_dir = result_hash_log_dir
   runner.use_kerberos = use_kerberos
@@ -1210,6 +1226,19 @@ def _check_store_version(store):
 def print_runtime_info_comparison(old_runtime_info, new_runtime_info):
   # TODO: Provide a way to call this from the CLI. This was hard coded to run from main()
   #       when it was used.
+  print(",".join(["Database", "Query",
+    "Old Mem MB w/Spilling",
+    "New Mem MB w/Spilling",
+    "Diff %",
+    "Old Runtime w/Spilling",
+    "New Runtime w/Spilling",
+    "Diff %",
+    "Old Mem MB wout/Spilling",
+    "New Mem MB wout/Spilling",
+    "Diff %",
+    "Old Runtime wout/Spilling",
+    "New Runtime wout/Spilling",
+    "Diff %"]))
   for db_name, old_queries in old_runtime_info.iteritems():
     new_queries = new_runtime_info.get(db_name)
     if not new_queries:
@@ -1218,23 +1247,23 @@ def print_runtime_info_comparison(old_runtime_info, new_runtime_info):
       new_query = new_queries.get(sql)
       if not new_query:
         continue
-      sys.stdout.write(old_query.db_name)
-      sys.stdout.write("\t")
-      sys.stdout.write(old_query.name)
-      sys.stdout.write("\t")
+      sys.stdout.write(old_query["db_name"])
+      sys.stdout.write(",")
+      sys.stdout.write(old_query["name"])
+      sys.stdout.write(",")
       for attr in ["required_mem_mb_with_spilling", "solo_runtime_secs_with_spilling",
           "required_mem_mb_without_spilling", "solo_runtime_secs_without_spilling"]:
-        old_value = getattr(old_query, attr)
+        old_value = old_query[attr]
         sys.stdout.write(str(old_value))
-        sys.stdout.write("\t")
-        new_value = getattr(new_query, attr)
+        sys.stdout.write(",")
+        new_value = new_query[attr]
         sys.stdout.write(str(new_value))
-        sys.stdout.write("\t")
+        sys.stdout.write(",")
         if old_value and new_value is not None:
           sys.stdout.write("%0.2f%%" % (100 * float(new_value - old_value) / old_value))
         else:
           sys.stdout.write("N/A")
-        sys.stdout.write("\t")
+        sys.stdout.write(",")
       print()
 
 
@@ -1259,6 +1288,15 @@ def main():
       default=os.path.join(gettempdir(), "{cm_host}_query_runtime_info.json"),
       help="The path to store query runtime info at. '{cm_host}' will be replaced with"
       " the actual host name from --cm-host.")
+  parser.add_argument("--samples", default=1, type=int,
+      help='Used when collecting "runtime info" - the number of samples to collect when'
+      ' testing a particular mem limit value.')
+  parser.add_argument("--max-conflicting-samples", default=0, type=int,
+      help='Used when collecting "runtime info" - the number of samples outcomes that'
+      ' can disagree when deciding to accept a particular mem limit. Ex, when trying to'
+      ' determine the mem limit that avoids spilling with samples=5 and'
+      ' max-conflicting-samples=1, then 4/5 queries must not spill at a particular mem'
+      ' limit.')
   parser.add_argument("--result-hash-log-dir", default=gettempdir(),
       help="If query results do not match, a log file will be left in this dir. The log"
       " file is also created during the first run when runtime info is collected for"
@@ -1367,7 +1405,8 @@ def main():
       LOG.debug("Reusing previous runtime data for query: " + query.sql)
       queries[idx] = query
     else:
-      populate_runtime_info(query, impala, args.use_kerberos, args.result_hash_log_dir)
+      populate_runtime_info(query, impala, args.use_kerberos, args.result_hash_log_dir,
+          samples=args.samples, max_conflicting_samples=args.max_conflicting_samples)
       save_runtime_info(runtime_info_path, query, impala)
 
   # A particular random query may either fail (due to a generator or Impala bug) or
