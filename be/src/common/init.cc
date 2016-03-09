@@ -20,6 +20,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "exprs/expr.h"
+#include "gutil/atomicops.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -147,6 +148,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     if (!error_message.empty()) EXIT_WITH_ERROR(error_message);
   }
   impala::InitGoogleLoggingSafe(argv[0]);
+  AtomicOps_x86CPUFeaturesInit();
   impala::InitThreading();
   impala::TimestampParser::Init();
   EXIT_IF_ERROR(impala::InitAuth(argv[0]));

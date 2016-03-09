@@ -38,8 +38,6 @@
 // Features of this x86.  Values may not be correct before InitGoogle() is run,
 // but are set conservatively.
 struct AtomicOps_x86CPUFeatureStruct {
-  bool has_amd_lock_mb_bug;  // Processor has AMD memory-barrier bug; do lfence
-                             // after acquire compare-and-swap.
   bool has_sse2;             // Processor has SSE2.
   bool has_cmpxchg16b;       // Processor supports cmpxchg16b instruction.
 };
@@ -97,9 +95,6 @@ inline Atomic32 Acquire_AtomicExchange(volatile Atomic32* ptr,
                                        Atomic32 new_value) {
   CheckNaturalAlignment(ptr);
   Atomic32 old_val = NoBarrier_AtomicExchange(ptr, new_value);
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return old_val;
 }
 
@@ -127,9 +122,6 @@ inline Atomic32 Barrier_AtomicIncrement(volatile Atomic32* ptr,
                        : "+r" (temp), "+m" (*ptr)
                        : : "memory");
   // temp now holds the old value of *ptr
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return temp + increment;
 }
 
@@ -137,9 +129,6 @@ inline Atomic32 Acquire_CompareAndSwap(volatile Atomic32* ptr,
                                        Atomic32 old_value,
                                        Atomic32 new_value) {
   Atomic32 x = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return x;
 }
 
@@ -252,9 +241,6 @@ inline Atomic64 NoBarrier_AtomicExchange(volatile Atomic64* ptr,
 inline Atomic64 Acquire_AtomicExchange(volatile Atomic64* ptr,
                                        Atomic64 new_value) {
   Atomic64 old_val = NoBarrier_AtomicExchange(ptr, new_value);
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return old_val;
 }
 
@@ -282,9 +268,6 @@ inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr,
                        : "+r" (temp), "+m" (*ptr)
                        : : "memory");
   // temp now contains the previous value of *ptr
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return temp + increment;
 }
 
@@ -398,9 +381,6 @@ inline Atomic64 Acquire_AtomicExchange(volatile Atomic64* ptr,
                                        Atomic64 new_val) {
   CheckNaturalAlignment(ptr);
   Atomic64 old_val = NoBarrier_AtomicExchange(ptr, new_val);
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return old_val;
 }
 
@@ -426,9 +406,6 @@ inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr,
                                         Atomic64 increment) {
   CheckNaturalAlignment(ptr);
   Atomic64 new_val = NoBarrier_AtomicIncrement(ptr, increment);
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return new_val;
 }
 
@@ -488,9 +465,6 @@ inline Atomic64 Acquire_CompareAndSwap(volatile Atomic64* ptr,
                                        Atomic64 old_value,
                                        Atomic64 new_value) {
   Atomic64 x = NoBarrier_CompareAndSwap(ptr, old_value, new_value);
-  if (AtomicOps_Internalx86CPUFeatures.has_amd_lock_mb_bug) {
-    __asm__ __volatile__("lfence" : : : "memory");
-  }
   return x;
 }
 
