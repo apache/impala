@@ -24,7 +24,7 @@
 
 #include <stdint.h>
 
-#include <glog/logging.h>
+#include "common/logging.h"
 
 #define BASE_HAS_ATOMIC64 1  // Use only in tests and base/atomic*
 

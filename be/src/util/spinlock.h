@@ -15,56 +15,41 @@
 #ifndef IMPALA_UTIL_SPINLOCK_H
 #define IMPALA_UTIL_SPINLOCK_H
 
-#include "common/atomic.h"
+#include "gutil/spinlock.h"
 #include "common/logging.h"
 
 namespace impala {
 
-/// Lightweight spinlock.
+// Wrapper around the Google SpinLock class to adapt it to the method names
+// expected by Boost.
 class SpinLock {
  public:
-  SpinLock() : locked_(false) {}
+  SpinLock() {}
 
-  /// Acquires the lock, spins until the lock becomes available
+  /// Acquires the lock, spins and then blocks until the lock becomes available.
   void lock() {
-    if (!try_lock()) SlowAcquire();
+    l_.Lock();
   }
 
+  /// Releases the lock.
   void unlock() {
-    // Memory barrier here. All updates before the unlock need to be made visible.
-    __sync_synchronize();
-    DCHECK(locked_);
-    locked_ = false;
+    l_.Unlock();
   }
 
-  /// Tries to acquire the lock
-  inline bool try_lock() { return __sync_bool_compare_and_swap(&locked_, false, true); }
+  /// Tries to get the lock but does not spin or block.  Returns true if the lock was
+  /// acquired, false otherwise.
+  bool try_lock() {
+    return l_.TryLock();
+  }
 
-  void DCheckLocked() { DCHECK(locked_); }
+  /// Verify that the lock is held.
+  void DCheckLocked() { DCHECK(l_.IsHeld()); }
 
  private:
+  /// The underlying SpinLock from gutil.
+  base::SpinLock l_;
 
-  /// Out-of-line definition of the actual spin loop. The primary goal is to have the
-  /// actual lock method as short as possible to avoid polluting the i-cache with
-  /// unnecessary instructions in the non-contested case.
-  void SlowAcquire();
-
-  /// In typical spin lock implements, we want to spin (and keep the core fully busy),
-  /// for some number of cycles before yielding. Consider these three cases:
-  ///  1) lock is un-contended - spinning doesn't kick in and has no effect.
-  ///  2) lock is taken by another thread and that thread finishes quickly.
-  ///  3) lock is taken by another thread and that thread is slow (e.g. scheduled away).
-  ///
-  /// In case 3), we'd want to yield so another thread can do work. This thread
-  /// won't be able to do anything useful until the thread with the lock runs again.
-  /// In case 2), we don't want to yield (and give up our scheduling time slice)
-  /// since we will get to run soon after.
-  /// To try to get the best of everything, we will busy spin for a while before
-  /// yielding to another thread.
-  /// TODO: how do we set this.
-  static const int NUM_SPIN_CYCLES = 70;
-  /// TODO: pad this to be a cache line?
-  bool locked_;
+  DISALLOW_COPY_AND_ASSIGN(SpinLock);
 };
 
 }

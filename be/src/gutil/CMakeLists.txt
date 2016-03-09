@@ -39,6 +39,7 @@ INCLUDE_DIRECTORIES(${GLOG_INCLUDE_DIR})
 ADD_LIBRARY(gutil
 #  ${GUTIL_SRCS}
 ./bits.cc
+./dynamic_annotations.c
 ./stringprintf.cc
 ./strings/memutil.cc
 ./strings/charset.cc
@@ -59,7 +60,9 @@ ADD_LIBRARY(gutil
 ./strtoint.cc
 ./once.cc
 ./atomicops-internals-x86.cc
-./spinlock_wait.cc
+./spinlock.cc
+./spinlock_internal.cc
+./sysinfo.cc
 ./walltime.cc
 ./hash/hash.cc
 ./hash/jenkins.cc

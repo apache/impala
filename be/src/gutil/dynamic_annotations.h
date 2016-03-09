@@ -396,7 +396,7 @@
 
 #if defined(__GNUC__) && (!defined(SWIG)) && (!defined(__clang__))
 
-#if DYNAMIC_ANNOTATIONS_ENABLED == 0
+#if DYNAMIC_ANNOTATIONS_ENABLED == 0 && LLVM_ENABLE_THREADS == 0
 #define ANNOTALYSIS_ONLY 1
 #undef ANNOTALYSIS_STATIC_INLINE
 #define ANNOTALYSIS_STATIC_INLINE static inline

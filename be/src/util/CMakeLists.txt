@@ -65,7 +65,6 @@ add_library(Util
   redactor.cc
   runtime-profile.cc
   simple-logger.cc
-  spinlock.cc
   symbols-util.cc
   static-asserts.cc
   summary-util.cc

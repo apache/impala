@@ -27,40 +27,45 @@
 
 using namespace impala;
 
-
 // Benchmark for locking.
-// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
+// Machine Info: Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz
 // locking:              Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//       Unlocked 2-Total Threads                45.5                  1X
-//         Atomic 2-Total Threads               2.734            0.06009X
-//       SpinLock 2-Total Threads               2.245            0.04934X
-//          Boost 2-Total Threads              0.5453            0.01198X
+//       Unlocked 1-Total Threads               52.38                  1X
+//         Atomic 1-Total Threads               17.84             0.3406X
+//       SpinLock 1-Total Threads               8.923             0.1704X
+//          Boost 1-Total Threads               6.055             0.1156X
 //
-//       Unlocked 6-Total Threads               61.16                  1X
-//         Atomic 6-Total Threads               2.875              0.047X
-//       SpinLock 6-Total Threads               1.368            0.02236X
-//          Boost 6-Total Threads              0.3173           0.005187X
+//       Unlocked 4-Total Threads               91.46                  1X
+//         Atomic 4-Total Threads                2.43            0.02657X
+//       SpinLock 4-Total Threads              0.6329            0.00692X
+//          Boost 4-Total Threads              0.2672           0.002922X
 //
-//      Unlocked 10-Total Threads               52.18                  1X
-//        Atomic 10-Total Threads               2.061             0.0395X
-//      SpinLock 10-Total Threads               1.236            0.02369X
-//         Boost 10-Total Threads              0.3184           0.006101X
+//       Unlocked 8-Total Threads               66.82                  1X
+//         Atomic 8-Total Threads               2.406            0.03601X
+//       SpinLock 8-Total Threads              0.4092           0.006124X
+//          Boost 8-Total Threads              0.2477           0.003707X
 //
-//      Unlocked 14-Total Threads               54.18                  1X
-//        Atomic 14-Total Threads               2.659            0.04907X
-//      SpinLock 14-Total Threads               1.274            0.02351X
-//         Boost 14-Total Threads              0.3252           0.006002X
+//      Unlocked 12-Total Threads               64.48                  1X
+//        Atomic 12-Total Threads               2.413            0.03743X
+//      SpinLock 12-Total Threads              0.4085           0.006335X
+//         Boost 12-Total Threads              0.2527           0.003918X
 //
-//      Unlocked 18-Total Threads               53.36                  1X
-//        Atomic 18-Total Threads               1.952            0.03659X
-//      SpinLock 18-Total Threads               1.308            0.02452X
-//         Boost 18-Total Threads              0.3259           0.006109X
+//      Unlocked 16-Total Threads               66.04                  1X
+//        Atomic 16-Total Threads               2.397            0.03629X
+//      SpinLock 16-Total Threads              0.4119           0.006237X
+//         Boost 16-Total Threads               0.257           0.003892X
 //
-//      Unlocked 22-Total Threads               56.91                  1X
-//        Atomic 22-Total Threads               2.711            0.04764X
-//      SpinLock 22-Total Threads               1.311            0.02303X
-//         Boost 22-Total Threads              0.3254           0.005718X
+//      Unlocked 20-Total Threads               65.56                  1X
+//        Atomic 20-Total Threads                2.39            0.03645X
+//      SpinLock 20-Total Threads              0.4103           0.006259X
+//         Boost 20-Total Threads              0.2558           0.003901X
+//
+//      Unlocked 24-Total Threads               65.14                  1X
+//        Atomic 24-Total Threads               2.406            0.03694X
+//      SpinLock 24-Total Threads              0.4087           0.006274X
+//         Boost 24-Total Threads              0.2558           0.003926X
+
 struct TestData {
   int num_producer_threads;
   int num_consumer_threads;
@@ -129,8 +134,14 @@ void BoostProduceThread(int64_t n, int64_t* value) {
 void LaunchThreads(void* d, Fn consume_fn, Fn produce_fn, int64_t scale) {
   TestData* data = reinterpret_cast<TestData*>(d);
   data->value = 0;
-  int64_t num_per_consumer = data->num_consumes / data->num_consumer_threads;
-  int64_t num_per_producer = data->num_produces / data->num_producer_threads;
+  int64_t num_per_consumer = 0;
+  int64_t num_per_producer = 0;
+  if (data->num_consumer_threads > 0) {
+    num_per_consumer = data->num_consumes / data->num_consumer_threads;
+  }
+  if (data->num_producer_threads > 0) {
+    num_per_producer = data->num_produces / data->num_producer_threads;
+  }
   num_per_producer *= scale;
   num_per_consumer *= scale;
   thread_group consumers, producers;
@@ -153,19 +164,19 @@ void TestUnlocked(int batch_size, void* d) {
 void TestAtomic(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   LaunchThreads(d, AtomicConsumeThread, AtomicProduceThread, batch_size);
-  CHECK_EQ(data->value, 0);
+  if (data->num_consumer_threads > 0) CHECK_EQ(data->value, 0);
 }
 
 void TestSpinLock(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   LaunchThreads(d, SpinLockConsumeThread, SpinLockProduceThread, batch_size);
-  CHECK_EQ(data->value, 0);
+  if (data->num_consumer_threads > 0) CHECK_EQ(data->value, 0);
 }
 
 void TestBoost(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   LaunchThreads(d, BoostConsumeThread, BoostProduceThread, batch_size);
-  CHECK_EQ(data->value, 0);
+  if (data->num_consumer_threads > 0) CHECK_EQ(data->value, 0);
 }
 
 int main(int argc, char **argv) {
@@ -176,16 +187,23 @@ int main(int argc, char **argv) {
   const int max_producers = 12;
 
   Benchmark suite("locking");
-  TestData data[max_producers];
-  for (int i = 0; i < max_producers; i += 2) {
-    data[i].num_producer_threads = i + 1;
-    data[i].num_consumer_threads = i + 1;
+  TestData data[max_producers + 1];
+  for (int i = 0; i <= max_producers; i += 2) {
+    if (i == 0) {
+      // Single thread / no contention case.
+      data[i].num_producer_threads = 1;
+      data[i].num_consumer_threads = 0;
+    } else {
+      data[i].num_producer_threads = i;
+      data[i].num_consumer_threads = i;
+    }
     data[i].num_produces = N;
     data[i].num_consumes = N;
 
     stringstream suffix;
     stringstream name;
-    suffix << " " << (i+1) * 2 << "-Total Threads";
+    suffix << " " << data[i].num_producer_threads + data[i].num_consumer_threads
+           << "-Total Threads";
 
     name.str("");
     name << "Unlocked" << suffix.str();
