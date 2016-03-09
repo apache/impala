@@ -1,3 +1,6 @@
-hdfs-site.xml
-yarn-site.xml
 hbase-env.sh
+hdfs-site.xml
+hive-log4j.properties
+log4j.properties
+sentry-site.xml
+yarn-site.xml
