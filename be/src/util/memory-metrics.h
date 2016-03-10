@@ -19,7 +19,7 @@
 
 #include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
-#include <google/malloc_extension.h>
+#include <gperftools/malloc_extension.h>
 
 #include "util/debug-util.h"
 #include "gen-cpp/Frontend_types.h"

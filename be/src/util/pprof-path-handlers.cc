@@ -17,9 +17,9 @@
 #include <boost/bind.hpp>
 #include <fstream>
 #include <sys/stat.h>
-#include <google/profiler.h>
-#include <google/heap-profiler.h>
-#include <google/malloc_extension.h>
+#include <gperftools/profiler.h>
+#include <gperftools/heap-profiler.h>
+#include <gperftools/malloc_extension.h>
 
 #include "common/logging.h"
 #include "util/webserver.h"
