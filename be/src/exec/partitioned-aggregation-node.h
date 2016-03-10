@@ -521,6 +521,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// 'remaining_capacity' is an array with PARTITION_FANOUT entries with the number of
   ///     additional rows that can be added to the hash table per partition. It is updated
   ///     by ProcessBatchStreaming() when it inserts new rows.
+  /// 'ht_ctx' is passed in as a way to avoid aliasing of 'this' confusing the optimiser.
   Status ProcessBatchStreaming(bool needs_serialize, RowBatch* in_batch,
       RowBatch* out_batch, HashTableCtx* ht_ctx,
       int remaining_capacity[PARTITION_FANOUT]);

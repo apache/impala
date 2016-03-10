@@ -150,7 +150,7 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
   for (int i = 0; i < in_batch->num_rows(); ++i) {
     TupleRow* in_row = in_batch->GetRow(i);
     uint32_t hash;
-    if (!ht_ctx_->EvalAndHashProbe(in_row, &hash)) continue;
+    if (!ht_ctx->EvalAndHashProbe(in_row, &hash)) continue;
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
 
     if (TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx], in_row, hash,
