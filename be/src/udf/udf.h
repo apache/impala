@@ -211,7 +211,7 @@ class FunctionContext {
 
   /// Returns the underlying opaque implementation object. The UDF/UDA should not
   /// use this. This is used internally.
-  impala::FunctionContextImpl* impl() { return impl_; }
+  impala::FunctionContextImpl* impl() const { return impl_; }
 
   ~FunctionContext();
 

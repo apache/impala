@@ -14,6 +14,7 @@
 
 #include "exprs/decimal-functions.h"
 
+#include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
 #include "exprs/expr.h"
 
@@ -25,16 +26,16 @@
 namespace impala {
 
 IntVal DecimalFunctions::Precision(FunctionContext* context, const DecimalVal& val) {
-  return IntVal(context->GetArgType(0)->precision);
+  return IntVal(Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0));
 }
 
 IntVal DecimalFunctions::Scale(FunctionContext* context, const DecimalVal& val) {
-  return IntVal(context->GetArgType(0)->scale);
+  return IntVal(Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0));
 }
 
 DecimalVal DecimalFunctions::Abs(FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return DecimalVal::null();
-  int type_byte_size = Expr::GetConstant<int>(*context, Expr::ARG_TYPE_SIZE, 0);
+  int type_byte_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0);
   switch (type_byte_size) {
     case 4:
       return DecimalVal(abs(val.val4));
@@ -60,17 +61,20 @@ DecimalVal DecimalFunctions::Round(FunctionContext* context, const DecimalVal& v
   return DecimalOperators::RoundDecimal(context, val, DecimalOperators::ROUND);
 }
 
-inline DecimalVal DecimalFunctions::RoundTo(
+/// Always inline in IR module so that constants can be replaced.
+IR_ALWAYS_INLINE DecimalVal DecimalFunctions::RoundTo(
     FunctionContext* context, const DecimalVal& val, int scale,
     DecimalOperators::DecimalRoundOp op) {
-  const FunctionContext::TypeDesc& val_type = *context->GetArgType(0);
-  const FunctionContext::TypeDesc& return_type = context->GetReturnType();
+  int val_precision = Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0);
+  int val_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0);
+  int return_precision = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION);
+  int return_scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE);
   if (scale < 0) {
-    return DecimalOperators::RoundDecimalNegativeScale(
-        context, val, val_type, return_type, op, -scale);
+    return DecimalOperators::RoundDecimalNegativeScale(context,
+        val, val_precision, val_scale, return_precision, return_scale, op, -scale);
   } else {
-    return DecimalOperators::RoundDecimal(
-        context, val, val_type, return_type, op);
+    return DecimalOperators::RoundDecimal(context,
+        val, val_precision, val_scale, return_precision, return_scale, op);
   }
 }
 

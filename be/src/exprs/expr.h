@@ -249,34 +249,51 @@ class Expr {
   /// not strip these symbols.
   static void InitBuiltinsDummy();
 
-  // Any additions to this enum must be reflected in both GetConstant() and
+  // Any additions to this enum must be reflected in both GetConstant*() and
   // GetIrConstant().
   enum ExprConstant {
     RETURN_TYPE_SIZE, // int
-    ARG_TYPE_SIZE // int[]
+    RETURN_TYPE_PRECISION, // int
+    RETURN_TYPE_SCALE, // int
+    ARG_TYPE_SIZE, // int[]
+    ARG_TYPE_PRECISION, // int[]
+    ARG_TYPE_SCALE, // int[]
   };
 
   // Static function for obtaining a runtime constant.  Expr compute functions and
   // builtins implementing the UDF interface should use this function, rather than
-  // accessing runtime constants directly, so any constants can be inlined via
+  // accessing runtime constants directly, so any recognized constants can be inlined via
   // InlineConstants() in the codegen path. In the interpreted path, this function will
   // work as-is.
   //
-  // 'c' determines which constant is returned. 'T' must match the type of the constant,
-  // which is annotated in the ExprConstant enum above. If the constant is an array, 'i'
-  // must be specified and indicates which element to return. 'T' is the element type in
-  // this case. 'i' must always be an immediate integer value so InlineConstants() can
-  // resolve the index, e.g., it cannot be a variable or an expression like "1 + 1".  For
-  // example, if 'c' = ARG_TYPE_SIZE, then 'T' = int and 0 <= i < children_.size().
+  // 'c' determines which constant is returned. The type of the constant is annotated in
+  // the ExprConstant enum above. If the constant is an array, 'i' must be specified and
+  // indicates which element to return. 'i' must always be an immediate integer value so
+  // InlineConstants() can resolve the index, e.g., it cannot be a variable or an
+  // expression like "1 + 1".  For example, if 'c' = ARG_TYPE_SIZE, then 'T' = int and
+  // 0 <= i < children_.size().
   //
-  // TODO: implement a loop unroller (or use LLVM's) so we can use GetConstant() in loops
-  template<typename T> static T GetConstant(
-      const FunctionContext& ctx, ExprConstant c, int i = -1);
+  // InlineConstants() can be run on the function to replace recognized constants. The
+  // constants are only replaced in the function itself, so any callee functions with
+  // constants to be replaced must be inlined into the function that InlineConstants()
+  // is run on (e.g. by annotating them with IR_ALWAYS_INLINE).
+  //
+  // TODO: implement a loop unroller (or use LLVM's) so we can use GetConstantInt() in loops
+  static int GetConstantInt(const FunctionContext& ctx, ExprConstant c, int i = -1);
+
+  /// Finds all calls to Expr::GetConstantInt() in 'fn' and replaces them with the
+  /// appropriate runtime constants based on the arguments. 'return_type' is the
+  /// return type of the UDF or UDAF, i.e. the value of FunctionContext::GetReturnType().
+  /// 'arg_types' are the argument types of the UDF or UDAF, i.e. the values of
+  /// FunctionContext::GetArgType().
+  static int InlineConstants(const FunctionContext::TypeDesc& return_type,
+      const std::vector<FunctionContext::TypeDesc>& arg_types,
+      LlvmCodeGen* codegen, llvm::Function* fn);
 
   static const char* LLVM_CLASS_NAME;
 
-  // Prefix of Expr::GetConstant() symbols, regardless of template specialization
-  static const char* GET_CONSTANT_SYMBOL_PREFIX;
+  // Expr::GetConstantInt() symbol prefix.
+  static const char* GET_CONSTANT_INT_SYMBOL_PREFIX;
 
  protected:
   friend class AggFnEvaluator;
@@ -376,9 +393,9 @@ class Expr {
   /// functions (e.g. in ScalarFnCall() when codegen is disabled).
   llvm::Function* GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen);
 
-  /// Finds all calls to Expr::GetConstant() in 'fn' and replaces them with the requested
-  /// runtime constant. Returns the number of calls replaced. This should be used in
-  /// GetCodegendComputeFn().
+  /// Replace all calls to Expr::GetConstant() in 'fn' based on the types of the
+  /// expr and its children. This is a convenience method that invokes the static
+  /// InlineConstants() function with the correct arguments for the expr.
   int InlineConstants(LlvmCodeGen* codegen, llvm::Function* fn);
 
   /// Simple debug string that provides no expr subclass-specific information
@@ -429,9 +446,12 @@ class Expr {
   static TimestampVal GetTimestampVal(Expr* expr, ExprContext* context, TupleRow* row);
   static DecimalVal GetDecimalVal(Expr* expr, ExprContext* context, TupleRow* row);
 
-  // Helper function for InlineConstants(). Returns the IR version of what GetConstant()
-  // would return.
-  llvm::Value* GetIrConstant(LlvmCodeGen* codegen, ExprConstant c, int i);
+
+  // Helper function for GetConstantInt() and InlineConstants(): return the constant value
+  // given the specific argument and return types.
+  static int GetConstantInt(const FunctionContext::TypeDesc& return_type,
+      const std::vector<FunctionContext::TypeDesc>& arg_types, ExprConstant c,
+      int i = -1);
 };
 
 }

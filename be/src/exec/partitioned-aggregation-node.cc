@@ -25,6 +25,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
+#include "exprs/anyval-util.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "exprs/slot-ref.h"
@@ -1540,8 +1541,16 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
       // Get xcompiled update/merge function from IR module
       const string& symbol = evaluator->is_merge() ?
                              evaluator->merge_symbol() : evaluator->update_symbol();
+      const ColumnType& dst_type = evaluator->intermediate_type();
       Function* ir_fn = codegen->module()->getFunction(symbol);
       DCHECK(ir_fn != NULL);
+
+      // Clone and replace constants.
+      ir_fn = codegen->CloneFunction(ir_fn);
+      vector<FunctionContext::TypeDesc> arg_types;
+      arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(input_expr->type()));
+      Expr::InlineConstants(AnyValUtil::ColumnTypeToTypeDesc(dst_type), arg_types,
+          codegen, ir_fn);
 
       // Create pointer to src to pass to ir_fn. We must use the unlowered type.
       Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
@@ -1553,7 +1562,6 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
           builder.CreateBitCast(src_lowered_ptr, unlowered_ptr_type, "src_unlowered_ptr");
 
       // Create intermediate argument 'dst' from 'dst_value'
-      const ColumnType& dst_type = evaluator->intermediate_type();
       CodegenAnyVal dst = CodegenAnyVal::GetNonNullVal(
           codegen, &builder, dst_type, "dst");
       dst.SetFromRawValue(dst_value);

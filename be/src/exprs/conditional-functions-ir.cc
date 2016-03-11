@@ -73,7 +73,7 @@ NULL_IF_COMPUTE_FUNCTION(DecimalVal);
 DecimalVal ConditionalFunctions::NullIfZero(
     FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return DecimalVal::null();
-  int type_byte_size = Expr::GetConstant<int>(*context, Expr::RETURN_TYPE_SIZE);
+  int type_byte_size = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SIZE);
   switch (type_byte_size) {
     case 4:
       if (val.val4 == 0) return DecimalVal::null();

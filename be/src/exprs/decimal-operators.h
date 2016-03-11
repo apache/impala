@@ -17,6 +17,7 @@
 #define IMPALA_EXPRS_DECIMAL_OPERATORS_H
 
 #include <stdint.h>
+
 #include "runtime/decimal-value.h"
 #include "udf/udf.h"
 
@@ -101,9 +102,9 @@ class DecimalOperators {
 
   /// Evaluates a round from 'val' and returns the result, using the rounding rule of
   /// 'type'.
-  static DecimalVal RoundDecimal(FunctionContext* context, const DecimalVal& val,
-      const FunctionContext::TypeDesc& val_type,
-      const FunctionContext::TypeDesc& output_type, const DecimalRoundOp& op);
+  static DecimalVal RoundDecimal(FunctionContext* context,
+      const DecimalVal& val, int val_precision, int val_scale, int output_precision,
+      int output_scale, const DecimalRoundOp& op);
 
   /// Same as above but infers 'val_type' from the first argument type and 'output_type'
   /// from the return type according to 'context'.
@@ -123,34 +124,30 @@ class DecimalOperators {
   ///   Decimal4Value Round(const Decimal8Value&);
   ///   etc.
   static DecimalVal RoundDecimalNegativeScale(FunctionContext* context,
-      const DecimalVal& val, const FunctionContext::TypeDesc& val_type,
-      const FunctionContext::TypeDesc& output_type, const DecimalRoundOp& op,
-      int64_t rounding_scale);
+      const DecimalVal& val, int val_precision, int val_scale, int output_precision,
+      int output_scale, const DecimalRoundOp& op, int64_t rounding_scale);
 
  private:
-  /// Converts 'val' to a DecimalVal according to 'type'. 'type' must be a decimal type.
+  /// Converts 'val' to a DecimalVal with given precision and scale.
   static DecimalVal IntToDecimalVal(
-      FunctionContext* context, const FunctionContext::TypeDesc& type, int64_t val);
+      FunctionContext* context, int precision, int scale, int64_t val);
   static DecimalVal FloatToDecimalVal(
-      FunctionContext* context, const FunctionContext::TypeDesc& type, double val);
+      FunctionContext* context, int precision, int scale, double val);
 
   /// Returns the value of 'val' scaled to 'output_type'.
   static DecimalVal ScaleDecimalValue(FunctionContext* context, const Decimal4Value& val,
-      const FunctionContext::TypeDesc& val_type,
-      const FunctionContext::TypeDesc& output_type);
+      int val_scale, int output_precision, int output_scale);
   static DecimalVal ScaleDecimalValue(FunctionContext* context, const Decimal8Value& val,
-      const FunctionContext::TypeDesc& val_type,
-      const FunctionContext::TypeDesc& output_type);
+      int val_scale, int output_precision, int output_scale);
   static DecimalVal ScaleDecimalValue(FunctionContext* context, const Decimal16Value& val,
-      const FunctionContext::TypeDesc& val_type,
-      const FunctionContext::TypeDesc& output_type);
+      int val_scale, int output_precision, int output_scale);
 
   /// Returns the delta that needs to be added when the source decimal is rounded to
   /// target scale. Returns 0, if no rounding is necessary, or -1/1 if rounding
   /// is required.
   template <typename T>
-  static T RoundDelta(const DecimalValue<T>& v, int src_scale, int target_scale,
-      const DecimalRoundOp& op);
+  static T RoundDelta(const DecimalValue<T>& v, int src_scale,
+      int target_scale, const DecimalRoundOp& op);
 };
 
 }

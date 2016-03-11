@@ -480,8 +480,8 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
     Function* called_fn = call_instr->getCalledFunction();
     // look for call to Expr::GetConstant()
     if (called_fn != NULL &&
-        called_fn->getName().find(Expr::GET_CONSTANT_SYMBOL_PREFIX) != string::npos) {
-      LOG(ERROR) << "Found call to Expr::GetConstant(): " << Print(call_instr);
+        called_fn->getName().find(Expr::GET_CONSTANT_INT_SYMBOL_PREFIX) != string::npos) {
+      LOG(ERROR) << "Found call to Expr::GetConstant*(): " << Print(call_instr);
       is_corrupt_ = true;
       break;
     }

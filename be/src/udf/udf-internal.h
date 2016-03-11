@@ -101,6 +101,10 @@ class FunctionContextImpl {
   void IncrementNumUpdates(int64_t n = 1) { num_updates_ += n; }
   void IncrementNumRemoves(int64_t n = 1) { num_removes_ += n; }
 
+  const std::vector<impala_udf::FunctionContext::TypeDesc> arg_types() {
+    return arg_types_;
+  }
+
   static const char* LLVM_FUNCTIONCONTEXT_NAME;
 
   RuntimeState* state() { return state_; }

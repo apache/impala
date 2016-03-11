@@ -32,10 +32,10 @@ IntVal TestGetConstant(
     FunctionContext* ctx, const DecimalVal& arg0, StringVal arg1, StringVal arg2) {
   Constants* state = reinterpret_cast<Constants*>(
       ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  state->return_type_size = Expr::GetConstant<int>(*ctx, Expr::RETURN_TYPE_SIZE);
-  state->arg0_type_size = Expr::GetConstant<int>(*ctx, Expr::ARG_TYPE_SIZE, 0);
-  state->arg1_type_size = Expr::GetConstant<int>(*ctx, Expr::ARG_TYPE_SIZE, 1);
-  state->arg2_type_size = Expr::GetConstant<int>(*ctx, Expr::ARG_TYPE_SIZE, 2);
+  state->return_type_size = Expr::GetConstantInt(*ctx, Expr::RETURN_TYPE_SIZE);
+  state->arg0_type_size = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 0);
+  state->arg1_type_size = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 1);
+  state->arg2_type_size = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 2);
   return IntVal(10);
 }
 

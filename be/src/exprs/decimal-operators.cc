@@ -18,6 +18,7 @@
 #include <sstream>
 #include <math.h>
 
+#include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
 #include "exprs/case-expr.h"
 #include "exprs/expr.h"
@@ -38,26 +39,23 @@ namespace impala {
     }\
   } while (false)
 
-inline DecimalVal DecimalOperators::IntToDecimalVal(
-    FunctionContext* context, const FunctionContext::TypeDesc& type, int64_t val) {
-  DCHECK_EQ(type.type, FunctionContext::TYPE_DECIMAL);
+// Inline in IR module so branches can be optimised out.
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::IntToDecimalVal(
+    FunctionContext* context, int precision, int scale, int64_t val) {
   bool overflow = false;
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
-      Decimal4Value dv =
-          Decimal4Value::FromInt(type.precision, type.scale, val, &overflow);
+      Decimal4Value dv = Decimal4Value::FromInt(precision, scale, val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(dv.value());
     }
     case 8: {
-      Decimal8Value dv =
-          Decimal8Value::FromInt(type.precision, type.scale, val, &overflow);
+      Decimal8Value dv = Decimal8Value::FromInt(precision, scale, val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(dv.value());
     }
     case 16: {
-      Decimal16Value dv =
-          Decimal16Value::FromInt(type.precision, type.scale, val, &overflow);
+      Decimal16Value dv = Decimal16Value::FromInt(precision, scale, val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(dv.value());
     }
@@ -67,26 +65,26 @@ inline DecimalVal DecimalOperators::IntToDecimalVal(
   }
 }
 
-inline DecimalVal DecimalOperators::FloatToDecimalVal(
-    FunctionContext* context, const FunctionContext::TypeDesc& type, double val) {
-  DCHECK_EQ(type.type, FunctionContext::TYPE_DECIMAL);
+// Inline in IR module so branches can be optimised out.
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::FloatToDecimalVal(
+    FunctionContext* context, int precision, int scale, double val) {
   bool overflow = false;
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv =
-          Decimal4Value::FromDouble(type.precision, type.scale, val, &overflow);
+          Decimal4Value::FromDouble(precision, scale, val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(dv.value());
     }
     case 8: {
       Decimal8Value dv =
-          Decimal8Value::FromDouble(type.precision, type.scale, val, &overflow);
+          Decimal8Value::FromDouble(precision, scale, val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(dv.value());
     }
     case 16: {
       Decimal16Value dv =
-          Decimal16Value::FromDouble(type.precision, type.scale, val, &overflow);
+          Decimal16Value::FromDouble(precision, scale, val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(dv.value());
     }
@@ -102,31 +100,29 @@ inline DecimalVal DecimalOperators::FloatToDecimalVal(
 // When going from a larger type to a smaller type, we need to adjust the scales first
 // (since it can reduce the magnitude of the value) to minimize cases where we overflow.
 // When going from a smaller type to a larger type, we convert and then scale.
+// Inline these functions in IR module so branches can be optimised out.
 
-inline DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
-    const Decimal4Value& val, const FunctionContext::TypeDesc& val_type,
-    const FunctionContext::TypeDesc& output_type) {
-  DCHECK_EQ(val_type.type, FunctionContext::TYPE_DECIMAL);
-  DCHECK_EQ(output_type.type, FunctionContext::TYPE_DECIMAL);
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
+    const Decimal4Value& val, int val_scale, int output_precision, int output_scale) {
   bool overflow = false;
-  switch (ColumnType::GetDecimalByteSize(output_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal4Value scaled_val = val.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(scaled_val.value());
     }
     case 8: {
       Decimal8Value val8 = ToDecimal8(val, &overflow);
       Decimal8Value scaled_val = val8.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(scaled_val.value());
     }
     case 16: {
       Decimal16Value val16 = ToDecimal16(val, &overflow);
       Decimal16Value scaled_val = val16.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(scaled_val.value());
     }
@@ -136,30 +132,27 @@ inline DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
   }
 }
 
-inline DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
-    const Decimal8Value& val, const FunctionContext::TypeDesc& val_type,
-    const FunctionContext::TypeDesc& output_type) {
-  DCHECK_EQ(val_type.type, FunctionContext::TYPE_DECIMAL);
-  DCHECK_EQ(output_type.type, FunctionContext::TYPE_DECIMAL);
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
+    const Decimal8Value& val, int val_scale, int output_precision, int output_scale) {
   bool overflow = false;
-  switch (ColumnType::GetDecimalByteSize(output_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal8Value scaled_val = val.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       Decimal4Value val4 = ToDecimal4(scaled_val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(val4.value());
     }
     case 8: {
       Decimal8Value scaled_val = val.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(scaled_val.value());
     }
     case 16: {
       Decimal16Value val16 = ToDecimal16(val, &overflow);
       Decimal16Value scaled_val = val16.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(scaled_val.value());
     }
@@ -169,30 +162,27 @@ inline DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
   }
 }
 
-inline DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
-    const Decimal16Value& val, const FunctionContext::TypeDesc& val_type,
-    const FunctionContext::TypeDesc& output_type) {
-  DCHECK_EQ(val_type.type, FunctionContext::TYPE_DECIMAL);
-  DCHECK_EQ(output_type.type, FunctionContext::TYPE_DECIMAL);
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
+    const Decimal16Value& val, int val_scale, int output_precision, int output_scale) {
   bool overflow = false;
-  switch (ColumnType::GetDecimalByteSize(output_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal16Value scaled_val = val.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       Decimal4Value val4 = ToDecimal4(scaled_val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(val4.value());
     }
     case 8: {
       Decimal16Value scaled_val = val.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       Decimal8Value val8 = ToDecimal8(scaled_val, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(val8.value());
     }
     case 16: {
       Decimal16Value scaled_val = val.ScaleTo(
-          val_type.scale, output_type.scale, output_type.precision, &overflow);
+          val_scale, output_scale, output_precision, &overflow);
       RETURN_IF_OVERFLOW(context, overflow);
       return DecimalVal(scaled_val.value());
     }
@@ -202,8 +192,9 @@ inline DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext* context,
   }
 }
 
+// Inline in IR module so branches can be optimised out.
 template <typename T>
-T DecimalOperators::RoundDelta(const DecimalValue<T>& v, int src_scale,
+IR_ALWAYS_INLINE T DecimalOperators::RoundDelta(const DecimalValue<T>& v, int src_scale,
     int target_scale, const DecimalRoundOp& op) {
   if (op == TRUNCATE) return 0;
 
@@ -238,9 +229,8 @@ T DecimalOperators::RoundDelta(const DecimalValue<T>& v, int src_scale,
 }
 
 static inline Decimal4Value GetDecimal4Value(
-    const DecimalVal& val, const FunctionContext::TypeDesc& type, bool* overflow) {
-  DCHECK_EQ(type.type, FunctionContext::TYPE_DECIMAL);
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+    const DecimalVal& val, int val_byte_size, bool* overflow) {
+  switch (val_byte_size) {
     case 4: return ToDecimal4(Decimal4Value(val.val4), overflow);
     case 8: return ToDecimal4(Decimal8Value(val.val8), overflow);
     case 16: return ToDecimal4(Decimal16Value(val.val16), overflow);
@@ -251,9 +241,8 @@ static inline Decimal4Value GetDecimal4Value(
 }
 
 static inline Decimal8Value GetDecimal8Value(
-    const DecimalVal& val, const FunctionContext::TypeDesc& type, bool* overflow) {
-  DCHECK_EQ(type.type, FunctionContext::TYPE_DECIMAL);
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+    const DecimalVal& val, int val_byte_size, bool* overflow) {
+  switch (val_byte_size) {
     case 4: return ToDecimal8(Decimal4Value(val.val4), overflow);
     case 8: return ToDecimal8(Decimal8Value(val.val8), overflow);
     case 16: return ToDecimal8(Decimal16Value(val.val16), overflow);
@@ -264,9 +253,8 @@ static inline Decimal8Value GetDecimal8Value(
 }
 
 static inline Decimal16Value GetDecimal16Value(
-    const DecimalVal& val, const FunctionContext::TypeDesc& type, bool* overflow) {
-  DCHECK_EQ(type.type, FunctionContext::TYPE_DECIMAL);
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+    const DecimalVal& val, int val_byte_size, bool* overflow) {
+  switch (val_byte_size) {
     case 4: return ToDecimal16(Decimal4Value(val.val4), overflow);
     case 8: return ToDecimal16(Decimal8Value(val.val8), overflow);
     case 16: return ToDecimal16(Decimal16Value(val.val16), overflow);
@@ -280,35 +268,37 @@ static inline Decimal16Value GetDecimal16Value(
   DecimalVal DecimalOperators::CastToDecimalVal( \
       FunctionContext* context, const from_type& val) { \
     if (val.is_null) return DecimalVal::null(); \
-    const FunctionContext::TypeDesc& type = context->GetReturnType(); \
-    return IntToDecimalVal(context, type, val.val); \
+    int precision = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION); \
+    int scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE); \
+    return IntToDecimalVal(context, precision, scale, val.val); \
   }
 
 #define CAST_FLOAT_TO_DECIMAL(from_type) \
   DecimalVal DecimalOperators::CastToDecimalVal( \
       FunctionContext* context, const from_type& val) { \
     if (val.is_null) return DecimalVal::null(); \
-    const FunctionContext::TypeDesc& type = context->GetReturnType(); \
-    return FloatToDecimalVal(context, type, val.val); \
+    int precision = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION); \
+    int scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE); \
+    return FloatToDecimalVal(context, precision, scale, val.val); \
   }
 
 #define CAST_DECIMAL_TO_INT(to_type) \
   to_type DecimalOperators::CastTo##to_type( \
       FunctionContext* context, const DecimalVal& val) { \
     if (val.is_null) return to_type::null(); \
-    const FunctionContext::TypeDesc& type = *context->GetArgType(0); \
-    switch (ColumnType::GetDecimalByteSize(type.precision)) { \
+    int scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0); \
+    switch (Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0)) { \
       case 4: { \
         Decimal4Value dv(val.val4); \
-        return to_type(dv.whole_part(type.scale)); \
+        return to_type(dv.whole_part(scale)); \
       } \
       case 8: { \
         Decimal8Value dv(val.val8); \
-        return to_type(dv.whole_part(type.scale)); \
+        return to_type(dv.whole_part(scale)); \
       } \
       case 16: { \
         Decimal16Value dv(val.val16); \
-        return to_type(dv.whole_part(type.scale)); \
+        return to_type(dv.whole_part(scale)); \
       } \
       default:\
         DCHECK(false); \
@@ -320,19 +310,19 @@ static inline Decimal16Value GetDecimal16Value(
   to_type DecimalOperators::CastTo##to_type( \
       FunctionContext* context, const DecimalVal& val) { \
     if (val.is_null) return to_type::null(); \
-    const FunctionContext::TypeDesc& type = *context->GetArgType(0); \
-    switch (ColumnType::GetDecimalByteSize(type.precision)) { \
+    int scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0); \
+    switch (Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0)) { \
       case 4: { \
         Decimal4Value dv(val.val4); \
-        return to_type(dv.ToDouble(type.scale)); \
+        return to_type(dv.ToDouble(scale)); \
       } \
       case 8: { \
         Decimal8Value dv(val.val8); \
-        return to_type(dv.ToDouble(type.scale)); \
+        return to_type(dv.ToDouble(scale)); \
       } \
       case 16: { \
         Decimal16Value dv(val.val16); \
-        return to_type(dv.ToDouble(type.scale)); \
+        return to_type(dv.ToDouble(scale)); \
       } \
       default:\
         DCHECK(false); \
@@ -354,29 +344,33 @@ CAST_DECIMAL_TO_INT(BigIntVal)
 CAST_DECIMAL_TO_FLOAT(FloatVal)
 CAST_DECIMAL_TO_FLOAT(DoubleVal)
 
-DecimalVal DecimalOperators::RoundDecimalNegativeScale(FunctionContext* context,
-    const DecimalVal& val, const FunctionContext::TypeDesc& val_type,
-    const FunctionContext::TypeDesc& output_type, const DecimalRoundOp& op,
+// Inline in IR module so branches can be optimised out.
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::RoundDecimalNegativeScale(
+    FunctionContext* context, const DecimalVal& val, int val_precision, int val_scale,
+    int output_precision, int output_scale, const DecimalRoundOp& op,
     int64_t rounding_scale) {
   DCHECK_GT(rounding_scale, 0);
   if (val.is_null) return DecimalVal::null();
 
   // 'result' holds the value prior to rounding.
   DecimalVal result;
-  switch (ColumnType::GetDecimalByteSize(val_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(val_precision)) {
     case 4: {
       Decimal4Value val4(val.val4);
-      result = ScaleDecimalValue(context, val4, val_type, output_type);
+      result = ScaleDecimalValue(context, val4, val_scale, output_precision,
+          output_scale);
       break;
     }
     case 8: {
       Decimal8Value val8(val.val8);
-      result = ScaleDecimalValue(context, val8, val_type, output_type);
+      result = ScaleDecimalValue(context, val8, val_scale, output_precision,
+          output_scale);
       break;
     }
     case 16: {
       Decimal16Value val16(val.val16);
-      result = ScaleDecimalValue(context, val16, val_type, output_type);
+      result = ScaleDecimalValue(context, val16, val_scale, output_precision,
+          output_scale);
       break;
     }
     default:
@@ -388,7 +382,7 @@ DecimalVal DecimalOperators::RoundDecimalNegativeScale(FunctionContext* context,
   if (result.is_null) return result;
 
   // We've done the cast portion of the computation. Now round it.
-  switch (ColumnType::GetDecimalByteSize(output_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal4Value val4(result.val4);
       int32_t d = RoundDelta(val4, 0, -rounding_scale, op);
@@ -426,31 +420,35 @@ DecimalVal DecimalOperators::RoundDecimalNegativeScale(FunctionContext* context,
   return result;
 }
 
-DecimalVal DecimalOperators::RoundDecimal(FunctionContext* context, const DecimalVal& val,
-    const FunctionContext::TypeDesc& val_type,
-    const FunctionContext::TypeDesc& output_type, const DecimalRoundOp& op) {
-  DCHECK(output_type.type == FunctionContext::TYPE_DECIMAL) << output_type.type;
+// Inline in IR module so branches can be optimised out.
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::RoundDecimal(FunctionContext* context,
+    const DecimalVal& val, int val_precision, int val_scale, int output_precision,
+    int output_scale, const DecimalRoundOp& op) {
   if (val.is_null) return DecimalVal::null();
   // Switch on the child type.
   DecimalVal result = DecimalVal::null();
   int delta = 0;
-  switch (ColumnType::GetDecimalByteSize(val_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(val_precision)) {
     case 4: {
       Decimal4Value val4(val.val4);
-      result = ScaleDecimalValue(context, val4, val_type, output_type);
-      delta = RoundDelta(val4, val_type.scale, output_type.scale, op);
+      result = ScaleDecimalValue(context, val4, val_scale, output_precision,
+          output_scale);
+      delta = RoundDelta(val4, val_scale, output_scale, op);
       break;
     }
     case 8: {
       Decimal8Value val8(val.val8);
-      result = ScaleDecimalValue(context, val8, val_type, output_type);
-      delta = RoundDelta(val8, val_type.scale, output_type.scale, op);
+      result = ScaleDecimalValue(context, val8, val_scale, output_precision,
+          output_scale);
+      delta = RoundDelta(val8, val_scale, output_scale, op);
       break;
     }
     case 16: {
       Decimal16Value val16(val.val16);
-      result = ScaleDecimalValue(context, val16, val_type, output_type);
-      delta = RoundDelta(val16, val_type.scale, output_type.scale, op);
+      result = ScaleDecimalValue(context, val16, val_scale, output_precision,
+          output_scale);
+
+      delta = RoundDelta(val16, val_scale, output_scale, op);
       break;
     }
     default:
@@ -474,11 +472,15 @@ DecimalVal DecimalOperators::RoundDecimal(FunctionContext* context, const Decima
   return result;
 }
 
-DecimalVal DecimalOperators::RoundDecimal(
+// Inline in IR module so branches can be optimised out.
+IR_ALWAYS_INLINE DecimalVal DecimalOperators::RoundDecimal(
     FunctionContext* context, const DecimalVal& val, const DecimalRoundOp& op) {
-  const FunctionContext::TypeDesc& val_type = *context->GetArgType(0);
-  const FunctionContext::TypeDesc& return_type = context->GetReturnType();
-  return RoundDecimal(context, val, val_type, return_type, op);
+  int val_precision = Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0);
+  int val_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0);
+  int return_precision = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION);
+  int return_scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE);
+  return RoundDecimal(context, val, val_precision, val_scale, return_precision,
+      return_scale, op);
 }
 
 // Cast is just RoundDecimal(TRUNCATE).
@@ -494,23 +496,24 @@ DecimalVal DecimalOperators::CastToDecimalVal(
   if (val.is_null) return DecimalVal::null();
   StringParser::ParseResult result;
   DecimalVal dv;
-  const FunctionContext::TypeDesc& type = context->GetReturnType();
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+  int precision = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION);
+  int scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE);
+  switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv4 = StringParser::StringToDecimal<int32_t>(
-          reinterpret_cast<char*>(val.ptr), val.len, type.precision, type.scale, &result);
+          reinterpret_cast<char*>(val.ptr), val.len, precision, scale, &result);
       dv = DecimalVal(dv4.value());
       break;
     }
     case 8: {
       Decimal8Value dv8 = StringParser::StringToDecimal<int64_t>(
-          reinterpret_cast<char*>(val.ptr), val.len, type.precision, type.scale, &result);
+          reinterpret_cast<char*>(val.ptr), val.len, precision, scale, &result);
       dv = DecimalVal(dv8.value());
       break;
     }
     case 16: {
       Decimal16Value dv16 = StringParser::StringToDecimal<int128_t>(
-          reinterpret_cast<char*>(val.ptr), val.len, type.precision, type.scale, &result);
+          reinterpret_cast<char*>(val.ptr), val.len, precision, scale, &result);
       dv = DecimalVal(dv16.value());
       break;
     }
@@ -530,17 +533,18 @@ DecimalVal DecimalOperators::CastToDecimalVal(
 StringVal DecimalOperators::CastToStringVal(
     FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return StringVal::null();
-  const FunctionContext::TypeDesc& type = *context->GetArgType(0);
+  int precision = Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0);
+  int scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0);
   string s;
-  switch (ColumnType::GetDecimalByteSize(type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4:
-      s = Decimal4Value(val.val4).ToString(type.precision, type.scale);
+      s = Decimal4Value(val.val4).ToString(precision, scale);
       break;
     case 8:
-      s = Decimal8Value(val.val8).ToString(type.precision, type.scale);
+      s = Decimal8Value(val.val8).ToString(precision, scale);
       break;
     case 16:
-      s = Decimal16Value(val.val16).ToString(type.precision, type.scale);
+      s = Decimal16Value(val.val16).ToString(precision, scale);
       break;
     default:
       DCHECK(false);
@@ -554,25 +558,25 @@ StringVal DecimalOperators::CastToStringVal(
 TimestampVal DecimalOperators::CastToTimestampVal(
     FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return TimestampVal::null();
-  const FunctionContext::TypeDesc& val_type = *context->GetArgType(0);
-  DCHECK_EQ(val_type.type, FunctionContext::TYPE_DECIMAL);
+  int precision = Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0);
+  int scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0);
   TimestampVal result;
-  switch (ColumnType::GetDecimalByteSize(val_type.precision)) {
+  switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv(val.val4);
-      TimestampValue tv(dv.ToDouble(val_type.scale));
+      TimestampValue tv(dv.ToDouble(scale));
       tv.ToTimestampVal(&result);
       break;
     }
     case 8: {
       Decimal8Value dv(val.val8);
-      TimestampValue tv(dv.ToDouble(val_type.scale));
+      TimestampValue tv(dv.ToDouble(scale));
       tv.ToTimestampVal(&result);
       break;
     }
     case 16: {
       Decimal16Value dv(val.val16);
-      TimestampValue tv(dv.ToDouble(val_type.scale));
+      TimestampValue tv(dv.ToDouble(scale));
       tv.ToTimestampVal(&result);
       break;
     }
@@ -586,9 +590,7 @@ TimestampVal DecimalOperators::CastToTimestampVal(
 BooleanVal DecimalOperators::CastToBooleanVal(
     FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return BooleanVal::null();
-  const FunctionContext::TypeDesc& val_type = *context->GetArgType(0);
-  DCHECK_EQ(val_type.type, FunctionContext::TYPE_DECIMAL);
-  switch (ColumnType::GetDecimalByteSize(val_type.precision)) {
+  switch (Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0)) {
     case 4:
       return BooleanVal(val.val4 != 0);
     case 8:
@@ -606,31 +608,35 @@ BooleanVal DecimalOperators::CastToBooleanVal(
       FunctionContext* context, const DecimalVal& x, const DecimalVal& y) { \
     if (x.is_null || y.is_null) return DecimalVal::null(); \
     bool overflow = false; \
-    const FunctionContext::TypeDesc& x_type = *context->GetArgType(0); \
-    const FunctionContext::TypeDesc& y_type = *context->GetArgType(1); \
-    const FunctionContext::TypeDesc& return_type = context->GetReturnType(); \
-    switch (ColumnType::GetDecimalByteSize(return_type.precision)) { \
+    int x_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0); \
+    int x_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0); \
+    int y_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 1); \
+    int y_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 1); \
+    int return_precision = \
+        Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION); \
+    int return_scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE); \
+    switch (Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SIZE)) { \
       case 4: { \
-        Decimal4Value x_val = GetDecimal4Value(x, x_type, &overflow); \
-        Decimal4Value y_val = GetDecimal4Value(y, y_type, &overflow); \
-        Decimal4Value result = x_val.OP_FN<int32_t>(x_type.scale, y_val, y_type.scale, \
-            return_type.precision, return_type.scale, &overflow); \
-        DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
+        Decimal4Value x_val = GetDecimal4Value(x, x_size, &overflow); \
+        Decimal4Value y_val = GetDecimal4Value(y, y_size, &overflow); \
+        Decimal4Value result = x_val.OP_FN<int32_t>(x_scale, y_val, y_scale, \
+            return_precision, return_scale, &overflow); \
+        DCHECK(!overflow) << "Cannot overflow except with Decimal17Value"; \
         return DecimalVal(result.value()); \
       } \
       case 8: { \
-        Decimal8Value x_val = GetDecimal8Value(x, x_type, &overflow); \
-        Decimal8Value y_val = GetDecimal8Value(y, y_type, &overflow); \
-        Decimal8Value result = x_val.OP_FN<int64_t>(x_type.scale, y_val, y_type.scale, \
-            return_type.precision, return_type.scale, &overflow); \
+        Decimal8Value x_val = GetDecimal8Value(x, x_size, &overflow); \
+        Decimal8Value y_val = GetDecimal8Value(y, y_size, &overflow); \
+        Decimal8Value result = x_val.OP_FN<int64_t>(x_scale, y_val, y_scale, \
+            return_precision, return_scale, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         return DecimalVal(result.value()); \
       } \
       case 16: { \
-        Decimal16Value x_val = GetDecimal16Value(x, x_type, &overflow); \
-        Decimal16Value y_val = GetDecimal16Value(y, y_type, &overflow); \
-        Decimal16Value result = x_val.OP_FN<int128_t>(x_type.scale, y_val, y_type.scale, \
-            return_type.precision, return_type.scale, &overflow); \
+        Decimal16Value x_val = GetDecimal16Value(x, x_size, &overflow); \
+        Decimal16Value y_val = GetDecimal16Value(y, y_size, &overflow); \
+        Decimal16Value result = x_val.OP_FN<int128_t>(x_scale, y_val, y_scale, \
+            return_precision, return_scale, &overflow); \
         RETURN_IF_OVERFLOW(context, overflow); \
         return DecimalVal(result.value()); \
       } \
@@ -646,33 +652,37 @@ BooleanVal DecimalOperators::CastToBooleanVal(
     if (x.is_null || y.is_null) return DecimalVal::null(); \
     bool overflow = false; \
     bool is_nan = false; \
-    const FunctionContext::TypeDesc& x_type = *context->GetArgType(0); \
-    const FunctionContext::TypeDesc& y_type = *context->GetArgType(1); \
-    const FunctionContext::TypeDesc& return_type = context->GetReturnType(); \
-    switch (ColumnType::GetDecimalByteSize(return_type.precision)) { \
+    int x_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0); \
+    int x_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0); \
+    int y_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 1); \
+    int y_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 1); \
+    int return_precision = \
+        Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION); \
+    int return_scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE); \
+    switch (Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SIZE)) { \
       case 4: { \
-        Decimal4Value x_val = GetDecimal4Value(x, x_type, &overflow); \
-        Decimal4Value y_val = GetDecimal4Value(y, y_type, &overflow); \
-        Decimal4Value result = x_val.OP_FN<int32_t>(x_type.scale, y_val, y_type.scale, \
-            return_type.precision, return_type.scale, &is_nan, &overflow); \
+        Decimal4Value x_val = GetDecimal4Value(x, x_size, &overflow); \
+        Decimal4Value y_val = GetDecimal4Value(y, y_size, &overflow); \
+        Decimal4Value result = x_val.OP_FN<int32_t>(x_scale, y_val, y_scale, \
+            return_precision, return_scale, &is_nan, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
       } \
       case 8: { \
-        Decimal8Value x_val = GetDecimal8Value(x, x_type, &overflow); \
-        Decimal8Value y_val = GetDecimal8Value(y, y_type, &overflow); \
-        Decimal8Value result = x_val.OP_FN<int64_t>(x_type.scale, y_val, y_type.scale, \
-            return_type.precision, return_type.scale, &is_nan, &overflow); \
+        Decimal8Value x_val = GetDecimal8Value(x, x_size, &overflow); \
+        Decimal8Value y_val = GetDecimal8Value(y, y_size, &overflow); \
+        Decimal8Value result = x_val.OP_FN<int64_t>(x_scale, y_val, y_scale, \
+            return_precision, return_scale, &is_nan, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
       } \
       case 16: { \
-        Decimal16Value x_val = GetDecimal16Value(x, x_type, &overflow); \
-        Decimal16Value y_val = GetDecimal16Value(y, y_type, &overflow); \
-        Decimal16Value result = x_val.OP_FN<int128_t>(x_type.scale, y_val, y_type.scale, \
-            return_type.precision, return_type.scale, &is_nan, &overflow); \
+        Decimal16Value x_val = GetDecimal16Value(x, x_size, &overflow); \
+        Decimal16Value y_val = GetDecimal16Value(y, y_size, &overflow); \
+        Decimal16Value result = x_val.OP_FN<int128_t>(x_scale, y_val, y_scale, \
+            return_precision, return_scale, &is_nan, &overflow); \
         RETURN_IF_OVERFLOW(context, overflow); \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
@@ -685,27 +695,28 @@ BooleanVal DecimalOperators::CastToBooleanVal(
 
 #define DECIMAL_BINARY_OP_NONNULL(OP_FN, X, Y) \
   bool dummy = false; \
-  const FunctionContext::TypeDesc& x_type = *context->GetArgType(0); \
-  const FunctionContext::TypeDesc& y_type = *context->GetArgType(1); \
-  int byte_size = ::max(ColumnType::GetDecimalByteSize(x_type.precision), \
-                        ColumnType::GetDecimalByteSize(y_type.precision)); \
+  int x_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0); \
+  int x_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0); \
+  int y_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 1); \
+  int y_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 1); \
+  int byte_size = ::max(x_size, y_size); \
   switch (byte_size) { \
     case 4: { \
-      Decimal4Value x_val = GetDecimal4Value(X, x_type, &dummy); \
-      Decimal4Value y_val = GetDecimal4Value(Y, y_type, &dummy); \
-      bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
+      Decimal4Value x_val = GetDecimal4Value(X, x_size, &dummy); \
+      Decimal4Value y_val = GetDecimal4Value(Y, y_size, &dummy); \
+      bool result = x_val.OP_FN(x_scale, y_val, y_scale); \
       return BooleanVal(result); \
     } \
     case 8: { \
-      Decimal8Value x_val = GetDecimal8Value(X, x_type, &dummy); \
-      Decimal8Value y_val = GetDecimal8Value(Y, y_type, &dummy); \
-      bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
+      Decimal8Value x_val = GetDecimal8Value(X, x_size, &dummy); \
+      Decimal8Value y_val = GetDecimal8Value(Y, y_size, &dummy); \
+      bool result = x_val.OP_FN(x_scale, y_val, y_scale); \
       return BooleanVal(result); \
     } \
     case 16: { \
-      Decimal16Value x_val = GetDecimal16Value(X, x_type, &dummy); \
-      Decimal16Value y_val = GetDecimal16Value(Y, y_type, &dummy); \
-      bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
+      Decimal16Value x_val = GetDecimal16Value(X, x_size, &dummy); \
+      Decimal16Value y_val = GetDecimal16Value(Y, y_size, &dummy); \
+      bool result = x_val.OP_FN(x_scale, y_val, y_scale); \
       return BooleanVal(result); \
     } \
     default: \

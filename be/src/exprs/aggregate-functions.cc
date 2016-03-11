@@ -23,12 +23,14 @@
 #include <boost/random/ranlux.hpp>
 #include <boost/random/uniform_int.hpp>
 
+#include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "exprs/anyval-util.h"
+#include "exprs/expr.h"
 #include "exprs/hll-bias.h"
 
 #include "common/names.h"
@@ -357,19 +359,18 @@ void AggregateFunctions::DecimalAvgRemove(FunctionContext* ctx, const DecimalVal
   DecimalAvgAddOrRemove(ctx, src, dst, true);
 }
 
-void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext* ctx,
+// Always inline in IR so that constants can be replaced.
+IR_ALWAYS_INLINE void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext* ctx,
     const DecimalVal& src, StringVal* dst, bool remove) {
   if (src.is_null) return;
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(DecimalAvgState), dst->len);
   DecimalAvgState* avg = reinterpret_cast<DecimalAvgState*>(dst->ptr);
-  const FunctionContext::TypeDesc* arg_desc = ctx->GetArgType(0);
-  DCHECK(arg_desc != NULL);
 
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
   int m = remove ? -1 : 1;
-  switch (ColumnType::GetDecimalByteSize(arg_desc->precision)) {
+  switch (Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 0)) {
     case 4:
       avg->sum.val16 += m * src.val4;
       break;
@@ -474,17 +475,18 @@ void AggregateFunctions::SumDecimalRemove(FunctionContext* ctx,
   SumDecimalAddOrSubtract(ctx, src, dst, true);
 }
 
-void AggregateFunctions::SumDecimalAddOrSubtract(FunctionContext* ctx,
+// Always inline in IR so that constants can be replaced.
+IR_ALWAYS_INLINE void AggregateFunctions::SumDecimalAddOrSubtract(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst, bool subtract) {
   if (src.is_null) return;
   if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
-  const FunctionContext::TypeDesc* arg_desc = ctx->GetArgType(0);
+  int precision = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_PRECISION, 0);
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
   int m = subtract ? -1 : 1;
-  if (arg_desc->precision <= 9) {
+  if (precision <= 9) {
     dst->val16 += m * src.val4;
-  } else if (arg_desc->precision <= 19) {
+  } else if (precision <= 19) {
     dst->val16 += m * src.val8;
   } else {
     dst->val16 += m * src.val16;
@@ -540,11 +542,10 @@ template<>
 void AggregateFunctions::Min(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
   if (src.is_null) return;
-  const FunctionContext::TypeDesc* arg = ctx->GetArgType(0);
-  DCHECK(arg != NULL);
-  if (arg->precision <= 9) {
+  int precision = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_PRECISION, 0);
+  if (precision <= 9) {
     if (dst->is_null || src.val4 < dst->val4) *dst = src;
-  } else if (arg->precision <= 19) {
+  } else if (precision <= 19) {
     if (dst->is_null || src.val8 < dst->val8) *dst = src;
   } else {
     if (dst->is_null || src.val16 < dst->val16) *dst = src;
@@ -555,11 +556,10 @@ template<>
 void AggregateFunctions::Max(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
   if (src.is_null) return;
-  const FunctionContext::TypeDesc* arg = ctx->GetArgType(0);
-  DCHECK(arg != NULL);
-  if (arg->precision <= 9) {
+  int precision = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_PRECISION, 0);
+  if (precision <= 9) {
     if (dst->is_null || src.val4 > dst->val4) *dst = src;
-  } else if (arg->precision <= 19) {
+  } else if (precision <= 19) {
     if (dst->is_null || src.val8 > dst->val8) *dst = src;
   } else {
     if (dst->is_null || src.val16 > dst->val16) *dst = src;
