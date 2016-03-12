@@ -33,9 +33,6 @@ using namespace strings;
 
 const string DECOMPRESSOR_MEM_LIMIT_EXCEEDED = "$0Decompressor failed to allocate $1 bytes.";
 
-// Output buffer size for streaming compressed file.
-const int64_t STREAM_OUT_BUF_SIZE = 8 * 1024 * 1024;
-
 GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is_deflate)
   : Codec(mem_pool, reuse_buffer, true),
     is_deflate_(is_deflate) {
@@ -92,6 +89,7 @@ Status GzipDecompressor::ProcessBlockStreaming(int64_t input_length, const uint8
   stream_.next_out = reinterpret_cast<Bytef*>(*output);
   stream_.avail_out = buffer_length_;
 
+  *stream_end = false;
   *input_bytes_read = 0;
   *output_length = 0;
   while (stream_.avail_out > 0 && stream_.avail_in > 0) {
@@ -373,6 +371,7 @@ Status BzipDecompressor::ProcessBlockStreaming(int64_t input_length, const uint8
   stream_.next_out = reinterpret_cast<char*>(*output);
   stream_.avail_out = buffer_length_;
 
+  *stream_end = false;
   *input_bytes_read = 0;
   *output_length = 0;
   while (stream_.avail_out > 0 && stream_.avail_in > 0) {

@@ -23,6 +23,7 @@ namespace impala {
 // Macros for backend tests to be used when we expect the status to be OK.
 #define EXPECT_OK(status) EXPECT_TRUE(status.ok()) << "Error: " << status.GetDetail();
 #define ASSERT_OK(status) ASSERT_TRUE(status.ok()) << "Error: " << status.GetDetail();
+#define EXPECT_ERROR(status, err) EXPECT_EQ(status.code(), err);
 
 }
 #endif // IMPALA_TESTUTIL_GTEST_UTIL_H_
