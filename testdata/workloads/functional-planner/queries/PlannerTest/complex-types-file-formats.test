@@ -38,12 +38,17 @@ select 1 from functional_rc_snap.complextypes_fileformat t, t.a
 not implemented: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
-# Complex types are not supported on RC files, even if no complex-typed
-# columns are selected.
+select s.f1 from functional_rc_snap.complextypes_fileformat t, t.m
+---- PLAN
+not implemented: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+Complex types are supported for these file formats: PARQUET.
+====
+# Complex types are not supported on RC files, however queries materializing
+# only scalar type columns are allowed.
 select id from functional_rc_snap.complextypes_fileformat
 ---- PLAN
-not implemented: Scan of table 'functional_rc_snap.complextypes_fileformat' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+00:SCAN HDFS [functional_rc_snap.complextypes_fileformat]
+   partitions=1/1 files=1 size=56B
 ====
 # Complex types are not supported on RC files but count(*) and similar
 # queries should work.
@@ -61,12 +66,12 @@ select s.f1 from functional_seq_snap.complextypes_fileformat t, t.a
 not implemented: Scan of table 't' in format 'SEQUENCE_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
-# Complex types are not supported on sequence files, even if no complex-typed
-# columns are selected.
-select 1 from functional_seq_snap.complextypes_fileformat
+# Queries referencing only scalar typed columns on sequence files
+# are allowed.
+select id from functional_seq_snap.complextypes_fileformat
 ---- PLAN
-not implemented: Scan of table 'functional_seq_snap.complextypes_fileformat' in format 'SEQUENCE_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+00:SCAN HDFS [functional_seq_snap.complextypes_fileformat]
+   partitions=1/1 files=1 size=87B
 ====
 # Scanning all partitions fails because there are partitions with a file format for which
 # complex types are not supported. The error message is abbreviated because it is

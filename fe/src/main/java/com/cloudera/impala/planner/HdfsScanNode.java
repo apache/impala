@@ -185,10 +185,11 @@ public class HdfsScanNode extends ScanNode {
     }
     if (firstComplexTypedCol == null) return;
 
-    boolean hasMaterializedSlots = false;
+    boolean referencesComplexTypedCol = false;
     for (SlotDescriptor slotDesc: desc_.getSlots()) {
-      if (slotDesc.isMaterialized()) {
-        hasMaterializedSlots = true;
+      if (!slotDesc.isMaterialized()) continue;
+      if (slotDesc.getType().isComplexType() || slotDesc.getColumn() == null) {
+        referencesComplexTypedCol = true;
         break;
       }
     }
@@ -196,8 +197,11 @@ public class HdfsScanNode extends ScanNode {
     for (HdfsPartition part: partitions_) {
       HdfsFileFormat format = part.getInputFormatDescriptor().getFileFormat();
       if (format.isComplexTypesSupported()) continue;
-      // Allow count(*) and similar queries on RC_FILE with complex types.
-      if (format == HdfsFileFormat.RC_FILE && !hasMaterializedSlots) continue;
+      // If the file format allows querying just scalar typed columns and the query
+      // doesn't materialize any complex typed columns, it is allowed.
+      if (format.canSkipComplexTypes() && !referencesComplexTypedCol) {
+        continue;
+      }
       String errSuffix = String.format(
           "Complex types are supported for these file formats: %s",
           Joiner.on(", ").join(HdfsFileFormat.complexTypesFormats()));

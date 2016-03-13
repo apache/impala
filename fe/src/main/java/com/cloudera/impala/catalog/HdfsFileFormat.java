@@ -35,26 +35,26 @@ public enum HdfsFileFormat {
   RC_FILE("org.apache.hadoop.hive.ql.io.RCFileInputFormat",
       "org.apache.hadoop.hive.ql.io.RCFileOutputFormat",
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe",
-      false),
+      false, true),
   TEXT("org.apache.hadoop.mapred.TextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
-      false),
+      false, false),
   LZO_TEXT("com.hadoop.mapred.DeprecatedLzoTextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-      "",
-      false),
+      "", false, false),
   SEQUENCE_FILE("org.apache.hadoop.mapred.SequenceFileInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat",
-      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", false),
+      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", false,
+      true),
   AVRO("org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat",
       "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat",
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe",
-      false),
+      false, false),
   PARQUET("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
-      true);
+      true, true);
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -63,12 +63,18 @@ public enum HdfsFileFormat {
   // Indicates whether we support scanning complex types for this file format.
   private final boolean isComplexTypesSupported_;
 
+  // Indicates whether the file format can skip complex columns in scans and just
+  // materialize scalar typed columns. Ignored if isComplexTypesSupported_ is true.
+  // TODO: Remove this once we support complex types for all file formats.
+  private final boolean canSkipColumnTypes_;
+
   HdfsFileFormat(String inputFormat, String outputFormat, String serializationLib,
-      boolean isComplexTypesSupported) {
+      boolean isComplexTypesSupported, boolean canSkipColumnTypes) {
     inputFormat_ = inputFormat;
     outputFormat_ = outputFormat;
     serializationLib_ = serializationLib;
     isComplexTypesSupported_ = isComplexTypesSupported;
+    canSkipColumnTypes_ = canSkipColumnTypes;
   }
 
   public String inputFormat() { return inputFormat_; }
@@ -233,6 +239,12 @@ public enum HdfsFileFormat {
    * from a table/partition with this file format.
    */
   public boolean isComplexTypesSupported() { return isComplexTypesSupported_; }
+
+  /**
+   * Returns true if this file format can skip complex typed columns and materialize
+   * only scalar typed columns.
+   */
+  public boolean canSkipComplexTypes() { return canSkipColumnTypes_; }
 
   /**
    * Returns a list with all formats for which isComplexTypesSupported() is true.
