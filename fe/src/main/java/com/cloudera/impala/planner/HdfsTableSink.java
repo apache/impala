@@ -44,7 +44,7 @@ public class HdfsTableSink extends TableSink {
 
   public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
       boolean overwrite) {
-    super(targetTable);
+    super(targetTable, Op.INSERT);
     Preconditions.checkState(targetTable instanceof HdfsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
@@ -138,7 +138,7 @@ public class HdfsTableSink extends TableSink {
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
         Expr.treesToThrift(partitionKeyExprs_), overwrite_);
     TTableSink tTableSink = new TTableSink(targetTable_.getId().asInt(),
-        TTableSinkType.HDFS);
+        TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;
     result.table_sink = tTableSink;
     return result;

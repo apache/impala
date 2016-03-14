@@ -65,6 +65,10 @@ public class PlannerContext {
     queryCtx_ = queryCtx;
     if (isInsertOrCtas()) {
       queryStmt_ = analysisResult.getInsertStmt().getQueryStmt();
+    } else if (analysisResult.isUpdateStmt()) {
+      queryStmt_ = analysisResult.getUpdateStmt().getQueryStmt();
+    } else if (analysisResult.isDeleteStmt()) {
+      queryStmt_ = analysisResult.getDeleteStmt().getQueryStmt();
     } else {
       queryStmt_ = analysisResult.getQueryStmt();
     }
@@ -88,4 +92,6 @@ public class PlannerContext {
   public SubplanNode getSubplan() { return subplans_.getFirst(); }
   public boolean pushSubplan(SubplanNode n) { return subplans_.offerFirst(n); }
   public void popSubplan() { subplans_.removeFirst(); }
+  public boolean isUpdate() { return analysisResult_.isUpdateStmt(); }
+  public boolean isDelete() { return analysisResult_.isDeleteStmt(); }
 }

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "testutil/gtest-util.h"
+#include "common/init.h"
 #include "common/logging.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
@@ -173,8 +174,7 @@ TEST(Auth, KerbAndSslEnabled) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitGoogleLoggingSafe(argv[0]);
-  impala::InitThreading();
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   ::testing::InitGoogleTest(&argc, argv);
 
   env_keytab = getenv("KRB5_KTNAME");

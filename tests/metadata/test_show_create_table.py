@@ -16,7 +16,7 @@ import shlex
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIf, SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.test_file_parser import remove_comments
 
@@ -59,6 +59,10 @@ class TestShowCreateTable(ImpalaTestSuite):
   @SkipIfS3.insert
   def test_show_create_table(self, vector):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector)
+
+  @SkipIf.kudu_not_supported
+  def test_kudu_show_create_table(self, vector):
+    self.__run_show_create_table_test_case('QueryTest/kudu-show-create', vector)
 
   def __run_show_create_table_test_case(self, test_file_name, vector):
     """

@@ -19,6 +19,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "exec/kudu-util.h"
 #include "exprs/expr.h"
 #include "gutil/atomicops.h"
 #include "util/cpu-info.h"
@@ -184,6 +185,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     DCHECK(false);
     Expr::InitBuiltinsDummy();
   }
+
+  impala::InitKuduLogging();
 
 #ifndef ADDRESS_SANITIZER
   // tcmalloc and address sanitizer can not be used together

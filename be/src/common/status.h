@@ -259,6 +259,15 @@ class Status {
     if (UNLIKELY(!__status__.ok())) return __status__; \
   } while (false)
 
+#define RETURN_IF_ERROR_PREPEND(expr, prepend) \
+  do { \
+    Status __status__ = (stmt); \
+    if (UNLIKELY(!__status__.ok())) { \
+      return Status(strings::Substitute("$0: $1", prepend, __status__.GetDetail())); \
+    } \
+  } while (false)
+
+
 #define EXIT_IF_ERROR(stmt) \
   do { \
     Status __status__ = (stmt); \

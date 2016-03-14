@@ -110,6 +110,29 @@ public class BinaryPredicate extends Predicate {
     }
   }
 
+  /**
+   * Returns a version of 'predicate' that always has the SlotRef, if there is one, on the
+   * left and the other expression on the right. This also folds constant children of the
+   * predicate into literals, if possible.
+   * Returns null if this is not a SlotRef comparison.
+   * TODO(kudu-merge): create a more general mechanism and retire this function
+   */
+  public static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
+      Analyzer analyzer)
+      throws AnalysisException {
+    SlotRef ref = predicate.getBoundSlot();
+    if (ref == null) return null;
+    if (ref != predicate.getChild(0).unwrapSlotRef(true)) {
+      Preconditions.checkState(ref == predicate.getChild(1).unwrapSlotRef(true));
+      predicate = new BinaryPredicate(predicate.getOp().converse(), ref,
+          predicate.getChild(0));
+      predicate.analyzeNoThrow(analyzer);
+    }
+    predicate.foldConstantChildren(analyzer);
+    predicate.analyzeNoThrow(analyzer);
+    return predicate;
+  }
+
   private Operator op_;
 
   public Operator getOp() { return op_; }

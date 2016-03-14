@@ -29,6 +29,12 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
   public CatalogServiceTestCatalog(boolean loadInBackground, int numLoadingThreads,
       SentryConfig sentryConfig, TUniqueId catalogServiceId) {
     super(loadInBackground, numLoadingThreads, sentryConfig, catalogServiceId);
+
+    // Cache pools are typically loaded asynchronously, but as there is no fixed execution
+    // order for tests, the cache pools are loaded synchronously before the tests are
+    // executed.
+    CachePoolReader rd = new CachePoolReader();
+    rd.run();
   }
 
   public static CatalogServiceCatalog create() {
@@ -50,5 +56,6 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     return cs;
   }
 
+  @Override
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
 }

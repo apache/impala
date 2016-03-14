@@ -60,6 +60,58 @@ export USE_GOLD_LINKER
 export IMPALA_CXX_COMPILER
 export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
 
+# To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
+# set KUDU_CLIENT_DIR to the path KUDU was installed in.
+# Example:
+#   git clone https://github.com/cloudera/kudu.git
+#   ...build 3rd party etc...
+#   mkdir -p $KUDU_BUILD_DIR
+#   cd $KUDU_BUILD_DIR
+#   cmake <path to Kudu source dir>
+#   make
+#   DESTDIR=$KUDU_CLIENT_DIR make install
+: ${KUDU_BUILD_DIR=}
+: ${KUDU_CLIENT_DIR=}
+export KUDU_BUILD_DIR
+export KUDU_CLIENT_DIR
+if [[ -n $KUDU_BUILD_DIR && -z $KUDU_CLIENT_DIR ]]; then
+  echo When KUDU_BUILD_DIR is set KUDU_CLIENT_DIR must also be set. 1>&2
+  return 1
+fi
+if [[ -z $KUDU_BUILD_DIR && -n $KUDU_CLIENT_DIR ]]; then
+  echo When KUDU_CLIENT_DIR is set KUDU_BUILD_DIR must also be set. 1>&2
+  return 1
+fi
+
+: ${USE_KUDU_DEBUG_BUILD=false}   # Only applies when using Kudu from the toolchain
+export USE_KUDU_DEBUG_BUILD
+
+# Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
+# into the backend. The frontend build is OS independent since it is Java.
+export KUDU_IS_SUPPORTED=true
+if [[ -z $KUDU_BUILD_DIR ]]; then
+  if [[ $DISABLE_IMPALA_TOOLCHAIN -eq 1 ]]; then
+    KUDU_IS_SUPPORTED=false
+  elif ! $IS_OSX; then
+    if ! which lsb_release &>/dev/null; then
+      echo Unable to find the 'lsb_release' command. \
+          Please ensure it is available in your PATH. 1>&2
+      return 1
+    fi
+    DISTRO_VERSION=$(lsb_release -sir 2>&1)
+    if [[ $? -ne 0 ]]; then
+      echo lsb_release cammond failed, output was: "$DISTRO_VERSION" 1>&2
+      return 1
+    fi
+    # Remove spaces, trim minor versions, and convert to lowercase.
+    DISTRO_VERSION=$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")
+    case "$DISTRO_VERSION" in
+      # "enterprise" is Oracle
+      centos5 | debian6 | enterprise*5 | redhat*5 | suse*11) KUDU_IS_SUPPORTED=false;;
+    esac
+  fi
+fi
+
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}
@@ -149,6 +201,7 @@ export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2
 export IMPALA_GPERFTOOLS_VERSION=2.0
 export IMPALA_GTEST_VERSION=1.6.0
+export IMPALA_KUDU_VERSION=0.7.0.p0.425
 export IMPALA_LLVM_VERSION=3.3
 export IMPALA_LLVM_DEBUG_VERSION=3.3
 export IMPALA_LLVM_ASAN_VERSION=3.7.0
@@ -178,6 +231,13 @@ if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   # so this will need to be revisited when upgrading the LLVM version.
   IMPALA_LLVM_DEBUG_VERSION+=-p1
 fi
+
+export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
+export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
+# TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
+#       to nightly changes from Kudu. The version below is the last released version but
+#       before release this needs to be updated to the version about to be released.
+export KUDU_JAVA_VERSION=0.6.0
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26

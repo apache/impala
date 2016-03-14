@@ -14,6 +14,8 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 # to use when running the query.
 class TableFormatInfo(object):
   KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'avro', 'hbase']
+  if os.environ['KUDU_IS_SUPPORTED'] == 'true':
+    KNOWN_FILE_FORMATS.append('kudu')
   KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def', 'lzo']
   KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
 
@@ -181,4 +183,3 @@ def is_supported_insert_format(table_format):
   # Returns true if the given table_format is a supported Impala INSERT format
   return table_format.compression_codec == 'none' and\
       table_format.file_format in ['text', 'parquet']
-

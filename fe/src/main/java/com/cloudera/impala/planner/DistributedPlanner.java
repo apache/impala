@@ -71,7 +71,8 @@ public class DistributedPlanner {
     // partitioned, otherwise merge everything into a single coordinator fragment,
     // so we can pass it back to the client.
     boolean isPartitioned = false;
-    if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())
+    if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt()
+        || analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt())
         && !singleNodePlan.hasLimit()) {
       Preconditions.checkState(!queryStmt.hasOffset());
       isPartitioned = true;

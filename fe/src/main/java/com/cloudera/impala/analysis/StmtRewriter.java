@@ -55,6 +55,10 @@ public class StmtRewriter {
       queryStmt = ((InsertStmt) analysisResult.getStmt()).getQueryStmt();
     } else if (stmt instanceof CreateTableAsSelectStmt) {
       queryStmt = ((CreateTableAsSelectStmt) analysisResult.getStmt()).getQueryStmt();
+    } else if (analysisResult.isUpdateStmt()) {
+      queryStmt = ((UpdateStmt) analysisResult.getStmt()).getQueryStmt();
+    } else if (analysisResult.isDeleteStmt()) {
+      queryStmt = ((DeleteStmt) analysisResult.getStmt()).getQueryStmt();
     } else {
       throw new AnalysisException("Unsupported statement containing subqueries: " +
           stmt.toSql());
@@ -90,7 +94,7 @@ public class StmtRewriter {
   private static void rewriteSelectStatement(SelectStmt stmt, Analyzer analyzer)
       throws AnalysisException {
     // Rewrite all the subqueries in the FROM clause.
-    for (TableRef tblRef: stmt.tableRefs_) {
+    for (TableRef tblRef: stmt.fromClause_) {
       if (!(tblRef instanceof InlineViewRef)) continue;
       InlineViewRef inlineViewRef = (InlineViewRef)tblRef;
       rewriteQueryStatement(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer());
@@ -195,7 +199,7 @@ public class StmtRewriter {
    */
   private static void rewriteWhereClauseSubqueries(SelectStmt stmt, Analyzer analyzer)
      throws AnalysisException {
-    int numTableRefs = stmt.tableRefs_.size();
+    int numTableRefs = stmt.fromClause_.size();
     ArrayList<Expr> exprsWithSubqueries = Lists.newArrayList();
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     // Replace all BetweenPredicates that contain subqueries with their
@@ -375,8 +379,8 @@ public class StmtRewriter {
     // idempotent, the analysis needs to be reset.
     inlineView.reset();
     inlineView.analyze(analyzer);
-    inlineView.setLeftTblRef(stmt.tableRefs_.get(stmt.tableRefs_.size() - 1));
-    stmt.tableRefs_.add(inlineView);
+    inlineView.setLeftTblRef(stmt.fromClause_.get(stmt.fromClause_.size() - 1));
+    stmt.fromClause_.add(inlineView);
     JoinOperator joinOp = JoinOperator.LEFT_SEMI_JOIN;
 
     // Create a join conjunct from the expr that contains a subquery.
@@ -555,7 +559,7 @@ public class StmtRewriter {
    * replacing an unqualified star item.
    */
   private static void replaceUnqualifiedStarItems(SelectStmt stmt, int tableIdx) {
-    Preconditions.checkState(tableIdx < stmt.tableRefs_.size());
+    Preconditions.checkState(tableIdx < stmt.fromClause_.size());
     ArrayList<SelectListItem> newItems = Lists.newArrayList();
     for (int i = 0; i < stmt.selectList_.getItems().size(); ++i) {
       SelectListItem item = stmt.selectList_.getItems().get(i);
@@ -566,7 +570,7 @@ public class StmtRewriter {
       // '*' needs to be replaced by tbl1.*,...,tbln.*, where
       // tbl1,...,tbln are the visible tableRefs in stmt.
       for (int j = 0; j < tableIdx; ++j) {
-        TableRef tableRef = stmt.tableRefs_.get(j);
+        TableRef tableRef = stmt.fromClause_.get(j);
         if (tableRef.getJoinOp() == JoinOperator.LEFT_SEMI_JOIN ||
             tableRef.getJoinOp() == JoinOperator.LEFT_ANTI_JOIN) {
           continue;

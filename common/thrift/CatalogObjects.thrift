@@ -42,7 +42,8 @@ enum TTableType {
   HDFS_TABLE,
   HBASE_TABLE,
   VIEW,
-  DATA_SOURCE_TABLE
+  DATA_SOURCE_TABLE,
+  KUDU_TABLE,
 }
 
 enum THdfsFileFormat {
@@ -180,6 +181,12 @@ struct TColumn {
   7: optional string column_family
   8: optional string column_qualifier
   9: optional bool is_binary
+
+  // Indicates whether this is a Kudu column. If true implies all following Kudu specific
+  // fields are set.
+  10: optional bool is_kudu_column
+  11: optional bool is_key
+  12: optional bool is_nullable
 }
 
 // Represents a block in an HDFS file
@@ -313,6 +320,17 @@ struct TDataSourceTable {
   2: required string init_string
 }
 
+// Represents a Kudu table
+struct TKuduTable {
+  1: required string table_name
+
+  // Network address of a master host in the form of 0.0.0.0:port
+  2: required list<string> master_addresses
+
+  // Name of the key columns
+  3: required list<string> key_columns
+}
+
 // Represents a table or view.
 struct TTable {
   // Name of the parent database. Case insensitive, expected to be stored as lowercase.
@@ -357,6 +375,9 @@ struct TTable {
 
   // Set iff this is a table from an external data source
   13: optional TDataSourceTable data_source_table
+
+  // Set iff this a kudu table
+  14: optional TKuduTable kudu_table
 }
 
 // Represents a database.

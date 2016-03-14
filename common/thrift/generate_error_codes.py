@@ -227,7 +227,14 @@ error_codes = (
    "Unexpected end of compressed file. File may be truncated. file=$0"),
 
   ("DATASTREAM_SENDER_TIMEOUT", 72, "Sender timed out waiting for receiver fragment "
-   "instance: $0")
+   "instance: $0"),
+
+  ("KUDU_IMPALA_TYPE_MISSING", 73, "Kudu type $0 is not available in Impala."),
+
+  ("IMPALA_KUDU_TYPE_MISSING", 74, "Impala type $0 is not available in Kudu."),
+
+  ("KUDU_NOT_SUPPORTED_ON_OS", 75, "Kudu is not supported on this operating system.")
+
 )
 
 import sys

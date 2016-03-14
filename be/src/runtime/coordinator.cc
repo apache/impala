@@ -1880,10 +1880,12 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
   // Collect the TTupleId(s) for ScanNode(s).
   unordered_set<TTupleId> tuple_ids;
   BOOST_FOREACH(const TPlanNode& plan_node, fragment.plan.nodes) {
-    // TODO This should change if there is a ScanNode for Kudu.
     switch (plan_node.node_type) {
       case TPlanNodeType::HDFS_SCAN_NODE:
         tuple_ids.insert(plan_node.hdfs_scan_node.tuple_id);
+        break;
+      case TPlanNodeType::KUDU_SCAN_NODE:
+        tuple_ids.insert(plan_node.kudu_scan_node.tuple_id);
         break;
       case TPlanNodeType::HBASE_SCAN_NODE:
         tuple_ids.insert(plan_node.hbase_scan_node.tuple_id);

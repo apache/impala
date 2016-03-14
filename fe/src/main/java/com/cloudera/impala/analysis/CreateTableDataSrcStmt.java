@@ -48,7 +48,7 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
     super(tableName, columnDefs, Lists.<ColumnDef>newArrayList(), false, comment,
         RowFormat.DEFAULT_ROW_FORMAT, THdfsFileFormat.TEXT, null, null, ifNotExists,
         createInitialTableProperties(dataSourceName, initString),
-        Maps.<String, String>newHashMap());
+        Maps.<String, String>newHashMap(), null);
   }
 
   /**

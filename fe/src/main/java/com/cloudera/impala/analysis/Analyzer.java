@@ -44,6 +44,7 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.Type;
@@ -299,6 +300,12 @@ public class Analyzer {
 
   public boolean containsSubquery() { return globalState_.containsSubquery; }
 
+  /**
+   * Helper function to reset the global state information about the existence of
+   * subqueries.
+   */
+  public void resetSubquery() { globalState_.containsSubquery = false; }
+
   // An analyzer stores analysis state for a single select block. A select block can be
   // a top level select statement, or an inline view select block.
   // ancestors contains the Analyzers of the enclosing select blocks of 'this'
@@ -523,7 +530,9 @@ public class Analyzer {
       if (table instanceof View) return new InlineViewRef((View) table, tableRef);
       // The table must be a base table.
       Preconditions.checkState(table instanceof HdfsTable ||
-          table instanceof HBaseTable || table instanceof DataSourceTable);
+          table instanceof KuduTable ||
+          table instanceof HBaseTable ||
+          table instanceof DataSourceTable);
       return new BaseTableRef(tableRef);
     } else {
       return new CollectionTableRef(tableRef);
@@ -674,21 +683,7 @@ public class Analyzer {
       boolean resolveInAncestors) throws AnalysisException, TableLoadingException {
     // List of all candidate paths with different roots. Paths in this list are initially
     // unresolved and may be illegal with respect to the pathType.
-    ArrayList<Path> candidates = Lists.newArrayList();
-
-    // Path rooted at a tuple desc with an explicit or implicit unqualified alias.
-    TupleDescriptor rootDesc = getDescriptor(rawPath.get(0));
-    if (rootDesc != null) {
-      candidates.add(new Path(rootDesc, rawPath.subList(1, rawPath.size())));
-    }
-
-    // Path rooted at a tuple desc with an implicit qualified alias.
-    if (rawPath.size() > 1) {
-      rootDesc = getDescriptor(rawPath.get(0) + "." + rawPath.get(1));
-      if (rootDesc != null) {
-        candidates.add(new Path(rootDesc, rawPath.subList(2, rawPath.size())));
-      }
-    }
+    List<Path> candidates = getTupleDescPaths(rawPath);
 
     LinkedList<String> errors = Lists.newLinkedList();
     if (pathType == PathType.SLOT_REF || pathType == PathType.STAR) {
@@ -729,6 +724,30 @@ public class Analyzer {
     if (result == null) {
       Preconditions.checkState(!errors.isEmpty());
       throw new AnalysisException(errors.getFirst());
+    }
+    return result;
+  }
+
+  /**
+   * Returns a list of unresolved Paths that are rooted at a registered tuple
+   * descriptor matching a prefix of the given raw path.
+   */
+  public List<Path> getTupleDescPaths(List<String> rawPath)
+      throws AnalysisException {
+    ArrayList<Path> result = Lists.newArrayList();
+
+    // Path rooted at a tuple desc with an explicit or implicit unqualified alias.
+    TupleDescriptor rootDesc = getDescriptor(rawPath.get(0));
+    if (rootDesc != null) {
+      result.add(new Path(rootDesc, rawPath.subList(1, rawPath.size())));
+    }
+
+    // Path rooted at a tuple desc with an implicit qualified alias.
+    if (rawPath.size() > 1) {
+      rootDesc = getDescriptor(rawPath.get(0) + "." + rawPath.get(1));
+      if (rootDesc != null) {
+        result.add(new Path(rootDesc, rawPath.subList(2, rawPath.size())));
+      }
     }
     return result;
   }

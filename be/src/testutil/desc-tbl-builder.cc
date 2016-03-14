@@ -40,8 +40,7 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnTyp
   slot_desc.__set_id(id);
   slot_desc.__set_parent(parent_id);
   slot_desc.__set_slotType(type.ToThrift());
-  // For now no tests depend on the materialized path being populated correctly.
-  slot_desc.__set_materializedPath(vector<int>());
+  slot_desc.__set_materializedPath(vector<int>(1, slot_idx));
   slot_desc.__set_byteOffset(byte_offset);
   slot_desc.__set_nullIndicatorByte(null_byte);
   slot_desc.__set_nullIndicatorBit(null_bit);
@@ -50,25 +49,32 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnTyp
   return slot_desc;
 }
 
-static TTupleDescriptor MakeTupleDescriptor(int id, int byte_size, int num_null_bytes) {
+static TTupleDescriptor MakeTupleDescriptor(int id, int byte_size, int num_null_bytes,
+    int table_id = -1) {
   TTupleDescriptor tuple_desc;
   tuple_desc.__set_id(id);
   tuple_desc.__set_byteSize(byte_size);
   tuple_desc.__set_numNullBytes(num_null_bytes);
+  if (table_id != -1) tuple_desc.__set_tableId(table_id);
   return tuple_desc;
+}
+
+void DescriptorTblBuilder::SetTableDescriptor(const TTableDescriptor& table_desc) {
+  DCHECK(thrift_desc_tbl_.tableDescriptors.empty())
+      << "Only one TableDescriptor can be set.";
+  thrift_desc_tbl_.tableDescriptors.push_back(table_desc);
 }
 
 DescriptorTbl* DescriptorTblBuilder::Build() {
   DescriptorTbl* desc_tbl;
-  TDescriptorTable thrift_desc_tbl;
   int tuple_id = 0;
-  int slot_id = 0;
+  int slot_id = tuples_descs_.size(); // First ids reserved for TupleDescriptors
 
   for (int i = 0; i < tuples_descs_.size(); ++i) {
-    BuildTuple(tuples_descs_[i]->slot_types(), &thrift_desc_tbl, &tuple_id, &slot_id);
+    BuildTuple(tuples_descs_[i]->slot_types(), &thrift_desc_tbl_, &tuple_id, &slot_id);
   }
 
-  Status status = DescriptorTbl::Create(obj_pool_, thrift_desc_tbl, &desc_tbl);
+  Status status = DescriptorTbl::Create(obj_pool_, thrift_desc_tbl_, &desc_tbl);
   DCHECK(status.ok());
   return desc_tbl;
 }
@@ -104,7 +110,15 @@ TTupleDescriptor DescriptorTblBuilder::BuildTuple(
     ++(*slot_id);
   }
 
-  TTupleDescriptor result = MakeTupleDescriptor(tuple_id, byte_offset, num_null_bytes);
+  TTupleDescriptor result;
+
+  // If someone set a table descriptor pass that id along to the tuple descriptor.
+  if (thrift_desc_tbl_.tableDescriptors.empty()) {
+    result = MakeTupleDescriptor(tuple_id, byte_offset, num_null_bytes);
+  } else {
+    result = MakeTupleDescriptor(tuple_id, byte_offset, num_null_bytes,
+                                 thrift_desc_tbl_.tableDescriptors[0].id);
+  }
   thrift_desc_tbl->tupleDescriptors.push_back(result);
   return result;
 }

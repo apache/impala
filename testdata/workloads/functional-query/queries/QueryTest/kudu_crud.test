@@ -1,0 +1,258 @@
+====
+---- QUERY
+-- Test KuduClient will automatically set the default port if no port is given
+create table tdata_no_port ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'tdata_no_port',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'id'
+ )
+---- RESULTS
+====
+---- QUERY
+-- Invalid hostname
+create table tdata_bogus_host ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'tdata_no_port',
+'kudu.master_addresses' = 'bogus host name',
+'kudu.key_columns' = 'id'
+ )
+---- CATCH
+Couldn't resolve this master's address bogus host name:7051
+====
+---- QUERY
+-- Non-existing host
+create table tdata_non_existing_host ( id int, name string, valf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'tdata_no_port',
+'kudu.master_addresses' = 'bogus.host.name',
+'kudu.key_columns' = 'id'
+ )
+---- CATCH
+Couldn't resolve this master's address bogus.host.name:7051
+====
+---- QUERY
+create table tdata
+( id int, name string, valf float, vali bigint, valv varchar(20), valb boolean)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'tdata',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'id'
+ )
+---- RESULTS
+====
+---- QUERY
+insert into tdata values
+(1, "martin", 1.0, 232232323, cast('a' as VARCHAR(20)), true),
+(2, "david", cast(1.0 as float), 99398493939, cast('b' as VARCHAR(20)), false),
+(3, "todd", cast(1.0 as float), 993393939, cast('c' as VARCHAR(20)), true)
+---- RESULTS
+: 3
+====
+---- QUERY
+update tdata set vali=43 where id = 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43,'a',true
+2,'david',1.0,99398493939,'b',false
+3,'todd',1.0,993393939,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+====
+---- QUERY
+# Try updating a varchar col. with a value that is bigger than it's size (truncated).
+update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as VARCHAR(20)) where id = 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',true
+2,'david',1.0,99398493939,'b',false
+3,'todd',1.0,993393939,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+====
+---- QUERY
+update tdata set valb=false where id = 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1.0,99398493939,'b',false
+3,'todd',1.0,993393939,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+update tdata set vali=43 where id > 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1.0,43,'b',false
+3,'todd',1.0,43,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+update tdata set name='unknown' where name = 'martin'
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1.0,43,'b',false
+3,'todd',1.0,43,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+insert into tdata values
+(40, "he", cast(0.0 as float), 43, cast('e' as VARCHAR(20)), false),
+(120, "she", cast(0.0 as float), 99, cast('f' as VARCHAR(20)), true)
+---- RESULTS
+: 2
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1.0,43,'b',false
+3,'todd',1.0,43,'c',true
+40,'he',0.0,43,'e',false
+120,'she',0.0,99,'f',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+update tdata set name=null where id = 40
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1.0,43,'b',false
+3,'todd',1.0,43,'c',true
+40,'NULL',0.0,43,'e',false
+120,'she',0.0,99,'f',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+update tdata set name='he' where id = 40
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1.0,43,'b',false
+3,'todd',1.0,43,'c',true
+40,'he',0.0,43,'e',false
+120,'she',0.0,99,'f',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+# Make sure we can insert empty strings into string columns and that we can scan them
+# back.
+insert into tdata values (320, '', 2.0, 932, cast('' as VARCHAR(20)), false)
+---- RESULTS
+: 1
+====
+---- QUERY
+select id, name, valv, valb from tdata where id = 320;
+---- RESULTS
+320,'','',false
+---- TYPES
+INT,STRING,STRING,BOOLEAN
+====
+---- QUERY
+-- Test that string case is ignored
+create table ignore_column_case ( Id int, NAME string, vAlf float, vali bigint)
+DISTRIBUTE BY RANGE SPLIT ROWS ((10, 'b'), (30, 'a'))
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'ignore_column_case',
+'kudu.master_addresses' = '127.0.0.1',
+'kudu.key_columns' = 'Id,NAME'
+ )
+---- RESULTS
+====
+---- QUERY
+insert into ignore_column_case values (1, 'Martin', 1.0, 10);
+====
+---- QUERY
+select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
+---- RESULTS
+1,'Martin',1.0,10
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+insert into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
+---- RESULTS
+: 1
+====
+---- QUERY
+insert into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
+---- CATCH
+Error while flushing Kudu session:
+====
+---- QUERY
+insert ignore into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
+---- RESULTS
+: 0
+====
+---- QUERY
+-- Updating the same record twice
+update a set a.name='Satan' from tdata a, tdata b where a.id = 666
+---- RESULTS
+====
+---- QUERY
+-- Does not exercise any error path in the sink because updating the same record twice
+-- is valid. Makes sure IGNORE works.
+update ignore a set a.name='Satan' from tdata a, tdata b where a.id = 666
+---- RESULTS
+====
+---- QUERY
+-- Using a cross join to generate the same delete twice. After the first delete succeeded,
+-- trying to execute the second delete will fail because the record does not exist.
+delete a from tdata a, tdata b where a.id = 666
+---- CATCH
+Error while flushing Kudu session:
+====
+---- QUERY
+-- Re-insert the data
+insert into tdata values
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
+---- RESULTS
+: 1
+====
+---- QUERY
+delete ignore a from tdata a, tdata b where a.id = 666
+---- RESULTS
+====

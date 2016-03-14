@@ -64,6 +64,7 @@ struct TTableDescriptor {
   5: optional CatalogObjects.THdfsTable hdfsTable
   6: optional CatalogObjects.THBaseTable hbaseTable
   9: optional CatalogObjects.TDataSourceTable dataSourceTable
+  11: optional CatalogObjects.TKuduTable kuduTable
 
   // Unqualified name of table
   7: required string tableName

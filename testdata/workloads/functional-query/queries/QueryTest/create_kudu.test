@@ -1,0 +1,89 @@
+====
+---- QUERY
+# Create managed Kudu table
+create table managed_kudu
+( id int, f float, d double, s string, v varchar(10), t tinyint, m smallint )
+tblproperties
+(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'managed_kudu',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'id'
+)
+---- RESULTS
+====
+---- QUERY
+describe managed_kudu
+---- RESULTS
+'id','int',''
+'f','float',''
+'d','double',''
+'s','string',''
+'v','varchar(10)',''
+'t','tinyint',''
+'m','smallint',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Create external kudu table with non-matching schema (name)
+create external table external_kudu
+( id int, f float, do double, s string, v varchar(10), t tinyint, m smallint )
+tblproperties
+(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'managed_kudu',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'id'
+)
+---- CATCH
+ImpalaRuntimeException: Table external_kudu (managed_kudu) has a different schema in Kudu than in Hive.
+====
+---- QUERY
+# Create external kudu table with non-matching schema (type)
+create external table external_kudu
+( id bigint, f float, d double, s string, v varchar(10), t tinyint, m smallint )
+tblproperties
+(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'managed_kudu',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'id'
+)
+---- CATCH
+ImpalaRuntimeException: Table external_kudu (managed_kudu) has a different schema in Kudu than in Hive.
+====
+---- QUERY
+# Create external kudu table with matching schema
+create external table external_kudu
+( id int, f float, d double, s string, v varchar(10), t tinyint, m smallint )
+tblproperties
+(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'managed_kudu',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'id'
+)
+---- RESULTS
+====
+---- QUERY
+describe external_kudu
+---- RESULTS
+'id','int',''
+'f','float',''
+'d','double',''
+'s','string',''
+'v','varchar(10)',''
+'t','tinyint',''
+'m','smallint',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+drop table external_kudu
+---- RESULTS
+=====
+---- QUERY
+drop table managed_kudu
+---- RESULTS
+=====

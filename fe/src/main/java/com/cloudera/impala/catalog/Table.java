@@ -214,6 +214,8 @@ public abstract class Table implements CatalogObject {
       table = new View(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (HBaseTable.isHBaseTable(msTbl)) {
       table = new HBaseTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (KuduTable.isKuduTable(msTbl)) {
+      table = new KuduTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // It's important to check if this is a DataSourceTable before HdfsTable because
       // DataSourceTables are still represented by HDFS tables in the metastore but
@@ -425,6 +427,7 @@ public abstract class Table implements CatalogObject {
   public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
     return msTable_;
   }
+
   public void setMetaStoreTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     msTable_ = msTbl;
   }

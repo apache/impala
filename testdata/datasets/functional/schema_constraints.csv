@@ -147,6 +147,7 @@ table_name:testescape_32_crlf, constraint:restrict_to, table_format:text/none/no
 # alltimezones is used to verify that impala properly deals with timezones
 table_name:alltimezones, constraint:restrict_to, table_format:text/none/none
 
+
 # Avro schema is inferred from the column definitions (IMPALA-1136)
 table_name:no_avro_schema, constraint:restrict_to, table_format:avro/snap/block
 table_name:avro_unicode_nulls, constraint:restrict_to, table_format:avro/snap/block
@@ -156,3 +157,12 @@ table_name:bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:large_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:multistream_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:large_multistream_bzip2_tbl, constraint:restrict_to, table_format:text/bzip/block
+
+# Kudu can't handle certain types such as timestamp so we pick and choose the tables
+# we actually use for Kudu related tests.
+table_name:testtbl, constraint:only, table_format:kudu/none/none
+table_name:dimtbl, constraint:only, table_format:kudu/none/none
+table_name:text_comma_backslash_newline, constraint:only, table_format:kudu/none/none
+table_name:tinytable, constraint:only, table_format:kudu/none/none
+table_name:tinyinttable, constraint:only, table_format:kudu/none/none
+table_name:zipcode_incomes, constraint:only, table_format:kudu/none/none

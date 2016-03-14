@@ -89,6 +89,12 @@ public class Column {
       col = new HBaseColumn(columnDesc.getColumnName(), columnDesc.getColumn_family(),
           columnDesc.getColumn_qualifier(), columnDesc.isIs_binary(),
           Type.fromThrift(columnDesc.getColumnType()), comment, position);
+    } else if (columnDesc.isIs_kudu_column()) {
+      Preconditions.checkState(columnDesc.isSetIs_key());
+      Preconditions.checkState(columnDesc.isSetIs_nullable());
+      col = new KuduColumn(columnDesc.getColumnName(), columnDesc.isIs_key(),
+          columnDesc.isIs_nullable(),
+          Type.fromThrift(columnDesc.getColumnType()), comment, position);
     } else {
       // Hdfs table column.
       col = new Column(columnDesc.getColumnName(),

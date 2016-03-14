@@ -22,7 +22,7 @@ function do_start {
   # Give the process some time to die... if thing go wrong it usually takes at least a
   # few seconds for the process to totallly shutdown
   sleep 5
-  kill -0 $PID
+  pid_exists
 }
 
 function read_pid {
