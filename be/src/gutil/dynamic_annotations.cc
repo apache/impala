@@ -31,10 +31,6 @@
  * Author: Kostya Serebryany
  */
 
-#ifdef __cplusplus
-# error "This file should be built as pure C to avoid name mangling"
-#endif
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -44,6 +40,9 @@
 /* valgrind.h uses gcc extensions so it won't build with other compilers */
 #include "gutil/valgrind.h"
 #endif
+
+// Impala modification: made this file C++ and use extern "C" (IMPALA-3183).
+extern "C" {
 
 /* Compiler-based ThreadSanitizer defines
    DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL = 1
@@ -171,3 +170,4 @@ double ValgrindSlowdown(void) {
 }
 
 #endif  /* DYNAMIC_ANNOTATIONS_EXTERNAL_IMPL == 0 */
+}

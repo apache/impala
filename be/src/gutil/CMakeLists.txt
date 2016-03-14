@@ -39,7 +39,7 @@ INCLUDE_DIRECTORIES(${GLOG_INCLUDE_DIR})
 ADD_LIBRARY(gutil
 #  ${GUTIL_SRCS}
 ./bits.cc
-./dynamic_annotations.c
+./dynamic_annotations.cc
 ./stringprintf.cc
 ./strings/memutil.cc
 ./strings/charset.cc
