@@ -113,6 +113,9 @@ if [[ -z $KUDU_BUILD_DIR ]]; then
   fi
 fi
 
+# Always disable Kudu for now until some build problems are fixed.
+KUDU_IS_SUPPORTED=false
+
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}

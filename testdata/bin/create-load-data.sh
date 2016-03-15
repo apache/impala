@@ -359,9 +359,11 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
       load-data "functional-query" "core" "hbase/none"
 fi
 
-# Tests depend on the kudu data being clean, so load the data from scratch.
-run-step "Loading Kudu data" load-kudu.log \
-      load-data "functional-query" "core" "kudu/none/none" force
+if $KUDU_IS_SUPPORTED; then
+  # Tests depend on the kudu data being clean, so load the data from scratch.
+  run-step "Loading Kudu data" load-kudu.log \
+        load-data "functional-query" "core" "kudu/none/none" force
+fi
 run-step "Loading Hive UDFs" build-and-copy-hive-udfs.log \
     build-and-copy-hive-udfs
 run-step "Running custom post-load steps" custom-post-load-steps.log \
