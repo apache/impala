@@ -1,6 +1,5 @@
 #!/usr/bin/env impala-python
 # Copyright (c) 2015, Cloudera, inc.
-# Confidential Cloudera Information: Covered by NDA.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -93,7 +92,6 @@ def download_package(destination, product, version, compiler):
     if os.path.exists(new_dir):
       shutil.rmtree(new_dir)
     os.rename(kudu_dirs[0], new_dir)
-    print "renamed shit"
 
   write_version_file(destination, product, version, compiler, label)
 
@@ -129,7 +127,8 @@ def bootstrap(packages):
 
   for p in packages:
     pkg_name, pkg_version = unpack_name_and_version(p)
-    if check_for_existing_package(destination, pkg_name, pkg_version, compiler):
+    if check_for_existing_package(destination, pkg_name, pkg_version,
+        "any" if pkg_name == "kudu" else compiler):
       continue
     download_package(destination, pkg_name, pkg_version,
         "any" if pkg_name == "kudu" else compiler)
