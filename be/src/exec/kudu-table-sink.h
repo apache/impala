@@ -148,7 +148,7 @@ class KuduTableSink : public DataSink {
   virtual RuntimeProfile* profile() { return NULL; }
 
   virtual Status FlushFinal(RuntimeState* state) {
-    return Status(TErrorCode::KUDU_NOT_SUPPORTED);
+    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
   }
 };
 
