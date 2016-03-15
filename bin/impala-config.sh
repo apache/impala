@@ -107,7 +107,8 @@ if [[ -z $KUDU_BUILD_DIR ]]; then
     DISTRO_VERSION=$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")
     case "$DISTRO_VERSION" in
       # "enterprise" is Oracle
-      centos5 | debian6 | enterprise*5 | redhat*5 | suse*11) KUDU_IS_SUPPORTED=false;;
+      centos5 | debian6 | enterprise*5 | redhat*5 | suse*11 | ubuntu*12)
+          KUDU_IS_SUPPORTED=false;;
     esac
   fi
 fi
