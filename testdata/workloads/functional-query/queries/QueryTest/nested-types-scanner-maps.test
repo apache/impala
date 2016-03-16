@@ -58,3 +58,60 @@ select id, a.pos, m.key, m.value from complextypestbl t, t.int_map_array a, a.it
 ---- TYPES
 bigint,bigint,string,int
 ====
+---- QUERY
+select id, key from complextypestbl t, t.nested_struct.g
+---- RESULTS
+1,'foo'
+2,'g1'
+2,'g2'
+2,'g3'
+2,'g4'
+2,'g5'
+5,'foo'
+---- TYPES
+bigint,string
+====
+---- QUERY
+select id, key, item from complextypestbl t, t.nested_struct.g, g.value.h.i
+---- RESULTS
+1,'foo',1.1
+2,'g1',2.2
+2,'g1',NULL
+5,'foo',2.2
+5,'foo',3.3
+---- TYPES
+bigint,string,double
+====
+---- QUERY
+select key, item from complextypestbl.nested_struct.g, g.value.h.i
+---- RESULTS
+'foo',1.1
+'g1',2.2
+'g1',NULL
+'foo',2.2
+'foo',3.3
+---- TYPES
+string,double
+====
+---- QUERY
+select key, item, pos from complextypestbl.nested_struct.g, g.value.h.i
+---- RESULTS
+'foo',1.1,0
+'g1',2.2,0
+'g1',NULL,1
+'foo',2.2,0
+'foo',3.3,1
+---- TYPES
+string,double,bigint
+====
+---- QUERY
+select item from complextypestbl.nested_struct.g.value.h.i
+---- RESULTS
+1.1
+2.2
+NULL
+2.2
+3.3
+---- TYPES
+double
+====
