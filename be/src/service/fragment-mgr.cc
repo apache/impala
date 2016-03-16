@@ -15,7 +15,7 @@
 #include "service/fragment-mgr.h"
 
 #include <boost/lexical_cast.hpp>
-#include <gperftools/malloc_extension.h>
+#include <google/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "service/fragment-exec-state.h"

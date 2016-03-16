@@ -25,7 +25,7 @@
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <gperftools/malloc_extension.h>
+#include <google/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
