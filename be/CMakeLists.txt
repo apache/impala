@@ -133,9 +133,15 @@ add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 # was optimized at -O1. Higher optimization levels tend to bloat the code.
 #  -Wno-deprecated: gutil contains deprecated headers
 #  -Wno-c++11-extensions: c++11 extensions are ok as long as clang supports them
+#  -Wno-return-type-c-linkage: UDFs return C++ classes but use C linkage to prevent
+#       mangling
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-DIR_COMPILE" "-DNDEBUG"
   "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG"
-  "-Wno-deprecated" "-Wno-c++11-extensions" "-O1")
+  "-Wno-deprecated" "-Wno-c++11-extensions" "-Wno-return-type-c-linkage" "-O1")
+if (IMPALA_TOOLCHAIN)
+  # -Werror: compile warnings should be errors when using the toolchain compiler.
+  SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
+endif()
 
 # Flags to pass to LLVM's opt to further optimize cross-compiled IR.
 #  -inline: inline with low threshold to get rid of trivial accessor functions.
