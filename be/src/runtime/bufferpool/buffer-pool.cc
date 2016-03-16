@@ -308,6 +308,16 @@ int64_t BufferPool::ClientHandle::GetUnusedReservation() const {
   return impl_->reservation()->GetUnusedReservation();
 }
 
+bool BufferPool::ClientHandle::TransferReservationFrom(
+    ReservationTracker* src, int64_t bytes) {
+  return src->TransferReservationTo(impl_->reservation(), bytes);
+}
+
+bool BufferPool::ClientHandle::TransferReservationTo(
+    ReservationTracker* dst, int64_t bytes) {
+  return impl_->reservation()->TransferReservationTo(dst, bytes);
+}
+
 void BufferPool::ClientHandle::SaveReservation(SubReservation* dst, int64_t bytes) {
   DCHECK_EQ(dst->tracker_->parent(), impl_->reservation());
   bool success = impl_->reservation()->TransferReservationTo(dst->tracker_.get(), bytes);
@@ -355,7 +365,7 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
   RuntimeProfile* child_profile = profile->CreateChild("Buffer pool", true, true);
   reservation_.InitChildTracker(
       child_profile, parent_reservation, mem_tracker, reservation_limit);
-  counters_.alloc_time = ADD_TIMER(profile, "AllocTime");
+  counters_.alloc_time = ADD_TIMER(child_profile, "AllocTime");
   counters_.cumulative_allocations =
       ADD_COUNTER(child_profile, "CumulativeAllocations", TUnit::UNIT);
   counters_.cumulative_bytes_alloced =

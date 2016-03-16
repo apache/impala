@@ -338,6 +338,14 @@ class BufferPool::ClientHandle {
   int64_t GetUsedReservation() const;
   int64_t GetUnusedReservation() const;
 
+  /// Try to transfer 'bytes' of reservation from 'src' to this client using
+  /// ReservationTracker::TransferReservationTo().
+  bool TransferReservationFrom(ReservationTracker* src, int64_t bytes);
+
+  /// Transfer 'bytes' of reservation from this client to 'dst' using
+  /// ReservationTracker::TransferReservationTo().
+  bool TransferReservationTo(ReservationTracker* dst, int64_t bytes);
+
   bool is_registered() const { return impl_ != NULL; }
 
   std::string DebugString() const;

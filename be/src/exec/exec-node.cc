@@ -34,10 +34,10 @@
 #include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
 #include "exec/hbase-scan-node.h"
-#include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
-#include "exec/kudu-scan-node.h"
+#include "exec/hdfs-scan-node.h"
 #include "exec/kudu-scan-node-mt.h"
+#include "exec/kudu-scan-node.h"
 #include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
 #include "exec/partial-sort-node.h"
@@ -50,9 +50,14 @@
 #include "exec/topn-node.h"
 #include "exec/union-node.h"
 #include "exec/unnest-node.h"
+#include "exprs/expr.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
-#include "runtime/mem-tracker.h"
+#include "runtime/exec-env.h"
+#include "runtime/initial-reservations.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
@@ -61,7 +66,10 @@
 #include "common/names.h"
 
 using namespace llvm;
+using strings::Substitute;
 
+DECLARE_int32(be_port);
+DECLARE_string(hostname);
 DEFINE_bool(enable_partitioned_hash_join, true, "Deprecated - has no effect");
 DEFINE_bool(enable_partitioned_aggregation, true, "Deprecated - has no effect");
 
@@ -116,6 +124,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     type_(tnode.node_type),
     pool_(pool),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
+    resource_profile_(tnode.resource_profile),
     debug_phase_(TExecNodePhase::INVALID),
     debug_action_(TDebugAction::WAIT),
     limit_(tnode.limit),
@@ -195,13 +204,41 @@ void ExecNode::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(conjunct_evals_, state);
   ScalarExpr::Close(conjuncts_);
   if (expr_mem_pool() != nullptr) expr_mem_pool_->FreeAll();
-
+  if (buffer_pool_client_.is_registered()) {
+    VLOG_FILE << id_ << " returning reservation " << resource_profile_.min_reservation;
+    state->query_state()->initial_reservations()->Return(
+        &buffer_pool_client_, resource_profile_.min_reservation);
+    state->exec_env()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
+  }
   if (mem_tracker() != NULL && mem_tracker()->consumption() != 0) {
     LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
                  << state->instance_mem_tracker()->LogUsage();
     DCHECK_EQ(mem_tracker()->consumption(), 0)
         << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
   }
+}
+
+Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
+  DCHECK(!buffer_pool_client_.is_registered());
+  BufferPool* buffer_pool = ExecEnv::GetInstance()->buffer_pool();
+  // Check the minimum buffer size in case the minimum buffer size used by the planner
+  // doesn't match this backend's.
+  if (resource_profile_.__isset.spillable_buffer_size &&
+      resource_profile_.spillable_buffer_size < buffer_pool->min_buffer_len()) {
+    return Status(Substitute("Spillable buffer size for node $0 of $1 bytes is less "
+                             "than the minimum buffer pool buffer size of $2 bytes",
+        id_, resource_profile_.spillable_buffer_size, buffer_pool->min_buffer_len()));
+  }
+
+  RETURN_IF_ERROR(buffer_pool->RegisterClient(
+      Substitute("$0 id=$1 ptr=$2", PrintPlanNodeType(type_), id_, this),
+      state->query_state()->file_group(), state->instance_buffer_reservation(),
+      mem_tracker(), resource_profile_.max_reservation, runtime_profile(),
+      &buffer_pool_client_));
+  VLOG_FILE << id_ << " claiming reservation " << resource_profile_.min_reservation;
+  state->query_state()->initial_reservations()->Claim(
+      &buffer_pool_client_, resource_profile_.min_reservation);
+  return Status::OK();
 }
 
 Status ExecNode::CreateTree(

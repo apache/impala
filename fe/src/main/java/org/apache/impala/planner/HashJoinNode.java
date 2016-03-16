@@ -28,7 +28,6 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TEqJoinCondition;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THashJoinNode;
@@ -223,17 +222,18 @@ public class HashJoinNode extends JoinNode {
     long minBuffers = PARTITION_FANOUT + 1
         + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0);
 
-    long bufferSize = getDefaultSpillableBufferBytes();
+    long bufferSize = queryOptions.getDefault_spillable_buffer_size();
     if (perInstanceDataBytes != -1) {
       long bytesPerBuffer = perInstanceDataBytes / PARTITION_FANOUT;
       // Scale down the buffer size if we think there will be excess free space with the
       // default buffer size, e.g. if the right side is a small dimension table.
       bufferSize = Math.min(bufferSize, Math.max(
-          RuntimeEnv.INSTANCE.getMinSpillableBufferBytes(),
+          queryOptions.getMin_spillable_buffer_size(),
           BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
     }
 
     long perInstanceMinBufferBytes = bufferSize * minBuffers;
-    nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, perInstanceMinBufferBytes);
+    nodeResourceProfile_ = ResourceProfile.spillableWithMinReservation(
+        perInstanceMemEstimate, perInstanceMinBufferBytes, bufferSize);
   }
 }

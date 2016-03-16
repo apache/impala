@@ -126,8 +126,6 @@ Status FragmentInstanceState::Prepare() {
   profile()->AddChild(timings_profile_);
   SCOPED_TIMER(ADD_TIMER(timings_profile_, PREPARE_TIMER_NAME));
 
-  // TODO: move this into a RuntimeState::Init()
-  RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
   runtime_state_->InitFilterBank();
 
   // Reserve one main thread from the pool

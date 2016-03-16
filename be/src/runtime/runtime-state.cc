@@ -17,21 +17,21 @@
 
 #include "runtime/runtime-state.h"
 
-#include <iostream>
 #include <jni.h>
+#include <iostream>
 #include <sstream>
 #include <string>
 
-#include "common/logging.h"
 #include <boost/algorithm/string/join.hpp>
 #include <gutil/strings/substitute.h>
+#include "common/logging.h"
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-fn-call.h"
-#include "runtime/buffered-block-mgr.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
@@ -54,21 +54,9 @@
 #include "common/names.h"
 
 using namespace llvm;
+using strings::Substitute;
 
 DECLARE_int32(max_errors);
-
-// The fraction of the query mem limit that is used for the block mgr. Operators
-// that accumulate memory all use the block mgr so the majority of the memory should
-// be allocated to the block mgr. The remaining memory is used by the non-spilling
-// operators and should be independent of data size.
-static const float BLOCK_MGR_MEM_FRACTION = 0.8f;
-
-// The minimum amount of memory that must be left after the block mgr reserves the
-// BLOCK_MGR_MEM_FRACTION. The block limit is:
-// min(query_limit * BLOCK_MGR_MEM_FRACTION, query_limit - BLOCK_MGR_MEM_MIN_REMAINING)
-// TODO: this value was picked arbitrarily and the tests are written to rely on this
-// for the minimum memory required to run the query. Revisit.
-static const int64_t BLOCK_MGR_MEM_MIN_REMAINING = 100 * 1024 * 1024;
 
 namespace impala {
 
@@ -82,7 +70,7 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
         query_state->query_ctx().utc_timestamp_string))),
     exec_env_(exec_env),
     profile_(obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
-    instance_buffer_reservation_(nullptr),
+    instance_buffer_reservation_(new ReservationTracker),
     is_cancelled_(false),
     root_node_id_(-1) {
   Init();
@@ -127,8 +115,7 @@ void RuntimeState::Init() {
   instance_mem_tracker_.reset(new MemTracker(
       runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker()));
 
-  if (query_state_ != nullptr && exec_env_->buffer_pool() != nullptr) {
-    instance_buffer_reservation_ = obj_pool()->Add(new ReservationTracker);
+  if (instance_buffer_reservation_ != nullptr) {
     instance_buffer_reservation_->InitChildTracker(&profile_,
         query_state_->buffer_reservation(), instance_mem_tracker_.get(),
         numeric_limits<int64_t>::max());
@@ -137,28 +124,6 @@ void RuntimeState::Init() {
 
 void RuntimeState::InitFilterBank() {
   filter_bank_.reset(new RuntimeFilterBank(query_ctx(), this));
-}
-
-Status RuntimeState::CreateBlockMgr() {
-  DCHECK(block_mgr_.get() == NULL);
-
-  // Compute the max memory the block mgr will use.
-  int64_t block_mgr_limit = query_mem_tracker()->lowest_limit();
-  if (block_mgr_limit < 0) block_mgr_limit = numeric_limits<int64_t>::max();
-  block_mgr_limit = min(static_cast<int64_t>(block_mgr_limit * BLOCK_MGR_MEM_FRACTION),
-      block_mgr_limit - BLOCK_MGR_MEM_MIN_REMAINING);
-  if (block_mgr_limit < 0) block_mgr_limit = 0;
-  if (query_options().__isset.max_block_mgr_memory &&
-      query_options().max_block_mgr_memory > 0) {
-    block_mgr_limit = query_options().max_block_mgr_memory;
-    LOG(WARNING) << "Block mgr mem limit: "
-                 << PrettyPrinter::Print(block_mgr_limit, TUnit::BYTES);
-  }
-
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
-      runtime_profile(), exec_env()->tmp_file_mgr(), block_mgr_limit,
-      io_mgr()->max_read_buffer_size(), &block_mgr_));
-  return Status::OK();
 }
 
 Status RuntimeState::CreateCodegen() {
@@ -177,6 +142,10 @@ Status RuntimeState::CodegenScalarFns() {
     RETURN_IF_ERROR(scalar_fn->GetCodegendComputeFn(codegen_.get(), &fn));
   }
   return Status::OK();
+}
+
+Status RuntimeState::StartSpilling(MemTracker* mem_tracker) {
+  return query_state_->StartSpilling(this, mem_tracker);
 }
 
 string RuntimeState::ErrorLog() {
@@ -270,7 +239,6 @@ void RuntimeState::ReleaseResources() {
   if (resource_pool_ != nullptr) {
     exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
   }
-  block_mgr_.reset(); // Release any block mgr memory, if this is the last reference.
   codegen_.reset(); // Release any memory associated with codegen.
 
   // Release the reservation, which should be unused at the point.

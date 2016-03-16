@@ -124,6 +124,8 @@ void QueryExecMgr::StartQueryHelper(QueryState* qs) {
   }
 #endif
 
+  // decrement refcount taken in QueryState::Init();
+  qs->ReleaseInitialReservationRefcount();
   // decrement refcount taken in StartQuery()
   ReleaseQueryState(qs);
 }

@@ -481,6 +481,21 @@ struct TUnnestNode {
   1: required Exprs.TExpr collection_expr
 }
 
+// This contains all of the information computed by the plan as part of the resource
+// profile that is needed by the backend to execute.
+struct TBackendResourceProfile {
+  // The minimum reservation for this plan node in bytes.
+  1: required i64 min_reservation
+
+  // The maximum reservation for this plan node in bytes. MAX_INT64 means effectively
+  // unlimited.
+  2: required i64 max_reservation
+
+  // The spillable buffer size in bytes to use for this node, chosen by the planner.
+  // Set iff the node uses spillable buffers.
+  3: optional i64 spillable_buffer_size
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -526,6 +541,9 @@ struct TPlanNode {
 
   // Runtime filters assigned to this plan node
   24: optional list<TRuntimeFilterDesc> runtime_filters
+
+  // Resource profile for this plan node.
+  25: required TBackendResourceProfile resource_profile
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

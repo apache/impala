@@ -20,7 +20,7 @@
 
 #include "exec/partitioned-hash-join-node.h"
 
-#include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/buffered-tuple-stream-v2.inline.h"
 
 namespace impala {
 

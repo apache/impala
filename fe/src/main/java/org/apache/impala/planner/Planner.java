@@ -63,7 +63,7 @@ public class Planner {
   public static final long MIN_PER_HOST_MEM_ESTIMATE_BYTES = 10 * 1024 * 1024;
 
   public static final ResourceProfile MIN_PER_HOST_RESOURCES =
-      new ResourceProfile(MIN_PER_HOST_MEM_ESTIMATE_BYTES, 0);
+      ResourceProfile.withMinReservation(MIN_PER_HOST_MEM_ESTIMATE_BYTES, 0);
 
   private final PlannerContext ctx_;
 
@@ -262,9 +262,9 @@ public class Planner {
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
-    if (request.isSetPer_host_min_reservation()) {
+    if (request.query_ctx.isSetPer_host_min_reservation()) {
       str.append(String.format("Per-Host Resource Reservation: Memory=%s\n",
-              PrintUtils.printBytes(request.getPer_host_min_reservation()))) ;
+          PrintUtils.printBytes(request.query_ctx.getPer_host_min_reservation())));
       hasHeader = true;
     }
     if (request.isSetPer_host_mem_estimate()) {
@@ -344,7 +344,7 @@ public class Planner {
    * per-host resource values in 'request'.
    */
   public void computeResourceReqs(List<PlanFragment> planRoots,
-      TQueryExecRequest request) {
+      TQueryCtx queryCtx, TQueryExecRequest request) {
     Preconditions.checkState(!planRoots.isEmpty());
     Preconditions.checkNotNull(request);
     TQueryOptions queryOptions = ctx_.getRootAnalyzer().getQueryOptions();
@@ -389,8 +389,8 @@ public class Planner {
     perHostPeakResources = MIN_PER_HOST_RESOURCES.max(perHostPeakResources);
 
     request.setPer_host_mem_estimate(perHostPeakResources.getMemEstimateBytes());
-    request.setPer_host_min_reservation(perHostPeakResources.getMinReservationBytes());
-    request.setPer_host_initial_reservation_total_claims(perHostInitialReservationTotal);
+    queryCtx.setPer_host_min_reservation(perHostPeakResources.getMinReservationBytes());
+    queryCtx.setPer_host_initial_reservation_total_claims(perHostInitialReservationTotal);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Per-host min buffer : " + perHostPeakResources.getMinReservationBytes());
       LOG.trace(

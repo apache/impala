@@ -16,14 +16,12 @@
 # under the License.
 
 import pytest
-from copy import deepcopy
 
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.test_dimensions import (
-    create_single_exec_option_dimension,
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_parquet_dimension)
 
-class TestSpilling(CustomClusterTestSuite):
+class TestSpilling(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -33,15 +31,9 @@ class TestSpilling(CustomClusterTestSuite):
     super(TestSpilling, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear_constraints()
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    # Tests are calibrated so that they can execute and spill with this page size.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k']}))
 
-  # Reduce the IO read size. This reduces the memory required to trigger spilling.
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--read_size=200000",
-      catalogd_args="--load_catalog_in_background=false")
   def test_spilling(self, vector):
-    new_vector = deepcopy(vector)
-    # remove this. the test cases set this explicitly.
-    del new_vector.get_value('exec_option')['num_nodes']
-    self.run_test_case('QueryTest/spilling', new_vector)
+    self.run_test_case('QueryTest/spilling', vector)

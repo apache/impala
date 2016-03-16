@@ -26,6 +26,8 @@
 #include "common/status.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/descriptors.h" // for RowDescriptor
 #include "util/blocking-queue.h"
 #include "util/runtime-profile.h"
@@ -227,6 +229,12 @@ class ExecNode {
  protected:
   friend class DataSink;
 
+  /// Initialize 'buffer_pool_client_' and claim the initial reservation for this
+  /// ExecNode. Only needs to be called by ExecNodes that will use the client.
+  /// The client is automatically cleaned up in Close(). Should not be called if
+  /// the client is already open.
+  Status ClaimBufferReservation(RuntimeState* state);
+
   /// Extends blocking queue for row batches. Row batches have a property that
   /// they must be processed in the order they were produced, even in cancellation
   /// paths. Preceding row batches can contain ptrs to memory in subsequent row batches
@@ -276,6 +284,9 @@ class ExecNode {
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
 
+  /// Resource information sent from the frontend.
+  const TBackendResourceProfile resource_profile_;
+
   /// debug-only: if debug_action_ is not INVALID, node will perform action in
   /// debug_phase_
   TExecNodePhase::type debug_phase_;
@@ -297,6 +308,12 @@ class ExecNode {
   /// MemPool for allocating data structures used by expression evaluators in this node.
   /// Created in Prepare().
   boost::scoped_ptr<MemPool> expr_mem_pool_;
+
+  /// Buffer pool client for this node. Initialized with the node's minimum reservation
+  /// in ClaimBufferReservation(). After initialization, the client must hold onto at
+  /// least the minimum reservation so that it can be returned to the initial
+  /// reservations pool in Close().
+  BufferPool::ClientHandle buffer_pool_client_;
 
   bool is_closed() const { return is_closed_; }
 

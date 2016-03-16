@@ -159,8 +159,8 @@ class ExecEnv {
   boost::scoped_ptr<QueryExecMgr> query_exec_mgr_;
 
   /// Query-wide buffer pool and the root reservation tracker for the pool. The
-  /// reservation limit is equal to the maximum capacity of the pool.
-  /// For now this is only used by backend tests that create them via InitBufferPool();
+  /// reservation limit is equal to the maximum capacity of the pool. Created in
+  /// InitBufferPool();
   boost::scoped_ptr<ReservationTracker> buffer_reservation_;
   boost::scoped_ptr<BufferPool> buffer_pool_;
 

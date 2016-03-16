@@ -16,7 +16,7 @@ row_regex: .*RowsProduced: 10.99..\W10995\W
 # Test to verify that is limit_ is correctly enforced when
 # output_batch is at AtCapacity.
 set batch_size=6;
-set max_block_mgr_memory=180m;
+set buffer_pool_limit=180m;
 select * from tpch.lineitem t1 full outer join tpch.lineitem t2 on
 t1.l_orderkey = t2.l_orderkey limit 10;
 ---- RUNTIME_PROFILE

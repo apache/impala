@@ -20,13 +20,12 @@
 
 #include "exec/exec-node.h"
 #include "runtime/sorter.h"
-#include "runtime/buffered-block-mgr.h"
 
 namespace impala {
 
 /// Node that implements a full sort of its input with a fixed memory budget, spilling
 /// to disk if the input is larger than available memory.
-/// Uses Sorter and BufferedBlockMgr for the external sort implementation.
+/// Uses Sorter for the external sort implementation.
 /// Input rows to SortNode are materialized by the Sorter into a single tuple
 /// using the expressions specified in sort_tuple_exprs_.
 /// In GetNext(), SortNode passes in the output batch to the sorter instance created

@@ -15,28 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_EXEC_PARTITIONED_HASH_JOIN_NODE_H
 #define IMPALA_EXEC_PARTITIONED_HASH_JOIN_NODE_H
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
 #include <list>
 #include <memory>
 #include <string>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "exec/blocking-join-node.h"
 #include "exec/exec-node.h"
 #include "exec/partitioned-hash-join-builder.h"
-#include "runtime/buffered-block-mgr.h"
 
 #include "gen-cpp/Types_types.h"
 
 namespace impala {
 
 class BloomFilter;
-class BufferedBlockMgr;
-class BufferedTupleStream;
 class MemPool;
 class RowBatch;
 class RuntimeFilter;
@@ -100,8 +96,6 @@ class TupleRow;
 /// NULLs into several different streams, which are processed in a separate step to
 /// produce additional output rows. The NAAJ algorithm is documented in more detail in
 /// header comments for the null aware functions and data structures.
-///
-/// TODO: don't copy tuple rows so often.
 class PartitionedHashJoinNode : public BlockingJoinNode {
  public:
   PartitionedHashJoinNode(ObjectPool* pool, const TPlanNode& tnode,
@@ -168,7 +162,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Creates an initialized probe partition at 'partition_idx' in
   /// 'probe_hash_partitions_'.
   void CreateProbePartition(
-      int partition_idx, std::unique_ptr<BufferedTupleStream> probe_rows);
+      int partition_idx, std::unique_ptr<BufferedTupleStreamV2> probe_rows);
 
   /// Append the probe row 'row' to 'stream'. The stream must be unpinned and must have
   /// a write buffer allocated, so this will succeed unless an error is encountered.
@@ -176,7 +170,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// return convention is used to avoid emitting unnecessary code for ~Status in perf-
   /// critical code.
   bool AppendProbeRow(
-      BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
+      BufferedTupleStreamV2* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
 
   /// Probes the hash table for rows matching the current probe row and appends
   /// all the matching build rows (with probe row) to output batch. Returns true
@@ -331,7 +325,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// conjuncts pass (i.e. there is a match).
   /// This is used for NAAJ, when there are NULL probe rows.
   Status EvaluateNullProbe(
-      RuntimeState* state, BufferedTupleStream* build) WARN_UNUSED_RESULT;
+      RuntimeState* state, BufferedTupleStreamV2* build) WARN_UNUSED_RESULT;
 
   /// Prepares to output NULLs on the probe side for NAAJ. Before calling this,
   /// matched_null_probe_ should have been fully evaluated.
@@ -478,7 +472,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// For NAAJ, this stream contains all probe rows that had NULL on the hash table
   /// conjuncts. Must be unique_ptr so we can release it and transfer to output batches.
-  std::unique_ptr<BufferedTupleStream> null_probe_rows_;
+  std::unique_ptr<BufferedTupleStreamV2> null_probe_rows_;
 
   /// For each row in null_probe_rows_, true if this row has matched any build row
   /// (i.e. the resulting joined row passes other_join_conjuncts).
@@ -510,7 +504,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// that has been prepared for writing with an I/O-sized write buffer.
     ProbePartition(RuntimeState* state, PartitionedHashJoinNode* parent,
         PhjBuilder::Partition* build_partition,
-        std::unique_ptr<BufferedTupleStream> probe_rows);
+        std::unique_ptr<BufferedTupleStreamV2> probe_rows);
     ~ProbePartition();
 
     /// Prepare to read the probe rows. Allocates the first read block, so reads will
@@ -523,21 +517,19 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// resources if 'batch' is NULL. Idempotent.
     void Close(RowBatch* batch);
 
-    BufferedTupleStream* ALWAYS_INLINE probe_rows() { return probe_rows_.get(); }
+    BufferedTupleStreamV2* ALWAYS_INLINE probe_rows() { return probe_rows_.get(); }
     PhjBuilder::Partition* build_partition() { return build_partition_; }
 
     inline bool IsClosed() const { return probe_rows_ == NULL; }
 
    private:
-    PartitionedHashJoinNode* parent_;
-
     /// The corresponding build partition. Not NULL. Owned by PhjBuilder.
     PhjBuilder::Partition* build_partition_;
 
     /// Stream of probe tuples in this partition. Initially owned by this object but
     /// transferred to the parent exec node (via the row batch) when the partition
     /// is complete. If NULL, ownership was transferred and the partition is closed.
-    std::unique_ptr<BufferedTupleStream> probe_rows_;
+    std::unique_ptr<BufferedTupleStreamV2> probe_rows_;
   };
 
   /// For the below codegen'd functions, xxx_fn_level0_ uses CRC hashing when available

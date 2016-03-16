@@ -23,6 +23,7 @@
 #include "runtime/runtime-filter-bank.h"
 #include "util/bloom-filter.h"
 #include "util/spinlock.h"
+#include "util/time.h"
 
 namespace impala {
 

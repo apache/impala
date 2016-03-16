@@ -23,9 +23,10 @@
 #include "exprs/agg-fn-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/buffered-tuple-stream-v2.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
@@ -34,13 +35,14 @@
 #include "common/names.h"
 
 static const int MAX_TUPLE_POOL_SIZE = 8 * 1024 * 1024; // 8MB
+static const int MIN_REQUIRED_BUFFERS = 2;
 
 using namespace strings;
 
 namespace impala {
 
-AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
+AnalyticEvalNode::AnalyticEvalNode(
+    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     window_(tnode.analytic_node.window),
     intermediate_tuple_desc_(
@@ -51,7 +53,6 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     rows_end_offset_(0),
     has_first_val_null_offset_(false),
     first_val_null_offset_(0),
-    client_(nullptr),
     child_tuple_cmp_row_(nullptr),
     last_result_idx_(-1),
     prev_pool_last_result_idx_(-1),
@@ -110,6 +111,7 @@ AnalyticEvalNode::~AnalyticEvalNode() {
 Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK_EQ(conjunct_evals_.size(), 0);
+  state_ = state;
   const TAnalyticNode& analytic_node = tnode.analytic_node;
   bool has_lead_fn = false;
 
@@ -154,6 +156,8 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   DCHECK(child(0)->row_desc()->IsPrefixOf(*row_desc()));
+  DCHECK_GE(resource_profile_.min_reservation,
+      resource_profile_.spillable_buffer_size * MIN_REQUIRED_BUFFERS);
   curr_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
@@ -175,12 +179,6 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
         fn_pool_.get(), &order_by_eq_expr_eval_));
     AddEvaluatorToFree(order_by_eq_expr_eval_);
   }
-
-  // Must be kept in sync with AnalyticEvalNode.computeResourceProfile() in fe.
-  const int MIN_REQUIRED_BUFFERS = 2;
-  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
-      Substitute("AnalyticEvalNode id=$0 ptr=$1", id_, this),
-      MIN_REQUIRED_BUFFERS, false, mem_tracker(), state, &client_));
   return Status::OK();
 }
 
@@ -190,22 +188,20 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
-  DCHECK(client_ != nullptr);
+
+  // Claim reservation after the child has been opened to reduce the peak reservation
+  // requirement.
+  if (!buffer_pool_client_.is_registered()) {
+    RETURN_IF_ERROR(ClaimBufferReservation(state));
+  }
   DCHECK(input_stream_ == nullptr);
-  input_stream_.reset(
-      new BufferedTupleStream(state, child(0)->row_desc(), state->block_mgr(), client_,
-          false /* use_initial_small_buffers */, true /* read_write */));
-  RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
-  bool got_write_buffer;
-  RETURN_IF_ERROR(input_stream_->PrepareForWrite(&got_write_buffer));
-  if (!got_write_buffer) {
-    return state->block_mgr()->MemLimitTooLowError(client_, id());
-  }
-  bool got_read_buffer;
-  RETURN_IF_ERROR(input_stream_->PrepareForRead(true, &got_read_buffer));
-  if (!got_read_buffer) {
-    return state->block_mgr()->MemLimitTooLowError(client_, id());
-  }
+  input_stream_.reset(new BufferedTupleStreamV2(state, child(0)->row_desc(),
+      &buffer_pool_client_, resource_profile_.spillable_buffer_size,
+      resource_profile_.spillable_buffer_size));
+  RETURN_IF_ERROR(input_stream_->Init(id(), true));
+  bool success;
+  RETURN_IF_ERROR(input_stream_->PrepareForReadWrite(true, &success));
+  DCHECK(success) << "Had reservation: " << buffer_pool_client_.DebugString();
 
   for (int i = 0; i < analytic_fn_evals_.size(); ++i) {
     RETURN_IF_ERROR(analytic_fn_evals_[i]->Open(state));
@@ -366,8 +362,8 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     // the stream and continue writing/reading in unpinned mode.
     // TODO: Consider re-pinning later if the output stream is fully consumed.
     RETURN_IF_ERROR(status);
-    RETURN_IF_ERROR(
-        input_stream_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    RETURN_IF_ERROR(state_->StartSpilling(mem_tracker()));
+    input_stream_->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
     VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
     if (!input_stream_->AddRow(row, &status)) {
       // Rows should be added in unpinned mode unless an error occurs.
@@ -627,7 +623,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
             << " tuple pool size:" << curr_tuple_pool_->total_allocated_bytes();
   SCOPED_TIMER(evaluation_timer_);
 
-  // BufferedTupleStream::num_rows() returns the total number of rows that have been
+  // BufferedTupleStreamV2::num_rows() returns the total number of rows that have been
   // inserted into the stream (it does not decrease when we read rows), so the index of
   // the next input row that will be inserted will be the current size of the stream.
   int64_t stream_idx = input_stream_->num_rows();
@@ -857,7 +853,6 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
 
 void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  if (client_ != nullptr) state->block_mgr()->ClearReservations(client_);
   // We may need to clean up input_stream_ if an error occurred at some point.
   if (input_stream_ != nullptr) {
     input_stream_->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);

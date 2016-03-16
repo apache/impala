@@ -25,8 +25,10 @@
 #include "exec/hash-table.inline.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "runtime/buffered-tuple-stream.h"
+#include "runtime/buffered-tuple-stream-v2.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/runtime-filter.h"
@@ -44,19 +46,23 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
     "the memory limit may help this query to complete successfully.";
 
 using namespace impala;
-using namespace llvm;
-using namespace strings;
-using std::unique_ptr;
+using llvm::ConstantInt;
+using llvm::Function;
+using llvm::Type;
+using llvm::Value;
+using strings::Substitute;
 
 PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
-    RuntimeState* state)
+    RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
+    int64_t spillable_buffer_size)
   : DataSink(build_row_desc),
     runtime_state_(state),
     join_node_id_(join_node_id),
     join_op_(join_op),
     probe_row_desc_(probe_row_desc),
-    block_mgr_client_(NULL),
+    buffer_pool_client_(buffer_pool_client),
+    spillable_buffer_size_(spillable_buffer_size),
     non_empty_build_(false),
     partitions_created_(NULL),
     largest_partition_percent_(NULL),
@@ -137,9 +143,6 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, &pool_,
         expr_mem_pool(), &filter_ctxs_[i].expr_eval));
   }
-  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
-      Substitute("PartitionedHashJoin id=$0 builder=$1", join_node_id_, this),
-      MinRequiredBuffers(), true, mem_tracker_.get(), state, &block_mgr_client_));
 
   partitions_created_ = ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
   largest_partition_percent_ =
@@ -168,6 +171,11 @@ Status PhjBuilder::Open(RuntimeState* state) {
 
   for (const FilterContext& ctx : filter_ctxs_) {
     RETURN_IF_ERROR(ctx.expr_eval->Open(state));
+  }
+  if (ht_allocator_ == nullptr) {
+    // Create 'ht_allocator_' on the first call to Open().
+    ht_allocator_.reset(new Suballocator(
+        state->exec_env()->buffer_pool(), buffer_pool_client_, spillable_buffer_size_));
   }
   RETURN_IF_ERROR(CreateHashPartitions(0));
   AllocateRuntimeFilters();
@@ -248,7 +256,6 @@ void PhjBuilder::Close(RuntimeState* state) {
     if (ctx.expr_eval != nullptr) ctx.expr_eval->Close(state);
   }
   ScalarExpr::Close(filter_exprs_);
-  if (block_mgr_client_ != NULL) state->block_mgr()->ClearReservations(block_mgr_client_);
   ScalarExpr::Close(build_exprs_);
   pool_.Clear();
   DataSink::Close(state);
@@ -264,13 +271,11 @@ void PhjBuilder::Reset() {
 Status PhjBuilder::CreateAndPreparePartition(int level, Partition** partition) {
   all_partitions_.emplace_back(new Partition(runtime_state_, this, level));
   *partition = all_partitions_.back().get();
-  RETURN_IF_ERROR((*partition)->build_rows()->Init(join_node_id_, profile(), true));
+  RETURN_IF_ERROR((*partition)->build_rows()->Init(join_node_id_, true));
   bool got_buffer;
   RETURN_IF_ERROR((*partition)->build_rows()->PrepareForWrite(&got_buffer));
-  if (!got_buffer) {
-    return runtime_state_->block_mgr()->MemLimitTooLowError(
-        block_mgr_client_, join_node_id_);
-  }
+  DCHECK(got_buffer)
+      << "Accounted in min reservation" << buffer_pool_client_->DebugString();
   return Status::OK();
 }
 
@@ -288,22 +293,11 @@ Status PhjBuilder::CreateHashPartitions(int level) {
 }
 
 bool PhjBuilder::AppendRowStreamFull(
-    BufferedTupleStream* stream, TupleRow* row, Status* status) noexcept {
+    BufferedTupleStreamV2* stream, TupleRow* row, Status* status) noexcept {
   while (true) {
-    // Check if the stream is still using small buffers and try to switch to IO-buffers.
-    if (stream->using_small_buffers()) {
-      bool got_buffer;
-      *status = stream->SwitchToIoBuffers(&got_buffer);
-      if (!status->ok()) return false;
-
-      if (got_buffer) {
-        if (LIKELY(stream->AddRow(row, status))) return true;
-        if (!status->ok()) return false;
-      }
-    }
     // We ran out of memory. Pick a partition to spill. If we ran out of unspilled
     // partitions, SpillPartition() will return an error status.
-    *status = SpillPartition(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+    *status = SpillPartition(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
     if (!status->ok()) return false;
     if (stream->AddRow(row, status)) return true;
     if (!status->ok()) return false;
@@ -313,7 +307,7 @@ bool PhjBuilder::AppendRowStreamFull(
 }
 
 // TODO: can we do better with a different spilling heuristic?
-Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode) {
+Status PhjBuilder::SpillPartition(BufferedTupleStreamV2::UnpinMode mode) {
   DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
   int64_t max_freed_mem = 0;
   int partition_idx = -1;
@@ -323,7 +317,7 @@ Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode) {
     Partition* candidate = hash_partitions_[i];
     if (candidate->IsClosed()) continue;
     if (candidate->is_spilled()) continue;
-    int64_t mem = candidate->build_rows()->bytes_in_mem(false);
+    int64_t mem = candidate->build_rows()->BytesPinned(false);
     if (candidate->hash_tbl() != NULL) {
       // The hash table should not have matches, since we have not probed it yet.
       // Losing match info would lead to incorrect results (IMPALA-1488).
@@ -337,9 +331,9 @@ Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode) {
   }
 
   if (partition_idx == -1) {
-    // Could not find a partition to spill. This means the mem limit was just too low.
-    return runtime_state_->block_mgr()->MemLimitTooLowError(
-        block_mgr_client_, join_node_id_);
+    return Status(Substitute("Internal error: could not find a partition to spill in "
+                             " hash join $1: \n$2\nClient:\n$3",
+        join_node_id_, DebugString(), buffer_pool_client_->DebugString()));
   }
 
   VLOG(2) << "Spilling partition: " << partition_idx << endl << DebugString();
@@ -373,8 +367,7 @@ Status PhjBuilder::BuildHashTablesAndPrepareProbeStreams() {
       partition->Close(NULL);
     } else if (partition->is_spilled()) {
       // We don't need any build-side data for spilled partitions in memory.
-      RETURN_IF_ERROR(
-          partition->build_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL));
+      partition->build_rows()->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL);
     }
   }
 
@@ -393,7 +386,7 @@ Status PhjBuilder::BuildHashTablesAndPrepareProbeStreams() {
     RETURN_IF_ERROR(partition->BuildHashTable(&built));
     // If we did not have enough memory to build this hash table, we need to spill this
     // partition (clean up the hash table, unpin build).
-    if (!built) RETURN_IF_ERROR(partition->Spill(BufferedTupleStream::UNPIN_ALL));
+    if (!built) RETURN_IF_ERROR(partition->Spill(BufferedTupleStreamV2::UNPIN_ALL));
   }
 
   // We may have spilled additional partitions while building hash tables, we need to
@@ -429,11 +422,11 @@ Status PhjBuilder::InitSpilledPartitionProbeStreams() {
 
   while (probe_streams_to_create > 0) {
     // Create stream in vector, so that it will be cleaned up after any failure.
-    spilled_partition_probe_streams_.emplace_back(std::make_unique<BufferedTupleStream>(
-        runtime_state_, probe_row_desc_, runtime_state_->block_mgr(), block_mgr_client_,
-        false /* use_initial_small_buffers */, false /* read_write */));
-    BufferedTupleStream* probe_stream = spilled_partition_probe_streams_.back().get();
-    RETURN_IF_ERROR(probe_stream->Init(join_node_id_, profile(), false));
+    spilled_partition_probe_streams_.emplace_back(
+        make_unique<BufferedTupleStreamV2>(runtime_state_, probe_row_desc_,
+            buffer_pool_client_, spillable_buffer_size_, spillable_buffer_size_));
+    BufferedTupleStreamV2* probe_stream = spilled_partition_probe_streams_.back().get();
+    RETURN_IF_ERROR(probe_stream->Init(join_node_id_, false));
 
     // Loop until either the stream gets a buffer or all partitions are spilled (in which
     // case SpillPartition() returns an error).
@@ -442,7 +435,7 @@ Status PhjBuilder::InitSpilledPartitionProbeStreams() {
       RETURN_IF_ERROR(probe_stream->PrepareForWrite(&got_buffer));
       if (got_buffer) break;
 
-      RETURN_IF_ERROR(SpillPartition(BufferedTupleStream::UNPIN_ALL));
+      RETURN_IF_ERROR(SpillPartition(BufferedTupleStreamV2::UNPIN_ALL));
       ++probe_streams_to_create;
     }
     --probe_streams_to_create;
@@ -450,7 +443,7 @@ Status PhjBuilder::InitSpilledPartitionProbeStreams() {
   return Status::OK();
 }
 
-vector<unique_ptr<BufferedTupleStream>> PhjBuilder::TransferProbeStreams() {
+vector<unique_ptr<BufferedTupleStreamV2>> PhjBuilder::TransferProbeStreams() {
   return std::move(spilled_partition_probe_streams_);
 }
 
@@ -460,7 +453,7 @@ void PhjBuilder::CloseAndDeletePartitions() {
   all_partitions_.clear();
   hash_partitions_.clear();
   null_aware_partition_ = NULL;
-  for (unique_ptr<BufferedTupleStream>& stream : spilled_partition_probe_streams_) {
+  for (unique_ptr<BufferedTupleStreamV2>& stream : spilled_partition_probe_streams_) {
     stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
   spilled_partition_probe_streams_.clear();
@@ -512,14 +505,14 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
 }
 
 Status PhjBuilder::RepartitionBuildInput(
-    Partition* input_partition, int level, BufferedTupleStream* input_probe_rows) {
+    Partition* input_partition, int level, BufferedTupleStreamV2* input_probe_rows) {
   DCHECK_GE(level, 1);
   SCOPED_TIMER(repartition_timer_);
   COUNTER_ADD(num_repartitions_, 1);
   RuntimeState* state = runtime_state_;
 
   // Setup the read buffer and the new partitions.
-  BufferedTupleStream* build_rows = input_partition->build_rows();
+  BufferedTupleStreamV2* build_rows = input_partition->build_rows();
   DCHECK(build_rows != NULL);
   bool got_read_buffer;
   RETURN_IF_ERROR(build_rows->PrepareForRead(true, &got_read_buffer));
@@ -552,7 +545,7 @@ Status PhjBuilder::RepartitionBuildInput(
     bool got_buffer;
     RETURN_IF_ERROR(input_probe_rows->PrepareForRead(true, &got_buffer));
     if (got_buffer) break;
-    RETURN_IF_ERROR(SpillPartition(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    RETURN_IF_ERROR(SpillPartition(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT));
   }
 
   RETURN_IF_ERROR(FlushFinal(state));
@@ -580,12 +573,9 @@ bool PhjBuilder::HashTableStoresNulls() const {
 
 PhjBuilder::Partition::Partition(RuntimeState* state, PhjBuilder* parent, int level)
   : parent_(parent), is_spilled_(false), level_(level) {
-  // If we're repartitioning, we can assume the build input is fairly large and small
-  // buffers will most likely just waste memory.
-  bool use_initial_small_buffers = level == 0;
-  build_rows_ =
-      std::make_unique<BufferedTupleStream>(state, parent_->row_desc_, state->block_mgr(),
-          parent_->block_mgr_client_, use_initial_small_buffers, false /* read_write */);
+  build_rows_ = make_unique<BufferedTupleStreamV2>(state, parent_->row_desc_,
+      parent_->buffer_pool_client_, parent->spillable_buffer_size_,
+      parent->spillable_buffer_size_);
 }
 
 PhjBuilder::Partition::~Partition() {
@@ -612,30 +602,15 @@ void PhjBuilder::Partition::Close(RowBatch* batch) {
   }
 }
 
-Status PhjBuilder::Partition::Spill(BufferedTupleStream::UnpinMode mode) {
+Status PhjBuilder::Partition::Spill(BufferedTupleStreamV2::UnpinMode mode) {
   DCHECK(!IsClosed());
-  // Close the hash table as soon as possible to release memory.
+  RETURN_IF_ERROR(parent_->runtime_state_->StartSpilling(parent_->mem_tracker()));
+  // Close the hash table and unpin the stream backing it to free memory.
   if (hash_tbl() != NULL) {
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
-
-  // Unpin the stream as soon as possible to increase the chances that the
-  // SwitchToIoBuffers() call below will succeed.
-  RETURN_IF_ERROR(build_rows_->UnpinStream(mode));
-
-  if (build_rows_->using_small_buffers()) {
-    bool got_buffer;
-    RETURN_IF_ERROR(build_rows_->SwitchToIoBuffers(&got_buffer));
-    if (!got_buffer) {
-      // We'll try again to get the buffers when the stream fills up the small buffers.
-      VLOG_QUERY << "Not enough memory to switch to IO-sized buffer for partition "
-                 << this << " of join=" << parent_->join_node_id_
-                 << " build small buffers=" << build_rows_->using_small_buffers();
-      VLOG_FILE << GetStackTrace();
-    }
-  }
-
+  build_rows_->UnpinStream(mode);
   if (!is_spilled_) {
     COUNTER_ADD(parent_->num_spilled_partitions_, 1);
     if (parent_->num_spilled_partitions_->value() == 1) {
@@ -652,14 +627,14 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
   *built = false;
 
   // Before building the hash table, we need to pin the rows in memory.
-  RETURN_IF_ERROR(build_rows_->PinStream(false, built));
+  RETURN_IF_ERROR(build_rows_->PinStream(built));
   if (!*built) return Status::OK();
 
   RuntimeState* state = parent_->runtime_state_;
   HashTableCtx* ctx = parent_->ht_ctx_.get();
   ctx->set_level(level()); // Set the hash function for building the hash table.
   RowBatch batch(parent_->row_desc_, state->batch_size(), parent_->mem_tracker());
-  vector<BufferedTupleStream::RowIdx> indices;
+  vector<BufferedTupleStreamV2::FlatRowPtr> flat_rows;
   bool eos = false;
 
   // Allocate the partition-local hash table. Initialize the number of buckets based on
@@ -674,22 +649,22 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
   //
   // TODO: Try to allocate the hash table before pinning the stream to avoid needlessly
   // reading all of the spilled rows from disk when we won't succeed anyway.
-  int64_t estimated_num_buckets = build_rows()->RowConsumesMemory() ?
-      HashTable::EstimateNumBuckets(build_rows()->num_rows()) :
-      state->batch_size() * 2;
-  hash_tbl_.reset(HashTable::Create(state, parent_->block_mgr_client_,
+  int64_t estimated_num_buckets = HashTable::EstimateNumBuckets(build_rows()->num_rows());
+  hash_tbl_.reset(HashTable::Create(parent_->ht_allocator_.get(),
       true /* store_duplicates */, parent_->row_desc_->tuple_descriptors().size(),
       build_rows(), 1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
-  if (!hash_tbl_->Init()) goto not_built;
+  bool success;
+  Status status = hash_tbl_->Init(&success);
+  if (!status.ok() || !success) goto not_built;
+  status = build_rows_->PrepareForRead(false, &success);
+  if (!status.ok()) goto not_built;
+  DCHECK(success) << "Stream was already pinned.";
 
-  bool got_read_buffer;
-  RETURN_IF_ERROR(build_rows_->PrepareForRead(false, &got_read_buffer));
-  DCHECK(got_read_buffer) << "Stream was already pinned.";
   do {
-    RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
-    DCHECK_EQ(batch.num_rows(), indices.size());
-    DCHECK_LE(batch.num_rows(), hash_tbl_->EmptyBuckets())
-        << build_rows()->RowConsumesMemory();
+    status = build_rows_->GetNext(&batch, &eos, &flat_rows);
+    if (!status.ok()) goto not_built;
+    DCHECK_EQ(batch.num_rows(), flat_rows.size());
+    DCHECK_LE(batch.num_rows(), hash_tbl_->EmptyBuckets());
     TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
     if (parent_->insert_batch_fn_ != NULL) {
       InsertBatchFn insert_batch_fn;
@@ -699,11 +674,12 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
         insert_batch_fn = parent_->insert_batch_fn_;
       }
       DCHECK(insert_batch_fn != NULL);
-      if (UNLIKELY(!insert_batch_fn(this, prefetch_mode, ctx, &batch, indices))) {
+      if (UNLIKELY(
+              !insert_batch_fn(this, prefetch_mode, ctx, &batch, flat_rows, &status))) {
         goto not_built;
       }
-    } else {
-      if (UNLIKELY(!InsertBatch(prefetch_mode, ctx, &batch, indices))) goto not_built;
+    } else if (UNLIKELY(!InsertBatch(prefetch_mode, ctx, &batch, flat_rows, &status))) {
+      goto not_built;
     }
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->GetQueryStatus());
@@ -725,7 +701,7 @@ not_built:
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
-  return Status::OK();
+  return status;
 }
 
 void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
@@ -774,7 +750,8 @@ string PhjBuilder::DebugString() const {
     DCHECK(partition->build_rows() != NULL);
     ss << endl
        << "    Build Rows: " << partition->build_rows()->num_rows()
-       << " (Blocks pinned: " << partition->build_rows()->blocks_pinned() << ")" << endl;
+       << " (Bytes pinned: " << partition->build_rows()->BytesPinned(false) << ")"
+       << endl;
     if (partition->hash_tbl() != NULL) {
       ss << "    Hash Table Rows: " << partition->hash_tbl()->size() << endl;
     }

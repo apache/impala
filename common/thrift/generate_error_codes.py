@@ -240,11 +240,11 @@ error_codes = (
 
   ("PARTITIONED_HASH_JOIN_REPARTITION_FAILS", 76, "Cannot perform hash join at node with "
    "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
-   "level $1. Number of rows $2."),
+   "level $1. Number of rows $2:\\n$3\\n$4"),
 
   ("PARTITIONED_AGG_REPARTITION_FAILS", 77,  "Cannot perform aggregation at node with "
    "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
-   "level $1. Number of rows $2."),
+   "level $1. Number of rows $2:\\n$3\\n$4"),
 
   ("AVRO_TRUNCATED_BLOCK", 78, "File '$0' is corrupt: truncated data block at offset $1"),
 
@@ -322,10 +322,14 @@ error_codes = (
 
   # TODO: IMPALA-3200: make sure that this references the correct query option.
   ("MAX_ROW_SIZE", 104, "Row of size $0 could not be materialized in plan node with "
-    "id $1. Limit is $2, which can be increased with query option max_row_size"),
+    "id $1. Increase the <TBD> query option (currently $2) to process larger rows."),
 
   ("IR_VERIFY_FAILED", 105,
    "Failed to verify generated IR function $0, see log for more details."),
+
+  ("MINIMUM_RESERVATION_UNAVAILABLE", 106, "Failed to get minimum memory reservation of "
+     "$0 on daemon $1:$2 for query $3 because it would exceed an applicable query, "
+     "request pool or process memory limit. Memory usage:\\n$4"),
 )
 
 import sys

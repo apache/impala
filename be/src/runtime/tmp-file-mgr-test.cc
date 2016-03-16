@@ -145,6 +145,12 @@ class TmpFileMgrTest : public ::testing::Test {
     return bytes_allocated;
   }
 
+  /// Helpers to call WriteHandle methods.
+  void Cancel(TmpFileMgr::WriteHandle* handle) { handle->Cancel(); }
+  void WaitForWrite(TmpFileMgr::WriteHandle* handle) {
+    handle->WaitForWrite();
+  }
+
   // Write callback, which signals 'cb_cv_' and increments 'cb_counter_'.
   void SignalCallback(Status write_status) {
     {
@@ -481,8 +487,8 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
   string file_path = handle->TmpFilePath();
 
   // Cancel the write - prior to the IMPALA-4820 fix decryption could race with the write.
-  handle->Cancel();
-  handle->WaitForWrite();
+  Cancel(handle.get());
+  WaitForWrite(handle.get());
   ASSERT_OK(file_group.RestoreData(move(handle), data_mem_range));
   WaitForCallbacks(1);
 

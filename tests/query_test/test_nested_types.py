@@ -27,7 +27,6 @@ from tests.common.skip import (
     SkipIfS3,
     SkipIfADLS,
     SkipIfLocal)
-
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 
 class TestNestedTypes(ImpalaTestSuite):

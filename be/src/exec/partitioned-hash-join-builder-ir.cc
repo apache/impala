@@ -19,7 +19,7 @@
 
 #include "codegen/impala-ir.h"
 #include "exec/hash-table.inline.h"
-#include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/buffered-tuple-stream-v2.inline.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.h"
@@ -30,7 +30,7 @@
 using namespace impala;
 
 inline bool PhjBuilder::AppendRow(
-    BufferedTupleStream* stream, TupleRow* row, Status* status) {
+    BufferedTupleStreamV2* stream, TupleRow* row, Status* status) {
   if (LIKELY(stream->AddRow(row, status))) return true;
   if (UNLIKELY(!status->ok())) return false;
   return AppendRowStreamFull(stream, row, status);
@@ -73,12 +73,12 @@ Status PhjBuilder::ProcessBuildBatch(
 
 bool PhjBuilder::Partition::InsertBatch(TPrefetchMode::type prefetch_mode,
     HashTableCtx* ht_ctx, RowBatch* batch,
-    const vector<BufferedTupleStream::RowIdx>& indices) {
+    const vector<BufferedTupleStreamV2::FlatRowPtr>& flat_rows, Status* status) {
   // Compute the hash values and prefetch the hash table buckets.
   const int num_rows = batch->num_rows();
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   const int prefetch_size = expr_vals_cache->capacity();
-  const BufferedTupleStream::RowIdx* row_indices = indices.data();
+  const BufferedTupleStreamV2::FlatRowPtr* flat_rows_data = flat_rows.data();
   for (int prefetch_group_row = 0; prefetch_group_row < num_rows;
        prefetch_group_row += prefetch_size) {
     int cur_row = prefetch_group_row;
@@ -97,9 +97,9 @@ bool PhjBuilder::Partition::InsertBatch(TPrefetchMode::type prefetch_mode,
     expr_vals_cache->ResetForRead();
     FOREACH_ROW_LIMIT(batch, cur_row, prefetch_size, batch_iter) {
       TupleRow* row = batch_iter.Get();
-      BufferedTupleStream::RowIdx row_idx = row_indices[cur_row];
+      BufferedTupleStreamV2::FlatRowPtr flat_row = flat_rows_data[cur_row];
       if (!expr_vals_cache->IsRowNull()
-          && UNLIKELY(!hash_tbl_->Insert(ht_ctx, row_idx, row))) {
+          && UNLIKELY(!hash_tbl_->Insert(ht_ctx, flat_row, row, status))) {
         return false;
       }
       expr_vals_cache->NextRow();

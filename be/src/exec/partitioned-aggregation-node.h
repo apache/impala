@@ -19,13 +19,15 @@
 #ifndef IMPALA_EXEC_PARTITIONED_AGGREGATION_NODE_H
 #define IMPALA_EXEC_PARTITIONED_AGGREGATION_NODE_H
 
+#include <deque>
+
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/exec-node.h"
 #include "exec/hash-table.h"
-#include "runtime/buffered-block-mgr.h"
-#include "runtime/buffered-tuple-stream.h"
-#include "runtime/descriptors.h"  // for TupleId
+#include "runtime/buffered-tuple-stream-v2.h"
+#include "runtime/bufferpool/suballocator.h"
+#include "runtime/descriptors.h" // for TupleId
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 
@@ -229,7 +231,9 @@ class PartitionedAggregationNode : public ExecNode {
   std::vector<int> string_grouping_exprs_;
 
   RuntimeState* state_;
-  BufferedBlockMgr::Client* block_mgr_client_;
+
+  /// Allocator for hash table memory.
+  boost::scoped_ptr<Suballocator> ht_allocator_;
 
   /// MemPool used to allocate memory for when we don't have grouping and don't initialize
   /// the partitioning structures, or during Close() when creating new output tuples.
@@ -337,12 +341,12 @@ class PartitionedAggregationNode : public ExecNode {
   HashTable* hash_tbls_[PARTITION_FANOUT];
 
   /// All partitions that have been spilled and need further processing.
-  std::list<Partition*> spilled_partitions_;
+  std::deque<Partition*> spilled_partitions_;
 
   /// All partitions that are aggregated and can just return the results in GetNext().
   /// After consuming all the input, hash_partitions_ is split into spilled_partitions_
   /// and aggregated_partitions_, depending on if it was spilled or not.
-  std::list<Partition*> aggregated_partitions_;
+  std::deque<Partition*> aggregated_partitions_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
@@ -352,31 +356,42 @@ class PartitionedAggregationNode : public ExecNode {
   /// initially use small buffers. Streaming pre-aggregations do not spill and do not
   /// require an unaggregated stream.
   struct Partition {
-    Partition(PartitionedAggregationNode* parent, int level)
-      : parent(parent), is_closed(false), level(level) {}
+    Partition(PartitionedAggregationNode* parent, int level, int idx)
+      : parent(parent), is_closed(false), level(level), idx(idx) {}
 
     ~Partition();
 
     /// Initializes aggregated_row_stream and unaggregated_row_stream (if a spilling
-    /// aggregation), reserving one buffer for each. The buffers backing these streams
-    /// are reserved, so this function will not fail with a continuable OOM. If we fail
-    /// to init these buffers, the mem limit is too low to run this algorithm.
-    Status InitStreams();
+    /// aggregation), allocating one buffer for each. Spilling merge aggregations must
+    /// have enough reservation for the initial buffer for the stream, so this should
+    /// not fail due to OOM. Preaggregations do not reserve any buffers: if does not
+    /// have enough reservation for the initial buffer, the aggregated row stream is not
+    /// created and an OK status is returned.
+    Status InitStreams() WARN_UNUSED_RESULT;
 
-    /// Initializes the hash table. Returns false on OOM.
-    bool InitHashTable();
+    /// Initializes the hash table. 'aggregated_row_stream' must be non-NULL.
+    /// Sets 'got_memory' to true if the hash table was initialised or false on OOM.
+    Status InitHashTable(bool* got_memory) WARN_UNUSED_RESULT;
 
     /// Called in case we need to serialize aggregated rows. This step effectively does
     /// a merge aggregation in this node.
-    Status SerializeStreamForSpilling();
+    Status SerializeStreamForSpilling() WARN_UNUSED_RESULT;
 
     /// Closes this partition. If finalize_rows is true, this iterates over all rows
     /// in aggregated_row_stream and finalizes them (this is only used in the cancellation
     /// path).
     void Close(bool finalize_rows);
 
-    /// Spills this partition, unpinning streams and cleaning up hash tables as necessary.
-    Status Spill();
+    /// Spill this partition. 'more_aggregate_rows' = true means that more aggregate rows
+    /// may be appended to the the partition before appending unaggregated rows. On
+    /// success, one of the streams is left with a write iterator: the aggregated stream
+    /// if 'more_aggregate_rows' is true or the unaggregated stream otherwise.
+    Status Spill(bool more_aggregate_rows) WARN_UNUSED_RESULT;
+
+    /// Discards the aggregated row stream and hash table. Only valid to call if this is
+    /// a streaming preaggregation and the initial memory allocation for hash tables or
+    /// the aggregated stream failed. The aggregated stream must have 0 rows.
+    void DiscardAggregatedRowStream();
 
     bool is_spilled() const { return hash_tbl.get() == NULL; }
 
@@ -390,9 +405,12 @@ class PartitionedAggregationNode : public ExecNode {
     /// etc.
     const int level;
 
+    /// The index of this partition within 'hash_partitions_' at its level.
+    const int idx;
+
     /// Hash table for this partition.
     /// Can be NULL if this partition is no longer maintaining a hash table (i.e.
-    /// is spilled).
+    /// is spilled or we are passing through all rows for this partition).
     boost::scoped_ptr<HashTable> hash_tbl;
 
     /// Clone of parent's agg_fn_evals_ and backing MemPool.
@@ -401,18 +419,24 @@ class PartitionedAggregationNode : public ExecNode {
 
     /// Tuple stream used to store aggregated rows. When the partition is not spilled,
     /// (meaning the hash table is maintained), this stream is pinned and contains the
-    /// memory referenced by the hash table. When it is spilled, aggregate rows are
-    /// just appended to this stream.
-    boost::scoped_ptr<BufferedTupleStream> aggregated_row_stream;
+    /// memory referenced by the hash table. When it is spilled, this consumes reservation
+    /// for a write buffer only during repartitioning of aggregated rows.
+    ///
+    /// For streaming preaggs, this may be NULL if sufficient memory is not available.
+    /// In that case hash_tbl is also NULL and all rows for the partition will be passed
+    /// through.
+    boost::scoped_ptr<BufferedTupleStreamV2> aggregated_row_stream;
 
     /// Unaggregated rows that are spilled. Always NULL for streaming pre-aggregations.
-    boost::scoped_ptr<BufferedTupleStream> unaggregated_row_stream;
+    /// Always unpinned. Has a write buffer allocated when the partition is spilled and
+    /// unaggregated rows are being processed.
+    boost::scoped_ptr<BufferedTupleStreamV2> unaggregated_row_stream;
   };
 
   /// Stream used to store serialized spilled rows. Only used if needs_serialize_
   /// is set. This stream is never pinned and only used in Partition::Spill as a
   /// a temporary buffer.
-  boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
+  boost::scoped_ptr<BufferedTupleStreamV2> serialize_stream_;
 
   /// Accessor for 'hash_tbls_' that verifies consistency with the partitions.
   HashTable* ALWAYS_INLINE GetHashTable(int partition_idx) {
@@ -447,7 +471,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// FunctionContexts, so is stored outside the stream. If stream's small buffers get
   /// full, it will attempt to switch to IO-buffers.
   Tuple* ConstructIntermediateTuple(const std::vector<AggFnEvaluator*>& agg_fn_evals,
-      BufferedTupleStream* stream, Status* status) noexcept;
+      BufferedTupleStreamV2* stream, Status* status) noexcept;
 
   /// Constructs intermediate tuple, allocating memory from pool instead of the stream.
   /// Returns NULL and sets status if there is not enough memory to allocate the tuple.
@@ -495,7 +519,7 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Do the aggregation for all tuple rows in the batch when there is no grouping.
   /// This function is replaced by codegen.
-  Status ProcessBatchNoGrouping(RowBatch* batch);
+  Status ProcessBatchNoGrouping(RowBatch* batch) WARN_UNUSED_RESULT;
 
   /// Processes a batch of rows. This is the core function of the algorithm. We partition
   /// the rows into hash_partitions_, spilling as necessary.
@@ -507,9 +531,9 @@ class PartitionedAggregationNode : public ExecNode {
   //
   /// This function is replaced by codegen. We pass in ht_ctx_.get() as an argument for
   /// performance.
-  template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch,
-      TPrefetchMode::type prefetch_mode, HashTableCtx* ht_ctx);
+  template <bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, TPrefetchMode::type prefetch_mode,
+      HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
 
   /// Evaluates the rows in 'batch' starting at 'start_row_idx' and stores the results in
   /// the expression values cache in 'ht_ctx'. The number of rows evaluated depends on
@@ -524,7 +548,8 @@ class PartitionedAggregationNode : public ExecNode {
   /// ProcessBatch for codegen to substitute function calls with codegen'd versions.
   /// May spill partitions if not enough memory is available.
   template <bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, HashTableCtx* ht_ctx);
+  Status IR_ALWAYS_INLINE ProcessRow(
+      TupleRow* row, HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
 
   /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
   /// the context for the partition's hash table and hash is the precomputed hash of
@@ -533,35 +558,33 @@ class PartitionedAggregationNode : public ExecNode {
   /// tuple to the partition's stream. Must be inlined into ProcessBatch for codegen
   /// to substitute function calls with codegen'd versions.  insert_it is an iterator
   /// for insertion returned from HashTable::FindBuildRowBucket().
-  template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE AddIntermediateTuple(Partition* partition,
-      TupleRow* row, uint32_t hash, HashTable::Iterator insert_it);
+  template <bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE AddIntermediateTuple(Partition* partition, TupleRow* row,
+      uint32_t hash, HashTable::Iterator insert_it) WARN_UNUSED_RESULT;
 
-  /// Append a row to a spilled partition. May spill partitions if needed to switch to
-  /// I/O buffers. Selects the correct stream according to the argument. Inlined into
-  /// ProcessBatch().
-  template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE AppendSpilledRow(Partition* partition, TupleRow* row);
-
-  /// Append a row to a stream of a spilled partition. May spill partitions if needed
-  /// to append the row.
-  Status AppendSpilledRow(BufferedTupleStream* stream, TupleRow* row);
+  /// Append a row to a spilled partition. The row may be aggregated or unaggregated
+  /// according to AGGREGATED_ROWS. May spill partitions if needed to append the row
+  /// buffers.
+  template <bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE AppendSpilledRow(
+      Partition* partition, TupleRow* row) WARN_UNUSED_RESULT;
 
   /// Reads all the rows from input_stream and process them by calling ProcessBatch().
-  template<bool AGGREGATED_ROWS>
-  Status ProcessStream(BufferedTupleStream* input_stream);
+  template <bool AGGREGATED_ROWS>
+  Status ProcessStream(BufferedTupleStreamV2* input_stream) WARN_UNUSED_RESULT;
 
   /// Output 'singleton_output_tuple_' and transfer memory to 'row_batch'.
   void GetSingletonOutput(RowBatch* row_batch);
 
   /// Get rows for the next rowbatch from the next partition. Sets 'partition_eos_' to
   /// true if all rows from all partitions have been returned or the limit is reached.
-  Status GetRowsFromPartition(RuntimeState* state, RowBatch* row_batch);
+  Status GetRowsFromPartition(
+      RuntimeState* state, RowBatch* row_batch) WARN_UNUSED_RESULT;
 
   /// Get output rows from child for streaming pre-aggregation. Aggregates some rows with
   /// hash table and passes through other rows converted into the intermediate
   /// tuple format. Sets 'child_eos_' once all rows from child have been returned.
-  Status GetRowsStreaming(RuntimeState* state, RowBatch* row_batch);
+  Status GetRowsStreaming(RuntimeState* state, RowBatch* row_batch) WARN_UNUSED_RESULT;
 
   /// Return true if we should keep expanding hash tables in the preagg. If false,
   /// the preagg should pass through any rows it can't fit in its tables.
@@ -582,7 +605,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// 'ht_ctx' is passed in as a way to avoid aliasing of 'this' confusing the optimiser.
   Status ProcessBatchStreaming(bool needs_serialize, TPrefetchMode::type prefetch_mode,
       RowBatch* in_batch, RowBatch* out_batch, HashTableCtx* ht_ctx,
-      int remaining_capacity[PARTITION_FANOUT]);
+      int remaining_capacity[PARTITION_FANOUT]) WARN_UNUSED_RESULT;
 
   /// Tries to add intermediate to the hash table 'hash_tbl' of 'partition' for streaming
   /// aggregation. The input row must have been evaluated with 'ht_ctx', with 'hash' set
@@ -592,18 +615,24 @@ class PartitionedAggregationNode : public ExecNode {
   /// keeps track of how many more entries can be added to the hash table so we can avoid
   /// retrying inserts. It is decremented if an insert succeeds and set to zero if an
   /// insert fails. If an error occurs, returns false and sets 'status'.
-  bool IR_ALWAYS_INLINE TryAddToHashTable(HashTableCtx* ht_ctx,
-      Partition* partition, HashTable* hash_tbl, TupleRow* in_row, uint32_t hash,
-      int* remaining_capacity, Status* status);
+  bool IR_ALWAYS_INLINE TryAddToHashTable(HashTableCtx* ht_ctx, Partition* partition,
+      HashTable* hash_tbl, TupleRow* in_row, uint32_t hash, int* remaining_capacity,
+      Status* status) WARN_UNUSED_RESULT;
 
   /// Initializes hash_partitions_. 'level' is the level for the partitions to create.
+  /// If 'single_partition_idx' is provided, it must be a number in range
+  /// [0, PARTITION_FANOUT), and only that partition is created - the others are
+  /// initialized to NULL.
   /// Also sets ht_ctx_'s level to 'level'.
-  Status CreateHashPartitions(int level);
+  Status CreateHashPartitions(
+      int level, int single_partition_idx = -1) WARN_UNUSED_RESULT;
 
   /// Ensure that hash tables for all in-memory partitions are large enough to fit
   /// 'num_rows' additional hash table entries. If there is not enough memory to
-  /// resize the hash tables, may spill partitions.
-  Status CheckAndResizeHashPartitions(int num_rows, const HashTableCtx* ht_ctx);
+  /// resize the hash tables, may spill partitions. 'aggregated_rows' is true if
+  /// we're currently partitioning aggregated rows.
+  Status CheckAndResizeHashPartitions(
+      bool aggregated_rows, int num_rows, const HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
 
   /// Iterates over all the partitions in hash_partitions_ and returns the number of rows
   /// of the largest spilled partition (in terms of number of aggregated and unaggregated
@@ -614,16 +643,39 @@ class PartitionedAggregationNode : public ExecNode {
   /// initializes output_iterator_ and output_partition_. This either removes
   /// a partition from aggregated_partitions_ (and is done) or removes the next
   /// partition from aggregated_partitions_ and repartitions it.
-  Status NextPartition();
+  Status NextPartition() WARN_UNUSED_RESULT;
 
-  /// Picks a partition from hash_partitions_ to spill.
-  Status SpillPartition();
+  /// Tries to build the first partition in 'spilled_partitions_'.
+  /// If successful, set *built_partition to the partition. The caller owns the partition
+  /// and is responsible for closing it. If unsuccessful because the partition could not
+  /// fit in memory, set *built_partition to NULL and append the spilled partition to the
+  /// head of 'spilled_partitions_' so it can be processed by
+  /// RepartitionSpilledPartition().
+  Status BuildSpilledPartition(Partition** built_partition) WARN_UNUSED_RESULT;
+
+  /// Repartitions the first partition in 'spilled_partitions_' into PARTITION_FANOUT
+  /// output partitions. On success, each output partition is either:
+  /// * closed, if no rows were added to the partition.
+  /// * in 'spilled_partitions_', if the partition spilled.
+  /// * in 'aggregated_partitions_', if the output partition was not spilled.
+  Status RepartitionSpilledPartition() WARN_UNUSED_RESULT;
+
+  /// Picks a partition from 'hash_partitions_' to spill. 'more_aggregate_rows' is passed
+  /// to Partition::Spill() when spilling the partition. See the Partition::Spill()
+  /// comment for further explanation.
+  Status SpillPartition(bool more_aggregate_rows) WARN_UNUSED_RESULT;
 
   /// Moves the partitions in hash_partitions_ to aggregated_partitions_ or
   /// spilled_partitions_. Partitions moved to spilled_partitions_ are unpinned.
   /// input_rows is the number of input rows that have been repartitioned.
   /// Used for diagnostics.
-  Status MoveHashPartitions(int64_t input_rows);
+  Status MoveHashPartitions(int64_t input_rows) WARN_UNUSED_RESULT;
+
+  /// Adds a partition to the front of 'spilled_partitions_' for later processing.
+  /// 'spilled_partitions_' uses LIFO so more finely partitioned partitions are processed
+  /// first). This allows us to delete pages earlier and bottom out the recursion
+  /// earlier and also improves time locality of access to spilled data on disk.
+  void PushSpilledPartition(Partition* partition);
 
   /// Calls Close() on every Partition in 'aggregated_partitions_',
   /// 'spilled_partitions_', and 'hash_partitions_' and then resets the lists,
@@ -638,7 +690,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// and returns the IR function in 'fn'. Returns non-OK status if codegen
   /// is unsuccessful.
   Status CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
-      SlotDescriptor* slot_desc, llvm::Function** fn);
+      SlotDescriptor* slot_desc, llvm::Function** fn) WARN_UNUSED_RESULT;
 
   /// Codegen a call to a function implementing the UDA interface with input values
   /// from 'input_vals'. 'dst_val' should contain the previous value of the aggregate
@@ -647,10 +699,10 @@ class PartitionedAggregationNode : public ExecNode {
   /// the insert position of 'builder'.
   Status CodegenCallUda(LlvmCodeGen* codegen, LlvmBuilder* builder, AggFn* agg_fn,
       llvm::Value* agg_fn_ctx_arg, const std::vector<CodegenAnyVal>& input_vals,
-      const CodegenAnyVal& dst_val, CodegenAnyVal* updated_dst_val);
+      const CodegenAnyVal& dst_val, CodegenAnyVal* updated_dst_val) WARN_UNUSED_RESULT;
 
   /// Codegen UpdateTuple(). Returns non-OK status if codegen is unsuccessful.
-  Status CodegenUpdateTuple(LlvmCodeGen* codegen, llvm::Function** fn);
+  Status CodegenUpdateTuple(LlvmCodeGen* codegen, llvm::Function** fn) WARN_UNUSED_RESULT;
 
   /// Codegen the non-streaming process row batch loop. The loop has already been
   /// compiled to IR and loaded into the codegen object. UpdateAggTuple has also been
@@ -659,26 +711,28 @@ class PartitionedAggregationNode : public ExecNode {
   /// 'process_batch_no_grouping_fn_' will be updated with the codegened function
   /// depending on whether this is a grouping or non-grouping aggregation.
   /// Assumes AGGREGATED_ROWS = false.
-  Status CodegenProcessBatch(LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode);
+  Status CodegenProcessBatch(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
   /// Codegen the materialization loop for streaming preaggregations.
   /// 'process_batch_streaming_fn_' will be updated with the codegened function.
   Status CodegenProcessBatchStreaming(
-      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode);
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
-  /// We need two buffers per partition, one for the aggregated stream and one
-  /// for the unaggregated stream. We need an additional buffer to read the stream
-  /// we are currently repartitioning.
+  /// Compute minimum buffer requirement for grouping aggregations.
+  /// We need one buffer per partition, which is used either as the write buffer for the
+  /// aggregated stream or the unaggregated stream. We need an additional buffer to read
+  /// the stream we are currently repartitioning.
   /// If we need to serialize, we need an additional buffer while spilling a partition
   /// as the partitions aggregate stream needs to be serialized and rewritten.
   /// We do not spill streaming preaggregations, so we do not need to reserve any buffers.
   int MinRequiredBuffers() const {
-    // Must be kept in sync with AggregationNode.computeResourceProfile() in fe.
-    if (is_streaming_preagg_) return 0;
-    return 2 * PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
+    DCHECK(!grouping_exprs_.empty());
+    // Must be kept in sync with AggregationNode.computeNodeResourceProfile() in fe.
+    if (is_streaming_preagg_) return 0; // Need 0 buffers to pass through rows.
+    return PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
   }
 };
-
 }
 
 #endif

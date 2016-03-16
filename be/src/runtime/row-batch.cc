@@ -147,9 +147,6 @@ RowBatch::~RowBatch() {
   for (int i = 0; i < io_buffers_.size(); ++i) {
     ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffers_[i]));
   }
-  for (int i = 0; i < blocks_.size(); ++i) {
-    blocks_[i]->Delete();
-  }
   for (BufferInfo& buffer_info : buffers_) {
     ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
         buffer_info.client, &buffer_info.buffer);
@@ -295,14 +292,6 @@ void RowBatch::AddIoBuffer(unique_ptr<DiskIoMgr::BufferDescriptor> buffer) {
   io_buffers_.emplace_back(move(buffer));
 }
 
-void RowBatch::AddBlock(BufferedBlockMgr::Block* block, FlushMode flush) {
-  DCHECK(block != NULL);
-  DCHECK(block->is_pinned());
-  blocks_.push_back(block);
-  auxiliary_mem_usage_ += block->buffer_len();
-  if (flush == FlushMode::FLUSH_RESOURCES) MarkFlushResources();
-}
-
 void RowBatch::AddBuffer(BufferPool::ClientHandle* client,
     BufferPool::BufferHandle&& buffer, FlushMode flush) {
   auxiliary_mem_usage_ += buffer.len();
@@ -322,10 +311,6 @@ void RowBatch::Reset() {
     ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffers_[i]));
   }
   io_buffers_.clear();
-  for (int i = 0; i < blocks_.size(); ++i) {
-    blocks_[i]->Delete();
-  }
-  blocks_.clear();
   for (BufferInfo& buffer_info : buffers_) {
     ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
         buffer_info.client, &buffer_info.buffer);
@@ -342,10 +327,6 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
     dest->AddIoBuffer(move(io_buffers_[i]));
   }
   io_buffers_.clear();
-  for (int i = 0; i < blocks_.size(); ++i) {
-    dest->AddBlock(blocks_[i], FlushMode::NO_FLUSH_RESOURCES);
-  }
-  blocks_.clear();
   for (BufferInfo& buffer_info : buffers_) {
     dest->AddBuffer(
         buffer_info.client, std::move(buffer_info.buffer), FlushMode::NO_FLUSH_RESOURCES);

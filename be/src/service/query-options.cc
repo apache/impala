@@ -261,10 +261,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::QUERY_TIMEOUT_S:
         query_options->__set_query_timeout_s(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::MAX_BLOCK_MGR_MEMORY: {
+      case TImpalaQueryOptions::BUFFER_POOL_LIMIT: {
         int64_t mem;
-        RETURN_IF_ERROR(ParseMemValue(value, "block mgr memory limit", &mem));
-        query_options->__set_max_block_mgr_memory(mem);
+        RETURN_IF_ERROR(ParseMemValue(value, "buffer pool limit", &mem));
+        query_options->__set_buffer_pool_limit(mem);
         break;
       }
       case TImpalaQueryOptions::APPX_COUNT_DISTINCT: {
@@ -503,6 +503,28 @@ Status impala::SetQueryOption(const string& key, const string& value,
               "Invalid threshold: '$0'. Only positive values are allowed.", val));
         }
         query_options->__set_disable_codegen_rows_threshold(val);
+        break;
+      }
+      case TImpalaQueryOptions::DEFAULT_SPILLABLE_BUFFER_SIZE: {
+        int64_t buffer_size_bytes;
+        RETURN_IF_ERROR(
+            ParseMemValue(value, "Spillable buffer size", &buffer_size_bytes));
+        if (!BitUtil::IsPowerOf2(buffer_size_bytes)) {
+          return Status(
+              Substitute("Buffer size must be a power of two: $0", buffer_size_bytes));
+        }
+        query_options->__set_default_spillable_buffer_size(buffer_size_bytes);
+        break;
+      }
+      case TImpalaQueryOptions::MIN_SPILLABLE_BUFFER_SIZE: {
+        int64_t buffer_size_bytes;
+        RETURN_IF_ERROR(
+            ParseMemValue(value, "Spillable buffer size", &buffer_size_bytes));
+        if (!BitUtil::IsPowerOf2(buffer_size_bytes)) {
+          return Status(
+              Substitute("Buffer size must be a power of two: $0", buffer_size_bytes));
+        }
+        query_options->__set_min_spillable_buffer_size(buffer_size_bytes);
         break;
       }
       default:

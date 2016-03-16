@@ -26,7 +26,7 @@
 #include "exprs/slot-ref.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "runtime/buffered-block-mgr.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/runtime-state.h"
@@ -37,8 +37,17 @@
 #include "common/names.h"
 
 using namespace impala;
-using namespace llvm;
-using namespace strings;
+using llvm::APFloat;
+using llvm::ArrayRef;
+using llvm::BasicBlock;
+using llvm::ConstantFP;
+using llvm::Function;
+using llvm::LLVMContext;
+using llvm::PHINode;
+using llvm::PointerType;
+using llvm::Type;
+using llvm::Value;
+using strings::Substitute;
 
 DEFINE_bool(enable_quadratic_probing, true, "Enable quadratic probing hash table");
 
@@ -84,12 +93,6 @@ static int64_t NULL_VALUE[] = {
 
 static_assert(sizeof(NULL_VALUE) >= ColumnType::MAX_CHAR_LENGTH,
     "NULL_VALUE must be at least as large as the largest possible slot");
-
-// The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the IO size (of 8MB)
-// to reduce the memory footprint of small queries. In particular, we always first use a
-// 64KB and a 512KB block before starting using IO-sized blocks.
-static const int64_t INITIAL_DATA_PAGE_SIZES[] = { 64 * 1024, 512 * 1024 };
-static const int NUM_SMALL_DATA_PAGES = sizeof(INITIAL_DATA_PAGE_SIZES) / sizeof(int64_t);
 
 HashTableCtx::HashTableCtx(const std::vector<ScalarExpr*>& build_exprs,
     const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
@@ -378,21 +381,20 @@ void HashTableCtx::ExprValuesCache::ResetForRead() {
   ResetIterators();
 }
 
-const double HashTable::MAX_FILL_FACTOR = 0.75f;
+constexpr double HashTable::MAX_FILL_FACTOR;
+constexpr int64_t HashTable::DATA_PAGE_SIZE;
 
-HashTable* HashTable::Create(RuntimeState* state,
-    BufferedBlockMgr::Client* client, bool stores_duplicates, int num_build_tuples,
-    BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
+HashTable* HashTable::Create(Suballocator* allocator, bool stores_duplicates,
+    int num_build_tuples, BufferedTupleStreamV2* tuple_stream, int64_t max_num_buckets,
     int64_t initial_num_buckets) {
-  return new HashTable(FLAGS_enable_quadratic_probing, state, client, stores_duplicates,
+  return new HashTable(FLAGS_enable_quadratic_probing, allocator, stores_duplicates,
       num_build_tuples, tuple_stream, max_num_buckets, initial_num_buckets);
 }
 
-HashTable::HashTable(bool quadratic_probing, RuntimeState* state,
-    BufferedBlockMgr::Client* client, bool stores_duplicates, int num_build_tuples,
-    BufferedTupleStream* stream, int64_t max_num_buckets, int64_t num_buckets)
-  : state_(state),
-    block_mgr_client_(client),
+HashTable::HashTable(bool quadratic_probing, Suballocator* allocator,
+    bool stores_duplicates, int num_build_tuples, BufferedTupleStreamV2* stream,
+    int64_t max_num_buckets, int64_t num_buckets)
+  : allocator_(allocator),
     tuple_stream_(stream),
     stores_tuples_(num_build_tuples == 1),
     stores_duplicates_(stores_duplicates),
@@ -410,26 +412,23 @@ HashTable::HashTable(bool quadratic_probing, RuntimeState* state,
     has_matches_(false),
     num_probes_(0), num_failed_probes_(0), travel_length_(0), num_hash_collisions_(0),
     num_resizes_(0) {
-  DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
+  DCHECK_EQ((num_buckets & (num_buckets - 1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
   DCHECK(stores_tuples_ || stream != NULL);
-  DCHECK(client != NULL);
 }
 
-bool HashTable::Init() {
+Status HashTable::Init(bool* got_memory) {
   int64_t buckets_byte_size = num_buckets_ * sizeof(Bucket);
-  if (!state_->block_mgr()->ConsumeMemory(block_mgr_client_, buckets_byte_size)) {
+  RETURN_IF_ERROR(allocator_->Allocate(buckets_byte_size, &bucket_allocation_));
+  if (bucket_allocation_ == nullptr) {
     num_buckets_ = 0;
-    return false;
+    *got_memory = false;
+    return Status::OK();
   }
-  buckets_ = reinterpret_cast<Bucket*>(malloc(buckets_byte_size));
-  if (buckets_ == NULL) {
-    state_->block_mgr()->ReleaseMemory(block_mgr_client_, buckets_byte_size);
-    num_buckets_ = 0;
-    return false;
-  }
+  buckets_ = reinterpret_cast<Bucket*>(bucket_allocation_->data());
   memset(buckets_, 0, buckets_byte_size);
-  return true;
+  *got_memory = true;
+  return Status::OK();
 }
 
 void HashTable::Close() {
@@ -439,36 +438,39 @@ void HashTable::Close() {
   const int64_t HEAVILY_USED = 1024 * 1024;
   // TODO: These statistics should go to the runtime profile as well.
   if ((num_buckets_ > LARGE_HT) || (num_probes_ > HEAVILY_USED)) VLOG(2) << PrintStats();
-  for (int i = 0; i < data_pages_.size(); ++i) {
-    data_pages_[i]->Delete();
-  }
+  for (auto& data_page : data_pages_) allocator_->Free(move(data_page));
+  data_pages_.clear();
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
     ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-total_data_page_size_);
   }
-  data_pages_.clear();
-  if (buckets_ != NULL) free(buckets_);
-  state_->block_mgr()->ReleaseMemory(block_mgr_client_, num_buckets_ * sizeof(Bucket));
+  if (bucket_allocation_ != nullptr) allocator_->Free(move(bucket_allocation_));
 }
 
-bool HashTable::CheckAndResize(uint64_t buckets_to_fill, const HashTableCtx* ht_ctx) {
+Status HashTable::CheckAndResize(
+    uint64_t buckets_to_fill, const HashTableCtx* ht_ctx, bool* got_memory) {
   uint64_t shift = 0;
   while (num_filled_buckets_ + buckets_to_fill >
          (num_buckets_ << shift) * MAX_FILL_FACTOR) {
-    // TODO: next prime instead of double?
     ++shift;
   }
-  if (shift > 0) return ResizeBuckets(num_buckets_ << shift, ht_ctx);
-  return true;
+  if (shift > 0) return ResizeBuckets(num_buckets_ << shift, ht_ctx, got_memory);
+  *got_memory = true;
+  return Status::OK();
 }
 
-bool HashTable::ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx) {
-  DCHECK_EQ((num_buckets & (num_buckets-1)), 0)
+Status HashTable::ResizeBuckets(
+    int64_t num_buckets, const HashTableCtx* ht_ctx, bool* got_memory) {
+  DCHECK_EQ((num_buckets & (num_buckets - 1)), 0)
       << "num_buckets=" << num_buckets << " must be a power of 2";
-  DCHECK_GT(num_buckets, num_filled_buckets_) << "Cannot shrink the hash table to "
-      "smaller number of buckets than the number of filled buckets.";
-  VLOG(2) << "Resizing hash table from "
-          << num_buckets_ << " to " << num_buckets << " buckets.";
-  if (max_num_buckets_ != -1 && num_buckets > max_num_buckets_) return false;
+  DCHECK_GT(num_buckets, num_filled_buckets_)
+    << "Cannot shrink the hash table to smaller number of buckets than the number of "
+    << "filled buckets.";
+  VLOG(2) << "Resizing hash table from " << num_buckets_ << " to " << num_buckets
+          << " buckets.";
+  if (max_num_buckets_ != -1 && num_buckets > max_num_buckets_) {
+    *got_memory = false;
+    return Status::OK();
+  }
   ++num_resizes_;
 
   // All memory that can grow proportional to the input should come from the block mgrs
@@ -476,14 +478,16 @@ bool HashTable::ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx) {
   // Note that while we copying over the contents of the old hash table, we need to have
   // allocated both the old and the new hash table. Once we finish, we return the memory
   // of the old hash table.
-  int64_t old_size = num_buckets_ * sizeof(Bucket);
+  // int64_t old_size = num_buckets_ * sizeof(Bucket);
   int64_t new_size = num_buckets * sizeof(Bucket);
-  if (!state_->block_mgr()->ConsumeMemory(block_mgr_client_, new_size)) return false;
-  Bucket* new_buckets = reinterpret_cast<Bucket*>(malloc(new_size));
-  if (new_buckets == NULL) {
-    state_->block_mgr()->ReleaseMemory(block_mgr_client_, new_size);
-    return false;
+
+  unique_ptr<Suballocation> new_allocation;
+  RETURN_IF_ERROR(allocator_->Allocate(new_size, &new_allocation));
+  if (new_allocation == NULL) {
+    *got_memory = false;
+    return Status::OK();
   }
+  Bucket* new_buckets = reinterpret_cast<Bucket*>(new_allocation->data());
   memset(new_buckets, 0, new_size);
 
   // Walk the old table and copy all the filled buckets to the new (resized) table.
@@ -503,28 +507,22 @@ bool HashTable::ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx) {
   }
 
   num_buckets_ = num_buckets;
-  free(buckets_);
-  buckets_ = new_buckets;
-  state_->block_mgr()->ReleaseMemory(block_mgr_client_, old_size);
-  return true;
+  allocator_->Free(move(bucket_allocation_));
+  bucket_allocation_ = move(new_allocation);
+  buckets_ = reinterpret_cast<Bucket*>(bucket_allocation_->data());
+  *got_memory = true;
+  return Status::OK();
 }
 
-bool HashTable::GrowNodeArray() {
-  int64_t page_size = 0;
-  page_size = state_->block_mgr()->max_block_size();
-  if (data_pages_.size() < NUM_SMALL_DATA_PAGES) {
-    page_size = min(page_size, INITIAL_DATA_PAGE_SIZES[data_pages_.size()]);
-  }
-  BufferedBlockMgr::Block* block = NULL;
-  Status status = state_->block_mgr()->GetNewBlock(
-      block_mgr_client_, NULL, &block, page_size);
-  DCHECK(status.ok() || block == NULL);
-  if (block == NULL) return false;
-  data_pages_.push_back(block);
-  next_node_ = block->Allocate<DuplicateNode>(page_size);
-  ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(page_size);
-  node_remaining_current_page_ = page_size / sizeof(DuplicateNode);
-  total_data_page_size_ += page_size;
+bool HashTable::GrowNodeArray(Status* status) {
+  unique_ptr<Suballocation> allocation;
+  *status = allocator_->Allocate(DATA_PAGE_SIZE, &allocation);
+  if (!status->ok() || allocation == nullptr) return false;
+  next_node_ = reinterpret_cast<DuplicateNode*>(allocation->data());
+  data_pages_.push_back(move(allocation));
+  ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(DATA_PAGE_SIZE);
+  node_remaining_current_page_ = DATA_PAGE_SIZE / sizeof(DuplicateNode);
+  total_data_page_size_ += DATA_PAGE_SIZE;
   return true;
 }
 
@@ -533,8 +531,7 @@ void HashTable::DebugStringTuple(stringstream& ss, HtData& htdata,
   if (stores_tuples_) {
     ss << "(" << htdata.tuple << ")";
   } else {
-    ss << "(" << htdata.idx.block() << ", " << htdata.idx.idx()
-       << ", " << htdata.idx.offset() << ")";
+    ss << "(" << htdata.flat_row << ")";
   }
   if (desc != NULL) {
     Tuple* row[num_build_tuples_];

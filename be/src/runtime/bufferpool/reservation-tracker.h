@@ -127,6 +127,10 @@ class ReservationTracker {
   /// Returns true if the reservation increase was successful or not necessary.
   bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
 
+  /// Decrease reservation by 'bytes' on this tracker and all ancestors. This tracker's
+  /// reservation must be at least 'bytes' before calling this method.
+  void DecreaseReservation(int64_t bytes) { DecreaseReservation(bytes, false); }
+
   /// Transfer reservation from this tracker to 'other'. Both trackers must be in the
   /// same query subtree of the hierarchy. One tracker can be the ancestor of the other,
   /// or they can share a common ancestor. The subtree root must be at the query level

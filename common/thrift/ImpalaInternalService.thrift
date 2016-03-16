@@ -130,7 +130,7 @@ struct TQueryOptions {
   26: optional i32 query_timeout_s = 0
 
   // test hook to cap max memory for spilling operators (to force them to spill).
-  27: optional i64 max_block_mgr_memory
+  27: optional i64 buffer_pool_limit
 
   // If true, transforms all count(distinct) aggregations into NDV()
   28: optional bool appx_count_distinct = 0
@@ -255,6 +255,14 @@ struct TQueryOptions {
   // If the number of rows processed per node is below the threshold codegen will be
   // automatically disabled by the planner.
   57: optional i32 disable_codegen_rows_threshold = 50000
+
+  // The default spillable buffer size in bytes, which may be overridden by the planner.
+  // Defaults to 2MB.
+  58: optional i64 default_spillable_buffer_size = 2097152;
+
+  // The minimum spillable buffer to use. The planner will not choose a size smaller than
+  // this. Defaults to 64KB.
+  59: optional i64 min_spillable_buffer_size = 65536;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -375,6 +383,18 @@ struct TQueryCtx {
   // String containing a timestamp (in UTC) set as the query submission time. It
   // represents the same point in time as now_string
   17: required string utc_timestamp_string
+
+  // Minimum query-wide buffer reservation required per host in bytes. This is the peak
+  // minimum reservation that may be required by the concurrently-executing operators at
+  // any point in query execution. It may be less than the initial reservation total
+  // claims (below) if execution of some operators never overlaps, which allows reuse of
+  // reservations.
+  18: optional i64 per_host_min_reservation;
+
+  // Total of the initial buffer reservations that we expect to be claimed per host.
+  // I.e. the sum over all operators in all fragment instances that execute on that host.
+  // Measured in bytes.
+  19: optional i64 per_host_initial_reservation_total_claims;
 }
 
 // Specification of one output destination of a plan fragment

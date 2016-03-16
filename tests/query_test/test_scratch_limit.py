@@ -28,7 +28,7 @@ class TestScratchLimit(ImpalaTestSuite):
 
   # Block manager memory limit that is low enough to
   # force Impala to spill to disk when executing 'spill_query'
-  max_block_mgr_memory = "64m"
+  buffer_pool_limit = "64m"
 
   @classmethod
   def get_workload(self):
@@ -48,7 +48,7 @@ class TestScratchLimit(ImpalaTestSuite):
     its required scratch space which in this case is 128m.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '500m'
     self.execute_query_expect_success(self.client, self.spill_query, exec_option)
 
@@ -58,7 +58,7 @@ class TestScratchLimit(ImpalaTestSuite):
     its required scratch space which in this case is 128m.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '24m'
     expected_error = 'Scratch space limit of %s bytes exceeded'
     scratch_limit_in_bytes = 24 * 1024 * 1024
@@ -74,7 +74,7 @@ class TestScratchLimit(ImpalaTestSuite):
     zero which means no scratch space can be allocated.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '0'
     self.execute_query_expect_failure(self.spill_query, exec_option)
 
@@ -83,7 +83,7 @@ class TestScratchLimit(ImpalaTestSuite):
     Query runs to completion with a scratch Limit of -1 means default/no limit.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '-1'
     self.execute_query_expect_success(self.client, self.spill_query, exec_option)
 
@@ -92,7 +92,7 @@ class TestScratchLimit(ImpalaTestSuite):
     Query runs to completion with the default setting of no scratch limit.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     self.execute_query_expect_success(self.client, self.spill_query, exec_option)
 
   def test_with_zero_scratch_limit_no_memory_limit(self, vector):

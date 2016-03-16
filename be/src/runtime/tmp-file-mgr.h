@@ -281,20 +281,8 @@ class TmpFileMgr {
       DCHECK(read_range_ == nullptr);
     }
 
-    /// Cancels any in-flight writes or reads. Reads are cancelled synchronously and
-    /// writes are cancelled asynchronously. After Cancel() is called, writes are not
-    /// retried. The write callback may be called with a CANCELLED status (unless
-    /// it succeeded or encountered a different error first).
-    /// TODO: IMPALA-3200: make this private once BufferedBlockMgr doesn't need it.
-    void Cancel();
-
     /// Cancel any in-flight read synchronously.
     void CancelRead();
-
-    /// Blocks until the write completes either successfully or unsuccessfully.
-    /// May return before the write callback has been called.
-    /// TODO: IMPALA-3200: make this private once BufferedBlockMgr doesn't need it.
-    void WaitForWrite();
 
     /// Path of temporary file backing the block. Intended for use in testing.
     /// Returns empty string if no backing file allocated.
@@ -307,6 +295,7 @@ class TmpFileMgr {
 
    private:
     friend class FileGroup;
+    friend class TmpFileMgrTest;
 
     WriteHandle(RuntimeProfile::Counter* encryption_timer, WriteDoneCallback cb);
 
@@ -326,6 +315,16 @@ class TmpFileMgr {
     /// Called when the write has completed successfully or not. Sets 'write_in_flight_'
     /// then calls 'cb_'.
     void WriteComplete(const Status& write_status);
+
+    /// Cancels any in-flight writes or reads. Reads are cancelled synchronously and
+    /// writes are cancelled asynchronously. After Cancel() is called, writes are not
+    /// retried. The write callback may be called with a CANCELLED status (unless
+    /// it succeeded or encountered a different error first).
+    void Cancel();
+
+    /// Blocks until the write completes either successfully or unsuccessfully.
+    /// May return before the write callback has been called.
+    void WaitForWrite();
 
     /// Encrypts the data in 'buffer' in-place and computes 'hash_'.
     Status EncryptAndHash(MemRange buffer) WARN_UNUSED_RESULT;

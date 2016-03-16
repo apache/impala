@@ -82,7 +82,8 @@ class TestExprMemUsage(ImpalaTestSuite):
 
 class TestLowMemoryLimits(ImpalaTestSuite):
   '''Super class for the memory limit tests with the TPC-H and TPC-DS queries'''
-  EXPECTED_ERROR_MSG = "Memory limit exceeded"
+  EXPECTED_ERROR_MSGS = ["Memory limit exceeded",
+      "Failed to get minimum memory reservation"]
 
   def low_memory_limit_test(self, vector, tpch_query, limit, xfail_mem_limit=None):
     mem = vector.get_value('mem_limit')
@@ -93,28 +94,36 @@ class TestLowMemoryLimits(ImpalaTestSuite):
     # If memory limit larger than the minimum threshold, then it is not expected to fail.
     expects_error = mem < limit
     new_vector = copy(vector)
-    new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
+    exec_options = new_vector.get_value('exec_option')
+    exec_options['mem_limit'] = str(mem) + "m"
+
+    # Reduce the page size to better exercise page boundary logic.
+    exec_options['default_spillable_buffer_size'] = "256k"
     try:
       self.run_test_case(tpch_query, new_vector)
     except ImpalaBeeswaxException as e:
       if not expects_error and not xfail_mem_limit: raise
-      assert TestLowMemoryLimits.EXPECTED_ERROR_MSG in str(e)
+      found_expected_error = False
+      for error_msg in TestLowMemoryLimits.EXPECTED_ERROR_MSGS:
+        if error_msg in str(e): found_expected_error = True
+      assert found_expected_error, str(e)
       if not expects_error and xfail_mem_limit:
         pytest.xfail(xfail_mem_limit)
 
 
 class TestTpchMemLimitError(TestLowMemoryLimits):
-  # TODO: After we stabilize the mem usage test, we should move this test to exhaustive.
+  # TODO: consider moving this test to exhaustive.
   # The mem limits that will be used.
-  MEM_IN_MB = [20, 140, 180, 275, 450, 700, 980]
+  MEM_IN_MB = [20, 140, 180, 220, 275, 450, 700]
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
-  # to run without problem. Those values were determined by manual testing.
-  MIN_MEM_FOR_TPCH = { 'Q1' : 140, 'Q2' : 120, 'Q3' : 240, 'Q4' : 125, 'Q5' : 235,\
-                       'Q6' : 25, 'Q7' : 265, 'Q8' : 250, 'Q9' : 400, 'Q10' : 240,\
-                       'Q11' : 110, 'Q12' : 125, 'Q13' : 110, 'Q14' : 229, 'Q15' : 125,\
-                       'Q16' : 125, 'Q17' : 130, 'Q18' : 475, 'Q19' : 240, 'Q20' : 250,\
-                       'Q21' : 620, 'Q22' : 125}
+  # to run without problem. These were determined using the query_runtime_info.json file
+  # produced by the stress test (i.e. concurrent_select.py).
+  MIN_MEM_FOR_TPCH = { 'Q1' : 125, 'Q2' : 125, 'Q3' : 112, 'Q4' : 137, 'Q5' : 137,\
+                       'Q6' : 25, 'Q7' : 200, 'Q8' : 125, 'Q9' : 200, 'Q10' : 162,\
+                       'Q11' : 112, 'Q12' : 150, 'Q13' : 125, 'Q14' : 125, 'Q15' : 125,\
+                       'Q16' : 137, 'Q17' : 137, 'Q18' : 196, 'Q19' : 112, 'Q20' : 162,\
+                       'Q21' : 187, 'Q22' : 125}
 
   @classmethod
   def get_workload(self):

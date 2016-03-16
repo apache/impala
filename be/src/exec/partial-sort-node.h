@@ -19,7 +19,6 @@
 #define IMPALA_EXEC_PARTIAL_SORT_NODE_H
 
 #include "exec/exec-node.h"
-#include "runtime/buffered-block-mgr.h"
 #include "runtime/sorter.h"
 
 namespace impala {

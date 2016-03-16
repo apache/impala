@@ -1021,7 +1021,7 @@ public class HdfsScanNode extends ScanNode {
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(scanRanges_, "Cost estimation requires scan ranges.");
     if (scanRanges_.isEmpty()) {
-      nodeResourceProfile_ = new ResourceProfile(0, 0);
+      nodeResourceProfile_ = ResourceProfile.noReservation(0);
       return;
     }
     Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
@@ -1075,7 +1075,7 @@ public class HdfsScanNode extends ScanNode {
           PrintUtils.printBytes(perHostUpperBound)));
       perInstanceMemEstimate = perHostUpperBound;
     }
-    nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
+    nodeResourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
   }
 
   /**

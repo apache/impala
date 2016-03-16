@@ -30,7 +30,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TAggregationNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
@@ -302,24 +301,24 @@ public class AggregationNode extends PlanNode {
 
     // Must be kept in sync with PartitionedAggregationNode::MinRequiredBuffers() in be.
     long perInstanceMinBuffers;
+    long bufferSize = queryOptions.getDefault_spillable_buffer_size();
     if (aggInfo_.getGroupingExprs().isEmpty() || useStreamingPreagg_) {
       perInstanceMinBuffers = 0;
     } else {
       final int PARTITION_FANOUT = 16;
-      long minBuffers = 2 * PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
-      long bufferSize = getDefaultSpillableBufferBytes();
+      long minBuffers = PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
       if (perInstanceDataBytes != -1) {
         long bytesPerBuffer = perInstanceDataBytes / PARTITION_FANOUT;
         // Scale down the buffer size if we think there will be excess free space with the
         // default buffer size, e.g. with small dimension tables.
         bufferSize = Math.min(bufferSize, Math.max(
-            RuntimeEnv.INSTANCE.getMinSpillableBufferBytes(),
+            queryOptions.getMin_spillable_buffer_size(),
             BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
       }
       perInstanceMinBuffers = bufferSize * minBuffers;
     }
 
-    nodeResourceProfile_ =
-        new ResourceProfile(perInstanceMemEstimate, perInstanceMinBuffers);
+    nodeResourceProfile_ = ResourceProfile.spillableWithMinReservation(
+        perInstanceMemEstimate, perInstanceMinBuffers, bufferSize);
   }
 }

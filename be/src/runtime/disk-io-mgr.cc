@@ -83,7 +83,7 @@ DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
 // io and sequential io perform similarly.
 DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
-DEFINE_int32(min_buffer_size, 1024, "The minimum read buffer size (in bytes)");
+DECLARE_int64(min_buffer_size);
 
 // With 1024B through 8MB buffers, this is up to ~2GB of buffers.
 DEFINE_int32(max_free_io_buffers, 128,
@@ -937,9 +937,8 @@ void DiskIoMgr::HandleWriteFinished(
   int disk_id = write_range->disk_id_;
 
   // Execute the callback before decrementing the thread count. Otherwise CancelContext()
-  // that waits for the disk ref count to be 0 will return, creating a race, e.g.
-  // between BufferedBlockMgr::WriteComplete() and BufferedBlockMgr::~BufferedBlockMgr().
-  // See IMPALA-1890.
+  // that waits for the disk ref count to be 0 will return, creating a race, e.g. see
+  // IMPALA-1890.
   // The status of the write does not affect the status of the writer context.
   write_range->callback_(write_status);
   {

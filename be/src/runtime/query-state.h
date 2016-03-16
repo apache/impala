@@ -34,8 +34,10 @@
 namespace impala {
 
 class FragmentInstanceState;
+class InitialReservations;
 class MemTracker;
 class ReservationTracker;
+class RuntimeState;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
 /// of the individual fragment instances) created for a particular query.
@@ -110,6 +112,7 @@ class QueryState {
 
   // the following getters are only valid after Prepare()
   ReservationTracker* buffer_reservation() const { return buffer_reservation_; }
+  InitialReservations* initial_reservations() const { return initial_reservations_; }
   TmpFileMgr::FileGroup* file_group() const { return file_group_; }
   const TExecQueryFInstancesParams& rpc_params() const { return rpc_params_; }
 
@@ -117,8 +120,10 @@ class QueryState {
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
 
   /// Sets up state required for fragment execution: memory reservations, etc. Fails
-  /// if resources could not be acquired. Uses few cycles and never blocks.
-  /// Not idempotent, not thread-safe.
+  /// if resources could not be acquired. On success, acquires an initial reservation
+  /// refcount for the caller, which the caller must release by calling
+  /// ReleaseInitialReservationRefcount().
+  /// Uses few cycles and never blocks. Not idempotent, not thread-safe.
   /// The remaining public functions must be called only after Init().
   Status Init(const TExecQueryFInstancesParams& rpc_params) WARN_UNUSED_RESULT;
 
@@ -155,6 +160,12 @@ class QueryState {
   /// If there is an error during the rpc, initiates cancellation.
   void ReportExecStatus(bool done, const Status& status, FragmentInstanceState* fis);
 
+  /// Checks whether spilling is enabled for this query. Must be called before the first
+  /// call to BufferPool::Unpin() for the query. Returns OK if spilling is enabled. If
+  /// spilling is not enabled, logs a MEM_LIMIT_EXCEEDED error from
+  /// tracker->MemLimitExceeded() to 'runtime_state'.
+  Status StartSpilling(RuntimeState* runtime_state, MemTracker* mem_tracker);
+
   ~QueryState();
 
  private:
@@ -162,6 +173,7 @@ class QueryState {
 
   /// test execution
   friend class RuntimeState;
+  friend class TestEnv;
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
@@ -176,16 +188,21 @@ class QueryState {
   /// TODO: find a way not to have to copy this
   TExecQueryFInstancesParams rpc_params_;
 
-  /// Buffer reservation for this query (owned by obj_pool_)
-  /// Only non-null in backend tests that explicitly enabled the new buffer pool
-  /// Set in Prepare().
-  /// TODO: this will always be non-null once IMPALA-3200 is done
+  /// Buffer reservation for this query (owned by obj_pool_). Set in Prepare().
   ReservationTracker* buffer_reservation_ = nullptr;
 
-  /// Temporary files for this query (owned by obj_pool_)
-  /// Only non-null in backend tests the explicitly enabled the new buffer pool
-  /// Set in Prepare().
-  /// TODO: this will always be non-null once IMPALA-3200 is done
+  /// Pool of buffer reservations used to distribute initial reservations to operators
+  /// in the query. Contains a ReservationTracker that is a child of
+  /// 'buffer_reservation_'. Owned by 'obj_pool_'. Set in Prepare().
+  InitialReservations* initial_reservations_ = nullptr;
+
+  /// Number of fragment instances executing, which may need to claim
+  /// from 'initial_reservations_'.
+  /// TODO: not needed if we call ReleaseResources() in a timely manner (IMPALA-1575).
+  AtomicInt32 initial_reservation_refcnt_;
+
+  /// Temporary files for this query (owned by obj_pool_). Non-null if spilling is
+  /// enabled. Set in Prepare().
   TmpFileMgr::FileGroup* file_group_ = nullptr;
 
   /// created in StartFInstances(), owned by obj_pool_
@@ -214,6 +231,11 @@ class QueryState {
   /// True if and only if ReleaseResources() has been called.
   bool released_resources_ = false;
 
+  /// Whether the query has spilled. 0 if the query has not spilled. Atomically set to 1
+  /// when the query first starts to spill. Required to correctly maintain the
+  /// "num-queries-spilled" metric.
+  AtomicInt32 query_spilled_;
+
   /// Create QueryState w/ refcnt of 0.
   /// The query is associated with the resource pool query_ctx.request_pool or
   /// 'request_pool', if the former is not set (needed for tests).
@@ -222,12 +244,15 @@ class QueryState {
   /// Execute the fragment instance and decrement the refcnt when done.
   void ExecFInstance(FragmentInstanceState* fis);
 
-  /// Called from Prepare() to initialize MemTrackers.
+  /// Called from constructor to initialize MemTrackers.
   void InitMemTrackers();
 
-  /// Called from Prepare() to setup buffer reservations and the
-  /// file group. Fails if required resources are not available.
+  /// Called from Init() to set up buffer reservations and the file group.
   Status InitBufferPoolState() WARN_UNUSED_RESULT;
+
+  /// Decrement 'initial_reservation_refcnt_' and release the initial reservation if it
+  /// goes to zero.
+  void ReleaseInitialReservationRefcount();
 
   /// Same behavior as ReportExecStatus().
   /// Cancel on error only if instances_started is true.

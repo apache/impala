@@ -58,8 +58,10 @@ Status PartialSortNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   less_than_.reset(new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
   sorter_.reset(new Sorter(*less_than_, sort_tuple_exprs_, &row_descriptor_,
-      mem_tracker(), runtime_profile(), state, false));
+      mem_tracker(), &buffer_pool_client_, resource_profile_.spillable_buffer_size,
+      runtime_profile(), state, id(), false));
   RETURN_IF_ERROR(sorter_->Prepare(pool_, expr_mem_pool()));
+  DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   AddCodegenDisabledMessage(state);
   input_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
@@ -81,6 +83,9 @@ Status PartialSortNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
+  if (!buffer_pool_client_.is_registered()) {
+    RETURN_IF_ERROR(ClaimBufferReservation(state));
+  }
   return Status::OK();
 }
 

@@ -8,7 +8,7 @@
 # consumption / spilling behaviour.
 ####################################################
 
-SET MAX_BLOCK_MGR_MEMORY=275m;
+SET BUFFER_POOL_LIMIT=40m;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_BLOOM_FILTER_SIZE=16M;
@@ -82,7 +82,8 @@ SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
-SET MEM_LIMIT=140MB;
+# Allocate enough memory for the join + filter + scan
+SET MEM_LIMIT=170MB;
 select STRAIGHT_JOIN * from alltypes a join [BROADCAST] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS

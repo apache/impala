@@ -75,6 +75,8 @@ DEFINE_int32(state_store_subscriber_port, 23000,
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
+DEFINE_int64(min_buffer_size, 64 * 1024,
+    "(Advanced) The minimum buffer size to use in the buffer pool");
 
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
@@ -204,13 +206,14 @@ Status ExecEnv::StartServices() {
   // memory limit either based on the available physical memory, or if overcommitting
   // is turned off, we use the memory commit limit from /proc/meminfo (see
   // IMPALA-1690).
-  // --mem_limit="" means no memory limit
+  // --mem_limit="" means no memory limit. TODO: IMPALA-5652: deprecate this mode
   int64_t bytes_limit = 0;
   bool is_percent;
+  int64_t system_mem;
   if (MemInfo::vm_overcommit() == 2 &&
       MemInfo::commit_limit() < MemInfo::physical_mem()) {
-    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent,
-        MemInfo::commit_limit());
+    system_mem = MemInfo::commit_limit();
+    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, system_mem);
     // There might be the case of misconfiguration, when on a system swap is disabled
     // and overcommitting is turned off the actual usable memory is less than the
     // available physical memory.
@@ -225,13 +228,22 @@ Status ExecEnv::StartServices() {
                  << "/proc/sys/vm/overcommit_memory and "
                  << "/proc/sys/vm/overcommit_ratio.";
   } else {
-    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent,
-        MemInfo::physical_mem());
+    system_mem = MemInfo::physical_mem();
+    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, system_mem);
   }
-
+  // ParseMemSpec returns 0 to mean unlimited. TODO: IMPALA-5652: deprecate this mode.
+  bool no_process_mem_limit = bytes_limit == 0;
   if (bytes_limit < 0) {
     return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
   }
+
+  if (!BitUtil::IsPowerOf2(FLAGS_min_buffer_size)) {
+    return Status(Substitute(
+        "--min_buffer_size must be a power-of-two: $0", FLAGS_min_buffer_size));
+  }
+  int64_t buffer_pool_capacity = BitUtil::RoundDown(
+      no_process_mem_limit ? system_mem : bytes_limit * 4 / 5, FLAGS_min_buffer_size);
+  InitBufferPool(FLAGS_min_buffer_size, buffer_pool_capacity);
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr);
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
@@ -240,8 +252,8 @@ Status ExecEnv::StartServices() {
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
 
   // Limit of -1 means no memory limit.
-  mem_tracker_.reset(new MemTracker(
-      AggregateMemoryMetrics::TOTAL_USED, bytes_limit > 0 ? bytes_limit : -1, "Process"));
+  mem_tracker_.reset(new MemTracker(AggregateMemoryMetrics::TOTAL_USED,
+      no_process_mem_limit ? -1 : bytes_limit, "Process"));
   if (buffer_pool_ != nullptr) {
     // Add BufferPool MemTrackers for cached memory that is not tracked against queries
     // but is included in process memory consumption.
@@ -270,6 +282,8 @@ Status ExecEnv::StartServices() {
   }
   LOG(INFO) << "Using global memory limit: "
             << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
+  LOG(INFO) << "Buffer pool capacity: "
+            << PrettyPrinter::Print(buffer_pool_capacity, TUnit::BYTES);
 
   RETURN_IF_ERROR(disk_io_mgr_->Init(mem_tracker_.get()));
 
@@ -310,9 +324,8 @@ Status ExecEnv::StartServices() {
   return Status::OK();
 }
 
-void ExecEnv::InitBufferPool(int64_t min_page_size, int64_t capacity) {
-  DCHECK(buffer_pool_ == nullptr);
-  buffer_pool_.reset(new BufferPool(min_page_size, capacity));
+void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity) {
+  buffer_pool_.reset(new BufferPool(min_buffer_size, capacity));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
 }

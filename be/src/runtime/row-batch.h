@@ -25,7 +25,6 @@
 #include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
-#include "runtime/buffered-block-mgr.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
@@ -207,7 +206,6 @@ class RowBatch {
   int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_io_buffers() const { return io_buffers_.size(); }
-  int num_blocks() const { return blocks_.size(); }
   int num_buffers() const { return buffers_.size(); }
 
   /// Resets the row batch, returning all resources it has accumulated.
@@ -215,13 +213,6 @@ class RowBatch {
 
   /// Add io buffer to this row batch.
   void AddIoBuffer(std::unique_ptr<DiskIoMgr::BufferDescriptor> buffer);
-
-  /// Adds a block to this row batch. The block must be pinned. The blocks must be
-  /// deleted when freeing resources. The block's memory remains accounted against
-  /// the original owner, even when the ownership of batches is transferred. If the
-  /// original owner wants the memory to be released, it should call this with 'mode'
-  /// FLUSH_RESOURCES (see MarkFlushResources() for further explanation).
-  void AddBlock(BufferedBlockMgr::Block* block, FlushMode flush);
 
   /// Adds a buffer to this row batch. The buffer is deleted when freeing resources.
   /// The buffer's memory remains accounted against the original owner, even when the
@@ -425,10 +416,6 @@ class RowBatch {
   /// between row batches. Any IO buffer will be owned by at most one row batch
   /// (i.e. they are not ref counted) so most row batches don't own any.
   std::vector<std::unique_ptr<DiskIoMgr::BufferDescriptor>> io_buffers_;
-
-  /// Blocks attached to this row batch. The underlying memory and block manager client
-  /// are owned by the BufferedBlockMgr.
-  std::vector<BufferedBlockMgr::Block*> blocks_;
 
   struct BufferInfo {
     BufferPool::ClientHandle* client;

@@ -52,7 +52,7 @@ DEBUG_ACTIONS = [None, 'WAIT']
 # Extra dimensions to test order by without limit
 SORT_QUERY = 'select * from lineitem order by l_orderkey'
 SORT_CANCEL_DELAY = range(6, 10)
-SORT_BLOCK_MGR_LIMIT = ['0', '300m'] # Test spilling and non-spilling sorts.
+SORT_BUFFER_POOL_LIMIT = ['0', '300m'] # Test spilling and non-spilling sorts.
 
 class TestCancellation(ImpalaTestSuite):
   @classmethod
@@ -71,7 +71,7 @@ class TestCancellation(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('action', *DEBUG_ACTIONS))
     cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('max_block_mgr_memory', 0))
+        ImpalaTestDimension('buffer_pool_limit', 0))
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('query_type') != 'CTAS' or (\
@@ -121,8 +121,8 @@ class TestCancellation(ImpalaTestSuite):
     debug_action = '0:GETNEXT:' + action if action != None else ''
     vector.get_value('exec_option')['debug_action'] = debug_action
 
-    vector.get_value('exec_option')['max_block_mgr_memory'] =\
-        vector.get_value('max_block_mgr_memory')
+    vector.get_value('exec_option')['buffer_pool_limit'] =\
+        vector.get_value('buffer_pool_limit')
 
     # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):
@@ -216,7 +216,7 @@ class TestCancellationFullSort(TestCancellation):
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('cancel_delay', *SORT_CANCEL_DELAY))
     cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('max_block_mgr_memory', *SORT_BLOCK_MGR_LIMIT))
+        ImpalaTestDimension('buffer_pool_limit', *SORT_BUFFER_POOL_LIMIT))
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('action', None))
     cls.ImpalaTestMatrix.add_constraint(lambda v:\
        v.get_value('table_format').file_format =='parquet' and\

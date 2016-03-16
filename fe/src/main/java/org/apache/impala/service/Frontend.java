@@ -1005,7 +1005,7 @@ public class Frontend {
     }
 
     // Compute resource requirements of the final plans.
-    planner.computeResourceReqs(planRoots, result);
+    planner.computeResourceReqs(planRoots, queryCtx, result);
 
     // create per-plan exec info;
     // also assemble list of names of tables with missing or corrupt stats for

@@ -84,7 +84,7 @@ public class SelectNode extends PlanNode {
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add an estimate
-    nodeResourceProfile_ = new ResourceProfile(0, 0);
+    nodeResourceProfile_ = ResourceProfile.noReservation(0);
   }
 
   @Override

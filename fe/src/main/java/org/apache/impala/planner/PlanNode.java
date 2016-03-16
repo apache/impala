@@ -33,7 +33,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
-import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBackendResourceProfile;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
@@ -408,6 +408,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.addToRuntime_filters(filter.toThrift());
     }
     msg.setDisable_codegen(disableCodegen_);
+    Preconditions.checkState(nodeResourceProfile_.isValid());
+    msg.resource_profile = nodeResourceProfile_.toThrift();
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.
@@ -674,16 +676,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
           childResources.duringOpenProfile.sum(nodeResourceProfile_),
           childResources.postOpenProfile.sum(nodeResourceProfile_));
     }
-  }
-
-  /**
-   * The default size of buffer used in spilling nodes. Used in
-   * computeNodeResourceProfile().
-   */
-  protected final static long getDefaultSpillableBufferBytes() {
-    // BufferedBlockMgr uses --read_size to determine buffer size.
-    // TODO: IMPALA-3200: get from query option
-    return BackendConfig.INSTANCE.getReadSize();
   }
 
   /**

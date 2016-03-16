@@ -399,9 +399,9 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     ss << query_exec_request.per_host_mem_estimate;
     summary_profile_.AddInfoString(PER_HOST_MEM_KEY, ss.str());
   }
-  if (query_exec_request.__isset.per_host_min_reservation) {
+  if (query_exec_request.query_ctx.__isset.per_host_min_reservation) {
     stringstream ss;
-    ss << query_exec_request.per_host_min_reservation;
+    ss << query_exec_request.query_ctx.per_host_min_reservation;
     summary_profile_.AddInfoString(PER_HOST_MEMORY_RESERVATION_KEY, ss.str());
   }
   if (!query_exec_request.query_ctx.__isset.parent_query_id &&

@@ -19,8 +19,7 @@
 #define IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 
 #include "exec/exec-node.h"
-#include "runtime/buffered-block-mgr.h"
-#include "runtime/buffered-tuple-stream.h"
+#include "runtime/buffered-tuple-stream-v2.h"
 #include "runtime/tuple.h"
 
 namespace impala {
@@ -189,6 +188,10 @@ class AnalyticEvalNode : public ExecNode {
   /// Debug string containing the window definition.
   std::string DebugWindowString() const;
 
+  /// The RuntimeState for the fragment instance containing this AnalyticEvalNode. Set
+  /// in Init().
+  RuntimeState* state_;
+
   /// Window over which the analytic functions are evaluated. Only used if fn_scope_
   /// is ROWS or RANGE.
   /// TODO: fn_scope_ and window_ are candidates to be removed during codegen
@@ -253,9 +256,6 @@ class AnalyticEvalNode : public ExecNode {
   /// window tuples it contains are no longer needed, or upon eos.
   boost::scoped_ptr<MemPool> curr_tuple_pool_;
   boost::scoped_ptr<MemPool> prev_tuple_pool_;
-
-  /// Block manager client used by input_stream_. Not owned.
-  BufferedBlockMgr::Client* client_ = nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
@@ -330,15 +330,16 @@ class AnalyticEvalNode : public ExecNode {
 
   /// Buffers input rows added in ProcessChildBatch() until enough rows are able to
   /// be returned by GetNextOutputBatch(), in which case row batches are returned from
-  /// the front of the stream and the underlying buffered blocks are deleted once read.
+  /// the front of the stream and the underlying buffers are deleted once read.
   /// The number of rows that must be buffered may vary from an entire partition (e.g.
-  /// no order by clause) to a single row (e.g. ROWS windows). When the amount of
-  /// buffered data exceeds the available memory in the underlying BufferedBlockMgr,
-  /// input_stream_ is unpinned (i.e., possibly spilled to disk if necessary).
-  /// The input stream owns tuple data backing rows returned in GetNext(). The blocks
-  /// with tuple data are attached to an output row batch on eos or ReachedLimit().
+  /// no order by clause) to a single row (e.g. ROWS windows). If the amount of buffered
+  /// data in 'input_stream_' exceeds the ExecNode's buffer reservation and the stream
+  /// cannot increase the reservation, then 'input_stream_' is unpinned (i.e., spilled to
+  /// disk). The input stream owns tuple data backing rows returned in GetNext(). The
+  /// buffers with tuple data are attached to an output row batch on eos or
+  /// ReachedLimit().
   /// TODO: Consider re-pinning unpinned streams when possible.
-  boost::scoped_ptr<BufferedTupleStream> input_stream_;
+  boost::scoped_ptr<BufferedTupleStreamV2> input_stream_;
 
   /// Pool used for O(1) allocations that live until Close() or Reset().
   /// Does not own data backing tuples returned in GetNext(), so it does not

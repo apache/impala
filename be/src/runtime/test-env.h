@@ -55,13 +55,8 @@ class TestEnv {
   Status CreateQueryState(
       int64_t query_id, const TQueryOptions* query_options, RuntimeState** runtime_state);
 
-  /// Same as CreateQueryState() but also creates a BufferedBlockMgr with the provided
-  /// parameters. If 'max_buffers' is -1, there is no limit, otherwise the limit is
-  /// max_buffers * block_size.
-  Status CreateQueryStateWithBlockMgr(int64_t query_id, int max_buffers, int block_size,
-      const TQueryOptions* query_options, RuntimeState** runtime_state);
-  /// Destroy all query states and associated RuntimeStates, BufferedBlockMgrs,
-  /// etc, that were created since the last TearDownQueries() call.
+  /// Destroy all query states and associated RuntimeStates, etc, that were created since
+  /// the last TearDownQueries() call.
   void TearDownQueries();
 
   /// Calculate memory limit accounting for overflow and negative values.
