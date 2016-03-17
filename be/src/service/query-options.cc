@@ -362,6 +362,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_num_runtime_filters(val);
         break;
       }
+      case TImpalaQueryOptions::PARQUET_ANNOTATE_STRINGS_UTF8: {
+        query_options->__set_parquet_annotate_strings_utf8(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

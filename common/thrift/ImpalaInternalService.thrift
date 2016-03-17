@@ -163,6 +163,13 @@ struct TQueryOptions {
 
   // Maximum number of runtime filters allowed per query
   41: optional i32 max_num_runtime_filters = 10
+
+  // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
+  // always use the annotation.
+  //
+  // This is disabled by default in order to preserve the existing behavior of legacy
+  // workloads. In addition, Impala strings are not necessarily UTF8-encoded.
+  42: optional bool parquet_annotate_strings_utf8 = false
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

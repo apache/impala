@@ -877,7 +877,6 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
     DCHECK(ctx->filter != NULL);
-    const TRuntimeFilterDesc& desc = ctx->filter->filter_desc();
     filter_ctxs_.push_back(ctx);
   }
   filter_stats_.resize(filter_ctxs_.size());

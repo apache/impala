@@ -200,7 +200,11 @@ enum TImpalaQueryOptions {
   DISABLE_ROW_RUNTIME_FILTERING,
 
   // Maximum number of runtime filters allowed per query.
-  MAX_NUM_RUNTIME_FILTERS
+  MAX_NUM_RUNTIME_FILTERS,
+
+  // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
+  // always use the annotation.
+  PARQUET_ANNOTATE_STRINGS_UTF8
 }
 
 // The summary of an insert.

@@ -749,7 +749,9 @@ Status HdfsParquetTableWriter::CreateSchema() {
           ParquetPlainEncoder::DecimalSize(output_expr_ctxs_[i]->root()->type()));
       node.__set_scale(output_expr_ctxs_[i]->root()->type().scale);
       node.__set_precision(output_expr_ctxs_[i]->root()->type().precision);
-    } else if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR) {
+    } else if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR ||
+        (type.type == TYPE_STRING &&
+         state_->query_options().parquet_annotate_strings_utf8)) {
       node.__set_converted_type(ConvertedType::UTF8);
     }
   }
@@ -982,4 +984,3 @@ Status HdfsParquetTableWriter::WriteFileFooter() {
   RETURN_IF_ERROR(Write(PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER)));
   return Status::OK();
 }
-

@@ -8,6 +8,7 @@
 
 import logging
 import pytest
+import random
 from copy import deepcopy
 from subprocess import call, check_call
 
@@ -15,9 +16,12 @@ from testdata.common import widetable
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins, SkipIfLocal
+
+from parquet.ttypes import ConvertedType
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
@@ -237,6 +241,67 @@ class TestParquet(ImpalaTestSuite):
 
     for scan_ranges_complete in scan_ranges_complete_list[1:]:
       assert int(scan_ranges_complete) == 1
+
+  @SkipIfS3.insert
+  def test_annotate_utf8_option(self, vector):
+    if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
+
+    # Create table
+    table_name = "parquet_annotate_utf8_test_%s" % random.randint(0, 10000)
+    query = 'drop table if exists %s' % table_name
+    self.client.execute(query)
+    query = 'create table %s (a string, b char(10), c varchar(10), d string) ' \
+            'stored as parquet' % table_name
+    self.client.execute(query)
+
+    # Insert data that should have UTF8 annotation
+    query = 'insert overwrite table %s '\
+            'values("a", cast("b" as char(10)), cast("c" as varchar(10)), "d")' \
+            % table_name
+    self.execute_query(query, {'parquet_annotate_strings_utf8': True})
+
+    def get_schema_elements():
+      # Copy the created file to the local filesystem and parse metadata
+      local_file = '/tmp/utf8_test_%s.parq' % random.randint(0, 10000)
+      LOG.info("test_annotate_utf8_option local file name: " + local_file)
+      hdfs_file = get_fs_path('/test-warehouse/%s/*.parq' % table_name)
+      check_call(['hadoop', 'fs', '-copyToLocal', hdfs_file, local_file])
+      metadata = get_parquet_metadata(local_file)
+
+      # Extract SchemaElements corresponding to the table columns
+      a_schema_element = metadata.schema[1]
+      assert a_schema_element.name == 'a'
+      b_schema_element = metadata.schema[2]
+      assert b_schema_element.name == 'b'
+      c_schema_element = metadata.schema[3]
+      assert c_schema_element.name == 'c'
+      d_schema_element = metadata.schema[4]
+      assert d_schema_element.name == 'd'
+
+      os.remove(local_file)
+      return a_schema_element, b_schema_element, c_schema_element, d_schema_element
+
+    # Check that the schema uses the UTF8 annotation
+    a_schema_elt, b_schema_elt, c_schema_elt, d_schema_elt = get_schema_elements()
+    assert a_schema_elt.converted_type == ConvertedType.UTF8
+    assert b_schema_elt.converted_type == ConvertedType.UTF8
+    assert c_schema_elt.converted_type == ConvertedType.UTF8
+    assert d_schema_elt.converted_type == ConvertedType.UTF8
+
+    # Create table and insert data that should not have UTF8 annotation for strings
+    self.execute_query(query, {'parquet_annotate_strings_utf8': False})
+
+    # Check that the schema does not use the UTF8 annotation except for CHAR and VARCHAR
+    # columns
+    a_schema_elt, b_schema_elt, c_schema_elt, d_schema_elt = get_schema_elements()
+    assert a_schema_elt.converted_type == None
+    assert b_schema_elt.converted_type == ConvertedType.UTF8
+    assert c_schema_elt.converted_type == ConvertedType.UTF8
+    assert d_schema_elt.converted_type == None
+
+    # Drop table
+    query = "drop table %s" % table_name
+    self.client.execute(query)
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
