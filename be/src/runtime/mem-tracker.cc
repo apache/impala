@@ -15,7 +15,7 @@
 #include "runtime/mem-tracker.h"
 
 #include <boost/algorithm/string/join.hpp>
-#include <google/malloc_extension.h>
+#include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "runtime/exec-env.h"

@@ -9,12 +9,12 @@
 
 set(PPROF_SEARCH_HEADER_PATHS
   ${GPERFTOOLS_ROOT}/include
-  $ENV{IMPALA_HOME}/thirdparty/gperftools-2.0/src
+  $ENV{IMPALA_HOME}/thirdparty/gperftools-$ENV{IMPALA_GPERFTOOLS_VERSION}/src
 )
 
 set(PPROF_SEARCH_LIB_PATH
   ${GPERFTOOLS_ROOT}/lib
-  $ENV{IMPALA_HOME}/thirdparty/gperftools-2.0/.libs
+  $ENV{IMPALA_HOME}/thirdparty/gperftools-$ENV{IMPALA_GPERFTOOLS_VERSION}/.libs
 )
 
 find_path(PPROF_INCLUDE_DIR google/profiler.h PATHS

@@ -14,8 +14,8 @@
 
 #include "common/init.h"
 
-#include <google/heap-profiler.h>
-#include <google/malloc_extension.h>
+#include <gperftools/heap-profiler.h>
+#include <gperftools/malloc_extension.h>
 
 #include "common/logging.h"
 #include "common/status.h"

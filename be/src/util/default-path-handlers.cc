@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
-#include <google/malloc_extension.h>
+#include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"

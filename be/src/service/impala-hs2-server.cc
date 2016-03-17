@@ -25,8 +25,8 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
-#include <google/heap-profiler.h>
-#include <google/malloc_extension.h>
+#include <gperftools/heap-profiler.h>
+#include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
