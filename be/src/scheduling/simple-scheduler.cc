@@ -56,7 +56,7 @@ DECLARE_bool(enable_rm);
 DECLARE_int32(rm_default_cpu_vcores);
 DECLARE_string(rm_default_memory);
 
-DEFINE_bool(disable_admission_control, true, "Disables admission control.");
+DEFINE_bool(disable_admission_control, false, "Disables admission control.");
 
 namespace impala {
 
