@@ -243,28 +243,28 @@ class TestParquet(ImpalaTestSuite):
       assert int(scan_ranges_complete) == 1
 
   @SkipIfS3.insert
-  def test_annotate_utf8_option(self, vector):
+  def test_annotate_utf8_option(self, vector, unique_database):
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
 
     # Create table
-    table_name = "parquet_annotate_utf8_test_%s" % random.randint(0, 10000)
-    query = 'drop table if exists %s' % table_name
-    self.client.execute(query)
+    TABLE_NAME = "parquet_annotate_utf8_test"
+    qualified_table_name = "%s.%s" % (unique_database, TABLE_NAME)
     query = 'create table %s (a string, b char(10), c varchar(10), d string) ' \
-            'stored as parquet' % table_name
+            'stored as parquet' % qualified_table_name
     self.client.execute(query)
 
     # Insert data that should have UTF8 annotation
     query = 'insert overwrite table %s '\
             'values("a", cast("b" as char(10)), cast("c" as varchar(10)), "d")' \
-            % table_name
+            % qualified_table_name
     self.execute_query(query, {'parquet_annotate_strings_utf8': True})
 
     def get_schema_elements():
       # Copy the created file to the local filesystem and parse metadata
       local_file = '/tmp/utf8_test_%s.parq' % random.randint(0, 10000)
       LOG.info("test_annotate_utf8_option local file name: " + local_file)
-      hdfs_file = get_fs_path('/test-warehouse/%s/*.parq' % table_name)
+      hdfs_file = get_fs_path('/test-warehouse/%s.db/%s/*.parq'
+          % (unique_database, TABLE_NAME))
       check_call(['hadoop', 'fs', '-copyToLocal', hdfs_file, local_file])
       metadata = get_parquet_metadata(local_file)
 
@@ -298,10 +298,6 @@ class TestParquet(ImpalaTestSuite):
     assert b_schema_elt.converted_type == ConvertedType.UTF8
     assert c_schema_elt.converted_type == ConvertedType.UTF8
     assert d_schema_elt.converted_type == None
-
-    # Drop table
-    query = "drop table %s" % table_name
-    self.client.execute(query)
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
