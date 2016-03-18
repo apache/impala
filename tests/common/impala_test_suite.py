@@ -22,6 +22,7 @@ import pytest
 import grp
 import re
 import string
+import time
 from getpass import getuser
 from functools import wraps
 from impala._thrift_gen.ImpalaService.ttypes import TImpalaQueryOptions
@@ -184,7 +185,7 @@ class ImpalaTestSuite(BaseTestSuite):
         LOG.info('Unexpected exception when executing ' + query_str + ' : ' + str(e))
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
-      encoding=None):
+      encoding=None, wait_secs_between_stmts=None):
     """
     Runs the queries in the specified test based on the vector values
 
@@ -254,6 +255,8 @@ class ImpalaTestSuite(BaseTestSuite):
           if set_pattern_match != None:
             query_options_changed.append(set_pattern_match.groups()[0])
           result = self.__execute_query(target_impalad_client, query, user=user)
+          if wait_secs_between_stmts:
+            time.sleep(wait_secs_between_stmts)
       except Exception as e:
         if 'CATCH' in test_section:
           # In error messages, some paths are always qualified and some are not.

@@ -15,22 +15,30 @@
 #ifndef IMPALA_UTIL_KUDU_UTIL_H_
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
-#ifdef USE_KUDU
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
-#endif
 
 #include <boost/unordered_map.hpp>
 
 namespace impala {
-
-#ifdef USE_KUDU
 
 class TExpr;
 class KuduTableDescriptor;
 class Status;
 class ColumnType;
 class TupleDescriptor;
+
+/// Returns false when running on an operating system that Kudu doesn't support. If this
+/// check fails, there is no way Kudu should be expected to work. Exposed for testing.
+bool KuduClientIsSupported();
+
+/// Returns OK if Kudu is available or an error status containing the reason Kudu is not
+/// available. Kudu may not be available if no Kudu client is available for the platform
+/// or if Kudu was disabled by the startup flag --disable_kudu.
+Status CheckKuduAvailability();
+
+/// Convenience function for the bool equivalent of CheckKuduAvailability().
+bool KuduIsAvailable();
 
 Status ImpalaToKuduType(const ColumnType& impala_type,
     kudu::client::KuduColumnSchema::DataType* kudu_type);
@@ -70,12 +78,6 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
       return Status(strings::Substitute("$0: $1", prepend, _s.ToString())); \
     } \
   } while (0)
-
-#else  // No Kudu
-
-void InitKuduLogging() {}
-
-#endif
 
 } /// namespace impala
 #endif

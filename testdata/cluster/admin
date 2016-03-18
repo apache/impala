@@ -413,6 +413,7 @@ function stop_cluster {
 
 function delete_data {
   rm -rf "$NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
+  rm -rf "$NODES_DIR/$NODE_PREFIX"*/var/lib/kudu/{master,tserver}/*
 }
 
 function delete_cluster {

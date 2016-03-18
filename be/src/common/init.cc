@@ -221,7 +221,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     Expr::InitBuiltinsDummy();
   }
 
-  impala::InitKuduLogging();
+  if (impala::KuduIsAvailable()) impala::InitKuduLogging();
 
 #ifndef ADDRESS_SANITIZER
   // tcmalloc and address sanitizer can not be used together

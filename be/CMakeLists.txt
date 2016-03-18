@@ -326,11 +326,9 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}
   ${JAVA_JVM_LIBRARY}
+  kudu_client
   -lrt
 )
-if($ENV{KUDU_IS_SUPPORTED} STREQUAL true)
-  list(APPEND IMPALA_LINK_LIBS kudu_client)
-endif()
 
 # The above link list does not include tcmalloc. This is because the Impala JVM support
 # libraries (libfesupport, libloggingsupport) cannot use tcmalloc in all cases. When they

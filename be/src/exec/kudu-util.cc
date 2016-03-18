@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef USE_KUDU
-
 #include "exec/kudu-util.h"
 
 #include <algorithm>
@@ -32,7 +30,30 @@ using boost::algorithm::to_lower_copy;
 using kudu::client::KuduSchema;
 using kudu::client::KuduColumnSchema;
 
+DECLARE_bool(disable_kudu);
+
 namespace impala {
+
+bool KuduClientIsSupported() {
+#ifdef KUDU_CLIENT_SUPPORTED
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool KuduIsAvailable() { return CheckKuduAvailability().ok(); }
+
+Status CheckKuduAvailability() {
+  if (KuduClientIsSupported()) {
+    if (FLAGS_disable_kudu) {
+      return Status(TErrorCode::KUDU_NOT_ENABLED);
+    } else{
+      return Status::OK();
+    }
+  }
+  return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
+}
 
 Status ImpalaToKuduType(const ColumnType& impala_type,
     kudu::client::KuduColumnSchema::DataType* kudu_type) {
@@ -175,11 +196,10 @@ void LogKuduMessage(void* unused, kudu::client::KuduLogSeverity severity,
 }
 
 void InitKuduLogging() {
+  DCHECK(KuduIsAvailable());
   static kudu::client::KuduLoggingFunctionCallback<void*> log_cb(&LogKuduMessage, NULL);
   kudu::client::InstallLoggingCallback(&log_cb);
   kudu::client::SetVerboseLogLevel(FLAGS_v);
 }
 
 }  // namespace impala
-
-#endif

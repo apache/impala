@@ -16,22 +16,17 @@
 #define IMPALA_EXEC_KUDU_TABLE_SINK_H
 
 #include <boost/scoped_ptr.hpp>
-#ifdef USE_KUDU
 #include <kudu/client/client.h>
-#endif
 
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "common/status.h"
-#ifdef USE_KUDU
 #include "exec/kudu-util.h"
-#endif
 #include "exec/data-sink.h"
 #include "exprs/expr-context.h"
 #include "exprs/expr.h"
 
 namespace impala {
 
-#ifdef USE_KUDU
 /// Sink that takes RowBatches and writes them into Kudu.
 /// Currently the data is sent to Kudu on Send(), i.e. the data is batched on the
 /// KuduSession until all the rows in a RowBatch are applied and then the session
@@ -124,35 +119,6 @@ class KuduTableSink : public DataSink {
 
 };
 
-#else  // No Kudu
-
-class KuduTableSink : public DataSink {
- public:
-  KuduTableSink(const RowDescriptor& row_desc,
-      const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink) {}
-
-  virtual Status Prepare(RuntimeState* state) {
-    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
-  }
-
-  virtual Status Open(RuntimeState* state) {
-    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
-  }
-
-  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos) {
-    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
-  }
-
-  virtual void Close(RuntimeState* state) {}
-
-  virtual RuntimeProfile* profile() { return NULL; }
-
-  virtual Status FlushFinal(RuntimeState* state) {
-    return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
-  }
-};
-
-#endif
 }  // namespace impala
 
 #endif // IMPALA_EXEC_KUDU_TABLE_SINK_H

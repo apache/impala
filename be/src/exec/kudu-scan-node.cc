@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef USE_KUDU
-
 #include "exec/kudu-scan-node.h"
 
 #include <boost/algorithm/string.hpp>
@@ -77,6 +75,7 @@ KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
       done_(false),
       pushable_conjuncts_(tnode.kudu_scan_node.kudu_conjuncts),
       thread_avail_cb_id_(-1) {
+  DCHECK(KuduIsAvailable());
 }
 
 KuduScanNode::~KuduScanNode() {
@@ -466,5 +465,3 @@ done:
 }
 
 }  // namespace impala
-
-#endif

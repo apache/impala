@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef USE_KUDU
-#error Kudu is required
-#endif
-
 #include "exec/kudu-testutil.h"
 
 #include "common/init.h"
@@ -304,6 +300,7 @@ TEST_F(KuduTableSinkTest, DeleteModThreeTwice) {
 } // namespace impala
 
 int main(int argc, char** argv) {
+  if (!impala::KuduClientIsSupported()) return 0;
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();

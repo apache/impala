@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef USE_KUDU
-
 #include "exec/kudu-table-sink.h"
 
 #include <sstream>
@@ -59,6 +57,7 @@ KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
       kudu_error_counter_(NULL),
       rows_written_(NULL),
       rows_written_rate_(NULL) {
+  DCHECK(KuduIsAvailable());
 }
 
 Status KuduTableSink::PrepareExprs(RuntimeState* state) {
@@ -295,5 +294,3 @@ void KuduTableSink::Close(RuntimeState* state) {
 }
 
 }  // namespace impala
-
-#endif

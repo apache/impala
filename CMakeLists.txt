@@ -307,18 +307,23 @@ message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
 message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
 
 if($ENV{KUDU_IS_SUPPORTED} STREQUAL true)
-  add_definitions(-DUSE_KUDU)
-  # KuduClient can use GLOG
-  add_definitions(-DKUDU_HEADERS_USE_GLOG)
-  if(NOT $ENV{KUDU_CLIENT_DIR} EQUAL "")
-    set(kuduClient_DIR "$ENV{KUDU_CLIENT_DIR}/usr/local/share/kuduClient/cmake")
-  else()
-    set(kuduClient_DIR
-        "$ENV{IMPALA_TOOLCHAIN}/kudu-$ENV{IMPALA_KUDU_VERSION}/share/kuduClient/cmake")
-  endif()
-  find_package(kuduClient REQUIRED)
-  include_directories(${KUDU_CLIENT_INCLUDE_DIR})
+  # This can be removed after some toolchain work to improve the Kudu client stub
+  # library. That work involves overriding a method added to the 0.8 client. So
+  # we wait for that.
+  add_definitions(-DKUDU_CLIENT_SUPPORTED)
 endif()
+# KuduClient can use GLOG
+add_definitions(-DKUDU_HEADERS_USE_GLOG)
+if(NOT $ENV{KUDU_CLIENT_DIR} EQUAL "")
+  set(kuduClient_DIR "$ENV{KUDU_CLIENT_DIR}/usr/local/share/kuduClient/cmake")
+else()
+  set(kuduClient_DIR
+      "$ENV{IMPALA_TOOLCHAIN}/kudu-$ENV{IMPALA_KUDU_VERSION}/share/kuduClient/cmake")
+endif()
+# When KUDU_IS_SUPPORTED is false, the Kudu client is expected to be a non-functional
+# stub. It's still needed to link though.
+find_package(kuduClient REQUIRED)
+include_directories(SYSTEM ${KUDU_CLIENT_INCLUDE_DIR})
 
 # find jni headers and libs
 find_package(JNI REQUIRED)

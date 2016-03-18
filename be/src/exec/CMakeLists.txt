@@ -110,11 +110,9 @@ ADD_BE_TEST(parquet-plain-test)
 ADD_BE_TEST(parquet-version-test)
 ADD_BE_TEST(row-batch-list-test)
 ADD_BE_TEST(incr-stats-util-test)
-if($ENV{KUDU_IS_SUPPORTED} STREQUAL true)
-  ADD_BE_TEST(kudu-scan-node-test)
-  ADD_BE_TEST(kudu-table-sink-test)
-  SET_TARGET_PROPERTIES(kudu-scan-node-test PROPERTIES COMPILE_FLAGS
-    "${CXX_COMMON_FLAGS} -Wno-error")
-  SET_TARGET_PROPERTIES(kudu-table-sink-test PROPERTIES COMPILE_FLAGS
-    "${CXX_COMMON_FLAGS} -Wno-error")
-endif()
+ADD_BE_TEST(kudu-scan-node-test)
+ADD_BE_TEST(kudu-table-sink-test)
+SET_TARGET_PROPERTIES(kudu-scan-node-test PROPERTIES COMPILE_FLAGS
+  "${CXX_COMMON_FLAGS} -Wno-error")
+SET_TARGET_PROPERTIES(kudu-table-sink-test PROPERTIES COMPILE_FLAGS
+  "${CXX_COMMON_FLAGS} -Wno-error")

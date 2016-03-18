@@ -33,6 +33,7 @@
 #include "exec/hbase-scan-node.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/kudu-scan-node.h"
+#include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
 #include "exec/partitioned-aggregation-node.h"
 #include "exec/partitioned-hash-join-node.h"
@@ -292,6 +293,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new DataSourceScanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::KUDU_SCAN_NODE:
+      RETURN_IF_ERROR(CheckKuduAvailability());
       *node = pool->Add(new KuduScanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::AGGREGATION_NODE:
