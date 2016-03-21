@@ -24,7 +24,7 @@ where 10 > int_col and
 ---- PLAN
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: 10 > int_col, string_col != 'Foo'
-predicates: 5 > double_col, string_col != 'Bar', NOT TRUE = bool_col, NOT 5.0 = double_col
+predicates: 5 > double_col, NOT TRUE = bool_col, NOT 5.0 = double_col, string_col != 'Bar'
 ====
 # The 3rd predicate is not in a form that can be offered to the data source so
 # the 4th will be offered and accepted instead.
@@ -58,7 +58,7 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 |--predicates: b.id = b.int_col, b.id = b.bigint_col
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource a]
-predicates: a.tinyint_col = a.smallint_col, a.int_col = a.bigint_col, a.id = a.tinyint_col, a.id = a.int_col
+predicates: a.id = a.int_col, a.tinyint_col = a.smallint_col, a.int_col = a.bigint_col, a.id = a.tinyint_col
 ====
 # Tests that <=>, IS DISTINCT FROM, and IS NOT DISTINCT FROM all can be offered to the
 # data source.

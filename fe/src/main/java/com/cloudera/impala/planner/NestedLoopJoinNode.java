@@ -67,6 +67,7 @@ public class NestedLoopJoinNode extends JoinNode {
       // A cross join with predicates is an inner join.
       joinOp_ = JoinOperator.INNER_JOIN;
     }
+    orderJoinConjunctsByCost();
   }
 
   @Override

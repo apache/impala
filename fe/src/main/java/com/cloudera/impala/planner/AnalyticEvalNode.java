@@ -96,6 +96,7 @@ public class AnalyticEvalNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) {
+    Preconditions.checkState(conjuncts_.isEmpty());
     computeMemLayout(analyzer);
     intermediateTupleDesc_.computeMemLayout();
 

@@ -94,6 +94,7 @@ public class DataSourceScanNode extends ScanNode {
     assignConjuncts(analyzer);
     analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
     prepareDataSource();
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
     computeStats(analyzer);
     // materialize slots in remaining conjuncts_
     analyzer.materializeSlots(conjuncts_);

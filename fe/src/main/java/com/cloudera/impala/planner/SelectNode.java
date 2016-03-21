@@ -48,6 +48,7 @@ public class SelectNode extends PlanNode {
   @Override
   public void init(Analyzer analyzer) {
     analyzer.markConjunctsAssigned(conjuncts_);
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
     computeStats(analyzer);
     createDefaultSmap(analyzer);
   }

@@ -46,6 +46,7 @@ public class IsNotEmptyPredicate extends Predicate {
     }
     // Avoid influencing cardinality estimates.
     selectivity_ = 1.0;
+    if (getChild(0).hasCost()) evalCost_ = getChild(0).getCost() + IS_NOT_EMPTY_COST;
   }
 
   @Override

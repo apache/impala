@@ -1320,7 +1320,7 @@ where a.int_col = b.int_col and b.bigint_col < a.tinyint_col
 ---- PLAN
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = b.id
-|  other predicates: a.int_col = b.int_col, b.bigint_col < a.tinyint_col, b.tinyint_col = c.tinyint_col, b.bool_col != c.bool_col
+|  other predicates: a.int_col = b.int_col, b.tinyint_col = c.tinyint_col, b.bool_col != c.bool_col, b.bigint_col < a.tinyint_col
 |  runtime filters: RF000 <- b.tinyint_col
 |
 |--03:HASH JOIN [RIGHT OUTER JOIN]

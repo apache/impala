@@ -164,6 +164,7 @@ public class TimestampArithmeticExpr extends Expr {
     Preconditions.checkNotNull(fn_);
     Preconditions.checkState(fn_.getReturnType().isTimestamp());
     type_ = fn_.getReturnType();
+    if (hasChildCosts()) evalCost_ = getChildCosts() + TIMESTAMP_ARITHMETIC_COST;
   }
 
   @Override

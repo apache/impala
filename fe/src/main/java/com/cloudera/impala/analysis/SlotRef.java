@@ -71,6 +71,7 @@ public class SlotRef extends Expr {
     isAnalyzed_ = true;
     desc_ = desc;
     type_ = desc.getType();
+    evalCost_ = SLOT_REF_COST;
     String alias = desc.getParent().getAlias();
     label_ = (alias != null ? alias + "." : "") + desc.getLabel();
     numDistinctValues_ = desc.getStats().getNumDistinctValues();
@@ -112,6 +113,7 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new AnalysisException("Unsupported type in '" + toSql() + "'.");
     }
+    evalCost_ = SLOT_REF_COST;
 
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
     Table rootTable = resolvedPath.getRootTable();

@@ -222,4 +222,9 @@ public class PlannerTest extends PlannerTestBase {
     options.setRuntime_filter_mode(TRuntimeFilterMode.GLOBAL);
     runPlannerTestFile("runtime-filter-propagation", options);
   }
+
+  @Test
+  public void testConjunctOrdering() {
+    runPlannerTestFile("conjunct-ordering");
+  }
 }

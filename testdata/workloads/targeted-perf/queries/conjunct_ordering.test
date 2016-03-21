@@ -1,0 +1,73 @@
+====
+---- QUERY: conjunct_ordering_1
+-- Description : A simple select with one expensive conjunct and one cheap conjunct.
+SELECT *
+FROM lineitem
+WHERE (l_shipdate < current_timestamp() - interval 1 day) AND l_orderkey = -1;
+====
+---- QUERY: conjunct_ordering_2
+-- Description: Based on TPCH-Q19
+SELECT sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM lineitem, part
+WHERE p_partkey = l_partkey
+  AND ((p_brand = 'Brand#12'
+      AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+      AND l_quantity >= 1 AND l_quantity <= 11
+      AND p_size BETWEEN 1 AND 5
+      AND l_shipmode IN ('AIR', 'AIR REG')
+      AND l_shipinstruct = 'DELIVER IN PERSON')
+    OR (p_brand = 'Brand#23'
+      AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+      AND l_quantity >= 10 AND l_quantity <= 20
+      AND p_size BETWEEN 1 AND 10
+      AND l_shipmode IN ('AIR', 'AIR REG')
+      AND l_shipinstruct = 'DELIVER IN PERSON')
+    OR (p_brand = 'Brand#34'
+      AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+      AND l_quantity >= 20 AND l_quantity <= 30
+      AND p_size BETWEEN 1 AND 15
+      AND l_shipmode IN ('AIR', 'AIR REG')
+      AND l_shipinstruct = 'DELIVER IN PERSON'))
+  AND (p_partkey = 0 OR l_partkey = 0)
+====
+---- QUERY: conjunct_ordering_3
+-- Description: Based on TPCDS-Q28
+SELECT avg(l_extendedprice), count(l_extendedprice), count(distinct l_extendedprice)
+FROM lineitem
+WHERE
+  (l_discount BETWEEN 0.2 AND 0.3
+    OR l_discount BETWEEN 0.4 AND 0.5
+    OR l_tax BETWEEN 0.1 AND 0.2
+    OR l_tax BETWEEN 0 AND 0.09)
+  AND l_extendedprice BETWEEN 100 AND 500
+====
+---- QUERY: conjunct_ordering_4
+-- Description: Based on TPCDS-Q41
+SELECT p_mfgr, count(*) as item_cnt
+FROM part
+WHERE ((p_type LIKE '%STEEL%'
+      AND p_size BETWEEN 10 AND 40
+      AND p_container IN ('LG BOX', 'LG BAG', 'LG CASE'))
+    OR (p_type LIKE '%COPPER%'
+      AND p_size BETWEEN 20 AND 50
+      AND p_container IN ('JUMBO BOX', 'JUMBO BAG', 'JUMBO CASE'))
+    OR (p_type LIKE '%TIN%'
+      AND p_size BETWEEN 0 AND 30
+      AND p_container IN ('MED BOX', 'MED BAG', 'MED CASE'))
+    OR (p_type LIKE '%BRASS%'
+      AND p_size BETWEEN 0 AND 20
+      AND p_container IN ('SMALL BOX', 'SMALL BAG', 'SMALL CASE')))
+  AND p_partkey = -1
+GROUP BY p_mfgr
+====
+---- QUERY: conjunct_ordering_5
+-- Description: Based on TPCDS-Q48
+SELECT sum(l_quantity)
+FROM orders, lineitem,
+  (SELECT * FROM customer WHERE c_comment LIKE c_comment AND c_nationkey IN (5, 20)) as v1
+WHERE l_orderkey = o_orderkey
+  AND (v1.c_custkey = o_custkey
+    AND (o_totalprice BETWEEN 1000 AND 2000
+      OR o_totalprice BETWEEN 3000 AND 4000
+      OR o_totalprice BETWEEN 5000 AND 6000))
+====

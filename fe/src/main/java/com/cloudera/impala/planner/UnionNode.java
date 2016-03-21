@@ -162,6 +162,7 @@ public class UnionNode extends PlanNode {
    */
   @Override
   public void init(Analyzer analyzer) {
+    Preconditions.checkState(conjuncts_.isEmpty());
     computeMemLayout(analyzer);
     computeStats(analyzer);
 

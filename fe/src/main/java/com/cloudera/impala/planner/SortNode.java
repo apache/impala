@@ -90,6 +90,7 @@ public class SortNode extends PlanNode {
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
+    Preconditions.checkState(conjuncts_.isEmpty());
     // Compute the memory layout for the generated tuple.
     computeMemLayout(analyzer);
     computeStats(analyzer);

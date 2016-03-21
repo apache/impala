@@ -1248,7 +1248,7 @@ where
   v.b != v.c
 ---- PLAN
 07:SELECT
-|  predicates: bigint_col > 10, min(int_col) < 1, min(int_col) < bigint_col + 1, max(int_col) < 2, max(int_col) < bigint_col + 2, count(int_col) < 3, count(int_col) < bigint_col + 3, sum(int_col) < 4, sum(int_col) < bigint_col + 4, avg(int_col) < 5, avg(int_col) < bigint_col + 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col)
+|  predicates: bigint_col > 10, min(int_col) < 1, max(int_col) < 2, count(int_col) < 3, sum(int_col) < 4, avg(int_col) < 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, min(int_col) < bigint_col + 1, max(int_col) < bigint_col + 2, avg(int_col) < bigint_col + 5
 |
 06:ANALYTIC
 |  functions: min(int_col)
@@ -1280,7 +1280,7 @@ where
    predicates: int_col >= 5, int_col <= 10
 ---- DISTRIBUTEDPLAN
 07:SELECT
-|  predicates: bigint_col > 10, min(int_col) < 1, min(int_col) < bigint_col + 1, max(int_col) < 2, max(int_col) < bigint_col + 2, count(int_col) < 3, count(int_col) < bigint_col + 3, sum(int_col) < 4, sum(int_col) < bigint_col + 4, avg(int_col) < 5, avg(int_col) < bigint_col + 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col)
+|  predicates: bigint_col > 10, min(int_col) < 1, max(int_col) < 2, count(int_col) < 3, sum(int_col) < 4, avg(int_col) < 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, min(int_col) < bigint_col + 1, max(int_col) < bigint_col + 2, avg(int_col) < bigint_col + 5
 |
 06:ANALYTIC
 |  functions: min(int_col)
@@ -1818,7 +1818,7 @@ select * from
 where year = 2009 and tinyint_col = 1
 ---- PLAN
 07:SELECT
-|  predicates: year = 2009, tinyint_col = 1
+|  predicates: tinyint_col = 1, year = 2009
 |
 06:ANALYTIC
 |  functions: lead(int_col, 1, NULL)
@@ -1871,7 +1871,7 @@ where month = int_col and int_col = 1 and tinyint_col = 1
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
-   predicates: id = tinyint_col, functional.alltypestiny.tinyint_col = 1, functional.alltypestiny.id = 1
+   predicates: functional.alltypestiny.id = 1, id = tinyint_col, functional.alltypestiny.tinyint_col = 1
 ====
 # Don't propagate predicates through an inline view with an analytic
 # function that has a complex (non SlotRef) partition by clause for consistency with

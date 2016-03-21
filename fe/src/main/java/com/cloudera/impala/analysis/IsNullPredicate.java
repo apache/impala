@@ -133,6 +133,7 @@ public class IsNullPredicate extends Predicate {
       fn_ = getBuiltinFunction(
           analyzer, IS_NULL, collectChildReturnTypes(), CompareMode.IS_IDENTICAL);
     }
+    if (getChild(0).hasCost()) evalCost_ = getChild(0).getCost() + IS_NULL_COST;
 
     // determine selectivity
     // TODO: increase this to make sure we don't end up favoring broadcast joins

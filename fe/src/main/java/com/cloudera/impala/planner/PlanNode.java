@@ -625,4 +625,68 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     output.append(Joiner.on(", ").join(filtersStr) + "\n");
     return output.toString();
   }
+
+  /**
+   * Sort a list of conjuncts into an estimated cheapest order to evaluate them in, based
+   * on estimates of the cost to evaluate and selectivity of the expressions. Should be
+   * called during PlanNode.init for any PlanNode that could have a conjunct list.
+   *
+   * The conjuncts are sorted by repeatedly iterating over them and choosing the conjunct
+   * that would result in the least total estimated work were it to be applied before the
+   * remaining conjuncts.
+   *
+   * As in computeCombinedSelecivity, the selectivities are exponentially backed off over
+   * the iterations, to reflect the possibility that the conjuncts may be correlated, and
+   * Exprs without selectivity estimates are given a reasonable default.
+   */
+  public static <T extends Expr> List<T> orderConjunctsByCost(List<T> conjuncts) {
+    if (conjuncts.size() <= 1) return conjuncts;
+
+    float totalCost = 0;
+    int numWithoutSel = 0;
+    List<T> remaining = Lists.newArrayListWithCapacity(conjuncts.size());
+    for (T e : conjuncts) {
+      Preconditions.checkState(e.hasCost());
+      totalCost += e.getCost();
+      remaining.add(e);
+      if (!e.hasSelectivity()) {
+        ++numWithoutSel;
+      }
+    }
+
+    // We distribute the DEFAULT_SELECTIVITY over the conjuncts without a selectivity
+    // estimate so that their combined selectivities equal DEFAULT_SELECTIVITY, i.e.
+    // Math.pow(defaultSel, numWithoutSel) = Expr.DEFAULT_SELECTIVITY
+    double defaultSel = Expr.DEFAULT_SELECTIVITY;
+    if (numWithoutSel != 0) {
+      defaultSel = Math.pow(Math.E, Math.log(Expr.DEFAULT_SELECTIVITY) / numWithoutSel);
+    }
+
+    List<T> sortedConjuncts = Lists.newArrayListWithCapacity(conjuncts.size());
+    while (!remaining.isEmpty()) {
+      double smallestCost = Float.MAX_VALUE;
+      T bestConjunct =  null;
+      double backoffExp = 1.0 / (double) (sortedConjuncts.size() + 1);
+      for (T e : remaining) {
+        double sel = Math.pow(e.hasSelectivity() ? e.getSelectivity() : defaultSel,
+            backoffExp);
+
+        // The cost of evaluating this conjunct first is estimated as the cost of
+        // applying this conjunct to all rows plus the cost of applying all the
+        // remaining conjuncts to the number of rows we expect to remain given
+        // this conjunct's selectivity, exponentially backed off.
+        double cost = e.getCost() + (totalCost - e.getCost()) * sel;
+        if (cost < smallestCost) {
+          smallestCost = cost;
+          bestConjunct = e;
+        }
+      }
+
+      sortedConjuncts.add(bestConjunct);
+      remaining.remove(bestConjunct);
+      totalCost -= bestConjunct.getCost();
+    }
+
+    return sortedConjuncts;
+  }
 }

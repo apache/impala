@@ -205,6 +205,8 @@ public class CastExpr extends Expr {
   }
 
   private void analyze() throws AnalysisException {
+    if (getChild(0).hasCost()) evalCost_ = getChild(0).getCost() + CAST_COST;
+
     Preconditions.checkNotNull(type_);
     if (type_.isComplexType()) {
       throw new AnalysisException(

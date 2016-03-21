@@ -618,7 +618,7 @@ where
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
-   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24
+   predicates: l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * l_discount)
@@ -630,7 +630,7 @@ where
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
-   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24
+   predicates: l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ====
 # TPCH-Q7
 # Q7 - Volume Shipping Query
@@ -1834,7 +1834,7 @@ order by
 |
 |--01:SCAN HDFS [tpch.part]
 |     partitions=1/1 files=1 size=22.83MB
-|     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%', p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |
 00:SCAN HDFS [tpch.partsupp]
    partitions=1/1 files=1 size=112.71MB
@@ -1875,7 +1875,7 @@ order by
 |  |
 |  01:SCAN HDFS [tpch.part]
 |     partitions=1/1 files=1 size=22.83MB
-|     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%', p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |
 00:SCAN HDFS [tpch.partsupp]
    partitions=1/1 files=1 size=112.71MB
@@ -1915,7 +1915,7 @@ where
 |  |
 |  |--01:SCAN HDFS [tpch.part]
 |  |     partitions=1/1 files=1 size=22.83MB
-|  |     predicates: p_brand = 'Brand#23', p_container = 'MED BOX'
+|  |     predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
 |  |
 |  00:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 files=1 size=718.94MB
@@ -1952,7 +1952,7 @@ where
 |  |  |
 |  |  01:SCAN HDFS [tpch.part]
 |  |     partitions=1/1 files=1 size=22.83MB
-|  |     predicates: p_brand = 'Brand#23', p_container = 'MED BOX'
+|  |     predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
 |  |
 |  00:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 files=1 size=718.94MB

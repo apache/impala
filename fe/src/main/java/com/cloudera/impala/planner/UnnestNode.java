@@ -53,6 +53,7 @@ public class UnnestNode extends PlanNode {
     // because they must have been assigned in the scan node materializing the
     // collection-typed slot.
     super.init(analyzer);
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
 
     // Unnest is like a scan and must materialize the slots of its conjuncts.
     analyzer.materializeSlots(conjuncts_);

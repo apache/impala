@@ -306,7 +306,7 @@ select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
-   predicates: string_col = '4', tinyint_col = 5
+   predicates: tinyint_col = 5, string_col = '4'
 ====
 # mix of predicates, functional_hbase. filters and start/stop keys
 select * from functional_hbase.stringids
@@ -316,7 +316,7 @@ where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: string_col = '4', tinyint_col = 5
+   predicates: tinyint_col = 5, string_col = '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=16202 4:5\0
@@ -327,7 +327,7 @@ NODE 0:
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: string_col = '4', tinyint_col = 5
+   predicates: tinyint_col = 5, string_col = '4'
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from functional_hbase.alltypessmall where cast(string_col as int) >= 4
@@ -360,7 +360,7 @@ where string_col = '4' and tinyint_col = 5
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: string_col = '4', tinyint_col = 5
+   predicates: tinyint_col = 5, string_col = '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=16202 4:5\0
@@ -371,7 +371,7 @@ NODE 0:
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: string_col = '4', tinyint_col = 5
+   predicates: tinyint_col = 5, string_col = '4'
 ====
 # IMP-1188 - row key predicate is null.
 select * from functional_hbase.stringids where id = null

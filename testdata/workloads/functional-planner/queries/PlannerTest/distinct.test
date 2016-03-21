@@ -400,7 +400,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 ---- PLAN
 02:AGGREGATE [FINALIZE]
 |  output: count(1), count:merge(1)
-|  having: count(1) > 0, count(1) + zeroifnull(count(1)) > 10, zeroifnull(count(1)) > 1
+|  having: count(1) > 0, zeroifnull(count(1)) > 1, count(1) + zeroifnull(count(1)) > 10
 |
 01:AGGREGATE
 |  output: count(1)
@@ -411,7 +411,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(1), count:merge(1)
-|  having: count(1) > 0, count(1) + zeroifnull(count(1)) > 10, zeroifnull(count(1)) > 1
+|  having: count(1) > 0, zeroifnull(count(1)) > 1, count(1) + zeroifnull(count(1)) > 10
 |
 05:EXCHANGE [UNPARTITIONED]
 |

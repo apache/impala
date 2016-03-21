@@ -324,6 +324,35 @@ public class CaseExpr extends Expr {
         CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     Preconditions.checkNotNull(fn_);
     type_ = returnType;
+
+    // Compute cost as the sum of evaluating all of the WHEN exprs, plus
+    // the max of the THEN/ELSE exprs.
+    float maxThenCost = 0;
+    float whenCosts = 0;
+    boolean hasChildCosts = true;
+    for (int i = 0; i < children_.size(); ++i) {
+      if (!getChild(i).hasCost()) {
+        hasChildCosts = false;
+        break;
+      }
+
+      if (hasCaseExpr_ && i % 2 == 1) {
+        // This child is a WHEN expr. BINARY_PREDICATE_COST accounts for the cost of
+        // comparing the CASE expr to the WHEN expr.
+        whenCosts += getChild(0).getCost() + getChild(i).getCost() +
+          BINARY_PREDICATE_COST;
+      } else if (!hasCaseExpr_ && i % 2 == 0) {
+        // This child is a WHEN expr.
+        whenCosts += getChild(i).getCost();
+      } else if (i != 0) {
+        // This child is a THEN or ELSE expr.
+        float thenCost = getChild(i).getCost();
+        if (thenCost > maxThenCost) maxThenCost = thenCost;
+      }
+    }
+    if (hasChildCosts) {
+      evalCost_ =  whenCosts + maxThenCost;
+    }
   }
 
   private boolean isCase() { return !isDecode(); }

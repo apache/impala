@@ -132,6 +132,7 @@ public class CompoundPredicate extends Predicate {
     Preconditions.checkState(fn_ != null);
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     castForFunctionCall(false);
+    if (hasChildCosts()) evalCost_ = getChildCosts() + COMPOUND_PREDICATE_COST;
 
     if (!getChild(0).hasSelectivity() ||
         (children_.size() == 2 && !getChild(1).hasSelectivity())) {

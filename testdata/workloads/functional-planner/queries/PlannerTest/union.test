@@ -2411,7 +2411,7 @@ where a + b < 100 and c > 20 and d > 50
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: functional.alltypes.tinyint_col + functional.alltypes.int_col < 100, functional.alltypes.smallint_col > 20, functional.alltypes.bigint_col > 50
+|     predicates: functional.alltypes.smallint_col > 20, functional.alltypes.bigint_col > 50, functional.alltypes.tinyint_col + functional.alltypes.int_col < 100
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B

@@ -50,7 +50,7 @@ where month = id and id = int_col and tinyint_col = int_col and int_col < 2
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
-   predicates: month = id, id = int_col, tinyint_col = int_col, functional.alltypes.id < 2, int_col < 2, functional.alltypes.tinyint_col < 2
+   predicates: month = id, id = int_col, functional.alltypes.id < 2, int_col < 2, functional.alltypes.tinyint_col < 2, tinyint_col = int_col
 ====
 # all subquery results get materialized correctly;
 # a.string_col = 'a' needs to be evaluated by the join itself, not the scan
@@ -190,16 +190,16 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
   and cast(sin(c.int_col) as boolean) = true
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
-|  runtime filters: RF000 <- c.int_col, RF001 <- c.id, RF002 <- c.year, RF003 <- c.month
+|  hash predicates: b.id = c.id, b.year = c.year, b.month = c.month, b.smallint_col = c.int_col
+|  runtime filters: RF000 <- c.id, RF001 <- c.year, RF002 <- c.month, RF003 <- c.int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny c]
 |     partitions=2/4 files=2 size=230B
 |     predicates: c.id = 17, CAST(sin(c.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  runtime filters: RF004 <- b.smallint_col, RF005 <- b.id, RF006 <- b.year, RF007 <- b.month
+|  hash predicates: a.id = b.id, a.year = b.year, a.month = b.month, a.tinyint_col = b.smallint_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.year, RF006 <- b.month, RF007 <- b.smallint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=2/4 files=2 size=3.16KB
@@ -208,7 +208,7 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id = 17, CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE
-   runtime filters: RF000 -> a.tinyint_col, RF001 -> a.id, RF002 -> a.year, RF003 -> a.month, RF004 -> a.tinyint_col, RF005 -> a.id, RF006 -> a.year, RF007 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col, RF004 -> a.id, RF005 -> a.year, RF006 -> a.month, RF007 -> a.tinyint_col
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -223,31 +223,31 @@ NODE 2:
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
-|  runtime filters: RF000 <- c.int_col, RF001 <- c.id, RF002 <- c.year, RF003 <- c.month
+|  hash predicates: b.id = c.id, b.year = c.year, b.month = c.month, b.smallint_col = c.int_col
+|  runtime filters: RF000 <- c.id, RF001 <- c.year, RF002 <- c.month, RF003 <- c.int_col
 |
-|--07:EXCHANGE [HASH(c.int_col,c.id,c.year,c.month)]
+|--07:EXCHANGE [HASH(c.id,c.year,c.month,c.int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny c]
 |     partitions=2/4 files=2 size=230B
 |     predicates: c.id = 17, CAST(sin(c.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  runtime filters: RF004 <- b.smallint_col, RF005 <- b.id, RF006 <- b.year, RF007 <- b.month
+|  hash predicates: a.id = b.id, a.year = b.year, a.month = b.month, a.tinyint_col = b.smallint_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.year, RF006 <- b.month, RF007 <- b.smallint_col
 |
-|--06:EXCHANGE [HASH(b.smallint_col,b.id,b.year,b.month)]
+|--06:EXCHANGE [HASH(b.id,b.year,b.month,b.smallint_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=2/4 files=2 size=3.16KB
 |     predicates: b.id = 17, CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE
 |
-05:EXCHANGE [HASH(a.tinyint_col,a.id,a.year,a.month)]
+05:EXCHANGE [HASH(a.id,a.year,a.month,a.tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id = 17, CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE
-   runtime filters: RF000 -> a.tinyint_col, RF001 -> a.id, RF002 -> a.year, RF003 -> a.month, RF004 -> a.tinyint_col, RF005 -> a.id, RF006 -> a.year, RF007 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col, RF004 -> a.id, RF005 -> a.year, RF006 -> a.month, RF007 -> a.tinyint_col
 ====
 # basic propagation between equivalence classes, with partition pruning;
 # variation with inline views
@@ -261,16 +261,16 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
   and cast(sin(c.int_col) as boolean) = true
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
-|  runtime filters: RF000 <- functional.alltypestiny.int_col, RF001 <- functional.alltypestiny.id, RF002 <- functional.alltypestiny.year, RF003 <- functional.alltypestiny.month
+|  hash predicates: functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month, functional.alltypessmall.smallint_col = functional.alltypestiny.int_col
+|  runtime filters: RF000 <- functional.alltypestiny.id, RF001 <- functional.alltypestiny.year, RF002 <- functional.alltypestiny.month, RF003 <- functional.alltypestiny.int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=2/4 files=2 size=230B
 |     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
-|  runtime filters: RF004 <- functional.alltypessmall.smallint_col, RF005 <- functional.alltypessmall.id, RF006 <- functional.alltypessmall.year, RF007 <- functional.alltypessmall.month
+|  hash predicates: functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month, functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col
+|  runtime filters: RF004 <- functional.alltypessmall.id, RF005 <- functional.alltypessmall.year, RF006 <- functional.alltypessmall.month, RF007 <- functional.alltypessmall.smallint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.16KB
@@ -279,7 +279,7 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=38.07KB
    predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
-   runtime filters: RF000 -> functional.alltypes.tinyint_col, RF001 -> functional.alltypes.id, RF002 -> functional.alltypes.year, RF003 -> functional.alltypes.month, RF004 -> functional.alltypes.tinyint_col, RF005 -> functional.alltypes.id, RF006 -> functional.alltypes.year, RF007 -> functional.alltypes.month
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.year, RF002 -> functional.alltypes.month, RF003 -> functional.alltypes.tinyint_col, RF004 -> functional.alltypes.id, RF005 -> functional.alltypes.year, RF006 -> functional.alltypes.month, RF007 -> functional.alltypes.tinyint_col
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -294,31 +294,31 @@ NODE 2:
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
-|  runtime filters: RF000 <- functional.alltypestiny.int_col, RF001 <- functional.alltypestiny.id, RF002 <- functional.alltypestiny.year, RF003 <- functional.alltypestiny.month
+|  hash predicates: functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month, functional.alltypessmall.smallint_col = functional.alltypestiny.int_col
+|  runtime filters: RF000 <- functional.alltypestiny.id, RF001 <- functional.alltypestiny.year, RF002 <- functional.alltypestiny.month, RF003 <- functional.alltypestiny.int_col
 |
-|--07:EXCHANGE [HASH(functional.alltypestiny.int_col,functional.alltypestiny.id,functional.alltypestiny.year,functional.alltypestiny.month)]
+|--07:EXCHANGE [HASH(functional.alltypestiny.id,functional.alltypestiny.year,functional.alltypestiny.month,functional.alltypestiny.int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=2/4 files=2 size=230B
 |     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
-|  runtime filters: RF004 <- functional.alltypessmall.smallint_col, RF005 <- functional.alltypessmall.id, RF006 <- functional.alltypessmall.year, RF007 <- functional.alltypessmall.month
+|  hash predicates: functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month, functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col
+|  runtime filters: RF004 <- functional.alltypessmall.id, RF005 <- functional.alltypessmall.year, RF006 <- functional.alltypessmall.month, RF007 <- functional.alltypessmall.smallint_col
 |
-|--06:EXCHANGE [HASH(functional.alltypessmall.smallint_col,functional.alltypessmall.id,functional.alltypessmall.year,functional.alltypessmall.month)]
+|--06:EXCHANGE [HASH(functional.alltypessmall.id,functional.alltypessmall.year,functional.alltypessmall.month,functional.alltypessmall.smallint_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.16KB
 |     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
 |
-05:EXCHANGE [HASH(functional.alltypes.tinyint_col,functional.alltypes.id,functional.alltypes.year,functional.alltypes.month)]
+05:EXCHANGE [HASH(functional.alltypes.id,functional.alltypes.year,functional.alltypes.month,functional.alltypes.tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=38.07KB
    predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
-   runtime filters: RF000 -> functional.alltypes.tinyint_col, RF001 -> functional.alltypes.id, RF002 -> functional.alltypes.year, RF003 -> functional.alltypes.month, RF004 -> functional.alltypes.tinyint_col, RF005 -> functional.alltypes.id, RF006 -> functional.alltypes.year, RF007 -> functional.alltypes.month
+   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.year, RF002 -> functional.alltypes.month, RF003 -> functional.alltypes.tinyint_col, RF004 -> functional.alltypes.id, RF005 -> functional.alltypes.year, RF006 -> functional.alltypes.month, RF007 -> functional.alltypes.tinyint_col
 ====
 # propagation between outer-joined tables only goes in one direction:
 # - predicates on a.year and a.tinyint_col are propagated to b
@@ -338,15 +338,15 @@ where a.year = 2009 and a.tinyint_col = 7 and a.id is null and b.id = 17 and b.i
 ---- PLAN
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  other predicates: b.id = 17, b.int_col IS NULL
+|  other predicates: b.int_col IS NULL, b.id = 17
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=1/4 files=1 size=1.57KB
-|     predicates: b.tinyint_col = 7, b.id = 17
+|     predicates: b.id = 17, b.tinyint_col = 7
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 files=12 size=238.68KB
-   predicates: a.tinyint_col = 7, a.id IS NULL
+   predicates: a.id IS NULL, a.tinyint_col = 7
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -368,17 +368,17 @@ NODE 1:
 |
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  other predicates: b.id = 17, b.int_col IS NULL
+|  other predicates: b.int_col IS NULL, b.id = 17
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=1/4 files=1 size=1.57KB
-|     predicates: b.tinyint_col = 7, b.id = 17
+|     predicates: b.id = 17, b.tinyint_col = 7
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 files=12 size=238.68KB
-   predicates: a.tinyint_col = 7, a.id IS NULL
+   predicates: a.id IS NULL, a.tinyint_col = 7
 ====
 # propagation between outer-joined tables only goes in one direction:
 # - predicates on b.year, b.tinyint_col are propagated to a
@@ -398,36 +398,36 @@ where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.i
 ---- PLAN
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  other predicates: a.id = 17, a.int_col IS NULL
+|  other predicates: a.int_col IS NULL, a.id = 17
 |  runtime filters: RF000 <- b.tinyint_col, RF001 <- b.id, RF002 <- b.year, RF003 <- b.month
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=12/24 files=12 size=238.68KB
-|     predicates: b.tinyint_col = 7, b.id IS NULL
+|     predicates: b.id IS NULL, b.tinyint_col = 7
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=1/4 files=1 size=1.57KB
-   predicates: a.tinyint_col = 7, a.id = 17
+   predicates: a.id = 17, a.tinyint_col = 7
    runtime filters: RF000 -> a.tinyint_col, RF001 -> a.id, RF002 -> a.year, RF003 -> a.month
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  other predicates: a.id = 17, a.int_col IS NULL
+|  other predicates: a.int_col IS NULL, a.id = 17
 |  runtime filters: RF000 <- b.tinyint_col, RF001 <- b.id, RF002 <- b.year, RF003 <- b.month
 |
 |--04:EXCHANGE [HASH(b.tinyint_col,b.id,b.year,b.month)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=12/24 files=12 size=238.68KB
-|     predicates: b.tinyint_col = 7, b.id IS NULL
+|     predicates: b.id IS NULL, b.tinyint_col = 7
 |
 03:EXCHANGE [HASH(a.tinyint_col,a.id,a.year,a.month)]
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=1/4 files=1 size=1.57KB
-   predicates: a.tinyint_col = 7, a.id = 17
+   predicates: a.id = 17, a.tinyint_col = 7
    runtime filters: RF000 -> a.tinyint_col, RF001 -> a.id, RF002 -> a.year, RF003 -> a.month
 ====
 # propagation into inline view with aggregation:
@@ -445,8 +445,8 @@ from functional.alltypes a
 where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col != 5
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -460,7 +460,7 @@ where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col 
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -472,8 +472,8 @@ NODE 1:
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -495,7 +495,7 @@ NODE 1:
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ====
 # Same as above but with cross join
 select straight_join a.id, b.id
@@ -515,8 +515,8 @@ where a.id = b.id and
       a.tinyint_col != 5
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -530,13 +530,13 @@ where a.id = b.id and
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -558,7 +558,7 @@ where a.id = b.id and
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ====
 # no propagation into select block with limit;
 # propagation out of that block is okay;
@@ -576,8 +576,8 @@ from functional.alltypes a
 where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col != 5
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--03:SELECT
 |  |  predicates: count(*) + 1 = 17
@@ -594,7 +594,7 @@ where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col 
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -608,8 +608,8 @@ NODE 1:
 09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--08:EXCHANGE [BROADCAST]
 |  |
@@ -637,7 +637,7 @@ NODE 1:
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ====
 # Similar to the above, converts the cross join to a hash join
 select straight_join a.id, b.id
@@ -658,8 +658,8 @@ where a.year = 2009 and
       a.month = b.month
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--03:SELECT
 |  |  predicates: count(*) + 1 = 17
@@ -676,13 +676,13 @@ where a.year = 2009 and
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-|  runtime filters: RF000 <- id, RF001 <- int_col, RF002 <- year, RF003 <- month
+|  hash predicates: a.id = id, a.year = year, a.month = month, a.tinyint_col = int_col
+|  runtime filters: RF000 <- id, RF001 <- year, RF002 <- month, RF003 <- int_col
 |
 |--08:EXCHANGE [BROADCAST]
 |  |
@@ -710,7 +710,7 @@ where a.year = 2009 and
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
-   runtime filters: RF000 -> a.id, RF001 -> a.tinyint_col, RF002 -> a.year, RF003 -> a.month
+   runtime filters: RF000 -> a.id, RF001 -> a.year, RF002 -> a.month, RF003 -> a.tinyint_col
 ====
 # propagation of z.month=1 to alltypesagg is prevented
 select straight_join x.int_col, z.int_col
@@ -783,7 +783,7 @@ where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 ---- PLAN
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = id
-|  other predicates: isnull(id, 0) = 0, int_col = 17
+|  other predicates: int_col = 17, isnull(id, 0) = 0
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  group by: id, int_col
@@ -835,7 +835,7 @@ where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 ---- PLAN
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = a.id
-|  other predicates: isnull(id, 0) = 0, int_col = 17
+|  other predicates: int_col = 17, isnull(id, 0) = 0
 |  runtime filters: RF000 <- a.id
 |
 |--02:SCAN HDFS [functional.alltypes a]
@@ -944,7 +944,7 @@ having bool_col = false and int_col > 0 and count(bigint_col) > 0
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.bool_col = FALSE, functional.alltypes.int_col > 0
+   predicates: functional.alltypes.int_col > 0, functional.alltypes.bool_col = FALSE
 ====
 # basic propagation of multi-slot, single-tuple predicates
 select straight_join 1 from
@@ -964,9 +964,9 @@ and t2.id + t2.smallint_col + t2.bigint_col > 30
 and t2.id + t3.int_col > 40
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = functional.alltypestiny.id, t2.smallint_col = functional.alltypestiny.int_col, t2.bigint_col = functional.alltypestiny.bigint_col
+|  hash predicates: t2.id = functional.alltypestiny.id, t2.bigint_col = functional.alltypestiny.bigint_col, t2.smallint_col = functional.alltypestiny.int_col
 |  other predicates: t2.id + functional.alltypestiny.int_col > 40
-|  runtime filters: RF000 <- functional.alltypestiny.id, RF001 <- functional.alltypestiny.int_col, RF002 <- functional.alltypestiny.bigint_col
+|  runtime filters: RF000 <- functional.alltypestiny.id, RF002 <- functional.alltypestiny.int_col, RF001 <- functional.alltypestiny.bigint_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -979,12 +979,12 @@ and t2.id + t3.int_col > 40
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.id + t2.smallint_col > 10, t2.id + t2.bigint_col > 20, t2.id + t2.smallint_col + t2.bigint_col > 30
-|     runtime filters: RF002 -> t2.bigint_col
+|     runtime filters: RF001 -> t2.bigint_col
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    predicates: t1.id + t1.tinyint_col > 10
-   runtime filters: RF000 -> t1.id, RF001 -> t1.tinyint_col, RF003 -> t1.id, RF004 -> t1.tinyint_col
+   runtime filters: RF000 -> t1.id, RF002 -> t1.tinyint_col, RF003 -> t1.id, RF004 -> t1.tinyint_col
 ====
 # basic propagation of multi-slot, single-tuple predicates with aggregates
 select straight_join 1 from
@@ -1057,7 +1057,7 @@ and t1.id * t1.int_col < 100
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
-|     predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, functional.alltypestiny.id * functional.alltypestiny.int_col < 100
+|     predicates: functional.alltypestiny.id * functional.alltypestiny.int_col < 100, functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id, t1.int_col = t2.int_col
@@ -1088,7 +1088,7 @@ where t2.year + t2.month > 10
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
-   predicates: t1.year + t1.id > 10, t1.id = t1.month
+   predicates: t1.id = t1.month, t1.year + t1.id > 10
    runtime filters: RF000 -> t1.id, RF001 -> t1.year
 ====
 # TODO: Fix this limitation of our getBindingPredicates() implementation:
@@ -1108,7 +1108,7 @@ where t1.id + t1.tinyint_col > 10
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
-|     predicates: t2.id + t2.tinyint_col > 10, t2.id = t2.smallint_col, t2.tinyint_col = t2.int_col
+|     predicates: t2.id = t2.smallint_col, t2.tinyint_col = t2.int_col, t2.id + t2.tinyint_col > 10
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
@@ -1128,8 +1128,8 @@ on (t1.id = t2.bigint_col and t1.int_col = t2.x)
 where t1.id + t1.int_col > 10
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.id = bigint_col, t1.int_col = min(int_col)
-|  runtime filters: RF000 <- bigint_col, RF001 <- min(int_col)
+|  hash predicates: t1.int_col = min(int_col), t1.id = bigint_col
+|  runtime filters: RF000 <- min(int_col), RF001 <- bigint_col
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: min(int_col), max(int_col)
@@ -1141,7 +1141,7 @@ where t1.id + t1.int_col > 10
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    predicates: t1.id + t1.int_col > 10
-   runtime filters: RF000 -> t1.id, RF001 -> t1.int_col
+   runtime filters: RF000 -> t1.int_col, RF001 -> t1.id
 ====
 # Anti-joins have a uni-directional value transfer (IMPALA-1249).
 select * from
@@ -1254,7 +1254,7 @@ SELECT count(*) FROM
 |
 |--01:SCAN HDFS [tpch_parquet.nation n]
 |     partitions=1/1 files=1 size=2.17KB
-|     predicates: n_name = 'BRAZIL', n_regionkey = 1
+|     predicates: n_regionkey = 1, n_name = 'BRAZIL'
 |
 00:SCAN HDFS [tpch_parquet.customer c]
    partitions=1/1 files=1 size=12.47MB

@@ -189,6 +189,7 @@ public class ArithmeticExpr extends Expr {
       Preconditions.checkState(children_.size() == 2);
       t1 = getChild(1).getType();
     }
+    if (hasChildCosts()) evalCost_ = getChildCosts() + ARITHMETIC_OP_COST;
 
     String fnName = op_.getName();
     switch (op_) {

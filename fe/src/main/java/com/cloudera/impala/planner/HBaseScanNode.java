@@ -117,6 +117,7 @@ public class HBaseScanNode extends ScanNode {
   public void init(Analyzer analyzer) throws ImpalaException {
     checkForSupportedFileFormats();
     assignConjuncts(analyzer);
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
     setStartStopKey(analyzer);
     // Convert predicates to HBase filters_.
     createHBaseFilters(analyzer);

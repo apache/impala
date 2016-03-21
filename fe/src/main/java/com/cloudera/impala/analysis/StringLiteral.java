@@ -37,11 +37,13 @@ public class StringLiteral extends LiteralExpr {
   public StringLiteral(String value) {
     this.value_ = value;
     type_ = ScalarType.STRING;
+    evalCost_ = LITERAL_COST;
   }
 
   public StringLiteral(String value, Type type) {
     this.value_ = value;
     type_ = type;
+    evalCost_ = LITERAL_COST;
   }
 
   /**

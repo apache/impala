@@ -179,6 +179,11 @@ public class InPredicate extends Predicate {
           / (double) slotRefRef.getRef().getNumDistinctValues();
       selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
     }
+
+    if (hasChildCosts()) {
+      // BINARY_PREDICATE_COST accounts for the cost of performing the comparison.
+      evalCost_ = getChildCosts() + BINARY_PREDICATE_COST * (children_.size() - 1);
+    }
   }
 
   @Override

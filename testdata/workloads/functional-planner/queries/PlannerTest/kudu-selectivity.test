@@ -45,7 +45,7 @@ select * from functional_kudu.zipcode_incomes where id > '1' and zip > '2'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED]
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
-     predicates: id > '1', zip > '2'
+     predicates: zip > '2', id > '1'
      hosts=3 per-host-mem=unavailable
      tuple-ids=0 row-size=124B cardinality=3317
 ---- DISTRIBUTEDPLAN
@@ -57,7 +57,7 @@ F01:PLAN FRAGMENT [UNPARTITIONED]
 F00:PLAN FRAGMENT [RANDOM]
   DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, UNPARTITIONED]
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
-     predicates: id > '1', zip > '2'
+     predicates: zip > '2', id > '1'
      hosts=3 per-host-mem=0B
      tuple-ids=0 row-size=124B cardinality=3317
 ====

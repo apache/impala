@@ -107,6 +107,9 @@ public class BetweenPredicate extends Predicate {
 
     // Make sure toThrift() picks up the children of the rewritten predicate.
     children_ = rewrittenPredicate_.getChildren();
+    // Since the only child is a CompoundPredicate expressing the comparison,
+    // the cost of the comparison is fully captured by the children's cost.
+    evalCost_ = getChildCosts();
     isAnalyzed_ = true;
   }
 

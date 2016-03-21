@@ -93,10 +93,13 @@ public class HashJoinNode extends JoinNode {
       }
       Preconditions.checkState(
           eqPred.getChild(0).getType().matchesType(eqPred.getChild(1).getType()));
-      newEqJoinConjuncts.add(new BinaryPredicate(eqPred.getOp(),
-          eqPred.getChild(0), eqPred.getChild(1)));
+      BinaryPredicate newEqPred = new BinaryPredicate(eqPred.getOp(),
+          eqPred.getChild(0), eqPred.getChild(1));
+      newEqPred.analyze(analyzer);
+      newEqJoinConjuncts.add(newEqPred);
     }
     eqJoinConjuncts_ = newEqJoinConjuncts;
+    orderJoinConjunctsByCost();
   }
 
   @Override

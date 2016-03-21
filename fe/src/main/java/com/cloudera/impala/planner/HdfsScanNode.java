@@ -159,6 +159,7 @@ public class HdfsScanNode extends ScanNode {
    */
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
     checkForSupportedFileFormats();
 
     assignCollectionConjuncts(analyzer);

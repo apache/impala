@@ -1,0 +1,147 @@
+# Check that checking a bool value costs less than a numeric comparison.
+select *
+from functional.alltypes a
+where a.int_col = a.tinyint_col and
+      a.bool_col
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.bool_col, a.int_col = a.tinyint_col
+====
+# Check that numeric comparison costs less than LIKE.
+select *
+from functional.alltypes a
+where a.string_col LIKE '%a%' and
+      a.int_col = a.tinyint_col
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col = a.tinyint_col, a.string_col LIKE '%a%'
+====
+# Check that single numeric comparison costs less than compound numeric comparison.
+select *
+from functional.alltypes a
+where (a.int_col = a.tinyint_col or a.int_col = a.smallint_col) and
+      a.int_col = a.bigint_col
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col = a.bigint_col, (a.int_col = a.tinyint_col OR a.int_col = a.smallint_col)
+====
+# Check that a simple numeric comparison costs less than one with arithmetic.
+select *
+from functional.alltypes a
+where a.int_col + 5 = a.bigint_col - 10 and a.int_col = a.tinyint_col
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col = a.tinyint_col, a.int_col + 5 = a.bigint_col - 10
+====
+# Check that large CASE costs more than numeric comparison.
+select *
+from functional.alltypes a
+where a.int_col = a.tinyint_col and
+      (case a.int_col when 0 then true when 1 then true when 2 then true else false end)
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col = a.tinyint_col, (CASE a.tinyint_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END), (CASE a.int_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END)
+====
+# Check that a LIKE with only leading/trailing wildcards costs less then LIKE with
+# non-leading/trailing wildcards.
+select *
+from functional.alltypes a
+where a.date_string_col LIKE 'a%a' and a.date_string_col LIKE '%a%'
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.date_string_col LIKE '%a%', a.date_string_col LIKE 'a%a'
+====
+# Check that an IN predicate costs more than a single numeric comparison.
+select *
+from functional.alltypes a
+where a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9) and a.int_col = 1
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col = 1, a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9)
+====
+# Check that a timestamp comparison costs more than a numeric comparison.
+select *
+from functional.alltypes a
+where a.timestamp_col > '2000-01-01' and a.int_col = 0
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col = 0, a.timestamp_col > '2000-01-01'
+====
+# Check that string comparisons are ordered by string length.
+select *
+from functional.alltypes a
+where a.string_col = "looooooooooooooooong string" and
+      a.string_col = "medium string" and
+      a.string_col = "a"
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.string_col = 'a', a.string_col = 'medium string', a.string_col = 'looooooooooooooooong string'
+====
+# Check that timestamp arithmetic adds cost.
+select *
+from functional.alltypes a
+where a.timestamp_col - interval 1 day > '2000-01-01' and
+      a.timestamp_col < '2020-01-01'
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.timestamp_col < '2020-01-01', a.timestamp_col - INTERVAL 1 day > '2000-01-01'
+====
+# Check that a function call adds cost.
+select *
+from functional.alltypes a
+where ceil(a.double_col) > 0 and a.double_col > 0
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.double_col > 0, ceil(a.double_col) > 0
+====
+# Check that a cast adds cost.
+select *
+from functional.alltypes a
+where cast(a.int_col as double) > 0 and a.int_col > 0
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col > 0, CAST(a.int_col AS DOUBLE) > 0
+====
+# Check that is null costs less than string comparison.
+select *
+from functional.alltypes a
+where a.string_col = "string" and a.int_col is null
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.int_col IS NULL, a.string_col = 'string'
+====
+# Check that long list of predicates is sorted correctly.
+select *
+from functional.alltypes a
+where a.string_col LIKE '%a%' and
+      a.bool_col and
+      (a.int_col = a.tinyint_col or a.int_col = a.smallint_col) and
+      a.int_col = a.bigint_col
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.bool_col, a.int_col = a.bigint_col, (a.int_col = a.tinyint_col OR a.int_col = a.smallint_col), a.string_col LIKE '%a%'
+====
+# Check that for two equal cost conjuncts, the one with the higher selectivity goes first.
+# There are more distinct id values, so it is more selective.
+select *
+from functional.alltypes a
+where a.int_col = 0 and a.id = 0
+---- PLAN
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.id = 0, a.int_col = 0
+====

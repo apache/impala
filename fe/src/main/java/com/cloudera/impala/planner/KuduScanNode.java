@@ -83,6 +83,7 @@ public class KuduScanNode extends ScanNode {
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
     analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
 
     // Extract predicates that can be evaluated by Kudu.
     try {

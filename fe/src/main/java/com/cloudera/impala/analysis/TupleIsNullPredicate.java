@@ -58,6 +58,7 @@ public class TupleIsNullPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
     analyzer_ = analyzer;
+    evalCost_ = tupleIds_.size() * IS_NULL_COST;
   }
 
   @Override

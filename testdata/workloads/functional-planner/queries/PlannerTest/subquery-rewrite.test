@@ -341,7 +341,7 @@ select * from t where t.bool_col = false and t.int_col = 10
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   predicates: a.bool_col = FALSE, a.int_col = 10
+   predicates: a.int_col = 10, a.bool_col = FALSE
    runtime filters: RF000 -> id
 ====
 # Subqueries in WITH, FROM and WHERE clauses
@@ -1063,7 +1063,7 @@ and bool_col = false
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: bool_col = FALSE, id < 5
+|     predicates: id < 5, bool_col = FALSE
 |
 00:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
@@ -1466,7 +1466,7 @@ where
    where t1.id + t2.id = t.bigint_col) = t.int_col
 ---- PLAN
 05:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: sum(t1.id) = t.int_col, t1.id + t2.id = t.bigint_col
+|  hash predicates: t1.id + t2.id = t.bigint_col, sum(t1.id) = t.int_col
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
 |     partitions=4/4 files=4 size=460B

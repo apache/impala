@@ -143,7 +143,7 @@ and t1.int_col = 1 and 1 = t2.bigint_col
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
-|  other predicates: t1.year + t2.int_col = t1.month + t2.tinyint_col, t1.year = t1.month + t2.int_col, t1.year + t2.smallint_col = t2.tinyint_col
+|  other predicates: t1.year = t1.month + t2.int_col, t1.year + t2.smallint_col = t2.tinyint_col, t1.year + t2.int_col = t1.month + t2.tinyint_col
 |  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypesnopart t2]
@@ -162,8 +162,8 @@ where t1.year + t1.month = t2.id and t1.int_col + 1 - t1.tinyint_col = t2.smalli
 and t1.int_col * 100 = t2.bigint_col / 100 and t2.bool_col = false
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.year + t1.month = t2.id, t1.int_col + 1 - t1.tinyint_col = t2.smallint_col + 10, t1.int_col * 100 = t2.bigint_col / 100
-|  runtime filters: RF000 <- t2.id, RF001 <- t2.smallint_col + 10, RF002 <- t2.bigint_col / 100
+|  hash predicates: t1.year + t1.month = t2.id, t1.int_col * 100 = t2.bigint_col / 100, t1.int_col + 1 - t1.tinyint_col = t2.smallint_col + 10
+|  runtime filters: RF000 <- t2.id, RF001 <- t2.bigint_col / 100, RF002 <- t2.smallint_col + 10
 |
 |--01:SCAN HDFS [functional.alltypesnopart t2]
 |     partitions=1/1 files=0 size=0B
@@ -171,7 +171,7 @@ and t1.int_col * 100 = t2.bigint_col / 100 and t2.bool_col = false
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
-   runtime filters: RF000 -> t1.year + t1.month, RF001 -> t1.int_col + 1 - t1.tinyint_col, RF002 -> t1.int_col * 100
+   runtime filters: RF000 -> t1.year + t1.month, RF001 -> t1.int_col * 100, RF002 -> t1.int_col + 1 - t1.tinyint_col
 ====
 # Three-way join query with an inline view on the probe side of the join where the left
 # child of the equi-join predicate is an arithmetic expr between two slots from
@@ -208,8 +208,8 @@ select straight_join * from functional.alltypesagg t1,
 where v.cnt = t1.year and v.id = t1.month
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.year = count(int_col), t1.month = id
-|  runtime filters: RF000 <- count(int_col), RF001 <- id
+|  hash predicates: t1.month = id, t1.year = count(int_col)
+|  runtime filters: RF000 <- id, RF001 <- count(int_col)
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(int_col)
@@ -221,7 +221,7 @@ where v.cnt = t1.year and v.id = t1.month
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=0/11 files=0 size=0B
-   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+   runtime filters: RF000 -> t1.month, RF001 -> t1.year
 ====
 # Two-way join query with an inline view in the build side of the join that has a
 # two-way join (bushy plan)
@@ -231,8 +231,8 @@ select straight_join * from functional.alltypesagg t1,
 where v.id = t1.year and t1.month = v.tinyint_col
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.year = t2.id + t3.id, t1.month = t3.tinyint_col
-|  runtime filters: RF000 <- t2.id + t3.id, RF001 <- t3.tinyint_col
+|  hash predicates: t1.month = t3.tinyint_col, t1.year = t2.id + t3.id
+|  runtime filters: RF000 <- t3.tinyint_col, RF001 <- t2.id + t3.id
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.int_col = t3.int_col
@@ -247,7 +247,7 @@ where v.id = t1.year and t1.month = v.tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
-   runtime filters: RF000 -> t1.year, RF001 -> t1.month
+   runtime filters: RF000 -> t1.month, RF001 -> t1.year
 ====
 # Four-way join query with an inline view in the build side of the join where the
 # inline view has a tree-way cyclic join (bushy plan)
@@ -448,7 +448,7 @@ where t2.id = 10 and t1.month = t2.tinyint_col and t1.int_col = 1
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t1.year = t2.int_col
 |  other join predicates: t2.int_col = 10
-|  other predicates: t1.month = t2.tinyint_col, t1.int_col = 1
+|  other predicates: t1.int_col = 1, t1.month = t2.tinyint_col
 |  runtime filters: RF000 <- t2.int_col, RF001 <- t2.tinyint_col
 |
 |--01:SCAN HDFS [functional.alltypesnopart t2]
@@ -706,7 +706,7 @@ select straight_join * from
 where v1.month = t3.tinyint_col and v1.year = t3.id and t3.bool_col = false
 ---- PLAN
 06:HASH JOIN [INNER JOIN]
-|  hash predicates: month = t3.tinyint_col, year = t3.id
+|  hash predicates: year = t3.id, month = t3.tinyint_col
 |
 |--05:SCAN HDFS [functional.alltypesnopart t3]
 |     partitions=1/1 files=0 size=0B

@@ -92,7 +92,7 @@ where id >= 10 and zip <= 5 and 20 >= id and 'foo' = name and zip >= 0 and 30 >=
 and zip > 1 and zip < 50
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30, zip >= 2, zip <= 49
+   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip >= 2, zip <= 49, name = 'foo'
 ---- SCANRANGELOCATIONS
 NODE 0:
   KUDU KEYRANGE []:[]
@@ -100,7 +100,7 @@ NODE 0:
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30, zip >= 2, zip <= 49
+   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip >= 2, zip <= 49, name = 'foo'
 ====
 # Test constant folding.
 select * from functional_kudu.testtbl
@@ -142,7 +142,7 @@ select * from functional_kudu.testtbl
 where cast(sin(id) as boolean) = true and name is null
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: CAST(sin(id) AS BOOLEAN) = TRUE, name IS NULL
+   predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
   KUDU KEYRANGE []:[]
@@ -150,5 +150,5 @@ NODE 0:
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: CAST(sin(id) AS BOOLEAN) = TRUE, name IS NULL
+   predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
 ====

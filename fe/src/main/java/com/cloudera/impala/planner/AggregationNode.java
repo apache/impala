@@ -144,6 +144,7 @@ public class AggregationNode extends PlanNode {
 
       analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_, groupBySlots);
     }
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
     // Compute the mem layout for both tuples here for simplicity.
     aggInfo_.getOutputTupleDesc().computeMemLayout();
     aggInfo_.getIntermediateTupleDesc().computeMemLayout();

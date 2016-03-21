@@ -483,6 +483,9 @@ public class FunctionCallExpr extends Expr {
     if (type_.isWildcardChar() || type_.isWildcardVarchar()) {
       type_ = ScalarType.STRING;
     }
+
+    // TODO(tmarshall): Differentiate based on the specific function.
+    if (hasChildCosts()) evalCost_ = getChildCosts() + FUNCTION_CALL_COST;
   }
 
   /**

@@ -450,4 +450,10 @@ public abstract class JoinNode extends PlanNode {
     if (distrMode_ != DistributionMode.NONE) output.append(", " + distrMode_.toString());
     return output.toString();
   }
+
+  protected void orderJoinConjunctsByCost() {
+    conjuncts_ = orderConjunctsByCost(conjuncts_);
+    eqJoinConjuncts_ = orderConjunctsByCost(eqJoinConjuncts_);
+    otherJoinConjuncts_ = orderConjunctsByCost(otherJoinConjuncts_);
+  }
 }

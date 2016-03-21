@@ -21,6 +21,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TExchangeNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -62,6 +63,12 @@ public class ExchangeNode extends PlanNode {
   public ExchangeNode(PlanNodeId id) {
     super(id, "EXCHANGE");
     offset_ = 0;
+  }
+
+  @Override
+  public void init(Analyzer analyzer) throws ImpalaException {
+    super.init(analyzer);
+    Preconditions.checkState(conjuncts_.isEmpty());
   }
 
   public void addChild(PlanNode node, boolean copyConjuncts) {

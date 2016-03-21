@@ -24,6 +24,7 @@ public class NullLiteral extends LiteralExpr {
 
   public NullLiteral() {
     type_ = Type.NULL;
+    evalCost_ = LITERAL_COST;
   }
 
   /**

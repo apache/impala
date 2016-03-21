@@ -45,6 +45,7 @@ public class EmptySetNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) {
+    Preconditions.checkState(conjuncts_.isEmpty());
     // If the physical output tuple produced by an AnalyticEvalNode wasn't created
     // the logical output tuple is returned by getMaterializedTupleIds(). It needs
     // to be set as materialized (even though it isn't) to avoid failing precondition

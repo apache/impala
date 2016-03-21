@@ -16,6 +16,8 @@ package com.cloudera.impala.analysis;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -61,6 +63,27 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   // To be used where we cannot come up with a better estimate (selectivity_ is -1).
   public static double DEFAULT_SELECTIVITY = 0.1;
+
+  // The relative costs of different Exprs. These numbers are not intended as a precise
+  // reflection of running times, but as simple heuristics for ordering Exprs from cheap
+  // to expensive.
+  // TODO(tmwarshall): Get these costs in a more principled way, eg. with a benchmark.
+  public final static float ARITHMETIC_OP_COST = 1;
+  public final static float BINARY_PREDICATE_COST = 1;
+  public final static float VAR_LEN_BINARY_PREDICATE_COST = 5;
+  public final static float CAST_COST = 1;
+  public final static float COMPOUND_PREDICATE_COST = 1;
+  public final static float FUNCTION_CALL_COST = 10;
+  public final static float IS_NOT_EMPTY_COST = 1;
+  public final static float IS_NULL_COST = 1;
+  public final static float LIKE_COST = 10;
+  public final static float LITERAL_COST = 1;
+  public final static float SLOT_REF_COST = 1;
+  public final static float TIMESTAMP_ARITHMETIC_COST = 5;
+
+  // To be used when estimating the cost of Exprs of type string where we don't otherwise
+  // have an estimate of how long the strings produced by that Expr are.
+  public final static int DEFAULT_AVG_STRING_LENGTH = 5;
 
   // returns true if an Expr is a non-analytic aggregate.
   private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
@@ -163,6 +186,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // Between 0 and 1, or set to -1 if the selectivity could not be estimated.
   protected double selectivity_;
 
+  // Estimated relative cost of evaluating this expression, including the costs of
+  // its children. Set during analysis and used to sort conjuncts within a PlanNode.
+  // Has a default value of -1 indicating unknown cost if the cost of this expression
+  // or any of its children was not set, but it is required to be set for any
+  // expression which may be part of a conjunct.
+  protected float evalCost_;
+
   // estimated number of distinct values produced by Expr; invalid: -1
   // set during analysis
   protected long numDistinctValues_;
@@ -175,6 +205,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     super();
     type_ = Type.INVALID;
     selectivity_ = -1.0;
+    evalCost_ = -1.0f;
     numDistinctValues_ = -1;
   }
 
@@ -189,6 +220,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     isOnClauseConjunct_ = other.isOnClauseConjunct_;
     printSqlInParens_ = other.printSqlInParens_;
     selectivity_ = other.selectivity_;
+    evalCost_ = other.evalCost_;
     numDistinctValues_ = other.numDistinctValues_;
     fn_ = other.fn_;
     children_ = Expr.cloneList(other.children_);
@@ -199,6 +231,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public Type getType() { return type_; }
   public double getSelectivity() { return selectivity_; }
   public boolean hasSelectivity() { return selectivity_ >= 0; }
+  public float getCost() {
+    Preconditions.checkState(isAnalyzed_);
+    return evalCost_;
+  }
+  public boolean hasCost() { return evalCost_ >= 0; }
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setPrintSqlInParens(boolean b) { printSqlInParens_ = b; }
   public boolean isOnClauseConjunct() { return isOnClauseConjunct_; }
@@ -1072,6 +1109,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         .add("id", id_)
         .add("type", type_)
         .add("sel", selectivity_)
+        .add("evalCost", evalCost_)
         .add("#distinct", numDistinctValues_)
         .toString();
   }
@@ -1184,5 +1222,48 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       setChild(i, literalExpr);
     }
     isAnalyzed_ = false;
+  }
+
+  /**
+   * Returns true iff all of this Expr's children have their costs set.
+   */
+  protected boolean hasChildCosts() {
+    for (Expr child : children_) {
+      if (!child.hasCost()) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Computes and returns the sum of the costs of all of this Expr's children.
+   */
+  protected float getChildCosts() {
+    float cost = 0;
+    for (Expr child : children_) cost += child.getCost();
+    return cost;
+  }
+
+  /**
+   * Returns the average length of the values produced by an Expr
+   * of type string. Returns a default for unknown lengths.
+   */
+  protected static double getAvgStringLength(Expr e) {
+    Preconditions.checkState(e.getType().isStringType());
+    Preconditions.checkState(e.isAnalyzed_);
+
+    SlotRef ref = e.unwrapSlotRef(false);
+    if (ref != null) {
+      if (ref.getDesc() != null && ref.getDesc().getStats().getAvgSize() > 0) {
+        return ref.getDesc().getStats().getAvgSize();
+      } else {
+        return DEFAULT_AVG_STRING_LENGTH;
+      }
+    } else if (e instanceof StringLiteral) {
+      return ((StringLiteral) e).getValue().length();
+    } else {
+      // TODO(tmarshall): Extend this to support other string Exprs, such as
+      // function calls that return string.
+      return DEFAULT_AVG_STRING_LENGTH;
+    }
   }
 }
