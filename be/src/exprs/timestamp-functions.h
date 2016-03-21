@@ -27,7 +27,7 @@ namespace impala {
 
 class Expr;
 class OpcodeRegistry;
-class StringValue;
+struct StringValue;
 class TimestampValue;
 class TupleRow;
 
