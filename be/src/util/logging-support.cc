@@ -106,8 +106,10 @@ void LoggingSupport::DeleteOldLogs(const string& path_pattern, int max_log_files
   glob_t result;
   int glob_ret = glob(path_pattern.c_str(), GLOB_TILDE, NULL, &result);
   if (glob_ret != 0) {
-    LOG(ERROR) << "glob failed in LoggingSupport::DeleteOldLogs on " << path_pattern
-               << " with ret = " << glob_ret;
+    if (glob_ret != GLOB_NOMATCH) {
+      LOG(ERROR) << "glob failed in LoggingSupport::DeleteOldLogs on " << path_pattern
+                 << " with ret = " << glob_ret;
+    }
     globfree(&result);
     return;
   }
