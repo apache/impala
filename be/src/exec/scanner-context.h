@@ -244,6 +244,10 @@ class ScannerContext {
     Status ReportInvalidRead(int64_t length);
   };
 
+  bool HasStream() {
+    return !streams_.empty();
+  }
+
   Stream* GetStream(int idx = 0) {
     DCHECK_GE(idx, 0);
     DCHECK_LT(idx, streams_.size());

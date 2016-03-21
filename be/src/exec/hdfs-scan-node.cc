@@ -1192,10 +1192,12 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
        << scan_range->file() << "(" << scan_range->offset() << ":"
        << scan_range->len() << ").";
-    if (partition->file_format() != THdfsFileFormat::PARQUET) {
-      // Parquet doesn't read the range end to end so the current offset isn't useful.
-      // TODO: make sure the parquet reader is outputting as much diagnostic
-      // information as possible.
+    // Parquet doesn't read the range end to end so the current offset isn't useful.
+    // TODO: make sure the parquet reader is outputting as much diagnostic
+    // information as possible.
+    // The error status may not necessarily be related to this scanner thread so this
+    // thread may have run to completion and closed all its streams already.
+    if (partition->file_format() != THdfsFileFormat::PARQUET && context.HasStream()) {
       ScannerContext::Stream* stream = context.GetStream();
       ss << " Processed " << stream->total_bytes_returned() << " bytes.";
     }
