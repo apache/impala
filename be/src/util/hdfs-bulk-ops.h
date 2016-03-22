@@ -125,7 +125,7 @@ class HdfsOperationSet {
 
   /// The number of ops remaining to be executed. Used to coordinate between executor
   /// threads so that when all ops are finished, promise_ is signalled.
-  AtomicInt<int64_t> num_ops_;
+  AtomicInt64 num_ops_;
 
   /// HDFS connection shared between all operations. Not owned by this class.
   hdfsFS* hdfs_connection_;

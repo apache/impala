@@ -212,48 +212,48 @@ class DiskIoMgr::RequestContext {
   RuntimeProfile::Counter* disks_accessed_bitmap_;
 
   /// Total number of bytes read locally, updated at end of each range scan
-  AtomicInt<int64_t> bytes_read_local_;
+  AtomicInt64 bytes_read_local_;
 
   /// Total number of bytes read via short circuit read, updated at end of each range scan
-  AtomicInt<int64_t> bytes_read_short_circuit_;
+  AtomicInt64 bytes_read_short_circuit_;
 
   /// Total number of bytes read from date node cache, updated at end of each range scan
-  AtomicInt<int64_t> bytes_read_dn_cache_;
+  AtomicInt64 bytes_read_dn_cache_;
 
   /// Total number of bytes from remote reads that were expected to be local.
-  AtomicInt<int64_t> unexpected_remote_bytes_;
+  AtomicInt64 unexpected_remote_bytes_;
 
   /// The number of buffers that have been returned to the reader (via GetNext) that the
   /// reader has not returned. Only included for debugging and diagnostics.
-  AtomicInt<int> num_buffers_in_reader_;
+  AtomicInt32 num_buffers_in_reader_;
 
   /// The number of scan ranges that have been completed for this reader.
-  AtomicInt<int> num_finished_ranges_;
+  AtomicInt32 num_finished_ranges_;
 
   /// The number of scan ranges that required a remote read, updated at the end of each
   /// range scan. Only used for diagnostics.
-  AtomicInt<int> num_remote_ranges_;
+  AtomicInt32 num_remote_ranges_;
 
   /// The total number of scan ranges that have not been started. Only used for
   /// diagnostics. This is the sum of all unstarted_scan_ranges across all disks.
-  AtomicInt<int> num_unstarted_scan_ranges_;
+  AtomicInt32 num_unstarted_scan_ranges_;
 
   /// The number of buffers that are being used for this reader. This is the sum
   /// of all buffers in ScanRange queues and buffers currently being read into (i.e. about
   /// to be queued).
-  AtomicInt<int> num_used_buffers_;
+  AtomicInt32 num_used_buffers_;
 
   /// The total number of ready buffers across all ranges.  Ready buffers are buffers
   /// that have been read from disk but not retrieved by the caller.
   /// This is the sum of all queued buffers in all ranges for this reader context.
-  AtomicInt<int> num_ready_buffers_;
+  AtomicInt32 num_ready_buffers_;
 
   /// The total (sum) of queue capacities for finished scan ranges. This value
   /// divided by num_finished_ranges_ is the average for finished ranges and
   /// used to seed the starting queue capacity for future ranges. The assumption
   /// is that if previous ranges were fast, new ones will be fast too. The scan
   /// range adjusts the queue capacity dynamically so a rough approximation will do.
-  AtomicInt<int> total_range_queue_capacity_;
+  AtomicInt32 total_range_queue_capacity_;
 
   /// The initial queue size for new scan ranges. This is always
   /// total_range_queue_capacity_ / num_finished_ranges_ but stored as a separate
@@ -447,7 +447,7 @@ class DiskIoMgr::RequestContext {
     /// entire operation, we need this ref count to keep track of which thread should do
     /// final resource cleanup during cancellation.
     /// Only the thread that sees the count at 0 should do the final cleanup.
-    AtomicInt<int> num_threads_in_op_;
+    AtomicInt32 num_threads_in_op_;
 
     /// Queue of write ranges to process for this disk. A write range is always added
     /// to in_flight_ranges_ in GetNextRequestRange(). There is a separate

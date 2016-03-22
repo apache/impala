@@ -734,10 +734,10 @@ class DiskIoMgr {
   std::list<BufferDescriptor*> free_buffer_descs_;
 
   /// Total number of allocated buffers, used for debugging.
-  AtomicInt<int> num_allocated_buffers_;
+  AtomicInt32 num_allocated_buffers_;
 
   /// Total number of buffers in readers
-  AtomicInt<int> num_buffers_in_readers_;
+  AtomicInt32 num_buffers_in_readers_;
 
   /// Per disk queues. This is static and created once at Init() time.  One queue is
   /// allocated for each local disk on the system and for each remote filesystem type.

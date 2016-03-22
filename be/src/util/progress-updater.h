@@ -75,10 +75,10 @@ class ProgressUpdater {
   int update_period_;
 
   /// Number of completed work items.
-  AtomicInt<int64_t> num_complete_;
+  AtomicInt64 num_complete_;
 
   /// Percentage when the last output was generated.
-  AtomicInt<int> last_output_percentage_;
+  AtomicInt32 last_output_percentage_;
 };
 
 }

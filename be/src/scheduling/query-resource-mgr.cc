@@ -97,8 +97,8 @@ void QueryResourceMgr::InitVcoreAcquisition(int32_t init_vcores) {
   // inspects immediately after exiting Expand(), and if true, exits before touching any
   // of the class-wide state (because the destructor may have finished before this point).
 
-  thread_in_expand_.reset(new AtomicInt<int32_t>());
-  early_exit_.reset(new AtomicInt<int32_t>());
+  thread_in_expand_.reset(new AtomicInt32());
+  early_exit_.reset(new AtomicInt32());
   acquire_vcore_thread_.reset(
       new Thread("resource-mgmt", Substitute("acquire-cpu-$0", PrintId(query_id_)),
           bind<void>(mem_fn(&QueryResourceMgr::AcquireVcoreResources), this,
@@ -170,8 +170,8 @@ Status QueryResourceMgr::RequestMemExpansion(int64_t requested_bytes,
 }
 
 void QueryResourceMgr::AcquireVcoreResources(
-    shared_ptr<AtomicInt<int32_t> > thread_in_expand,
-    shared_ptr<AtomicInt<int32_t> > early_exit) {
+    shared_ptr<AtomicInt32> thread_in_expand,
+    shared_ptr<AtomicInt32> early_exit) {
   // Take a copy because we'd like to print it in some cases after the destructor.
   TUniqueId reservation_id = reservation_id_;
   VLOG_QUERY << "Starting Vcore acquisition for: " << reservation_id;

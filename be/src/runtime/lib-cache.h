@@ -117,7 +117,7 @@ class LibCache {
 
   /// The number of libs that have been copied from HDFS to the local FS.
   /// This is appended to the local fs path to remove collisions.
-  AtomicInt<int64_t> num_libs_copied_;
+  AtomicInt64 num_libs_copied_;
 
   /// Protects lib_cache_. For lock ordering, this lock must always be taken before
   /// the per entry lock.

@@ -137,7 +137,7 @@ class PeriodicCounterUpdater {
   TimeSeriesCounters time_series_counters_;
 
   /// If 1, tear down the update thread.
-  AtomicInt<int32_t> done_;
+  AtomicInt32 done_;
 
   /// Singleton object that keeps track of all rate counters and the thread
   /// for updating them.

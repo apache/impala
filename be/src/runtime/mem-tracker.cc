@@ -39,7 +39,7 @@ MemTracker::RequestTrackersMap MemTracker::request_to_mem_trackers_;
 MemTracker::PoolTrackersMap MemTracker::pool_to_mem_trackers_;
 mutex MemTracker::static_mem_trackers_lock_;
 
-AtomicInt<int64_t> MemTracker::released_memory_since_gc_;
+AtomicInt64 MemTracker::released_memory_since_gc_;
 
 // Name for request pool MemTrackers. '$0' is replaced with the pool name.
 const string REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT = "RequestPool=$0";

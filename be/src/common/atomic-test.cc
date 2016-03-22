@@ -20,8 +20,9 @@
 
 #include "common/names.h"
 
-
 namespace impala {
+
+using namespace internal; // Testing AtomicInt<> directly.
 
 // Simple test to make sure there is no obvious error in the operations.  This is not
 // intended to test the thread safety.

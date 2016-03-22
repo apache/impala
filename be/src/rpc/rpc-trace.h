@@ -84,7 +84,7 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
     StatsMetric<double>* time_stats;
 
     /// Number of invocations in flight
-    AtomicInt<int32_t> num_in_flight;
+    AtomicInt32 num_in_flight;
   };
 
   /// Map from method name to descriptor

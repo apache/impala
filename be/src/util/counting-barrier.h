@@ -43,7 +43,7 @@ class CountingBarrier {
   Promise<bool> promise_;
 
   /// The number of pending notifications remaining.
-  AtomicInt<int32_t> count_;
+  AtomicInt32 count_;
 
   DISALLOW_COPY_AND_ASSIGN(CountingBarrier);
 };

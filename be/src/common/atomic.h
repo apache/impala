@@ -45,7 +45,10 @@ class AtomicUtil {
   }
 };
 
-/// Atomic integer. 'T' can be either 32-bit or 64-bit signed integer. Each operation
+namespace internal {
+
+/// Atomic integer. This class template should not be used directly; instead use the
+/// typedefs below. 'T' can be either 32-bit or 64-bit signed integer. Each operation
 /// is performed atomically and has a specified memory-ordering semantic:
 ///
 /// Acquire: these operations ensure no later memory access by the same thread can be
@@ -101,6 +104,13 @@ class AtomicInt {
 
   DISALLOW_COPY_AND_ASSIGN(AtomicInt);
 };
+
+} // namespace internal
+
+/// Supported atomic types. Use these types rather than referring to AtomicInt<>
+/// directly.
+typedef internal::AtomicInt<int32_t> AtomicInt32;
+typedef internal::AtomicInt<int64_t> AtomicInt64;
 
 }
 

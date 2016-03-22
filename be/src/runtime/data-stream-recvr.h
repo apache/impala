@@ -136,7 +136,7 @@ class DataStreamRecvr {
   bool is_merging_;
 
   /// total number of bytes held across all sender queues.
-  AtomicInt<int> num_buffered_bytes_;
+  AtomicInt32 num_buffered_bytes_;
 
   /// Memtracker for batches in the sender queue(s).
   boost::scoped_ptr<MemTracker> mem_tracker_;

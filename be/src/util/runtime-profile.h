@@ -125,7 +125,7 @@ class RuntimeProfile {
    protected:
     friend class RuntimeProfile;
 
-    AtomicInt<int64_t> value_;
+    AtomicInt64 value_;
     TUnit::type unit_;
   };
 
@@ -175,7 +175,7 @@ class RuntimeProfile {
 
     /// The current value of the counter. value_ in the super class represents
     /// the high water mark.
-    AtomicInt<int64_t> current_value_;
+    AtomicInt64 current_value_;
   };
 
   typedef boost::function<int64_t ()> DerivedCounterFunction;

@@ -394,7 +394,7 @@ class MemTracker {
 
   /// Total amount of memory from calls to Release() since the last GC. If this
   /// is greater than GC_RELEASE_SIZE, this will trigger a tcmalloc gc.
-  static AtomicInt<int64_t> released_memory_since_gc_;
+  static AtomicInt64 released_memory_since_gc_;
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   boost::mutex gc_lock_;

@@ -369,7 +369,7 @@ class HdfsScanNode : public ScanNode {
   int64_t scanner_thread_bytes_required_;
 
   /// Number of files that have not been issued from the scanners.
-  AtomicInt<int> num_unqueued_files_;
+  AtomicInt32 num_unqueued_files_;
 
   /// Map of HdfsScanner objects to file types.  Only one scanner object will be
   /// created for each file type.  Objects stored in runtime_state's pool.
@@ -424,12 +424,12 @@ class HdfsScanNode : public ScanNode {
   /// This is the number of io buffers that are owned by the scan node and the scanners.
   /// This is used just to help debug leaked io buffers to determine if the leak is
   /// happening in the scanners vs other parts of the execution.
-  AtomicInt<int> num_owned_io_buffers_;
+  AtomicInt32 num_owned_io_buffers_;
 
   /// Counters which track the number of scanners that have codegen enabled for the
   /// materialize and conjuncts evaluation code paths.
-  AtomicInt<int> num_scanners_codegen_enabled_;
-  AtomicInt<int> num_scanners_codegen_disabled_;
+  AtomicInt32 num_scanners_codegen_enabled_;
+  AtomicInt32 num_scanners_codegen_disabled_;
 
   /// The size of the largest compressed text file to be scanned. This is used to
   /// estimate scanner thread memory usage.

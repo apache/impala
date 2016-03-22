@@ -136,7 +136,7 @@ class DiskIoMgrTest : public testing::Test {
   // Updates num_ranges_processed with the number of ranges seen by this thread.
   static void ScanRangeThread(DiskIoMgr* io_mgr, DiskIoMgr::RequestContext* reader,
       const char* expected_result, int expected_len, const Status& expected_status,
-      int max_ranges, AtomicInt<int>* num_ranges_processed) {
+      int max_ranges, AtomicInt32* num_ranges_processed) {
     int num_ranges = 0;
     while (max_ranges == 0 || num_ranges < max_ranges) {
       DiskIoMgr::ScanRange* range;
@@ -373,7 +373,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           }
           ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
-          AtomicInt<int> num_ranges_processed;
+          AtomicInt32 num_ranges_processed;
           thread_group threads;
           for (int i = 0; i < num_read_threads; ++i) {
             threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
@@ -432,7 +432,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
                 stat_val.st_mtime));
           }
         }
-        AtomicInt<int> num_ranges_processed;
+        AtomicInt32 num_ranges_processed;
 
         // Issue first half the scan ranges.
         ASSERT_OK(io_mgr.AddScanRanges(reader, ranges_first_half));
@@ -507,7 +507,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         }
         ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
-        AtomicInt<int> num_ranges_processed;
+        AtomicInt32 num_ranges_processed;
         thread_group threads;
         for (int i = 0; i < 5; ++i) {
           threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
@@ -570,7 +570,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         }
         ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
-        AtomicInt<int> num_ranges_processed;
+        AtomicInt32 num_ranges_processed;
         int num_succesful_ranges = ranges.size() / 2;
         // Read half the ranges
         for (int i = 0; i < num_succesful_ranges; ++i) {
@@ -637,7 +637,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     // Don't return buffers to force memory pressure
     vector<DiskIoMgr::BufferDescriptor*> buffers;
 
-    AtomicInt<int> num_ranges_processed;
+    AtomicInt32 num_ranges_processed;
     ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::MemLimitExceeded(),
         1, &num_ranges_processed);
 
@@ -717,7 +717,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     }
     ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
-    AtomicInt<int> num_ranges_processed;
+    AtomicInt32 num_ranges_processed;
     thread_group threads;
     for (int i = 0; i < 5; ++i) {
       threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
@@ -780,7 +780,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
         while (read_offset < file_size) {
           for (int context_index = 0; context_index < num_contexts; ++context_index) {
             if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-            AtomicInt<int> num_ranges_processed;
+            AtomicInt32 num_ranges_processed;
             thread_group threads;
             vector<DiskIoMgr::ScanRange*> ranges;
             int num_scan_ranges = min<int>(num_reads_queued, write_offset - read_offset);
@@ -898,7 +898,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
             ASSERT_OK(io_mgr.AddScanRanges(readers[i], ranges));
           }
 
-          AtomicInt<int> num_ranges_processed;
+          AtomicInt32 num_ranges_processed;
           thread_group threads;
           for (int i = 0; i < NUM_READERS; ++i) {
             for (int j = 0; j < NUM_THREADS_PER_READER; ++j) {
