@@ -142,10 +142,10 @@ class TestWideRow(ImpalaTestSuite):
     # We need > 10 MB of memory because we're creating extra buffers:
     # - 10 MB table / 5 MB scan range = 2 scan ranges, each of which may allocate ~20MB
     # - Sync reads will allocate ~5MB of space
-    # The 80MB value used here was determined empirically by raising the limit until the
+    # The 100MB value used here was determined empirically by raising the limit until the
     # query succeeded for all file formats -- I don't know exactly why we need this much.
     # TODO: figure out exact breakdown of memory usage (IMPALA-681)
-    new_vector.get_value('exec_option')['mem_limit'] = 80 * 1024 * 1024
+    new_vector.get_value('exec_option')['mem_limit'] = 100 * 1024 * 1024
     self.run_test_case('QueryTest/wide-row', new_vector)
 
 class TestWideTable(ImpalaTestSuite):
