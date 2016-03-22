@@ -347,6 +347,11 @@ struct TQueryExecRequest {
   // it is unpartitioned.
   2: required list<Planner.TPlanFragment> fragments
 
+  // Multi-threaded execution: sequence of plans; the last one materializes
+  // the query result
+  // TODO: this will eventually supercede 'fragments'
+  14: optional list<Planner.TPlanFragmentTree> mt_plans
+
   // Specifies the destination fragment of the output of each fragment.
   // parent_fragment_idx.size() == fragments.size() - 1 and
   // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]

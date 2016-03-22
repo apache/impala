@@ -388,6 +388,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
+      case TImpalaQueryOptions::MT_NUM_CORES: {
+        StringParser::ParseResult result;
+        const int32_t num_cores =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || num_cores < 0 || num_cores > 128) {
+          return Status(
+              Substitute("$0 is not valid for mt_num_cores. Valid values are in "
+                "[0, 128].", value));
+        }
+        query_options->__set_mt_num_cores(num_cores);
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

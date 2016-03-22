@@ -71,7 +71,7 @@ public class ExchangeNode extends PlanNode {
     Preconditions.checkState(conjuncts_.isEmpty());
   }
 
-  public void addChild(PlanNode node, boolean copyConjuncts) {
+  public void addChild(PlanNode node) {
     // This ExchangeNode 'inherits' several parameters from its children.
     // Ensure that all children agree on them.
     if (!children_.isEmpty()) {
@@ -84,7 +84,6 @@ public class ExchangeNode extends PlanNode {
       tupleIds_ = Lists.newArrayList(node.tupleIds_);
       nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
     }
-    if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_));
     children_.add(node);
   }
 

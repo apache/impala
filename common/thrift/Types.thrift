@@ -20,6 +20,7 @@ typedef i32 TPlanNodeId
 typedef i32 TTupleId
 typedef i32 TSlotId
 typedef i32 TTableId
+typedef i32 TJoinTableId
 
 // TODO: Consider moving unrelated enums to better locations.
 

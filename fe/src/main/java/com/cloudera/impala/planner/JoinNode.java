@@ -59,6 +59,10 @@ public abstract class JoinNode extends PlanNode {
   protected List<BinaryPredicate> eqJoinConjuncts_;
   protected List<Expr> otherJoinConjuncts_;
 
+  // if valid, the rhs input is materialized outside of this node and is assigned
+  // joinTableId_
+  protected JoinTableId joinTableId_ = JoinTableId.INVALID;
+
   public enum DistributionMode {
     NONE("NONE"),
     BROADCAST("BROADCAST"),
@@ -129,6 +133,8 @@ public abstract class JoinNode extends PlanNode {
   public DistributionMode getDistributionModeHint() { return distrModeHint_; }
   public DistributionMode getDistributionMode() { return distrMode_; }
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
+  public JoinTableId getJoinTableId() { return joinTableId_; }
+  public void setJoinTableId(JoinTableId id) { joinTableId_ = id; }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {

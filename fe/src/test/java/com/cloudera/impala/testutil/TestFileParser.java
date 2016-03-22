@@ -61,6 +61,7 @@ public class TestFileParser {
     RESULTS,
     PLAN,
     DISTRIBUTEDPLAN,
+    PARALLELPLANS,
     FILEERRORS,
     PARTITIONS,
     SETUP,
@@ -177,10 +178,14 @@ public class TestFileParser {
      * Returns false if the current test case is invalid due to missing sections or query
      */
     public boolean isValid() {
-      return !getQuery().isEmpty() && (!getSectionContents(Section.PLAN).isEmpty() ||
-          !getSectionContents(Section.DISTRIBUTEDPLAN).isEmpty() ||
-          !getSectionContents(Section.LINEAGE).isEmpty());
+      return !getQuery().isEmpty()
+          && (!getSectionContents(Section.PLAN).isEmpty()
+            || !getSectionContents(Section.DISTRIBUTEDPLAN).isEmpty()
+            || !getSectionContents(Section.PARALLELPLANS).isEmpty()
+            || !getSectionContents(Section.LINEAGE).isEmpty());
     }
+
+    public boolean isEmpty() { return expectedResultSections.isEmpty(); }
   }
 
   private final List<TestCase> testCases = Lists.newArrayList();
@@ -243,7 +248,7 @@ public class TestFileParser {
       ++lineNum;
       if (line.startsWith("====") && sectionCount > 0) {
         currentTestCase.addSection(currentSection, sectionContents);
-        if(!currentTestCase.isValid()) {
+        if (!currentTestCase.isValid()) {
           throw new IllegalStateException("Invalid test case" +
               " at line " + currentTestCase.startLineNum + " detected.");
         }
@@ -288,7 +293,7 @@ public class TestFileParser {
       }
     }
 
-    if(!currentTestCase.isValid()) {
+    if (!currentTestCase.isEmpty() && !currentTestCase.isValid()) {
       throw new IllegalStateException("Invalid test case" +
           " at line " + currentTestCase.startLineNum + " detected.");
     }
@@ -308,7 +313,8 @@ public class TestFileParser {
       open(table);
       testCases.clear();
       while (scanner.hasNextLine()) {
-        testCases.add(parseOneTestCase());
+        TestCase testCase = parseOneTestCase();
+        if (!testCase.isEmpty()) testCases.add(testCase);
       }
     } finally {
       close();

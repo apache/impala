@@ -110,10 +110,12 @@ public class TupleDescriptor {
     if (path_ == null) return null;
     return path_.getRootTable();
   }
+
   public TableName getTableName() {
     Table t = getTable();
     return (t == null) ? null : t.getTableName();
   }
+
   public void setPath(Path p) {
     Preconditions.checkNotNull(p);
     Preconditions.checkState(p.isResolved());
@@ -128,6 +130,7 @@ public class TupleDescriptor {
       type_ = Path.getTypeAsStruct(p.destType());
     }
   }
+
   public Path getPath() { return path_; }
   public void setType(StructType type) { type_ = type; }
   public StructType getType() { return type_; }

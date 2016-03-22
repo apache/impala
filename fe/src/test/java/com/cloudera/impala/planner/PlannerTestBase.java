@@ -375,10 +375,9 @@ public class PlannerTestBase {
    * locations to actualScanRangeLocations; compares both to the appropriate sections
    * of 'testCase'.
    */
-  private void RunTestCase(TestCase testCase, StringBuilder errorLog,
+  private void runTestCase(TestCase testCase, StringBuilder errorLog,
       StringBuilder actualOutput, String dbName, TQueryOptions options)
       throws CatalogException {
-
     if (options == null) {
       options = defaultQueryOptions();
     } else {
@@ -396,11 +395,13 @@ public class PlannerTestBase {
     queryCtx.request.query_options = options;
     // Test single node plan, scan range locations, and column lineage.
     TExecRequest singleNodeExecRequest =
-        testPlan(testCase, true, queryCtx, errorLog, actualOutput);
+        testPlan(testCase, Section.PLAN, queryCtx, errorLog, actualOutput);
     checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
     // Test distributed plan.
-    testPlan(testCase, false, queryCtx, errorLog, actualOutput);
+    testPlan(testCase, Section.DISTRIBUTEDPLAN, queryCtx, errorLog, actualOutput);
+    // test parallel plans
+    testPlan(testCase, Section.PARALLELPLANS, queryCtx, errorLog, actualOutput);
   }
 
   /**
@@ -410,16 +411,19 @@ public class PlannerTestBase {
    * Returns the produced exec request or null if there was an error generating
    * the plan.
    */
-  private TExecRequest testPlan(TestCase testCase, boolean singleNodePlan,
+  private TExecRequest testPlan(TestCase testCase, Section section,
       TQueryCtx queryCtx, StringBuilder errorLog, StringBuilder actualOutput) {
-    Section section = (singleNodePlan) ? Section.PLAN : Section.DISTRIBUTEDPLAN;
     String query = testCase.getQuery();
     queryCtx.request.setStmt(query);
     if (section == Section.PLAN) {
       queryCtx.request.getQuery_options().setNum_nodes(1);
     } else {
+      // for distributed and parallel execution we want to run on all available nodes
       queryCtx.request.getQuery_options().setNum_nodes(
           ImpalaInternalServiceConstants.NUM_NODES_ALL);
+    }
+    if (section == Section.PARALLELPLANS) {
+      queryCtx.request.query_options.mt_num_cores = 2;
     }
     ArrayList<String> expectedPlan = testCase.getSectionContents(section);
     boolean sectionExists = expectedPlan != null && !expectedPlan.isEmpty();
@@ -614,7 +618,7 @@ public class PlannerTestBase {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
       try {
-        RunTestCase(testCase, errorLog, actualOutput, dbName, options);
+        runTestCase(testCase, errorLog, actualOutput, dbName, options);
       } catch (CatalogException e) {
         errorLog.append(String.format("Failed to plan query\n%s\n%s",
             testCase.getQuery(), e.getMessage()));

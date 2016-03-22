@@ -314,9 +314,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       String childHeadlinePrefix = prefix + "|--";
       String childDetailPrefix = prefix + "|  ";
       for (int i = children_.size() - 1; i >= 1; --i) {
-        expBuilder.append(
-            children_.get(i).getExplainString(childHeadlinePrefix, childDetailPrefix,
-                detailLevel));
+        PlanNode child = getChild(i);
+        if (fragment_ != child.fragment_) {
+          // we're crossing a fragment boundary
+          expBuilder.append(
+              child.fragment_.getExplainString(
+                childHeadlinePrefix, childDetailPrefix, detailLevel));
+        } else {
+          expBuilder.append(
+              child.getExplainString(childHeadlinePrefix, childDetailPrefix,
+                  detailLevel));
+        }
         if (printFiller) expBuilder.append(filler + "\n");
       }
       expBuilder.append(children_.get(0).getExplainString(prefix, prefix, detailLevel));
@@ -327,7 +335,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   /**
    * Return the node-specific details.
    * Subclass should override this function.
-   * Each line should be prefix by detailPrefix.
+   * Each line should be prefixed by detailPrefix.
    */
   protected String getNodeExplainString(String rootPrefix, String detailPrefix,
       TExplainLevel detailLevel) {

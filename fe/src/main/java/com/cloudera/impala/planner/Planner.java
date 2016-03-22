@@ -96,6 +96,7 @@ public class Planner {
     }
 
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
+    rootFragment.verifyTree();
     ExprSubstitutionMap rootNodeSmap = rootFragment.getPlanRoot().getOutputSmap();
     List<Expr> resultExprs = null;
     if (ctx_.isInsertOrCtas()) {
@@ -158,6 +159,19 @@ public class Planner {
     }
 
     return fragments;
+  }
+
+  /**
+   * Return a list of plans, each represented by the root of their fragment trees.
+   * TODO: roll into createPlan()
+   */
+  public List<PlanFragment> createParallelPlans() throws ImpalaException {
+    ArrayList<PlanFragment> distrPlan = createPlan();
+    Preconditions.checkNotNull(distrPlan);
+    ParallelPlanner planner = new ParallelPlanner(ctx_);
+    List<PlanFragment> parallelPlans = planner.createPlans(distrPlan.get(0));
+    ctx_.getRootAnalyzer().getTimeline().markEvent("Parallel plans created");
+    return parallelPlans;
   }
 
   /**

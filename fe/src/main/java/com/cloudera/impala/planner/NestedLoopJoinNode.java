@@ -93,6 +93,10 @@ public class NestedLoopJoinNode extends JoinNode {
           displayName_, getDisplayLabelDetail()));
     }
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (joinTableId_.isValid()) {
+          output.append(
+              detailPrefix + "join table id: " + joinTableId_.toString() + "\n");
+      }
       if (!otherJoinConjuncts_.isEmpty()) {
         output.append(detailPrefix + "join predicates: ")
         .append(getExplainString(otherJoinConjuncts_) + "\n");

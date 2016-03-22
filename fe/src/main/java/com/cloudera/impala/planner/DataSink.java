@@ -29,7 +29,6 @@ import com.cloudera.impala.thrift.TExplainLevel;
  * The destination could be another plan fragment on a remote machine,
  * or a table into which the rows are to be inserted
  * (i.e., the destination of the last fragment of an INSERT statement).
- *
  */
 public abstract class DataSink {
 

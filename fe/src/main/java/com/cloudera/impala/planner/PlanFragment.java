@@ -29,25 +29,35 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
+import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanFragment;
+import com.cloudera.impala.thrift.TPlanFragmentTree;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 /**
- * A PlanFragment is part of a tree of such fragments that together make
- * up a complete execution plan for a single query. Each plan fragment can have
- * one or many instances, each of which in turn is executed by a single node and the
- * output sent to a specific instance of the destination fragment (or, in the case
- * of the root fragment, is materialized in some form).
+ * PlanFragments form a tree structure via their ExchangeNodes. A tree of fragments
+ * connected in that way forms a plan. The output of a plan is produced by the root
+ * fragment and is either the result of the query or an intermediate result
+ * needed by a different plan (such as a hash table).
  *
- * The plan fragment encapsulates the specific tree of execution nodes that
+ * Plans are grouped into cohorts based on the consumer of their output: all
+ * plans that materialize intermediate results for a particular consumer plan
+ * are grouped into a single cohort.
+ *
+ * A PlanFragment encapsulates the specific tree of execution nodes that
  * are used to produce the output of the plan fragment, as well as output exprs,
  * destination node, etc. If there are no output exprs, the full row that is
  * is produced by the plan root is marked as materialized.
+ *
+ * A plan fragment can have one or many instances, each of which in turn is executed by
+ * an individual node and the output sent to a specific instance of the destination
+ * fragment (or, in the case of the root fragment, is materialized in some form).
  *
  * A hash-partitioned plan fragment is the result of one or more hash-partitioning data
  * streams being received by plan nodes in this fragment. In the future, a fragment's
@@ -59,11 +69,17 @@ import com.google.common.collect.Lists;
  * - assemble with getters, etc.
  * - finalize()
  * - toThrift()
+ *
+ * TODO: the tree of PlanNodes is connected across fragment boundaries, which makes
+ *   it impossible search for things within a fragment (using TreeNode functions);
+ *   fix that
  */
-public class PlanFragment {
+public class PlanFragment extends TreeNode<PlanFragment> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
 
   private final PlanFragmentId fragmentId_;
+  private PlanId planId_;
+  private CohortId cohortId_;
 
   // root of plan tree executed by this fragment
   private PlanNode planRoot_;
@@ -103,14 +119,26 @@ public class PlanFragment {
    * Does not traverse the children of ExchangeNodes because those must belong to a
    * different fragment.
    */
-  private void setFragmentInPlanTree(PlanNode node) {
+  public void setFragmentInPlanTree(PlanNode node) {
     if (node == null) return;
     node.setFragment(this);
-    if (!(node instanceof ExchangeNode)) {
-      for (PlanNode child : node.getChildren()) {
-        setFragmentInPlanTree(child);
-      }
-    }
+    if (node instanceof ExchangeNode) return;
+    for (PlanNode child : node.getChildren()) setFragmentInPlanTree(child);
+  }
+
+  /**
+   * Collect all PlanNodes that belong to the exec tree of this fragment.
+   */
+  public void collectPlanNodes(List<PlanNode> nodes) {
+    Preconditions.checkNotNull(nodes);
+    collectPlanNodesHelper(planRoot_, nodes);
+  }
+
+  private void collectPlanNodesHelper(PlanNode root, List<PlanNode> nodes) {
+    if (root == null) return;
+    nodes.add(root);
+    if (root instanceof ExchangeNode) return;
+    for (PlanNode child: root.getChildren()) collectPlanNodesHelper(child, nodes);
   }
 
   public void setOutputExprs(List<Expr> outputExprs) {
@@ -216,31 +244,56 @@ public class PlanFragment {
     return result;
   }
 
-  public String getExplainString(TExplainLevel explainLevel) {
+  public TPlanFragmentTree treeToThrift() {
+    TPlanFragmentTree result = new TPlanFragmentTree();
+    treeToThriftHelper(result);
+    return result;
+  }
+
+  private void treeToThriftHelper(TPlanFragmentTree plan) {
+    plan.addToFragments(toThrift());
+    for (PlanFragment child: children_) {
+      child.treeToThriftHelper(plan);
+    }
+  }
+
+  public String getExplainString(TExplainLevel detailLevel) {
+    return getExplainString("", "", detailLevel);
+  }
+
+  /**
+   * The root of the output tree will be prefixed by rootPrefix and the remaining plan
+   * output will be prefixed by prefix.
+   */
+  protected final String getExplainString(String rootPrefix, String prefix,
+      TExplainLevel detailLevel) {
     StringBuilder str = new StringBuilder();
     Preconditions.checkState(dataPartition_ != null);
-    String rootPrefix = "";
-    String prefix = "";
-    String detailPrefix = "|  ";
-    if (explainLevel == TExplainLevel.VERBOSE) {
+    String detailPrefix = prefix + "|  ";  // sink detail
+    if (detailLevel == TExplainLevel.VERBOSE) {
+      // we're printing a new tree, start over with the indentation
       prefix = "  ";
       rootPrefix = "  ";
       detailPrefix = prefix + "|  ";
       str.append(String.format("%s:PLAN FRAGMENT [%s]\n", fragmentId_.toString(),
           dataPartition_.getExplainString()));
       if (sink_ != null && sink_ instanceof DataStreamSink) {
-        str.append(sink_.getExplainString(prefix, detailPrefix, explainLevel) + "\n");
+        str.append(sink_.getExplainString(rootPrefix, prefix, detailLevel) + "\n");
       }
     }
-    // Always print table sinks.
-    if (sink_ != null && sink_ instanceof TableSink) {
-      str.append(sink_.getExplainString(prefix, detailPrefix, explainLevel));
-      if (explainLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+
+    String planRootPrefix = rootPrefix;
+    // Always print sinks other than DataStreamSinks.
+    if (sink_ != null && !(sink_ instanceof DataStreamSink)) {
+      str.append(sink_.getExplainString(rootPrefix, detailPrefix, detailLevel));
+      if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
         str.append(prefix + "|\n");
       }
+      // we already used the root prefix for the sink
+      planRootPrefix = prefix;
     }
     if (planRoot_ != null) {
-      str.append(planRoot_.getExplainString(rootPrefix, prefix, explainLevel));
+      str.append(planRoot_.getExplainString(planRootPrefix, prefix, detailLevel));
     }
     return str.toString();
   }
@@ -251,6 +304,10 @@ public class PlanFragment {
   }
 
   public PlanFragmentId getId() { return fragmentId_; }
+  public PlanId getPlanId() { return planId_; }
+  public void setPlanId(PlanId id) { planId_ = id; }
+  public CohortId getCohortId() { return cohortId_; }
+  public void setCohortId(CohortId id) { cohortId_ = id; }
   public PlanFragment getDestFragment() {
     if (destNode_ == null) return null;
     return destNode_.getFragment();
@@ -270,7 +327,13 @@ public class PlanFragment {
     setFragmentInPlanTree(planRoot_);
   }
 
-  public void setDestination(ExchangeNode destNode) { destNode_ = destNode; }
+  public void setDestination(ExchangeNode destNode) {
+    destNode_ = destNode;
+    PlanFragment dest = getDestFragment();
+    Preconditions.checkNotNull(dest);
+    dest.addChild(this);
+  }
+
   public boolean hasSink() { return sink_ != null; }
   public DataSink getSink() { return sink_; }
   public void setSink(DataSink sink) {
@@ -289,5 +352,34 @@ public class PlanFragment {
     newRoot.setChild(0, planRoot_);
     planRoot_ = newRoot;
     planRoot_.setFragment(this);
+  }
+
+  /**
+   * Verify that the tree of PlanFragments and their contained tree of
+   * PlanNodes is constructed correctly.
+   */
+  public void verifyTree() {
+    // PlanNode.fragment_ is set correctly
+    List<PlanNode> nodes = Lists.newArrayList();
+    collectPlanNodes(nodes);
+    List<PlanNode> exchNodes = Lists.newArrayList();
+    for (PlanNode node: nodes) {
+      if (node instanceof ExchangeNode) exchNodes.add(node);
+      Preconditions.checkState(node.getFragment() == this);
+    }
+
+    // all ExchangeNodes have registered input fragments
+    Preconditions.checkState(exchNodes.size() == getChildren().size());
+    List<PlanFragment> childFragments = Lists.newArrayList();
+    for (PlanNode exchNode: exchNodes) {
+      PlanFragment childFragment = exchNode.getChild(0).getFragment();
+      Preconditions.checkState(!childFragments.contains(childFragment));
+      childFragments.add(childFragment);
+      Preconditions.checkState(childFragment.getDestNode() == exchNode);
+    }
+    // all registered children are accounted for
+    Preconditions.checkState(getChildren().containsAll(childFragments));
+
+    for (PlanFragment child: getChildren()) child.verifyTree();
   }
 }

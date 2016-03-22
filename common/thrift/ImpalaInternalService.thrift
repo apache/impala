@@ -180,6 +180,12 @@ struct TQueryOptions {
   // is always, since fields IDs are NYI). Valid values are "position" (default) and
   // "name".
   43: optional TParquetFallbackSchemaResolution parquet_fallback_schema_resolution = 0
+
+  // Multi-threaded execution: number of cores per query per node.
+  // > 1: multi-threaded execution mode, with given number of cores
+  // 1: single-threaded execution mode
+  // 0: multi-threaded execution mode, number of cores is the pool default
+  44: optional i32 mt_num_cores = 1
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

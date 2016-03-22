@@ -143,6 +143,12 @@ public class HashJoinNode extends JoinNode {
     output.append(String.format("%s%s [%s]\n", prefix, getDisplayLabel(),
         getDisplayLabelDetail()));
 
+    if (detailLevel.ordinal() > TExplainLevel.STANDARD.ordinal()) {
+      if (joinTableId_.isValid()) {
+        output.append(
+            detailPrefix + "hash-table-id=" + joinTableId_.toString() + "\n");
+      }
+    }
     if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
       output.append(detailPrefix + "hash predicates: ");
       for (int i = 0; i < eqJoinConjuncts_.size(); ++i) {

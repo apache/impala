@@ -33,6 +33,7 @@ import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 public class FunctionCallExpr extends Expr {
   private final FunctionName fnName_;
@@ -66,7 +67,7 @@ public class FunctionCallExpr extends Expr {
     fnName_ = fnName;
     params_ = params;
     isMergeAggFn_ = isMergeAggFn;
-    if (params.exprs() != null) children_ = params_.exprs();
+    if (params.exprs() != null) children_ = Lists.newArrayList(params_.exprs());
   }
 
   /**

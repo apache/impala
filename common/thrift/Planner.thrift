@@ -76,3 +76,13 @@ struct TScanRangeLocations {
   // non-empty list
   2: list<TScanRangeLocation> locations
 }
+
+// A plan: tree of plan fragments that materializes either a query result or the build
+// side of a join used by another plan; it consists of a sequence of plan fragments.
+// TODO: rename both this and PlanNodes.TPlan (TPlan should be something like TExecPlan
+// or TExecTree)
+struct TPlanFragmentTree {
+  1: required i32 cohort_id
+
+  2: required list<TPlanFragment> fragments
+}

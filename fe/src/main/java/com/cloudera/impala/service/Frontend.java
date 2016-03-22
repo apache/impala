@@ -118,6 +118,7 @@ import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TPlanFragment;
+import com.cloudera.impala.thrift.TPlanFragmentTree;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
@@ -947,6 +948,23 @@ public class Frontend {
     // create plan
     LOG.debug("create plan");
     Planner planner = new Planner(analysisResult, queryCtx);
+    if (RuntimeEnv.INSTANCE.isTestEnv()
+        && queryCtx.request.query_options.mt_num_cores != 1) {
+      // TODO: this is just to be able to run tests; implement this
+      List<PlanFragment> planRoots = planner.createParallelPlans();
+      for (PlanFragment planRoot: planRoots) {
+        TPlanFragmentTree thriftPlan = planRoot.treeToThrift();
+        queryExecRequest.addToMt_plans(thriftPlan);
+      }
+      queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
+      queryExecRequest.setQuery_ctx(queryCtx);
+      explainString.append(planner.getExplainString(
+          Lists.newArrayList(planRoots.get(0)), queryExecRequest,
+          TExplainLevel.STANDARD));
+      queryExecRequest.setQuery_plan(explainString.toString());
+      result.setQuery_exec_request(queryExecRequest);
+      return result;
+    }
     ArrayList<PlanFragment> fragments = planner.createPlan();
 
     List<ScanNode> scanNodes = Lists.newArrayList();
@@ -954,11 +972,11 @@ public class Frontend {
     // queryExecRequest.dest_fragment_idx
     Map<PlanFragment, Integer> fragmentIdx = Maps.newHashMap();
 
-    for (int fragmentId = 0; fragmentId < fragments.size(); ++fragmentId) {
-      PlanFragment fragment = fragments.get(fragmentId);
+    for (int idx = 0; idx < fragments.size(); ++idx) {
+      PlanFragment fragment = fragments.get(idx);
       Preconditions.checkNotNull(fragment.getPlanRoot());
       fragment.getPlanRoot().collect(Predicates.instanceOf(ScanNode.class), scanNodes);
-      fragmentIdx.put(fragment, fragmentId);
+      fragmentIdx.put(fragment, idx);
     }
 
     // set fragment destinations

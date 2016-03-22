@@ -230,7 +230,7 @@ public class DistributedPlanner {
 
     Preconditions.checkState(partitionHint == null || partitionHint);
     ExchangeNode exchNode = new ExchangeNode(ctx_.getNextNodeId());
-    exchNode.addChild(inputFragment.getPlanRoot(), false);
+    exchNode.addChild(inputFragment.getPlanRoot());
     exchNode.init(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition = DataPartition.hashPartitioned(nonConstPartitionExprs);
@@ -251,7 +251,7 @@ public class DistributedPlanner {
       throws ImpalaException {
     Preconditions.checkState(inputFragment.isPartitioned());
     ExchangeNode mergePlan = new ExchangeNode(ctx_.getNextNodeId());
-    mergePlan.addChild(inputFragment.getPlanRoot(), false);
+    mergePlan.addChild(inputFragment.getPlanRoot());
     mergePlan.init(ctx_.getRootAnalyzer());
     Preconditions.checkState(mergePlan.hasValidStats());
     PlanFragment fragment = new PlanFragment(ctx_.getNextFragmentId(), mergePlan,
@@ -292,7 +292,7 @@ public class DistributedPlanner {
       throws ImpalaException {
     node.setDistributionMode(DistributionMode.BROADCAST);
     node.setChild(0, leftChildFragment.getPlanRoot());
-    connectChildFragment(node, 1, rightChildFragment);
+    connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
     leftChildFragment.setPlanRoot(node);
     return leftChildFragment;
   }
@@ -323,11 +323,11 @@ public class DistributedPlanner {
             lhsJoinExprs, rhsJoinExprs, analyzer)) {
       node.setChild(0, leftChildFragment.getPlanRoot());
       node.setChild(1, rightChildFragment.getPlanRoot());
-      // Redirect fragments sending to rightFragment to leftFragment.
-      for (PlanFragment fragment: fragments) {
-        if (fragment.getDestFragment() == rightChildFragment) {
-          fragment.setDestination(fragment.getDestNode());
-        }
+      // fix up PlanNode.fragment_ for the migrated PlanNode tree of the rhs child
+      leftChildFragment.setFragmentInPlanTree(node.getChild(1));
+      // Relocate input fragments of rightChildFragment to leftChildFragment.
+      for (PlanFragment rhsInput: rightChildFragment.getChildren()) {
+        leftChildFragment.getChildren().add(rhsInput);
       }
       // Remove right fragment because its plan tree has been merged into leftFragment.
       fragments.remove(rightChildFragment);
@@ -346,7 +346,7 @@ public class DistributedPlanner {
           leftChildFragment.getDataPartition(), rhsJoinExprs, analyzer);
       if (rhsJoinPartition != null) {
         node.setChild(0, leftChildFragment.getPlanRoot());
-        connectChildFragment(node, 1, rightChildFragment);
+        connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
         rightChildFragment.setOutputPartition(rhsJoinPartition);
         leftChildFragment.setPlanRoot(node);
         return leftChildFragment;
@@ -360,7 +360,7 @@ public class DistributedPlanner {
           rightChildFragment.getDataPartition(), lhsJoinExprs, analyzer);
       if (lhsJoinPartition != null) {
         node.setChild(1, rightChildFragment.getPlanRoot());
-        connectChildFragment(node, 0, leftChildFragment);
+        connectChildFragment(node, 0, rightChildFragment, leftChildFragment);
         leftChildFragment.setOutputPartition(lhsJoinPartition);
         rightChildFragment.setPlanRoot(node);
         return rightChildFragment;
@@ -379,11 +379,11 @@ public class DistributedPlanner {
     // on their respective join exprs.
     // The new fragment is hash-partitioned on the lhs input join exprs.
     ExchangeNode lhsExchange = new ExchangeNode(ctx_.getNextNodeId());
-    lhsExchange.addChild(leftChildFragment.getPlanRoot(), false);
+    lhsExchange.addChild(leftChildFragment.getPlanRoot());
     lhsExchange.computeStats(null);
     node.setChild(0, lhsExchange);
     ExchangeNode rhsExchange = new ExchangeNode(ctx_.getNextNodeId());
-    rhsExchange.addChild(rightChildFragment.getPlanRoot(), false);
+    rhsExchange.addChild(rightChildFragment.getPlanRoot());
     rhsExchange.computeStats(null);
     node.setChild(1, rhsExchange);
 
@@ -502,7 +502,7 @@ public class DistributedPlanner {
       // the join; the build input is provided by an ExchangeNode, which is the
       // destination of the rightChildFragment's output
       node.setChild(0, leftChildFragment.getPlanRoot());
-      connectChildFragment(node, 1, rightChildFragment);
+      connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
       leftChildFragment.setPlanRoot(node);
       hjFragment = leftChildFragment;
     } else {
@@ -624,15 +624,22 @@ public class DistributedPlanner {
       if (!childFragments.get(i).isPartitioned()) ++numUnpartitionedChildFragments;
     }
 
+    // remove all children to avoid them being tagged with the wrong
+    // fragment (in the PlanFragment c'tor; we haven't created ExchangeNodes yet)
+    unionNode.clearChildren();
+
     // If all child fragments are unpartitioned, return a single unpartitioned fragment
     // with a UnionNode that merges all child fragments.
     if (numUnpartitionedChildFragments == childFragments.size()) {
-      // Absorb the plan trees of all childFragments into unionNode.
-      for (int i = 0; i < childFragments.size(); ++i) {
-        unionNode.setChild(i, childFragments.get(i).getPlanRoot());
-      }
       PlanFragment unionFragment = new PlanFragment(ctx_.getNextFragmentId(),
           unionNode, DataPartition.UNPARTITIONED);
+      // Absorb the plan trees of all childFragments into unionNode
+      // and fix up the fragment tree in the process.
+      for (int i = 0; i < childFragments.size(); ++i) {
+        unionNode.addChild(childFragments.get(i).getPlanRoot());
+        unionFragment.setFragmentInPlanTree(unionNode.getChild(i));
+        unionFragment.addChildren(childFragments.get(i).getChildren());
+      }
       unionNode.init(ctx_.getRootAnalyzer());
       // All child fragments have been absorbed into unionFragment.
       fragments.removeAll(childFragments);
@@ -640,22 +647,24 @@ public class DistributedPlanner {
     }
 
     // There is at least one partitioned child fragment.
+    PlanFragment unionFragment = new PlanFragment(
+        ctx_.getNextFragmentId(), unionNode, DataPartition.RANDOM);
     for (int i = 0; i < childFragments.size(); ++i) {
       PlanFragment childFragment = childFragments.get(i);
       if (childFragment.isPartitioned()) {
-        // Absorb the plan trees of all partitioned child fragments into unionNode.
-        unionNode.setChild(i, childFragment.getPlanRoot());
+        // absorb the plan trees of all partitioned child fragments into unionNode
+        unionNode.addChild(childFragment.getPlanRoot());
+        unionFragment.setFragmentInPlanTree(unionNode.getChild(i));
+        unionFragment.addChildren(childFragment.getChildren());
         fragments.remove(childFragment);
       } else {
+        // dummy entry for subsequent addition of the ExchangeNode
+        unionNode.addChild(null);
         // Connect the unpartitioned child fragments to unionNode via a random exchange.
-        connectChildFragment(unionNode, i, childFragment);
+        connectChildFragment(unionNode, i, unionFragment, childFragment);
         childFragment.setOutputPartition(DataPartition.RANDOM);
       }
     }
-
-    // Fragment contains the UnionNode that consumes the data of all child fragments.
-    PlanFragment unionFragment = new PlanFragment(ctx_.getNextFragmentId(),
-        unionNode, DataPartition.RANDOM);
     unionNode.reorderOperands(ctx_.getRootAnalyzer());
     unionNode.init(ctx_.getRootAnalyzer());
     return unionFragment;
@@ -678,13 +687,14 @@ public class DistributedPlanner {
 
   /**
    * Replace node's child at index childIdx with an ExchangeNode that receives its
-   * input from childFragment.
+   * input from childFragment. ParentFragment contains node and the new ExchangeNode.
    */
   private void connectChildFragment(PlanNode node, int childIdx,
-      PlanFragment childFragment) throws ImpalaException {
+      PlanFragment parentFragment, PlanFragment childFragment) throws ImpalaException {
     ExchangeNode exchangeNode = new ExchangeNode(ctx_.getNextNodeId());
-    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    exchangeNode.addChild(childFragment.getPlanRoot());
     exchangeNode.init(ctx_.getRootAnalyzer());
+    exchangeNode.setFragment(parentFragment);
     node.setChild(childIdx, exchangeNode);
     childFragment.setDestination(exchangeNode);
   }
@@ -703,7 +713,7 @@ public class DistributedPlanner {
       PlanFragment childFragment, DataPartition parentPartition)
       throws ImpalaException {
     ExchangeNode exchangeNode = new ExchangeNode(ctx_.getNextNodeId());
-    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    exchangeNode.addChild(childFragment.getPlanRoot());
     exchangeNode.init(ctx_.getRootAnalyzer());
     PlanFragment parentFragment = new PlanFragment(ctx_.getNextFragmentId(),
         exchangeNode, parentPartition);

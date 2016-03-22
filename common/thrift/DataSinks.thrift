@@ -22,7 +22,8 @@ include "Partitions.thrift"
 
 enum TDataSinkType {
   DATA_STREAM_SINK,
-  TABLE_SINK
+  TABLE_SINK,
+  JOIN_BUILD_SINK
 }
 
 enum TSinkAction {
@@ -73,6 +74,14 @@ struct TKuduTableSink {
   2: optional bool ignore_not_found_or_duplicate;
 }
 
+// Sink to create the build side of a JoinNode.
+struct TJoinBuildSink {
+  1: required Types.TJoinTableId join_table_id
+
+  // only set for hash join build sinks
+  2: required list<Exprs.TExpr> build_exprs
+}
+
 // Union type of all table sinks.
 struct TTableSink {
   1: required Types.TTableId  target_table_id
@@ -86,4 +95,5 @@ struct TDataSink {
   1: required TDataSinkType type
   2: optional TDataStreamSink stream_sink
   3: optional TTableSink table_sink
+  4: optional TJoinBuildSink join_build_sink
 }

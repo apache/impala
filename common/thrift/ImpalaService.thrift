@@ -209,6 +209,9 @@ enum TImpalaQueryOptions {
   // Determines how to resolve Parquet files' schemas in the absence of field IDs (which
   // is always, since fields IDs are NYI). Valid values are "position" and "name".
   PARQUET_FALLBACK_SCHEMA_RESOLUTION
+
+  // Multi-threaded execution: number of cores per machine
+  MT_NUM_CORES
 }
 
 // The summary of an insert.
