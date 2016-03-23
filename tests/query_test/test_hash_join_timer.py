@@ -44,7 +44,9 @@ class TestHashJoinTimer(ImpalaTestSuite):
               " where a.id>b.id and a.id=99",
               "NESTED LOOP JOIN"]
              ]
-  HASH_JOIN_UPPER_BOUND_MS = 1000
+  # IMPALA-2973: For non-code-coverage builds, 1000 milliseconds are sufficent, but more
+  # time is needed in code-coverage builds.
+  HASH_JOIN_UPPER_BOUND_MS = 2000
   # IMPALA-2973: Temporary workaround: when timers are using Linux COARSE clockid_t, very
   # short times may be measured as zero.
   HASH_JOIN_LOWER_BOUND_MS = 0
