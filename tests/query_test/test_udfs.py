@@ -88,16 +88,19 @@ class TestUdfs(ImpalaTestSuite):
       self.client.execute("drop database if exists udf_test cascade")
 
   @SkipIfLocal.multiple_impalad
-  def test_hive_udfs_missing_jar(self, vector):
+  def test_hive_udfs_missing_jar(self, vector, unique_database):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present
     on HDFS"""
     # Copy hive-exec.jar to a temporary file
     jar_path = get_fs_path("/test-warehouse/" + get_random_id(5) + ".jar")
     hive_jar = get_fs_path("/test-warehouse/hive-exec.jar")
     check_call(["hadoop", "fs", "-cp", hive_jar, jar_path])
-    drop_fn_stmt = "drop function if exists default.pi_missing_jar()"
-    create_fn_stmt = "create function default.pi_missing_jar() returns double \
-        location '%s' symbol='org.apache.hadoop.hive.ql.udf.UDFPI'" % jar_path
+    drop_fn_stmt = (
+        "drop function if exists "
+        "`{0}`.`pi_missing_jar`()".format(unique_database))
+    create_fn_stmt = (
+        "create function `{0}`.`pi_missing_jar`() returns double location '{1}' "
+        "symbol='org.apache.hadoop.hive.ql.udf.UDFPI'".format(unique_database, jar_path))
 
     cluster = ImpalaCluster()
     impalad = cluster.get_any_impalad()
@@ -118,8 +121,8 @@ class TestUdfs(ImpalaTestSuite):
     # we used to create the function. This is to bypass loading from
     # the cache
     try:
-      self.execute_query_using_client(client,
-          "select default.pi_missing_jar()", vector)
+      self.execute_query_using_client(
+          client, "select `{0}`.`pi_missing_jar`()".format(unique_database), vector)
       assert False, "Query expected to fail"
     except ImpalaBeeswaxException, e:
       assert "Failed to get file info" in str(e)
@@ -127,22 +130,24 @@ class TestUdfs(ImpalaTestSuite):
   def test_libs_with_same_filenames(self, vector):
     self.run_test_case('QueryTest/libs_with_same_filenames', vector)
 
-  def test_udf_update_via_drop(self, vector):
+  def test_udf_update_via_drop(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Dropping
     the function should remove the binary from the local cache."""
     # Run with sync_ddl to guarantee the drop is processed by all impalads.
     exec_options = vector.get_value('exec_option')
     exec_options['sync_ddl'] = 1
-    old_udf = os.path.join(os.environ['IMPALA_HOME'],
-        'testdata/udfs/impala-hive-udfs.jar')
-    new_udf = os.path.join(os.environ['IMPALA_HOME'],
-        'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+    old_udf = os.path.join(
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
+    new_udf = os.path.join(
+        os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
     udf_dst = get_fs_path('/test-warehouse/impala-hive-udfs2.jar')
 
-    drop_fn_stmt = 'drop function if exists default.udf_update_test_drop()'
-    create_fn_stmt = "create function default.udf_update_test_drop() returns string "\
-        "LOCATION '" + udf_dst + "' SYMBOL='com.cloudera.impala.TestUpdateUdf'"
-    query_stmt = "select default.udf_update_test_drop()"
+    drop_fn_stmt = (
+        'drop function if exists `{0}`.`udf_update_test_drop`()'.format(unique_database))
+    create_fn_stmt = (
+        "create function `{0}`.`udf_update_test_drop`() returns string LOCATION '{1}' "
+        "SYMBOL='com.cloudera.impala.TestUpdateUdf'".format(unique_database, udf_dst))
+    query_stmt = "select `{0}`.`udf_update_test_drop`()".format(unique_database)
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
     check_call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
@@ -157,48 +162,50 @@ class TestUdfs(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self.__run_query_all_impalads(exec_options, query_stmt, ["New UDF"])
 
-  def test_udf_update_via_create(self, vector):
+  def test_udf_update_via_create(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Creating a new function
     from the library should refresh the cache."""
     # Run with sync_ddl to guarantee the create is processed by all impalads.
     exec_options = vector.get_value('exec_option')
     exec_options['sync_ddl'] = 1
-    old_udf = os.path.join(os.environ['IMPALA_HOME'],
-        'testdata/udfs/impala-hive-udfs.jar')
-    new_udf = os.path.join(os.environ['IMPALA_HOME'],
-        'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+    old_udf = os.path.join(
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
+    new_udf = os.path.join(
+        os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
     udf_dst = get_fs_path('/test-warehouse/impala-hive-udfs3.jar')
     old_function_name = "udf_update_test_create1"
     new_function_name = "udf_update_test_create2"
 
-    drop_fn_template = 'drop function if exists default.%s()'
+    drop_fn_template = 'drop function if exists `{0}`.`{{0}}`()'.format(unique_database)
     self.execute_query_expect_success(
-      self.client, drop_fn_template % old_function_name, exec_options)
+        self.client, drop_fn_template.format(old_function_name), exec_options)
     self.execute_query_expect_success(
-      self.client, drop_fn_template % new_function_name, exec_options)
+        self.client, drop_fn_template.format(new_function_name), exec_options)
 
-    create_fn_template = "create function default.%s() returns string "\
-        "LOCATION '" + udf_dst + "' SYMBOL='com.cloudera.impala.TestUpdateUdf'"
-    query_template = "select default.%s()"
+    create_fn_template = (
+        "create function `{0}`.`{{0}}`() returns string LOCATION '{1}' "
+        "SYMBOL='com.cloudera.impala.TestUpdateUdf'".format(unique_database, udf_dst))
+
+    query_template = "select `{0}`.`{{0}}`()".format(unique_database)
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
     check_call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
     self.execute_query_expect_success(
-      self.client, create_fn_template % old_function_name, exec_options)
+        self.client, create_fn_template.format(old_function_name), exec_options)
     self.__run_query_all_impalads(
-      exec_options, query_template % old_function_name, ["Old UDF"])
+        exec_options, query_template.format(old_function_name), ["Old UDF"])
 
     # Update the binary, and create a new function using the binary. The new binary
     # should be running.
     check_call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
     self.execute_query_expect_success(
-      self.client, create_fn_template % new_function_name, exec_options)
+        self.client, create_fn_template.format(new_function_name), exec_options)
     self.__run_query_all_impalads(
-      exec_options, query_template % new_function_name, ["New UDF"])
+        exec_options, query_template.format(new_function_name), ["New UDF"])
 
     # The old function should use the new library now
     self.__run_query_all_impalads(
-      exec_options, query_template % old_function_name, ["New UDF"])
+        exec_options, query_template.format(old_function_name), ["New UDF"])
 
   def test_drop_function_while_running(self, vector):
     self.client.execute("drop function if exists default.drop_while_running(BIGINT)")
