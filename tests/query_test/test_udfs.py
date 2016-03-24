@@ -341,6 +341,8 @@ drop function if exists {database}.var_sum(double...);
 drop function if exists {database}.var_sum(string...);
 drop function if exists {database}.var_sum(decimal(4,2)...);
 drop function if exists {database}.var_sum_multiply(double, int...);
+drop function if exists {database}.var_sum_multiply2(double, int...);
+drop function if exists {database}.to_lower(string);
 drop function if exists {database}.constant_timestamp();
 drop function if exists {database}.validate_arg_type(string);
 drop function if exists {database}.count_rows();
@@ -425,6 +427,14 @@ location '{location}' symbol='VarSum';
 create function {database}.var_sum_multiply(double, int...) returns double
 location '{location}'
 symbol='_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE';
+
+create function {database}.var_sum_multiply2(double, int...) returns double
+location '{location}'
+symbol='_Z15VarSumMultiply2PN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE';
+
+create function {database}.to_lower(string) returns string
+location '{location}'
+symbol='_Z7ToLowerPN10impala_udf15FunctionContextERKNS_9StringValE';
 
 create function {database}.constant_timestamp() returns timestamp
 location '{location}' symbol='ConstantTimestamp';

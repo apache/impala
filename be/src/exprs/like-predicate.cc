@@ -45,13 +45,6 @@ static const RE2 STARTS_WITH_RE(
 // A regex to match any regex pattern which is equivalent to a constant string match.
 static const RE2 EQUALS_RE("\\^([^\\.\\^\\{\\[\\(\\|\\)\\]\\}\\+\\*\\?\\$\\\\]*)\\$");
 
-LikePredicate::LikePredicate(const TExprNode& node)
-  : Predicate(node) {
-}
-
-LikePredicate::~LikePredicate() {
-}
-
 void LikePredicate::LikePrepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
   LikePrepareInternal(context, scope, true);

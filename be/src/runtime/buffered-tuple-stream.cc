@@ -855,3 +855,33 @@ bool BufferedTupleStream::CopyCollections(const Tuple* tuple,
   }
   return true;
 }
+
+void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) const {
+  DCHECK(row != NULL);
+  DCHECK(!closed_);
+  DCHECK(is_pinned());
+  DCHECK(!delete_on_read_);
+  DCHECK_EQ(blocks_.size(), block_start_idx_.size());
+  DCHECK_LT(idx.block(), blocks_.size());
+
+  uint8_t* data = block_start_idx_[idx.block()] + idx.offset();
+  if (has_nullable_tuple_) {
+    // Stitch together the tuples from the block and the NULL ones.
+    const int tuples_per_row = desc_.tuple_descriptors().size();
+    uint32_t tuple_idx = idx.idx() * tuples_per_row;
+    for (int i = 0; i < tuples_per_row; ++i) {
+      const uint8_t* null_word = block_start_idx_[idx.block()] + (tuple_idx >> 3);
+      const uint32_t null_pos = tuple_idx & 7;
+      const bool is_not_null = ((*null_word & (1 << (7 - null_pos))) == 0);
+      row->SetTuple(i, reinterpret_cast<Tuple*>(
+          reinterpret_cast<uint64_t>(data) * is_not_null));
+      data += desc_.tuple_descriptors()[i]->byte_size() * is_not_null;
+      ++tuple_idx;
+    }
+  } else {
+    for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
+      row->SetTuple(i, reinterpret_cast<Tuple*>(data));
+      data += desc_.tuple_descriptors()[i]->byte_size();
+    }
+  }
+}

@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 
 #include "codegen/llvm-codegen.h"
+#include "util/cpu-info.h"
 #include "util/symbols-util.h"
 
 #include "common/names.h"
@@ -324,6 +325,7 @@ TEST(SymbolsUtil, ManglingPrepareOrClose) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::CpuInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

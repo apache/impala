@@ -1588,7 +1588,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
       const string& symbol = evaluator->is_merge() ?
                              evaluator->merge_symbol() : evaluator->update_symbol();
       const ColumnType& dst_type = evaluator->intermediate_type();
-      Function* ir_fn = codegen->module()->getFunction(symbol);
+      Function* ir_fn = codegen->GetFunction(symbol);
       DCHECK(ir_fn != NULL);
 
       // Clone and replace constants.

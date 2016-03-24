@@ -34,11 +34,13 @@ namespace impala {
 /// This class handles the Like, Regexp, and Rlike predicates and uses the udf interface.
 class LikePredicate: public Predicate {
  public:
-  ~LikePredicate();
+  ~LikePredicate() { }
 
  protected:
   friend class Expr;
-  LikePredicate(const TExprNode& node);
+
+  LikePredicate(const TExprNode& node)
+      : Predicate(node) { }
 
  private:
   typedef impala_udf::BooleanVal (*LikePredicateFunction) (impala_udf::FunctionContext*,

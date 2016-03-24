@@ -423,54 +423,61 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
     if (!status.ok() && fn_.binary_type == TFunctionBinaryType::BUILTIN) {
       // Builtins symbols should exist unless there is a version mismatch.
       status.AddDetail(ErrorMsg(TErrorCode::MISSING_BUILTIN,
-              fn_.name.function_name, fn_.scalar_fn.symbol).msg());
+          fn_.name.function_name, fn_.scalar_fn.symbol).msg());
     }
     RETURN_IF_ERROR(status);
     DCHECK(fn_ptr != NULL);
 
-    // Convert UDF function pointer to llvm::Function*
-    // First generate the llvm::FunctionType* corresponding to the UDF.
-    llvm::Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());
-    vector<llvm::Type*> arg_types;
+    // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument.
+    // So, the return type is void.
+    bool is_decimal = type().type == TYPE_DECIMAL;
+    llvm::Type* return_type = is_decimal ? codegen->void_type() :
+        CodegenAnyVal::GetLoweredType(codegen, type());
 
-    if (type().type == TYPE_DECIMAL) {
+    // Convert UDF function pointer to llvm::Function*. Start by creating a function
+    // prototype for it.
+    LlvmCodeGen::FnPrototype prototype(codegen, fn_.scalar_fn.symbol, return_type);
+
+    if (is_decimal) {
       // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument
-      return_type = codegen->void_type();
-      arg_types.push_back(
-          codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, type())));
+      llvm::Type* output_type =
+          codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, type()));
+      prototype.AddArgument("output", output_type);
     }
 
-    arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
+    // The "FunctionContext*" argument.
+    prototype.AddArgument("ctx",
+        codegen->GetPtrType("class.impala_udf::FunctionContext"));
+
+    // The "fixed" arguments for the UDF function.
     for (int i = 0; i < NumFixedArgs(); ++i) {
+      stringstream arg_name;
+      arg_name << "fixed_arg_" << i;
       llvm::Type* arg_type = codegen->GetPtrType(
           CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type()));
-      arg_types.push_back(arg_type);
+      prototype.AddArgument(arg_name.str(), arg_type);
     }
-
+    // The varargs for the UDF function if there is any.
     if (vararg_start_idx_ >= 0) {
       llvm::Type* vararg_type = CodegenAnyVal::GetUnloweredPtrType(
           codegen, children_[vararg_start_idx_]->type());
-      arg_types.push_back(codegen->GetType(TYPE_INT));
-      arg_types.push_back(vararg_type);
+      prototype.AddArgument("num_var_arg", codegen->GetType(TYPE_INT));
+      prototype.AddArgument("var_arg", vararg_type);
     }
-    llvm::FunctionType* udf_type = llvm::FunctionType::get(return_type, arg_types, false);
 
     // Create a llvm::Function* with the generated type. This is only a function
     // declaration, not a definition, since we do not create any basic blocks or
     // instructions in it.
-    *udf = llvm::Function::Create(
-        udf_type, llvm::GlobalValue::ExternalLinkage,
-        fn_.scalar_fn.symbol, codegen->module());
+    *udf = prototype.GeneratePrototype(NULL, NULL, false);
 
-    // Associate the dynamically loaded function pointer with the Function* we
-    // defined. This tells LLVM where the compiled function definition is located in
-    // memory.
+    // Associate the dynamically loaded function pointer with the Function* we defined.
+    // This tells LLVM where the compiled function definition is located in memory.
     codegen->execution_engine()->addGlobalMapping(*udf, fn_ptr);
   } else if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
     // In this path, we're running a builtin with the UDF interface. The IR is
     // in the llvm module.
     DCHECK(state->codegen_enabled());
-    *udf = codegen->module()->getFunction(fn_.scalar_fn.symbol);
+    *udf = codegen->GetFunction(fn_.scalar_fn.symbol);
     if (*udf == NULL) {
       // Builtins symbols should exist unless there is a version mismatch.
       stringstream ss;
@@ -490,7 +497,7 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
   } else {
     // We're running an IR UDF.
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
-    *udf = codegen->module()->getFunction(fn_.scalar_fn.symbol);
+    *udf = codegen->GetFunction(fn_.scalar_fn.symbol);
     if (*udf == NULL) {
       stringstream ss;
       ss << "Unable to locate function " << fn_.scalar_fn.symbol
@@ -515,7 +522,7 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
-    llvm::Function* ir_fn = codegen->module()->getFunction(symbol);
+    llvm::Function* ir_fn = codegen->GetFunction(symbol);
     if (ir_fn == NULL) {
       stringstream ss;
       ss << "Unable to locate function " << symbol

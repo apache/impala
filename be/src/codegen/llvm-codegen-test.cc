@@ -158,8 +158,8 @@ Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int de
 //   6. Run the loop and make sure the updated is called.
 TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   ObjectPool pool;
-  const char* loop_call_name = "DefaultImplementation";
-  const char* loop_name = "TestLoop";
+  const string loop_call_name("_Z21DefaultImplementationv");
+  const string loop_name("_Z8TestLoopi");
   typedef void (*TestLoopFn)(int);
 
   string module_file;
@@ -170,16 +170,11 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   ASSERT_OK(LlvmCodeGenTest::CreateFromFile(&pool, module_file.c_str(), &codegen));
   EXPECT_TRUE(codegen.get() != NULL);
 
-  vector<Function*> functions;
-  codegen->GetFunctions(&functions);
-  EXPECT_EQ(functions.size(), 3);
-
-  Function* loop_call = functions[0];
-  Function* loop = functions[1];
-
-  EXPECT_TRUE(loop_call->getName().find(loop_call_name) != string::npos);
+  Function* loop_call = codegen->GetFunction(loop_call_name);
+  EXPECT_TRUE(loop_call != NULL);
   EXPECT_TRUE(loop_call->arg_empty());
-  EXPECT_TRUE(loop->getName().find(loop_name) != string::npos);
+  Function* loop = codegen->GetFunction(loop_name);
+  EXPECT_TRUE(loop != NULL);
   EXPECT_EQ(loop->arg_size(), 1);
 
   // Part 2: Generate a new inner loop function.

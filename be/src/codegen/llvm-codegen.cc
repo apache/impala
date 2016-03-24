@@ -28,9 +28,11 @@
 #include <llvm/Bitcode/ReaderWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
-#include "llvm/IR/Function.h"
-#include "llvm/IR/InstIterator.h"
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/NoFolder.h>
 #include <llvm/IR/Verifier.h>
@@ -73,7 +75,6 @@ using std::unique_ptr;
 
 DEFINE_bool(print_llvm_ir_instruction_count, false,
     "if true, prints the instruction counts of all JIT'd functions");
-
 DEFINE_bool(disable_optimization_passes, false,
     "if true, disables llvm optimization passes (used for testing)");
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
@@ -164,15 +165,30 @@ Status LlvmCodeGen::CreateFromFile(ObjectPool* pool,
   return (*codegen)->Init(std::move(loaded_module));
 }
 
-Status LlvmCodeGen::CreateFromMemory(ObjectPool* pool, MemoryBufferRef module_ir,
-    const string& module_name, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
+Status LlvmCodeGen::CreateFromMemory(ObjectPool* pool, const string& id,
+    scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(pool, id));
   SCOPED_TIMER((*codegen)->profile_.total_time_counter());
 
-  unique_ptr<Module> loaded_module;
-  RETURN_IF_ERROR(
-      (*codegen)->LoadModuleFromMemory(module_ir, module_name, &loaded_module));
+  // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
+  // a machine without SSE4.2 support.
+  StringRef module_ir;
+  string module_name;
+  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
+    module_ir = StringRef(reinterpret_cast<const char*>(impala_sse_llvm_ir),
+        impala_sse_llvm_ir_len);
+    module_name = "Impala IR with SSE 4.2 support";
+  } else {
+    module_ir = StringRef(reinterpret_cast<const char*>(impala_no_sse_llvm_ir),
+        impala_no_sse_llvm_ir_len);
+    module_name = "Impala IR with no SSE 4.2 support";
+  }
 
+  unique_ptr<MemoryBuffer> module_ir_buf(
+      MemoryBuffer::getMemBuffer(module_ir, "", false));
+  unique_ptr<Module> loaded_module;
+  RETURN_IF_ERROR((*codegen)->LoadModuleFromMemory(std::move(module_ir_buf),
+      module_name, &loaded_module));
   return (*codegen)->Init(std::move(loaded_module));
 }
 
@@ -192,15 +208,16 @@ Status LlvmCodeGen::LoadModuleFromFile(const string& file, unique_ptr<Module>* m
   }
 
   COUNTER_ADD(module_bitcode_size_, file_buffer->getBufferSize());
-  return LoadModuleFromMemory(file_buffer->getMemBufferRef(), file, module);
+  return LoadModuleFromMemory(std::move(file_buffer), file, module);
 }
 
-Status LlvmCodeGen::LoadModuleFromMemory(MemoryBufferRef module_ir, string module_name,
-    unique_ptr<Module>* module) {
+Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
+    string module_name, unique_ptr<Module>* module) {
   DCHECK(!module_name.empty());
   SCOPED_TIMER(prepare_module_timer_);
-  ErrorOr<unique_ptr<Module>> tmp_module =
-      parseBitcodeFile(module_ir, context());
+  ErrorOr<unique_ptr<Module>> tmp_module(NULL);
+  COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
+  tmp_module = getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
   if (!tmp_module) {
     stringstream ss;
     ss << "Could not parse module " << module_name << ": " << tmp_module.getError();
@@ -214,7 +231,6 @@ Status LlvmCodeGen::LoadModuleFromMemory(MemoryBufferRef module_ir, string modul
   StripGlobalCtorsDtors((*module).get());
 
   (*module)->setModuleIdentifier(module_name);
-  COUNTER_ADD(module_bitcode_size_, module_ir.getBufferSize());
   return Status::OK();
 }
 
@@ -248,24 +264,7 @@ void LlvmCodeGen::StripGlobalCtorsDtors(llvm::Module* module) {
 
 Status LlvmCodeGen::CreateImpalaCodegen(
     ObjectPool* pool, const string& id, scoped_ptr<LlvmCodeGen>* codegen_ret) {
-  // Select the appropriate IR version.  We cannot use LLVM IR with sse instructions on
-  // a machine without sse support (loading the module will fail regardless of whether
-  // those instructions are run or not).
-  StringRef module_ir;
-  string module_name;
-  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
-    module_ir = StringRef(reinterpret_cast<const char*>(impala_sse_llvm_ir),
-        impala_sse_llvm_ir_len);
-    module_name = "Impala IR with SSE support";
-  } else {
-    module_ir = StringRef(reinterpret_cast<const char*>(impala_no_sse_llvm_ir),
-        impala_no_sse_llvm_ir_len);
-    module_name = "Impala IR with no SSE support";
-  }
-  unique_ptr<MemoryBuffer> module_ir_buf(
-      MemoryBuffer::getMemBuffer(module_ir, "", false));
-  RETURN_IF_ERROR(CreateFromMemory(pool, module_ir_buf->getMemBufferRef(), module_name, id,
-      codegen_ret));
+  RETURN_IF_ERROR(CreateFromMemory(pool, id, codegen_ret));
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
@@ -287,9 +286,12 @@ Status LlvmCodeGen::CreateImpalaCodegen(
     return Status("Could not create llvm struct type for StringVal");
   }
 
-  // Parse functions from module
+  // Fills 'functions' with all the cross-compiled functions that are defined in
+  // the module.
   vector<Function*> functions;
-  codegen->GetFunctions(&functions);
+  for (Function& fn: codegen->module_->functions()) {
+    if (fn.isMaterializable()) functions.push_back(&fn);
+  }
   int parsed_functions = 0;
   for (int i = 0; i < functions.size(); ++i) {
     string fn_name = functions[i]->getName();
@@ -524,18 +526,55 @@ void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name,
   *else_block = BasicBlock::Create(context(), else_name, fn, insert_before);
 }
 
-Function* LlvmCodeGen::GetLibCFunction(FnPrototype* prototype) {
-  if (external_functions_.find(prototype->name()) != external_functions_.end()) {
-    return external_functions_[prototype->name()];
+Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
+  DCHECK(!is_compiled_);
+  if (fn->isIntrinsic() || !fn->isMaterializable()) return Status::OK();
+
+  std::error_code err = module_->materialize(fn);
+  if (UNLIKELY(err)) {
+    return Status(Substitute("Failed to materialize $0: $1",
+        fn->getName().str(), err.message()));
   }
-  Function* func = prototype->GeneratePrototype();
-  external_functions_[prototype->name()] = func;
-  return func;
+
+  // Materialized functions are marked as not materializable by LLVM.
+  DCHECK(!fn->isMaterializable());
+  for (inst_iterator iter = inst_begin(fn); iter != inst_end(fn); ++iter) {
+    Instruction* instr = &*iter;
+    Function* called_fn = NULL;
+    if (isa<CallInst>(instr)) {
+      CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
+      called_fn = call_instr->getCalledFunction();
+    } else if (isa<InvokeInst>(instr)) {
+      InvokeInst* invoke_instr = reinterpret_cast<InvokeInst*>(instr);
+      called_fn = invoke_instr->getCalledFunction();
+    }
+    if (called_fn != NULL) MaterializeFunctionHelper(called_fn);
+  }
+  return Status::OK();
 }
 
-Function* LlvmCodeGen::GetFunction(IRFunction::Type function, bool clone) {
-  DCHECK(loaded_functions_[function] != NULL);
-  Function* fn = loaded_functions_[function];
+Status LlvmCodeGen::MaterializeFunction(Function *fn) {
+  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(prepare_module_timer_);
+  return MaterializeFunctionHelper(fn);
+}
+
+Function* LlvmCodeGen::GetFunction(const string& symbol) {
+  Function* fn = module_->getFunction(symbol.c_str());
+  if (fn == NULL) {
+    LOG(ERROR) << "Unable to locate function " << symbol;
+    return NULL;
+  }
+  Status status = MaterializeFunction(fn);
+  if (UNLIKELY(!status.ok())) return NULL;
+  return fn;
+}
+
+Function* LlvmCodeGen::GetFunction(IRFunction::Type ir_type, bool clone) {
+  DCHECK(loaded_functions_[ir_type] != NULL);
+  Function* fn = loaded_functions_[ir_type];
+  Status status = MaterializeFunction(fn);
+  if (UNLIKELY(!status.ok())) return NULL;
   if (clone) return CloneFunction(fn);
   return fn;
 }
@@ -590,14 +629,13 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
   return true;
 }
 
-LlvmCodeGen::FnPrototype::FnPrototype(
-    LlvmCodeGen* gen, const string& name, Type* ret_type) :
-  codegen_(gen), name_(name), ret_type_(ret_type) {
+LlvmCodeGen::FnPrototype::FnPrototype(LlvmCodeGen* codegen, const string& name,
+    Type* ret_type) : codegen_(codegen), name_(name), ret_type_(ret_type) {
   DCHECK(!codegen_->is_compiled_) << "Not valid to add additional functions";
 }
 
 Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
-      LlvmBuilder* builder, Value** params) {
+    LlvmBuilder* builder, Value** params, bool print_ir) {
   vector<Type*> arguments;
   for (int i = 0; i < args_.size(); ++i) {
     arguments.push_back(args_[i].type);
@@ -605,7 +643,7 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
   FunctionType* prototype = FunctionType::get(ret_type_, arguments, false);
 
   Function* fn = Function::Create(
-      prototype, Function::ExternalLinkage, name_, codegen_->module_);
+      prototype, GlobalValue::ExternalLinkage, name_, codegen_->module_);
   DCHECK(fn != NULL);
 
   // Name the arguments
@@ -621,7 +659,7 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
     builder->SetInsertPoint(entry_block);
   }
 
-  codegen_->codegend_functions_.push_back(fn);
+  if (print_ir) codegen_->codegend_functions_.push_back(fn);
   return fn;
 }
 
@@ -686,6 +724,9 @@ void LlvmCodeGen::FindCallSites(Function* caller, const string& target_name,
 Function* LlvmCodeGen::CloneFunction(Function* fn) {
   DCHECK(!is_compiled_);
   ValueToValueMapTy dummy_vmap;
+  // Verifies that 'fn' has been materialized already. Callers are expected to use
+  // GetFunction() to obtain the Function object.
+  DCHECK(!fn->isMaterializable());
   // CloneFunction() automatically gives the new function a unique name
   Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap, false);
   fn_clone->copyAttributesFrom(fn);
@@ -694,7 +735,9 @@ Function* LlvmCodeGen::CloneFunction(Function* fn) {
 }
 
 Function* LlvmCodeGen::FinalizeFunction(Function* function) {
-  function->addFnAttr(llvm::Attribute::AlwaysInline);
+  if (LIKELY(!function->hasFnAttribute(llvm::Attribute::NoInline))) {
+    function->addFnAttr(llvm::Attribute::AlwaysInline);
+  }
 
   if (!VerifyFunction(function)) {
     function->eraseFromParent(); // deletes function
@@ -702,6 +745,42 @@ Function* LlvmCodeGen::FinalizeFunction(Function* function) {
   }
   if (FLAGS_dump_ir) function->dump();
   return function;
+}
+
+Status LlvmCodeGen::MaterializeModule(Module* module) {
+  std::error_code err = module->materializeAll();
+  if (UNLIKELY(err)) {
+    stringstream err_msg;
+    err_msg << "Failed to complete materialization of module " << module->getName().str()
+        << ": " << err.message();
+    return Status(err_msg.str());
+  }
+  return Status::OK();
+}
+
+// It's okay to call this function even if the module has been materialized.
+Status LlvmCodeGen::FinalizeLazyMaterialization() {
+  SCOPED_TIMER(prepare_module_timer_);
+  for (Function& fn: module_->functions()) {
+    if (fn.isMaterializable()) {
+      DCHECK(!module_->isMaterialized());
+      // Unmaterialized functions can still have their declarations around. LLVM asserts
+      // these unmaterialized functions' linkage types are external / external weak.
+      fn.setLinkage(Function::ExternalLinkage);
+      // DCE may claim the personality function is still referenced by unmaterialized
+      // functions when it is deleted by DCE. Similarly, LLVM may complain if comdats
+      // reference unmaterialized functions but their definition cannot be found.
+      // Since the unmaterialized functions are not used anyway, just remove their
+      // personality functions and comdats.
+      fn.setPersonalityFn(NULL);
+      fn.setComdat(NULL);
+      fn.setIsMaterializable(false);
+    }
+  }
+  // All unused functions are now not materializable so it should be quick to call
+  // materializeAll(). We need to call this function in order to destroy the
+  // materializer so that DCE will not assert fail.
+  return MaterializeModule(module_);
 }
 
 Status LlvmCodeGen::FinalizeModule() {
@@ -726,6 +805,7 @@ Status LlvmCodeGen::FinalizeModule() {
   // if the codegen object is created but no functions are successfully codegen'd.
   if (fns_to_jit_compile_.empty()) return Status::OK();
 
+  RETURN_IF_ERROR(FinalizeLazyMaterialization());
   if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) OptimizeModule();
 
   if (FLAGS_opt_module_dir.size() != 0) {
@@ -874,7 +954,7 @@ void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str,
   debug_strings_.push_back(Substitute("LLVM Trace: $0", str));
   str = debug_strings_.back().c_str();
 
-  Function* printf = module()->getFunction("printf");
+  Function* printf = module_->getFunction("printf");
   DCHECK(printf != NULL);
 
   // Call printf by turning 'str' into a constant ptr value
@@ -886,15 +966,9 @@ void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str,
   builder->CreateCall(printf, calling_args);
 }
 
-void LlvmCodeGen::GetFunctions(vector<Function*>* functions) {
-  for (Function& fn: module_->functions()) {
-    if (!fn.empty()) functions->push_back(&fn);
-  }
-}
-
 void LlvmCodeGen::GetSymbols(unordered_set<string>* symbols) {
   for (const Function& fn: module_->functions()) {
-    if (!fn.empty()) symbols->insert(fn.getName());
+    if (fn.isMaterializable()) symbols->insert(fn.getName());
   }
 }
 
@@ -982,7 +1056,7 @@ Status LlvmCodeGen::LoadIntrinsics() {
   // Load memcpy
   {
     Type* types[] = { ptr_type(), ptr_type(), GetType(TYPE_INT) };
-    Function* fn = Intrinsic::getDeclaration(module(), Intrinsic::memcpy, types);
+    Function* fn = Intrinsic::getDeclaration(module_, Intrinsic::memcpy, types);
     if (fn == NULL) {
       return Status("Could not find memcpy intrinsic.");
     }
@@ -1004,7 +1078,7 @@ Status LlvmCodeGen::LoadIntrinsics() {
 
   for (int i = 0; i < num_intrinsics; ++i) {
     Intrinsic::ID id = non_overloaded_intrinsics[i].id;
-    Function* fn = Intrinsic::getDeclaration(module(), id);
+    Function* fn = Intrinsic::getDeclaration(module_, id);
     if (fn == NULL) {
       stringstream ss;
       ss << "Could not find " << non_overloaded_intrinsics[i].error << " intrinsic";

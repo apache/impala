@@ -388,6 +388,20 @@ double
 105
 ====
 ---- QUERY
+select var_sum_multiply2(5.0, 1, 2, 3, 4, 5, 6)
+---- TYPES
+double
+---- RESULTS
+105
+====
+---- QUERY
+select to_lower("HELLO")
+---- TYPES
+string
+---- RESULTS
+'hello'
+====
+---- QUERY
 select tinyint_col, int_col, var_sum_multiply(2, tinyint_col, int_col)
 from functional.alltypestiny
 ---- TYPES

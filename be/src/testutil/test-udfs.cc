@@ -123,7 +123,7 @@ DecimalVal VarSum(FunctionContext* context, int n, const DecimalVal* args) {
   return DecimalVal(result);
 }
 
-DoubleVal VarSumMultiply(FunctionContext* context,
+DoubleVal __attribute__((noinline)) VarSumMultiply(FunctionContext* context,
     const DoubleVal& d, int n, const IntVal* args) {
   if (d.is_null) return DoubleVal::null();
 
@@ -136,6 +136,23 @@ DoubleVal VarSumMultiply(FunctionContext* context,
   }
   if (is_null) return DoubleVal::null();
   return DoubleVal(result * d.val);
+}
+
+// Call the non-inlined function in the same module to make sure linking works correctly.
+DoubleVal VarSumMultiply2(FunctionContext* context,
+    const DoubleVal& d, int n, const IntVal* args) {
+  return VarSumMultiply(context, d, n, args);
+}
+
+// Call a function defined in Impalad proper to make sure linking works correctly.
+extern "C" StringVal
+    _ZN6impala15StringFunctions5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE(
+        FunctionContext* context, const StringVal& str);
+
+StringVal ToLower(FunctionContext* context, const StringVal& str) {
+  return
+      _ZN6impala15StringFunctions5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE(
+          context, str);
 }
 
 BooleanVal TestError(FunctionContext* context) {

@@ -103,10 +103,19 @@ class SubExprElimination;
 /// functions from across modules.
 //
 /// LLVM has a nontrivial memory management scheme and objects will take
-/// ownership of others.  The document is pretty good about being explicit with this
+/// ownership of others. The document is pretty good about being explicit with this
 /// but it is not very intuitive.
 /// TODO: look into diagnostic output and debuggability
 /// TODO: confirm that the multi-threaded usage is correct
+//
+/// llvm::Function objects in the module are materialized lazily to save the cost of
+/// parsing IR of functions which are dead code. An unmaterialized function is similar
+/// to a function declaration which only contains the function signature and needs to
+/// be materialized before optimization and compilation happen if it's not dead code.
+/// Materializing a function means parsing the bitcode to populate the basic blocks and
+/// instructions attached to the function object. Functions reachable by the function
+/// are also materialized recursively.
+//
 class LlvmCodeGen {
  public:
   /// This function must be called once per process before any llvm API calls are
@@ -164,7 +173,7 @@ class LlvmCodeGen {
    public:
     /// Create a function prototype object, specifying the name of the function and
     /// the return type.
-    FnPrototype(LlvmCodeGen*, const std::string& name, llvm::Type* ret_type);
+    FnPrototype(LlvmCodeGen* codegen, const std::string& name, llvm::Type* ret_type);
 
     /// Returns name of function
     const std::string& name() const { return name_; }
@@ -178,13 +187,18 @@ class LlvmCodeGen {
     }
 
     /// Generate LLVM function prototype.
-    /// If a non-null builder is passed, this function will also create the entry block
+    /// If a non-null 'builder' is passed, this function will also create the entry block
     /// and set the builder's insert point to there.
-    /// If params is non-null, this function will also return the arguments
-    /// values (params[0] is the first arg, etc).
-    /// In that case, params should be preallocated to be number of arguments
+    ///
+    /// If 'params' is non-null, this function will also return the arguments values
+    /// (params[0] is the first arg, etc). In that case, 'params' should be preallocated
+    /// to be number of arguments
+    ///
+    /// If 'print_ir' is true, the generated llvm::Function's IR will be printed when
+    /// GetIR() is called. Avoid doing so for IR function prototypes generated for
+    /// externally defined native function.
     llvm::Function* GeneratePrototype(LlvmBuilder* builder = NULL,
-        llvm::Value** params = NULL);
+        llvm::Value** params = NULL, bool print_ir = true);
 
    private:
     friend class LlvmCodeGen;
@@ -226,9 +240,6 @@ class LlvmCodeGen {
 
   /// Returns execution engine interface
   llvm::ExecutionEngine* execution_engine() { return execution_engine_.get(); }
-
-  /// Returns the underlying llvm module
-  llvm::Module* module() { return module_; }
 
   /// Register a expr function with unique id.  It can be subsequently retrieved via
   /// GetRegisteredExprFn with that id.
@@ -307,17 +318,23 @@ class LlvmCodeGen {
     return str;
   }
 
-  /// Returns the libc function, adding it to the module if it has not already been.
-  llvm::Function* GetLibCFunction(FnPrototype* prototype);
-
-  /// Returns the cross compiled function. IRFunction::Type is an enum which is generated
-  /// by gen_ir_descriptions.py.
+  /// Returns the cross compiled function. 'ir_type' is an enum which is generated
+  /// by gen_ir_descriptions.py. The returned function and its callee will be materialized
+  /// recursively. Returns NULL if there is any error.
   ///
   /// If 'clone' is true, a clone of the function will be returned. Clones should be used
   /// iff the caller will modify the returned function. This avoids clobbering the
   /// function in case other users need it, but we don't clone if we can avoid it to
   /// reduce compilation time.
-  llvm::Function* GetFunction(IRFunction::Type, bool clone);
+  ///
+  /// TODO: Return Status instead.
+  llvm::Function* GetFunction(IRFunction::Type ir_type, bool clone);
+
+  /// Return the function with the symbol name 'symbol' from the module. The returned
+  /// function and its callee will be recursively materialized. The returned function
+  /// isn't cloned. Returns NULL if there is any error.
+  /// TODO: Return Status instead.
+  llvm::Function* GetFunction(const string& symbol);
 
   /// Returns the hash function with signature:
   ///   int32_t Hash(int8_t* data, int len, int32_t seed);
@@ -379,10 +396,6 @@ class LlvmCodeGen {
   llvm::Type* void_type() { return void_type_; }
   llvm::Type* i128_type() { return llvm::Type::getIntNTy(context(), 128); }
 
-  /// Fills 'functions' with all the functions that are defined in the module.
-  /// Note: this does not include functions that are just declared
-  void GetFunctions(std::vector<llvm::Function*>* functions);
-
   /// Fils in 'symbols' with all the symbols in the module.
   void GetSymbols(boost::unordered_set<std::string>* symbols);
 
@@ -425,21 +438,26 @@ class LlvmCodeGen {
   /// Initializes the jitter and execution engine with the given module.
   Status Init(std::unique_ptr<llvm::Module> module);
 
-  /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'module_ir'.
-  /// 'codegen' will contain the created object on success.
-  static Status CreateFromMemory(ObjectPool* pool, llvm::MemoryBufferRef module_ir,
-      const std::string& module_name, const std::string& id,
+  /// Creates a LlvmCodeGen instance initialized with the module bitcode in memory.
+  /// 'codegen' will contain the created object on success. Note that the functions
+  /// are not materialized. Getting a reference to the function via GetFunction()
+  /// will materialize the function and its callees recursively.
+  static Status CreateFromMemory(ObjectPool* pool, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
 
-  /// Loads an LLVM module. 'file' should be the local path to the LLVM bitcode
-  /// file. The caller is responsible for cleaning up module.
+  /// Loads an LLVM module from 'file' which is the local path to the LLVM bitcode file.
+  /// The functions in the module are not materialized. Getting a reference to the
+  /// function via GetFunction() will materialize the function and its callees
+  /// recursively. The caller is responsible for cleaning up the module.
   Status LoadModuleFromFile(const string& file, std::unique_ptr<llvm::Module>* module);
 
-  /// Loads an LLVM module. 'module_ir' should be a reference to a memory buffer containing
-  /// LLVM bitcode. module_name is the name of the module to use when reporting errors.
-  /// The caller is responsible for cleaning up module.
-  Status LoadModuleFromMemory(llvm::MemoryBufferRef module_ir, std::string module_name,
-      std::unique_ptr<llvm::Module>* module);
+  /// Loads an LLVM module. 'module_ir_buf' is the memory buffer containing LLVM bitcode.
+  /// 'module_name' is the name of the module to use when reporting errors.
+  /// The caller is responsible for cleaning up 'module'. The functions in the module
+  /// aren't materialized. Getting a reference to the function via GetFunction() will
+  /// materialize the function and its callees recursively.
+  Status LoadModuleFromMemory(std::unique_ptr<llvm::MemoryBuffer> module_ir_buf,
+      std::string module_name, std::unique_ptr<llvm::Module>* module);
 
   /// Strip global constructors and destructors from an LLVM module. We never run them
   /// anyway (they must be explicitly invoked) so it is dead code.
@@ -486,6 +504,32 @@ class LlvmCodeGen {
   /// Host CPU name and attributes, filled in by InitializeLlvm().
   static std::string cpu_name_;
   static std::vector<std::string> cpu_attrs_;
+
+  /// This is the workhorse for materializing function 'fn'. It's invoked by
+  /// MaterializeFunction(). Calls LLVM to materialize 'fn' if it's materializable
+  /// (i.e. the function has a definition in the module and it's not materialized yet).
+  /// This function parses the bitcode of 'fn' to populate basic blocks, instructions
+  /// and other data structures attached to the function object. Return error status
+  /// for any error.
+  Status MaterializeFunctionHelper(llvm::Function* fn);
+
+  /// Entry point for materializing function 'fn'. Invokes MaterializeFunctionHelper()
+  /// to do the actual work. Return error status for any error.
+  Status MaterializeFunction(llvm::Function* fn);
+
+  /// Materialize the given module by materializing all its unmaterialized functions
+  /// and deleting the module's materializer. Returns error status for any error.
+  Status MaterializeModule(llvm::Module* module);
+
+  /// With lazy materialization, functions which haven't been materialized when the module
+  /// is finalized must be dead code or referenced only by global variables (e.g. boost
+  /// library functions or virtual function (e.g. IfExpr::GetBooleanVal())), in which case
+  /// the function is not inlined so the native version can be used and the IR version is
+  /// dead code. Mark them as not materializable, change their linkage types to external
+  /// (so linking will happen to the native version) and strip their personality functions
+  /// and comdats. DCE may complain if the above are not done. Return error status if
+  /// there is error in materializing the module.
+  Status FinalizeLazyMaterialization();
 
   /// ID used for debugging (can be e.g. the fragment instance ID)
   std::string id_;
