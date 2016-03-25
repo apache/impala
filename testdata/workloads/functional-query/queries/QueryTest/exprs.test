@@ -2415,3 +2415,42 @@ NULL
 ---- TYPES
 timestamp
 ====
+---- QUERY
+# base64 encoding/decoding
+select count(*) from functional.alltypes
+where length(string_col) > 0 &&
+length(base64encode(string_col)) <= length(string_col)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# base64 encoding/decoding
+select count (*) from functional.alltypes
+where base64decode(base64encode(string_col)) IS DISTINCT FROM string_col
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# base64 decoding a string of invalid length (must be divisible by 4)
+select base64decode('foo')
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+---- ERRORS
+UDF WARNING: Invalid base64 string; input length is 3, which is not a multiple of 4.
+====
+---- QUERY
+# base64 decoding a string with invalid characters
+select base64decode('abc%')
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+---- ERRORS
+UDF WARNING: Could not base64 decode input in space 4; actual output length 0
+====

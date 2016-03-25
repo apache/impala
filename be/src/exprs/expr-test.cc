@@ -102,6 +102,21 @@ string LiteralToString<double, double>(double val) {
   return ss.str();
 }
 
+// For writing C++ std::strings as impala literals, we have to ensure that characters like
+// single-quote are escaped properly. To do this, we escape every character into its octal
+// equivalent: \PQR for some octal digits P, Q, and R. Currently, this only works for
+// ASCII literals.
+string StringToOctalLiteral(const string& s) {
+  string result(4 * s.size(), 0);
+  for (int i = 0; i < s.size(); ++i) {
+    result[4 * i] = '\\';
+    result[4 * i + 1] = '0' + (s[i] / 64);
+    result[4 * i + 2] = '0' + ((s[i] / 8) % 8);
+    result[4 * i + 3] = '0' + (s[i] % 8);
+  }
+  return result;
+}
+
 // Override the time zone for the duration of the scope. The time zone is overridden
 // using an environment variable there is no risk of making a permanent system change
 // and no special permissions are needed. This is not thread-safe.
@@ -2081,6 +2096,36 @@ TEST_F(ExprTest, StringFunctions) {
   big_str[ColumnType::MAX_VARCHAR_LENGTH] = '\0';
   sprintf(query, "cast('%sxxx' as VARCHAR(%d))", big_str, ColumnType::MAX_VARCHAR_LENGTH);
   TestStringValue(query, big_str);
+
+  // base64{en,de}code
+
+  // Test some known values of base64{en,de}code
+  TestIsNull("base64encode(NULL)", TYPE_STRING);
+  TestIsNull("base64decode(NULL)", TYPE_STRING);
+  TestStringValue("base64encode('')", "");
+  TestStringValue("base64decode('')", "");
+  TestStringValue("base64encode('a')","YQ==");
+  TestStringValue("base64decode('YQ==')","a");
+  TestStringValue("base64encode('alpha')","YWxwaGE=");
+  TestStringValue("base64decode('YWxwaGE=')","alpha");
+  TestIsNull("base64decode('YWxwaGE')", TYPE_STRING);
+  TestIsNull("base64decode('YWxwaGE%')", TYPE_STRING);
+
+  // Test random short strings.
+  srand(0);
+  for (int length = 1; length < 100; ++length) {
+    for (int iteration = 0; iteration < 10; ++iteration) {
+      string raw(length, ' ');
+      for (int j = 0; j < length; ++j) {
+        raw[j] = rand() % 128;
+      }
+      const string as_octal = StringToOctalLiteral(raw);
+      TestValue("length(base64encode('" + as_octal + "')) > length('" + as_octal + "')",
+          TYPE_BOOLEAN, true);
+      TestValue("base64decode(base64encode('" + as_octal + "')) = '" + as_octal + "'",
+          TYPE_BOOLEAN, true);
+    }
+  }
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {

@@ -100,6 +100,9 @@ class StringFunctions {
   /// both ends of string 'str'.
   static StringVal BTrimString(FunctionContext* ctx, const StringVal& str,
     const StringVal& chars_to_trim);
+
+  static StringVal Base64Encode(FunctionContext* ctx, const StringVal& str);
+  static StringVal Base64Decode(FunctionContext* ctx, const StringVal& str);
 };
 }
 #endif

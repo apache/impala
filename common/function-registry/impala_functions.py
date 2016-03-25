@@ -403,6 +403,8 @@ visible_functions = [
    'impala::StringFunctions::Substring'],
   [['split_part'], 'STRING', ['STRING', 'STRING', 'BIGINT'],
    'impala::StringFunctions::SplitPart'],
+  [['base64encode'], 'STRING', ['STRING'], 'impala::StringFunctions::Base64Encode'],
+  [['base64decode'], 'STRING', ['STRING'], 'impala::StringFunctions::Base64Decode'],
   # left and right are key words, leave them out for now.
   [['strleft'], 'STRING', ['STRING', 'BIGINT'], 'impala::StringFunctions::Left'],
   [['strright'], 'STRING', ['STRING', 'BIGINT'], 'impala::StringFunctions::Right'],
