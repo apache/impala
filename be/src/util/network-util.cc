@@ -32,6 +32,7 @@
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
+using std::random_device;
 
 #ifdef __APPLE__
 // OS X does not seem to have a similar limitation as Linux and thus the
@@ -138,6 +139,32 @@ string TNetworkAddressToString(const TNetworkAddress& address) {
 ostream& operator<<(ostream& out, const TNetworkAddress& hostport) {
   out << hostport.hostname << ":" << dec << hostport.port;
   return out;
+}
+
+/// Pick a random port in the range of ephemeral ports
+/// https://tools.ietf.org/html/rfc6335
+int FindUnusedEphemeralPort() {
+  static uint32_t LOWER = 49152, UPPER = 65000;
+  random_device rd;
+  srand(rd());
+
+  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0) return -1;
+  struct sockaddr_in server_address;
+  bzero(reinterpret_cast<char*>(&server_address), sizeof(server_address));
+  server_address.sin_family = AF_INET;
+  server_address.sin_addr.s_addr = INADDR_ANY;
+  for (uint32_t tries = 0; tries < 10; ++tries) {
+    int port = LOWER + rand() % (UPPER - LOWER);
+    server_address.sin_port = htons(port);
+    if (bind(sockfd, reinterpret_cast<struct sockaddr*>(&server_address),
+        sizeof(server_address)) == 0) {
+      close(sockfd);
+      return port;
+    }
+  }
+  close(sockfd);
+  return -1;
 }
 
 }

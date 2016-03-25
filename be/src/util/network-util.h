@@ -49,4 +49,7 @@ std::string TNetworkAddressToString(const TNetworkAddress& address);
 /// Prints a hostport as ipaddress:port
 std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 
+/// Returns a ephemeral port that is unused when this function executes. Returns -1 on an
+/// error or if a free ephemeral port can't be found after 10 tries.
+int FindUnusedEphemeralPort();
 }

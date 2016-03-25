@@ -41,14 +41,17 @@ TEST(StatestoreTest, SmokeTest) {
       new InProcessStatestore(ips->port(), ips->port() + 10);
   ASSERT_FALSE(statestore_wont_start->Start().ok());
 
+  int subscriber_port = FindUnusedEphemeralPort();
+  ASSERT_NE(subscriber_port, -1) << "Could not find unused port";
+
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
-      MakeNetworkAddress("localhost", ips->port() + 20),
+      MakeNetworkAddress("localhost", subscriber_port),
       MakeNetworkAddress("localhost", ips->port()), new MetricGroup(""));
   ASSERT_OK(sub_will_start->Start());
 
   // Confirm that a subscriber trying to use an in-use port will fail to start.
   StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub2",
-      MakeNetworkAddress("localhost", ips->port() + 20),
+      MakeNetworkAddress("localhost", subscriber_port),
       MakeNetworkAddress("localhost", ips->port()), new MetricGroup(""));
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 }
@@ -66,16 +69,22 @@ TEST(StatestoreSslTest, SmokeTest) {
   InProcessStatestore* statestore =  InProcessStatestore::StartWithEphemeralPorts();
   if (statestore == NULL) FAIL() << "Unable to start Statestore";
 
+  int subscriber_port = FindUnusedEphemeralPort();
+  ASSERT_NE(subscriber_port, -1) << "Could not find unused port";
+
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("smoke_sub1",
-      MakeNetworkAddress("localhost", statestore->port() + 10),
+      MakeNetworkAddress("localhost", subscriber_port),
       MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
   ASSERT_OK(sub_will_start->Start());
 
   stringstream invalid_server_cert;
   invalid_server_cert << impala_home << "/be/src/testutil/invalid-server-cert.pem";
   FLAGS_ssl_client_ca_certificate = invalid_server_cert.str();
+  int another_subscriber_port = FindUnusedEphemeralPort();
+  ASSERT_NE(another_subscriber_port, -1) << "Could not find unused port";
+
   StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("smoke_sub2",
-      MakeNetworkAddress("localhost", statestore->port() + 20),
+      MakeNetworkAddress("localhost", another_subscriber_port),
       MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 }

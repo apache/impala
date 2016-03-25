@@ -36,19 +36,24 @@ using namespace apache::thrift;
 using namespace impala;
 using boost::shared_ptr;
 
-/// Pick a random port in the range of ephemeral ports
-/// https://tools.ietf.org/html/rfc6335
-static uint32_t RandomEphemeralPort() {
-  static uint32_t LOWER = 49152, UPPER = 65000;
-  return LOWER + rand() % (UPPER - LOWER);
-}
-
 InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     const string& statestore_host, int statestore_port) {
-  for (uint32_t tries = 0; tries < 10; ++tries) {
-    uint32_t p = RandomEphemeralPort();
-    uint32_t backend_port = p, subscriber_port = ++p, webserver_port = ++p,
-        beeswax_port = ++p, hs2_port = ++p;
+  for (int tries = 0; tries < 10; ++tries) {
+    int backend_port = FindUnusedEphemeralPort();
+    if (backend_port == -1) continue;
+
+    int subscriber_port = FindUnusedEphemeralPort();
+    if (subscriber_port == -1) continue;
+
+    int webserver_port = FindUnusedEphemeralPort();
+    if (webserver_port == -1) continue;
+
+    int beeswax_port = FindUnusedEphemeralPort();
+    if (beeswax_port == -1) continue;
+
+    int hs2_port = FindUnusedEphemeralPort();
+    if (hs2_port == -1) continue;
+
     InProcessImpalaServer* impala =
         new InProcessImpalaServer("localhost", backend_port, subscriber_port,
             webserver_port, statestore_host, statestore_port);
@@ -122,9 +127,13 @@ Status InProcessImpalaServer::Join() {
 }
 
 InProcessStatestore* InProcessStatestore::StartWithEphemeralPorts() {
-  for (uint32_t tries = 0; tries < 10; ++tries) {
-    uint32_t p = RandomEphemeralPort();
-    uint32_t statestore_port = p, webserver_port = ++p;
+  for (int tries = 0; tries < 10; ++tries) {
+    int statestore_port = FindUnusedEphemeralPort();
+    if (statestore_port == -1) continue;
+
+    int webserver_port = FindUnusedEphemeralPort();
+    if (webserver_port == -1) continue;
+
     InProcessStatestore* ips = new InProcessStatestore(statestore_port, webserver_port);
     if (ips->Start().ok()) return ips;
     delete ips;
