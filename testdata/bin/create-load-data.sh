@@ -146,7 +146,7 @@ function load-data {
   # Use unbuffered logging by executing with -u
   if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
     echo Error loading data. The end of the log file is:
-    tail -n 20 $LOG_FILE
+    tail -n 50 $LOG_FILE
     return 1
   fi
 }
