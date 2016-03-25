@@ -491,13 +491,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * The second issue is addressed by an exponential backoff when multiplying each
    * additional selectivity into the final result.
    */
-  protected double computeSelectivity() {
+  static protected double computeCombinedSelectivity(List<Expr> conjuncts) {
     // Collect all estimated selectivities.
     List<Double> selectivities = Lists.newArrayList();
-    for (Expr e: conjuncts_) {
+    for (Expr e: conjuncts) {
       if (e.hasSelectivity()) selectivities.add(e.getSelectivity());
     }
-    if (selectivities.size() != conjuncts_.size()) {
+    if (selectivities.size() != conjuncts.size()) {
       // Some conjuncts have no estimated selectivity. Use a single default
       // representative selectivity for all those conjuncts.
       selectivities.add(Expr.DEFAULT_SELECTIVITY);
@@ -513,6 +513,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
     // Bound result in [0, 1]
     return Math.max(0.0, Math.min(1.0, result));
+  }
+
+  protected double computeSelectivity() {
+    return computeCombinedSelectivity(conjuncts_);
   }
 
   // Convert this plan node into msg (excluding children), which requires setting

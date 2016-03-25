@@ -29,6 +29,7 @@ import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import org.kududb.client.KuduClient;
 import org.kududb.client.LocatedTablet;
 import org.slf4j.Logger;
@@ -151,20 +152,11 @@ public class KuduScanNode extends ScanNode {
     }
   }
 
-  /**
-   * TODO(kudu-merge): IMPALA-3148 - Update selectivity computation.
-   */
   @Override
   protected double computeSelectivity() {
-    double baseSelectivity = super.computeSelectivity();
-    // The kuduConjuncts_ are not part of the selectivity calculation of the PlanNode
-    // superclass. Adjust the selectivity to account for predicates that are
-    // pushed down to Kudu.
-    for (Expr e : kuduConjuncts_) {
-      if (baseSelectivity < 0) continue;
-      baseSelectivity *= e.getSelectivity();
-    }
-    return baseSelectivity;
+    List<Expr> allConjuncts = Lists.newArrayList(
+        Iterables.concat(conjuncts_, kuduConjuncts_));
+    return computeCombinedSelectivity(allConjuncts);
   }
 
   @Override
@@ -201,7 +193,7 @@ public class KuduScanNode extends ScanNode {
         }
         if (!kuduConjuncts_.isEmpty()) {
           result.append(detailPrefix + "kudu predicates: " + getExplainString(
-              kuduConjuncts_));
+              kuduConjuncts_) + "\n");
         }
       }
     }
