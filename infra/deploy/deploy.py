@@ -30,12 +30,14 @@
 
 import argparse
 import hashlib
+import os
 import re
 import time
 
 from cm_api.api_client import ApiResource
 
-IMPALA_KUDU_PARCEL_URL = "http://archive.cloudera.com/beta/impala-kudu/parcels/latest"
+IMPALA_KUDU_PARCEL_URL = os.getenv("IMPALA_KUDU_PARCEL_URL",
+                                   "http://archive.cloudera.com/beta/impala-kudu/parcels/latest")
 IMPALA_KUDU_PARCEL_PRODUCT = "IMPALA_KUDU"
 MAX_PARCEL_REPO_WAIT_SECS = 60
 MAX_PARCEL_WAIT_SECS = 60 * 30
