@@ -39,7 +39,7 @@ Status HdfsLzoTextScanner::library_load_status_;
 
 SpinLock HdfsLzoTextScanner::lzo_load_lock_;
 
-const char* (*GetImpalaBuildVersion)();
+const char* (*GetImpalaLzoBuildVersion)();
 
 HdfsScanner* (*HdfsLzoTextScanner::CreateLzoTextScanner)(
     HdfsScanNode* scan_node, RuntimeState* state);
@@ -68,7 +68,7 @@ Status HdfsLzoTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       if (!library_load_status_.ok()) {
         stringstream ss;
         ss << "Error loading impala-lzo library. Check that the impala-lzo library "
-           << "is at version " << IMPALA_BUILD_VERSION;
+           << "is at version " << GetDaemonBuildVersion();
         library_load_status_.AddDetail(ss.str());
         return library_load_status_;
       }
@@ -85,13 +85,13 @@ Status HdfsLzoTextScanner::LoadLzoLibrary() {
   void* handle;
   RETURN_IF_ERROR(DynamicOpen(LIB_IMPALA_LZO.c_str(), &handle));
   RETURN_IF_ERROR(DynamicLookup(handle,
-      "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaBuildVersion)));
+      "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaLzoBuildVersion)));
 
-  if (strcmp((*GetImpalaBuildVersion)(), IMPALA_BUILD_VERSION) != 0) {
+  if (strcmp((*GetImpalaLzoBuildVersion)(), GetDaemonBuildVersion()) != 0) {
     stringstream ss;
     ss << "Impala LZO library was built against Impala version "
-       << (*GetImpalaBuildVersion)() << ", but the running Impala version is "
-       << IMPALA_BUILD_VERSION;
+       << (*GetImpalaLzoBuildVersion)() << ", but the running Impala version is "
+       << GetDaemonBuildVersion();
     if (FLAGS_skip_lzo_version_check) {
       LOG(ERROR) << ss.str();
     } else {

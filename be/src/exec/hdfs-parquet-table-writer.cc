@@ -633,8 +633,8 @@ Status HdfsParquetTableWriter::Init() {
   file_metadata_.version = PARQUET_CURRENT_VERSION;
 
   stringstream created_by;
-  created_by << "impala version " << IMPALA_BUILD_VERSION
-             << " (build " << IMPALA_BUILD_HASH << ")";
+  created_by << "impala version " << GetDaemonBuildVersion()
+             << " (build " << GetDaemonBuildHash() << ")";
   file_metadata_.__set_created_by(created_by.str());
 
   // Default to snappy compressed

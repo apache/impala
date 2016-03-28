@@ -283,16 +283,16 @@ string PrintNumericPath(const SchemaPath& path) {
 
 string GetBuildVersion(bool compact) {
   stringstream ss;
-  ss << IMPALA_BUILD_VERSION
+  ss << GetDaemonBuildVersion()
 #ifdef NDEBUG
      << " RELEASE"
 #else
      << " DEBUG"
 #endif
-     << " (build " << IMPALA_BUILD_HASH
+     << " (build " << GetDaemonBuildHash()
      << ")";
   if (!compact) {
-    ss << endl << "Built on " << IMPALA_BUILD_TIME;
+    ss << endl << "Built on " << GetDaemonBuildTime();
   }
   return ss.str();
 }

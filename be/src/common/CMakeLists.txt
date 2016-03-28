@@ -20,10 +20,22 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 
+set(VERSION_CC_GEN_OUTPUT
+  ${CMAKE_SOURCE_DIR}/be/src/common/version.cc
+)
+
 add_library(Common
   init.cc
   logging.cc
   status.cc
+  ${VERSION_CC_GEN_OUTPUT}
+)
+
+add_custom_command(
+  OUTPUT ${VERSION_CC_GEN_OUTPUT}
+  COMMAND $ENV{IMPALA_HOME}/bin/gen_build_version.py
+  COMMENT "Generating the version.cc file"
+  VERBATIM
 )
 add_dependencies(Common thrift-deps)
 

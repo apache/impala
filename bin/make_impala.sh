@@ -126,7 +126,7 @@ then
   ${MAKE_CMD} clean
 fi
 
-$IMPALA_HOME/bin/gen_build_version.py --noclean
+$IMPALA_HOME/bin/gen_build_version.py
 
 if [ $CMAKE_ONLY -eq 1 ]; then
   exit 0
