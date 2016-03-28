@@ -24,6 +24,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+#include "util/bloom-filter.h"
 #include "util/runtime-profile.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -241,6 +242,11 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
       AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
       VLOG(2) << "Disabling runtime filter build because build table is too large: "
               << hash_tbl_->size();
+      // Send dummy filters to unblock any waiting scans.
+      BOOST_FOREACH(RuntimeFilter* filter, filters_) {
+        state->filter_bank()->UpdateFilterFromLocal(filter->filter_desc().filter_id,
+            BloomFilter::ALWAYS_TRUE_FILTER);
+      }
     }
   }
   return Status::OK();
