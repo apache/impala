@@ -180,13 +180,6 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // user specified a location for the table this will be a no-op.
       msTbl.getSd().setLocation(analyzer.getCatalog().getTablePath(msTbl).toString());
 
-      // If the user didn't specify a table location for the CREATE statement, inject the
-      // location that was calculated in the getTablePath() call. Since this will be the
-      // target location for the INSERT statement, it is important the two match.
-      if (createStmt_.getLocation() == null) {
-        createStmt_.setLocation(new HdfsUri(msTbl.getSd().getLocation()));
-      }
-
       // Create a "temp" table based off the given metastore.api.Table object. Normally,
       // the CatalogService assigns all table IDs, but in this case we need to assign the
       // "temp" table an ID locally. This table ID cannot conflict with any table in the

@@ -822,6 +822,10 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
 
+    // CTAS with a subquery.
+    AuthzOk("create table tpch.new_table as select * from functional.alltypesagg " +
+        "where id < (select max(year) from functional.alltypesagg)");
+
     AuthzError("create table functional.tbl tblproperties('a'='b')" +
         " as select 1",
         "User '%s' does not have privileges to execute 'CREATE' on: " +

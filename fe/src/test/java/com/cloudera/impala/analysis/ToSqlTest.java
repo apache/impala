@@ -304,8 +304,8 @@ public class ToSqlTest extends AnalyzerTest {
         "select double_col, int_col from functional.alltypes",
         "default",
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) STORED AS " +
-        "TEXTFILE LOCATION 'hdfs://localhost:20500/test-warehouse/p' " +
-        "AS SELECT double_col, int_col FROM functional.alltypes", true);
+        "TEXTFILE AS SELECT double_col, int_col FROM functional.alltypes",
+        true);
   }
 
   @Test
