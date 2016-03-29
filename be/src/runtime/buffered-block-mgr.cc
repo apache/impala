@@ -55,7 +55,8 @@ struct BufferedBlockMgr::Client {
         num_reserved_buffers_(num_reserved_buffers),
         tolerates_oversubscription_(tolerates_oversubscription),
         num_tmp_reserved_buffers_(0),
-        num_pinned_buffers_(0) {
+        num_pinned_buffers_(0),
+        logged_large_allocation_warning_(false) {
     DCHECK(tracker != NULL);
   }
 
@@ -94,6 +95,10 @@ struct BufferedBlockMgr::Client {
 
   /// Number of buffers pinned by this client.
   int num_pinned_buffers_;
+
+  /// Whether a warning about a large allocation has been made for this client. Used
+  /// to avoid producing excessive log messages.
+  bool logged_large_allocation_warning_;
 
   void PinBuffer(BufferDescriptor* buffer) {
     DCHECK(buffer != NULL);
@@ -301,8 +306,13 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   // Workaround IMPALA-1619. Return immediately if the allocation size will cause
   // an arithmetic overflow.
   if (UNLIKELY(size >= (1LL << 31))) {
-    LOG(WARNING) << "Trying to allocate memory >=2GB (" << size << ")B."
-                 << GetStackTrace();
+    // IMPALA-3238: don't repeatedly log warning when bumping up against this limit for
+    // large hash tables.
+    if (!client->logged_large_allocation_warning_) {
+      LOG(WARNING) << "Trying to allocate memory >=2GB (" << size << ")B."
+                   << GetStackTrace();
+      client->logged_large_allocation_warning_ = true;
+    }
     return false;
   }
   int buffers_needed = BitUtil::Ceil(size, max_block_size());
