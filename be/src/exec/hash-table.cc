@@ -128,7 +128,7 @@ void HashTableCtx::Close() {
   row_ = NULL;
 }
 
-bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
+bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) const {
   bool has_null = false;
   for (int i = 0; i < ctxs.size(); ++i) {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
@@ -144,13 +144,13 @@ bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
       expr_value_null_bits_[i] = false;
     }
     DCHECK_LE(build_expr_ctxs_[i]->root()->type().GetSlotSize(),
-              sizeof(NULL_VALUE));
+        sizeof(NULL_VALUE));
     RawValue::Write(val, loc, build_expr_ctxs_[i]->root()->type(), NULL);
   }
   return has_null;
 }
 
-uint32_t HashTableCtx::HashVariableLenRow() {
+uint32_t HashTableCtx::HashVariableLenRow() const {
   uint32_t hash = seeds_[level_];
   // Hash the non-var length portions (if there are any)
   if (var_result_begin_ != 0) {
@@ -177,7 +177,7 @@ uint32_t HashTableCtx::HashVariableLenRow() {
 }
 
 template<bool FORCE_NULL_EQUALITY>
-bool HashTableCtx::Equals(TupleRow* build_row) {
+bool HashTableCtx::Equals(TupleRow* build_row) const {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     void* val = build_expr_ctxs_[i]->GetValue(build_row);
     if (val == NULL) {
@@ -196,8 +196,8 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
   return true;
 }
 
-template bool HashTableCtx::Equals<true>(TupleRow* build_row);
-template bool HashTableCtx::Equals<false>(TupleRow* build_row);
+template bool HashTableCtx::Equals<true>(TupleRow* build_row) const;
+template bool HashTableCtx::Equals<false>(TupleRow* build_row) const;
 
 const double HashTable::MAX_FILL_FACTOR = 0.75f;
 
@@ -265,7 +265,7 @@ void HashTable::Close() {
   state_->block_mgr()->ReleaseMemory(block_mgr_client_, num_buckets_ * sizeof(Bucket));
 }
 
-bool HashTable::CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx) {
+bool HashTable::CheckAndResize(uint64_t buckets_to_fill, const HashTableCtx* ht_ctx) {
   uint64_t shift = 0;
   while (num_filled_buckets_ + buckets_to_fill >
          (num_buckets_ << shift) * MAX_FILL_FACTOR) {
@@ -276,7 +276,7 @@ bool HashTable::CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx) {
   return true;
 }
 
-bool HashTable::ResizeBuckets(int64_t num_buckets, HashTableCtx* ht_ctx) {
+bool HashTable::ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0)
       << "num_buckets=" << num_buckets << " must be a power of 2";
   DCHECK_GT(num_buckets, num_filled_buckets_) << "Cannot shrink the hash table to "

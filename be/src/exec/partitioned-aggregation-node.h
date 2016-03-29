@@ -453,7 +453,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// Do the aggregation for all tuple rows in the batch when there is no grouping.
   /// The HashTableCtx argument is unused, but included so the signature matches that of
   /// ProcessBatch() for codegen. This function is replaced by codegen.
-  Status ProcessBatchNoGrouping(RowBatch* batch, HashTableCtx* ht_ctx = NULL);
+  Status ProcessBatchNoGrouping(RowBatch* batch, const HashTableCtx* ht_ctx = NULL);
 
   /// Processes a batch of rows. This is the core function of the algorithm. We partition
   /// the rows into hash_partitions_, spilling as necessary.
@@ -463,13 +463,13 @@ class PartitionedAggregationNode : public ExecNode {
   /// This function is replaced by codegen. It's inlined into ProcessBatch_true/false in
   /// the IR module. We pass in ht_ctx_.get() as an argument for performance.
   template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx);
+  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, const HashTableCtx* ht_ctx);
 
   /// This function processes each individual row in ProcessBatch(). Must be inlined into
   /// ProcessBatch for codegen to substitute function calls with codegen'd versions.
   /// May spill partitions if not enough memory is available.
   template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, HashTableCtx* ht_ctx);
+  Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, const HashTableCtx* ht_ctx);
 
   /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
   /// the context for the partition's hash table and hash is the precomputed hash of
@@ -480,7 +480,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// for insertion returned from HashTable::FindBuildRowBucket().
   template<bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE AddIntermediateTuple(Partition* partition,
-      HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, HashTable::Iterator insert_it);
+      TupleRow* row, uint32_t hash, HashTable::Iterator insert_it);
 
   /// Append a row to a spilled partition. May spill partitions if needed to switch to
   /// I/O buffers. Selects the correct stream according to the argument. Inlined into
@@ -534,8 +534,9 @@ class PartitionedAggregationNode : public ExecNode {
   /// of how many more entries can be added to the hash table so we can avoid retrying
   /// inserts. It is decremented if an insert succeeds and set to zero if an insert
   /// fails. If an error occurs, returns false and sets 'status'.
-  bool IR_ALWAYS_INLINE TryAddToHashTable(HashTableCtx* ht_ctx, Partition* partition,
-      TupleRow* in_row, uint32_t hash, int* remaining_capacity, Status* status);
+  bool IR_ALWAYS_INLINE TryAddToHashTable(const HashTableCtx* ht_ctx,
+      Partition* partition, TupleRow* in_row, uint32_t hash, int* remaining_capacity,
+      Status* status);
 
   /// Initializes hash_partitions_. 'level' is the level for the partitions to create.
   /// Also sets ht_ctx_'s level to 'level'.
@@ -544,7 +545,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// Ensure that hash tables for all in-memory partitions are large enough to fit
   /// 'num_rows' additional hash table entries. If there is not enough memory to
   /// resize the hash tables, may spill partitions.
-  Status CheckAndResizeHashPartitions(int num_rows, HashTableCtx* ht_ctx);
+  Status CheckAndResizeHashPartitions(int num_rows, const HashTableCtx* ht_ctx);
 
   /// Iterates over all the partitions in hash_partitions_ and returns the number of rows
   /// of the largest spilled partition (in terms of number of aggregated and unaggregated

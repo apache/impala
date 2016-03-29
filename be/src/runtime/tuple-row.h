@@ -67,11 +67,6 @@ class TupleRow {
     }
   }
 
-  inline TupleRow* next_row(RowBatch* batch) const {
-    uint8_t* mem = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(this));
-    return reinterpret_cast<TupleRow*>(mem + batch->row_byte_size());
-  }
-
   /// TODO: make a macro for doing thisf
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;

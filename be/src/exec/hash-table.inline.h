@@ -23,14 +23,14 @@
 
 namespace impala {
 
-inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
+inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) const {
   bool has_null = EvalBuildRow(row);
   if (!stores_nulls_ && has_null) return false;
   *hash = HashCurrentRow();
   return true;
 }
 
-inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
+inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) const {
   bool has_null = EvalProbeRow(row);
   if (has_null && !(stores_nulls_ && finds_some_nulls_)) return false;
   *hash = HashCurrentRow();
@@ -39,7 +39,7 @@ inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
 
 template <bool FORCE_NULL_EQUALITY>
 inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
-    HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
+    const HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   DCHECK(buckets != NULL);
   DCHECK_GT(num_buckets, 0);
   *found = false;
@@ -119,7 +119,7 @@ inline bool HashTable::Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash)
   return false;
 }
 
-inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash) {
+inline HashTable::Iterator HashTable::FindProbeRow(const HashTableCtx* ht_ctx, uint32_t hash) {
   ++num_probes_;
   bool found = false;
   int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
@@ -131,7 +131,7 @@ inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx, uint32_
 }
 
 inline HashTable::Iterator HashTable::FindBuildRowBucket(
-    HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
+    const HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   ++num_probes_;
   int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
   DuplicateNode* duplicates = LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND) ?
@@ -139,7 +139,7 @@ inline HashTable::Iterator HashTable::FindBuildRowBucket(
   return Iterator(this, ht_ctx->row(), bucket_idx, duplicates);
 }
 
-inline HashTable::Iterator HashTable::Begin(HashTableCtx* ctx) {
+inline HashTable::Iterator HashTable::Begin(const HashTableCtx* ctx) {
   int64_t bucket_idx = Iterator::BUCKET_NOT_FOUND;
   DuplicateNode* node = NULL;
   NextFilledBucket(&bucket_idx, &node);

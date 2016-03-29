@@ -23,16 +23,18 @@
 
 using namespace impala;
 
-Status PartitionedAggregationNode::ProcessBatchNoGrouping(
-    RowBatch* batch, HashTableCtx* ht_ctx) {
-  for (int i = 0; i < batch->num_rows(); ++i) {
-    UpdateTuple(&agg_fn_ctxs_[0], singleton_output_tuple_, batch->GetRow(i));
+Status PartitionedAggregationNode::ProcessBatchNoGrouping(RowBatch* batch,
+    const HashTableCtx* ht_ctx) { // 'ht_ctx' is unused
+  Tuple* output_tuple = singleton_output_tuple_;
+  FOREACH_ROW(batch, 0, row) {
+    UpdateTuple(&agg_fn_ctxs_[0], output_tuple, row);
   }
   return Status::OK();
 }
 
 template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx) {
+Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
+    const HashTableCtx* __restrict__ ht_ctx) {
   DCHECK(!hash_partitions_.empty());
   DCHECK(!is_streaming_preagg_);
 
@@ -41,18 +43,16 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
   // will end up to the same partition.
   // TODO: Once we have a histogram with the number of rows per partition, we will have
   // accurate resize calls.
-  int num_rows = batch->num_rows();
-  RETURN_IF_ERROR(CheckAndResizeHashPartitions(num_rows, ht_ctx));
-
-  for (int i = 0; i < num_rows; ++i) {
-    RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(batch->GetRow(i), ht_ctx));
+  RETURN_IF_ERROR(CheckAndResizeHashPartitions(batch->num_rows(), ht_ctx));
+  FOREACH_ROW(batch, 0, row) {
+    RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(row, ht_ctx));
   }
-
   return Status::OK();
 }
 
 template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::ProcessRow(TupleRow* row, HashTableCtx* ht_ctx) {
+Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
+    const HashTableCtx* __restrict__ ht_ctx) {
   uint32_t hash = 0;
   if (AGGREGATED_ROWS) {
     if (!ht_ctx->EvalAndHashBuild(row, &hash)) return Status::OK();
@@ -91,12 +91,12 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* row, HashTableCtx* ht_ct
 
   // If we are seeing this result row for the first time, we need to construct the
   // result row and initialize it.
-  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, ht_ctx, row, hash, it);
+  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, row, hash, it);
 }
 
 template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
-    HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, HashTable::Iterator insert_it) {
+Status PartitionedAggregationNode::AddIntermediateTuple(Partition* __restrict__ partition,
+    TupleRow* __restrict__ row, uint32_t hash, HashTable::Iterator insert_it) {
   while (true) {
     DCHECK(partition->aggregated_row_stream->is_pinned());
     Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_ctxs,
@@ -120,7 +120,8 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* partition,
 }
 
 template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::AppendSpilledRow(Partition* partition, TupleRow* row) {
+Status PartitionedAggregationNode::AppendSpilledRow(Partition* __restrict__ partition,
+    TupleRow* __restrict__ row) {
   DCHECK(!is_streaming_preagg_);
   DCHECK(partition->is_spilled());
   BufferedTupleStream* stream = AGGREGATED_ROWS ?
@@ -130,30 +131,30 @@ Status PartitionedAggregationNode::AppendSpilledRow(Partition* partition, TupleR
 }
 
 Status PartitionedAggregationNode::ProcessBatch_false(
-    RowBatch* batch, HashTableCtx* ht_ctx) {
+    RowBatch* batch, HashTableCtx* __restrict__ ht_ctx) {
   return ProcessBatch<false>(batch, ht_ctx);
 }
 
 Status PartitionedAggregationNode::ProcessBatch_true(
-    RowBatch* batch, HashTableCtx* ht_ctx) {
+    RowBatch* batch, HashTableCtx* __restrict__ ht_ctx) {
   return ProcessBatch<true>(batch, ht_ctx);
 }
 
 Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
-    RowBatch* in_batch, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    RowBatch* in_batch, RowBatch* out_batch, HashTableCtx* __restrict__ ht_ctx,
     int remaining_capacity[PARTITION_FANOUT]) {
   DCHECK(is_streaming_preagg_);
   DCHECK_EQ(out_batch->num_rows(), 0);
   DCHECK_LE(in_batch->num_rows(), out_batch->capacity());
 
-  for (int i = 0; i < in_batch->num_rows(); ++i) {
-    TupleRow* in_row = in_batch->GetRow(i);
+  RowBatch::Iterator out_batch_iterator(out_batch, out_batch->num_rows());
+  FOREACH_ROW(in_batch, 0, in_row) {
     uint32_t hash;
     if (!ht_ctx->EvalAndHashProbe(in_row, &hash)) continue;
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
 
     if (TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx], in_row, hash,
-          &remaining_capacity[partition_idx], &process_batch_status_)) {
+            &remaining_capacity[partition_idx], &process_batch_status_)) {
       continue;
     }
     RETURN_IF_ERROR(process_batch_status_);
@@ -167,23 +168,24 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
     }
     UpdateTuple(&agg_fn_ctxs_[0], intermediate_tuple, in_row, false);
 
-    TupleRow* output_row = out_batch->GetRow(out_batch->AddRow());
-    output_row ->SetTuple(0, intermediate_tuple);
+    out_batch_iterator.Get()->SetTuple(0, intermediate_tuple);
+    out_batch_iterator.Next();
     out_batch->CommitLastRow();
   }
 
   if (needs_serialize) {
-    for (int i = 0; i < out_batch->num_rows(); ++i) {
+    FOREACH_ROW(out_batch, 0, serialize_row) {
       AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_,
-          out_batch->GetRow(i)->GetTuple(0));
+          serialize_row->GetTuple(0));
     }
   }
 
   return Status::OK();
 }
 
-bool PartitionedAggregationNode::TryAddToHashTable(HashTableCtx* ht_ctx,
-    Partition* partition, TupleRow* in_row, uint32_t hash, int* remaining_capacity,
+bool PartitionedAggregationNode::TryAddToHashTable(
+    const HashTableCtx* __restrict__ ht_ctx, Partition* __restrict__ partition,
+    TupleRow* __restrict__ in_row, uint32_t hash, int* __restrict__ remaining_capacity,
     Status* status) {
   DCHECK(remaining_capacity != NULL);
   DCHECK_GE(*remaining_capacity, 0);
@@ -202,7 +204,7 @@ bool PartitionedAggregationNode::TryAddToHashTable(HashTableCtx* ht_ctx,
       --(*remaining_capacity);
     } else {
       // Avoid repeatedly trying to add tuples when under memory pressure.
-      (*remaining_capacity) = 0;
+      *remaining_capacity = 0;
       return false;
     }
   }

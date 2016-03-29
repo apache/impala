@@ -114,7 +114,7 @@ class RowBatch {
 
   void ALWAYS_INLINE CommitLastRow() { CommitRows(1); }
 
-  /// Set function can be used to reduce the number of rows in the batch.  This is only
+  /// Set function can be used to reduce the number of rows in the batch. This is only
   /// used in the limit case where more rows were added than necessary.
   void set_num_rows(int num_rows) {
     DCHECK_LE(num_rows, num_rows_);
@@ -142,6 +142,52 @@ class RowBatch {
     return reinterpret_cast<TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);
   }
 
+  /// An iterator for going through a row batch, starting at 'row_idx'.
+  /// This is more efficient than using GetRow() as it avoids loading the
+  /// row batch state and doing multiplication on each loop with GetRow().
+  class Iterator {
+   public:
+    IR_ALWAYS_INLINE Iterator(RowBatch* parent, int row_idx) :
+        num_tuples_per_row_(parent->num_tuples_per_row_),
+        row_(parent->tuple_ptrs_ + row_idx * num_tuples_per_row_),
+        row_batch_end_(parent->tuple_ptrs_ + parent->num_rows_ * num_tuples_per_row_),
+        parent_(parent) {
+      DCHECK_GE(row_idx, 0);
+      /// We allow empty row batches with num_rows_ == capacity_ == 0.
+      /// That's why we cannot call GetRow() above to initialize 'row_'.
+      DCHECK_LE(row_idx, parent->capacity_);
+    }
+
+    /// Return the current row pointed to by the row pointer.
+    TupleRow* IR_ALWAYS_INLINE Get() { return reinterpret_cast<TupleRow*>(row_); }
+
+    /// Increment the row pointer and return the next row.
+    TupleRow* IR_ALWAYS_INLINE Next() {
+      row_ += num_tuples_per_row_;
+      DCHECK_LE((row_ - parent_->tuple_ptrs_) / num_tuples_per_row_, parent_->capacity_);
+      return Get();
+    }
+
+    /// Returns true if the iterator is beyond the last row for read iterators.
+    /// Useful for read iterators to determine the limit. Write iterators should use
+    /// RowBatch::AtCapacity() instead.
+    bool IR_ALWAYS_INLINE AtEnd() { return row_ >= row_batch_end_; }
+
+   private:
+    /// Number of tuples per row.
+    const int num_tuples_per_row_;
+
+    /// Pointer to the current row.
+    Tuple** row_;
+
+    /// Pointer to the row after the last row for read iterators.
+    Tuple** const row_batch_end_;
+
+    /// The row batch being iterated on.
+    RowBatch* const parent_;
+  };
+
+  int num_tuples_per_row() { return num_tuples_per_row_; }
   int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_io_buffers() const { return io_buffers_.size(); }
@@ -282,13 +328,13 @@ class RowBatch {
   // up the top to fit in as few cache lines as possible.
 
   int num_rows_;  // # of committed rows
-  int capacity_; // the value of num_rows_ at which batch is considered full.
+  int capacity_;  // the value of num_rows_ at which batch is considered full.
 
   /// If true, this batch references unowned memory that will be cleaned up soon.
   /// See MarkNeedToReturn().
   bool need_to_return_;
 
-  int num_tuples_per_row_;
+  const int num_tuples_per_row_;
 
   /// Array of pointers with capacity_ * num_tuples_per_row_ elements.
   /// The memory ownership depends on whether legacy joins and aggs are enabled.
@@ -347,5 +393,14 @@ class RowBatch {
 };
 
 }
+
+/// Macro for iterating through '_row_batch', starting at '_start_row_idx'.
+/// '_row_batch' is the row batch to iterate through.
+/// '_start_row_idx' is the starting row index.
+/// '_row' is the current row which the iterator is pointing to.
+#define FOREACH_ROW(_row_batch, _start_row_idx, _row)                              \
+  RowBatch::Iterator _##_row_batch##_iter(_row_batch, _start_row_idx);             \
+  for (TupleRow* _row = _##_row_batch##_iter.Get(); !_##_row_batch##_iter.AtEnd(); \
+      _row = _##_row_batch##_iter.Next())
 
 #endif

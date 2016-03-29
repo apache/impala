@@ -153,8 +153,8 @@ class HashTableCtx {
   /// contains NULL.
   /// These need to be inlined in the IR module so we can find and replace the calls to
   /// EvalBuildRow()/EvalProbeRow().
-  bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row, uint32_t* hash);
-  bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash);
+  bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row, uint32_t* hash) const;
+  bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash) const;
 
   int ALWAYS_INLINE results_buffer_size() const { return results_buffer_size_; }
 
@@ -186,7 +186,7 @@ class HashTableCtx {
   /// Compute the hash of the values in expr_values_buffer_.
   /// This will be replaced by codegen.  We don't want this inlined for replacing
   /// with codegen'd functions so the function name does not change.
-  uint32_t IR_NO_INLINE HashCurrentRow() {
+  uint32_t IR_NO_INLINE HashCurrentRow() const {
     DCHECK_LT(level_, seeds_.size());
     if (var_result_begin_ == -1) {
       /// This handles NULLs implicitly since a constant seed value was put
@@ -201,7 +201,7 @@ class HashTableCtx {
   }
 
   /// Wrapper function for calling correct HashUtil function in non-codegen'd case.
-  uint32_t inline Hash(const void* input, int len, int32_t hash) {
+  uint32_t inline Hash(const void* input, int len, int32_t hash) const {
     /// Use CRC hash at first level for better performance. Switch to murmur hash at
     /// subsequent levels since CRC doesn't randomize well with different seed inputs.
     if (level_ == 0) return HashUtil::Hash(input, len, hash);
@@ -213,31 +213,31 @@ class HashTableCtx {
   /// compiled because we need to be able to differentiate between EvalBuildRow and
   /// EvalProbeRow by name and the build/probe exprs are baked into the codegen'd
   /// function.
-  bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
+  bool IR_NO_INLINE EvalBuildRow(TupleRow* row) const {
     return EvalRow(row, build_expr_ctxs_);
   }
 
   /// Evaluate 'row' over probe exprs caching the results in 'expr_values_buffer_'
   /// This will be replaced by codegen.
-  bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
+  bool IR_NO_INLINE EvalProbeRow(TupleRow* row) const {
     return EvalRow(row, probe_expr_ctxs_);
   }
 
   /// Compute the hash of the values in expr_values_buffer_ for rows with variable length
   /// fields (e.g. strings).
-  uint32_t HashVariableLenRow();
+  uint32_t HashVariableLenRow() const;
 
   /// Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
   /// Returns whether any expr evaluated to NULL.
   /// This will be replaced by codegen.
-  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
+  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs) const;
 
   /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
   /// values cached in expr_values_buffer_.  This will be replaced by
   /// codegen. FORCE_NULL_EQUALITY is true if all nulls should be treated as equal,
   /// regardless of the values of finds_nulls_
   template<bool FORCE_NULL_EQUALITY>
-  bool IR_NO_INLINE Equals(TupleRow* build_row);
+  bool IR_NO_INLINE Equals(TupleRow* build_row) const;
 
   const std::vector<ExprContext*>& build_expr_ctxs_;
   const std::vector<ExprContext*>& probe_expr_ctxs_;
@@ -392,13 +392,13 @@ class HashTable {
   /// go to the next matching row. The matching rows do not need to be evaluated since all
   /// the nodes of a bucket are duplicates. One scan can be in progress for each 'ht_ctx'.
   /// Used during the probe phase of hash joins.
-  Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash);
+  Iterator IR_ALWAYS_INLINE FindProbeRow(const HashTableCtx* ht_ctx, uint32_t hash);
 
   /// If a match is found in the table, return an iterator as in FindProbeRow(). If a
   /// match was not present, return an iterator pointing to the empty bucket where the key
   /// should be inserted. Returns End() if the table is full. The caller can set the data
   /// in the bucket using a Set*() method on the iterator.
-  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(HashTableCtx* ht_ctx, uint32_t hash,
+  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(const HashTableCtx* ht_ctx, uint32_t hash,
       bool* found);
 
   /// Returns number of elements inserted in the hash table
@@ -417,7 +417,7 @@ class HashTable {
     return static_cast<double>(num_filled_buckets_) / num_buckets_;
   }
 
-  /// Returns an estimate of the number of bytes needed to build the hash table
+  /// Return an estimate of the number of bytes needed to build the hash table
   /// structure for 'num_rows'. To do that, it estimates the number of buckets,
   /// rounded up to a power of two, and also assumes that there are no duplicates.
   static int64_t EstimateNumBuckets(int64_t num_rows) {
@@ -441,14 +441,14 @@ class HashTable {
   /// max fill factor.
   /// If it returns true, then it is guaranteed at least 'rows_to_add' rows can be
   /// inserted without need to resize.
-  bool CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx);
+  bool CheckAndResize(uint64_t buckets_to_fill, const HashTableCtx* ht_ctx);
 
   /// Returns the number of bytes allocated to the hash table from the block manager.
   int64_t ByteSize() const { return num_buckets_ * sizeof(Bucket) + total_data_page_size_; }
 
   /// Returns an iterator at the beginning of the hash table.  Advancing this iterator
   /// will traverse all elements.
-  Iterator Begin(HashTableCtx* ht_ctx);
+  Iterator Begin(const HashTableCtx* ht_ctx);
 
   /// Return an iterator pointing to the first element (Bucket or DuplicateNode, if the
   /// bucket has duplicates) in the hash table that does not have its matched flag set.
@@ -582,7 +582,7 @@ class HashTable {
   /// There are wrappers of this function that perform the Find and Insert logic.
   template <bool FORCE_NULL_EQUALITY>
   int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
-      HashTableCtx* ht_ctx, uint32_t hash, bool* found);
+      const HashTableCtx* ht_ctx, uint32_t hash, bool* found);
 
   /// Performs the insert logic. Returns the HtData* of the bucket or duplicate node
   /// where the data should be inserted. Returns NULL if the insert was not successful.
@@ -595,7 +595,7 @@ class HashTable {
   void NextFilledBucket(int64_t* bucket_idx, DuplicateNode** node);
 
   /// Resize the hash table to 'num_buckets'. Returns false on OOM.
-  bool ResizeBuckets(int64_t num_buckets, HashTableCtx* ht_ctx);
+  bool ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx);
 
   /// Appends the DuplicateNode pointed by next_node_ to 'bucket' and moves the next_node_
   /// pointer to the next DuplicateNode in the page, updating the remaining node counter.

@@ -40,8 +40,8 @@ bool IR_NO_INLINE EvalOtherJoinConjuncts(
 // CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
 // codegen.
 template<int const JoinOp>
-int PartitionedHashJoinNode::ProcessProbeBatch(
-    RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status) {
+int PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch,
+    const HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
   ExprContext* const* other_join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
@@ -49,8 +49,11 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
 
   DCHECK(!out_batch->AtCapacity());
   DCHECK_GE(probe_batch_pos_, 0);
-  TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
+  RowBatch::Iterator out_batch_iterator(out_batch, out_batch->AddRow());
+  TupleRow* out_row = out_batch_iterator.Get();
   const int max_rows = out_batch->capacity() - out_batch->num_rows();
+  // Note that 'probe_batch_pos_' is the row no. of the row after 'current_probe_row_'.
+  RowBatch::Iterator probe_batch_iterator(probe_batch_.get(), probe_batch_pos_);
   int num_rows_added = 0;
 
   while (true) {
@@ -71,10 +74,9 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
           // Evaluate the non-equi-join conjuncts against a temp row assembled from all
           // build and probe tuples.
           if (num_other_join_conjuncts > 0) {
-            CreateOutputRow(semi_join_staging_row_, current_probe_row_,
-                matched_build_row);
+            CreateOutputRow(semi_join_staging_row_, current_probe_row_, matched_build_row);
             if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs,
-                     num_other_join_conjuncts, semi_join_staging_row_)) {
+                    num_other_join_conjuncts, semi_join_staging_row_)) {
               hash_tbl_iterator_.NextDuplicate();
               continue;
             }
@@ -92,7 +94,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
           // evaluate the non-equi-join conjuncts.
           CreateOutputRow(out_row, current_probe_row_, matched_build_row);
           if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs, num_other_join_conjuncts,
-                   out_row)) {
+                  out_row)) {
             hash_tbl_iterator_.NextDuplicate();
             continue;
           }
@@ -120,11 +122,11 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
           hash_tbl_iterator_.NextDuplicate();
         }
 
-        if ((JoinOp != TJoinOp::RIGHT_ANTI_JOIN) &&
+        if (JoinOp != TJoinOp::RIGHT_ANTI_JOIN &&
             ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
           ++num_rows_added;
-          out_row = out_row->next_row(out_batch);
-          if (num_rows_added == max_rows) goto end;
+          if (num_rows_added == max_rows) goto update_probe_batch_pos;
+          out_row = out_batch_iterator.Next();
         }
       }
 
@@ -136,8 +138,9 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         if (null_aware_partition_->build_rows()->num_rows() != 0) {
           if (num_other_join_conjuncts == 0) goto next_row;
           if (UNLIKELY(!AppendRow(null_aware_partition_->probe_rows(),
-                                  current_probe_row_, status))) {
-            return -1;
+                           current_probe_row_, status))) {
+            num_rows_added = -1;
+            goto update_probe_batch_pos;
           }
           goto next_row;
         }
@@ -150,8 +153,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
           ++num_rows_added;
           matched_probe_ = true;
-          out_row = out_row->next_row(out_batch);
-          if (num_rows_added == max_rows) goto end;
+          if (num_rows_added == max_rows) goto update_probe_batch_pos;
+          out_row = out_batch_iterator.Next();
         }
       }
       if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
@@ -162,24 +165,26 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         out_batch->CopyRow(current_probe_row_, out_row);
         ++num_rows_added;
         matched_probe_ = true;
-        out_row = out_row->next_row(out_batch);
-        if (num_rows_added == max_rows) goto end;
+        if (num_rows_added == max_rows) goto update_probe_batch_pos;
+        out_row = out_batch_iterator.Next();
       }
     }
 
 next_row:
     // Must have reached the end of the hash table iterator for the current row before
-    // moving to the row.
+    // moving to the next row.
     DCHECK(hash_tbl_iterator_.AtEnd());
 
-    if (UNLIKELY(probe_batch_pos_ == probe_batch_->num_rows())) {
+    if (UNLIKELY(probe_batch_iterator.AtEnd())) {
       // Finished this batch.
+      probe_batch_pos_ = probe_batch_->num_rows();
       current_probe_row_ = NULL;
-      goto end;
+      goto done;
     }
 
     // Establish current_probe_row_ and find its corresponding partition.
-    current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+    current_probe_row_ = probe_batch_iterator.Get();
+    probe_batch_iterator.Next();
     matched_probe_ = false;
     uint32_t hash;
     if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) {
@@ -194,7 +199,8 @@ next_row:
         if (!non_empty_build_) continue;
         if (num_other_join_conjuncts == 0) goto next_row;
         if (UNLIKELY(!AppendRow(null_probe_rows_, current_probe_row_, status))) {
-          return -1;
+          num_rows_added = -1;
+          goto update_probe_batch_pos;
         }
         matched_null_probe_.push_back(false);
         goto next_row;
@@ -203,7 +209,7 @@ next_row:
     }
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     if (LIKELY(hash_tbls_[partition_idx] != NULL)) {
-      hash_tbl_iterator_= hash_tbls_[partition_idx]->FindProbeRow(ht_ctx, hash);
+      hash_tbl_iterator_ = hash_tbls_[partition_idx]->FindProbeRow(ht_ctx, hash);
     } else {
       Partition* partition = hash_partitions_[partition_idx];
       if (UNLIKELY(partition->is_closed())) {
@@ -214,21 +220,27 @@ next_row:
         DCHECK(partition->is_spilled());
         DCHECK(partition->probe_rows() != NULL);
         if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_, status))) {
-          return -1;
+          num_rows_added = -1;
+          goto update_probe_batch_pos;
         }
         goto next_row;
       }
     }
   }
 
-end:
+update_probe_batch_pos:
+  probe_batch_pos_ =
+      (probe_batch_iterator.Get() - probe_batch_->GetRow(0)) / probe_batch_->num_tuples_per_row();
+done:
+  DCHECK_GE(probe_batch_pos_, 0);
+  DCHECK_LE(probe_batch_pos_, probe_batch_->capacity());
   DCHECK_LE(num_rows_added, max_rows);
   return num_rows_added;
 }
 
 int PartitionedHashJoinNode::ProcessProbeBatch(
-    const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx,
-    Status* status) {
+    const TJoinOp::type join_op, RowBatch* out_batch,
+    const HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
  switch (join_op) {
     case TJoinOp::INNER_JOIN:
       return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx, status);
@@ -257,9 +269,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
 
 Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
     bool build_filters) {
-  for (int i = 0; i < build_batch->num_rows(); ++i) {
-    DCHECK(buildStatus_.ok());
-    TupleRow* build_row = build_batch->GetRow(i);
+  FOREACH_ROW(build_batch, 0, build_row) {
+    DCHECK(build_status_.ok());
     uint32_t hash;
     if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) {
       if (null_aware_partition_ != NULL) {
@@ -267,8 +278,8 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
         // If we are NULL aware and this build row has NULL in the eq join slot,
         // append it to the null_aware partition. We will need it later.
         if (UNLIKELY(!AppendRow(null_aware_partition_->build_rows(),
-                                build_row, &buildStatus_))) {
-          return buildStatus_;
+                build_row, &build_status_))) {
+          return build_status_;
         }
       }
       continue;
@@ -286,8 +297,8 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
     }
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];
-    const bool result = AppendRow(partition->build_rows(), build_row, &buildStatus_);
-    if (UNLIKELY(!result)) return buildStatus_;
+    const bool result = AppendRow(partition->build_rows(), build_row, &build_status_);
+    if (UNLIKELY(!result)) return build_status_;
   }
   return Status::OK();
 }

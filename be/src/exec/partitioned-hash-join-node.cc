@@ -995,7 +995,7 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   DCHECK(!output_build_partitions_.empty());
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   const int num_conjuncts = conjunct_ctxs_.size();
-  TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
+  RowBatch::Iterator out_batch_iterator(out_batch, out_batch->num_rows());
   const int start_num_rows = out_batch->num_rows();
 
   while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd()) {
@@ -1004,13 +1004,14 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
       TupleRow* build_row = hash_tbl_iterator_.GetRow();
       DCHECK(build_row != NULL);
       if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN) {
-        out_batch->CopyRow(build_row, out_row);
+        out_batch->CopyRow(build_row, out_batch_iterator.Get());
       } else {
-        CreateOutputRow(out_row, NULL, build_row);
+        CreateOutputRow(out_batch_iterator.Get(), NULL, build_row);
       }
-      if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+      if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts,
+          out_batch_iterator.Get())) {
         out_batch->CommitLastRow();
-        out_row = out_row->next_row(out_batch);
+        out_batch_iterator.Next();
       }
       hash_tbl_iterator_.SetMatched();
     }
@@ -1631,7 +1632,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // Get cross compiled function
-  IRFunction::Type ir_fn;
+  IRFunction::Type ir_fn = IRFunction::FN_END;
   switch (join_op_) {
     case TJoinOp::INNER_JOIN:
       ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_INNER_JOIN;

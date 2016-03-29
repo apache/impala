@@ -180,11 +180,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Returns the number of rows added to out_batch; -1 on error (and *status will be
   /// set).
   template<int const JoinOp>
-  int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
+  int ProcessProbeBatch(RowBatch* out_batch, const HashTableCtx* ht_ctx, Status* status);
 
   /// Wrapper that calls the templated version of ProcessProbeBatch() based on 'join_op'.
   int ProcessProbeBatch(const TJoinOp::type join_op, RowBatch* out_batch,
-                        HashTableCtx* ht_ctx, Status* status);
+      const HashTableCtx* ht_ctx, Status* status);
 
   /// Sweep the hash_tbl_ of the partition that is at the front of
   /// output_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
@@ -316,7 +316,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// placing the build-side status here so exceptions won't need to destruct it.
   /// This status should used directly only by ProcesssBuildBatch().
   /// TODO: fix IMPALA-1948 and remove this.
-  Status buildStatus_;
+  Status build_status_;
 
   /// Client to the buffered block mgr.
   BufferedBlockMgr::Client* block_mgr_client_;

@@ -1121,7 +1121,7 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
 }
 
 Status PartitionedAggregationNode::CheckAndResizeHashPartitions(int num_rows,
-    HashTableCtx* ht_ctx) {
+    const HashTableCtx* ht_ctx) {
   DCHECK(!is_streaming_preagg_);
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     Partition* partition = hash_partitions_[i];
@@ -1585,6 +1585,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
       DCHECK(false) << "bad aggregate operator: " << evaluator->agg_op();
   }
 
+  // TODO: Store to register in the loop and store once to memory at the end of the loop.
   builder.CreateStore(result, dst_ptr);
   builder.CreateBr(ret_block);
 
