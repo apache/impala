@@ -163,6 +163,8 @@ class ImpalaShell(cmd.Cmd):
     self.print_summary = options.print_summary
     self.print_progress = options.print_progress
 
+    self.ignore_query_failure = options.ignore_query_failure
+
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
     # the non-interactive mode does not need readline - do not import it.
@@ -1021,6 +1023,20 @@ class ImpalaShell(cmd.Cmd):
     """Print a random tip"""
     print_to_stderr(random.choice(TIPS))
 
+  def do_src(self, args):
+    return self.do_source(args)
+
+  def do_source(self, args):
+    try:
+      cmd_file = open(args, "r")
+    except Exception, e:
+      print_to_stderr("Error opening file '%s': %s" % (args, e))
+      return CmdStatus.ERROR
+    if self.execute_query_list(parse_query_text(cmd_file.read())):
+      return CmdStatus.SUCCESS
+    else:
+      return CmdStatus.ERROR
+
   def preloop(self):
     """Load the history file if it exists"""
     if self.readline:
@@ -1087,6 +1103,18 @@ class ImpalaShell(cmd.Cmd):
     if text.isupper(): return [cmd_names.upper() for cmd_names in cmd_names]
     # If the user input is lower case or mixed case, return lower case commands.
     return cmd_names
+
+  def execute_query_list(self, queries):
+    if not self.imp_client.connected:
+      print_to_stderr('Not connected to Impala, could not execute queries.')
+      return False
+    queries = [ self.sanitise_input(q) for q in self.cmdqueue + queries ]
+    for q in queries:
+      if self.onecmd(q) is CmdStatus.ERROR:
+        print_to_stderr('Could not execute command: %s' % q)
+        if not self.ignore_query_failure: return False
+    return True
+
 
 TIPS=[
   "Press TAB twice to see a list of available commands.",
@@ -1159,7 +1187,6 @@ def parse_variables(keyvals):
 
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""
-  queries = []
   if options.query_file:
     try:
       # "-" here signifies input from STDIN
@@ -1167,31 +1194,18 @@ def execute_queries_non_interactive_mode(options):
         query_file_handle = sys.stdin
       else:
         query_file_handle = open(options.query_file, 'r')
-
-      queries = parse_query_text(query_file_handle.read())
-      if query_file_handle != sys.stdin:
-        query_file_handle.close()
     except Exception, e:
-      print_to_stderr('Error: %s' % e)
-      sys.exit(1)
+      print_to_stderr("Could not open file '%s': %s", options.query_file, e)
+
+    query_text = query_file_handle.read()
   elif options.query:
-    queries = parse_query_text(options.query)
-  shell = ImpalaShell(options)
-  # The impalad was specified on the command line and the connection failed.
-  # Return with an error, no need to process the query.
-  if options.impalad and shell.imp_client.connected == False:
+    query_text = options.query
+  else:
+    return
+
+  queries = parse_query_text(query_text)
+  if not ImpalaShell(options).execute_query_list(queries):
     sys.exit(1)
-  queries = shell.cmdqueue + queries
-  # Deal with case.
-  sanitized_queries = []
-  for query in queries:
-    sanitized_queries.append(shell.sanitise_input(query))
-  for query in sanitized_queries:
-    # check if an error was encountered
-    if shell.onecmd(query) is CmdStatus.ERROR:
-      print_to_stderr('Could not execute command: %s' % query)
-      if not options.ignore_query_failure:
-        sys.exit(1)
 
 if __name__ == "__main__":
   # pass defaults into option parser

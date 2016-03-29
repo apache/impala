@@ -266,6 +266,41 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive(cmds, shell_args=args)
     assert_var_substitution(result)
 
+  @pytest.mark.execute_serially
+  def test_source_file(self):
+    cwd = os.getcwd()
+    try:
+      # Change working dir so that SOURCE command in shell.cmds can find shell2.cmds.
+      os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
+      result = run_impala_shell_interactive("source shell.cmds;")
+      assert "Query: use FUNCTIONAL" in result.stderr
+      assert "Query: show TABLES" in result.stderr
+      assert "alltypes" in result.stdout
+
+      # This is from shell2.cmds, the result of sourcing a file from a sourced file.
+      assert "select VERSION()" in result.stderr
+      assert "version()" in result.stdout
+    finally:
+      os.chdir(cwd)
+
+  @pytest.mark.execute_serially
+  def test_source_file_with_errors(self):
+    full_path = "%s/tests/shell/shell_error.cmds" % os.environ['IMPALA_HOME']
+    result = run_impala_shell_interactive("source %s;" % full_path)
+    assert "Could not execute command: use UNKNOWN_DATABASE" in result.stderr
+    assert "Query: use FUNCTIONAL" not in result.stderr
+
+    result = run_impala_shell_interactive("source %s;" % full_path, '-c')
+    assert "Could not execute command: use UNKNOWN_DATABASE" in result.stderr
+    assert "Query: use FUNCTIONAL" in result.stderr
+    assert "Query: show TABLES" in result.stderr
+    assert "alltypes" in result.stdout
+
+  @pytest.mark.execute_serially
+  def test_source_missing_file(self):
+    full_path = "%s/tests/shell/doesntexist.cmds" % os.environ['IMPALA_HOME']
+    result = run_impala_shell_interactive("source %s;" % full_path)
+    assert "No such file or directory" in result.stderr
 
 def run_impala_shell_interactive(input_lines, shell_args=''):
   """Runs a command in the Impala shell interactively."""

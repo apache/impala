@@ -1,0 +1,3 @@
+USE FUNCTIONAL;
+SHOW TABLES;
+SOURCE shell2.cmds;
