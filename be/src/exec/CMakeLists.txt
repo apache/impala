@@ -84,21 +84,6 @@ add_library(Exec
   unnest-node.cc
 )
 
-# Some of the macros defined in gutil (COMPILE_ASSERT, DISALLOW_COPY_AND_ASSIGN)
-# are redefined in Kudu's kudu/client/stubs.h and because "-Werror" is set, compilation
-# fails on macro redefinition warnings. The ideal workaround would be to just disable
-# that particular warning (which is possible in recent LLVM releases with
-# "-Wno-macro-redefined") but gcc doesn't have a flag to do it, so we simply disable
-# "-Werror" for these particular files.
-set_source_files_properties(kudu-scanner.cc PROPERTIES COMPILE_FLAGS
-  "${CXX_COMMON_FLAGS} -Wno-error")
-set_source_files_properties(kudu-scan-node.cc PROPERTIES COMPILE_FLAGS
-  "${CXX_COMMON_FLAGS} -Wno-error")
-set_source_files_properties(kudu-table-sink.cc PROPERTIES COMPILE_FLAGS
-  "${CXX_COMMON_FLAGS} -Wno-error")
-set_source_files_properties(kudu-util.cc PROPERTIES COMPILE_FLAGS
-  "${CXX_COMMON_FLAGS} -Wno-error")
-
 add_dependencies(Exec thrift-deps)
 
 ADD_BE_TEST(zigzag-test)
@@ -112,7 +97,3 @@ ADD_BE_TEST(row-batch-list-test)
 ADD_BE_TEST(incr-stats-util-test)
 ADD_BE_TEST(kudu-scan-node-test)
 ADD_BE_TEST(kudu-table-sink-test)
-SET_TARGET_PROPERTIES(kudu-scan-node-test PROPERTIES COMPILE_FLAGS
-  "${CXX_COMMON_FLAGS} -Wno-error")
-SET_TARGET_PROPERTIES(kudu-table-sink-test PROPERTIES COMPILE_FLAGS
-  "${CXX_COMMON_FLAGS} -Wno-error")
