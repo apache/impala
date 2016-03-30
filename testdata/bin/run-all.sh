@@ -33,16 +33,15 @@ fi
 echo "Killing running services..."
 $IMPALA_HOME/testdata/bin/kill-all.sh &>${IMPALA_CLUSTER_LOGS_DIR}/kill-all.log
 
+echo "Starting cluster services..."
+$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
+    tee ${IMPALA_CLUSTER_LOGS_DIR}/run-mini-dfs.log
+
 # Starts up a mini-cluster which includes:
 # - HDFS with 3 DNs
 # - One Yarn ResourceManager
 # - Multiple Yarn NodeManagers, exactly one per HDFS DN
 if [[ ${DEFAULT_FS} == "hdfs://localhost:20500" ]]; then
-  echo "Starting all cluster services..."
-  echo " --> Starting mini-DFS cluster"
-  $IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
-      tee ${IMPALA_CLUSTER_LOGS_DIR}/run-mini-dfs.log
-
   echo " --> Starting HBase"
   $IMPALA_HOME/testdata/bin/run-hbase.sh 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hbase.log

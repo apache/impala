@@ -180,13 +180,6 @@ elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
   return 1
 fi
 
-if [[ "$TARGET_FILESYSTEM" != "hdfs" ]]; then
-  # TODO: Kudu is disabled to unblock builds. More work is needed to re-enable it for
-  #       non-mini-cluster testing. The problem now is nothing starts the Kudu service
-  #       in the non-mini-cluster mode.
-  KUDU_IS_SUPPORTED=false
-fi
-
 # Directories where local cluster logs will go when running tests or loading data
 export IMPALA_LOGS_DIR=${IMPALA_HOME}/logs
 export IMPALA_CLUSTER_LOGS_DIR=${IMPALA_LOGS_DIR}/cluster

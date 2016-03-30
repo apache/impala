@@ -49,9 +49,14 @@ TEMPLATE_SUFFIX=".tmpl"
 # Each process should be marked with this so a "pkill -f" can be done to nuke everything.
 export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 
-SUPPORTED_SERVICES=(hdfs yarn)
-if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
-  SUPPORTED_SERVICES+=(llama kms)
+if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
+  # The check above indicates that the regular mini-cluster is in use.
+  SUPPORTED_SERVICES=(hdfs yarn llama kms)
+else
+  # Either a remote distributed file system or a local non-distributed file system is
+  # in use. Currently the only service that is expected to work is Kudu, though in theory
+  # the other services could work after the proper configuration changes.
+  SUPPORTED_SERVICES=()
 fi
 if $KUDU_IS_SUPPORTED; then
   SUPPORTED_SERVICES+=(kudu)
