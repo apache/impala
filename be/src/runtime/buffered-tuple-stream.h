@@ -256,10 +256,9 @@ class BufferedTupleStream {
   /// begin reading. Otherwise this must be called after the last AddRow() and
   /// before GetNext().
   /// delete_on_read: Blocks are deleted after they are read.
-  /// If got_buffer is NULL, this function will fail (with a bad status) if no buffer
-  /// is available. If got_buffer is non-null, this function will not fail on OOM and
-  /// *got_buffer is true if a buffer was pinned.
-  Status PrepareForRead(bool delete_on_read, bool* got_buffer = NULL);
+  /// got_buffer: set to true if the first read block was successfully pinned, or
+  ///     false if the block could not be pinned and no error was encountered.
+  Status PrepareForRead(bool delete_on_read, bool* got_buffer);
 
   /// Pins all blocks in this stream and switches to pinned mode.
   /// If there is not enough memory, *pinned is set to false and the stream is unmodified.

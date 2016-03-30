@@ -190,7 +190,15 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
       state->block_mgr(), client_, false /* use_initial_small_buffers */,
       true /* read_write */);
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
-  RETURN_IF_ERROR(input_stream_->PrepareForRead(true));
+  bool got_read_buffer;
+  RETURN_IF_ERROR(input_stream_->PrepareForRead(true, &got_read_buffer));
+  if (!got_read_buffer) {
+    Status status = Status::MemLimitExceeded();
+    status.AddDetail("Failed to acquire initial read buffer for analytic function "
+        "evaluation. Reducing query concurrency or increasing the memory limit may "
+        "help this query to complete successfully.");
+    return status;
+  }
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {

@@ -41,6 +41,10 @@
 DEFINE_bool(enable_phj_probe_side_filtering, true,
     "Enables pushing PHJ build side filters to probe side");
 
+const string PREPARE_FOR_READ_FAILED_ERROR_MSG = "Failed to acquire initial read buffer "
+    "for stream in hash join node $0. Reducing query concurrency or increasing the "
+    "memory limit may help this query to complete successfully.";
+
 using namespace impala;
 using namespace llvm;
 using namespace strings;
@@ -433,7 +437,9 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   // We got the buffers we think we will need, try to build the hash table.
   RETURN_IF_ERROR(build_rows_->PinStream(false, built));
   if (!*built) return Status::OK();
-  RETURN_IF_ERROR(build_rows_->PrepareForRead(false));
+  bool got_read_buffer;
+  RETURN_IF_ERROR(build_rows_->PrepareForRead(false, &got_read_buffer));
+  DCHECK(got_read_buffer) << "Stream was already pinned.";
 
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
       parent_->mem_tracker());
@@ -623,7 +629,14 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   if (input_partition_ != NULL) {
     DCHECK(input_partition_->build_rows() != NULL);
     DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << NodeDebugString();
-    RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead(true));
+    bool got_read_buffer;
+    RETURN_IF_ERROR(
+        input_partition_->build_rows()->PrepareForRead(true, &got_read_buffer));
+    if (!got_read_buffer) {
+      Status status = Status::MemLimitExceeded();
+      status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
+      return status;
+    }
   }
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
@@ -788,7 +801,13 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   DCHECK(input_partition_->is_spilled());
 
   // Reserve one buffer to read the probe side.
-  RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead(true));
+  bool got_read_buffer;
+  RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead(true, &got_read_buffer));
+  if (!got_read_buffer) {
+    Status status = Status::MemLimitExceeded();
+    status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
+    return status;
+  }
   ht_ctx_->set_level(input_partition_->level_);
 
   int64_t mem_limit = mem_tracker()->SpareCapacity();
@@ -1045,7 +1064,13 @@ void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
 
 Status PartitionedHashJoinNode::PrepareNullAwareNullProbe() {
   DCHECK_EQ(null_probe_output_idx_, -1);
-  RETURN_IF_ERROR(null_probe_rows_->PrepareForRead(true));
+  bool got_read_buffer;
+  RETURN_IF_ERROR(null_probe_rows_->PrepareForRead(true, &got_read_buffer));
+  if (!got_read_buffer) {
+    Status status = Status::MemLimitExceeded();
+    status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
+    return status;
+  }
   DCHECK_EQ(probe_batch_->num_rows(), 0);
   probe_batch_pos_ = 0;
   null_probe_output_idx_ = 0;
@@ -1120,7 +1145,13 @@ Status PartitionedHashJoinNode::PrepareNullAwarePartition() {
   if (!got_rows) return NullAwareAntiJoinError(true);
 
   // Initialize the streams for read.
-  RETURN_IF_ERROR(probe_stream->PrepareForRead(true));
+  bool got_read_buffer;
+  RETURN_IF_ERROR(probe_stream->PrepareForRead(true, &got_read_buffer));
+  if (!got_read_buffer) {
+    Status status = Status::MemLimitExceeded();
+    status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
+    return status;
+  }
   probe_batch_pos_ = 0;
   return Status::OK();
 }

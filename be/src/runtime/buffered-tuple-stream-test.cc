@@ -314,7 +314,9 @@ class SimpleTupleStreamTest : public testing::Test {
       batch->Reset();
     }
 
-    ASSERT_OK(stream.PrepareForRead(false));
+    bool got_read_buffer;
+    ASSERT_OK(stream.PrepareForRead(false, &got_read_buffer));
+    ASSERT_TRUE(got_read_buffer);
 
     // Read all the rows back
     vector<T> results;
@@ -333,7 +335,9 @@ class SimpleTupleStreamTest : public testing::Test {
           client_, small_buffers == 0,  // initial small buffers
           true); // read_write
       ASSERT_OK(stream.Init(-1, NULL, true));
-      ASSERT_OK(stream.PrepareForRead(true));
+      bool got_read_buffer;
+      ASSERT_OK(stream.PrepareForRead(true, &got_read_buffer));
+      ASSERT_TRUE(got_read_buffer);
       if (unpin_stream) ASSERT_OK(stream.UnpinStream());
 
       vector<int> results;
@@ -575,7 +579,9 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
   int read_iters = 3;
   for (int i = 0; i < read_iters; ++i) {
     bool delete_on_read = i == read_iters - 1;
-    ASSERT_OK(stream.PrepareForRead(delete_on_read));
+    bool got_read_buffer;
+    ASSERT_OK(stream.PrepareForRead(delete_on_read, &got_read_buffer));
+    ASSERT_TRUE(got_read_buffer);
 
     if (varlen_data) {
       vector<StringValue> results;
@@ -690,7 +696,9 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
   for (int delete_on_read = 0; delete_on_read <= 1; ++delete_on_read) {
     // Keep stream in memory and test we can read ok.
     vector<StringValue> results;
-    stream.PrepareForRead(delete_on_read);
+    bool got_read_buffer;
+    ASSERT_OK(stream.PrepareForRead(delete_on_read, &got_read_buffer));
+    ASSERT_TRUE(got_read_buffer);
     ReadValues(&stream, string_desc_, &results);
     VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
   }
@@ -860,7 +868,9 @@ TEST_F(MultiTupleStreamTest, MultiTupleAllocateRow) {
   for (int i = 0; i < 3; ++i) {
     bool delete_on_read = i == 2;
     vector<StringValue> results;
-    stream.PrepareForRead(delete_on_read);
+    bool got_read_buffer;
+    stream.PrepareForRead(delete_on_read, &got_read_buffer);
+    ASSERT_TRUE(got_read_buffer);
     ReadValues(&stream, string_desc_, &results);
     VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
   }
@@ -1021,7 +1031,9 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   }
 
   // Read back and verify data.
-  stream.PrepareForRead(false);
+  bool got_read_buffer;
+  stream.PrepareForRead(false, &got_read_buffer);
+  ASSERT_TRUE(got_read_buffer);
   strings_index = 0;
   array_len_index = 0;
   bool eos = false;

@@ -398,7 +398,6 @@ Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_buffer
       bool current_pinned;
       RETURN_IF_ERROR((*it)->Pin(&current_pinned));
       if (!current_pinned) {
-        DCHECK(got_buffer != NULL) << "Should have reserved enough blocks";
         *got_buffer = false;
         return Status::OK();
       }
@@ -419,7 +418,7 @@ Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_buffer
   rows_returned_ = 0;
   read_block_idx_ = 0;
   delete_on_read_ = delete_on_read;
-  if (got_buffer != NULL) *got_buffer = true;
+  *got_buffer = true;
   return Status::OK();
 }
 
@@ -502,7 +501,9 @@ int BufferedTupleStream::ComputeNumNullIndicatorBytes(int block_size) const {
 Status BufferedTupleStream::GetRows(scoped_ptr<RowBatch>* batch, bool* got_rows) {
   RETURN_IF_ERROR(PinStream(false, got_rows));
   if (!*got_rows) return Status::OK();
-  RETURN_IF_ERROR(PrepareForRead(false));
+  bool got_read_buffer;
+  RETURN_IF_ERROR(PrepareForRead(false, &got_read_buffer));
+  DCHECK(got_read_buffer) << "Stream was pinned";
   batch->reset(
       new RowBatch(desc_, num_rows(), block_mgr_->get_tracker(block_mgr_client_)));
   bool eos = false;
