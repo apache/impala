@@ -27,6 +27,7 @@ from getpass import getuser
 from functools import wraps
 from impala._thrift_gen.ImpalaService.ttypes import TImpalaQueryOptions
 from random import choice
+from subprocess import check_call
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_connection import ImpalaConnection, create_connection
 from tests.common.test_dimensions import *
@@ -221,6 +222,17 @@ class ImpalaTestSuite(BaseTestSuite):
     sections = self.load_query_test_file(self.get_workload(), test_file_name,
         encoding=encoding)
     for test_section in sections:
+      if 'SHELL' in test_section:
+        assert len(test_section) == 1, \
+          "SHELL test sections can't contain other sections"
+        cmd = test_section['SHELL']\
+          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)\
+          .replace('$IMPALA_HOME', IMPALA_HOME)
+        if use_db: cmd = cmd.replace('$DATABASE', use_db)
+        LOG.info("Shell command: " + cmd)
+        check_call(cmd, shell=True)
+        continue
+
       if 'QUERY' not in test_section:
         assert 0, 'Error in test file %s. Test cases require a -- QUERY section.\n%s' %\
             (test_file_name, pprint.pformat(test_section))
@@ -265,7 +277,11 @@ class ImpalaTestSuite(BaseTestSuite):
               .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
               .replace('$NAMENODE', NAMENODE) \
               .replace('$IMPALA_HOME', IMPALA_HOME)
-          assert expected_str in str(e)
+          if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
+          # Strip newlines so we can split error message into multiple lines
+          expected_str = expected_str.replace('\n', '')
+          actual_str = str(e).replace('\n', '')
+          assert expected_str in actual_str
           continue
         raise
       finally:

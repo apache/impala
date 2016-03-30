@@ -205,6 +205,10 @@ enum TImpalaQueryOptions {
   // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
   // always use the annotation.
   PARQUET_ANNOTATE_STRINGS_UTF8
+
+  // Determines how to resolve Parquet files' schemas in the absence of field IDs (which
+  // is always, since fields IDs are NYI). Valid values are "position" and "name".
+  PARQUET_FALLBACK_SCHEMA_RESOLUTION
 }
 
 // The summary of an insert.

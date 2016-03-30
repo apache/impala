@@ -1,0 +1,8 @@
+
+{"type": "record",
+ "namespace": "com.cloudera.impala",
+ "name": "switched_map",
+ "fields": [
+     {"name": "int_map", "type": {"type": "map", "values": "int"}}
+ ]
+}

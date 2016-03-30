@@ -78,7 +78,7 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   section_names = valid_section_names
   if section_names is None:
     section_names = ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP', 'CATCH', 'ERRORS',
-                     'USER', 'RUNTIME_PROFILE']
+        'USER', 'RUNTIME_PROFILE', 'SHELL']
   return parse_test_file(file_name, section_names, encoding=encoding,
       skip_unknown_sections=False)
 

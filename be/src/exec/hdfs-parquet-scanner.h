@@ -418,7 +418,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Version of the application that wrote this file.
   FileVersion file_version_;
 
-  /// The root schema node for this file
+  /// The root schema node for this file.
   SchemaNode schema_;
 
   /// Scan range for the metadata.
@@ -590,10 +590,15 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Helper functions for ResolvePathHelper().
 
-  /// Advances 'node' to one of its children based on path[next_idx]. Returns the child
-  /// node or sets 'missing_field' to true.
-  SchemaNode* NextSchemaNode(const SchemaPath& path, int next_idx, SchemaNode* node,
-    bool* missing_field);
+  /// Advances 'node' to one of its children based on path[next_idx] and
+  /// 'col_type'. 'col_type' is NULL if 'node' is the root node, otherwise it's the type
+  /// associated with 'node'. Returns the child node or sets 'missing_field' to true.
+  SchemaNode* NextSchemaNode(const ColumnType* col_type, const SchemaPath& path,
+      int next_idx, SchemaNode* node, bool* missing_field);
+
+  /// Returns the index of 'node's child with 'name', or the number of children if not
+  /// found.
+  int FindChildWithName(SchemaNode* node, const string& name);
 
   /// The ResolvePathHelper() logic for arrays.
   Status ResolveArray(ArrayEncoding array_encoding, const SchemaPath& path, int idx,

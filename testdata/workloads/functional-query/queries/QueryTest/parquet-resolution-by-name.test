@@ -1,0 +1,234 @@
+====
+---- QUERY
+# Create a table and populate with data file
+drop table if exists resolution_by_name_test;
+create table resolution_by_name_test stored as parquet
+as select * from functional_parquet.tinytable;
+select a, b from resolution_by_name_test;
+---- TYPES
+string,string
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+====
+---- QUERY
+# Rearrange the columns and make sure we can still resolve by name
+alter table resolution_by_name_test replace columns (b string, a string);
+set parquet_fallback_schema_resolution="NAME";
+select a, b from resolution_by_name_test;
+---- TYPES
+string,string
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+====
+---- QUERY
+# Renaming a column will cause the column to not be resolved
+alter table resolution_by_name_test change a new_a string;
+select new_a from resolution_by_name_test;
+---- TYPES
+string
+---- RESULTS
+'NULL'
+'NULL'
+'NULL'
+====
+---- QUERY
+# Can still resolve by ordinal
+set parquet_fallback_schema_resolution="POSITION";
+select b, new_a from resolution_by_name_test;
+---- TYPES
+string,string
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+====
+---- QUERY
+# Check that we can parse the integer enum value as well
+set parquet_fallback_schema_resolution=1;
+select new_a from resolution_by_name_test;
+---- TYPES
+string
+---- RESULTS
+'NULL'
+'NULL'
+'NULL'
+====
+---- QUERY
+set parquet_fallback_schema_resolution=0;
+select b, new_a from resolution_by_name_test;
+---- TYPES
+string,string
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+====
+---- QUERY
+drop table resolution_by_name_test;
+====
+---- QUERY
+# Test nested types resolution
+drop table if exists nested_resolution_by_name_test;
+create table nested_resolution_by_name_test like functional_parquet.complextypestbl;
+====
+---- SHELL
+hadoop fs -cp $FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nullable.parq \
+$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nested_resolution_by_name_test/
+hadoop fs -cp $FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nonnullable.parq \
+$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nested_resolution_by_name_test/
+====
+---- QUERY
+select id, nested_struct.a, b.item
+from nested_resolution_by_name_test t, t.nested_struct.b
+---- TYPES
+bigint,int,int
+---- RESULTS
+1,1,1
+2,NULL,NULL
+7,7,2
+7,7,3
+7,7,NULL
+8,-1,-1
+====
+---- QUERY
+# Can safely ignore extra fields in nested_struct
+alter table nested_resolution_by_name_test change nested_struct nested_struct
+struct<a:int, b: array<int>>;
+select id, nested_struct.a, b.item
+from nested_resolution_by_name_test t, t.nested_struct.b
+---- TYPES
+bigint,int,int
+---- RESULTS
+1,1,1
+2,NULL,NULL
+7,7,2
+7,7,3
+7,7,NULL
+8,-1,-1
+====
+---- QUERY
+# Rearrange nested_struct's fields and make sure we can still resolve by name
+alter table nested_resolution_by_name_test change nested_struct nested_struct
+struct<b: array<int>, a: int>;
+set parquet_fallback_schema_resolution="name";
+select id, nested_struct.a, b.item
+from nested_resolution_by_name_test t, t.nested_struct.b
+---- TYPES
+bigint,int,int
+---- RESULTS
+1,1,1
+2,NULL,NULL
+7,7,2
+7,7,3
+7,7,NULL
+8,-1,-1
+====
+---- QUERY
+# Can add back a single field
+alter table nested_resolution_by_name_test change nested_struct nested_struct
+struct<b: array<int>, a: int, g: map<string, struct<h: struct<i: array<float>>>>>;
+select id, g.key
+from nested_resolution_by_name_test t, t.nested_struct.g
+---- TYPES
+bigint,string
+---- RESULTS
+1,'foo'
+2,'g1'
+2,'g2'
+2,'g3'
+2,'g4'
+2,'g5'
+5,'foo'
+====
+---- QUERY
+# Add back single more nested field (and remove 'g' field)
+alter table nested_resolution_by_name_test change nested_struct nested_struct
+struct<b: array<int>, a: int, c: struct<d: array<array<struct<f: string>>>>>;
+select tmp.f from nested_resolution_by_name_test.nested_struct.c.d.item tmp;
+---- TYPES
+string
+---- RESULTS
+'aaa'
+'bbb'
+'c'
+'NULL'
+'aaa'
+'NULL'
+'bbb'
+'NULL'
+'c'
+'NULL'
+'NULL'
+'nonnullable'
+====
+---- QUERY
+# Can't rename nested field
+alter table nested_resolution_by_name_test change nested_struct nested_struct
+struct<b: array<int>, a: int, c: struct<d: array<array<struct<renamed: string>>>>>;
+select tmp.renamed from nested_resolution_by_name_test.nested_struct.c.d.item tmp;
+---- TYPES
+string
+---- RESULTS
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+====
+---- QUERY
+drop table nested_resolution_by_name_test;
+====
+---- QUERY
+# Test switched key/value map fields
+drop table if exists switched_map_fields_resolution_test;
+create table switched_map_fields_resolution_test (int_map map<string,int>)
+stored as parquet;
+====
+---- SHELL
+hadoop fs -copyFromLocal \
+$IMPALA_HOME/testdata/parquet_schema_resolution/switched_map.parq \
+$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/switched_map_fields_resolution_test/
+====
+---- QUERY
+# Switched map fields should be resolvable by name.
+set parquet_fallback_schema_resolution="name";
+select key, value from switched_map_fields_resolution_test.int_map
+---- TYPES
+string,int
+---- RESULTS
+'a',1
+'b',2
+'c',3
+====
+---- QUERY
+# Can't resolve switched map fields by position since types are switched.
+set parquet_fallback_schema_resolution="position";
+select key, value from switched_map_fields_resolution_test.int_map
+---- CATCH
+File '$NAMENODE/test-warehouse/$DATABASE.db/switched_map_fields_resolution_test/
+switched_map.parq' has an incompatible Parquet schema for column
+ '$DATABASE.switched_map_fields_resolution_test.int_map.key'.
+ Column type: STRING, Parquet schema:
+required int32 value [i:0 d:1 r:1]
+====
+---- QUERY
+drop table switched_map_fields_resolution_test
+====
+---- QUERY
+# Check that we handle bad options gracefully
+set parquet_fallback_schema_resolution="FOO"
+---- CATCH
+Invalid PARQUET_FALLBACK_SCHEMA_RESOLUTION option: 'FOO'.
+ Valid options are 'POSITION' and 'NAME'.
+====

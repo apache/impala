@@ -1976,7 +1976,7 @@ Status HdfsParquetScanner::ResolvePathHelper(ArrayEncoding array_encoding,
   for (int i = 0; i < path.size(); ++i) {
     // Advance '*node' if necessary
     if (i == 0 || col_type->type != TYPE_ARRAY || array_encoding == THREE_LEVEL) {
-      *node = NextSchemaNode(path, i, *node, missing_field);
+      *node = NextSchemaNode(col_type, path, i, *node, missing_field);
       if (*missing_field) return Status::OK();
     } else {
       // We just resolved an array, meaning *node is set to the repeated field of the
@@ -2017,20 +2017,77 @@ Status HdfsParquetScanner::ResolvePathHelper(ArrayEncoding array_encoding,
   return Status::OK();
 }
 
-HdfsParquetScanner::SchemaNode* HdfsParquetScanner::NextSchemaNode(const SchemaPath& path,
-    int next_idx, SchemaNode* node, bool* missing_field) {
+HdfsParquetScanner::SchemaNode* HdfsParquetScanner::NextSchemaNode(
+    const ColumnType* col_type, const SchemaPath& path, int next_idx, SchemaNode* node,
+    bool* missing_field) {
   DCHECK_LT(next_idx, path.size());
-  // The first index in a path includes the table's partition keys
-  int file_idx =
-      next_idx == 0 ? path[next_idx] - scan_node_->num_partition_keys() : path[next_idx];
-  if (node->children.size() <= file_idx) {
-    // The selected field is not in the file
+  if (next_idx != 0) DCHECK(col_type != NULL);
+
+  int file_idx;
+  int table_idx = path[next_idx];
+  bool resolve_by_name = state_->query_options().parquet_fallback_schema_resolution ==
+      TParquetFallbackSchemaResolution::NAME;
+  if (resolve_by_name) {
+    if (next_idx == 0) {
+      // Resolve top-level table column by name.
+      DCHECK_LT(table_idx, scan_node_->hdfs_table()->col_descs().size());
+      const string& name = scan_node_->hdfs_table()->col_descs()[table_idx].name();
+      file_idx = FindChildWithName(node, name);
+    } else if (col_type->type == TYPE_STRUCT) {
+      // Resolve struct field by name.
+      DCHECK_LT(table_idx, col_type->field_names.size());
+      const string& name = col_type->field_names[table_idx];
+      file_idx = FindChildWithName(node, name);
+    } else if (col_type->type == TYPE_ARRAY) {
+      // Arrays have only one child in the file.
+      DCHECK_EQ(table_idx, SchemaPathConstants::ARRAY_ITEM);
+      file_idx = table_idx;
+    } else {
+      DCHECK_EQ(col_type->type, TYPE_MAP);
+      // Maps have two values, "key" and "value". These are supposed to be ordered and may
+      // not have the right field names, but try to resolve by name in case they're
+      // switched and otherwise use the order. See
+      // https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#maps for
+      // more details.
+      DCHECK(table_idx == SchemaPathConstants::MAP_KEY ||
+             table_idx == SchemaPathConstants::MAP_VALUE);
+      const string& name = table_idx == SchemaPathConstants::MAP_KEY ? "key" : "value";
+      file_idx = FindChildWithName(node, name);
+      if (file_idx >= node->children.size()) {
+        // Couldn't resolve by name, fall back to resolution by position.
+        file_idx = table_idx;
+      }
+    }
+  } else {
+    // Resolution by position.
+    DCHECK_EQ(state_->query_options().parquet_fallback_schema_resolution,
+        TParquetFallbackSchemaResolution::POSITION);
+    if (next_idx == 0) {
+      // For top-level columns, the first index in a path includes the table's partition
+      // keys.
+      file_idx = table_idx - scan_node_->num_partition_keys();
+    } else {
+      file_idx = table_idx;
+    }
+  }
+
+  if (file_idx >= node->children.size()) {
     VLOG_FILE << Substitute(
-        "File '$0' does not contain path '$1'", filename(), PrintPath(path));
+        "File '$0' does not contain path '$1' (resolving by $2)", filename(),
+        PrintPath(path), resolve_by_name ? "name" : "position");
     *missing_field = true;
     return NULL;
   }
   return &node->children[file_idx];
+}
+
+int HdfsParquetScanner::FindChildWithName(HdfsParquetScanner::SchemaNode* node,
+    const string& name) {
+  int idx;
+  for (idx = 0; idx < node->children.size(); ++idx) {
+    if (node->children[idx].element->name == name) break;
+  }
+  return idx;
 }
 
 // There are three types of array encodings:

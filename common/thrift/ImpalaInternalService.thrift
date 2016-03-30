@@ -42,6 +42,11 @@ const i32 INVALID_PLAN_NODE_ID = -1
 // Constant default partition ID, must be < 0 to avoid collisions
 const i64 DEFAULT_PARTITION_ID = -1;
 
+enum TParquetFallbackSchemaResolution {
+  POSITION,
+  NAME
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -170,6 +175,11 @@ struct TQueryOptions {
   // This is disabled by default in order to preserve the existing behavior of legacy
   // workloads. In addition, Impala strings are not necessarily UTF8-encoded.
   42: optional bool parquet_annotate_strings_utf8 = false
+
+  // Determines how to resolve Parquet files' schemas in the absence of field IDs (which
+  // is always, since fields IDs are NYI). Valid values are "position" (default) and
+  // "name".
+  43: optional TParquetFallbackSchemaResolution parquet_fallback_schema_resolution = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

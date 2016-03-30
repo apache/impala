@@ -336,6 +336,11 @@ class TestParquet(ImpalaTestSuite):
     assert c_schema_elt.converted_type == ConvertedType.UTF8
     assert d_schema_elt.converted_type == None
 
+  @SkipIfS3.insert
+  def test_resolution_by_name(self, unique_database, vector):
+    self.run_test_case('QueryTest/parquet-resolution-by-name', vector,
+                       use_db=unique_database)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range

@@ -219,6 +219,8 @@ def unique_database(request, testid_checksum):
                      'characters.'.format(db_name))
 
   def cleanup():
+    # Make sure we don't try to drop the current session database
+    request.instance.execute_query_expect_success(request.instance.client, "use default")
     request.instance.execute_query_expect_success(
         request.instance.client, 'DROP DATABASE `{0}` CASCADE'.format(db_name))
     LOG.info('Dropped database "{0}" for test ID "{1}"'.format(db_name,

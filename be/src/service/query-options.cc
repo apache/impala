@@ -33,6 +33,7 @@ using boost::algorithm::is_any_of;
 using boost::algorithm::token_compress_on;
 using boost::algorithm::split;
 using boost::algorithm::trim;
+using std::to_string;
 using namespace impala;
 using namespace strings;
 
@@ -100,6 +101,9 @@ int GetQueryOptionForKey(const string& key) {
   return -1;
 }
 
+// Note that we allow numerical values for boolean and enum options. This is because
+// TQueryOptionsToMap() will output the numerical values, and we need to parse its output
+// configuration.
 Status impala::SetQueryOption(const string& key, const string& value,
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask) {
   int option = GetQueryOptionForKey(key);
@@ -365,6 +369,21 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::PARQUET_ANNOTATE_STRINGS_UTF8: {
         query_options->__set_parquet_annotate_strings_utf8(
             iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
+      case TImpalaQueryOptions::PARQUET_FALLBACK_SCHEMA_RESOLUTION: {
+        if (iequals(value, "position") ||
+            iequals(value, to_string(TParquetFallbackSchemaResolution::POSITION))) {
+          query_options->__set_parquet_fallback_schema_resolution(
+              TParquetFallbackSchemaResolution::POSITION);
+        } else if (iequals(value, "name") ||
+                   iequals(value, to_string(TParquetFallbackSchemaResolution::NAME))) {
+          query_options->__set_parquet_fallback_schema_resolution(
+              TParquetFallbackSchemaResolution::NAME);
+        } else {
+          return Status(Substitute("Invalid PARQUET_FALLBACK_SCHEMA_RESOLUTION option: "
+              "'$0'. Valid options are 'POSITION' and 'NAME'.", value));
+        }
         break;
       }
       default:
