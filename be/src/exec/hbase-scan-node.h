@@ -103,12 +103,6 @@ class HBaseScanNode : public ScanNode {
   /// True, if row key is binary encoded
   bool row_key_binary_encoded_;
 
-  /// Size of tuple buffer determined by size of tuples and capacity of row batches.
-  int tuple_buffer_size_;
-
-  /// Current tuple.
-  Tuple* tuple_;
-
   /// Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 
@@ -116,12 +110,12 @@ class HBaseScanNode : public ScanNode {
   /// will be 0.
   int suggested_max_caching_;
 
-  /// Writes a slot in tuple_ from an HBase value containing text data.
+  /// Writes a slot in tuple from an HBase value containing text data.
   /// The HBase value is converted into the appropriate target type.
   void WriteTextSlot(
       const std::string& family, const std::string& qualifier,
       void* value, int value_length, SlotDescriptor* slot,
-      RuntimeState* state, MemPool* pool, bool* error_in_row);
+      RuntimeState* state, MemPool* pool, Tuple* tuple, bool* error_in_row);
 };
 
 }

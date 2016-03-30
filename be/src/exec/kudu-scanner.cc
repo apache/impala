@@ -109,13 +109,10 @@ Status KuduScanner::KeepKuduScannerAlive() {
 }
 
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
-  int tuple_buffer_size = row_batch->capacity() * tuple_byte_size_;
-  void* tuple_buffer = row_batch->tuple_data_pool()->TryAllocate(tuple_buffer_size);
-  if (tuple_buffer_size > 0 && tuple_buffer == NULL) {
-    Status s = Status::MemLimitExceeded();
-    s.AddDetail("Could not allocate memory for a tuple buffer.");
-    return s;
-  }
+  int64_t tuple_buffer_size;
+  uint8_t* tuple_buffer;
+  RETURN_IF_ERROR(
+      row_batch->ResizeAndAllocateTupleBuffer(state_, &tuple_buffer_size, &tuple_buffer));
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
 
   // Main scan loop:

@@ -135,13 +135,9 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
 Status HdfsScanner::StartNewRowBatch() {
   batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
       scan_node_->mem_tracker());
-  int64_t size = state_->batch_size() * tuple_byte_size_;
-  tuple_mem_ = batch_->tuple_data_pool()->TryAllocate(size);
-  if (UNLIKELY(tuple_mem_ == NULL)) {
-    string details = Substitute("StartNewRowBatch() failed to allocate $0 bytes.", size);
-    return batch_->tuple_data_pool()->mem_tracker()->MemLimitExceeded(state_,
-        details, size);
-  }
+  int64_t tuple_buffer_size;
+  RETURN_IF_ERROR(
+      batch_->ResizeAndAllocateTupleBuffer(state_, &tuple_buffer_size, &tuple_mem_));
   return Status::OK();
 }
 

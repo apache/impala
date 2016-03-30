@@ -73,9 +73,6 @@ class DataSourceScanNode : public ScanNode {
   /// Tuple index in tuple row.
   int tuple_idx_;
 
-  /// Current tuple.
-  Tuple* tuple_;
-
   /// The opaque handle returned by the data source for the scan.
   std::string scan_handle_;
 
@@ -96,8 +93,8 @@ class DataSourceScanNode : public ScanNode {
   /// the next row batch.
   std::vector<int> cols_next_val_idx_;
 
-  /// Materializes the next row (next_row_idx_) into tuple_.
-  Status MaterializeNextRow(MemPool* mem_pool);
+  /// Materializes the next row (next_row_idx_) into tuple.
+  Status MaterializeNextRow(MemPool* mem_pool, Tuple* tuple);
 
   /// Gets the next batch from the data source, stored in input_batch_.
   Status GetNextInputBatch();

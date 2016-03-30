@@ -189,17 +189,17 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
   return Status::OK();
 }
 
-Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool) {
+Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool, Tuple* tuple) {
   const vector<TColumnData>& cols = input_batch_->rows.cols;
-  tuple_->Init(tuple_desc_->byte_size());
+  tuple->Init(tuple_desc_->byte_size());
 
   for (int i = 0; i < tuple_desc_->slots().size(); ++i) {
     const SlotDescriptor* slot_desc = tuple_desc_->slots()[i];
-    void* slot = tuple_->GetSlot(slot_desc->tuple_offset());
+    void* slot = tuple->GetSlot(slot_desc->tuple_offset());
     const TColumnData& col = cols[i];
 
     if (col.is_null[next_row_idx_]) {
-      tuple_->SetNull(slot_desc->null_indicator_offset());
+      tuple->SetNull(slot_desc->null_indicator_offset());
       continue;
     }
 
@@ -306,14 +306,11 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
 
   // create new tuple buffer for row_batch
   MemPool* tuple_pool = row_batch->tuple_data_pool();
-  int tuple_buffer_size = row_batch->MaxTupleBufferSize();
-  void* tuple_buffer = tuple_pool->TryAllocate(tuple_buffer_size);
-  if (UNLIKELY(tuple_buffer == NULL)) {
-    string details = Substitute(ERROR_MEM_LIMIT_EXCEEDED, "GetNext",
-        tuple_buffer_size, "tuple");
-    return tuple_pool->mem_tracker()->MemLimitExceeded(state, details, tuple_buffer_size);
-  }
-  tuple_ = reinterpret_cast<Tuple*>(tuple_buffer);
+  int64_t tuple_buffer_size;
+  uint8_t* tuple_buffer;
+  RETURN_IF_ERROR(
+      row_batch->ResizeAndAllocateTupleBuffer(state, &tuple_buffer_size, &tuple_buffer));
+  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
   ExprContext** ctxs = &conjunct_ctxs_[0];
   int num_ctxs = conjunct_ctxs_.size();
 
@@ -322,16 +319,15 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       SCOPED_TIMER(materialize_tuple_timer());
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
       while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
-        RETURN_IF_ERROR(MaterializeNextRow(tuple_pool));
+        RETURN_IF_ERROR(MaterializeNextRow(tuple_pool, tuple));
         int row_idx = row_batch->AddRow();
         TupleRow* tuple_row = row_batch->GetRow(row_idx);
-        tuple_row->SetTuple(tuple_idx_, tuple_);
+        tuple_row->SetTuple(tuple_idx_, tuple);
 
         if (ExecNode::EvalConjuncts(ctxs, num_ctxs, tuple_row)) {
           row_batch->CommitLastRow();
-          char* new_tuple = reinterpret_cast<char*>(tuple_);
-          new_tuple += tuple_desc_->byte_size();
-          tuple_ = reinterpret_cast<Tuple*>(new_tuple);
+          tuple = reinterpret_cast<Tuple*>(
+              reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
           ++num_rows_returned_;
         }
         ++next_row_idx_;

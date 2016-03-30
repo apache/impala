@@ -34,6 +34,9 @@ DECLARE_bool(enable_partitioned_aggregation);
 
 namespace impala {
 
+const int RowBatch::AT_CAPACITY_MEM_USAGE;
+const int RowBatch::FIXED_LEN_BUFFER_LIMIT;
+
 RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     MemTracker* mem_tracker)
   : num_rows_(0),
@@ -431,15 +434,21 @@ int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
   return result;
 }
 
-int RowBatch::MaxTupleBufferSize() {
-  int row_size = row_desc_.GetRowSize();
-  if (row_size > AT_CAPACITY_MEM_USAGE) return row_size;
-  int num_rows = 0;
+Status RowBatch::ResizeAndAllocateTupleBuffer(RuntimeState* state,
+    int64_t* tuple_buffer_size, uint8_t** buffer) {
+  const int row_size = row_desc_.GetRowSize();
+  // Avoid divide-by-zero. Don't need to modify capacity for empty rows anyway.
   if (row_size != 0) {
-    num_rows = std::min(capacity_, AT_CAPACITY_MEM_USAGE / row_size);
+    capacity_ = max(1, min(capacity_, FIXED_LEN_BUFFER_LIMIT / row_size));
   }
-  int tuple_buffer_size = num_rows * row_size;
-  DCHECK_LE(tuple_buffer_size, AT_CAPACITY_MEM_USAGE);
-  return tuple_buffer_size;
+  *tuple_buffer_size = static_cast<int64_t>(row_size) * capacity_;
+  *buffer = tuple_data_pool_.TryAllocate(*tuple_buffer_size);
+  if (*buffer == NULL) {
+    Status status = Status::MemLimitExceeded();
+    return mem_tracker_->MemLimitExceeded(state, "Failed to allocate tuple buffer",
+        *tuple_buffer_size);
+  }
+  return Status::OK();
 }
+
 }

@@ -35,6 +35,7 @@ class BufferedTupleStream;
 template <typename K, typename V> class FixedSizeHashTable;
 class MemTracker;
 class RowBatchSerializeTest;
+class RuntimeState;
 class TRowBatch;
 class Tuple;
 class TupleRow;
@@ -228,8 +229,18 @@ class RowBatch {
   /// row's worth of data.
   static const int AT_CAPACITY_MEM_USAGE = 8 * 1024 * 1024;
 
-  /// Computes the maximum size needed to store tuple data for this row batch.
-  int MaxTupleBufferSize();
+  // Max memory out of AT_CAPACITY_MEM_USAGE that should be used for fixed-length data,
+  // in order to leave room for variable-length data.
+  static const int FIXED_LEN_BUFFER_LIMIT = AT_CAPACITY_MEM_USAGE / 2;
+
+  /// Allocates a buffer large enough for the fixed-length portion of 'capacity_' rows in
+  /// this batch from 'tuple_data_pool_'. 'capacity_' is reduced if the allocation would
+  /// exceed FIXED_LEN_BUFFER_LIMIT. Always returns enough space for at least one row.
+  /// Returns Status::MEM_LIMIT_EXCEEDED and sets 'buffer' to NULL if a memory limit would
+  /// have been exceeded. 'state' is used to log the error.
+  /// On success, sets 'buffer_size' to the size in bytes and 'buffer' to the buffer.
+  Status ResizeAndAllocateTupleBuffer(RuntimeState* state, int64_t* buffer_size,
+       uint8_t** buffer);
 
  private:
   friend class RowBatchSerializeBaseline;
