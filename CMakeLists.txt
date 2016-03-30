@@ -18,15 +18,19 @@ if (NOT $ENV{DISABLE_IMPALA_TOOLCHAIN})
   # Enable toolchain variable if the environment is setup
   set(IMPALA_TOOLCHAIN ON)
   message(STATUS "Toolchain build.")
-  # Download any missing toolchain dependencies. If this fails, fail the build.
-  set(BOOTSTRAP_CMD "$ENV{IMPALA_HOME}/bin/bootstrap_toolchain.py")
-  # Download and unpack the dependencies
-  message(STATUS "Downloading and extracting dependencies.")
-  execute_process(COMMAND ${BOOTSTRAP_CMD} RESULT_VARIABLE BOOTSTRAP_RESULT)
-  if (${BOOTSTRAP_RESULT} EQUAL 0)
-    message(STATUS "Toolchain bootstrap complete.")
+  if ("$ENV{SKIP_TOOLCHAIN_BOOTSTRAP}" STREQUAL "true")
+    message(STATUS "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap.")
   else()
-    message(FATAL_ERROR "Toolchain bootstrap failed.")
+    # Download any missing toolchain dependencies. If this fails, fail the build.
+    set(BOOTSTRAP_CMD "$ENV{IMPALA_HOME}/bin/bootstrap_toolchain.py")
+    # Download and unpack the dependencies
+    message(STATUS "Downloading and extracting dependencies.")
+    execute_process(COMMAND ${BOOTSTRAP_CMD} RESULT_VARIABLE BOOTSTRAP_RESULT)
+    if (${BOOTSTRAP_RESULT} EQUAL 0)
+      message(STATUS "Toolchain bootstrap complete.")
+    else()
+      message(FATAL_ERROR "Toolchain bootstrap failed.")
+    endif()
   endif()
 else()
   set(IMPALA_TOOLCHAIN OFF)
