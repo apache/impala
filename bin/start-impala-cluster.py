@@ -212,6 +212,10 @@ def build_rm_args(instance_num):
   return RM_ARGS % (llama_address, cgroup_path, fs_cfg_path)
 
 def start_impalad_instances(cluster_size):
+  if cluster_size == 0:
+    # No impalad instances should be started.
+    return
+
   # The default memory limit for an impalad is 80% of the total system memory. On a
   # mini-cluster with 3 impalads that means 240%. Since having an impalad be OOM killed
   # is very annoying, the mem limit will be reduced. This can be overridden using the
