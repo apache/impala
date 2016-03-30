@@ -27,7 +27,7 @@ VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_te
                    'statestore']
 
 TEST_DIR = os.path.join(os.environ['IMPALA_HOME'], 'tests')
-TEST_RESULT_DIR = os.path.join(TEST_DIR, 'results')
+TEST_RESULT_DIR = os.path.join(os.environ['IMPALA_EE_TEST_LOGS_DIR'], 'results')
 
 # Arguments that control output logging. If additional default arguments are needed they
 # should go in the pytest.ini file.
