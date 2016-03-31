@@ -17,7 +17,9 @@ import time
 
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIfLocal
 
+@SkipIfLocal.multiple_impalad
 class TestRuntimeFilters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -43,6 +45,7 @@ class TestRuntimeFilters(ImpalaTestSuite):
       "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
 
 
+@SkipIfLocal.multiple_impalad
 class TestRuntimeRowFilters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
