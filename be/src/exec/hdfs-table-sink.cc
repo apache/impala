@@ -340,7 +340,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   output_partition->num_rows = 0;
   Status status = output_partition->writer->InitNewFile();
   if (!status.ok()) {
-    ClosePartitionFile(state, output_partition);
+    status.MergeStatus(ClosePartitionFile(state, output_partition));
     hdfsDelete(output_partition->hdfs_connection,
         output_partition->current_file_name.c_str(), 0);
   }
@@ -608,24 +608,27 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
     DataSink::MergeInsertStats(partition->writer->stats(), &it->second.stats);
   }
 
-  ClosePartitionFile(state, partition);
+  RETURN_IF_ERROR(ClosePartitionFile(state, partition));
   return Status::OK();
 }
 
-void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* partition) {
-  if (partition->tmp_hdfs_file == NULL) return;
+Status HdfsTableSink::ClosePartitionFile(
+    RuntimeState* state, OutputPartition* partition) {
+  if (partition->tmp_hdfs_file == NULL) return Status::OK();
   int hdfs_ret = hdfsCloseFile(partition->hdfs_connection, partition->tmp_hdfs_file);
   VLOG_FILE << "hdfsCloseFile() file=" << partition->current_file_name;
+  partition->tmp_hdfs_file = NULL;
+  ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
   if (hdfs_ret != 0) {
-    state->LogError(ErrorMsg(TErrorCode::GENERAL,
+    return Status(ErrorMsg(TErrorCode::GENERAL,
         GetHdfsErrorMsg("Failed to close HDFS file: ",
         partition->current_file_name)));
   }
-  partition->tmp_hdfs_file = NULL;
-  ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
+  return Status::OK();
 }
 
 Status HdfsTableSink::FlushFinal(RuntimeState* state) {
+  DCHECK(!closed_);
   SCOPED_TIMER(profile()->total_time_counter());
 
   if (dynamic_partition_key_expr_ctxs_.empty()) {
@@ -643,8 +646,6 @@ Status HdfsTableSink::FlushFinal(RuntimeState* state) {
     RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
   }
 
-  // TODO: Move call to ClosePartitionFile() here so that the error status can be
-  // propagated. If closing the file fails, the query should fail.
   return Status::OK();
 }
 
@@ -658,7 +659,8 @@ void HdfsTableSink::Close(RuntimeState* state) {
     if (cur_partition->second.first->writer.get() != NULL) {
       cur_partition->second.first->writer->Close();
     }
-    ClosePartitionFile(state, cur_partition->second.first);
+    Status close_status = ClosePartitionFile(state, cur_partition->second.first);
+    if (!close_status.ok()) state->LogError(close_status.msg());
   }
   partition_keys_to_output_partitions_.clear();
 

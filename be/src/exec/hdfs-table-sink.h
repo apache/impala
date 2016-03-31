@@ -206,12 +206,12 @@ class HdfsTableSink : public DataSink {
   void BuildHdfsFileNames(const HdfsPartitionDescriptor& partition_descriptor,
       OutputPartition* output);
 
-  /// Updates runtime stats of HDFS with rows written, then closes the file associated with
-  /// the partition by calling ClosePartitionFile()
+  /// Updates runtime stats of HDFS with rows written, then closes the file associated
+  /// with the partition by calling ClosePartitionFile()
   Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition);
 
   /// Closes the hdfs file for this partition as well as the writer.
-  void ClosePartitionFile(RuntimeState* state, OutputPartition* partition);
+  Status ClosePartitionFile(RuntimeState* state, OutputPartition* partition);
 
   // Returns TRUE if the staging step should be skipped for this partition. This allows
   // for faster INSERT query completion time for the S3A filesystem as the coordinator
