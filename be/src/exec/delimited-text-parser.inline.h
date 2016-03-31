@@ -26,7 +26,7 @@ namespace impala {
 /// If the character at n is an escape character, then delimiters(tuple/field/escape
 /// characters) at n+1 don't count.
 inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
-                              uint16_t* delim_mask) {
+    uint16_t* delim_mask) {
   // Escape characters can escape escape characters.
   bool first_char_is_escape = *last_char_is_escape;
   bool escape_next = first_char_is_escape;
@@ -39,7 +39,7 @@ inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
 
   // Remember last character for the next iteration
   *last_char_is_escape = escape_mask &
-    SSEUtil::SSE_BITMASK[SSEUtil::CHARS_PER_128_BIT_REGISTER - 1];
+      SSEUtil::SSE_BITMASK[SSEUtil::CHARS_PER_128_BIT_REGISTER - 1];
 
   // Shift escape mask up one so they match at the same bit index as the tuple and
   // field mask (instead of being the character before) and set the correct first bit
@@ -50,35 +50,41 @@ inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
 }
 
 template <bool process_escapes>
-inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
+inline Status DelimitedTextParser::AddColumn(int64_t len, char** next_column_start,
     int* num_fields, FieldLocation* field_locations) {
+  if (UNLIKELY(!BitUtil::IsNonNegative32Bit(len))) {
+    return Status(TErrorCode::TEXT_PARSER_TRUNCATED_COLUMN, len);
+  }
   if (ReturnCurrentColumn()) {
     // Found a column that needs to be parsed, write the start/len to 'field_locations'
     field_locations[*num_fields].start = *next_column_start;
+    int64_t field_len = len;
     if (process_escapes && current_column_has_escape_) {
-      field_locations[*num_fields].len = -len;
-    } else {
-      field_locations[*num_fields].len = len;
+      field_len = -len;
     }
+    field_locations[*num_fields].len = static_cast<int32_t>(field_len);
     ++(*num_fields);
   }
   if (process_escapes) current_column_has_escape_ = false;
   *next_column_start += len + 1;
   ++column_idx_;
+  return Status::OK();
 }
 
 template <bool process_escapes>
-void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
+inline Status DelimitedTextParser::FillColumns(int64_t len, char** last_column,
     int* num_fields, FieldLocation* field_locations) {
   // Fill in any columns missing from the end of the tuple.
   char* dummy = NULL;
   if (last_column == NULL) last_column = &dummy;
   while (column_idx_ < num_cols_) {
-    AddColumn<process_escapes>(len, last_column, num_fields, field_locations);
+    RETURN_IF_ERROR(AddColumn<process_escapes>(len, last_column,
+        num_fields, field_locations));
     // The rest of the columns will be null.
     last_column = &dummy;
     len = 0;
   }
+  return Status::OK();
 }
 
 /// SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for
@@ -95,10 +101,9 @@ void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
 ///  Haystack = 'asdfghjklhjbdwwc' (the raw string)
 ///  Result   = '1010000000011001'
 template <bool process_escapes>
-inline void DelimitedTextParser::ParseSse(int max_tuples,
+inline Status DelimitedTextParser::ParseSse(int max_tuples,
     int64_t* remaining_len, char** byte_buffer_ptr,
-    char** row_end_locations,
-    FieldLocation* field_locations,
+    char** row_end_locations, FieldLocation* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
 
@@ -172,8 +177,8 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
       char* delim_ptr = *byte_buffer_ptr + n;
 
       if (*delim_ptr == field_delim_ || *delim_ptr == collection_item_delim_) {
-        AddColumn<process_escapes>(delim_ptr - *next_column_start,
-            next_column_start, num_fields, field_locations);
+        RETURN_IF_ERROR(AddColumn<process_escapes>(delim_ptr - *next_column_start,
+            next_column_start, num_fields, field_locations));
         continue;
       }
 
@@ -185,9 +190,10 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
           last_row_delim_offset_ = -1;
           continue;
         }
-        AddColumn<process_escapes>(delim_ptr - *next_column_start,
-            next_column_start, num_fields, field_locations);
-        FillColumns<false>(0, NULL, num_fields, field_locations);
+        RETURN_IF_ERROR(AddColumn<process_escapes>(delim_ptr - *next_column_start,
+            next_column_start, num_fields, field_locations));
+        Status status = FillColumns<false>(0, NULL, num_fields, field_locations);
+        DCHECK(status.ok());
         column_idx_ = num_partition_keys_;
         row_end_locations[*num_tuples] = delim_ptr;
         ++(*num_tuples);
@@ -200,7 +206,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
           // If the last character we processed was \r then set the offset to 0
           // so that we will use it at the beginning of the next batch.
           if (last_row_delim_offset_ == *remaining_len) last_row_delim_offset_ = 0;
-          return;
+          return Status::OK();
         }
       }
     }
@@ -214,11 +220,12 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
     *remaining_len -= SSEUtil::CHARS_PER_128_BIT_REGISTER;
     *byte_buffer_ptr += SSEUtil::CHARS_PER_128_BIT_REGISTER;
   }
+  return Status::OK();
 }
 
 /// Simplified version of ParseSSE which does not handle tuple delimiters.
 template <bool process_escapes>
-inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* buffer,
+inline Status DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* buffer,
     FieldLocation* field_locations, int* num_fields) {
   char* next_column_start = buffer;
   __m128i xmm_buffer, xmm_delim_mask, xmm_escape_mask;
@@ -263,8 +270,8 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
         // clear current bit
         delim_mask &= ~(SSEUtil::SSE_BITMASK[n]);
 
-        AddColumn<process_escapes>(buffer + n - next_column_start,
-            &next_column_start, num_fields, field_locations);
+        RETURN_IF_ERROR(AddColumn<process_escapes>(buffer + n - next_column_start,
+            &next_column_start, num_fields, field_locations));
       }
 
       if (process_escapes) {
@@ -288,8 +295,8 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
 
     if (!last_char_is_escape_ &&
           (*buffer == field_delim_ || *buffer == collection_item_delim_)) {
-      AddColumn<process_escapes>(buffer - next_column_start,
-          &next_column_start, num_fields, field_locations);
+      RETURN_IF_ERROR(AddColumn<process_escapes>(buffer - next_column_start,
+          &next_column_start, num_fields, field_locations));
     }
 
     --remaining_len;
@@ -298,8 +305,8 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
 
   // Last column does not have a delimiter after it.  Add that column and also
   // pad with empty cols if the input is ragged.
-  FillColumns<process_escapes>(buffer - next_column_start,
-        &next_column_start, num_fields, field_locations);
+  return FillColumns<process_escapes>(buffer - next_column_start,
+      &next_column_start, num_fields, field_locations);
 }
 
 }

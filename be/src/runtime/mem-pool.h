@@ -101,13 +101,18 @@ class MemPool {
   /// Returns 'byte_size' to the current chunk back to the mem pool. This can
   /// only be used to return either all or part of the previous allocation returned
   /// by Allocate().
-  void ReturnPartialAllocation(int byte_size) {
+  void ReturnPartialAllocation(int64_t byte_size) {
     DCHECK_GE(byte_size, 0);
     DCHECK(current_chunk_idx_ != -1);
     ChunkInfo& info = chunks_[current_chunk_idx_];
     DCHECK_GE(info.allocated_bytes, byte_size);
     info.allocated_bytes -= byte_size;
     total_allocated_bytes_ -= byte_size;
+  }
+
+  /// Return a dummy pointer for zero-length allocations.
+  static uint8_t* EmptyAllocPtr() {
+    return reinterpret_cast<uint8_t*>(&zero_length_region_);
   }
 
   /// Makes all allocated chunks available for re-use, but doesn't delete any chunks.
@@ -208,6 +213,7 @@ class MemPool {
 
   template <bool CHECK_LIMIT_FIRST>
   uint8_t* Allocate(int64_t size) noexcept {
+    DCHECK_GE(size, 0);
     if (UNLIKELY(size == 0)) return reinterpret_cast<uint8_t *>(&zero_length_region_);
 
     int64_t num_bytes = BitUtil::RoundUp(size, 8);

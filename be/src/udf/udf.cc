@@ -267,7 +267,7 @@ const char* FunctionContext::error_msg() const {
 }
 
 inline bool FunctionContextImpl::CheckAllocResult(const char* fn_name,
-    uint8_t* buf, int byte_size) {
+    uint8_t* buf, int64_t byte_size) {
   if (UNLIKELY(buf == NULL)) {
     stringstream ss;
     ss << string(fn_name) << "() failed to allocate " << byte_size << " bytes.";
@@ -416,7 +416,7 @@ void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
   }
 }
 
-uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) noexcept {
+uint8_t* FunctionContextImpl::AllocateLocal(int64_t byte_size) noexcept {
   assert(!closed_);
   if (byte_size == 0) return NULL;
   uint8_t* buffer = pool_->Allocate(byte_size);

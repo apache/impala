@@ -116,11 +116,11 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
 
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     if (process_escapes_) {
-      ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
-          field_locations, num_tuples, num_fields, next_column_start);
+      RETURN_IF_ERROR(ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr,
+          row_end_locations, field_locations, num_tuples, num_fields, next_column_start));
     } else {
-      ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
-          field_locations, num_tuples, num_fields, next_column_start);
+      RETURN_IF_ERROR(ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr,
+          row_end_locations, field_locations, num_tuples, num_fields, next_column_start));
     }
   }
 
@@ -155,9 +155,10 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
         // If the row ended in \r\n then move to the \n
         ++*next_column_start;
       } else {
-        AddColumn<true>(*byte_buffer_ptr - *next_column_start,
-            next_column_start, num_fields, field_locations);
-        FillColumns<false>(0, NULL, num_fields, field_locations);
+        RETURN_IF_ERROR(AddColumn<true>(*byte_buffer_ptr - *next_column_start,
+            next_column_start, num_fields, field_locations));
+        Status status = FillColumns<false>(0, NULL, num_fields, field_locations);
+        DCHECK(status.ok());
         column_idx_ = num_partition_keys_;
         row_end_locations[*num_tuples] = *byte_buffer_ptr;
         ++(*num_tuples);
@@ -171,8 +172,8 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
         return Status::OK();
       }
     } else if (new_col) {
-      AddColumn<true>(*byte_buffer_ptr - *next_column_start,
-          next_column_start, num_fields, field_locations);
+      RETURN_IF_ERROR(AddColumn<true>(*byte_buffer_ptr - *next_column_start,
+          next_column_start, num_fields, field_locations));
     }
 
     --remaining_len;
@@ -183,9 +184,10 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   // e.g. Sequence files.
   if (tuple_delim_ == '\0') {
     DCHECK_EQ(remaining_len, 0);
-    AddColumn<true>(*byte_buffer_ptr - *next_column_start,
-        next_column_start, num_fields, field_locations);
-    FillColumns<false>(0, NULL, num_fields, field_locations);
+    RETURN_IF_ERROR(AddColumn<true>(*byte_buffer_ptr - *next_column_start,
+        next_column_start, num_fields, field_locations));
+    Status status = FillColumns<false>(0, NULL, num_fields, field_locations);
+    DCHECK(status.ok());
     column_idx_ = num_partition_keys_;
     ++(*num_tuples);
     unfinished_tuple_ = false;
@@ -193,11 +195,10 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   return Status::OK();
 }
 
-// Find the first instance of the tuple delimiter.  This will
-// find the start of the first full tuple in buffer by looking for the end of
-// the previous tuple.
-int DelimitedTextParser::FindFirstInstance(const char* buffer, int len) {
-  int tuple_start = 0;
+// Find the first instance of the tuple delimiter. This will find the start of the first
+// full tuple in buffer by looking for the end of the previous tuple.
+int64_t DelimitedTextParser::FindFirstInstance(const char* buffer, int64_t len) {
+  int64_t tuple_start = 0;
   const char* buffer_start = buffer;
   bool found = false;
 
@@ -256,7 +257,7 @@ restart:
     // tuple break that are all escape characters, but that is
     // unlikely.
     int num_escape_chars = 0;
-    int before_tuple_end = tuple_start - 2;
+    int64_t before_tuple_end = tuple_start - 2;
     // TODO: If scan range is split between escape character and tuple delimiter,
     // before_tuple_end will be -1. Need to scan previous range for escape characters
     // in this case.

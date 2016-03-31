@@ -186,7 +186,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
   DCHECK(batch_ != NULL);
   DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
   batch_->CommitRows(num_rows);
-  tuple_mem_ += scan_node_->tuple_desc()->byte_size() * num_rows;
+  tuple_mem_ += static_cast<int64_t>(scan_node_->tuple_desc()->byte_size()) * num_rows;
 
   // We need to pass the row batch to the scan node if there is too much memory attached,
   // which can happen if the query is very selective. We need to release memory even

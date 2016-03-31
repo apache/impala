@@ -140,6 +140,7 @@ class FunctionContext {
   /// The UDF/UDA is responsible for calling Free() on all buffers returned by Allocate().
   /// If Allocate() fails or causes the memory limit to be exceeded, the error will be
   /// set in this object causing the query to fail.
+  /// TODO: 'byte_size' should be 64-bit. See IMPALA-2756.
   uint8_t* Allocate(int byte_size) noexcept;
 
   /// Wrapper around Allocate() to allocate a buffer of the given type "T".
@@ -155,6 +156,7 @@ class FunctionContext {
   /// memory limit to be exceeded, the error will be set in this object.
   ///
   /// This should be used for buffers that constantly get appended to.
+  /// TODO: 'byte_size' should be 64-bit. See IMPALA-2756.
   uint8_t* Reallocate(uint8_t* ptr, int byte_size) noexcept;
 
   /// Frees a buffer returned from Allocate() or Reallocate()

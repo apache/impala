@@ -156,9 +156,9 @@ class HdfsTextScanner : public HdfsScanner {
   int WriteFields(MemPool*, TupleRow* tuple_row_mem, int num_fields, int num_tuples);
 
   /// Utility function to write out 'num_fields' to 'tuple_'.  This is used to parse
-  /// partial tuples.  Returns bytes processed.  If copy_strings is true, strings
-  /// from fields will be copied into the boundary pool.
-  int WritePartialTuple(FieldLocation*, int num_fields, bool copy_strings);
+  /// partial tuples. If copy_strings is true, strings from fields will be copied into
+  /// the boundary pool.
+  void WritePartialTuple(FieldLocation*, int num_fields, bool copy_strings);
 
   /// Appends the current file and line to the RuntimeState's error log.
   /// row_idx is 0-based (in current batch) where the parse error occured.

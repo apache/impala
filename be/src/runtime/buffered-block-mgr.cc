@@ -303,22 +303,14 @@ bool BufferedBlockMgr::TryAcquireTmpReservation(Client* client, int num_buffers)
 }
 
 bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
-  // Workaround IMPALA-1619. Return immediately if the allocation size will cause
-  // an arithmetic overflow.
-  if (UNLIKELY(size >= (1LL << 31))) {
-    // IMPALA-3238: don't repeatedly log warning when bumping up against this limit for
-    // large hash tables.
-    if (!client->logged_large_allocation_warning_) {
-      LOG(WARNING) << "Trying to allocate memory >=2GB (" << size << ")B."
-                   << GetStackTrace();
-      client->logged_large_allocation_warning_ = true;
-    }
+  int64_t buffers_needed = BitUtil::Ceil(size, max_block_size());
+  if (UNLIKELY(!BitUtil::IsNonNegative32Bit(buffers_needed))) {
+    VLOG_QUERY << "Trying to consume " << size << " which is out of range.";
     return false;
   }
-  int buffers_needed = BitUtil::Ceil(size, max_block_size());
   DCHECK_GT(buffers_needed, 0) << "Trying to consume 0 memory";
-  unique_lock<mutex> lock(lock_);
 
+  unique_lock<mutex> lock(lock_);
   if (size < max_block_size() && mem_tracker_->TryConsume(size)) {
     // For small allocations (less than a block size), just let the allocation through.
     client->tracker_->ConsumeLocal(size, client->query_tracker_);
@@ -593,7 +585,7 @@ int BufferedBlockMgr::num_pinned_buffers(Client* client) const {
 }
 
 int BufferedBlockMgr::num_reserved_buffers_remaining(Client* client) const {
-  return max(client->num_reserved_buffers_ - client->num_pinned_buffers_, 0);
+  return max<int>(client->num_reserved_buffers_ - client->num_pinned_buffers_, 0);
 }
 
 MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
@@ -1017,7 +1009,8 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     //  1. In the unpinned list. The buffer will not be in the free list.
     //  2. in_write_ == true. The buffer will not be in the free list.
     //  3. The buffer is free, but hasn't yet been reassigned to a different block.
-    DCHECK_EQ(block->buffer_desc_->len, max_block_size()) << "Non-I/O blocks are always pinned";
+    DCHECK_EQ(block->buffer_desc_->len, max_block_size())
+        << "Non-I/O blocks are always pinned";
     DCHECK(unpinned_blocks_.Contains(block) ||
            block->in_write_ ||
            free_io_buffers_.Contains(block->buffer_desc_));
