@@ -295,9 +295,6 @@ popd
 echo "Creating shell tarball"
 ${IMPALA_HOME}/shell/make_shell_tarball.sh
 
-echo "Creating test tarball"
-${IMPALA_HOME}/tests/make_test_tarball.sh
-
 if [ $FORMAT_CLUSTER -eq 1 ]; then
   $IMPALA_HOME/testdata/bin/run-all.sh -format
 elif [ $TESTDATA_ACTION -eq 1 ] || [ $TESTS_ACTION -eq 1 ]; then
