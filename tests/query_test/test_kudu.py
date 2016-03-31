@@ -70,7 +70,8 @@ class TestKuduOperations(ImpalaTestSuite):
     self.cleanup_db("kududb_test")
 
   def test_kudu_scan_node(self, vector):
-    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db="functional_kudu")
+    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db="functional_kudu",
+        wait_secs_between_stmts=1)
 
   @pytest.mark.execute_serially
   def test_insert_update_delete(self, vector):
