@@ -148,7 +148,9 @@ uint8_t* TSaslClient::evaluateChallengeOrResponse(
           &outlen,   /* filled in on success */
           (const char**)&mechUsing);
     clientStarted = true;
-    chosenMech = mechUsing;
+    if (result == SASL_OK || result == SASL_CONTINUE) {
+      chosenMech = mechUsing;
+    }
   } else {
     if (len  > 0) {
       result=sasl_client_step(conn,  /* our context */
