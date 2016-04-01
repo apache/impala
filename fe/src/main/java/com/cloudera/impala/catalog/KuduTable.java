@@ -179,6 +179,7 @@ public class KuduTable extends Table {
           "Cannot load Kudu table %s, table is corrupt.", name_));
     }
 
+    msTable_ = msTbl;
     kuduTableName_ = msTbl.getParameters().get(KEY_TABLE_NAME);
     kuduMasters_ = msTbl.getParameters().get(KEY_MASTER_ADDRESSES);
 
