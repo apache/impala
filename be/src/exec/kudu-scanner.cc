@@ -49,6 +49,9 @@ DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
     "The period at which Kudu Scanners should send keep-alive requests to the tablet "
     "server to ensure that scanners do not time out.");
 
+DEFINE_int32(kudu_scanner_timeout_sec, 60,
+             "The timeout used for Kudu Scan requests.");
+
 namespace impala {
 
 namespace {
@@ -167,6 +170,10 @@ Status KuduScanner::OpenNextRange(const TKuduKeyRange& key_range)  {
     KUDU_RETURN_IF_ERROR(scanner_->SetSelection(kudu::client::KuduClient::LEADER_ONLY),
                          "Could not set replica selection.");
   }
+
+  KUDU_RETURN_IF_ERROR(scanner_->SetTimeoutMillis(
+      FLAGS_kudu_scanner_timeout_sec * 1000),
+      "Could not set scanner timeout");
 
   {
     SCOPED_TIMER(scan_node_->kudu_read_timer());
