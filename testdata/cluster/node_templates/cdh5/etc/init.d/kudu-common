@@ -1,14 +1,18 @@
-# This file is intended to be sourced. After sourcing the KUDU_BIN_DIR variable will be
-# set. KUDU_BUILD_DIR or USE_KUDU_DEBUG_BUILD must be set before this is sourced (default
-# values are set in impala-config.sh).
+# This file is intended to be sourced. After sourcing the KUDU_BIN_DIR and KUDU_WWW_DIR
+# variables will be set. KUDU_BUILD_DIR or USE_KUDU_DEBUG_BUILD must be set before this
+# is sourced (default values are set in impala-config.sh). If KUDU_BUILD_DIR is set then
+# KUDU_HOME should also be set otherwise the web pages may not function (but that should
+# be the only problem).
 
 if [[ -n "$KUDU_BUILD_DIR" ]]; then
   KUDU_BIN_DIR="$KUDU_BUILD_DIR/bin"
+  KUDU_WWW_DIR="$KUDU_HOME/www"
 else
-  KUDU_BIN_DIR="$IMPALA_TOOLCHAIN/kudu-$IMPALA_KUDU_VERSION/lib/kudu/sbin-"
+  KUDU_BIN_DIR="$IMPALA_TOOLCHAIN/kudu-$IMPALA_KUDU_VERSION"
   if $USE_KUDU_DEBUG_BUILD; then
-    KUDU_BIN_DIR+=debug
+    KUDU_BIN_DIR+=/debug/bin
   else
-    KUDU_BIN_DIR+=release
+    KUDU_BIN_DIR+=/release/bin
   fi
+  KUDU_WWW_DIR="$KUDU_BIN_DIR/../lib/kudu/www"
 fi

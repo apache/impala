@@ -24,14 +24,12 @@
 # The script is called as follows without any additional parameters:
 #
 #     python bootstrap_toolchain.py
-import sh
-import shutil
-import glob
 import os
 import re
 import sh
 import shutil
-import sys
+import subprocess
+import tempfile
 
 HOST = "https://native-toolchain.s3.amazonaws.com/build"
 
@@ -50,26 +48,29 @@ OS_MAPPING = {
   "ubuntu15.10" : "ec2-package-ubuntu-14-04",
 }
 
-def try_get_release_label():
+def try_get_platform_release_label():
   """Gets the right package label from the OS version. Return None if not found."""
   try:
-    return get_release_label()
+    return get_platform_release_label()
   except:
     return None
 
-def get_release_label():
-  """Gets the right package label from the OS version. Raise exception if not found."""
-  release = "".join(map(lambda x: x.lower(), sh.lsb_release("-irs").split()))
+def get_platform_release_label(release=None):
+  """Gets the right package label from the OS version. Raise exception if not found.
+     'release' can be provided to override the underlying OS version.
+  """
+  if not release:
+    release = "".join(map(lambda x: x.lower(), sh.lsb_release("-irs").split()))
   for k, v in OS_MAPPING.iteritems():
     if re.search(k, release):
       return v
 
   raise Exception("Could not find package label for OS version: {0}.".format(release))
 
-def download_package(destination, product, version, compiler):
+def download_package(destination, product, version, compiler, platform_release=None):
   remove_existing_package(destination, product, version)
 
-  label = get_release_label()
+  label = get_platform_release_label(release=platform_release)
   file_name = "{0}-{1}-{2}-{3}.tar.gz".format(product, version, compiler, label)
   url_path="/{0}/{1}-{2}/{0}-{1}-{2}-{3}.tar.gz".format(product, version, compiler, label)
   download_path = HOST + url_path
@@ -81,7 +82,6 @@ def download_package(destination, product, version, compiler):
   print "Extracting {0}".format(file_name)
   sh.tar(z=True, x=True, f=os.path.join(destination, file_name), directory=destination)
   sh.rm(os.path.join(destination, file_name))
-  write_version_file(destination, product, version, compiler, label)
 
 def bootstrap(packages):
   """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment. By
@@ -97,17 +97,17 @@ def bootstrap(packages):
     sys.exit(1)
 
   # Create the destination directory if necessary
-  destination = os.getenv("IMPALA_TOOLCHAIN")
-  if not destination:
+  toolchain_root = os.getenv("IMPALA_TOOLCHAIN")
+  if not toolchain_root:
     print("Impala environment not set up correctly, make sure "
           "$IMPALA_TOOLCHAIN is present.")
     sys.exit(1)
 
-  if not os.path.exists(destination):
-    os.makedirs(destination)
+  if not os.path.exists(toolchain_root):
+    os.makedirs(toolchain_root)
 
-  if not try_get_release_label():
-    check_custom_toolchain(destination, packages)
+  if not try_get_platform_release_label():
+    check_custom_toolchain(toolchain_root, packages)
     return
 
   # Detect the compiler
@@ -115,9 +115,123 @@ def bootstrap(packages):
 
   for p in packages:
     pkg_name, pkg_version = unpack_name_and_version(p)
-    if check_for_existing_package(destination, pkg_name, pkg_version, compiler):
+    if check_for_existing_package(toolchain_root, pkg_name, pkg_version, compiler):
       continue
-    download_package(destination, pkg_name, pkg_version, compiler)
+    if pkg_name != "kudu" or os.environ["KUDU_IS_SUPPORTED"] == "true":
+      download_package(toolchain_root, pkg_name, pkg_version, compiler)
+    else:
+      build_kudu_stub(toolchain_root, pkg_version, compiler)
+    write_version_file(toolchain_root, pkg_name, pkg_version, compiler,
+        get_platform_release_label())
+
+def build_kudu_stub(toolchain_root, kudu_version, compiler):
+  # When Kudu isn't supported, the CentOS 7 package will be downloaded and the client
+  # lib will be replaced with a stubbed client.
+  download_package(toolchain_root, "kudu", kudu_version, compiler,
+      platform_release="centos7")
+
+  # Find the client lib files in the extracted dir. There may be several files with
+  # various extensions. Also there will be a debug version.
+  kudu_dir = package_directory(toolchain_root, "kudu", kudu_version)
+  client_lib_paths = []
+  for path, _, files in os.walk(kudu_dir):
+    for file in files:
+      if not file.startswith("libkudu_client.so"):
+        continue
+      file_path = os.path.join(path, file)
+      if os.path.islink(file_path):
+        continue
+      client_lib_paths.append(file_path)
+  if not client_lib_paths:
+    raise Exception("Unable to find Kudu client lib under '%s'" % kudu_dir)
+
+  # The client stub will be create by inspecting a real client and extracting the
+  # symbols. The choice of which client file to use shouldn't matter.
+  client_lib_path = client_lib_paths[0]
+
+  # Use a newer version of binutils because on older systems the default binutils may
+  # not be able to read the newer binary.
+  binutils_dir = package_directory(
+      toolchain_root, "binutils", os.environ["IMPALA_BINUTILS_VERSION"])
+  nm_path = os.path.join(binutils_dir, "bin", "nm")
+  objdump_path = os.path.join(binutils_dir, "bin", "objdump")
+
+  # Extract the symbols and write the stubbed client source. There is a special method
+  # kudu::client::GetShortVersionString() that is overridden so that the stub can be
+  # identified by the caller.
+  get_short_version_symbol = "_ZN4kudu6client21GetShortVersionStringEv"
+  nm_out = check_output([nm_path, "--defined-only", "-D", client_lib_path])
+  stub_build_dir = tempfile.mkdtemp()
+  stub_client_src_file = open(os.path.join(stub_build_dir, "kudu_client.cc"), "w")
+  try:
+    stub_client_src_file.write("""
+#include <string>
+
+static const std::string kFakeKuduVersion = "__IMPALA_KUDU_STUB__";
+
+static void KuduNotSupported() {
+    *((char*)0) = 0;
+}
+
+namespace kudu { namespace client {
+std::string GetShortVersionString() { return kFakeKuduVersion; }
+}}
+""")
+    found_start_version_symbol = False
+    for line in nm_out.splitlines():
+      addr, sym_type, name = line.split(" ")
+      if name in ["_init", "_fini"]:
+        continue
+      if name == get_short_version_symbol:
+        found_start_version_symbol = True
+        continue
+      if sym_type.upper() in "TW":
+        stub_client_src_file.write("""
+extern "C" void %s() {
+  KuduNotSupported();
+}
+""" % name)
+    if not found_start_version_symbol:
+      raise Exception("Expected to find symbol " + get_short_version_symbol +
+          " corresponding to kudu::client::GetShortVersionString() but it was not found.")
+    stub_client_src_file.flush()
+
+    # The soname is needed to avoid problem in packaging builds. Without the soname,
+    # the library dependency as listed in the impalad binary will be a full path instead
+    # of a short name. Debian in particular has problems with packaging when that happens.
+    objdump_out = check_output([objdump_path, "-p", client_lib_path])
+    for line in objdump_out.splitlines():
+      if "SONAME" not in line:
+        continue
+      # The line that needs to be parsed should be something like:
+      # "  SONAME               libkudu_client.so.0"
+      so_name = line.split()[1]
+      break
+    else:
+      raise Exception("Unable to extract soname from %s" % client_lib_path)
+
+    # Compile the library.
+    stub_client_lib_path = os.path.join(stub_build_dir, "libkudu_client.so")
+    subprocess.check_call(["g++", stub_client_src_file.name, "-shared", "-fPIC",
+        "-Wl,-soname,%s" % so_name, "-o", stub_client_lib_path])
+
+    # Replace the real libs with the stub.
+    for client_lib_path in client_lib_paths:
+      shutil.copyfile(stub_client_lib_path, client_lib_path)
+  finally:
+    shutil.rmtree(stub_build_dir)
+
+def check_output(cmd_args):
+  """Run the command and return the output. Raise an exception if the command returns
+     a non-zero return code. Similar to subprocess.check_output() which is only provided
+     in python 2.7.
+  """
+  process = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  stdout, _ = process.communicate()
+  if process.wait() != 0:
+    raise Exception("Command with args '%s' failed with exit code %s:\n%s"
+        % (cmd_args, process.returncode, stdout))
+  return stdout
 
 def package_directory(toolchain_root, pkg_name, pkg_version):
   dir_name = "{0}-{1}".format(pkg_name, pkg_version)
@@ -144,7 +258,6 @@ def check_custom_toolchain(toolchain_root, packages):
     print("    https://github.com/cloudera/native-toolchain")
     raise Exception("Toolchain bootstrap failed: required packages were missing")
 
-
 def check_for_existing_package(toolchain_root, pkg_name, pkg_version, compiler):
   """Return true if toolchain_root already contains the package with the correct
   version and compiler.
@@ -153,7 +266,7 @@ def check_for_existing_package(toolchain_root, pkg_name, pkg_version, compiler):
   if not os.path.exists(version_file):
     return False
 
-  label = get_release_label()
+  label = get_platform_release_label()
   pkg_version_string = "{0}-{1}-{2}-{3}".format(pkg_name, pkg_version, compiler, label)
   with open(version_file) as f:
     return f.read().strip() == pkg_version_string
@@ -183,7 +296,7 @@ def unpack_name_and_version(package):
   return package[0], package[1]
 
 if __name__ == "__main__":
-  packages = ["avro", "boost", "bzip2", "gcc", "gflags", "glog", "gperftools", "gtest",
-      "kudu", "llvm", ("llvm", "3.3-p1"), ("llvm", "3.7.0"), "lz4", "openldap",
+  packages = ["avro", "binutils", "boost", "bzip2", "gcc", "gflags", "glog", "gperftools",
+      "gtest", "kudu", "llvm", ("llvm", "3.3-p1"), ("llvm", "3.7.0"), "lz4", "openldap",
       "rapidjson", "re2", "snappy", "thrift", "zlib"]
   bootstrap(packages)

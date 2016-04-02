@@ -12,6 +12,7 @@ function start {
   # identifiable in case the pid file is removed.
   do_start "$KUDU_BIN_DIR"/kudu-tserver \
       -flagfile "$NODE_DIR"/etc/kudu/tserver.conf \
+      -webserver_doc_root "$KUDU_WWW_DIR" \
       -vmodule IBelongToTheMiniCluster
 }
 

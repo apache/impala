@@ -35,11 +35,10 @@ DECLARE_bool(disable_kudu);
 namespace impala {
 
 bool KuduClientIsSupported() {
-#ifdef KUDU_CLIENT_SUPPORTED
-  return true;
-#else
-  return false;
-#endif
+  // The value below means the client is actually a stubbed client. This should mean
+  // that no official client exists for the underlying OS. The value below should match
+  // the value generated in bin/bootstrap_toolchain.py.
+  return kudu::client::GetShortVersionString() != "__IMPALA_KUDU_STUB__";
 }
 
 bool KuduIsAvailable() { return CheckKuduAvailability().ok(); }
