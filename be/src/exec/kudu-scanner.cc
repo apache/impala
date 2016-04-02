@@ -98,17 +98,24 @@ Status KuduScanner::Open() {
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
-Status KuduScanner::KeepKuduScannerAlive() {
-  if (scanner_ == NULL) return Status::OK();
+void KuduScanner::KeepKuduScannerAlive() {
+  if (scanner_ == NULL) return;
   int64_t now = MonotonicMicros();
   int64_t keepalive_us = FLAGS_kudu_scanner_keep_alive_period_sec * 1e6;
   if (now < last_alive_time_micros_ + keepalive_us) {
-    return Status::OK();
+    return;
   }
-  KUDU_RETURN_IF_ERROR(scanner_->KeepAlive(), "Unable to keep the "
-      "Kudu scanner alive.");
+  // If we fail to send a keepalive, it isn't a big deal. The Kudu
+  // client code doesn't handle cross-replica failover or retries when
+  // the server is busy, so it's better to just ignore errors here. In
+  // the worst case, we will just fail next time we try to fetch a batch
+  // if the scan is unrecoverable.
+  kudu::Status s = scanner_->KeepAlive();
+  if (!s.ok()) {
+    VLOG(1) << "Unable to keep the Kudu scanner alive: " << s.ToString();
+    return;
+  }
   last_alive_time_micros_ = now;
-  return Status::OK();
 }
 
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {

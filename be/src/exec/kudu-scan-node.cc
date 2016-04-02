@@ -424,18 +424,18 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_ra
     bool eos = false;
     while (!eos) {
       // Keep looping through all the rows.
-      gscoped_ptr<RowBatch> row_batch(new RowBatch(row_desc(), runtime_state_->batch_size(),
-          mem_tracker()));
+      gscoped_ptr<RowBatch> row_batch(new RowBatch(
+          row_desc(), runtime_state_->batch_size(), mem_tracker()));
       status = scanner.GetNext(row_batch.get(), &eos);
-      bool added_to_queue = false;
-      while (status.ok() && !done_ &&
-          !(added_to_queue = materialized_row_batches_->AddBatchWithTimeout(
-                row_batch.get(), 1000000))) {
-        status = scanner.KeepKuduScannerAlive();
+      if (!status.ok()) goto done;
+      while (true) {
+        if (done_) goto done;
+        scanner.KeepKuduScannerAlive();
+        if (materialized_row_batches_->AddBatchWithTimeout(row_batch.get(), 1000000)) {
+          ignore_result(row_batch.release());
+          break;
+        }
       }
-      if (added_to_queue) ignore_result(row_batch.release());
-      if (status.ok()) status = scanner.KeepKuduScannerAlive();
-      if (!status.ok() || done_) goto done;
     }
     // Mark the current scan range as complete.
     scan_ranges_complete_counter()->Add(1);

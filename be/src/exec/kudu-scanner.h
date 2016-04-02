@@ -45,8 +45,10 @@ class KuduScanner {
 
   /// Sends a "Ping" to the Kudu TabletServer servicing the current scan, if there is one.
   /// This serves the purpose of making the TabletServer keep the server side scanner alive
-  /// if the batch queue is full and no batches can be queued.
-  Status KeepKuduScannerAlive();
+  /// if the batch queue is full and no batches can be queued. If there are any errors,
+  /// they are ignored here, since we assume that we will just fail the next time we
+  /// try to read a batch.
+  void KeepKuduScannerAlive();
 
   /// Closes this scanner.
   void Close();
