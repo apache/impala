@@ -106,10 +106,10 @@ public final class RuntimeFilterGenerator {
     private boolean isBroadcastJoin_;
     // If true, targetExpr_ is bound by only partition columns
     private boolean isBoundByPartitionColumns_;
-    // If true, the filter is produced by a broadcast join and is applied on a scan which
-    // is in the same plan fragment as the join; set in
-    // DistributedPlanner.createHashJoinFragment().
-    private boolean hasLocalTarget_ = false;
+    // If true, the filter is applied by a scan in the same fragment as the join node
+    // which produced it. Set in DistributedPlanner.createHashJoinFragment() if there is a
+    // distributed plan, otherwise always true by definition.
+    private boolean hasLocalTarget_ = true;
 
     private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode,
         Expr srcExpr, Expr targetExpr, Map<TupleId, List<SlotId>> targetSlots) {

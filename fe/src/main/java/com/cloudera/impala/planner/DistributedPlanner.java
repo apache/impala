@@ -298,6 +298,107 @@ public class DistributedPlanner {
   }
 
   /**
+   * Helper function to produce a partitioning hash-join fragment
+   */
+  private PlanFragment createPartitionedHashJoinFragment(HashJoinNode node,
+      Analyzer analyzer, boolean lhsHasCompatPartition, boolean rhsHasCompatPartition,
+      PlanFragment leftChildFragment, PlanFragment rightChildFragment,
+      List<Expr> lhsJoinExprs, List<Expr> rhsJoinExprs,
+      ArrayList<PlanFragment> fragments) throws ImpalaException {
+    node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
+    // The lhs and rhs input fragments are already partitioned on the join exprs.
+    // Combine the lhs/rhs input fragments into leftChildFragment by placing the join
+    // node into leftChildFragment and setting its lhs/rhs children to the plan root of
+    // the lhs/rhs child fragment, respectively. No new child fragments or exchanges
+    // are created, and the rhs fragment is removed.
+    // TODO: Relax the isCompatPartition() check below. The check is conservative and
+    // may reject partitions that could be made physically compatible. Fix this by
+    // removing equivalent duplicates from partition exprs and impose a canonical order
+    // on partition exprs (both using the canonical equivalence class representatives).
+    if (lhsHasCompatPartition
+        && rhsHasCompatPartition
+        && isCompatPartition(
+            leftChildFragment.getDataPartition(),
+            rightChildFragment.getDataPartition(),
+            lhsJoinExprs, rhsJoinExprs, analyzer)) {
+      node.setChild(0, leftChildFragment.getPlanRoot());
+      node.setChild(1, rightChildFragment.getPlanRoot());
+      // Redirect fragments sending to rightFragment to leftFragment.
+      for (PlanFragment fragment: fragments) {
+        if (fragment.getDestFragment() == rightChildFragment) {
+          fragment.setDestination(fragment.getDestNode());
+        }
+      }
+      // Remove right fragment because its plan tree has been merged into leftFragment.
+      fragments.remove(rightChildFragment);
+      leftChildFragment.setPlanRoot(node);
+      return leftChildFragment;
+    }
+
+    // The lhs input fragment is already partitioned on the join exprs.
+    // Make the HashJoin the new root of leftChildFragment and set the join's
+    // first child to the lhs plan root. The second child of the join is an
+    // ExchangeNode that is fed by the rhsInputFragment whose sink repartitions
+    // its data by the rhs join exprs.
+    DataPartition rhsJoinPartition = null;
+    if (lhsHasCompatPartition) {
+      rhsJoinPartition = getCompatPartition(lhsJoinExprs,
+          leftChildFragment.getDataPartition(), rhsJoinExprs, analyzer);
+      if (rhsJoinPartition != null) {
+        node.setChild(0, leftChildFragment.getPlanRoot());
+        connectChildFragment(node, 1, rightChildFragment);
+        rightChildFragment.setOutputPartition(rhsJoinPartition);
+        leftChildFragment.setPlanRoot(node);
+        return leftChildFragment;
+      }
+    }
+
+    // Same as above but with rhs and lhs reversed.
+    DataPartition lhsJoinPartition = null;
+    if (rhsHasCompatPartition) {
+      lhsJoinPartition = getCompatPartition(rhsJoinExprs,
+          rightChildFragment.getDataPartition(), lhsJoinExprs, analyzer);
+      if (lhsJoinPartition != null) {
+        node.setChild(1, rightChildFragment.getPlanRoot());
+        connectChildFragment(node, 0, leftChildFragment);
+        leftChildFragment.setOutputPartition(lhsJoinPartition);
+        rightChildFragment.setPlanRoot(node);
+        return rightChildFragment;
+      }
+    }
+
+    Preconditions.checkState(lhsJoinPartition == null);
+    Preconditions.checkState(rhsJoinPartition == null);
+    lhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(lhsJoinExprs));
+    rhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(rhsJoinExprs));
+
+    // Neither lhs nor rhs are already partitioned on the join exprs.
+    // Create a new parent fragment containing a HashJoin node with two
+    // ExchangeNodes as inputs; the latter are the destinations of the
+    // left- and rightChildFragments, which now partition their output
+    // on their respective join exprs.
+    // The new fragment is hash-partitioned on the lhs input join exprs.
+    ExchangeNode lhsExchange = new ExchangeNode(ctx_.getNextNodeId());
+    lhsExchange.addChild(leftChildFragment.getPlanRoot(), false);
+    lhsExchange.computeStats(null);
+    node.setChild(0, lhsExchange);
+    ExchangeNode rhsExchange = new ExchangeNode(ctx_.getNextNodeId());
+    rhsExchange.addChild(rightChildFragment.getPlanRoot(), false);
+    rhsExchange.computeStats(null);
+    node.setChild(1, rhsExchange);
+
+    // Connect the child fragments in a new fragment, and set the data partition
+    // of the new fragment and its child fragments.
+    PlanFragment joinFragment =
+        new PlanFragment(ctx_.getNextFragmentId(), node, lhsJoinPartition);
+    leftChildFragment.setDestination(lhsExchange);
+    leftChildFragment.setOutputPartition(lhsJoinPartition);
+    rightChildFragment.setDestination(rhsExchange);
+    rightChildFragment.setOutputPartition(rhsJoinPartition);
+    return joinFragment;
+  }
+
+  /**
    * Creates either a broadcast join or a repartitioning join, depending on the
    * expected cost.
    * If any of the inputs to the cost computation is unknown, it assumes the cost
@@ -364,7 +465,7 @@ public class DistributedPlanner {
         + Float.toString(rhsTree.getAvgRowSize()));
     LOG.debug(rhsTree.getExplainString());
 
-    boolean doBroadcast;
+    boolean doBroadcast = false;
     // we do a broadcast join if
     // - we're explicitly told to do so
     // - or if it's cheaper and we weren't explicitly told to do a partitioned join
@@ -392,14 +493,9 @@ public class DistributedPlanner {
                 && broadcastCost <= partitionCost)))
         || node.getJoinOp().isNullAwareLeftAntiJoin()) {
       doBroadcast = true;
-    } else {
-      doBroadcast = false;
     }
 
-    for (RuntimeFilter runtimeFilter: node.getRuntimeFilters()) {
-      runtimeFilter.setIsBroadcast(doBroadcast);
-    }
-
+    PlanFragment hjFragment = null;
     if (doBroadcast) {
       node.setDistributionMode(HashJoinNode.DistributionMode.BROADCAST);
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
@@ -408,103 +504,20 @@ public class DistributedPlanner {
       node.setChild(0, leftChildFragment.getPlanRoot());
       connectChildFragment(node, 1, rightChildFragment);
       leftChildFragment.setPlanRoot(node);
-      for (RuntimeFilter filter: node.getRuntimeFilters()) filter.computeHasLocalTarget();
-      return leftChildFragment;
+      hjFragment = leftChildFragment;
     } else {
-      node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
-      // The lhs and rhs input fragments are already partitioned on the join exprs.
-      // Combine the lhs/rhs input fragments into leftChildFragment by placing the join
-      // node into leftChildFragment and setting its lhs/rhs children to the plan root of
-      // the lhs/rhs child fragment, respectively. No new child fragments or exchanges
-      // are created, and the rhs fragment is removed.
-      // TODO: Relax the isCompatPartition() check below. The check is conservative and
-      // may reject partitions that could be made physically compatible. Fix this by
-      // removing equivalent duplicates from partition exprs and impose a canonical order
-      // on partition exprs (both using the canonical equivalence class representatives).
-      if (lhsHasCompatPartition
-          && rhsHasCompatPartition
-          && isCompatPartition(
-              leftChildFragment.getDataPartition(),
-              rightChildFragment.getDataPartition(),
-              lhsJoinExprs, rhsJoinExprs, analyzer)) {
-        node.setChild(0, leftChildFragment.getPlanRoot());
-        node.setChild(1, rightChildFragment.getPlanRoot());
-        // Redirect fragments sending to rightFragment to leftFragment.
-        for (PlanFragment fragment: fragments) {
-          if (fragment.getDestFragment() == rightChildFragment) {
-            fragment.setDestination(fragment.getDestNode());
-          }
-        }
-        // Remove right fragment because its plan tree has been merged into leftFragment.
-        fragments.remove(rightChildFragment);
-        leftChildFragment.setPlanRoot(node);
-        return leftChildFragment;
-      }
-
-      // The lhs input fragment is already partitioned on the join exprs.
-      // Make the HashJoin the new root of leftChildFragment and set the join's
-      // first child to the lhs plan root. The second child of the join is an
-      // ExchangeNode that is fed by the rhsInputFragment whose sink repartitions
-      // its data by the rhs join exprs.
-      DataPartition rhsJoinPartition = null;
-      if (lhsHasCompatPartition) {
-        rhsJoinPartition = getCompatPartition(lhsJoinExprs,
-            leftChildFragment.getDataPartition(), rhsJoinExprs, analyzer);
-        if (rhsJoinPartition != null) {
-          node.setChild(0, leftChildFragment.getPlanRoot());
-          connectChildFragment(node, 1, rightChildFragment);
-          rightChildFragment.setOutputPartition(rhsJoinPartition);
-          leftChildFragment.setPlanRoot(node);
-          return leftChildFragment;
-        }
-      }
-
-      // Same as above but with rhs and lhs reversed.
-      DataPartition lhsJoinPartition = null;
-      if (rhsHasCompatPartition) {
-        lhsJoinPartition = getCompatPartition(rhsJoinExprs,
-            rightChildFragment.getDataPartition(), lhsJoinExprs, analyzer);
-        if (lhsJoinPartition != null) {
-          node.setChild(1, rightChildFragment.getPlanRoot());
-          connectChildFragment(node, 0, leftChildFragment);
-          leftChildFragment.setOutputPartition(lhsJoinPartition);
-          rightChildFragment.setPlanRoot(node);
-          return rightChildFragment;
-        }
-      }
-
-      Preconditions.checkState(lhsJoinPartition == null);
-      Preconditions.checkState(rhsJoinPartition == null);
-      lhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(lhsJoinExprs));
-      rhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(rhsJoinExprs));
-
-      // Neither lhs nor rhs are already partitioned on the join exprs.
-      // Create a new parent fragment containing a HashJoin node with two
-      // ExchangeNodes as inputs; the latter are the destinations of the
-      // left- and rightChildFragments, which now partition their output
-      // on their respective join exprs.
-      // The new fragment is hash-partitioned on the lhs input join exprs.
-      ExchangeNode lhsExchange = new ExchangeNode(ctx_.getNextNodeId());
-      lhsExchange.addChild(leftChildFragment.getPlanRoot(), false);
-      lhsExchange.computeStats(null);
-      node.setChild(0, lhsExchange);
-      ExchangeNode rhsExchange = new ExchangeNode(ctx_.getNextNodeId());
-      rhsExchange.addChild(rightChildFragment.getPlanRoot(), false);
-      rhsExchange.computeStats(null);
-      node.setChild(1, rhsExchange);
-
-      // Connect the child fragments in a new fragment, and set the data partition
-      // of the new fragment and its child fragments.
-      PlanFragment joinFragment =
-          new PlanFragment(ctx_.getNextFragmentId(), node, lhsJoinPartition);
-      leftChildFragment.setDestination(lhsExchange);
-      leftChildFragment.setOutputPartition(lhsJoinPartition);
-      rightChildFragment.setDestination(rhsExchange);
-      rightChildFragment.setOutputPartition(rhsJoinPartition);
-
-      return joinFragment;
+      hjFragment = createPartitionedHashJoinFragment(node, analyzer,
+          lhsHasCompatPartition, rhsHasCompatPartition, leftChildFragment,
+          rightChildFragment, lhsJoinExprs, rhsJoinExprs, fragments);
     }
-  }
+
+    for (RuntimeFilter filter: node.getRuntimeFilters()) {
+      filter.setIsBroadcast(doBroadcast);
+      filter.computeHasLocalTarget();
+    }
+
+    return hjFragment;
+ }
 
   /**
    * Returns true if the lhs and rhs partitions are physically compatible for executing

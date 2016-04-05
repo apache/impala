@@ -410,6 +410,9 @@ class Coordinator {
   /// Returns a pretty-printed table of the current filter state.
   std::string FilterDebugString();
 
+  /// Sets 'filter_routing_table_complete_' and prints the table to the profile and log.
+  void MarkFilterRoutingTableComplete();
+
   /// Fill in rpc_params based on parameters.
   /// 'fragment_instance_idx' is the 0-based query-wide ordinal of the fragment instance.
   /// 'fragment_idx' is the 0-based query-wide ordinal of the fragment of which it is an

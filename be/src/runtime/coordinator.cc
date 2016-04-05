@@ -422,6 +422,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
     // TODO: This is no longer necessary (see IMPALA-1599). Consider starting all
     // fragments in the same way with no coordinator special case.
     UpdateFilterRoutingTable(request.fragments[0].plan.nodes, 1, 0);
+    if (schedule.num_fragment_instances() == 0) MarkFilterRoutingTableComplete();
     TExecPlanFragmentParams rpc_params;
     SetExecPlanFragmentParams(schedule, request.fragments[0],
         (*schedule.exec_params())[0], 0, 0, 0, coord, &rpc_params);
@@ -575,17 +576,10 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
               per_fragment_instance_idx));
     }
   }
-  filter_routing_table_complete_ = true;
+  MarkFilterRoutingTableComplete();
   exec_complete_barrier_->Wait();
   query_events_->MarkEvent(
       Substitute("All $0 remote fragments started", fragment_instance_idx));
-
-  if (filter_mode_ != TRuntimeFilterMode::OFF) {
-    query_profile_->AddInfoString(
-        "Number of filters", Substitute("$0", filter_routing_table_.size()));
-    query_profile_->AddInfoString("Filter routing table", FilterDebugString());
-    if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
-  }
 
   Status status = Status::OK();
   const TMetricDef& def =
@@ -631,10 +625,12 @@ string Coordinator::FilterDebugString() {
     row.push_back(lexical_cast<string>(state.src));
     row.push_back(lexical_cast<string>(state.target));
     row.push_back(lexical_cast<string>(state.target_fragment_instance_idxs.size()));
-    if (state.desc.is_broadcast_join) {
-      row.push_back(state.desc.has_local_target ? "LOCAL" : "GLOBAL (Broadcast)");
+
+    if (state.desc.has_local_target) {
+      row.push_back("LOCAL");
     } else {
-      row.push_back("GLOBAL (Partition)");
+      row.push_back(
+          state.desc.is_broadcast_join ? "GLOBAL (Broadcast)" : "GLOBAL (Partition)");
     }
     row.push_back(state.desc.is_bound_by_partition_columns ? "true" : "false");
 
@@ -658,6 +654,16 @@ string Coordinator::FilterDebugString() {
   // Add a line break, as in all contexts this is called we need to start a new line to
   // print it correctly.
   return Substitute("\n$0", table_printer.ToString());
+}
+
+void Coordinator::MarkFilterRoutingTableComplete() {
+  if (filter_mode_ != TRuntimeFilterMode::OFF) {
+    query_profile_->AddInfoString(
+        "Number of filters", Substitute("$0", filter_routing_table_.size()));
+    query_profile_->AddInfoString("Filter routing table", FilterDebugString());
+    if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
+  }
+  filter_routing_table_complete_ = true;
 }
 
 Status Coordinator::GetStatus() {

@@ -311,3 +311,17 @@ with t1 as (select month x, bigint_col y from alltypes limit 7300),
 ---- RUNTIME_PROFILE
 row_regex: .*Files rejected: 7 .*
 ====
+
+
+---- QUERY
+####################################################
+# Test case 14: When NUM_NODES=1, all filters should be local.
+# Regression test for IMPALA-3245.
+####################################################
+set NUM_NODES=1;
+set RUNTIME_FILTER_MODE=GLOBAL;
+select STRAIGHT_JOIN count(a.id) from alltypes a
+    join [SHUFFLE] alltypes b on a.id = b.id;
+---- RESULTS
+7300
+====
