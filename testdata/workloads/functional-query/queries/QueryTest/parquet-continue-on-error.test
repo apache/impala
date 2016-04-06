@@ -1,6 +1,10 @@
 ====
 ---- QUERY
-# IMPALA-2558: trigger bad parse_status_ in HdfsParquetScanner::AssembleRows()
+# Returns all results despite a discrepancy between the number of values
+# scanned and the number of values stored in the file metadata.
+# Set a single node and scanner thread to make this test deterministic.
+set num_nodes=1;
+set num_scanner_threads=1;
 select id, cnt from bad_column_metadata t, (select count(*) cnt from t.int_array) v
 ---- TYPES
 bigint,bigint
@@ -14,6 +18,7 @@ bigint,bigint
 7,10
 8,10
 9,10
+10,10
 11,10
 12,10
 13,10
@@ -23,6 +28,7 @@ bigint,bigint
 17,10
 18,10
 19,10
+20,10
 21,10
 22,10
 23,10
@@ -33,9 +39,13 @@ bigint,bigint
 28,10
 29,10
 30,10
+---- ERRORS
+Column metadata states there are 50 values, but read 100 values from column element. file: hdfs://regex:.$
 ====
 ---- QUERY
-# IMPALA-2558
+# Same as above but only selecting a single scalar column.
+set num_nodes=1;
+set num_scanner_threads=1;
 select id from bad_column_metadata
 ---- TYPES
 bigint
@@ -59,6 +69,7 @@ bigint
 17
 18
 19
+20
 21
 22
 23
@@ -69,4 +80,6 @@ bigint
 28
 29
 30
+---- ERRORS
+Column metadata states there are 11 values, but read 10 values from column id. file: hdfs://regex:.$
 ====

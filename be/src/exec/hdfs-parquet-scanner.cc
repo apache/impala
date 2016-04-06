@@ -177,11 +177,60 @@ DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
 
 namespace impala {
 
+/// Helper struct that holds a batch of tuples allocated from a mem pool, as well
+/// as state associated with iterating over its tuples and transferring
+/// them to an output batch in TransferScratchTuples().
+struct ScratchTupleBatch {
+  // Memory backing the batch of tuples. Allocated from batch's tuple data pool.
+  uint8_t* tuple_mem;
+  // Keeps track of the current tuple index.
+  int tuple_idx;
+  // Number of valid tuples in tuple_mem.
+  int num_tuples;
+  // Cached for convenient access.
+  const int tuple_byte_size;
+
+  // Helper batch for safely allocating tuple_mem from its tuple data pool using
+  // ResizeAndAllocateTupleBuffer().
+  RowBatch batch;
+
+  ScratchTupleBatch(
+      const RowDescriptor& row_desc, int batch_size, MemTracker* mem_tracker)
+    : tuple_mem(NULL),
+      tuple_idx(0),
+      num_tuples(0),
+      tuple_byte_size(row_desc.GetRowSize()),
+      batch(row_desc, batch_size, mem_tracker) {
+    DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
+  }
+
+  Status Reset(RuntimeState* state) {
+    tuple_idx = 0;
+    num_tuples = 0;
+    // Buffer size is not needed.
+    int64_t buffer_size;
+    RETURN_IF_ERROR(batch.ResizeAndAllocateTupleBuffer(state, &buffer_size, &tuple_mem));
+    return Status::OK();
+  }
+
+  inline Tuple* GetTuple(int tuple_idx) const {
+    return reinterpret_cast<Tuple*>(tuple_mem + tuple_idx * tuple_byte_size);
+  }
+
+  inline MemPool* mem_pool() { return batch.tuple_data_pool(); }
+  inline int capacity() const { return batch.capacity(); }
+  inline uint8_t* CurrTuple() const { return tuple_mem + tuple_idx * tuple_byte_size; }
+  inline uint8_t* TupleEnd() const { return tuple_mem + num_tuples * tuple_byte_size; }
+  inline bool AtEnd() const { return tuple_idx == num_tuples; }
+};
+
 const string PARQUET_MEM_LIMIT_EXCEEDED = "HdfsParquetScanner::$0() failed to allocate "
     "$1 bytes for $2.";
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : HdfsScanner(scan_node, state),
+      scratch_batch_(new ScratchTupleBatch(
+          scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
       metadata_range_(NULL),
       dictionary_pool_(new MemPool(scan_node->mem_tracker())),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
@@ -265,9 +314,25 @@ class HdfsParquetScanner::ColumnReader {
   /// are currently dense so we'll need to figure out something there.
   virtual bool ReadValue(MemPool* pool, Tuple* tuple) = 0;
 
-  /// Same as ReadValue() but does not advance repetition level. Only valid for columns not
-  /// in collections.
+  /// Same as ReadValue() but does not advance repetition level. Only valid for columns
+  /// not in collections.
   virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple) = 0;
+
+  /// Batched version of ReadValue() that reads up to max_values at once and materializes
+  /// them into tuples in tuple_mem. Returns the number of values actually materialized
+  /// in *num_values. The return value, error behavior and state changes are generally
+  /// the same as in ReadValue(). For example, if an error occurs in the middle of
+  /// materializing a batch then false is returned, and num_values, tuple_mem, as well as
+  /// this column reader are left in an undefined state, assuming that the caller will
+  /// immediately abort execution.
+  virtual bool ReadValueBatch(MemPool* pool, int max_values, int tuple_size,
+      uint8_t* tuple_mem, int* num_values);
+
+  /// Batched version of ReadNonRepeatedValue() that reads up to max_values at once and
+  /// materializes them into tuples in tuple_mem.
+  /// The return value and error behavior are the same as in ReadValueBatch().
+  virtual bool ReadNonRepeatedValueBatch(MemPool* pool, int max_values, int tuple_size,
+      uint8_t* tuple_mem, int* num_values);
 
   /// Advances this column reader's def and rep levels to the next logical value, i.e. to
   /// the next scalar value or the beginning of the next collection, without attempting to
@@ -286,6 +351,10 @@ class HdfsParquetScanner::ColumnReader {
   /// 'tuple' (i.e. "reads" the synthetic position field of the parent collection into
   /// 'tuple') and increments pos_current_value_.
   void ReadPosition(Tuple* tuple);
+
+  /// Returns true if this column reader has reached the end of the row group, or
+  /// if this column reader has not been seeded with a first NextLevels().
+  inline bool RowGroupAtEnd() { return rep_level_ == -1; }
 
  protected:
   HdfsParquetScanner* parent_;
@@ -344,6 +413,7 @@ class HdfsParquetScanner::ColumnReader {
     if (max_rep_level() == 0) rep_level_ = 0;
   }
 };
+
 
 /// Collections are not materialized directly in parquet files; only scalar values appear
 /// in the file. CollectionColumnReader uses the definition and repetition levels of child
@@ -511,8 +581,8 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   /// Header for current data page.
   parquet::PageHeader current_page_header_;
 
-  /// Read the next data page.  If a dictionary page is encountered, that will be read and
-  /// this function will continue reading for the next data page.
+  /// Read the next data page. If a dictionary page is encountered, that will be read and
+  /// this function will continue reading the next data page.
   Status ReadDataPage();
 
   /// Try to move the the next page and buffer more values. Return false and sets rep_level_,
@@ -608,6 +678,12 @@ class HdfsParquetScanner::ScalarColumnReader :
   virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple) {
     return ReadValue<false>(pool, tuple);
   }
+
+  virtual bool ReadValueBatch(MemPool* pool, int max_values, int tuple_size,
+      uint8_t* tuple_mem, int* num_values);
+
+  virtual bool ReadNonRepeatedValueBatch(MemPool* pool, int max_values, int tuple_size,
+      uint8_t* tuple_mem, int* num_values);
 
  protected:
   template <bool IN_COLLECTION>
@@ -729,6 +805,48 @@ class HdfsParquetScanner::ScalarColumnReader :
   /// the max length for VARCHAR columns. Unused otherwise.
   int fixed_len_size_;
 };
+
+/// Implementations of the batched ReadValue() functions specialized for this
+/// column reader type.
+/// TODO: The code is only a proof-of-concept. It is almost identical to the
+/// generic ColumnReader::ReadValueBatch() function, except that this version
+/// avoids the virtual function calls for NextLevels()/ReadValue().
+/// This function needs to be optimized further.
+template<typename T, bool MATERIALIZED>
+bool HdfsParquetScanner::ScalarColumnReader<T, MATERIALIZED>::ReadValueBatch(
+    MemPool* pool, int max_values, int tuple_size, uint8_t* tuple_mem, int* num_values) {
+  int val_count = 0;
+  bool continue_execution = true;
+  while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
+    Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
+    if (def_level_ < def_level_of_immediate_repeated_ancestor()) {
+      // A containing repeated field is empty or NULL
+      continue_execution = NextLevels<true>();
+      continue;
+    }
+    // Fill in position slot if applicable
+    if (pos_slot_desc_ != NULL) ReadPosition(tuple);
+    continue_execution = ReadValue<true>(pool, tuple);
+    ++val_count;
+  }
+  *num_values = val_count;
+  return continue_execution;
+}
+
+template<typename T, bool MATERIALIZED>
+bool HdfsParquetScanner::ScalarColumnReader<T, MATERIALIZED>::ReadNonRepeatedValueBatch(
+    MemPool* pool, int max_values, int tuple_size,
+    uint8_t* tuple_mem, int* num_values) {
+  int val_count = 0;
+  bool continue_execution = true;
+  while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
+    Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
+    continue_execution = ReadValue<false>(pool, tuple);
+    ++val_count;
+  }
+  *num_values = val_count;
+  return continue_execution;
+}
 
 template<>
 inline bool HdfsParquetScanner::ScalarColumnReader<StringValue, true>::NeedsConversion() const {
@@ -990,7 +1108,40 @@ HdfsParquetScanner::ColumnReader* HdfsParquetScanner::CreateReader(
   return obj_pool_.Add(reader);
 }
 
-inline void HdfsParquetScanner::ColumnReader::ReadPosition(Tuple* tuple) {
+bool HdfsParquetScanner::ColumnReader::ReadValueBatch(MemPool* pool, int max_values,
+    int tuple_size, uint8_t* tuple_mem, int* num_values) {
+  int val_count = 0;
+  bool continue_execution = true;
+  while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
+    Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
+    if (def_level_ < def_level_of_immediate_repeated_ancestor()) {
+      // A containing repeated field is empty or NULL
+      continue_execution = NextLevels();
+      continue;
+    }
+    // Fill in position slot if applicable
+    if (pos_slot_desc_ != NULL) ReadPosition(tuple);
+    continue_execution = ReadValue(pool, tuple);
+    ++val_count;
+  }
+  *num_values = val_count;
+  return continue_execution;
+}
+
+bool HdfsParquetScanner::ColumnReader::ReadNonRepeatedValueBatch(MemPool* pool,
+    int max_values, int tuple_size, uint8_t* tuple_mem, int* num_values) {
+  int val_count = 0;
+  bool continue_execution = true;
+  while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
+    Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
+    continue_execution = ReadNonRepeatedValue(pool, tuple);
+    ++val_count;
+  }
+  *num_values = val_count;
+  return continue_execution;
+}
+
+void HdfsParquetScanner::ColumnReader::ReadPosition(Tuple* tuple) {
   DCHECK(pos_slot_desc() != NULL);
   // NextLevels() should have already been called
   DCHECK_GE(rep_level_, 0);
@@ -1017,7 +1168,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
 
   // We're about to move to the next data page.  The previous data page is
   // now complete, pass along the memory allocated for it.
-  parent_->AttachPool(decompressed_data_pool_.get(), false);
+  parent_->scratch_batch_->mem_pool()->AcquireData(decompressed_data_pool_.get(), false);
 
   // Read the next data page, skipping page types we don't care about.
   // We break out of this loop on the non-error case (a data page was found or we read all
@@ -1029,9 +1180,10 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
       // TODO: should we check for stream_->eosr()?
       break;
     } else if (num_values_read_ > metadata_->num_values) {
-      // The data pages contain more values than stated in the column metadata.
-      return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
-         metadata_->num_values, num_values_read_, node_.element->name, filename());
+      ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
+          metadata_->num_values, num_values_read_, node_.element->name, filename());
+      LOG_OR_RETURN_ON_ERROR(msg, parent_->state_);
+      return Status::OK();
     }
 
     int64_t buffer_size;
@@ -1041,8 +1193,10 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
       DCHECK(stream_->eosr());
       DCHECK_LT(num_values_read_, metadata_->num_values);
       // TODO for 2.3: node_.element->name isn't necessarily useful
-      return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID, metadata_->num_values,
-          num_values_read_, node_.element->name, filename());
+      ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
+          metadata_->num_values, num_values_read_, node_.element->name, filename());
+      LOG_OR_RETURN_ON_ERROR(msg, parent_->state_);
+      return Status::OK();
     }
 
     // We don't know the actual header size until the thrift object is deserialized.  Loop
@@ -1369,14 +1523,11 @@ bool HdfsParquetScanner::CollectionColumnReader::ReadSlot(void* slot, MemPool* p
   *coll_slot = CollectionValue();
   CollectionValueBuilder builder(
       coll_slot, *slot_desc_->collection_item_descriptor(), pool);
-  bool filters_pass = true;
-  bool continue_execution = parent_->AssembleRows<true, true>(
-      slot_desc_->collection_item_descriptor(), children_, new_collection_rep_level(), -1,
-      &builder, &filters_pass);
-  DCHECK(filters_pass) << "Filter applied to collection type";
+  bool continue_execution = parent_->AssembleCollection(
+      children_, new_collection_rep_level(), &builder);
   if (!continue_execution) return false;
 
-  // AssembleRows() advances child readers, so we don't need to call NextLevels()
+  // AssembleCollection() advances child readers, so we don't need to call NextLevels()
   UpdateDerivedState();
   return true;
 }
@@ -1400,7 +1551,7 @@ void HdfsParquetScanner::CollectionColumnReader::UpdateDerivedState() {
     }
   }
 
-  if (rep_level_ == -1) {
+  if (RowGroupAtEnd()) {
     // No more values
     pos_current_value_ = -1;
   } else if (rep_level_ <= max_rep_level() - 2) {
@@ -1492,6 +1643,8 @@ Status HdfsParquetScanner::ProcessSplit() {
   RETURN_IF_ERROR(CreateColumnReaders(*scan_node_->tuple_desc(), &column_readers_));
   COUNTER_SET(num_cols_counter_,
       static_cast<int64_t>(CountScalarColumns(column_readers_)));
+  // Set top-level template tuple.
+  template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
 
   // The scanner-wide stream was used only to read the file footer.  Each column has added
   // its own stream.
@@ -1525,14 +1678,9 @@ Status HdfsParquetScanner::ProcessSplit() {
 
     assemble_rows_timer_.Start();
 
-    // If we are materializing non-repeated fields, i.e. not in a Parquet collection,
-    // we do not need to maintain repetition levels.
-    bool in_collection = false;
-
     // Prepare column readers for first read
     bool continue_execution = true;
     BOOST_FOREACH(ColumnReader* col_reader, column_readers_) {
-      in_collection |= col_reader->max_rep_level() > 0;
       continue_execution = col_reader->NextLevels();
       if (!continue_execution) break;
       DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
@@ -1540,11 +1688,7 @@ Status HdfsParquetScanner::ProcessSplit() {
 
     bool filters_pass = true;
     if (continue_execution) {
-      continue_execution = in_collection ?
-          AssembleRows<true, false>(scan_node_->tuple_desc(), column_readers_, -1, i,
-              NULL, &filters_pass) :
-          AssembleRows<false, false>(scan_node_->tuple_desc(), column_readers_, -1, i,
-              NULL, &filters_pass);
+      AssembleRows(column_readers_, i, &filters_pass);
       assemble_rows_timer_.Stop();
     }
 
@@ -1575,22 +1719,198 @@ Status HdfsParquetScanner::ProcessSplit() {
   return Status::OK();
 }
 
-// TODO: this needs to be codegen'd.  The ReadValue function needs to be codegen'd,
-// specific to type and encoding and then inlined into AssembleRows().
-template <bool IN_COLLECTION, bool MATERIALIZING_COLLECTION>
-bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
-    const vector<ColumnReader*>& column_readers, int new_collection_rep_level,
-    int row_group_idx, CollectionValueBuilder* coll_value_builder,
-    bool* filters_pass) {
-  DCHECK(!column_readers.empty());
-  if (MATERIALIZING_COLLECTION) {
-    DCHECK_GE(new_collection_rep_level, 0);
-    DCHECK(coll_value_builder != NULL);
-  } else {
-    DCHECK_EQ(new_collection_rep_level, -1);
-    DCHECK(coll_value_builder == NULL);
+int HdfsParquetScanner::TransferScratchTuples() {
+  // This function must not be called when the output batch is already full. As long as
+  // we always call CommitRows() after TransferScratchTuples(), the output batch can
+  // never be empty.
+  DCHECK_LT(batch_->num_rows(), batch_->capacity());
+
+  const bool has_filters = !filter_ctxs_.empty();
+  const bool has_conjuncts = !scanner_conjunct_ctxs_->empty();
+  ExprContext* const* conjunct_ctxs = &(*scanner_conjunct_ctxs_)[0];
+  const int num_conjuncts = scanner_conjunct_ctxs_->size();
+
+  // Start/end/current iterators over the output rows.
+  DCHECK_EQ(scan_node_->tuple_idx(), 0);
+  DCHECK_EQ(batch_->row_desc().tuple_descriptors().size(), 1);
+  Tuple** output_row_start =
+      reinterpret_cast<Tuple**>(batch_->GetRow(batch_->num_rows()));
+  Tuple** output_row_end = output_row_start + (batch_->capacity() - batch_->num_rows());
+  Tuple** output_row = output_row_start;
+
+  // Start/end/current iterators over the scratch tuples.
+  uint8_t* scratch_tuple_start = scratch_batch_->CurrTuple();
+  uint8_t* scratch_tuple_end = scratch_batch_->TupleEnd();
+  uint8_t* scratch_tuple = scratch_tuple_start;
+  const int tuple_size = scratch_batch_->tuple_byte_size;
+
+  if (tuple_size == 0) {
+    // We are materializing a collection with empty tuples. Add a NULL tuple to the
+    // output batch per remaining scratch tuple and return. No need to evaluate
+    // filters/conjuncts or transfer memory ownership.
+    DCHECK(!has_filters);
+    DCHECK(!has_conjuncts);
+    DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
+    int num_tuples = min(batch_->capacity() - batch_->num_rows(),
+        scratch_batch_->num_tuples - scratch_batch_->tuple_idx);
+    memset(output_row, 0, num_tuples * sizeof(Tuple*));
+    scratch_batch_->tuple_idx += num_tuples;
+    return num_tuples;
   }
 
+  // Loop until the scratch batch is exhausted or the output batch is full.
+  // Do not use batch_->AtCapacity() in this loop because it is not necessary
+  // to perform the memory capacity check.
+  while (scratch_tuple != scratch_tuple_end) {
+    *output_row = reinterpret_cast<Tuple*>(scratch_tuple);
+    scratch_tuple += tuple_size;
+    // Evaluate runtime filters and conjuncts. Short-circuit the evaluation if
+    // the filters/conjuncts are empty to avoid function calls.
+    if (has_filters && !EvalRuntimeFilters(reinterpret_cast<TupleRow*>(output_row))) {
+      continue;
+    }
+    if (has_conjuncts && !ExecNode::EvalConjuncts(
+        conjunct_ctxs, num_conjuncts, reinterpret_cast<TupleRow*>(output_row))) {
+      continue;
+    }
+    // Row survived runtime filters and conjuncts.
+    ++output_row;
+    if (output_row == output_row_end) break;
+  }
+  scratch_batch_->tuple_idx += (scratch_tuple - scratch_tuple_start) / tuple_size;
+
+  // TODO: Consider compacting the output row batch to better handle cases where
+  // there are few surviving tuples per scratch batch. In such cases, we could
+  // quickly accumulate memory in the output batch, hit the memory capacity limit,
+  // and return an output batch with relatively few rows.
+  if (scratch_batch_->AtEnd()) {
+    batch_->tuple_data_pool()->AcquireData(scratch_batch_->mem_pool(), false);
+  }
+  return output_row - output_row_start;
+}
+
+bool HdfsParquetScanner::EvalRuntimeFilters(TupleRow* row) {
+  int num_filters = filter_ctxs_.size();
+  for (int i = 0; i < num_filters; ++i) {
+    LocalFilterStats* stats = &filter_stats_[i];
+    if (!stats->enabled) continue;
+    const RuntimeFilter* filter = filter_ctxs_[i]->filter;
+    // Check filter effectiveness every ROWS_PER_FILTER_SELECTIVITY_CHECK rows.
+    // TODO: The stats updates and the filter effectiveness check are executed very
+    // frequently. Consider hoisting it out of of this loop, and doing an equivalent
+    // check less frequently, e.g., after producing an output batch.
+    ++stats->total_possible;
+    if (UNLIKELY(
+        !(stats->total_possible & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
+      double reject_ratio = stats->rejected / static_cast<double>(stats->considered);
+      if (filter->AlwaysTrue() ||
+          reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
+        stats->enabled = 0;
+        continue;
+      }
+    }
+    ++stats->considered;
+    void* e = filter_ctxs_[i]->expr->GetValue(row);
+    if (!filter->Eval<void>(e, filter_ctxs_[i]->expr->root()->type())) {
+      ++stats->rejected;
+      return false;
+    }
+  }
+  return true;
+}
+
+/// High-level steps of this function:
+/// 1. Allocate 'scratch' memory for tuples able to hold a full batch
+/// 2. Populate the slots of all scratch tuples one column reader at a time,
+///    using the ColumnReader::Read*ValueBatch() functions.
+/// 3. Evaluate runtime filters and conjuncts against the scratch tuples and
+///    set the surviving tuples in the output batch. Transfer the ownership of
+///    scratch memory to the output batch once the scratch memory is exhausted.
+/// 4. Repeat steps above until we are done with the row group or an error
+///    occurred.
+/// TODO: Since the scratch batch is populated in a column-wise fashion, it is
+/// difficult to maintain a maximum memory footprint without throwing away at least
+/// some work. This point needs further experimentation and thought.
+bool HdfsParquetScanner::AssembleRows(
+    const vector<ColumnReader*>& column_readers, int row_group_idx, bool* filters_pass) {
+  DCHECK(!column_readers.empty());
+  DCHECK(scratch_batch_ != NULL);
+
+  int64_t rows_read = 0;
+  bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
+  while (!column_readers[0]->RowGroupAtEnd()) {
+    if (UNLIKELY(!continue_execution)) break;
+
+    // Apply any runtime filters to static tuples containing the partition keys for this
+    // partition. If any filter fails, we return immediately and stop processing this
+    // row group.
+    if (!scan_node_->PartitionPassesFilterPredicates(
+        context_->partition_descriptor()->id(),
+        FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
+      *filters_pass = false;
+      return false;
+    }
+
+    // Start a new scratch batch.
+    parse_status_.MergeStatus(scratch_batch_->Reset(state_));
+    if (UNLIKELY(!parse_status_.ok())) return false;
+    int scratch_capacity = scratch_batch_->capacity();
+
+    // Initialize tuple memory.
+    for (int i = 0; i < scratch_capacity; ++i) {
+      InitTuple(template_tuple_, scratch_batch_->GetTuple(i));
+    }
+
+    // Materialize the top-level slots into the scratch batch column-by-column.
+    int last_num_tuples = -1;
+    int num_col_readers = column_readers.size();
+    for (int c = 0; c < num_col_readers; ++c) {
+      ColumnReader* col_reader = column_readers[c];
+      if (col_reader->max_rep_level() > 0) {
+        continue_execution = col_reader->ReadValueBatch(
+            scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
+            scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
+      } else {
+        continue_execution = col_reader->ReadNonRepeatedValueBatch(
+            scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
+            scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
+      }
+      if (UNLIKELY(!continue_execution)) return false;
+      // Check that all column readers populated the same number of values.
+      if (c != 0) DCHECK_EQ(last_num_tuples, scratch_batch_->num_tuples);
+      last_num_tuples = scratch_batch_->num_tuples;
+    }
+
+    // Keep transferring scratch tuples to output batches until the scratch batch
+    // is empty. CommitRows() creates new output batches as necessary.
+    do {
+      int num_row_to_commit = TransferScratchTuples();
+      parse_status_.MergeStatus(CommitRows(num_row_to_commit));
+      if (UNLIKELY(!parse_status_.ok())) return false;
+    } while (!scratch_batch_->AtEnd());
+
+    rows_read += scratch_batch_->num_tuples;
+    COUNTER_ADD(scan_node_->rows_read_counter(), scratch_batch_->num_tuples);
+    continue_execution &= parse_status_.ok();
+    continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
+  }
+
+  if (column_readers[0]->RowGroupAtEnd() && parse_status_.ok()) {
+    parse_status_ = ValidateEndOfRowGroup(column_readers, row_group_idx, rows_read);
+    continue_execution &= parse_status_.ok();
+  }
+
+  return continue_execution;
+}
+
+bool HdfsParquetScanner::AssembleCollection(
+    const vector<ColumnReader*>& column_readers, int new_collection_rep_level,
+    CollectionValueBuilder* coll_value_builder) {
+  DCHECK(!column_readers.empty());
+  DCHECK_GE(new_collection_rep_level, 0);
+  DCHECK(coll_value_builder != NULL);
+
+  const TupleDescriptor* tuple_desc = &coll_value_builder->tuple_desc();
   Tuple* template_tuple = template_tuple_map_[tuple_desc];
   const vector<ExprContext*> conjunct_ctxs = scanner_conjuncts_map_[tuple_desc->id()];
 
@@ -1606,40 +1926,24 @@ bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
   if (coll_value_builder != NULL) DCHECK(!end_of_collection);
 
   while (!end_of_collection && continue_execution) {
-    if (!MATERIALIZING_COLLECTION) {
-      // Apply any runtime filters to static tuples containing the partition keys for this
-      // partition. If any filter fails, we return immediately and stop processing this
-      // row group.
-      if (!scan_node_->PartitionPassesFilterPredicates(
-              context_->partition_descriptor()->id(),
-              FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
-        *filters_pass = false;
-        return false;
-      }
-    }
-
     MemPool* pool;
     Tuple* tuple;
     TupleRow* row = NULL;
 
     int64_t num_rows;
-    if (!MATERIALIZING_COLLECTION) {
-      // We're assembling the top-level tuples into row batches
-      num_rows = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
-    } else {
-      // We're assembling item tuples into an CollectionValue
-      parse_status_ =
-          GetCollectionMemory(coll_value_builder, &pool, &tuple, &row, &num_rows);
-      if (UNLIKELY(!parse_status_.ok())) {
-        continue_execution = false;
-        break;
-      }
-      // 'num_rows' can be very high if we're writing to a large CollectionValue. Limit
-      // the number of rows we read at one time so we don't spend too long in the
-      // 'num_rows' loop below before checking for cancellation or limit reached.
-      num_rows = std::min(
-          num_rows, static_cast<int64_t>(scan_node_->runtime_state()->batch_size()));
+    // We're assembling item tuples into an CollectionValue
+    parse_status_ =
+        GetCollectionMemory(coll_value_builder, &pool, &tuple, &row, &num_rows);
+    if (UNLIKELY(!parse_status_.ok())) {
+      continue_execution = false;
+      break;
     }
+    // 'num_rows' can be very high if we're writing to a large CollectionValue. Limit
+    // the number of rows we read at one time so we don't spend too long in the
+    // 'num_rows' loop below before checking for cancellation or limit reached.
+    num_rows = std::min(
+        num_rows, static_cast<int64_t>(scan_node_->runtime_state()->batch_size()));
+
     int num_to_commit = 0;
     int row_idx = 0;
     for (row_idx = 0; row_idx < num_rows && !end_of_collection; ++row_idx) {
@@ -1647,39 +1951,25 @@ bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
       // A tuple is produced iff the collection that contains its values is not empty and
       // non-NULL. (Empty or NULL collections produce no output values, whereas NULL is
       // output for the fields of NULL structs.)
-      bool materialize_tuple = !IN_COLLECTION || column_readers[0]->def_level() >=
+      bool materialize_tuple = column_readers[0]->def_level() >=
           column_readers[0]->def_level_of_immediate_repeated_ancestor();
       InitTuple(tuple_desc, template_tuple, tuple);
       continue_execution =
-          ReadRow<IN_COLLECTION>(column_readers, tuple, pool, &materialize_tuple);
+          ReadCollectionItem(column_readers, materialize_tuple, pool, tuple);
       if (UNLIKELY(!continue_execution)) break;
       end_of_collection = column_readers[0]->rep_level() <= new_collection_rep_level;
 
       if (materialize_tuple) {
-        if (!MATERIALIZING_COLLECTION) row->SetTuple(scan_node_->tuple_idx(), tuple);
         if (ExecNode::EvalConjuncts(&conjunct_ctxs[0], conjunct_ctxs.size(), row)) {
-          if (!MATERIALIZING_COLLECTION) row = next_row(row);
           tuple = next_tuple(tuple_desc->byte_size(), tuple);
           ++num_to_commit;
         }
-      }
-
-      // Exit this loop early if the batch gets big due to varlen data. We need to
-      // materialize nested collections in full, regardless of size.
-      if (UNLIKELY(!MATERIALIZING_COLLECTION && batch_->AtCapacity())) {
-        ++row_idx;
-        break;
       }
     }
 
     rows_read += row_idx;
     COUNTER_ADD(scan_node_->rows_read_counter(), row_idx);
-    if (!MATERIALIZING_COLLECTION) {
-      parse_status_.MergeStatus(CommitRows(num_to_commit));
-      continue_execution &= parse_status_.ok();
-    } else {
-      coll_value_builder->CommitTuples(num_to_commit);
-    }
+    coll_value_builder->CommitTuples(num_to_commit);
     continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
   }
 
@@ -1689,29 +1979,18 @@ bool HdfsParquetScanner::AssembleRows(const TupleDescriptor* tuple_desc,
       FILE_CHECK_EQ(column_readers[c]->rep_level(), column_readers[0]->rep_level());
     }
   }
-
-  bool end_of_row_group = column_readers[0]->rep_level() == -1;
-  if (end_of_row_group && parse_status_.ok()) {
-    parse_status_ = ValidateEndOfRowGroup(column_readers, row_group_idx, rows_read);
-    continue_execution &= parse_status_.ok();
-  }
   return continue_execution;
 }
 
-template <bool IN_COLLECTION>
-inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_readers,
-    Tuple* tuple, MemPool* pool, bool* materialize_tuple) {
+inline bool HdfsParquetScanner::ReadCollectionItem(
+    const vector<ColumnReader*>& column_readers,
+    bool materialize_tuple, MemPool* pool, Tuple* tuple) const {
   DCHECK(!column_readers.empty());
   bool continue_execution = true;
   int size = column_readers.size();
   for (int c = 0; c < size; ++c) {
     ColumnReader* col_reader = column_readers[c];
-    if (!IN_COLLECTION) {
-      DCHECK(*materialize_tuple);
-      DCHECK(col_reader->pos_slot_desc() == NULL);
-      // We found a value, read it
-      continue_execution = col_reader->ReadNonRepeatedValue(pool, tuple);
-    } else if (*materialize_tuple) {
+    if (materialize_tuple) {
       // All column readers for this tuple should a value to materialize.
       FILE_CHECK_GE(col_reader->def_level(),
                     col_reader->def_level_of_immediate_repeated_ancestor());
@@ -1726,35 +2005,6 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
     }
     if (UNLIKELY(!continue_execution)) break;
   }
-
-  if (!IN_COLLECTION && *materialize_tuple) {
-    TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&tuple);
-    int num_filters = filter_ctxs_.size();
-    for (int i = 0; i < num_filters; ++i) {
-      LocalFilterStats* stats = &filter_stats_[i];
-      if (!stats->enabled) continue;
-      const RuntimeFilter* filter = filter_ctxs_[i]->filter;
-      ++stats->total_possible;
-      // Check filter effectiveness every ROWS_PER_FILTER_SELECTIVITY_CHECK rows.
-      if (UNLIKELY(
-          !(stats->total_possible & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
-        double reject_ratio = stats->rejected / static_cast<double>(stats->considered);
-        if (filter->AlwaysTrue() ||
-            reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
-          stats->enabled = 0;
-          continue;
-        }
-      }
-      ++stats->considered;
-      void* e = filter_ctxs_[i]->expr->GetValue(tuple_row_mem);
-      if (!filter->Eval<void>(e, filter_ctxs_[i]->expr->root()->type())) {
-        ++stats->rejected;
-        *materialize_tuple = false;
-        break;
-      }
-    }
-  }
-
   return continue_execution;
 }
 
@@ -2708,7 +2958,8 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
     if (num_values_read == -1) num_values_read = reader->num_values_read_;
     DCHECK_EQ(reader->num_values_read_, num_values_read);
     // ReadDataPage() uses metadata_->num_values to determine when the column's done
-    DCHECK_EQ(reader->num_values_read_, reader->metadata_->num_values);
+    DCHECK(reader->num_values_read_ == reader->metadata_->num_values ||
+        !state_->abort_on_error());
   }
   return Status::OK();
 }

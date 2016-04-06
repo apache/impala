@@ -243,7 +243,7 @@ def apply_error_match_filter(error_list):
   updated_errors = list()
   for row in error_list:
     # The actual file path isn't very interesting and can vary. Filter it out.
-    row = re.sub(r'^file:.+$|file hdfs:.+$', 'file: hdfs://regex:.$', row)
+    row = re.sub(r'^file:.+$|file=.+$|file hdfs:.+$', 'file: hdfs://regex:.$', row)
     # The "Backend <id>" can also vary, so filter it out as well.
     updated_errors.append(re.sub(r'Backend \d+:', '', row))
   return updated_errors

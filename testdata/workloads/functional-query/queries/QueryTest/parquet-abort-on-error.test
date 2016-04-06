@@ -1,0 +1,19 @@
+====
+---- QUERY
+# IMPALA-2558: Trigger bad parse_status_ in HdfsParquetScanner::AssembleRows().
+# Abort on error must be used to trigger a status.
+# Set a single node and scanner thread to make this test deterministic.
+set num_nodes=1;
+set num_scanner_threads=1;
+select id, cnt from bad_column_metadata t, (select count(*) cnt from t.int_array) v
+---- CATCH
+Column metadata states there are 50 values, but read 100 values from column element.
+====
+---- QUERY
+# IMPALA-2558. Same as above but only selecting a scalar column.
+set num_nodes=1;
+set num_scanner_threads=1;
+select id from bad_column_metadata
+---- CATCH
+Column metadata states there are 11 values, but read 10 values from column id.
+====

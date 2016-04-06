@@ -205,9 +205,11 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet', vector)
 
   @SkipIfOldAggsJoins.nested_types
-  def test_continue_on_error(self, vector):
+  def test_file_metadata_discrepancy(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('QueryTest/parquet-continue-on-error', vector)
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/parquet-abort-on-error', vector)
 
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size

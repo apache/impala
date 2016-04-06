@@ -244,8 +244,13 @@ class RleEncoder {
 template<typename T>
 inline bool RleDecoder::Get(T* val) {
   DCHECK_GE(bit_width_, 0);
-  if (UNLIKELY(literal_count_ == 0 && repeat_count_ == 0)) {
-    if (!NextCounts<T>()) return false;
+  // Profiling has shown that the quality and performance of the generated code is very
+  // sensitive to the exact shape of this check. For example, the version below performs
+  // significantly better than UNLIKELY(literal_count_ == 0 && repeat_count_ == 0)
+  if (repeat_count_ == 0) {
+    if (literal_count_ == 0) {
+      if (!NextCounts<T>()) return false;
+    }
   }
 
   if (LIKELY(repeat_count_ > 0)) {

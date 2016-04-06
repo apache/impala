@@ -23,6 +23,7 @@ namespace impala {
 
 class CollectionValueBuilder;
 struct HdfsFileDesc;
+struct ScratchTupleBatch;
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
 /// the Impala in-memory representation of data, e.g.  (tuples, rows, row batches).
@@ -271,8 +272,28 @@ struct HdfsFileDesc;
 ///   outer array, which determines how long each materialized array is, and the items in
 ///   the array are from the inner array.
 ///
-/// ---- Runtime filters ----
+/// ---- Slot materialization ----
+/// Top-level tuples:
+/// The slots of top-level tuples are populated in a column-wise fashion. Each column
+/// reader materializes a batch of values into a temporary 'scratch batch'. Once a
+/// scratch batch has been fully populated, runtime filters and conjuncts are evaluated
+/// against the scratch tuples, and the surviving tuples are set in the output batch that
+/// is handed to the scan node. The ownership of tuple memory is transferred from a
+/// scratch batch to an output row batch once all tuples in the scratch batch have either
+/// been filtered or returned as part of an output batch.
 ///
+/// Collection items:
+/// Unlike the top-level tuples, the item tuples of CollectionValues are populated in
+/// a row-wise fashion because doing it column-wise has the following challenges.
+/// First, we would need to allocate a scratch batch for every collection-typed slot
+/// which could consume a lot of memory. Then we'd need a similar mechanism to transfer
+/// tuples that survive conjuncts to an output collection. However, CollectionValues lack
+/// the row indirection that row batches have, so we would need to either deep copy the
+/// surviving tuples, or come up with a different mechanism altogether.
+/// TODO: Populating CollectionValues in a column-wise fashion seems different enough
+/// and less critical for most of our users today to defer this task until later.
+///
+/// ---- Runtime filters ----
 /// HdfsParquetScanner is able to apply runtime filters that arrive before or during
 /// scanning. Filters are applied at both the row group (see AssembleRows()) and row (see
 /// ReadRow()) scope. If all filter predicates do not pass, the row or row group will be
@@ -412,6 +433,10 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Column reader for each materialized columns for this file.
   std::vector<ColumnReader*> column_readers_;
 
+  /// Column readers will write slot values into this scratch batch for
+  /// top-level tuples. See AssembleRows().
+  boost::scoped_ptr<ScratchTupleBatch> scratch_batch_;
+
   /// File metadata thrift object
   parquet::FileMetaData file_metadata_;
 
@@ -439,50 +464,62 @@ class HdfsParquetScanner : public HdfsScanner {
 
   const char* filename() const { return metadata_range_->file(); }
 
-  /// Reads data using 'column_readers' to materialize instances of 'tuple_desc'
-  /// (including recursively reading collections).
+  /// Reads data using 'column_readers' to materialize top-level tuples.
   ///
-  /// If reading into a collection, 'coll_value_builder' should be non-NULL and
-  /// 'new_collection_rep_level' set appropriately. Otherwise, 'coll_value_builder'
-  /// should be NULL and 'new_collection_rep_level' should be -1.
+  /// Returns true when the row group is complete and execution can be safely resumed.
+  /// Returns false if execution should be aborted due to:
+  /// - parse_error_ is set
+  /// - query is cancelled
+  /// - scan node limit was reached
+  /// - the scanned file can be skipped based on runtime filters
+  /// When false is returned the column_readers are left in an undefined state and
+  /// execution should be aborted immediately by the caller.
   ///
-  /// Returns when the row group is complete, the end of the current collection is reached
-  /// as indicated by 'new_collection_rep_level' (if materializing a collection), or
-  /// some other condition causes execution to halt (e.g. parse_error_ set, cancellation).
-  ///
-  /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
-  /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
-  /// true.
-  ///
-  /// 'row_group_idx' is used for error checking when this is called on the table-level
-  /// tuple. If reading into a collection, 'row_group_idx' doesn't matter.
+  /// 'row_group_idx' is used for calling into ValidateEndOfRowGroup() when the end
+  /// of the row group is reached.
   ///
   /// If 'filters_pass' is set to false by this method, the partition columns associated
   /// with this row group did not pass all the runtime filters (and therefore only filter
   /// contexts that apply only to partition columns are checked).
-  ///
-  /// IN_COLLECTION is true if the columns we are materializing are part of a Parquet
-  /// collection. MATERIALIZING_COLLECTION is true if we are materializing tuples inside
-  /// a nested collection.
-  template <bool IN_COLLECTION, bool MATERIALIZING_COLLECTION>
-  bool AssembleRows(const TupleDescriptor* tuple_desc,
-      const std::vector<ColumnReader*>& column_readers, int new_collection_rep_level,
-      int row_group_idx, CollectionValueBuilder* coll_value_builder,
-      bool* filters_pass);
+  bool AssembleRows(const std::vector<ColumnReader*>& column_readers,
+      int row_group_idx, bool* filters_pass);
 
-  /// Function used by AssembleRows() to read a single row into 'tuple'. Returns false if
-  /// execution should be aborted for some reason, otherwise returns true.
-  /// materialize_tuple is an in/out parameter. It is set to true by the caller to
-  /// materialize the tuple.  If any conjuncts fail, materialize_tuple is set to false
-  /// by ReadRow().
-  /// 'tuple_materialized' is an output parameter set by this function. If false is
-  /// returned, there are no guarantees about 'materialize_tuple' or the state of
-  /// column_readers, so execution should be halted immediately.
-  /// The template argument IN_COLLECTION allows an optimized version of this code to
-  /// be produced in the case when we are materializing the top-level tuple.
-  template <bool IN_COLLECTION>
-  inline bool ReadRow(const std::vector<ColumnReader*>& column_readers, Tuple* tuple,
-      MemPool* pool, bool* materialize_tuple);
+  /// Evaluates runtime filters and conjuncts (if any) against the tuples in
+  /// 'scratch_batch_', and adds the surviving tuples to the output batch.
+  /// Transfers the ownership of tuple memory to the output batch when the
+  /// scratch batch is exhausted.
+  /// Returns the number of rows that should be committed to the output batch.
+  int TransferScratchTuples();
+
+  /// Evaluates runtime filters (if any) against the given row. Returns true if
+  /// they passed, false otherwise. Maintains the runtime filter stats, determines
+  /// whether the filters are effective, and disables them if they are not.
+  bool EvalRuntimeFilters(TupleRow* row);
+
+  /// Reads data using 'column_readers' to materialize the tuples of a CollectionValue
+  /// allocated from 'coll_value_builder'.
+  ///
+  /// 'new_collection_rep_level' indicates when the end of the collection has been
+  /// reached, namely when current_rep_level <= new_collection_rep_level.
+  ///
+  /// Returns true when the end of the current collection is reached, and execution can
+  /// be safely resumed.
+  /// Returns false if execution should be aborted due to:
+  /// - parse_error_ is set
+  /// - query is cancelled
+  /// - scan node limit was reached
+  /// When false is returned the column_readers are left in an undefined state and
+  /// execution should be aborted immediately by the caller.
+  bool AssembleCollection(const std::vector<ColumnReader*>& column_readers,
+      int new_collection_rep_level, CollectionValueBuilder* coll_value_builder);
+
+  /// Function used by AssembleCollection() to materialize a single collection item
+  /// into 'tuple'. Returns false if execution should be aborted for some reason,
+  /// otherwise returns true.
+  /// If 'materialize_tuple' is false, only advances the column readers' levels,
+  /// and does not read any data values.
+  inline bool ReadCollectionItem(const std::vector<ColumnReader*>& column_readers,
+      bool materialize_tuple, MemPool* pool, Tuple* tuple) const;
 
   /// Find and return the last split in the file if it is assigned to this scan node.
   /// Returns NULL otherwise.
