@@ -253,10 +253,6 @@ class HdfsParquetScanner::ColumnReader {
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
   ///
-  /// *conjuncts_passed is an in/out parameter. ReadValue() sets to false if the current
-  /// row should be filtered based on this column's value. If already false on input, the
-  /// row has already been filtered and ReadValue() only needs to advance the value.
-  ///
   /// NextLevels() must be called on this reader before calling ReadValue() for the first
   /// time. This is to initialize the current value that ReadValue() will read.
   ///
@@ -266,12 +262,11 @@ class HdfsParquetScanner::ColumnReader {
   /// TODO: another option is to materialize col by col for the entire row batch in
   /// one call.  e.g. MaterializeCol would write out 1024 values.  Our row batches
   /// are currently dense so we'll need to figure out something there.
-  virtual bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) = 0;
+  virtual bool ReadValue(MemPool* pool, Tuple* tuple) = 0;
 
   /// Same as ReadValue() but does not advance repetition level. Only valid for columns not
   /// in collections.
-  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple,
-      bool* conjuncts_passed) = 0;
+  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple) = 0;
 
   /// Advances this column reader's def and rep levels to the next logical value, i.e. to
   /// the next scalar value or the beginning of the next collection, without attempting to
@@ -375,11 +370,11 @@ class HdfsParquetScanner::CollectionColumnReader :
 
   /// Materializes CollectionValue into tuple slot (if materializing) and advances to next
   /// value.
-  virtual bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed);
+  virtual bool ReadValue(MemPool* pool, Tuple* tuple);
 
   /// Same as ReadValue but does not advance repetition level. Only valid for columns not
   /// in collections.
-  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed);
+  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple);
 
   /// Advances all child readers to the beginning of the next collection and updates this
   /// reader's state.
@@ -409,7 +404,7 @@ class HdfsParquetScanner::CollectionColumnReader :
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
-  inline bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_passed);
+  inline bool ReadSlot(void* slot, MemPool* pool);
 };
 
 /// Reader for a single column from the parquet file.  It's associated with a
@@ -565,7 +560,7 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
   template <bool IN_COLLECTION>
-  inline bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_passed);
+  inline bool ReadSlot(void* slot, MemPool* pool);
 };
 
 /// Per column type reader. If MATERIALIZED is true, the column values are materialized
@@ -605,17 +600,17 @@ class HdfsParquetScanner::ScalarColumnReader :
 
   virtual ~ScalarColumnReader() { }
 
-  virtual bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
-    return ReadValue<true>(pool, tuple, conjuncts_passed);
+  virtual bool ReadValue(MemPool* pool, Tuple* tuple) {
+    return ReadValue<true>(pool, tuple);
   }
 
-  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
-    return ReadValue<false>(pool, tuple, conjuncts_passed);
+  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple) {
+    return ReadValue<false>(pool, tuple);
   }
 
  protected:
   template <bool IN_COLLECTION>
-  inline bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
+  inline bool ReadValue(MemPool* pool, Tuple* tuple) {
     // NextLevels() should have already been called and def and rep levels should be in
     // valid range.
     DCHECK_GE(rep_level_, 0);
@@ -628,8 +623,7 @@ class HdfsParquetScanner::ScalarColumnReader :
     if (!MATERIALIZED) {
       return NextLevels<IN_COLLECTION>();
     } else if (def_level_ >= max_def_level()) {
-      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool,
-          conjuncts_passed);
+      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool);
     } else {
       // Null value
       tuple->SetNull(null_indicator_offset_);
@@ -682,7 +676,7 @@ class HdfsParquetScanner::ScalarColumnReader :
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
   template <bool IN_COLLECTION>
-  inline bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_passed) {
+  inline bool ReadSlot(void* slot, MemPool* pool) {
     T val;
     T* val_ptr = NeedsConversion() ? &val : reinterpret_cast<T*>(slot);
     if (page_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
@@ -794,13 +788,12 @@ class HdfsParquetScanner::BoolColumnReader :
 
   virtual ~BoolColumnReader() { }
 
-  virtual bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
-    return ReadValue<true>(pool, tuple, conjuncts_passed);
+  virtual bool ReadValue(MemPool* pool, Tuple* tuple) {
+    return ReadValue<true>(pool, tuple);
   }
 
-  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple,
-      bool* conjuncts_passed) {
-    return ReadValue<false>(pool, tuple, conjuncts_passed);
+  virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple) {
+    return ReadValue<false>(pool, tuple);
   }
 
  protected:
@@ -825,7 +818,7 @@ class HdfsParquetScanner::BoolColumnReader :
 
  private:
   template<bool IN_COLLECTION>
-  inline bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
+  inline bool ReadValue(MemPool* pool, Tuple* tuple) {
     DCHECK(slot_desc_ != NULL);
     // Def and rep levels should be in valid range.
     DCHECK_GE(rep_level_, 0);
@@ -836,8 +829,7 @@ class HdfsParquetScanner::BoolColumnReader :
         "Caller should have called NextLevels() until we are ready to read a value";
 
     if (def_level_ >= max_def_level()) {
-      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool,
-          conjuncts_passed);
+      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool);
     } else {
       // Null value
       tuple->SetNull(null_indicator_offset_);
@@ -852,7 +844,7 @@ class HdfsParquetScanner::BoolColumnReader :
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
   template <bool IN_COLLECTION>
-  inline bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_passed)  {
+  inline bool ReadSlot(void* slot, MemPool* pool)  {
     if (!bool_values_.GetValue(1, reinterpret_cast<bool*>(slot))) {
       parent_->parse_status_ = Status("Invalid bool column.");
       return false;
@@ -1345,8 +1337,7 @@ bool HdfsParquetScanner::CollectionColumnReader::NextLevels() {
   return true;
 }
 
-bool HdfsParquetScanner::CollectionColumnReader::ReadValue(
-    MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
+bool HdfsParquetScanner::CollectionColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
   DCHECK_GE(rep_level_, 0);
   DCHECK_GE(def_level_, 0);
   DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
@@ -1355,7 +1346,7 @@ bool HdfsParquetScanner::CollectionColumnReader::ReadValue(
   if (tuple_offset_ == -1) {
     return CollectionColumnReader::NextLevels();
   } else if (def_level_ >= max_def_level()) {
-    return ReadSlot(tuple->GetSlot(tuple_offset_), pool, conjuncts_passed);
+    return ReadSlot(tuple->GetSlot(tuple_offset_), pool);
   } else {
     // Null value
     tuple->SetNull(null_indicator_offset_);
@@ -1364,18 +1355,13 @@ bool HdfsParquetScanner::CollectionColumnReader::ReadValue(
 }
 
 bool HdfsParquetScanner::CollectionColumnReader::ReadNonRepeatedValue(
-    MemPool* pool, Tuple* tuple, bool* conjuncts_passed) {
-  return CollectionColumnReader::ReadValue(pool, tuple, conjuncts_passed);
+    MemPool* pool, Tuple* tuple) {
+  return CollectionColumnReader::ReadValue(pool, tuple);
 }
 
-// TODO for 2.3: test query where *conjuncts_passed == false
-bool HdfsParquetScanner::CollectionColumnReader::ReadSlot(
-    void* slot, MemPool* pool, bool* conjuncts_passed) {
+bool HdfsParquetScanner::CollectionColumnReader::ReadSlot(void* slot, MemPool* pool) {
   DCHECK(!children_.empty());
   DCHECK_LE(rep_level_, new_collection_rep_level());
-
-  // TODO: do something with conjuncts_passed? We still need to "read" the value in order
-  // to advance children_ but we don't need to materialize the collection.
 
   // Recursively read the collection into a new CollectionValue.
   CollectionValue* coll_slot = reinterpret_cast<CollectionValue*>(slot);
@@ -1716,7 +1702,6 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
     Tuple* tuple, MemPool* pool, bool* materialize_tuple) {
   DCHECK(!column_readers.empty());
   bool continue_execution = true;
-  bool conjuncts_passed = true;
   int size = column_readers.size();
   for (int c = 0; c < size; ++c) {
     ColumnReader* col_reader = column_readers[c];
@@ -1724,15 +1709,14 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
       DCHECK(*materialize_tuple);
       DCHECK(col_reader->pos_slot_desc() == NULL);
       // We found a value, read it
-      continue_execution = col_reader->ReadNonRepeatedValue(pool, tuple,
-          &conjuncts_passed);
+      continue_execution = col_reader->ReadNonRepeatedValue(pool, tuple);
     } else if (*materialize_tuple) {
       // All column readers for this tuple should a value to materialize.
       FILE_CHECK_GE(col_reader->def_level(),
                     col_reader->def_level_of_immediate_repeated_ancestor());
       // Fill in position slot if applicable
       if (col_reader->pos_slot_desc() != NULL) col_reader->ReadPosition(tuple);
-      continue_execution = col_reader->ReadValue(pool, tuple, &conjuncts_passed);
+      continue_execution = col_reader->ReadValue(pool, tuple);
     } else {
       // A containing repeated field is empty or NULL
       FILE_CHECK_LT(col_reader->def_level(),
@@ -1741,7 +1725,6 @@ inline bool HdfsParquetScanner::ReadRow(const vector<ColumnReader*>& column_read
     }
     if (UNLIKELY(!continue_execution)) break;
   }
-  *materialize_tuple &= conjuncts_passed;
 
   if (!IN_COLLECTION && *materialize_tuple) {
     TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&tuple);
