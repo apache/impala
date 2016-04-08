@@ -14,9 +14,9 @@
 
 #include "runtime/runtime-filter.inline.h"
 
-#include <gutil/strings/substitute.h>
-
 #include "common/names.h"
+#include "gutil/bits.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
@@ -43,7 +43,7 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
   int32_t bloom_filter_size = query_ctx_.request.query_options.runtime_bloom_filter_size;
   bloom_filter_size = std::max(bloom_filter_size, MIN_BLOOM_FILTER_SIZE);
   bloom_filter_size = std::min(bloom_filter_size, MAX_BLOOM_FILTER_SIZE);
-  log_filter_size_ = BitUtil::Log2(bloom_filter_size);
+  log_filter_size_ = Bits::Log2Ceiling64(bloom_filter_size);
 }
 
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,

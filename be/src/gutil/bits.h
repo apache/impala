@@ -79,6 +79,10 @@ class Bits {
   static int Log2Ceiling(uint32 n);
   static int Log2Ceiling64(uint64 n);
 
+  // Potentially faster version of Log2Ceiling() that returns an
+  // undefined value if n == 0
+  static int Log2CeilingNonZero64(uint64 n);
+
   // Return the first set least / most significant bit, 0-indexed.  Returns an
   // undefined value if n == 0.  FindLSBSetNonZero() is similar to ffs() except
   // that it's 0-indexed, while FindMSBSetNonZero() is the same as
@@ -137,6 +141,36 @@ inline int Bits::Log2Floor(uint32 n) {
 
 inline int Bits::Log2FloorNonZero(uint32 n) {
   return 31 ^ __builtin_clz(n);
+}
+
+inline int Bits::Log2Ceiling(uint32 n) {
+  int floor = Log2Floor(n);
+  // Check if zero or a power of two. This pattern is recognised by gcc and optimised
+  // into branch-free code.
+  if (0 == (n & (n - 1)))
+    return floor;
+  else
+    return floor + 1;
+}
+
+inline int Bits::Log2Ceiling64(uint64 n) {
+  int floor = Log2Floor64(n);
+  // Check if zero or a power of two. This pattern is recognised by gcc and optimised
+  // into branch-free code.
+  if (0 == (n & (n - 1)))
+    return floor;
+  else
+    return floor + 1;
+}
+
+inline int Bits::Log2CeilingNonZero64(uint64 n) {
+  int floor = Log2FloorNonZero64(n);
+  // Check if zero or a power of two. This pattern is recognised by gcc and optimised
+  // into branch-free code.
+  if (0 == (n & (n - 1)))
+    return floor;
+  else
+    return floor + 1;
 }
 
 inline int Bits::FindLSBSetNonZero(uint32 n) {

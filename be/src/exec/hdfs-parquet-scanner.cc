@@ -27,6 +27,7 @@
 #include "exec/scanner-context.inline.h"
 #include "exec/read-write-util.h"
 #include "exprs/expr.h"
+#include "gutil/bits.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
@@ -1231,7 +1232,7 @@ Status HdfsParquetScanner::LevelDecoder::Init(const string& filename,
       if (num_bytes < 0) {
         return Status(TErrorCode::PARQUET_CORRUPT_VALUE, filename, num_bytes);
       }
-      int bit_width = BitUtil::Log2(max_level + 1);
+      int bit_width = Bits::Log2Ceiling64(max_level + 1);
       Reset(*data, num_bytes, bit_width);
       break;
     }

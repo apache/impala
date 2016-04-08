@@ -14,10 +14,12 @@
 
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-internal.h"
-#include "util/hdfs-util.h"
 
-#include <gutil/strings/substitute.h>
 #include <boost/algorithm/string.hpp>
+
+#include "gutil/bits.h"
+#include "gutil/strings/substitute.h"
+#include "util/hdfs-util.h"
 
 DECLARE_bool(disable_mem_pools);
 
@@ -270,7 +272,7 @@ DiskIoMgr::DiskIoMgr() :
         FileSystemUtil::MaxNumFileHandles()),
         &HdfsCachedFileHandle::Release) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
-  free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
+  free_buffers_.resize(Bits::Log2Ceiling64(max_buffer_size_scaled) + 1);
   int num_local_disks = FLAGS_num_disks == 0 ? DiskInfo::num_disks() : FLAGS_num_disks;
   disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
@@ -288,7 +290,7 @@ DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_disk, int min_buffer_s
     file_handle_cache_(min(FLAGS_max_cached_file_handles,
             FileSystemUtil::MaxNumFileHandles()), &HdfsCachedFileHandle::Release) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
-  free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
+  free_buffers_.resize(Bits::Log2Ceiling64(max_buffer_size_scaled) + 1);
   if (num_local_disks == 0) num_local_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
@@ -1129,7 +1131,7 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
 
 int DiskIoMgr::free_buffers_idx(int64_t buffer_size) {
   int64_t buffer_size_scaled = BitUtil::Ceil(buffer_size, min_buffer_size_);
-  int idx = BitUtil::Log2(buffer_size_scaled);
+  int idx = Bits::Log2Ceiling64(buffer_size_scaled);
   DCHECK_GE(idx, 0);
   DCHECK_LT(idx, free_buffers_.size());
   return idx;

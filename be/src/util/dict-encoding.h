@@ -20,6 +20,7 @@
 #include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
 
+#include "gutil/bits.h"
 #include "exec/parquet-common.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
@@ -70,7 +71,7 @@ class DictEncoderBase {
   int bit_width() const {
     if (UNLIKELY(num_entries() == 0)) return 0;
     if (UNLIKELY(num_entries() == 1)) return 1;
-    return BitUtil::Log2(num_entries());
+    return Bits::Log2Ceiling64(num_entries());
   }
 
   /// Writes out any buffered indices to buffer preceded by the bit width of this data.

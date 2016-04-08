@@ -20,6 +20,7 @@
 #include <string.h>
 #include <string>
 #include "common/logging.h"
+#include "gutil/bits.h"
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
@@ -66,8 +67,7 @@ class FreePool {
     /// This is the typical malloc behavior. NULL is reserved for failures.
     if (size == 0) return reinterpret_cast<uint8_t*>(0x1);
 
-    /// Do ceil(log_2(size))
-    int free_list_idx = BitUtil::Log2(size);
+    int free_list_idx = Bits::Log2Ceiling64(size);
     DCHECK_LT(free_list_idx, NUM_LISTS);
 
     FreeListNode* allocation = lists_[free_list_idx].next;

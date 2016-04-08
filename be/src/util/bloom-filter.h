@@ -109,8 +109,8 @@ class BloomFilter {
   typedef uint64_t BucketWord;
 
   // log2(number of bits in a BucketWord)
-  // TODO: Use BitUtil::Log2(numeric_limits<BucketWord>::digits) once we enable C++14 for
-  // codegen.
+  // TODO: Use Bits::Log2Ceiling64(numeric_limits<BucketWord>::digits) once we enable
+  // C++14 for codegen.
   static const int LOG_BUCKET_WORD_BITS = 6;
   static const BucketWord BUCKET_WORD_MASK = 63; // 2^LOG_BUCKET_WORD_BITS - 1
 

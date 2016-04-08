@@ -19,6 +19,8 @@
 
 #include <boost/utility.hpp>
 #include <gtest/gtest.h>
+
+#include "gutil/bits.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
 
@@ -99,7 +101,7 @@ TEST(BitUtil, ByteSwap) {
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint64_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(
       static_cast<uint64_t>(0x1122334455667788)), 0x8877665544332211);
-  
+
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<int64_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(
       static_cast<int64_t>(0x1122334455667788)), 0x8877665544332211);
@@ -112,14 +114,16 @@ TEST(BitUtil, ByteSwap) {
 }
 
 TEST(BitUtil, Log2) {
-  EXPECT_EQ(BitUtil::Log2(1), 0);
-  EXPECT_EQ(BitUtil::Log2(2), 1);
-  EXPECT_EQ(BitUtil::Log2(3), 2);
-  EXPECT_EQ(BitUtil::Log2(4), 2);
-  EXPECT_EQ(BitUtil::Log2(5), 3);
-  EXPECT_EQ(BitUtil::Log2(INT_MAX), 31);
-  EXPECT_EQ(BitUtil::Log2(UINT_MAX), 32);
-  EXPECT_EQ(BitUtil::Log2(ULLONG_MAX), 64);
+  // We use gutil's implementation in place of an older custom implementation in BitUtil.
+  // We leave this test here to ensure no test coverage is lost.
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(1), 0);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(2), 1);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(3), 2);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(4), 2);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(5), 3);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(INT_MAX), 31);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(UINT_MAX), 32);
+  EXPECT_EQ(Bits::Log2CeilingNonZero64(ULLONG_MAX), 64);
 }
 
 TEST(BitUtil, RoundUpToPowerOf2) {
