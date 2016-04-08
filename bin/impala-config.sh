@@ -88,30 +88,33 @@ export USE_KUDU_DEBUG_BUILD
 
 # Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
 # into the backend. The frontend build is OS independent since it is Java.
-export KUDU_IS_SUPPORTED=true
-if [[ -z $KUDU_BUILD_DIR ]]; then
-  if [[ $DISABLE_IMPALA_TOOLCHAIN -eq 1 ]]; then
-    KUDU_IS_SUPPORTED=false
-  elif ! $IS_OSX; then
-    if ! which lsb_release &>/dev/null; then
-      echo Unable to find the 'lsb_release' command. \
-          Please ensure it is available in your PATH. 1>&2
-      return 1
+if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
+  KUDU_IS_SUPPORTED=true
+  if [[ -z $KUDU_BUILD_DIR ]]; then
+    if [[ $DISABLE_IMPALA_TOOLCHAIN -eq 1 ]]; then
+      KUDU_IS_SUPPORTED=false
+    elif ! $IS_OSX; then
+      if ! which lsb_release &>/dev/null; then
+        echo Unable to find the 'lsb_release' command. \
+            Please ensure it is available in your PATH. 1>&2
+        return 1
+      fi
+      DISTRO_VERSION=$(lsb_release -sir 2>&1)
+      if [[ $? -ne 0 ]]; then
+        echo lsb_release cammond failed, output was: "$DISTRO_VERSION" 1>&2
+        return 1
+      fi
+      # Remove spaces, trim minor versions, and convert to lowercase.
+      DISTRO_VERSION=$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")
+      case "$DISTRO_VERSION" in
+        # "enterprise" is Oracle
+        centos5 | debian* | enterprise*5 | redhat*5 | suse* | ubuntu*12)
+            KUDU_IS_SUPPORTED=false;;
+      esac
     fi
-    DISTRO_VERSION=$(lsb_release -sir 2>&1)
-    if [[ $? -ne 0 ]]; then
-      echo lsb_release cammond failed, output was: "$DISTRO_VERSION" 1>&2
-      return 1
-    fi
-    # Remove spaces, trim minor versions, and convert to lowercase.
-    DISTRO_VERSION=$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")
-    case "$DISTRO_VERSION" in
-      # "enterprise" is Oracle
-      centos5 | debian* | enterprise*5 | redhat*5 | suse* | ubuntu*12)
-          KUDU_IS_SUPPORTED=false;;
-    esac
   fi
 fi
+export KUDU_IS_SUPPORTED
 
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}
