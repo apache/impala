@@ -289,8 +289,9 @@ TEST(Webserver, DirectoryListingDisabledTest) {
 }
 
 void FrameCallback(const Webserver::ArgumentMap& args, Document* document) {
-  const string& contents = "<frameset cols='50%,50%'><frame src='/metrics'></frameset>";
-  document->AddMember("contents", contents.c_str(), document->GetAllocator());
+  const string contents = "<frameset cols='50%,50%'><frame src='/metrics'></frameset>";
+  Value value(contents.c_str(), document->GetAllocator());
+  document->AddMember("contents", value, document->GetAllocator());
 }
 
 TEST(Webserver, NoFrameEmbeddingTest) {
