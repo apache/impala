@@ -1382,10 +1382,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Unsupported partition-column types.
     AnalysisError("create table new_table (i int) PARTITIONED BY (t timestamp)",
         "Type 'TIMESTAMP' is not supported as partition-column type in column: t");
-    AnalysisError("create table new_table (i int) PARTITIONED BY (d date)",
-        "Type 'DATE' is not supported as partition-column type in column: d");
-    AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
-        "Type 'DATETIME' is not supported as partition-column type in column: d");
 
     // Caching ops
     AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) " +
@@ -2162,14 +2158,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create function f() RETURNS struct<f:int>" + udfSuffix,
         "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
 
-    // Try creating functions with unsupported return/arg types.
-    AnalysisError("create function f() RETURNS array<int>" + udfSuffix,
-        "Type 'ARRAY<INT>' is not supported in UDFs/UDAs.");
-    AnalysisError("create function f(map<string,int>) RETURNS int" + udfSuffix,
-        "Type 'MAP<STRING,INT>' is not supported in UDFs/UDAs.");
-    AnalysisError("create function f() RETURNS struct<f:int>" + udfSuffix,
-        "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
-
     // Try dropping functions.
     AnalyzesOk("drop function if exists foo()");
     AnalysisError("drop function foo()", "Function does not exist: foo()");
@@ -2454,7 +2442,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     TypeDefsAnalyzeOk("DOUBLE", "REAL");
     TypeDefsAnalyzeOk("STRING");
     TypeDefsAnalyzeOk("CHAR(1)", "CHAR(20)");
-    TypeDefsAnalyzeOk("BINARY");
     TypeDefsAnalyzeOk("DECIMAL");
     TypeDefsAnalyzeOk("TIMESTAMP");
 
@@ -2472,6 +2459,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Decimal precision must be > 0: 0");
     TypeDefAnalysisError("DECIMAL(39, 0)",
         "Decimal precision must be <= 38");
+
+    // Test unsupported types
+    for (ScalarType t: Type.getUnsupportedTypes()) {
+      TypeDefAnalysisError(t.toSql(),
+          String.format("Unsupported data type: %s", t.toSql()));
+    }
 
     // Test complex types.
     TypeDefsAnalyzeOk("ARRAY<BIGINT>");

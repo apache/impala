@@ -71,6 +71,7 @@ public abstract class Type {
   private static ArrayList<ScalarType> integerTypes;
   private static ArrayList<ScalarType> numericTypes;
   private static ArrayList<ScalarType> supportedTypes;
+  private static ArrayList<ScalarType> unsupportedTypes;
 
   static {
     integerTypes = Lists.newArrayList();
@@ -102,6 +103,11 @@ public abstract class Type {
     supportedTypes.add(CHAR);
     supportedTypes.add(TIMESTAMP);
     supportedTypes.add(DECIMAL);
+
+    unsupportedTypes = Lists.newArrayList();
+    unsupportedTypes.add(BINARY);
+    unsupportedTypes.add(DATE);
+    unsupportedTypes.add(DATETIME);
   }
 
   public static ArrayList<ScalarType> getIntegerTypes() {
@@ -112,6 +118,9 @@ public abstract class Type {
   }
   public static ArrayList<ScalarType> getSupportedTypes() {
     return supportedTypes;
+  }
+  public static ArrayList<ScalarType> getUnsupportedTypes() {
+    return unsupportedTypes;
   }
 
   /**

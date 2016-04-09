@@ -55,6 +55,9 @@ public class TypeDef implements ParseNode {
   }
 
   private void analyze(Type type, Analyzer analyzer) throws AnalysisException {
+    if (!type.isSupported()) {
+      throw new AnalysisException("Unsupported data type: " + type.toSql());
+    }
     if (type.isScalarType()) {
       analyzeScalarType((ScalarType) type, analyzer);
     } else if (type.isStructType()) {

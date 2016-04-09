@@ -199,14 +199,18 @@ public class SelectStmt extends QueryStmt {
           "Affected select statement:\n" + toSql());
     }
 
-    // Complex types are currently not supported in the select list because we'd need
-    // to serialize them in a meaningful way.
     for (Expr expr: resultExprs_) {
+      // Complex types are currently not supported in the select list because we'd need
+      // to serialize them in a meaningful way.
       if (expr.getType().isComplexType()) {
         throw new AnalysisException(String.format(
             "Expr '%s' in select list returns a complex type '%s'.\n" +
             "Only scalar types are allowed in the select list.",
             expr.toSql(), expr.getType().toSql()));
+      }
+      if (!expr.getType().isSupported()) {
+        throw new AnalysisException("Unsupported type '"
+            + expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
       }
     }
 

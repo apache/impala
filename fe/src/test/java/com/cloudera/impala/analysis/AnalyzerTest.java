@@ -563,16 +563,66 @@ public class AnalyzerTest {
     // Unsupported type binary.
     AnalysisError("select bin_col from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
+    // Unsupported type binary in a star expansion.
+    AnalysisError("select * from functional.unsupported_types",
+        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
     // Mixed supported/unsupported types.
     AnalysisError("select int_col, str_col, bin_col " +
         "from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
+    AnalysisError("create table tmp as select * from functional.unsupported_types",
+        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
+    // Unsupported type in the target insert table.
+    AnalysisError("insert into functional.unsupported_types " +
+        "values(null, null, null, null, null)",
+        "Unable to INSERT into target table (functional.unsupported_types) because " +
+        "the column 'bin_col' has an unsupported type 'BINARY'");
     // Unsupported partition-column type.
     AnalysisError("select * from functional.unsupported_partition_types",
         "Failed to load metadata for table: 'functional.unsupported_partition_types'");
 
     // Try with hbase
     AnalyzesOk("describe functional_hbase.allcomplextypes");
+
+    for (ScalarType t: Type.getUnsupportedTypes()) {
+      // Create/Alter table.
+      AnalysisError(String.format("create table new_table (new_col %s)", t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+      AnalysisError(String.format(
+          "create table new_table (new_col int) PARTITIONED BY (p_col %s)", t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+      AnalysisError(String.format(
+          "alter table functional.alltypes add columns (new_col %s)", t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+      AnalysisError(String.format(
+          "alter table functional.alltypes change column int_col new_col %s", t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+
+      // UDFs.
+      final String udfSuffix = " LOCATION '/test-warehouse/libTestUdfs.so' " +
+          "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'";
+      AnalysisError(String.format(
+          "create function foo(VARCHAR(5)) RETURNS %s" + udfSuffix, t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+      AnalysisError(String.format(
+          "create function foo(%s) RETURNS int" + udfSuffix, t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+
+      // UDAs.
+      final String udaSuffix = " LOCATION '/test-warehouse/libTestUdas.so' " +
+          "UPDATE_FN='AggUpdate'";
+      AnalysisError(String.format("create aggregate function foo(string, double) " +
+          "RETURNS %s" + udaSuffix, t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+      AnalysisError(String.format("create aggregate function foo(%s, double) " +
+          "RETURNS int" + udaSuffix, t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+
+      // Cast,
+      AnalysisError(String.format("select cast('abc' as %s)", t.toSql()),
+          String.format("Unsupported data type: %s", t.toSql()));
+
+    }
   }
 
   @Test

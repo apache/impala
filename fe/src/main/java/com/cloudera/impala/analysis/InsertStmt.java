@@ -344,6 +344,13 @@ public class InsertStmt extends StatementBase {
           table_.getFullName()));
     }
 
+    for (Column c: table_.getColumns()) {
+      if (!c.getType().isSupported()) {
+        throw new AnalysisException(String.format("Unable to INSERT into target table " +
+            "(%s) because the column '%s' has an unsupported type '%s'.",
+            targetTableName_, c.getName(), c.getType().toSql()));
+      }
+    }
 
     boolean isHBaseTable = (table_ instanceof HBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();

@@ -263,14 +263,7 @@ public class ScalarType extends Type {
 
   @Override
   public boolean isSupported() {
-    switch (type_) {
-      case DATE:
-      case DATETIME:
-      case BINARY:
-        return false;
-      default:
-        return true;
-      }
+    return !getUnsupportedTypes().contains(this);
   }
 
   @Override
