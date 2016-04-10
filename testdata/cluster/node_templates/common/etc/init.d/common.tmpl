@@ -10,19 +10,25 @@ export YARN_CONF_DIR="$HADOOP_CONF_DIR"
 export HADOOP_OPTS+=" -D${KILL_CLUSTER_MARKER}"
 export YARN_OPTS+=" -D${KILL_CLUSTER_MARKER}"
 
-PID_FILE="$PID_DIR/$(basename $0)"
+: ${SERVICE_NAME=$(basename "$0")}
+PID_FILE="$PID_DIR/$SERVICE_NAME"
 
 function do_start {
   local CMD="$1"
   shift
-  "$CMD" "$@" &> "$LOG_DIR/$(basename $0).out"  &
+  LOG_FILE="$LOG_DIR/$SERVICE_NAME.out"
+  "$CMD" "$@" &> "$LOG_FILE" &
   local PID=$!
   echo $PID > "$PID_FILE"
   disown -h $PID
   # Give the process some time to die... if thing go wrong it usually takes at least a
   # few seconds for the process to totallly shutdown
   sleep 5
-  pid_exists
+  if ! pid_exists $PID; then
+    echo "Failed to start $SERVICE_NAME. The end of the log ($LOG_FILE) is:"
+    tail -20 "$LOG_FILE"
+    return 1
+  fi
 }
 
 function read_pid {
@@ -32,6 +38,10 @@ function read_pid {
 }
 
 function pid_exists {
+  if [[ $# -ne 1 ]]; then
+    echo pid_exists must be called with a single argument -- the pid to check 1>&2
+    exit 1
+  fi
   kill -0 $1 &> /dev/null
 }
 
@@ -44,6 +54,18 @@ function stop {
   if pid_exists $PID; then
     kill $PID
   fi
+
+  # Wait up to 120 seconds for the service to stop.
+  local TIMEOUT_SECS=120
+  local DEADLINE=$(($(date +%s) + $TIMEOUT_SECS))
+  while [[ $(date +%s) -lt $DEADLINE ]]; do
+    if ! pid_exists $PID; then
+      return
+    fi
+    sleep 0.1
+  done
+  echo "$SERVICE_NAME did not stop after $TIMEOUT_SECS seconds" 1>&2
+  return 1
 }
 
 function restart {

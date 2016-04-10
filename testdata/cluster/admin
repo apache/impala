@@ -319,18 +319,28 @@ function start_cluster {
   fi
 
   for SERVICE in ${SUPPORTED_SERVICES[@]}; do
-    WEBUI_PORT_VAR="$(echo "$SERVICE" | awk '{print toupper($0)}')_WEBUI_PORT"
-    echo "Starting ${SERVICE} (Web UI - http://localhost:${!WEBUI_PORT_VAR})"
-    exec_init_script "$SERVICE*" start
-    if [ "${SERVICE}" = "hdfs" ]; then
-        chmod_hdfs_root
-    fi
+    start $SERVICE
   done
 
   # Check if the cluster is still alive...
   sleep 10
   check_cluster_status
   return $?
+}
+
+function start {
+  if [[ $# -ne 1 ]]; then
+    echo start must be called with a single argument -- the service to start. 1>&2
+    exit 1
+  fi
+  local SERVICE=$1
+
+  WEBUI_PORT_VAR="$(echo "$SERVICE" | awk '{print toupper($0)}')_WEBUI_PORT"
+  echo "Starting ${SERVICE} (Web UI - http://localhost:${!WEBUI_PORT_VAR})"
+  exec_init_script "$SERVICE*" start
+  if [ "${SERVICE}" = "hdfs" ]; then
+      chmod_hdfs_root
+  fi
 }
 
 function chmod_hdfs_root {
@@ -358,9 +368,11 @@ function chmod_hdfs_root {
 }
 
 function exec_init_script {
-  SCRIPT_NAME="$1"
+  local SCRIPT_NAME="$1"
   shift
+  local CMD="$1"
 
+  local PIDS=()
   for SCRIPT in $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" \
       $FIND_EXECUTABLE_FILTER -type f); do
     if "$SCRIPT" status &>/dev/null; then
@@ -368,13 +380,24 @@ function exec_init_script {
     else
       RUNNING=false
     fi
-    case $1 in
+    case "$CMD" in
       start) if ! $RUNNING; then "$SCRIPT" start; fi;;
       stop) if $RUNNING; then "$SCRIPT" stop; fi;;
       *) "$SCRIPT" "$@";;
     esac &
+    PIDS+=($!)
   done
-  wait
+
+  # Always wait for all the pids, otherwise the output gets messed up. If this function
+  # were to return while the background processes are still running, they may print
+  # output that makes it appear as though this process is still running.
+  local RET=0
+  for PID in ${PIDS[@]}; do
+    if ! wait $PID; then
+      RET=1
+    fi
+  done
+  return $RET
 }
 
 function check_cluster_status {
@@ -408,13 +431,32 @@ function stop_cluster {
   if cluster_exists; then
     # Stop services in reverse order to give them a chance to shutdown cleanly
     for ((SERVICE_IDX=${#SUPPORTED_SERVICES[@]} - 1; SERVICE_IDX >= 0; SERVICE_IDX--)); do
-      SERVICE="${SUPPORTED_SERVICES[$SERVICE_IDX]}"
-      echo "Stopping ${SERVICE}"
-      exec_init_script "$SERVICE*" stop
+      stop "${SUPPORTED_SERVICES[$SERVICE_IDX]}"
     done
   fi
   # Kill everything anyways just in case a git clean -xdf was done
   pkill -u $USER -f $KILL_CLUSTER_MARKER || true
+}
+
+function stop {
+  if [[ $# -ne 1 ]]; then
+    echo stop must be called with a single argument -- the service to stop. 1>&2
+    exit 1
+  fi
+  local SERVICE=$1
+
+  echo "Stopping ${SERVICE}"
+  exec_init_script "$SERVICE*" stop
+}
+
+function restart {
+  if [[ $# -ne 1 ]]; then
+    echo restart must be called with a single argument -- the service to restart. 1>&2
+    exit 1
+  fi
+  local SERVICE=$1
+  stop $SERVICE
+  start $SERVICE
 }
 
 function delete_data {
@@ -445,7 +487,11 @@ function get_hadoop_client_conf_dir {
 
 COMMAND=$1
 shift
-# Use an "if" to avoid triggering the ERR trap.
-if ! $COMMAND "$@"; then
-  exit 1
-fi
+case $COMMAND in
+  check_cluster_status | cluster_exists | is_kerberized)
+    # Use an "if" to avoid triggering the ERR trap.
+    if ! $COMMAND "$@"; then
+      exit 1
+    fi;;
+  *) $COMMAND "$@";;
+esac
