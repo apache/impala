@@ -1,8 +1,10 @@
-# This file is intended to be sourced. After sourcing the KUDU_BIN_DIR and KUDU_WWW_DIR
-# variables will be set. KUDU_BUILD_DIR or USE_KUDU_DEBUG_BUILD must be set before this
-# is sourced (default values are set in impala-config.sh). If KUDU_BUILD_DIR is set then
-# KUDU_HOME should also be set otherwise the web pages may not function (but that should
-# be the only problem).
+# This file is intended to be sourced. After sourcing the KUDU_COMMON_ARGS will be set.
+# KUDU_COMMON_ARGS should be passed to both the master and tservers on startup.
+#
+# KUDU_BUILD_DIR or USE_KUDU_DEBUG_BUILD must be set before this is sourced (default
+# values are set in impala-config.sh). If KUDU_BUILD_DIR is set then KUDU_HOME should
+# also be set otherwise the web pages may not function (but that should be the only
+# problem).
 
 if [[ -n "$KUDU_BUILD_DIR" ]]; then
   KUDU_BIN_DIR="$KUDU_BUILD_DIR/bin"
@@ -16,3 +18,15 @@ else
   fi
   KUDU_WWW_DIR="$KUDU_BIN_DIR/../lib/kudu/www"
 fi
+
+KUDU_COMMON_ARGS=("-webserver_doc_root=$KUDU_WWW_DIR")
+
+# Add a dummy flag with value IBelongToTheMiniCluster so the process is easily
+# identifiable in case the pid file is removed.
+KUDU_COMMON_ARGS+=("-vmodule=IBelongToTheMiniCluster")
+
+HOLE_PUNCH_TEST_FILE=$(mktemp)
+if ! fallocate -p -o 1 -l 1 "$HOLE_PUNCH_TEST_FILE" &>/dev/null; then
+  KUDU_COMMON_ARGS+=("-block_manager=file")
+fi
+rm -f "$HOLE_PUNCH_TEST_FILE"

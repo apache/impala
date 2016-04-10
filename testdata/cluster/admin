@@ -423,7 +423,7 @@ function delete_data {
 }
 
 function delete_kudu_data {
-  rm -rf "$NODES_DIR/$NODE_PREFIX"*/var/lib/kudu/{master,tserver}/*
+  rm -rf "$NODES_DIR/$NODE_PREFIX"*/var/lib/kudu/{master,ts}/*
 }
 
 function delete_cluster {
