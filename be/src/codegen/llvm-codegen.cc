@@ -126,6 +126,8 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& id) :
   codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
   optimization_timer_ = ADD_TIMER(&profile_, "OptimizationTime");
   compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
+  num_functions_ = ADD_COUNTER(&profile_, "NumFunctions", TUnit::UNIT);
+  num_instructions_ = ADD_COUNTER(&profile_, "NumInstructions", TUnit::UNIT);
 
   loaded_functions_.resize(IRFunction::FN_END);
 }
@@ -729,6 +731,13 @@ void LlvmCodeGen::OptimizeModule() {
   module_pass_manager->add(createInternalizePass(exported_fn_names));
   module_pass_manager->add(createGlobalDCEPass());
   module_pass_manager->run(*module_);
+
+  // Update counters before final optimization, but after removing unused functions. This
+  // gives us a rough measure of how much work the optimization and compilation must do.
+  InstructionCounter counter;
+  counter.visit(*module_);
+  COUNTER_SET(num_functions_, counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS));
+  COUNTER_SET(num_instructions_, counter.GetCount(InstructionCounter::TOTAL_INSTS));
 
   // Create and run function pass manager
   scoped_ptr<FunctionPassManager> fn_pass_manager(new FunctionPassManager(module_));

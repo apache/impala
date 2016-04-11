@@ -500,6 +500,11 @@ class LlvmCodeGen {
   /// Total size of bitcode modules loaded in bytes.
   RuntimeProfile::Counter* module_bitcode_size_;
 
+  /// Number of functions and instructions that are optimized and compiled after pruning
+  /// unused functions from the module.
+  RuntimeProfile::Counter* num_functions_;
+  RuntimeProfile::Counter* num_instructions_;
+
   /// whether or not optimizations are enabled
   bool optimizations_enabled_;
 
