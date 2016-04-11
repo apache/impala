@@ -88,7 +88,7 @@ Status KuduScanner::Open() {
   // Store columns that need relocation when materialized into the
   // destination row batch.
   for (int i = 0; i < scan_node_->tuple_desc_->slots().size(); ++i) {
-    if (scan_node_->tuple_desc_->slots()[i]->type().type == TYPE_STRING) {
+    if (scan_node_->tuple_desc_->slots()[i]->type().IsStringType()) {
       string_slots_.push_back(scan_node_->tuple_desc_->slots()[i]);
     }
   }
@@ -202,10 +202,12 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     Tuple** tuple_mem, bool* batch_done) {
 
   // Short-circuit the count(*) case.
-  if (scan_node_->tuple_desc_->slots().empty()) return HandleEmptyProjection(row_batch, batch_done);
+  if (scan_node_->tuple_desc_->slots().empty()) {
+    return HandleEmptyProjection(row_batch, batch_done);
+  }
 
-  // TODO consider consolidating the tuple creation/initialization here with the version that
-  // happens inside the loop.
+  // TODO consider consolidating the tuple creation/initialization here with the version
+  // that happens inside the loop.
   int idx = row_batch->AddRow();
   TupleRow* row = row_batch->GetRow(idx);
   (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
@@ -265,7 +267,7 @@ Status KuduScanner::RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool) {
 
     // Extract the string value.
     void* slot_ptr = tuple->GetSlot(slot->tuple_offset());
-    DCHECK(slot->type().IsStringType());
+    DCHECK(slot->type().IsVarLenStringType());
 
     // The string value of the slot has a pointer to memory from the Kudu row.
     StringValue* val = reinterpret_cast<StringValue*>(slot_ptr);
