@@ -24,6 +24,10 @@ from time import sleep, time
 from optparse import OptionParser
 from testdata.common import cgroups
 
+
+DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get('IMPALA_MAX_LOG_FILES', 10)
+
+
 # Options
 parser = OptionParser()
 parser.add_option("-s", "--cluster_size", type="int", dest="cluster_size", default=3,
@@ -53,6 +57,8 @@ parser.add_option("--in-process", dest="inprocess", action="store_true", default
                   help="Start all Impala backends and state store in a single process.")
 parser.add_option("--log_dir", dest="log_dir", default=os.environ['IMPALA_CLUSTER_LOGS_DIR'],
                   help="Directory to store output logs to.")
+parser.add_option('--max_log_files', default=DEFAULT_IMPALA_MAX_LOG_FILES,
+                  help='Max number of log files before rotation occurs.')
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
                   help="Prints all output to stderr/stdout.")
 parser.add_option("--wait_for_cluster", dest="wait_for_cluster", action="store_true",
@@ -80,7 +86,7 @@ IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
                  "-state_store_subscriber_port=%d -webserver_port=%d "
                  "-llama_callback_port=%d")
 JVM_ARGS = "-jvm_debug_port=%s -jvm_args=%s"
-BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5"
+BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5 -max_log_files=%s"
 RM_ARGS = ("-enable_rm=true -llama_addresses=%s -cgroup_hierarchy_path=%s "
            "-fair_scheduler_allocation_path=%s")
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
@@ -191,7 +197,8 @@ def build_impalad_port_args(instance_num):
 
 def build_impalad_logging_args(instance_num, service_name):
   log_file_path = os.path.join(options.log_dir, "%s.INFO" % service_name)
-  return BE_LOGGING_ARGS % (service_name, options.log_dir, options.log_level)
+  return BE_LOGGING_ARGS % (service_name, options.log_dir, options.log_level,
+                            options.max_log_files)
 
 def build_jvm_args(instance_num):
   BASE_JVM_DEBUG_PORT = 30000

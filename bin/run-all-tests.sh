@@ -168,6 +168,15 @@ do
   fi
 
   if [[ "$CLUSTER_TEST" == true ]]; then
+    # For custom cluster tests only, set an unlimited log rotation
+    # policy, for the mini cluster is restarted many times. So as not to
+    # pollute the directory with too many files, remove what was there
+    # before. Also, save the IMPALA_MAX_LOG_FILES value for re-set
+    # later.
+    rm -rf ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}
+    mkdir -p ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}
+    IMPALA_MAX_LOG_FILES_SAVE=${IMPALA_MAX_LOG_FILES:-10}
+    export IMPALA_MAX_LOG_FILES=0
     # Run the custom-cluster tests after all other tests, since they will restart the
     # cluster repeatedly and lose state.
     # TODO: Consider moving in to run-tests.py.
@@ -175,6 +184,7 @@ do
          --maxfail=${MAX_PYTEST_FAILURES}; then
       TEST_RET_CODE=1
     fi
+    export IMPALA_MAX_LOG_FILES=${IMPALA_MAX_LOG_FILES_SAVE}
   fi
 
   # Finally, run the process failure tests.
