@@ -76,9 +76,9 @@ class TestUdfs(ImpalaTestSuite):
       self.client.execute(drop_fn_stmt)
 
   def test_java_udfs(self, vector):
-    self.client.execute("create database if not exists java_udfs_test "\
+    self.client.execute("create database if not exists java_udfs_test "
         "location '%s'" % get_fs_path('/test-warehouse/java_udf_test.db'))
-    self.client.execute("create database if not exists udf_test "\
+    self.client.execute("create database if not exists udf_test "
         "location '%s'" % get_fs_path('/test-warehouse/udf_test.db'))
     try:
       self.run_test_case('QueryTest/load-java-udfs', vector)
@@ -128,7 +128,12 @@ class TestUdfs(ImpalaTestSuite):
       assert "Failed to get file info" in str(e)
 
   def test_libs_with_same_filenames(self, vector):
-    self.run_test_case('QueryTest/libs_with_same_filenames', vector)
+    self.client.execute("create database if not exists same_lib_filename_udf_test "
+        "location '%s'" % get_fs_path('/test-warehouse/same_lib_filename_udf_test.db'))
+    try:
+      self.run_test_case('QueryTest/libs_with_same_filenames', vector)
+    finally:
+      self.client.execute("drop database if exists same_lib_filename_udf_test cascade")
 
   def test_udf_update_via_drop(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Dropping

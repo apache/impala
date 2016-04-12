@@ -1,26 +1,24 @@
 ====
 ---- QUERY
-create database if not exists udf_test
-location '$FILESYSTEM_PREFIX/test-warehouse/udf_test.db';
-drop function if exists udf_test.no_args();
-drop function if exists udf_test.no_args2();
+drop function if exists same_lib_filename_udf_test.no_args();
+drop function if exists same_lib_filename_udf_test.no_args2();
 
-create function udf_test.no_args() returns string
+create function same_lib_filename_udf_test.no_args() returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' symbol='NoArgs';
 
-create function udf_test.no_args2() returns string
+create function same_lib_filename_udf_test.no_args2() returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/udf_test/libTestUdfs.so' symbol='NoArgs';
 ---- RESULTS
 ====
 ---- QUERY
-select udf_test.no_args();
+select same_lib_filename_udf_test.no_args();
 ---- TYPES
 string
 ---- RESULTS
 'string'
 ====
 ---- QUERY
-select udf_test.no_args2();
+select same_lib_filename_udf_test.no_args2();
 ---- TYPES
 string
 ---- RESULTS
