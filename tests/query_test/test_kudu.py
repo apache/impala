@@ -15,9 +15,10 @@
 import pytest
 from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.skip import SkipIf
-from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIf
+from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_vector import *
 
 @SkipIf.kudu_not_supported
 class TestKuduOperations(ImpalaTestSuite):
@@ -149,42 +150,45 @@ class TestKuduMemLimits(ImpalaTestSuite):
     # add mem_limit as a test dimension.
     new_dimension = TestDimension('mem_limit', *TestKuduMemLimits.TEST_LIMITS)
     cls.TestMatrix.add_dimension(new_dimension)
-    if cls.exploration_strategy() != 'exhaustive':
-      cls.TestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format in ['parquet'])
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  def setup_method(self, method):
-    self.cleanup_db("kudu_mem_limit")
-    self.client.execute("create database kudu_mem_limit")
-    self.client.execute(self.CREATE)
-    self.client.execute(self.LOAD)
+  @classmethod
+  def setup_class(cls):
+    super(TestKuduMemLimits, cls).setup_class()
+    cls.cleanup_db("kudu_mem_limit")
+    cls.client.execute("create database kudu_mem_limit")
+    cls.client.execute(cls.CREATE)
+    cls.client.execute(cls.LOAD)
 
-  def teardown_method(self, methd):
-    self.cleanup_db("kudu_mem_limit")
+  @classmethod
+  def teardown_class(cls):
+    cls.cleanup_db("kudu_mem_limit")
+    super(TestKuduMemLimits, cls).teardown_class()
 
   # TODO(kudu-merge) IMPALA-3178 DROP DATABASE ... CASCADE is broken in Kudu so we need
   # to clean up table-by-table. Once solved, delete this and rely on the overriden method.
-  def cleanup_db(self, db_name):
-    self.client.execute("use default")
-    self.client.set_configuration({'sync_ddl': True})
-    if db_name + "\t" in self.client.execute("show databases", ).data:
+  @classmethod
+  def cleanup_db(cls, db_name):
+    cls.client.execute("use default")
+    cls.client.set_configuration({'sync_ddl': True})
+    if db_name + "\t" in cls.client.execute("show databases", ).data:
       # We use quoted identifiers to avoid name clashes with keywords
-      for tbl_name in self.client.execute("show tables in `" + db_name + "`").data:
+      for tbl_name in cls.client.execute("show tables in `" + db_name + "`").data:
         full_tbl_name = '`%s`.`%s`' % (db_name, tbl_name)
-        result = self.client.execute("describe formatted " + full_tbl_name)
+        result = cls.client.execute("describe formatted " + full_tbl_name)
         if 'VIRTUAL_VIEW' in '\n'.join(result.data):
-          self.client.execute("drop view " + full_tbl_name)
+          cls.client.execute("drop view " + full_tbl_name)
         else:
-          self.client.execute("drop table " + full_tbl_name)
-      for fn_result in self.client.execute("show functions in `" + db_name + "`").data:
+          cls.client.execute("drop table " + full_tbl_name)
+      for fn_result in cls.client.execute("show functions in `" + db_name + "`").data:
         # First column is the return type, second is the function signature
         fn_name = fn_result.split('\t')[1]
-        self.client.execute("drop function `%s`.%s" % (db_name, fn_name))
-      for fn_result in self.client.execute(\
+        cls.client.execute("drop function `%s`.%s" % (db_name, fn_name))
+      for fn_result in cls.client.execute(\
         "show aggregate functions in `" + db_name + "`").data:
         fn_name = fn_result.split('\t')[1]
-        self.client.execute("drop function `%s`.%s" % (db_name, fn_name))
-      self.client.execute("drop database `" + db_name + "`")
+        cls.client.execute("drop function `%s`.%s" % (db_name, fn_name))
+      cls.client.execute("drop database `" + db_name + "`")
 
   @pytest.mark.execute_serially
   def test_low_mem_limit_low_selectivity_scan(self, vector):
