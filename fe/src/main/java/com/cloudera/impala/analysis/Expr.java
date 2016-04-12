@@ -321,18 +321,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Casts any child which is CHAR to a STRING.
-   */
-  public void castChildCharsToStrings(Analyzer analyzer) throws AnalysisException {
-    for (int i = 0; i < children_.size(); ++i) {
-      if (children_.get(i).getType().isScalarType(PrimitiveType.CHAR)) {
-        children_.set(i, children_.get(i).castTo(ScalarType.STRING));
-        children_.get(i).analyze(analyzer);
-      }
-    }
-  }
-
-  /**
    * Looks up in the catalog the builtin for 'name' and 'argTypes'.
    * Returns null if the function is not found.
    */

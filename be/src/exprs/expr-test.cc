@@ -2083,9 +2083,10 @@ TEST_F(ExprTest, StringFunctions) {
       "                                                                             "
       "                        ", ColumnType::CreateCharType(255));
 
-  TestStringValue("CASE cast('1.1' as char(3)) when cast('1.1' as char(3)) then "
+  TestCharValue("CASE cast('1.1' as char(3)) when cast('1.1' as char(3)) then "
       "cast('1' as char(1)) when cast('2.22' as char(4)) then "
-      "cast('2' as char(1)) else cast('3' as char(1)) end", "1");
+      "cast('2' as char(1)) else cast('3' as char(1)) end", "1",
+      ColumnType::CreateCharType(3));
 
   // Test maximum VARCHAR value
   char query[ColumnType::MAX_VARCHAR_LENGTH + 1024];

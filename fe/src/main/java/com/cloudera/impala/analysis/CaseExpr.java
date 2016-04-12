@@ -212,11 +212,16 @@ public class CaseExpr extends Expr {
     msg.case_expr = new TCaseExpr(hasCaseExpr_, hasElseExpr_);
   }
 
+  private void castCharToString(int childIndex) throws AnalysisException {
+    if (children_.get(childIndex).getType().isScalarType(PrimitiveType.CHAR)) {
+      children_.set(childIndex, children_.get(childIndex).castTo(ScalarType.STRING));
+    }
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
-    castChildCharsToStrings(analyzer);
 
     if (isDecode()) {
       Preconditions.checkState(!hasCaseExpr_);
@@ -228,6 +233,10 @@ public class CaseExpr extends Expr {
             + "arguments.");
       }
     }
+
+    // Since we have no BE implementation of a CaseExpr with CHAR types,
+    // we cast the CHAR-typed whenExprs and caseExprs to STRING,
+    // TODO: This casting is not always correct and needs to be fixed, see IMPALA-1652.
 
     // Keep track of maximum compatible type of case expr and all when exprs.
     Type whenType = null;
@@ -245,6 +254,7 @@ public class CaseExpr extends Expr {
     // Set loop start, and initialize returnType as type of castExpr.
     if (hasCaseExpr_) {
       loopStart = 1;
+      castCharToString(0);
       caseExpr = children_.get(0);
       caseExpr.analyze(analyzer);
       whenType = caseExpr.getType();
@@ -256,6 +266,7 @@ public class CaseExpr extends Expr {
 
     // Go through when/then exprs and determine compatible types.
     for (int i = loopStart; i < loopEnd; i += 2) {
+      castCharToString(i);
       Expr whenExpr = children_.get(i);
       if (hasCaseExpr_) {
         // Determine maximum compatible type of the case expr,

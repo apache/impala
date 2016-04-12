@@ -1697,6 +1697,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select case 1 when 2 then NULL else 3 end");
     AnalyzesOk("select case 1 when 2 then 3 else NULL end");
     AnalyzesOk("select case NULL when NULL then NULL else NULL end");
+
+    // IMPALA-3155: Verify that a CHAR type is returned when all THEN
+    // exprs are of type CHAR.
+    checkReturnType("select case when 5 < 3 then cast('L'  as char(1)) else " +
+        "cast('M'  as char(1)) end", ScalarType.createCharType(1));
+    // IMPALA-3155: Verify that a STRING type is returned when at least one THEN
+    // expr is of type STRING.
+    checkReturnType("select case when 5 < 3 then cast('L'  as string) else " +
+        "cast('M'  as char(1)) end", ScalarType.STRING);
   }
 
   @Test
