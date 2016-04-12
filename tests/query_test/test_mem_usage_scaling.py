@@ -151,7 +151,8 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
     self.low_memory_limit_test(vector, 'tpch-q8', self.MIN_MEM_FOR_TPCH['Q8'])
 
   def test_low_mem_limit_q9(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH['Q9'])
+    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH['Q9'],
+            xfail_mem_limit="IMPALA-3328: TPC-H Q9 memory limit test is flaky")
 
   @SkipIfLocal.mem_usage_different
   def test_low_mem_limit_q10(self, vector):
