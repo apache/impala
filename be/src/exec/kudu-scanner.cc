@@ -182,7 +182,6 @@ void KuduScanner::CloseCurrentRange() {
   DCHECK_NOTNULL(scanner_.get());
   scanner_->Close();
   scanner_.reset();
-  ExprContext::FreeLocalAllocations(conjunct_ctxs_);
 }
 
 Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch, bool* batch_done) {
@@ -247,7 +246,10 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
       row->SetTuple(tuple_idx(), *tuple_mem);
     }
   }
-  return Status::OK();
+  ExprContext::FreeLocalAllocations(conjunct_ctxs_);
+
+  // Check the status in case an error status was set during conjunct evaluation.
+  return state_->GetQueryStatus();
 }
 
 void KuduScanner::SetSlotToNull(Tuple* tuple, const SlotDescriptor& slot) {
