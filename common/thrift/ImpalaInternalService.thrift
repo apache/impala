@@ -153,7 +153,7 @@ struct TQueryOptions {
   36: optional bool disable_streaming_preaggregations = 0
 
   // If true, runtime filter propagation is enabled
-  37: optional Types.TRuntimeFilterMode runtime_filter_mode = 1
+  37: optional Types.TRuntimeFilterMode runtime_filter_mode = 2
 
   // Size in bytes of Bloom Filters used for runtime filters. Actual size of filter will
   // be rounded up to the nearest power of two.
