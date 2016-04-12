@@ -24,3 +24,10 @@ visit the [Impala homepage](http://impala.io/index.html).
 If you are interested in contributing to Impala as a developer, or learning more about
 Impala's internals and architecture, visit the
 [Impala wiki](https://github.com/cloudera/Impala/wiki).
+
+## Building Impala
+
+This Apache Incubator repository is currently not buildable but has the complete source
+code for Impala minus some third-party dependences. See https://github.com/cloudera/Impala
+for the buildable Impala source and https://issues.cloudera.org/browse/IMPALA-3223 to
+track progress on making this repository buildable.
