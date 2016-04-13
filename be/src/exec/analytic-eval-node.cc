@@ -766,13 +766,11 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     row_batch->AddTupleStream(input_stream_);
     input_stream_ = NULL;
     *eos = true;
-  }
-
-  // Transfer resources to the output row batch if enough have accumulated and they're
-  // no longer needed by output rows to be returned later.
-  if (input_stream_ != NULL && prev_pool_last_result_idx_ != -1 &&
+  } else if (prev_pool_last_result_idx_ != -1 &&
       prev_pool_last_result_idx_ < input_stream_->rows_returned() &&
       prev_pool_last_window_idx_ < window_tuples_.front().first) {
+    // Transfer resources to the output row batch if enough have accumulated and they're
+    // no longer needed by output rows to be returned later.
     VLOG_FILE << id() << " Transfer prev pool to output batch, "
               << " pool size: " << prev_tuple_pool_->total_allocated_bytes()
               << " last result idx: " << prev_pool_last_result_idx_
