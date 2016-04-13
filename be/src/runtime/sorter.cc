@@ -128,13 +128,13 @@ class Sorter::Run {
 
   /// Copy the StringValue data in var_values to dest in order and update the StringValue
   /// ptrs to point to the copied data.
-  void CopyVarLenData(char* dest, const vector<StringValue*>& var_values);
+  void CopyVarLenData(const vector<StringValue*>& var_values, uint8_t* dest);
 
   /// Copy the StringValue in var_values to dest in order. Update the StringValue ptrs to
-  /// contain an offset to the copied data. Parameter 'offset' is the offset for the first
-  /// StringValue.
-  void CopyVarLenDataConvertOffset(char* dest, int64_t offset,
-      const vector<StringValue*>& var_values);
+  /// contain a packed offset for the copied data comprising block_index and the offset
+  /// relative to block_start.
+  void CopyVarLenDataConvertOffset(const vector<StringValue*>& var_values,
+      int block_index, const uint8_t* block_start, uint8_t* dest);
 
   /// Returns true if we have var-len slots and there are var-len blocks.
   inline bool HasVarLenBlocks() const {
@@ -150,7 +150,6 @@ class Sorter::Run {
 
   /// Sizes of sort tuple and block.
   const int sort_tuple_size_;
-  const int block_size_;
 
   const bool has_var_len_slots_;
 
@@ -354,7 +353,6 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc,
   : sorter_(parent),
     sort_tuple_desc_(sort_tuple_desc),
     sort_tuple_size_(sort_tuple_desc->byte_size()),
-    block_size_(parent->block_mgr_->max_block_size()),
     has_var_len_slots_(sort_tuple_desc->HasVarlenSlots()),
     materialize_slots_(materialize_slots),
     is_sorted_(!materialize_slots),
@@ -471,13 +469,13 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
           DCHECK(new_tuple->IsNull(collection_slot->null_indicator_offset()));
         }
 
-        char* var_data_ptr = cur_var_len_block->Allocate<char>(total_var_len);
+        uint8_t* var_data_ptr = cur_var_len_block->Allocate<uint8_t>(total_var_len);
         if (materialize_slots_) {
-          CopyVarLenData(var_data_ptr, string_values);
+          CopyVarLenData(string_values, var_data_ptr);
         } else {
-          int64_t offset = (var_len_blocks_.size() - 1) * block_size_;
-          offset += var_data_ptr - reinterpret_cast<char*>(cur_var_len_block->buffer());
-          CopyVarLenDataConvertOffset(var_data_ptr, offset, string_values);
+          DCHECK_EQ(var_len_blocks_.back(), cur_var_len_block);
+          CopyVarLenDataConvertOffset(string_values, var_len_blocks_.size() - 1,
+              reinterpret_cast<uint8_t*>(cur_var_len_block->buffer()), var_data_ptr);
         }
       }
       ++num_tuples_;
@@ -535,7 +533,6 @@ Status Sorter::Run::UnpinAllBlocks() {
   vector<BufferedBlockMgr::Block*> sorted_var_len_blocks;
   sorted_var_len_blocks.reserve(var_len_blocks_.size());
   vector<StringValue*> string_values;
-  int64_t var_data_offset = 0;
   int total_var_len;
   string_values.reserve(sort_tuple_desc_->string_slots().size());
   BufferedBlockMgr::Block* cur_sorted_var_len_block = NULL;
@@ -562,10 +559,11 @@ Status Sorter::Run::UnpinAllBlocks() {
           DCHECK(added);
           cur_sorted_var_len_block = sorted_var_len_blocks.back();
         }
-        char* var_data_ptr = cur_sorted_var_len_block->Allocate<char>(total_var_len);
-        var_data_offset = block_size_ * (sorted_var_len_blocks.size() - 1) +
-            (var_data_ptr - reinterpret_cast<char*>(cur_sorted_var_len_block->buffer()));
-        CopyVarLenDataConvertOffset(var_data_ptr, var_data_offset, string_values);
+        uint8_t* var_data_ptr =
+          cur_sorted_var_len_block->Allocate<uint8_t>(total_var_len);
+        DCHECK_EQ(sorted_var_len_blocks.back(), cur_sorted_var_len_block);
+        CopyVarLenDataConvertOffset(string_values, sorted_var_len_blocks.size() - 1,
+            reinterpret_cast<uint8_t*>(cur_sorted_var_len_block->buffer()), var_data_ptr);
       }
     }
     RETURN_IF_ERROR(cur_fixed_block->Unpin());
@@ -729,13 +727,12 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
         DCHECK(slot_desc->type().IsVarLenStringType());
         StringValue* value = reinterpret_cast<StringValue*>(
             input_tuple->GetSlot(slot_desc->tuple_offset()));
-        int64_t data_offset = reinterpret_cast<int64_t>(value->ptr);
 
-        // data_offset is an offset in bytes from the beginning of the first block
-        // in var_len_blocks_. Convert it into an index into var_len_blocks_ and an
-        // offset within that block.
-        int block_index = data_offset / block_size_;
-        int block_offset = data_offset % block_size_;
+        // packed_offset includes the block index in the upper 32 bits and the block
+        // offset in the lower 32 bits. See CopyVarLenDataConvertOffset().
+        uint64_t packed_offset = reinterpret_cast<uint64_t>(value->ptr);
+        int block_index = packed_offset >> 32;
+        int block_offset = packed_offset & 0xFFFFFFFF;
 
         if (block_index > var_len_blocks_index_) {
           // We've reached the block boundary for the current var-len block.
@@ -747,7 +744,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
           pin_next_var_len_block_ = true;
           break;
         } else {
-          DCHECK_EQ(block_index, var_len_blocks_index_);
+          DCHECK_EQ(block_index, var_len_blocks_index_) << packed_offset;
           // Calculate the address implied by the offset and assign it.
           value->ptr = reinterpret_cast<char*>(
               var_len_blocks_[var_len_blocks_index_]->buffer() + block_offset);
@@ -811,21 +808,29 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
   return Status::OK();
 }
 
-void Sorter::Run::CopyVarLenData(char* dest, const vector<StringValue*>& string_values) {
+void Sorter::Run::CopyVarLenData(const vector<StringValue*>& string_values,
+    uint8_t* dest) {
   BOOST_FOREACH(StringValue* string_val, string_values) {
     memcpy(dest, string_val->ptr, string_val->len);
-    string_val->ptr = dest;
+    string_val->ptr = reinterpret_cast<char*>(dest);
     dest += string_val->len;
   }
 }
 
-void Sorter::Run::CopyVarLenDataConvertOffset(char* dest, int64_t offset,
-    const vector<StringValue*>& string_values) {
+void Sorter::Run::CopyVarLenDataConvertOffset(const vector<StringValue*>& string_values,
+    int block_index, const uint8_t* block_start, uint8_t* dest) {
+  DCHECK_GE(block_index, 0);
+  DCHECK_GE(dest - block_start, 0);
+
   BOOST_FOREACH(StringValue* string_val, string_values) {
     memcpy(dest, string_val->ptr, string_val->len);
-    string_val->ptr = reinterpret_cast<char*>(offset);
+    DCHECK_LE(dest - block_start, sorter_->block_mgr_->max_block_size());
+    DCHECK_LE(dest - block_start, INT_MAX);
+    int block_offset = dest - block_start;
+    uint64_t packed_offset =
+        (static_cast<uint64_t>(block_index) << 32) | block_offset;
+    string_val->ptr = reinterpret_cast<char*>(packed_offset);
     dest += string_val->len;
-    offset += string_val->len;
   }
 }
 

@@ -1,0 +1,33 @@
+====
+---- QUERY
+set mem_limit=512m;
+# Regression test for IMPALA-3317: empty string boundary of spilled block.
+# Need to force spilling and ensure that the empty string will end up at the
+# end of the tuple at the block boundary.
+select *
+from (
+  select *, first_value(col) over (order by sort_col) fv
+  from (
+    select concat(l_linestatus, repeat('a', 63)) sort_col, substr(l_returnflag, 1, 0) col
+    from tpch_parquet.lineitem
+    union all
+    select concat(l_linestatus, repeat('a', 63)) sort_col, substr(l_returnflag, 1, 0) col
+    from tpch_parquet.lineitem) q
+  ) q2
+limit 10;
+---- TYPES
+STRING,STRING,STRING
+---- RESULTS
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
+---- RUNTIME_PROFILE
+row_regex: .* TotalMergesPerformed: [^0] .*
+====

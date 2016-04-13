@@ -168,3 +168,12 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     """Regression test for IMPALA-1619. Doesn't need to be run on all file formats.
        Executes serially to avoid large random spikes in mem usage."""
     self.run_test_case('QueryTest/large_strings', vector)
+
+  def test_single_node_large_sorts(self, vector):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip("only run large sorts on exhaustive")
+
+    vector.get_value('exec_option')['disable_outermost_topn'] = 1
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/single-node-large-sorts', vector)
+
