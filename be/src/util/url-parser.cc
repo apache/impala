@@ -52,11 +52,24 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
   // Positioned to first char after '://'.
   StringValue protocol_end = trimmed_url.Substring(protocol_pos + protocol.len);
 
+  // Find the end of the authority. The authority ends at the first '/' or '?'.
+  int32_t auth_end_pos = -1;
+  {
+    int32_t first_slash = slash_search.Search(&protocol_end);
+    int32_t first_question = question_search.Search(&protocol_end);
+
+    auth_end_pos = first_slash;
+    if (first_slash < 0 || (0 <= first_question && first_question < first_slash)) {
+      // Either we did not find a slash, or there is one and the first question mark is
+      // left of the first slash (after the protocol), for example:
+      // http://example.com?dir=/etc
+      auth_end_pos = first_question;
+    }
+  }
+
   switch(part) {
     case AUTHORITY: {
-      // Find first '/'.
-      int32_t end_pos = slash_search.Search(&protocol_end);
-      *result = protocol_end.Substring(0, end_pos);
+      *result = protocol_end.Substring(0, auth_end_pos);
       break;
     }
 
@@ -92,22 +105,6 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
 
       // In order to get the host part we first extract the authority and then strip away
       // the userinfo and port.
-
-      // The authority ends at the first '/' or '?'.
-      int32_t first_slash = slash_search.Search(&protocol_end);
-      int32_t first_question = question_search.Search(&protocol_end);
-
-      int32_t auth_end_pos = first_slash;
-      if (first_slash < 0) {
-        // No slash found.
-        auth_end_pos = first_question;
-      }
-      if (0 <= first_question && first_question < first_slash) {
-        // Found question mark and it is left of the first slash.
-        // e.g. http://example.com?dir=/etc
-        auth_end_pos = first_question;
-      }
-
       StringValue authority = protocol_end.Substring(0, auth_end_pos);
 
       // Find '@' to strip away userinfo.
@@ -159,12 +156,12 @@ bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* resu
 
     case USERINFO: {
       // Find '@'.
-      int32_t end_pos = at_search.Search(&protocol_end);
-      if (end_pos < 0) {
+      int32_t at_pos = at_search.Search(&protocol_end);
+      if (at_pos < 0 || (auth_end_pos > 0 && at_pos > auth_end_pos)) {
         // Indicate no user and pass were given.
         return false;
       }
-      *result = protocol_end.Substring(0, end_pos);
+      *result = protocol_end.Substring(0, at_pos);
       break;
     }
 

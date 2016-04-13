@@ -2270,6 +2270,12 @@ TEST_F(ExprTest, StringParseUrlFunction) {
   // to behave exactly like Hive.
 
   // AUTHORITY part.
+  TestStringValue("parse_url('http://example.com', 'AUTHORITY')", "example.com");
+  TestStringValue("parse_url('http://example.com:80', 'AUTHORITY')", "example.com:80");
+  TestStringValue("parse_url('http://user:pass@example.com', 'AUTHORITY')",
+      "user:pass@example.com");
+  TestStringValue("parse_url('http://user:pass@example.com:80', 'AUTHORITY')",
+      "user:pass@example.com:80");
   TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'AUTHORITY')",
       "user:pass@example.com:80");
@@ -2283,6 +2289,9 @@ TEST_F(ExprTest, StringParseUrlFunction) {
   // Exactly what Hive returns as well.
   TestStringValue("parse_url('http://example.com_xyzabc^&*', 'AUTHORITY')",
       "example.com_xyzabc^&*");
+  // Missing slash at the end of the authority.
+  TestStringValue("parse_url('http://example.com:80?name=networking#DOWNLOADING',"
+      "'AUTHORITY')", "example.com:80");
   // Missing protocol.
   TestIsNull("parse_url('example.com/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'HOST')", TYPE_STRING);
@@ -2486,10 +2495,15 @@ TEST_F(ExprTest, StringParseUrlFunction) {
       "index.html?name=networking#DOWNLOADING', 'USERINFO')", "user:pass");
   // Only user given.
   TestStringValue("parse_url('http://user@example.com/docs/books/tutorial/"
-        "index.html?name=networking#DOWNLOADING', 'USERINFO')", "user");
+      "index.html?name=networking#DOWNLOADING', 'USERINFO')", "user");
   // No user or pass. Hive also returns NULL.
   TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'USERINFO')", TYPE_STRING);
+  // No user or pass, but @ in query part (IMPALA-1920). Hive also returns NULL.
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=@networking#DOWNLOADING', 'USERINFO')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com:80?name=@networking#DOWNLOADING',"
+      "'USERINFO')", TYPE_STRING);
   // Missing protocol.
   TestIsNull("parse_url('example.com/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'USERINFO')", TYPE_STRING);
