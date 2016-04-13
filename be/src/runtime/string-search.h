@@ -109,7 +109,7 @@ class StringSearch {
   ///   Returns -1 if the pattern is not found
   int Search(const StringValue* str) const {
     // Special cases
-    if (!str || !pattern_ || pattern_->len == 0) {
+    if (str == NULL || pattern_ == NULL || pattern_->len == 0) {
       return -1;
     }
 

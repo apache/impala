@@ -548,7 +548,9 @@ struct TimestampVal : public AnyVal {
 /// empty string (len == 0).
 struct StringVal : public AnyVal {
 
-  static const int MAX_LENGTH = (1 << 30);
+  // It's important to keep this as unsigned to avoid comparing with negative number
+  // in case of overflow.
+  static const unsigned MAX_LENGTH = (1 << 30);
 
   int len;
   uint8_t* ptr;

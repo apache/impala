@@ -149,6 +149,7 @@ StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
 
   int buff_len = dt_ctx->fmt_out_len + 1;
   StringVal result(context, buff_len);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   result.len = tv.Format(*dt_ctx, buff_len, reinterpret_cast<char*>(result.ptr));
   if (result.len <= 0) return StringVal::null();
   return result;

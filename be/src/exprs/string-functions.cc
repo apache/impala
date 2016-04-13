@@ -77,6 +77,7 @@ StringVal StringFunctions::Space(FunctionContext* context, const BigIntVal& len)
   if (len.is_null) return StringVal::null();
   if (len.val <= 0) return StringVal();
   StringVal result(context, len.val);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   memset(result.ptr, ' ', len.val);
   return result;
 }
@@ -86,7 +87,7 @@ StringVal StringFunctions::Repeat(
   if (str.is_null || n.is_null) return StringVal::null();
   if (str.len == 0 || n.val <= 0) return StringVal();
   StringVal result(context, str.len * n.val);
-  if (UNLIKELY(result.is_null)) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   uint8_t* ptr = result.ptr;
   for (int64_t i = 0; i < n.val; ++i) {
     memcpy(ptr, str.ptr, str.len);
@@ -104,7 +105,7 @@ StringVal StringFunctions::Lpad(FunctionContext* context, const StringVal& str,
   if (len.val <= str.len || pad.len == 0) return StringVal(str.ptr, len.val);
 
   StringVal result(context, len.val);
-  if (result.is_null) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   int padded_prefix_len = len.val - str.len;
   int pad_index = 0;
   int result_index = 0;
@@ -132,7 +133,7 @@ StringVal StringFunctions::Rpad(FunctionContext* context, const StringVal& str,
   }
 
   StringVal result(context, len.val);
-  if (UNLIKELY(result.is_null)) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   memcpy(result.ptr, str.ptr, str.len);
 
   // Append chars of pad until desired length
@@ -161,7 +162,7 @@ IntVal StringFunctions::CharLength(FunctionContext* context, const StringVal& st
 StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
-  if (UNLIKELY(result.is_null)) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   for (int i = 0; i < str.len; ++i) {
     result.ptr[i] = ::tolower(str.ptr[i]);
   }
@@ -171,7 +172,7 @@ StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str)
 StringVal StringFunctions::Upper(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
-  if (UNLIKELY(result.is_null)) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   for (int i = 0; i < str.len; ++i) {
     result.ptr[i] = ::toupper(str.ptr[i]);
   }
@@ -185,7 +186,7 @@ StringVal StringFunctions::Upper(FunctionContext* context, const StringVal& str)
 StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
-  if (UNLIKELY(result.is_null)) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   uint8_t* result_ptr = result.ptr;
   bool word_start = true;
   for (int i = 0; i < str.len; ++i) {
@@ -203,7 +204,7 @@ StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& st
 StringVal StringFunctions::Reverse(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
-  if (UNLIKELY(result.is_null)) return result;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   std::reverse_copy(str.ptr, str.ptr + str.len, result.ptr);
   return result;
 }
@@ -305,7 +306,7 @@ IntVal StringFunctions::LocatePos(FunctionContext* context, const StringVal& sub
   StringSearch search(&substr_sv);
   // Input start_pos.val starts from 1.
   StringValue adjusted_str(reinterpret_cast<char*>(str.ptr) + start_pos.val - 1,
-                           str.len - start_pos.val + 1);
+       str.len - start_pos.val + 1);
   int32_t match_pos = search.Search(&adjusted_str);
   if (match_pos >= 0) {
     // Hive returns the position in the original string starting from 1.
@@ -318,6 +319,7 @@ IntVal StringFunctions::LocatePos(FunctionContext* context, const StringVal& sub
 // The caller owns the returned regex. Returns NULL if the pattern could not be compiled.
 re2::RE2* CompileRegex(const StringVal& pattern, string* error_str,
     const StringVal& match_parameter) {
+  DCHECK(error_str != NULL);
   re2::StringPiece pattern_sp(reinterpret_cast<char*>(pattern.ptr), pattern.len);
   re2::RE2::Options options;
   // Disable error logging in case e.g. every row causes an error
@@ -547,6 +549,7 @@ StringVal StringFunctions::Concat(FunctionContext* context, int num_children,
 StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& sep,
     int num_children, const StringVal* strs) {
   DCHECK_GE(num_children, 1);
+  DCHECK(strs != NULL);
   if (sep.is_null) return StringVal::null();
 
   // Pass through if there's only one argument
@@ -561,9 +564,10 @@ StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& s
     total_size += sep.len + strs[i].len;
   }
   StringVal result(context, total_size);
-  uint8_t* ptr = result.ptr;
+  if (UNLIKELY(result.is_null)) return StringVal::null();
 
   // Loop again to append the data.
+  uint8_t* ptr = result.ptr;
   memcpy(ptr, strs[0].ptr, strs[0].len);
   ptr += strs[0].len;
   for (int32_t i = 1; i < num_children; ++i) {
@@ -662,7 +666,7 @@ void StringFunctions::ParseUrlClose(
 }
 
 StringVal StringFunctions::ParseUrlKey(FunctionContext* ctx, const StringVal& url,
-                                       const StringVal& part, const StringVal& key) {
+    const StringVal& part, const StringVal& key) {
   if (url.is_null || part.is_null || key.is_null) return StringVal::null();
   void* state = ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL);
   UrlParser::UrlPart url_part;
@@ -732,6 +736,7 @@ StringVal StringFunctions::BTrimString(FunctionContext* ctx,
   // characters here instead of using the bitset from function context.
   if (!ctx->IsArgConstant(1)) {
     unique_chars->reset();
+    DCHECK(chars_to_trim.len != 0 || chars_to_trim.is_null);
     for (int32_t i = 0; i < chars_to_trim.len; ++i) {
       unique_chars->set(static_cast<int>(chars_to_trim.ptr[i]), true);
     }
@@ -751,8 +756,9 @@ StringVal StringFunctions::BTrimString(FunctionContext* ctx,
 }
 
 // Similar to strstr() except that the strings are not null-terminated
-static char* locate_substring(char* haystack, int hay_len, char* needle, int needle_len) {
+static char* LocateSubstring(char* haystack, int hay_len, const char* needle, int needle_len) {
   DCHECK_GT(needle_len, 0);
+  DCHECK(haystack != NULL && needle != NULL);
   for (int i = 0; i < hay_len - needle_len + 1; ++i) {
     char* possible_needle = haystack + i;
     if (strncmp(possible_needle, needle, needle_len) == 0) return possible_needle;
@@ -776,7 +782,7 @@ StringVal StringFunctions::SplitPart(FunctionContext* context,
   char* delimiter = reinterpret_cast<char*>(delim.ptr);
   for (int cur_pos = 1; ; ++cur_pos) {
     int remaining_len = str.len - (str_part - str_start);
-    char* delim_ref = locate_substring(str_part, remaining_len, delimiter, delim.len);
+    char* delim_ref = LocateSubstring(str_part, remaining_len, delimiter, delim.len);
     if (delim_ref == NULL) {
       if (cur_pos == field_pos) {
         return StringVal(reinterpret_cast<uint8_t*>(str_part), remaining_len);

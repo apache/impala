@@ -32,13 +32,13 @@ using namespace strings;
 namespace impala {
 
 BigIntVal UtilityFunctions::FnvHashString(FunctionContext* ctx,
-                                          const StringVal& input_val) {
+    const StringVal& input_val) {
   if (input_val.is_null) return BigIntVal::null();
   return BigIntVal(HashUtil::FnvHash64(input_val.ptr, input_val.len, HashUtil::FNV_SEED));
 }
 
 BigIntVal UtilityFunctions::FnvHashTimestamp(FunctionContext* ctx,
-                                             const TimestampVal& input_val) {
+    const TimestampVal& input_val) {
   if (input_val.is_null) return BigIntVal::null();
   TimestampValue tv = TimestampValue::FromTimestampVal(input_val);
   return BigIntVal(HashUtil::FnvHash64(&tv, 12, HashUtil::FNV_SEED));
@@ -54,7 +54,7 @@ BigIntVal UtilityFunctions::FnvHash(FunctionContext* ctx, const T& input_val) {
 // Note that this only hashes the unscaled value and not the scale or precision, so this
 // function is only valid when used over a single decimal type.
 BigIntVal UtilityFunctions::FnvHashDecimal(FunctionContext* ctx,
-                                           const DecimalVal& input_val) {
+    const DecimalVal& input_val) {
   if (input_val.is_null) return BigIntVal::null();
   const FunctionContext::TypeDesc& input_type = *ctx->GetArgType(0);
   int byte_size = ColumnType::GetDecimalByteSize(input_type.precision);

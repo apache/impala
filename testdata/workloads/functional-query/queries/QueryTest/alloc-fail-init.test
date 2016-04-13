@@ -1,5 +1,6 @@
 ====
 ---- QUERY
+# TODO: IMPALA-3350: Add 'group by' to these tests to exercise different code paths.
 select ndv(string_col) from functional.alltypes
 ---- CATCH
 FunctionContext::Allocate() failed to allocate 1024 bytes.

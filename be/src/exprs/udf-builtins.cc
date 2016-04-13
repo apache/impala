@@ -120,6 +120,7 @@ struct TruncUnit {
 // Returns the TruncUnit for the given string
 TruncUnit::Type StrToTruncUnit(FunctionContext* ctx, const StringVal& unit_str) {
   StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
+  if (UNLIKELY(unit.is_null)) return TruncUnit::UNIT_INVALID;
   if ((unit == "syyyy") || (unit == "yyyy") || (unit == "year") || (unit == "syear") ||
       (unit == "yyy") || (unit == "yy") || (unit == "y")) {
     return TruncUnit::YEAR;
@@ -336,6 +337,7 @@ void UdfBuiltins::TruncClose(FunctionContext* ctx,
 // Returns the TExtractField for the given unit
 TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {
   StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
+  if (UNLIKELY(unit.is_null)) return TExtractField::INVALID_FIELD;
   if (unit == "year") return TExtractField::YEAR;
   if (unit == "month") return TExtractField::MONTH;
   if (unit == "day") return TExtractField::DAY;
@@ -480,6 +482,7 @@ bool ValidateMADlibVector(FunctionContext* context, const StringVal& arr) {
 
 StringVal UdfBuiltins::ToVector(FunctionContext* context, int n, const DoubleVal* vals) {
   StringVal s(context, n * sizeof(double));
+  if (UNLIKELY(s.is_null)) return StringVal::null();
   double* darr = reinterpret_cast<double*>(s.ptr);
   for (int i = 0; i < n; ++i) {
     if (vals[i].is_null) {
@@ -504,6 +507,7 @@ StringVal UdfBuiltins::PrintVector(FunctionContext* context, const StringVal& ar
   ss << ">";
   const string& str = ss.str();
   StringVal result(context, str.size());
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   memcpy(result.ptr, str.c_str(), str.size());
   return result;
 }
@@ -553,6 +557,7 @@ StringVal UdfBuiltins::EncodeVector(FunctionContext* context, const StringVal& a
   double* darr = reinterpret_cast<double*>(arr.ptr);
   int len = arr.len / sizeof(double);
   StringVal result(context, arr.len);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   memcpy(result.ptr, darr, arr.len);
   InplaceDoubleEncode(reinterpret_cast<double*>(result.ptr), len);
   return result;
@@ -561,6 +566,7 @@ StringVal UdfBuiltins::EncodeVector(FunctionContext* context, const StringVal& a
 StringVal UdfBuiltins::DecodeVector(FunctionContext* context, const StringVal& arr) {
   if (arr.is_null) return StringVal::null();
   StringVal result(context, arr.len);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   memcpy(result.ptr, arr.ptr, arr.len);
   InplaceDoubleDecode(reinterpret_cast<char*>(result.ptr), arr.len);
   return result;

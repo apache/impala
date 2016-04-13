@@ -235,6 +235,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   AggFnEvaluator::Init(evaluators_, fn_ctxs_, curr_tuple_);
   // Allocate dummy_result_tuple_ even if AggFnEvaluator::Init() may have failed
   // as it is needed in Close().
+  // TODO: move this to Prepare()
   dummy_result_tuple_ = Tuple::Create(result_tuple_desc_->byte_size(), mem_pool_.get());
   // Check for failures during AggFnEvaluator::Init().
   RETURN_IF_ERROR(state->GetQueryStatus());
