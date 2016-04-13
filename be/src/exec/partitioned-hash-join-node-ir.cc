@@ -17,6 +17,9 @@
 #include "codegen/impala-ir.h"
 #include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
+#include "runtime/raw-value.inline.h"
+#include "runtime/runtime-filter.h"
+#include "util/bloom-filter.h"
 
 #include "common/names.h"
 
@@ -252,7 +255,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
   }
 }
 
-Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
+Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
+    bool build_filters) {
   for (int i = 0; i < build_batch->num_rows(); ++i) {
     DCHECK(buildStatus_.ok());
     TupleRow* build_row = build_batch->GetRow(i);
@@ -268,6 +272,17 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
         }
       }
       continue;
+    }
+    if (build_filters) {
+      DCHECK_EQ(ht_ctx_->level(), 0)
+          << "Runtime filters should not be built during repartitioning.";
+      for (const FilterContext& ctx: filters_) {
+        if (ctx.local_bloom_filter == NULL) continue;
+        void* e = ctx.expr->GetValue(build_row);
+        uint32_t filter_hash = RawValue::GetHashValue(e, ctx.expr->root()->type(),
+            RuntimeFilterBank::DefaultHashSeed());
+        ctx.local_bloom_filter->Insert(filter_hash);
+      }
     }
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];

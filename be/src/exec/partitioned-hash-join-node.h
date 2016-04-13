@@ -161,8 +161,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// 'level' is the level new partitions (in hash_partitions_) should be created with.
   Status ProcessBuildInput(RuntimeState* state, int level);
 
-  /// Reads the rows in build_batch and partitions them in hash_partitions_.
-  Status ProcessBuildBatch(RowBatch* build_batch);
+  /// Reads the rows in build_batch and partitions them in hash_partitions_. If
+  /// 'build_filters' is true, runtime filters are populated.
+  Status ProcessBuildBatch(RowBatch* build_batch, bool build_filters);
 
   /// Call at the end of partitioning the build rows (which could be from the build child
   /// or from repartitioning an existing partition). After this function returns, all
@@ -256,8 +257,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// phase. Returns false if filter construction is disabled.
   bool AllocateRuntimeFilters(RuntimeState* state);
 
-  /// Publish the runtime filters to the fragment-local RuntimeFilterBank.
-  void PublishRuntimeFilters(RuntimeState* state);
+  /// Publish the runtime filters to the fragment-local
+  /// RuntimeFilterBank. 'total_build_rows' is used to determine whether the computed
+  /// filters have an unacceptably high false-positive rate.
+  void PublishRuntimeFilters(RuntimeState* state, int64_t total_build_rows);
 
   /// Codegen function to create output row. Assumes that the probe row is non-NULL.
   Status CodegenCreateOutputRow(LlvmCodeGen* codegen, llvm::Function** fn);
@@ -457,13 +460,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// Build rows cannot be added after calling this.
     /// If the partition could not be built due to memory pressure, *built is set to false
     /// and the caller is responsible for spilling this partition.
-    /// If 'BUILD_RUNTIME_FILTERS' is set, populates runtime filters.
-    template<bool const BUILD_RUNTIME_FILTERS>
-    Status BuildHashTableInternal(RuntimeState* state, bool* built);
-
-    /// Wrapper for the template-based BuildHashTable() based on 'add_runtime_filters'.
-    Status BuildHashTable(RuntimeState* state, bool* built,
-        const bool add_runtime_filters);
+    Status BuildHashTable(RuntimeState* state, bool* built);
 
     /// Spills this partition, cleaning up and unpinning blocks.
     /// If 'unpin_all_build' is true, the build stream is completely unpinned, otherwise,
@@ -500,7 +497,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   };
 
   /// llvm function and signature for codegening build batch.
-  typedef Status (*ProcessBuildBatchFn)(PartitionedHashJoinNode*, RowBatch*);
+  typedef Status (*ProcessBuildBatchFn)(PartitionedHashJoinNode*, RowBatch*,
+      bool build_filters);
   /// Jitted ProcessBuildBatch function pointers.  NULL if codegen is disabled.
   /// process_build_batch_fn_level0_ uses CRC hashing when available and is used when the
   /// partition level is 0, otherwise process_build_batch_fn_ uses murmur hash and is used

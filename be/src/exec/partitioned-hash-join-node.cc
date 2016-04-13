@@ -26,7 +26,6 @@
 #include "exprs/slot-ref.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
-#include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
@@ -38,8 +37,7 @@
 
 #include "common/names.h"
 
-DEFINE_bool(enable_phj_probe_side_filtering, true,
-    "Enables pushing PHJ build side filters to probe side");
+DEFINE_bool(enable_phj_probe_side_filtering, true, "Deprecated.");
 
 const string PREPARE_FOR_READ_FAILED_ERROR_MSG = "Failed to acquire initial read buffer "
     "for stream in hash join node $0. Reducing query concurrency or increasing the "
@@ -69,9 +67,6 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     process_probe_batch_fn_(NULL),
     process_probe_batch_fn_level0_(NULL) {
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
-
-  runtime_filters_enabled_ =
-      FLAGS_enable_phj_probe_side_filtering && tnode.runtime_filters.size() > 0;
 }
 
 PartitionedHashJoinNode::~PartitionedHashJoinNode() {
@@ -129,10 +124,6 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
   }
-
-  // Disable probe-side filters if we are inside a subplan because no node
-  // inside the subplan can use them.
-  if (IsInSubplan()) runtime_filters_enabled_ = false;
 
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   runtime_state_ = state;
@@ -241,6 +232,9 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
   }
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
+
+  DCHECK(null_aware_partition_ == NULL || join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN);
+
   return Status::OK();
 }
 
@@ -404,30 +398,12 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
     }
   }
 
-  if (parent_->runtime_filters_enabled_) {
-    // Disabling runtime filter push down because not all rows will be included in the
-    // filter due to a spilled partition.
-    parent_->runtime_filters_enabled_ = false;
-    parent_->AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (Spilling)");
-    VLOG(2) << "Disabling runtime filter construction because a partition will spill.";
-  }
-
   is_spilled_ = true;
   return Status::OK();
 }
 
 Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
-    bool* built, const bool add_runtime_filters) {
-  if (add_runtime_filters) {
-    return BuildHashTableInternal<true>(state, built);
-  } else {
-    return BuildHashTableInternal<false>(state, built);
-  }
-}
-
-template<bool const BUILD_RUNTIME_FILTERS>
-Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
-    RuntimeState* state, bool* built) {
+    bool* built) {
   DCHECK(build_rows_ != NULL);
   *built = false;
 
@@ -465,9 +441,6 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
-  if (BUILD_RUNTIME_FILTERS) {
-    DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
-  }
   do {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
@@ -479,15 +452,6 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
       if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) goto not_built;
-      if (BUILD_RUNTIME_FILTERS) {
-        BOOST_FOREACH(const FilterContext& ctx, parent_->filters_) {
-          if (ctx.local_bloom_filter == NULL) continue;
-          void* e = ctx.expr->GetValue(row);
-          uint32_t h = RawValue::GetHashValue(e, ctx.expr->root()->type(),
-              RuntimeFilterBank::DefaultHashSeed());
-          ctx.local_bloom_filter->Insert(h);
-        }
-      }
     }
     RETURN_IF_ERROR(state->GetQueryStatus());
     parent_->FreeLocalAllocations();
@@ -511,7 +475,8 @@ not_built:
 }
 
 bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
-  if (!runtime_filters_enabled_) return false;
+  DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN || filters_.size() == 0)
+      << "Runtime filters not supported with NULL_AWARE_LEFT_ANTI_JOIN";
   DCHECK(ht_ctx_.get() != NULL);
   for (int i = 0; i < filters_.size(); ++i) {
     filters_[i].local_bloom_filter = state->filter_bank()->AllocateScratchBloomFilter();
@@ -519,16 +484,27 @@ bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
   return true;
 }
 
-void PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state) {
-  if (runtime_filters_enabled_) {
-    AddRuntimeExecOption("Build-Side Runtime-Filter Produced");
+void PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state,
+    int64_t total_build_rows) {
+  // Use total_build_rows to estimate FP-rate of Bloom filter, and publish 'always-true'
+  // filters if it's too high. Doing so saves CPU at the coordinator, serialisation time,
+  // and reduces the cost of applying the filter at the scan - most significantly for
+  // per-row filters. However, the number of build rows could be a very poor estimate of
+  // the NDV - particularly if the filter expression is a function of several columns.
+  // TODO: Better heuristic.
+  bool publish_real_filters =
+      !state->filter_bank()->ShouldDisableFilter(total_build_rows);
+  if (publish_real_filters) {
+    AddRuntimeExecOption("Build-Side Runtime-Filter Published");
+  } else {
+    AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
   }
 
   // Add all the bloom filters to the runtime state. If runtime filters are disabled,
   // publish a complete Bloom filter (which rejects no values) to allow plan nodes that
   // are waiting for these filters to make progress.
   BOOST_FOREACH(const FilterContext& ctx, filters_) {
-    BloomFilter* filter = runtime_filters_enabled_ ?
+    BloomFilter* filter = publish_real_filters ?
         ctx.local_bloom_filter : BloomFilter::ALWAYS_TRUE_FILTER;
     state->filter_bank()->UpdateFilterFromLocal(
         ctx.filter->filter_desc().filter_id, filter);
@@ -614,7 +590,6 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   }
   RETURN_IF_ERROR(ProcessBuildInput(state, 0));
 
-  PublishRuntimeFilters(state);
   UpdateState(PROCESSING_PROBE);
   return Status::OK();
 }
@@ -677,19 +652,22 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     total_build_rows += build_batch.num_rows();
 
     SCOPED_TIMER(partition_build_timer_);
-    if (process_build_batch_fn_ == NULL || ht_ctx_->level() != 0) {
-      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch));
+    if (process_build_batch_fn_ == NULL) {
+      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch, true));
     } else {
       DCHECK(process_build_batch_fn_level0_ != NULL);
       if (ht_ctx_->level() == 0) {
-        RETURN_IF_ERROR(process_build_batch_fn_level0_(this, &build_batch));
+        RETURN_IF_ERROR(
+            process_build_batch_fn_level0_(this, &build_batch, true));
       } else {
-        RETURN_IF_ERROR(process_build_batch_fn_(this, &build_batch));
+        RETURN_IF_ERROR(process_build_batch_fn_(this, &build_batch, false));
       }
     }
     build_batch.Reset();
     DCHECK(!build_batch.AtCapacity());
   }
+
+  if (ht_ctx_->level() == 0) PublishRuntimeFilters(state, total_build_rows);
 
   if (input_partition_ != NULL) {
     // Done repartitioning build input, close it now.
@@ -698,9 +676,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   }
 
   stringstream ss;
-  ss << "PHJ(node_id=" << id() << ") partitioned(level="
-     << hash_partitions_[0]->level_ << ") "
-     << total_build_rows << " rows into:" << endl;
+  ss << Substitute("PHJ(node_id=$0) partitioned(level=$1) $2 rows into:", id(),
+            hash_partitions_[0]->level_, total_build_rows);
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
     double percent =
@@ -816,9 +793,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   int64_t estimated_memory = input_partition_->EstimatedInMemSize();
   if (estimated_memory < mem_limit) {
     ht_ctx_->set_level(input_partition_->level_);
-    // TODO: We disable filter on spilled partitions, but perhaps we can revisit
-    // this, especially if the probe side is very big (e.g. has spilled as well).
-    RETURN_IF_ERROR(input_partition_->BuildHashTable(state, &built, false));
+    RETURN_IF_ERROR(input_partition_->BuildHashTable(state, &built));
   } else {
     LOG(INFO) << "In hash join id=" << id_ << " the estimated needed memory ("
         << estimated_memory << ") for partition " << input_partition_ << " with "
@@ -1226,27 +1201,6 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
 Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
 
-  // Decide whether probe filters will be built.
-  if (input_partition_ == NULL && runtime_filters_enabled_) {
-    uint64_t num_build_rows = 0;
-    BOOST_FOREACH(Partition* partition, hash_partitions_) {
-      DCHECK(!partition->is_spilled()) << "Runtime filters enabled despite spilling";
-      const uint64_t partition_num_rows = partition->build_rows()->num_rows();
-      num_build_rows += partition_num_rows;
-    }
-    // Use num_build_rows to estimate efficacy of Bloom filter, and disable filter
-    // production if so. However, the number of build rows could be a very poor estimate
-    // of the NDV - particularly if the filter expression is a function of several
-    // columns.
-    // TODO: Better heuristic.
-    if (state->filter_bank()->ShouldDisableFilter(num_build_rows)) {
-      AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
-      runtime_filters_enabled_ = false;
-    }
-  } else {
-    runtime_filters_enabled_ = false;
-  }
-
   // First loop over the partitions and build hash tables for the partitions that did
   // not already spill.
   BOOST_FOREACH(Partition* partition, hash_partitions_) {
@@ -1259,14 +1213,11 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     if (!partition->is_spilled()) {
       bool built = false;
       DCHECK(partition->build_rows()->is_pinned());
-      RETURN_IF_ERROR(partition->BuildHashTable(state, &built, runtime_filters_enabled_));
+      RETURN_IF_ERROR(partition->BuildHashTable(state, &built));
       // If we did not have enough memory to build this hash table, we need to spill this
       // partition (clean up the hash table, unpin build).
       if (!built) RETURN_IF_ERROR(partition->Spill(true));
     }
-
-    DCHECK(!runtime_filters_enabled_ || !partition->is_spilled())
-        << "Runtime filters enabled despite spilling";
   }
 
   // Collect all the spilled partitions that don't have an IO buffer. We need to reserve
@@ -1632,6 +1583,11 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(
   Function* process_build_batch_fn_level0 =
       codegen->CloneFunction(process_build_batch_fn);
 
+  // Always build runtime filters at level0 (if there are any).
+  Value* build_filters_l0_arg = codegen->GetArgument(process_build_batch_fn_level0, 3);
+  build_filters_l0_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt1Ty(codegen->context()), filters_.size() > 0));
+
   // process_build_batch_fn_level0 uses CRC hash if available,
   replaced = codegen->ReplaceCallSites(process_build_batch_fn_level0, hash_fn,
       "HashCurrentRow");
@@ -1641,6 +1597,12 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(
   replaced = codegen->ReplaceCallSites(process_build_batch_fn, murmur_hash_fn,
       "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
+
+  // Never build filters after repartitioning, as all rows have already been added to the
+  // filters during the level0 build.
+  Value* build_filters_arg = codegen->GetArgument(process_build_batch_fn, 3);
+  build_filters_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt1Ty(codegen->context()), false));
 
   // Finalize ProcessBuildBatch functions
   process_build_batch_fn = codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
