@@ -17,7 +17,11 @@
 import pytest
 
 # List of metrics that should be equal to zero when there are no outstanding queries.
-METRIC_LIST = ["impala-server.backends.client-cache.clients-in-use",
+METRIC_LIST = [
+               # TODO (IMPALA-3377): Re-enable
+               # "impala-server.backends.client-cache.clients-in-use", disabled as a
+               # work-around due to IMPALA-3327.
+               #"impala-server.backends.client-cache.clients-in-use",
                "impala-server.hash-table.total-bytes",
                "impala-server.io-mgr.num-open-files",
                # Disable checking of mem-pool.total-bytes DUE TO IMPALA-1057
