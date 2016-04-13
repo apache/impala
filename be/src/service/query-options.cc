@@ -284,7 +284,8 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_exec_single_node_rows_threshold(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
-        query_options->__set_optimize_partition_key_scans(atoi(value.c_str()));
+        query_options->__set_optimize_partition_key_scans(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       case TImpalaQueryOptions::REPLICA_PREFERENCE:
         if (iequals(value, "cache_local") || iequals(value, "0")) {
@@ -308,8 +309,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::SCAN_NODE_CODEGEN_THRESHOLD:
         query_options->__set_scan_node_codegen_threshold(atol(value.c_str()));
+        break;
       case TImpalaQueryOptions::DISABLE_STREAMING_PREAGGREGATIONS:
-        query_options->__set_disable_streaming_preaggregations(atoi(value.c_str()));
+        query_options->__set_disable_streaming_preaggregations(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       case TImpalaQueryOptions::RUNTIME_FILTER_MODE:
         if (iequals(value, "off") || iequals(value, "0")) {

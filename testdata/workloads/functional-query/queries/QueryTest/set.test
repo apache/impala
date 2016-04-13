@@ -165,3 +165,94 @@ select count(string_col) from functional.alltypestiny
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-3334: 'optimize_partition_key_scans' is a boolean query option
+set explain_level=0;
+set optimize_partition_key_scans=true;
+explain select min(month), max(year), ndv(day) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'01:AGGREGATE [FINALIZE]'
+'00:UNION'
+'   constant-operands=11'
+====
+---- QUERY
+set explain_level=0;
+set optimize_partition_key_scans=1;
+explain select min(month), max(year), ndv(day) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'01:AGGREGATE [FINALIZE]'
+'00:UNION'
+'   constant-operands=11'
+====
+---- QUERY
+set explain_level=0;
+set optimize_partition_key_scans=false;
+explain select min(month), max(year), ndv(day) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'03:AGGREGATE [FINALIZE]'
+'02:EXCHANGE [UNPARTITIONED]'
+'01:AGGREGATE'
+'00:SCAN HDFS [functional.alltypesagg]'
+====
+---- QUERY
+set explain_level=0;
+set optimize_partition_key_scans=0;
+explain select min(month), max(year), ndv(day) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'03:AGGREGATE [FINALIZE]'
+'02:EXCHANGE [UNPARTITIONED]'
+'01:AGGREGATE'
+'00:SCAN HDFS [functional.alltypesagg]'
+====
+---- QUERY
+set explain_level=0;
+set disable_streaming_preaggregations=false;
+explain select count(distinct double_col) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'06:AGGREGATE [FINALIZE]'
+'05:EXCHANGE [UNPARTITIONED]'
+'02:AGGREGATE'
+'04:AGGREGATE'
+'03:EXCHANGE [HASH(double_col)]'
+'01:AGGREGATE [STREAMING]'
+'00:SCAN HDFS [functional.alltypesagg]'
+====
+---- QUERY
+set explain_level=0;
+set disable_streaming_preaggregations=0;
+explain select count(distinct double_col) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'06:AGGREGATE [FINALIZE]'
+'05:EXCHANGE [UNPARTITIONED]'
+'02:AGGREGATE'
+'04:AGGREGATE'
+'03:EXCHANGE [HASH(double_col)]'
+'01:AGGREGATE [STREAMING]'
+'00:SCAN HDFS [functional.alltypesagg]'
+====
+---- QUERY
+set explain_level=0;
+set disable_streaming_preaggregations=true;
+explain select count(distinct double_col) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'06:AGGREGATE [FINALIZE]'
+'05:EXCHANGE [UNPARTITIONED]'
+'02:AGGREGATE'
+'04:AGGREGATE'
+'03:EXCHANGE [HASH(double_col)]'
+'01:AGGREGATE'
+'00:SCAN HDFS [functional.alltypesagg]'
+====
+---- QUERY
+set explain_level=0;
+set disable_streaming_preaggregations=1;
+explain select count(distinct double_col) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'06:AGGREGATE [FINALIZE]'
+'05:EXCHANGE [UNPARTITIONED]'
+'02:AGGREGATE'
+'04:AGGREGATE'
+'03:EXCHANGE [HASH(double_col)]'
+'01:AGGREGATE'
+'00:SCAN HDFS [functional.alltypesagg]'
+====
