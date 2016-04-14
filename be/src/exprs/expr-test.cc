@@ -60,6 +60,7 @@ using boost::bad_lexical_cast;
 using boost::date_time::c_local_adjustor;
 using boost::posix_time::from_time_t;
 using boost::posix_time::ptime;
+using boost::posix_time::to_tm;
 using std::numeric_limits;
 using namespace Apache::Hadoop::Hive;
 using namespace impala;
@@ -3756,10 +3757,13 @@ TEST_F(ExprTest, TimestampFunctions) {
   // Check again with the flag enabled.
   {
     ScopedLocalUnixTimestampConversionOverride use_local;
-    unix_start_time = time(NULL);
+    tm before = to_tm(posix_time::microsec_clock::local_time());
+    unix_start_time = mktime(&before);
     GetValue("unix_timestamp()", TYPE_BIGINT,
         reinterpret_cast<void**>(&unix_timestamp_result));
-    EXPECT_BETWEEN(unix_start_time, *unix_timestamp_result, time(NULL));
+    tm after = to_tm(posix_time::microsec_clock::local_time());
+    EXPECT_BETWEEN(unix_start_time, *unix_timestamp_result,
+        static_cast<int64_t>(mktime(&after)));
   }
 
   // Test that the other current time functions are also reasonable.
