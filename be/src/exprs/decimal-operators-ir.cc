@@ -555,6 +555,21 @@ StringVal DecimalOperators::CastToStringVal(
   return result;
 }
 
+template <typename T>
+IR_ALWAYS_INLINE T DecimalOperators::ConvertToNanoseconds(T val, int scale) {
+  // Nanosecond scale means there should be 9 decimal digits.
+  const int NANOSECOND_SCALE = 9;
+  T nanoseconds;
+  if (LIKELY(scale <= NANOSECOND_SCALE)) {
+    nanoseconds = val * DecimalUtil::GetScaleMultiplier<T>(
+        NANOSECOND_SCALE - scale);
+  } else {
+    nanoseconds = val / DecimalUtil::GetScaleMultiplier<T>(
+        scale - NANOSECOND_SCALE);
+  }
+  return nanoseconds;
+}
+
 TimestampVal DecimalOperators::CastToTimestampVal(
     FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return TimestampVal::null();
@@ -564,19 +579,33 @@ TimestampVal DecimalOperators::CastToTimestampVal(
   switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv(val.val4);
-      TimestampValue tv(dv.ToDouble(scale));
+      int32_t seconds = dv.whole_part(scale);
+      int32_t nanoseconds = ConvertToNanoseconds(
+          dv.fractional_part(scale), scale);
+      TimestampValue tv(seconds, nanoseconds);
       tv.ToTimestampVal(&result);
       break;
     }
     case 8: {
       Decimal8Value dv(val.val8);
-      TimestampValue tv(dv.ToDouble(scale));
+      int64_t seconds = dv.whole_part(scale);
+      int64_t nanoseconds = ConvertToNanoseconds(
+          dv.fractional_part(scale), scale);
+      TimestampValue tv(seconds, nanoseconds);
       tv.ToTimestampVal(&result);
       break;
     }
     case 16: {
       Decimal16Value dv(val.val16);
-      TimestampValue tv(dv.ToDouble(scale));
+      int128_t seconds = dv.whole_part(scale);
+      if (seconds < numeric_limits<int64_t>::min() ||
+          seconds > numeric_limits<int64_t>::max()) {
+        // TimeStampVal() takes int64_t.
+        return TimestampVal::null();
+      }
+      int128_t nanoseconds = ConvertToNanoseconds(
+          dv.fractional_part(scale), scale);
+      TimestampValue tv(seconds, nanoseconds);
       tv.ToTimestampVal(&result);
       break;
     }

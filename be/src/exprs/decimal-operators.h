@@ -148,6 +148,10 @@ class DecimalOperators {
   template <typename T>
   static T RoundDelta(const DecimalValue<T>& v, int src_scale,
       int target_scale, const DecimalRoundOp& op);
+
+  /// Converts fractional 'val' with the given 'scale' to nanoseconds.
+  template <typename T>
+  static T ConvertToNanoseconds(T val, int scale);
 };
 
 }

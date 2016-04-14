@@ -1350,6 +1350,43 @@ TEST_F(ExprTest, CastExprs) {
   TestStringValue("cast(cast(cast('2012-01-01 09:10:11.123456789' as timestamp) as"
       " timestamp) as string)", "2012-01-01 09:10:11.123456789");
 
+  // IMPALA-3163: Test precise conversion from Decimal to Timestamp.
+  TestTimestampValue("cast(cast(1457473016.1230 as decimal(17,4)) as timestamp)",
+      TimestampValue("2016-03-08 21:36:56.123000000", 29));
+  // 32 bit Decimal.
+  TestTimestampValue("cast(cast(123.45 as decimal(9,2)) as timestamp)",
+      TimestampValue("1970-01-01 00:02:03.450000000", 29));
+  // 64 bit Decimal.
+  TestTimestampValue("cast(cast(123.45 as decimal(18,2)) as timestamp)",
+      TimestampValue("1970-01-01 00:02:03.450000000", 29));
+  TestTimestampValue("cast(cast(253402300799.99 as decimal(18, 2)) as timestamp)",
+      TimestampValue("9999-12-31 23:59:59.990000000", 29));
+  TestIsNull("cast(cast(260000000000.00 as decimal(18, 2)) as timestamp)",
+      TYPE_TIMESTAMP);
+  // 128 bit Decimal.
+  TestTimestampValue("cast(cast(123.45 as decimal(38,2)) as timestamp)",
+      TimestampValue("1970-01-01 00:02:03.450000000", 29));
+  TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 2)) as timestamp)",
+      TimestampValue("9999-12-31 23:59:59.990000000", 29));
+  TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 26)) as timestamp)",
+      TimestampValue("9999-12-31 23:59:59.990000000", 29));
+  TestIsNull("cast(cast(260000000000.00 as decimal(38, 2)) as timestamp)",
+      TYPE_TIMESTAMP);
+  // numeric_limits<int64_t>::max()
+  TestIsNull("cast(cast(9223372036854775807 as decimal(38, 0)) as timestamp)",
+      TYPE_TIMESTAMP);
+  // numeric_limits<int64_t>::max() + 1
+  TestIsNull("cast(cast(9223372036854775808 as decimal(38, 0)) as timestamp)",
+      TYPE_TIMESTAMP);
+  // numeric_limits<int64_t>::min()
+  TestIsNull("cast(cast(-9223372036854775808 as decimal(38, 0)) as timestamp)",
+      TYPE_TIMESTAMP);
+  // numeric_limits<int64_t>::min() - 1
+  TestIsNull("cast(cast(-9223372036854775809 as decimal(38, 0)) as timestamp)",
+      TYPE_TIMESTAMP);
+  // 2^70 + 1
+  TestIsNull("cast(cast(1180591620717411303425 as decimal(38, 0)) as timestamp)",
+      TYPE_TIMESTAMP);
 
   // Timestamp <--> Int
   TestIsNull("cast(cast('09:10:11.000000' as timestamp) as int)", TYPE_INT);
@@ -3745,9 +3782,8 @@ TEST_F(ExprTest, TimestampFunctions) {
       "as double)", TYPE_DOUBLE, 1.2938724611E9);
   TestValue("cast(to_utc_timestamp(cast('2011-01-01 01:01:01.0001' as timestamp), 'PST') "
       "as double)", TYPE_DOUBLE, 1.2938724610001E9);
-  // We get some decimal-binary skew here
   TestStringValue("cast(from_utc_timestamp(cast(1.3041352164485E9 as timestamp), 'PST') "
-      "as string)", "2011-04-29 20:46:56.448499917");
+      "as string)", "2011-04-29 20:46:56.448500000");
   // NULL arguments.
   TestIsNull("from_utc_timestamp(NULL, 'PST')", TYPE_TIMESTAMP);
   TestIsNull("from_utc_timestamp(cast('2011-01-01 01:01:01.1' as timestamp), NULL)",
@@ -3778,9 +3814,8 @@ TEST_F(ExprTest, TimestampFunctions) {
         1.2938724611E9);
     TestValue("cast(cast('2011-01-01 01:01:01.0001' as timestamp) as double)",
         TYPE_DOUBLE, 1.2938724610001E9);
-    // We get some decimal-binary skew here
     TestStringValue("cast(cast(1.3041352164485E9 as timestamp) as string)",
-        "2011-04-29 20:46:56.448499917");
+        "2011-04-29 20:46:56.448500000");
     // NULL arguments.
     TestIsNull("from_utc_timestamp(NULL, 'PST')", TYPE_TIMESTAMP);
     TestIsNull("from_utc_timestamp(cast('2011-01-01 01:01:01.1' as timestamp), NULL)",
