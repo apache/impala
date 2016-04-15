@@ -20,6 +20,7 @@ from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIfLocal
 
 @SkipIfLocal.multiple_impalad
+@pytest.mark.execute_serially # IMPALA-3367
 class TestRuntimeFilters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -46,6 +47,7 @@ class TestRuntimeFilters(ImpalaTestSuite):
 
 
 @SkipIfLocal.multiple_impalad
+@pytest.mark.execute_serially # IMPALA-3367
 class TestRuntimeRowFilters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
