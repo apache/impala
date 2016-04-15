@@ -79,6 +79,12 @@ elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
       ${IMPALA_HOME}/testdata/bin/load-test-warehouse-snapshot.sh "$SNAPSHOT_FILE"
   # Don't skip the metadata load if a schema change is detected.
   if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh; then
+    if [[ "${TARGET_FILESYSTEM}" == "isilon" || "${TARGET_FILESYSTEM}" == "s3" ]] ; then
+      echo "ERROR in $0 at line $LINENO: A schema change has been detected in the"
+      echo "metadata, but it cannot be loaded on isilon or s3 and the"
+      echo "target file system is ${TARGET_FILESYSTEM}.  Exiting."
+      exit 1
+    fi
     echo "Schema change detected, metadata will be loaded."
     SKIP_METADATA_LOAD=0
   fi
