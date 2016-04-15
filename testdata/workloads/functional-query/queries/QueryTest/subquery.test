@@ -330,6 +330,33 @@ and t.id > 0
 TINYINT
 ====
 ---- QUERY
+# Uncorrelated NOT EXISTS
+select id
+from functional.alltypestiny t
+where not exists (select 1 from functional.alltypessmall where bool_col = false)
+and bool_col = true
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Uncorrelated NOT EXISTS that returns an empty set
+select 1
+from functional.alltypestiny t
+where not exists (select null from functional.alltypessmall where id < 0)
+and t.id > 0
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+TINYINT
+====
+---- QUERY
 # Uncorrelated aggregate subquery
 select count(*) from
 functional.alltypessmall t

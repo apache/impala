@@ -1129,7 +1129,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select key, av from functional.allcomplextypes t, " +
         "(select a1.key, av from t.array_map_col a1, " +
         "(select avg(item) av from a1.value a2) v1) v2");
-    // TOOD: Enable once we support complex-typed exprs in the select list.
+    // TODO: Enable once we support complex-typed exprs in the select list.
     //AnalyzesOk("select key, av from functional.allcomplextypes t, " +
     //    "(select a1.key, a1.value from t.array_map_col a1) v1, " +
     //    "(select avg(item) av from v1.value) v2");
@@ -1152,7 +1152,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(select a1.key, av from t.array_map_col a1, " +
         "(select avg(item) av from a1.value a2) v1) v2) " +
         "select * from w");
-    // TOOD: Enable once we support complex-typed exprs in the select list.
+    // TODO: Enable once we support complex-typed exprs in the select list.
     //AnalyzesOk("with w as (select key, av from functional.allcomplextypes t, " +
     //    "(select a1.key, a1.value from t.array_map_col a1) v1, " +
     //    "(select avg(item) av from v1.value) v2) " +
@@ -1196,7 +1196,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "uncorrelated one 'functional.alltypes':\n" +
         "SELECT * FROM functional.alltypes, (SELECT count(1) cnt " +
         "FROM t.int_array_col) v1");
-    // TOOD: Enable once we support complex-typed exprs in the select list.
+    // TODO: Enable once we support complex-typed exprs in the select list.
     // Correlated table ref has correlated inline view as parent.
     //AnalysisError("select cnt from functional.allcomplextypes t, " +
     //    "(select value arr from t.array_map_col) v1, " +
@@ -2741,6 +2741,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "where timestamp_col between cast('2001-01-01' as timestamp) and " +
         "(cast('2001-01-01' as timestamp) + interval 10 days)) " +
         "select * from with_1");
+    AnalyzesOk("with with_1 as (select 1 as col_name), " +
+        "with_2 as (select 1 as col_name) " +
+        "select a.tinyint_col from functional.alltypes a " +
+        "where not exists (select 1 from with_1) ");
   }
 
   @Test

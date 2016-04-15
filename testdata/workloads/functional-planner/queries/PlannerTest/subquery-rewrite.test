@@ -640,7 +640,7 @@ select *
 from functional.alltypestiny t
 where exists (select * from functional.alltypessmall s where s.id < 5)
 ---- PLAN
-02:NESTED LOOP JOIN [CROSS JOIN]
+02:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
 |     partitions=4/4 files=4 size=6.32KB
@@ -658,7 +658,7 @@ where exists
    from functional.alltypesagg where tinyint_col = 10
    group by id, int_col, bigint_col)
 ---- PLAN
-03:NESTED LOOP JOIN [CROSS JOIN]
+03:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
 |     partitions=4/4 files=4 size=460B
@@ -677,6 +677,68 @@ from functional.alltypestiny t
 where exists (select * from functional.alltypessmall limit 0)
 ---- PLAN
 00:EMPTYSET
+====
+# Uncorrelated NOT EXISTS
+select *
+from functional.alltypestiny t
+where not exists (select * from functional.alltypessmall s where s.id < 5)
+---- PLAN
+02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|
+|--01:SCAN HDFS [functional.alltypessmall s]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: s.id < 5
+|     limit: 1
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 files=4 size=460B
+====
+# Uncorrelated NOT exists referencing a WITH clause
+with
+  w1 as (select * from functional.alltypestiny t),
+  w2 as (select * from functional.alltypessmall s where s.id < 0)
+select *
+from w1 t
+where not exists (select 1 from w2)
+---- PLAN
+02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|
+|--01:SCAN HDFS [functional.alltypessmall s]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: s.id < 0
+|     limit: 1
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 files=4 size=460B
+====
+# Uncorrelated NOT EXISTS with an analytic function and a group by clause
+select 1
+from functional.alltypestiny t
+where not exists
+  (select id, max(int_col) over (partition by bigint_col)
+   from functional.alltypesagg where tinyint_col = 10
+   group by id, int_col, bigint_col)
+---- PLAN
+03:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 files=4 size=460B
+|
+02:AGGREGATE [FINALIZE]
+|  group by: id, int_col, bigint_col
+|  limit: 1
+|
+01:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: tinyint_col = 10
+====
+# Uncorrelated NOT EXISTS with a LIMIT 0 clause
+select 1
+from functional.alltypestiny t
+where not exists (select * from functional.alltypessmall limit 0)
+---- PLAN
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 files=4 size=460B
 ====
 # Multiple nesting levels
 select count(*)

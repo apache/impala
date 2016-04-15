@@ -635,15 +635,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalyzesOk("select id from functional.alltypes where exists " +
         "(select id from functional.alltypestiny where int_col < 10 and exists (" +
         "select id from functional.alltypessmall where bool_col = true))");
-    // Uncorrelated NOT EXISTS subquery is illegal with only relative table refs
+    // Uncorrelated NOT EXISTS with relative table ref
     AnalyzesOk(String.format(
         "select id from functional.allcomplextypes t where not exists " +
         "(select item from t.int_array_col a where item < 10)"));
-    // Uncorrelated NOT EXISTS subquery is illegal with absolute table refs
-    AnalysisError("select * from functional.alltypestiny where not exists " +
-        "(select 1 from functional.alltypessmall where bool_col = false)",
-        "Unsupported uncorrelated NOT EXISTS subquery: SELECT 1 FROM " +
-        "functional.alltypessmall WHERE bool_col = FALSE");
+    // Uncorrelated NOT EXISTS subquery
+    AnalyzesOk("select * from functional.alltypestiny where not exists " +
+        "(select 1 from functional.alltypessmall where bool_col = false)");
 
     // Subquery references an explicit alias from the outer block in the FROM
     // clause

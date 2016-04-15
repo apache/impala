@@ -420,34 +420,22 @@ public class StmtRewriter {
     if (onClausePredicate == null) {
       Preconditions.checkState(expr instanceof ExistsPredicate);
       ExistsPredicate existsPred = (ExistsPredicate) expr;
+      // TODO This is very expensive if uncorrelated. Remove it when we implement
+      // independent subquery evaluation.
+      if (existsPred.isNotExists()) {
+        inlineView.setJoinOp(JoinOperator.LEFT_ANTI_JOIN);
+      } else {
+        inlineView.setJoinOp(JoinOperator.LEFT_SEMI_JOIN);
+      }
       // Note that the concept of a 'correlated inline view' is similar but not the same
       // as a 'correlated subquery', i.e., a subquery with a correlated predicate.
-      if (inlineView.isCorrelated()) {
-        if (existsPred.isNotExists()) {
-          inlineView.setJoinOp(JoinOperator.LEFT_ANTI_JOIN);
-        } else {
-          inlineView.setJoinOp(JoinOperator.LEFT_SEMI_JOIN);
-        }
-        // No visible tuples added.
-        return false;
-      } else {
-        // TODO: Remove this when we support independent subquery evaluation.
-        if (existsPred.isNotExists()) {
-          throw new AnalysisException("Unsupported uncorrelated NOT EXISTS subquery: " +
-              subqueryStmt.toSql());
-        }
+      if (!inlineView.isCorrelated()) {
         // For uncorrelated subqueries, we limit the number of rows returned by the
         // subquery.
         subqueryStmt.setLimit(1);
-        // We don't have an ON clause predicate to create an equi-join. Rewrite the
-        // subquery using a CROSS JOIN.
-        // TODO This is very expensive. Remove it when we implement independent
-        // subquery evaluation.
-        inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
-        LOG.warn("uncorrelated subquery rewritten using a cross join");
-        // Indicate that new visible tuples may be added in stmt's select list.
-        return true;
+        inlineView.setOnClause(new BoolLiteral(true));
       }
+      return false;
     }
 
     // Create an smap from the original select-list exprs of the select list to
