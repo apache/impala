@@ -184,8 +184,14 @@ class ImpalaDockerEnv(object):
         warn_only = True,
         host_string = '{0}@{1}:{2}'.format(DOCKER_USER_NAME, self.host, self.ssh_port),
         password = os.environ['DOCKER_PASSWORD']):
-      start_command = ('source {IMPALA_HOME}/bin/impala-config.sh '
-        '&& {IMPALA_HOME}/bin/start-impala-cluster.py').format(IMPALA_HOME = IMPALA_HOME)
+      impalad_args = [
+          '-convert_legacy_hive_parquet_utc_timestamps=true',
+      ]
+      start_command = (
+          'source {IMPALA_HOME}/bin/impala-config.sh '
+          '&& {IMPALA_HOME}/bin/start-impala-cluster.py '
+          '--impalad_args="{impalad_args}"').format(IMPALA_HOME=IMPALA_HOME,
+                                                    impalad_args=' '.join(impalad_args))
       result = retry(run)(start_command, pty=False)
       return result
 

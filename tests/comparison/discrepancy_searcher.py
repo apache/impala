@@ -641,15 +641,21 @@ class QueryResultDiffSearcher(object):
           # Assume Impala crashed and try restarting
           test_crash_count += 1
           LOG.info('Restarting Impala')
-          call([join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
-                          '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
+          impalad_args = [
+              '-convert_legacy_hive_parquet_utc_timestamps=true',
+          ]
+          impala_restart_cmd = [
+              join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
+              '--log_dir={0}'.format(getenv('LOG_DIR', "/tmp/")),
+              '--impalad_args="{0}"'.format(' '.join(impalad_args)),
+          ]
+          call(impala_restart_cmd)
           self.test_conn.reconnect()
           query_result_comparator.test_cursor = self.test_conn.cursor()
           result = query_result_comparator.compare_query_results(query)
           if result.error:
             LOG.info('Restarting Impala')
-            call([join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
-                            '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
+            call(impala_restart_cmd)
             self.test_conn.reconnect()
             query_result_comparator.test_cursor = self.test_conn.cursor()
           else:
