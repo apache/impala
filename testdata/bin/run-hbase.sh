@@ -73,18 +73,41 @@ export HBASE_REGIONSERVER_OPTS="${K1} ${K2} ${K4}"
 EOF
 fi
 
-# To work around HBase bug (HBASE-4467), unset $HADOOP_HOME before calling hbase
-HADOOP_HOME=
+: ${HBASE_START_RETRY_ATTEMPTS=5}
 
-# Start HBase and 3 regionserver
-$HBASE_HOME/bin/start-hbase.sh 2>&1 | tee ${HBASE_LOGDIR}/hbase-startup.out
+# `rm -f` hbase startup output capture so that `tee -a` below appends
+# only for the lifetime of this script
+rm -f ${HBASE_LOGDIR}/hbase-startup.out ${HBASE_LOGDIR}/hbase-rs-startup.out
 
-# TODO: Remove once the race between master and RS has been resolved.
-# Note wait-for-hbase-master.py requires having org.apache.zookeeper.ZooKeeperMain on the
-# classpath. ZooKeeper has conflicts with JARs added as part of set-classpath.sh, so
-# generate a valid classpath using the 'hadoop classpath' command.
-export CLASSPATH=`hadoop classpath`
-${CLUSTER_BIN}/wait-for-hbase-master.py
+for ((i=1; i <= HBASE_START_RETRY_ATTEMPTS; ++i)); do
+  echo "HBase start attempt: ${i}/${HBASE_START_RETRY_ATTEMPTS}"
 
-$HBASE_HOME/bin/local-regionservers.sh start 1 2 3 2>&1 | \
-    tee ${HBASE_LOGDIR}/hbase-rs-startup.out
+  echo "Killing any HBase processes possibly lingering from previous start attempts"
+  ${IMPALA_HOME}/testdata/bin/kill-hbase.sh
+  if ((i > 1)); then
+    HBASE_WAIT_AFTER_KILL=$((${i} * 2))
+    echo "Waiting ${HBASE_WAIT_AFTER_KILL} seconds before trying again..."
+    sleep ${HBASE_WAIT_AFTER_KILL}
+  fi
+
+  if ((i < HBASE_START_RETRY_ATTEMPTS)); then
+    # Here, we don't want errexit to take effect, so we use if blocks to control the flow.
+    if ! ${HBASE_HOME}/bin/start-hbase.sh 2>&1 | tee -a ${HBASE_LOGDIR}/hbase-startup.out
+    then
+      echo "HBase Master startup failed"
+    elif ! ${HBASE_HOME}/bin/local-regionservers.sh start 2 3 2>&1 | \
+        tee -a ${HBASE_LOGDIR}/hbase-rs-startup.out
+    then
+      echo "HBase regionserver startup failed"
+    else
+      break
+    fi
+  else
+    # In the last iteration, it's fine for errexit to do its thing.
+    ${HBASE_HOME}/bin/start-hbase.sh 2>&1 | tee -a ${HBASE_LOGDIR}/hbase-startup.out
+    ${HBASE_HOME}/bin/local-regionservers.sh start 2 3 2>&1 | \
+        tee -a ${HBASE_LOGDIR}/hbase-rs-startup.out
+  fi
+
+done
+echo "HBase startup scripts succeeded"
