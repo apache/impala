@@ -16,12 +16,15 @@ package com.cloudera.impala.analysis;
 
 import org.apache.commons.lang.NotImplementedException;
 
+import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 
 /**
  * Base class for all Impala SQL statements.
  */
 abstract class StatementBase implements ParseNode {
+
   // True if this Stmt is the top level of an explain stmt.
   protected boolean isExplain_ = false;
 
@@ -100,4 +103,36 @@ abstract class StatementBase implements ParseNode {
    * into the ParseNode interface for clarity.
    */
   public void reset() { analyzer_ = null; }
+
+  /**
+   * Checks that 'srcExpr' is type compatible with 'dstCol' and returns a type compatible
+   * expression by applying a CAST() if needed. Throws an AnalysisException the types
+   * are incompatible. 'dstTableName' is only used when constructing an AnalysisException
+   * message.
+   */
+  protected Expr checkTypeCompatibility(String dstTableName, Column dstCol, Expr srcExpr)
+      throws AnalysisException {
+    Type dstColType = dstCol.getType();
+    Type srcExprType = srcExpr.getType();
+
+    // Trivially compatible, unless the type is complex.
+    if (dstColType.equals(srcExprType) && !dstColType.isComplexType()) return srcExpr;
+
+    Type compatType = Type.getAssignmentCompatibleType(dstColType, srcExprType, false);
+    if (!compatType.isValid()) {
+      throw new AnalysisException(String.format(
+          "Target table '%s' is incompatible with source expressions.\nExpression '%s' " +
+              "(type: %s) is not compatible with column '%s' (type: %s)",
+          dstTableName, srcExpr.toSql(), srcExprType.toSql(), dstCol.getName(),
+          dstColType.toSql()));
+    }
+    if (!compatType.equals(dstColType) && !compatType.isNull()) {
+      throw new AnalysisException(String.format(
+          "Possible loss of precision for target table '%s'.\nExpression '%s' (type: " +
+              "%s) would need to be cast to %s for column '%s'",
+          dstTableName, srcExpr.toSql(), srcExprType.toSql(), dstColType.toSql(),
+          dstCol.getName()));
+    }
+    return srcExpr.castTo(compatType);
+  }
 }

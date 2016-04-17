@@ -24,7 +24,6 @@ import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.DataSink;
@@ -55,6 +54,7 @@ import static java.lang.String.format;
  * Currently, only Kudu tables can be modified.
  */
 public abstract class ModifyStmt extends StatementBase {
+
   private final static org.slf4j.Logger LOG = LoggerFactory.getLogger(ModifyStmt.class);
 
   // List of explicitly mentioned assignment expressions in the UPDATE's SET clause
@@ -274,50 +274,13 @@ public abstract class ModifyStmt extends StatementBase {
             format("Duplicate value assignment to column: '%s'", lhsSlotRef.toSql()));
       }
 
-      rhsExpr = checkTypeCompatibility(c, rhsExpr);
+      rhsExpr = checkTypeCompatibility(
+          targetTableRef_.getDesc().getTable().getFullName(), c, rhsExpr);
       uniqueSlots.add(lhsSlotRef.getSlotId());
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns.add(colIndexMap.get(c.getName()));
     }
   }
-
-  /**
-   * Checks for type compatibility of column and expr.
-   * Returns compatible (possibly cast) expr.
-   * TODO(kudu-merge) Find a way to consolidate this with
-   * InsertStmt#checkTypeCompatibility()
-   */
-  private Expr checkTypeCompatibility(Column column, Expr expr)
-      throws AnalysisException {
-    // Check for compatible type, and add casts to the selectListExprs if necessary.
-    // We don't allow casting to a lower precision type.
-    Type colType = column.getType();
-    Type exprType = expr.getType();
-    // Trivially compatible, unless the type is complex.
-    if (colType.equals(exprType) && !colType.isComplexType()) return expr;
-
-    Type compatibleType = Type.getAssignmentCompatibleType(colType, exprType, false);
-    // Incompatible types.
-    if (!compatibleType.isValid()) {
-      throw new AnalysisException(
-          format("Target table '%s' is incompatible with source expressions.\nExpression "
-              + "'%s' (type: %s) is not compatible with column '%s' (type: %s)",
-              targetTableRef_.getDesc().getTable().getFullName(), expr.toSql(),
-              exprType.toSql(), column.getName(), colType.toSql()));
-    }
-    // Loss of precision when inserting into the table.
-    if (!compatibleType.equals(colType) && !compatibleType.isNull()) {
-      throw new AnalysisException(
-          format("Possible loss of precision for target table '%s'.\n" +
-                  "Expression '%s' (type: %s) would need to be cast to %s" +
-                  " for column '%s'",
-              targetTableRef_.getDesc().getTable().getFullName(), expr.toSql(),
-              exprType.toSql(), colType.toSql(), column.getName()));
-    }
-    // Add a cast to the selectListExpr to the higher type.
-    return expr.castTo(compatibleType);
-  }
-
 
   public QueryStmt getQueryStmt() { return sourceStmt_; }
   public abstract DataSink createDataSink();

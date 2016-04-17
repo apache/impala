@@ -2458,10 +2458,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "partition (year, month) " +
         "values(1, true, 'a', 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp)," +
         "2009, 10)",
-        "Target table 'functional.alltypes' is incompatible with SELECT / PARTITION " +
-        "expressions.\n" +
-        "Expression ''a'' (type: STRING) is not compatible with column " +
-        "'tinyint_col' (type: TINYINT)");
+        "Target table 'functional.alltypes' is incompatible with source expressions.\n" +
+        "Expression ''a'' (type: STRING) is not compatible with column 'tinyint_col'" +
+        " (type: TINYINT)");
   }
 
   @Test
@@ -3221,9 +3220,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, bool_col, timestamp_col " +
         "from functional.alltypes",
-        "Target table 'functional.alltypessmall' is incompatible with SELECT / " +
-        "PARTITION expressions.\nExpression 'bool_col' (type: BOOLEAN) is not " +
-        "compatible with column 'string_col' (type: STRING)");
+        "Target table 'functional.alltypessmall' is incompatible with source " +
+        "expressions.\nExpression 'bool_col' (type: BOOLEAN) is not compatible with " +
+        "column 'string_col' (type: STRING)");
     // Duplicate partition columns
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=2009, month=4, year=10)" +
@@ -3266,8 +3265,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
-        "Target table 'functional.alltypessmall' is incompatible with " +
-        "SELECT / PARTITION expressions.");
+        "Target table 'functional.alltypessmall' is incompatible with source " +
+        "expressions.\nExpression ''should be an int'' (type: STRING) is not compatible" +
+        " with column 'year' (type: INT)");
     // Arbitrary exprs as partition key values. Non-constant exprs should fail.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
         "partition (year=-1, month=int_col)" +
@@ -3315,8 +3315,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(id, bool_col, string_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, tinyint_col, timestamp_col)" +
         " select * from functional.alltypesnopart",
-        "Target table 'functional.alltypesnopart' is incompatible with SELECT / " +
-        "PARTITION expressions.\nExpression 'functional.alltypesnopart.tinyint_col' " +
+        "Target table 'functional.alltypesnopart' is incompatible with source " +
+        "expressions.\nExpression 'functional.alltypesnopart.tinyint_col' " +
         "(type: TINYINT) is not compatible with column 'string_col' (type: STRING)");
 
     // Above query should work fine if select list also permuted
@@ -3378,10 +3378,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         " select id, bool_col, month, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, tinyint_col, timestamp_col, " +
         "year, string_col from functional.alltypes",
-        "Target table 'functional.alltypes' is incompatible with SELECT / PARTITION " +
-        "expressions.\n" +
-        "Expression 'month' (type: INT) is not compatible with column 'string_col' " +
-        "(type: STRING)");
+        "Target table 'functional.alltypes' is incompatible with source expressions.\n" +
+        "Expression 'month' (type: INT) is not compatible with column 'string_col'" +
+        " (type: STRING)");
 
     // Empty permutation and no query statement
     AnalyzesOk("insert " + qualifier + " table functional.alltypesnopart()");

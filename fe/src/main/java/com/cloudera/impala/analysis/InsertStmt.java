@@ -21,7 +21,6 @@ import java.util.Set;
 
 import com.cloudera.impala.planner.TableSink;
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -517,7 +516,8 @@ public class InsertStmt extends StatementBase {
     // Check dynamic partition columns for type compatibility.
     for (int i = 0; i < selectListExprs.size(); ++i) {
       Column targetColumn = selectExprTargetColumns.get(i);
-      Expr compatibleExpr = checkTypeCompatibility(targetColumn, selectListExprs.get(i));
+      Expr compatibleExpr = checkTypeCompatibility(
+          targetTableName_.toString(), targetColumn, selectListExprs.get(i));
       if (targetColumn.getPosition() < numClusteringCols) {
         // This is a dynamic clustering column
         tmpPartitionKeyExprs.add(compatibleExpr);
@@ -533,7 +533,8 @@ public class InsertStmt extends StatementBase {
         if (pkv.isStatic()) {
           // tableColumns is guaranteed to exist after the earlier analysis checks
           Column tableColumn = table_.getColumn(pkv.getColName());
-          Expr compatibleExpr = checkTypeCompatibility(tableColumn, pkv.getValue());
+          Expr compatibleExpr = checkTypeCompatibility(
+              targetTableName_.toString(), tableColumn, pkv.getValue());
           tmpPartitionKeyExprs.add(compatibleExpr);
           tmpPartitionKeyNames.add(pkv.getColName());
         }
@@ -591,43 +592,6 @@ public class InsertStmt extends StatementBase {
       queryStmt_ = new SelectStmt(selectList, null, null, null, null, null, null);
       queryStmt_.analyze(analyzer);
     }
-  }
-
-  /**
-   * Checks for type compatibility of column and expr.
-   * Returns compatible (possibly cast) expr.
-   */
-  private Expr checkTypeCompatibility(Column column, Expr expr)
-      throws AnalysisException {
-    // Check for compatible type, and add casts to the selectListExprs if necessary.
-    // We don't allow casting to a lower precision type.
-    Type colType = column.getType();
-    Type exprType = expr.getType();
-    // Trivially compatible, unless the type is complex.
-    if (colType.equals(exprType) && !colType.isComplexType()) return expr;
-
-    Type compatibleType =
-        Type.getAssignmentCompatibleType(colType, exprType, false);
-    // Incompatible types.
-    if (!compatibleType.isValid()) {
-      throw new AnalysisException(
-          String.format(
-            "Target table '%s' is incompatible with SELECT / PARTITION expressions.\n" +
-            "Expression '%s' (type: %s) is not compatible with column '%s' (type: %s)",
-            targetTableName_, expr.toSql(), exprType.toSql(), column.getName(),
-            colType.toSql()));
-    }
-    // Loss of precision when inserting into the table.
-    if (!compatibleType.equals(colType) && !compatibleType.isNull()) {
-      throw new AnalysisException(
-          String.format("Possible loss of precision for target table '%s'.\n" +
-                        "Expression '%s' (type: %s) would need to be cast to %s" +
-                        " for column '%s'",
-                        targetTableName_, expr.toSql(), exprType.toSql(),
-                        colType.toSql(), column.getName()));
-    }
-    // Add a cast to the selectListExpr to the higher type.
-    return expr.castTo(compatibleType);
   }
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
