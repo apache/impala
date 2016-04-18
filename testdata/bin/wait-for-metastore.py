@@ -17,6 +17,7 @@
 # to execute the get_database("default") Thrift RPC until the call succeeds,
 # or a timeout is reached.
 
+import os
 import time
 from optparse import OptionParser
 from tests.util.thrift_util import create_transport
@@ -25,6 +26,9 @@ from tests.util.thrift_util import create_transport
 from hive_metastore import ThriftHiveMetastore
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
+
+# Disable buffering to get "print" output on the console immediately.
+os.environ["PYTHONUNBUFFERED"] = "1"
 
 parser = OptionParser()
 parser.add_option("--metastore_hostport", dest="metastore_hostport",

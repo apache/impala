@@ -18,6 +18,7 @@
 # TODO: Consider combining this with wait-for-metastore.py. A TCLIService client
 # can perhaps also talk to the metastore.
 
+import os
 import time
 import getpass
 from optparse import OptionParser
@@ -27,6 +28,9 @@ from tests.util.thrift_util import create_transport
 from cli_service import LegacyTCLIService
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
+
+# Disable buffering to get "print" output on the console immediately.
+os.environ["PYTHONUNBUFFERED"] = "1"
 
 parser = OptionParser()
 parser.add_option("--hs2_hostport", dest="hs2_hostport",
