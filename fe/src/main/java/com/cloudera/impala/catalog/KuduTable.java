@@ -256,8 +256,7 @@ public class KuduTable extends Table {
           kuduTable.getTabletsLocations(KUDU_RPC_TIMEOUT_MS);
       for (LocatedTablet tab: tablets) {
         TResultRowBuilder builder = new TResultRowBuilder();
-        // TODO(kudu-merge) why -1?
-        builder.add("-1");
+        builder.add("-1");   // The Kudu client API doesn't expose tablet row counts.
         builder.add(DatatypeConverter.printHexBinary(
             tab.getPartition().getPartitionKeyStart()));
         builder.add(DatatypeConverter.printHexBinary(

@@ -269,8 +269,6 @@ public class KuduScanNode extends ScanNode {
     if (!(constantExpr instanceof NumericLiteral)) return comparisonPred;
     NumericLiteral numLiteral = (NumericLiteral) constantExpr;
     long intValue = numLiteral.getLongValue();
-    // TODO(kudu-merge) consider replacing the predicate with 'false' when the number
-    // overflows or underflows the specified column type.
     if (comparisonPred.getOp() == Operator.GT) {
       // Make sure we don't overflow the type, in which case the type would change and
       // the slot would get an implicit cast meaning we wouldn't push it anyway.

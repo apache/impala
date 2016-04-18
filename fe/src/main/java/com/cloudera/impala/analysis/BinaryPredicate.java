@@ -115,7 +115,6 @@ public class BinaryPredicate extends Predicate {
    * left and the other expression on the right. This also folds constant children of the
    * predicate into literals, if possible.
    * Returns null if this is not a SlotRef comparison.
-   * TODO(kudu-merge): create a more general mechanism and retire this function
    */
   public static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
       Analyzer analyzer)

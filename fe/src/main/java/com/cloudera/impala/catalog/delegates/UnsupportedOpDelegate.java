@@ -14,14 +14,10 @@
 
 package com.cloudera.impala.catalog.delegates;
 
-import org.apache.hadoop.hive.metastore.api.Table;
-
 import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TAlterTableParams;
 
 /**
  * Empty implementation for the DdlDelegate interface that does nothing.
- * TODO(kudu-merge) Should this really return an error?
  */
 public class UnsupportedOpDelegate extends DdlDelegate {
 
