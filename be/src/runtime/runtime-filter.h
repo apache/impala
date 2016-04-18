@@ -67,33 +67,35 @@ class RuntimeFilterBank {
   /// Updates a filter's bloom_filter with 'bloom_filter' which has been produced by some
   /// operator in the local fragment instance. 'bloom_filter' may be NULL, representing a
   /// full filter that contains all elements.
-  void UpdateFilterFromLocal(uint32_t filter_id, BloomFilter* bloom_filter);
+  void UpdateFilterFromLocal(int32_t filter_id, BloomFilter* bloom_filter);
 
   /// Makes a bloom_filter (aggregated globally from all producer fragments) available for
   /// consumption by operators that wish to use it for filtering.
-  void PublishGlobalFilter(uint32_t filter_id, const TBloomFilter& thrift_filter);
+  void PublishGlobalFilter(int32_t filter_id, const TBloomFilter& thrift_filter);
 
-  /// Returns true if, according to the estimate of the NDV in 'max_ndv', a filter's
-  /// expected false-positive rate would be too high and the filter should be disabled.
-  bool ShouldDisableFilter(uint64_t max_ndv);
+  /// Returns true if, according to the observed NDV in 'observed_ndv', a filter of size
+  /// 'filter_size' would have an expected false-positive rate which would exceed
+  /// FLAGS_max_filter_error_rate.
+  bool FpRateTooHigh(int64_t filter_size, int64_t observed_ndv);
 
   /// Returns a RuntimeFilter with the given filter id. This is safe to call after all
   /// calls to RegisterFilter() have finished, and not before. Filters may be cached by
   /// clients and subsequently accessed without synchronization. Concurrent calls to
   /// PublishGlobalFilter() will update a filter's bloom filter atomically, without the
   /// need for client synchronization.
-  inline const RuntimeFilter* GetRuntimeFilter(uint32_t filter_id);
+  inline const RuntimeFilter* GetRuntimeFilter(int32_t filter_id);
 
   /// Returns a bloom_filter that can be used by an operator to produce a local filter,
   /// which may then be used in UpdateFilterFromLocal(). The memory returned is owned by
   /// the RuntimeFilterBank (which may transfer it to a RuntimeFilter subsequently), and
-  /// should not be deleted by the caller.
+  /// should not be deleted by the caller. The filter identified by 'filter_id' must have
+  /// been previously registered as a 'producer' by RegisterFilter().
   ///
   /// If there is not enough memory, or if Close() has been called first, returns NULL.
-  BloomFilter* AllocateScratchBloomFilter();
+  BloomFilter* AllocateScratchBloomFilter(int32_t filter_id);
 
   /// Default hash seed to use when computing hashed values to insert into filters.
-  static const uint32_t DefaultHashSeed() { return 1234; }
+  static const int32_t DefaultHashSeed() { return 1234; }
 
   /// Releases all memory allocated for BloomFilters.
   void Close();
@@ -102,13 +104,18 @@ class RuntimeFilterBank {
   static const int32_t MAX_BLOOM_FILTER_SIZE = 16 * 1024 * 1024;   // 16MB
 
  private:
+  /// Returns the the space (in bytes) required for a filter to achieve the configured
+  /// maximum false-positive rate based on the expected NDV. If 'ndv' is -1 (i.e. no
+  /// estimate is known), the default filter size is returned.
+  int64_t GetFilterSizeForNdv(int64_t ndv);
+
   const TQueryCtx query_ctx_;
 
   /// Lock protecting produced_filters_ and consumed_filters_.
   boost::mutex runtime_filter_lock_;
 
   /// Map from filter id to a RuntimeFilter.
-  typedef boost::unordered_map<uint32_t, RuntimeFilter*> RuntimeFilterMap;
+  typedef boost::unordered_map<int32_t, RuntimeFilter*> RuntimeFilterMap;
 
   /// All filters expected to be produced by the local plan fragment instance.
   RuntimeFilterMap produced_filters_;
@@ -129,8 +136,8 @@ class RuntimeFilterBank {
   /// Total amount of memory allocated to Bloom Filters
   RuntimeProfile::Counter* memory_allocated_;
 
-  /// Precomputed logarithm of BloomFilter heap size.
-  int log_filter_size_;
+  /// Precomputed logarithm of default BloomFilter heap size.
+  int default_log_filter_size_;
 };
 
 /// RuntimeFilters represent set-membership predicates (implemented with bloom filters)
@@ -143,8 +150,10 @@ class RuntimeFilterBank {
 /// of that join node could eliminate rows from consideration for join matching).
 class RuntimeFilter {
  public:
-  RuntimeFilter(const TRuntimeFilterDesc& filter)
-      : bloom_filter_(NULL), filter_desc_(filter), arrival_time_(0L) {
+  RuntimeFilter(const TRuntimeFilterDesc& filter, int64_t filter_size)
+      : bloom_filter_(NULL), filter_desc_(filter), arrival_time_(0L),
+        filter_size_(filter_size) {
+    DCHECK_GT(filter_size_, 0);
     registration_time_ = MonotonicMillis();
   }
 
@@ -152,6 +161,8 @@ class RuntimeFilter {
   bool HasBloomFilter() const { return arrival_time_ != 0; }
 
   const TRuntimeFilterDesc& filter_desc() const { return filter_desc_; }
+  const int32_t id() const { return filter_desc().filter_id; }
+  int64_t filter_size() const { return filter_size_; }
 
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
@@ -197,6 +208,9 @@ class RuntimeFilter {
 
   /// Time, in ms, that the global fiter arrived. Set in SetBloomFilter().
   int64_t arrival_time_;
+
+  /// The size of the Bloom filter, in bytes.
+  int64_t filter_size_;
 };
 
 }

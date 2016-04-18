@@ -26,7 +26,7 @@
 
 namespace impala {
 
-inline const RuntimeFilter* RuntimeFilterBank::GetRuntimeFilter(uint32_t filter_id) {
+inline const RuntimeFilter* RuntimeFilterBank::GetRuntimeFilter(int32_t filter_id) {
   boost::lock_guard<boost::mutex> l(runtime_filter_lock_);
   RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
   if (it == consumed_filters_.end()) return NULL;

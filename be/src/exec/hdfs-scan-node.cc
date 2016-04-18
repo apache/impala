@@ -155,8 +155,10 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     RETURN_IF_ERROR(Expr::CreateExprTree(pool_, filter.target_expr, &filter_ctx.expr));
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, false);
 
-    RuntimeProfile* profile = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(),
-        Substitute("Filter $0", filter.filter_id)));
+    string filter_profile_title = Substitute("Filter $0 ($1)", filter.filter_id,
+        PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
+    RuntimeProfile* profile = state->obj_pool()->Add(
+        new RuntimeProfile(state->obj_pool(), filter_profile_title));
     runtime_profile_->AddChild(profile);
     filter_ctx.stats = state->obj_pool()->Add(
         new FilterStats(profile, filter.is_bound_by_partition_columns));
@@ -192,8 +194,7 @@ bool HdfsScanNode::WaitForRuntimeFilters(int32_t time_ms) {
   int32_t start = MonotonicMillis();
   for (auto& ctx: filter_ctxs_) {
     if (ctx.filter->WaitForArrival(time_ms)) {
-      arrived_filter_ids.push_back(
-          Substitute("$0", ctx.filter->filter_desc().filter_id));
+      arrived_filter_ids.push_back(Substitute("$0", ctx.filter->id()));
     }
   }
   int32_t end = MonotonicMillis();

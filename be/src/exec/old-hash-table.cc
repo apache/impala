@@ -140,7 +140,12 @@ void OldHashTable::AddBloomFilters() {
   vector<BloomFilter*> bloom_filters;
   bloom_filters.resize(filters_.size());
   for (int i = 0; i < filters_.size(); ++i) {
-    bloom_filters[i] = state_->filter_bank()->AllocateScratchBloomFilter();
+    if (state_->filter_bank()->FpRateTooHigh(filters_[i]->filter_size(), size())) {
+      bloom_filters[i] = BloomFilter::ALWAYS_TRUE_FILTER;
+    } else {
+      bloom_filters[i] =
+          state_->filter_bank()->AllocateScratchBloomFilter(filters_[i]->id());
+    }
   }
 
   OldHashTable::Iterator iter = Begin();
@@ -159,9 +164,7 @@ void OldHashTable::AddBloomFilters() {
 
   // Update all the local filters in the filter bank.
   for (int i = 0; i < filters_.size(); ++i) {
-    if (bloom_filters[i] == NULL) continue;
-    state_->filter_bank()->UpdateFilterFromLocal(filters_[i]->filter_desc().filter_id,
-        bloom_filters[i]);
+    state_->filter_bank()->UpdateFilterFromLocal(filters_[i]->id(), bloom_filters[i]);
   }
 }
 

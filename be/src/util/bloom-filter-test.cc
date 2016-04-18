@@ -164,6 +164,11 @@ TEST(BloomFilter, MinSpaceMaxNdv) {
   }
 }
 
+TEST(BloomFilter, MinSpaceEdgeCase) {
+  int min_space = BloomFilter::MinLogSpace(1, 0.75);
+  EXPECT_GE(min_space, 0) << "LogSpace should always be >= 0";
+}
+
 // Check that MinLogSpace() and FalsePositiveProb() are dual
 TEST(BloomFilter, MinSpaceForFpp) {
   for (size_t ndv = 10000; ndv < 100 * 1000 * 1000; ndv *= 1.01) {

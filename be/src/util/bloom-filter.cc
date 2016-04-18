@@ -94,7 +94,7 @@ void BloomFilter::Or(const BloomFilter& other) {
 // where space is in bits.
 
 size_t BloomFilter::MaxNdv(const int log_heap_space, const double fpp) {
-  DCHECK(log_heap_space < 61);
+  DCHECK(log_heap_space > 0 && log_heap_space < 61);
   DCHECK(0 < fpp && fpp < 1);
   static const double ik = 1.0 / BUCKET_WORDS;
   return -1 * ik * (1ull << (log_heap_space + 3)) * log(1 - pow(fpp, ik));
@@ -104,8 +104,10 @@ int BloomFilter::MinLogSpace(const size_t ndv, const double fpp) {
   static const double k = BUCKET_WORDS;
   if (0 == ndv) return 0;
   // m is the number of bits we would need to get the fpp specified
-  const double m = -k * ndv/ log(1 - pow(fpp, 1.0 / k));
-  return ceil(log2(m/8));
+  const double m = -k * ndv / log(1 - pow(fpp, 1.0 / k));
+
+  // Handle case where ndv == 1 => ceil(log2(m/8)) < 0.
+  return max(0, static_cast<int>(ceil(log2(m/8))));
 }
 
 double BloomFilter::FalsePositiveProb(const size_t ndv, const int log_heap_space) {

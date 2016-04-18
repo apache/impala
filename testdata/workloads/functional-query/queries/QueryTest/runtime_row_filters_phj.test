@@ -1,5 +1,7 @@
 ====
 ---- QUERY
+# Test cases that are only valid for PHJ joins are in this file.
+
 ####################################################
 # Test case 1: PHJ nodes that spill should still produce filters.
 # Run this for Parquet only to avoid variable memory
@@ -12,18 +14,17 @@ SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_BLOOM_FILTER_SIZE=16M;
 select STRAIGHT_JOIN count(a.l_comment)
     from tpch_parquet.lineitem a join tpch_parquet.lineitem b
-        on a.l_comment = b.l_comment AND b.l_linenumber < 5;
+        on a.l_comment = b.l_comment;
 ---- RESULTS
-40419515
+51495713
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledPartitions: [1-9]\d* .*
-row_regex: .*Rows rejected: 305.87K .*
-row_regex: .*Build-Side Runtime-Filter Published.*
+row_regex: .*Rows processed: 16.38K.*
+row_regex: .*Rows rejected: 0 .*
+row_regex: .*1 of 1 Runtime Filter Published.*
 ====
-
-
 
 
 ---- QUERY
@@ -42,6 +43,6 @@ select straight_join count(1)
 ---- RESULTS
 10
 ---- RUNTIME_PROFILE
-row_regex: .*Build-Side Runtime-Filter Published.*
+row_regex: .*1 of 1 Runtime Filter Published.*
 row_regex: .*Rows rejected: 2.43K \(2432\).*
 ====

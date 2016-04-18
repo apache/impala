@@ -44,12 +44,13 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
   int32_t bloom_filter_size = query_ctx_.request.query_options.runtime_bloom_filter_size;
   bloom_filter_size = std::max(bloom_filter_size, MIN_BLOOM_FILTER_SIZE);
   bloom_filter_size = std::min(bloom_filter_size, MAX_BLOOM_FILTER_SIZE);
-  log_filter_size_ = Bits::Log2Ceiling64(bloom_filter_size);
+  default_log_filter_size_ = Bits::Log2Ceiling64(bloom_filter_size);
 }
 
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,
     bool is_producer) {
-  RuntimeFilter* ret = obj_pool_.Add(new RuntimeFilter(filter_desc));
+  RuntimeFilter* ret = obj_pool_.Add(
+      new RuntimeFilter(filter_desc, GetFilterSizeForNdv(filter_desc.ndv_estimate)));
   lock_guard<mutex> l(runtime_filter_lock_);
   if (is_producer) {
     DCHECK(produced_filters_.find(filter_desc.filter_id) == produced_filters_.end());
@@ -82,7 +83,7 @@ void SendFilterToCoordinator(TNetworkAddress address, TUpdateFilterParams params
 
 }
 
-void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
+void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
     BloomFilter* bloom_filter) {
   DCHECK_NE(state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
       << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
@@ -124,7 +125,7 @@ void RuntimeFilterBank::UpdateFilterFromLocal(uint32_t filter_id,
   }
 }
 
-void RuntimeFilterBank::PublishGlobalFilter(uint32_t filter_id,
+void RuntimeFilterBank::PublishGlobalFilter(int32_t filter_id,
     const TBloomFilter& thrift_filter) {
   lock_guard<mutex> l(runtime_filter_lock_);
   if (closed_) return;
@@ -134,7 +135,7 @@ void RuntimeFilterBank::PublishGlobalFilter(uint32_t filter_id,
   if (thrift_filter.always_true) {
     it->second->SetBloomFilter(BloomFilter::ALWAYS_TRUE_FILTER);
   } else {
-    uint32_t required_space =
+    int64_t required_space =
         BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space);
     // Silently fail to publish the filter (replacing it with a 0-byte complete one) if
     // there's not enough memory for it.
@@ -153,21 +154,35 @@ void RuntimeFilterBank::PublishGlobalFilter(uint32_t filter_id,
       PrettyPrinter::Print(it->second->arrival_delay(), TUnit::TIME_MS));
 }
 
-BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter() {
+BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
   lock_guard<mutex> l(runtime_filter_lock_);
   if (closed_) return NULL;
 
+  RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
+  DCHECK(it != produced_filters_.end()) << "Filter ID " << filter_id << " not registered";
+
   // Track required space
-  uint32_t required_space = BloomFilter::GetExpectedHeapSpaceUsed(log_filter_size_);
+  int64_t log_filter_size = Bits::Log2Ceiling64(it->second->filter_size());
+  int64_t required_space = BloomFilter::GetExpectedHeapSpaceUsed(log_filter_size);
   if (!state_->query_mem_tracker()->TryConsume(required_space)) return NULL;
-  BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(log_filter_size_));
+  BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(log_filter_size));
   DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
   memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
   return bloom_filter;
 }
 
-bool RuntimeFilterBank::ShouldDisableFilter(uint64_t max_ndv) {
-  double fpp = BloomFilter::FalsePositiveProb(max_ndv, log_filter_size_);
+int64_t RuntimeFilterBank::GetFilterSizeForNdv(int64_t ndv) {
+  if (ndv == -1) return 1LL << default_log_filter_size_;
+  int64_t required_space =
+      1LL << BloomFilter::MinLogSpace(ndv, FLAGS_max_filter_error_rate);
+  if (required_space > MAX_BLOOM_FILTER_SIZE) required_space = MAX_BLOOM_FILTER_SIZE;
+  if (required_space < MIN_BLOOM_FILTER_SIZE) required_space = MIN_BLOOM_FILTER_SIZE;
+  return required_space;
+}
+
+bool RuntimeFilterBank::FpRateTooHigh(int64_t filter_size, int64_t observed_ndv) {
+  double fpp =
+      BloomFilter::FalsePositiveProb(observed_ndv, Bits::Log2Ceiling64(filter_size));
   return fpp > FLAGS_max_filter_error_rate;
 }
 

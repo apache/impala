@@ -502,35 +502,43 @@ bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
       << "Runtime filters not supported with NULL_AWARE_LEFT_ANTI_JOIN";
   DCHECK(ht_ctx_.get() != NULL);
   for (int i = 0; i < filters_.size(); ++i) {
-    filters_[i].local_bloom_filter = state->filter_bank()->AllocateScratchBloomFilter();
+    filters_[i].local_bloom_filter =
+        state->filter_bank()->AllocateScratchBloomFilter(filters_[i].filter->id());
   }
   return true;
 }
 
 void PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state,
     int64_t total_build_rows) {
-  // Use total_build_rows to estimate FP-rate of Bloom filter, and publish 'always-true'
-  // filters if it's too high. Doing so saves CPU at the coordinator, serialisation time,
-  // and reduces the cost of applying the filter at the scan - most significantly for
-  // per-row filters. However, the number of build rows could be a very poor estimate of
-  // the NDV - particularly if the filter expression is a function of several columns.
+  int32_t num_enabled_filters = 0;
+  // Use total_build_rows to estimate FP-rate of each Bloom filter, and publish
+  // 'always-true' filters if it's too high. Doing so saves CPU at the coordinator,
+  // serialisation time, and reduces the cost of applying the filter at the scan - most
+  // significantly for per-row filters. However, the number of build rows could be a very
+  // poor estimate of the NDV - particularly if the filter expression is a function of
+  // several columns.
   // TODO: Better heuristic.
-  bool publish_real_filters =
-      !state->filter_bank()->ShouldDisableFilter(total_build_rows);
-  if (publish_real_filters) {
-    AddRuntimeExecOption("Build-Side Runtime-Filter Published");
-  } else {
-    AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
+  for (const FilterContext& ctx: filters_) {
+    // TODO: Consider checking actual number of bits set in filter to compute FP rate.
+    // TODO: Consider checking this every few batches or so.
+    bool fp_rate_too_high =
+        state->filter_bank()->FpRateTooHigh(ctx.filter->filter_size(), total_build_rows);
+    state->filter_bank()->UpdateFilterFromLocal(ctx.filter->id(),
+        fp_rate_too_high ? BloomFilter::ALWAYS_TRUE_FILTER : ctx.local_bloom_filter);
+
+    num_enabled_filters += !fp_rate_too_high;
   }
 
-  // Add all the bloom filters to the runtime state. If runtime filters are disabled,
-  // publish a complete Bloom filter (which rejects no values) to allow plan nodes that
-  // are waiting for these filters to make progress.
-  BOOST_FOREACH(const FilterContext& ctx, filters_) {
-    BloomFilter* filter = publish_real_filters ?
-        ctx.local_bloom_filter : BloomFilter::ALWAYS_TRUE_FILTER;
-    state->filter_bank()->UpdateFilterFromLocal(
-        ctx.filter->filter_desc().filter_id, filter);
+  if (filters_.size() > 0) {
+    if (num_enabled_filters == filters_.size()) {
+      AddRuntimeExecOption(Substitute("$0 of $0 Runtime Filter$1 Published",
+          filters_.size(), filters_.size() == 1 ? "" : "s"));
+    } else {
+      string exec_option = Substitute("$0 of $1 Runtime Filter$2 Published, $3 Disabled",
+          num_enabled_filters, filters_.size(), filters_.size() == 1 ? "" : "s",
+          filters_.size() - num_enabled_filters);
+      AddRuntimeExecOption(exec_option);
+    }
   }
 }
 

@@ -227,24 +227,7 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
     if (eos) break;
   }
 
-  // We've finished constructing the build side. Set the bitmap of the build side values
-  // so that the probe side can use this as an additional predicate.
-  // We only do this if the build side is sufficiently small.
-  // TODO: Better heuristic? Currently we simply compare the size of the HT with a
-  // constant value.
-  if (!state->filter_bank()->ShouldDisableFilter(hash_tbl_->size())) {
-    AddRuntimeExecOption("Build-Side Filter Built");
-    hash_tbl_->AddBloomFilters();
-  } else {
-    AddRuntimeExecOption("Build-Side Runtime-Filter Disabled (FP Rate Too High)");
-    VLOG(2) << "Disabling runtime filter build because build table is too large: "
-            << hash_tbl_->size();
-    // Send dummy filters to unblock any waiting scans.
-    BOOST_FOREACH(RuntimeFilter* filter, filters_) {
-      state->filter_bank()->UpdateFilterFromLocal(filter->filter_desc().filter_id,
-          BloomFilter::ALWAYS_TRUE_FILTER);
-    }
-  }
+  hash_tbl_->AddBloomFilters();
   return Status::OK();
 }
 

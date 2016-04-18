@@ -97,6 +97,10 @@ struct TRuntimeFilterDesc {
   // is produced by a broadcast join and the target scan node is in the same fragment
   // as the join.
   7: optional bool has_local_target
+
+  // The estimated number of distinct values that the planner expects the filter to hold.
+  // Used to compute the size of the filter.
+  8: optional i64 ndv_estimate
 }
 
 // The information contained in subclasses of ScanNode captured in two separate

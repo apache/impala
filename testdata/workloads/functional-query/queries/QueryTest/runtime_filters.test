@@ -251,23 +251,25 @@ row_regex: .*RowsReturned: 2.43K .*
 ---- QUERY
 ####################################################
 # Test case 11: filters with high expected FP rate get disabled.
-# Set the filter size to small, and scan a fact table with high NDV on the build side. The
-# filter will be disabled due to a high expected FP rate.
+# To trigger this path, we have to trick the planner into estimating a too-small
+# build-side cardinality, which will cause the BF size to be estimated low (and therefore
+# the FP rate to be high). We do this by using predicates that are completely unselective,
+# but which the planner thinks have relatively high selectivity.
 ####################################################
 
 SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
-set RUNTIME_BLOOM_FILTER_SIZE=4096;
-with build as (
-    select id from alltypes UNION ALL select id + 10000 from alltypes
-    UNION ALL select id + 20000 from alltypes)
 select STRAIGHT_JOIN count(*) from alltypes a
-    join (select id FROM build UNION ALL select id + 100000 FROM build) b
-    on a.id = b.id
+    join [BROADCAST]
+    # Build-side needs to be sufficiently large to trigger FP check.
+    (select id, int_col from alltypes UNION ALL select id, int_col from alltypes) b
+        on a.id = b.id
+        # Predicates that are always true (but planner thinks are selective)
+        where (b.id - b.id) < 1 AND (b.int_col - b.int_col) < 1;
 ---- RESULTS
-7300
+14600
 ---- RUNTIME_PROFILE
-row_regex: .*Build-Side Runtime-Filter Disabled \(FP Rate Too High\).*
+row_regex: .*0 of 1 Runtime Filter Published, 1 Disabled.*
 row_regex: .*Rows rejected: 0 .*
 ====
 
@@ -324,4 +326,57 @@ select STRAIGHT_JOIN count(a.id) from alltypes a
     join [SHUFFLE] alltypes b on a.id = b.id;
 ---- RESULTS
 7300
+====
+
+
+---- QUERY
+####################################################
+# Test case 15: Filter sizes change according to their NDV
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 1) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(4.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 500000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(256.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 1000000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(512.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(1.00 MB\).*
 ====

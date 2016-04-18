@@ -232,7 +232,7 @@ row_regex: .*Rows rejected: 2.43K .*
 
 ---- QUERY
 ####################################################
-# Test case 9: filters do not pass through FOJ.
+# Test case 10: filters do not pass through FOJ.
 ####################################################
 
 SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
@@ -244,4 +244,28 @@ select STRAIGHT_JOIN count(*) from alltypes a
 7304
 ---- RUNTIME_PROFILE
 row_regex: .*RowsReturned: 2.43K .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 11: Large build triggers maximum filter size.
+# Run only on Parquet because query can take ~20s.
+####################################################
+
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+with l as (select l_orderkey from tpch_parquet.lineitem UNION ALL
+           select l_orderkey from tpch_parquet.lineitem UNION ALL
+           select l_orderkey from tpch_parquet.lineitem UNION ALL
+           select l_orderkey from tpch_parquet.lineitem)
+select STRAIGHT_JOIN count(*) from
+    (select l_orderkey from tpch_parquet.lineitem a LIMIT 1) a
+    join (select l_orderkey from l UNION ALL select l_orderkey from l) b
+    on a.l_orderkey = -b.l_orderkey
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(16.00 MB\).*
 ====
