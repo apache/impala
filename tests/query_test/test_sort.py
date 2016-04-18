@@ -90,3 +90,29 @@ class TestQueryFullSort(ImpalaTestSuite):
     result = transpose_results(self.execute_query(
       query, exec_option, table_format=table_format).data)
     assert(result[0] == sorted(result[0]))
+
+  def test_pathological_input(self, vector):
+    """ Regression test for stack overflow and poor performance on certain inputs where
+    always selecting the middle element as a quicksort pivot caused poor performance. The
+    trick is to concatenate two equal-size sorted inputs. If the middle element is always
+    selected as the pivot (the old method), the sorter tends to get stuck selecting the
+    minimum element as the pivot, which results in almost all of the tuples ending up
+    in the right partition.
+    """
+    query = """select l_orderkey from (
+      select * from tpch.lineitem limit 300000
+      union all
+      select * from tpch.lineitem limit 300000) t
+    order by l_orderkey"""
+
+    exec_option = vector.get_value('exec_option')
+    exec_option['disable_outermost_topn'] = 1
+    # Run with a single scanner thread so that the input doesn't get reordered.
+    exec_option['num_nodes'] = "1"
+    exec_option['num_scanner_threads'] = "1"
+    table_format = vector.get_value('table_format')
+
+    result = transpose_results(self.execute_query(
+      query, exec_option, table_format=table_format).data)
+    numeric_results = [int(val) for val in result[0]]
+    assert(numeric_results == sorted(numeric_results))

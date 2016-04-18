@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "runtime/sorter.h"
+
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "runtime/buffered-block-mgr.h"
@@ -23,6 +26,8 @@
 
 #include "common/names.h"
 
+using boost::uniform_int;
+using boost::mt19937_64;
 using namespace strings;
 
 namespace impala {
@@ -234,6 +239,10 @@ class Sorter::TupleSorter {
   /// sort.
   class TupleIterator {
    public:
+    /// Creates an iterator pointing at the tuple with the given 'index' in parent->run_.
+    /// The index can be in the range [0, run->num_tuples()]. If it is equal to
+    /// run->num_tuples(), the iterator points to one past the end of the run, so
+    /// invoking Prev() will cause the iterator to point at the last tuple in the run.
     TupleIterator(TupleSorter* parent, int64_t index)
       : parent_(parent),
         index_(index),
@@ -257,8 +266,10 @@ class Sorter::TupleSorter {
       current_tuple_ = buffer_start_ + block_offset + past_end_bytes;
     }
 
-    /// Sets current_tuple_ to point to the next tuple in the run. Increments
-    /// block_index and resets buffer if the next tuple is in the next block.
+    /// Sets 'current_tuple_' to point to the next tuple in the run. Increments 'block_index_'
+    /// and advances to the next block if the next tuple is in the next block.
+    /// Can be advanced one past the last tuple in the run, but is not valid to
+    /// dereference 'current_tuple_' in that case.
     void Next() {
       current_tuple_ += parent_->tuple_size_;
       ++index_;
@@ -272,8 +283,8 @@ class Sorter::TupleSorter {
       }
     }
 
-    /// Sets current_tuple to point to the previous tuple in the run. Decrements
-    /// block_index and resets buffer if the new tuple is in the previous block.
+    /// The reverse of Next(). Can advance one before the first tuple in the run, but it
+    /// is invalid to dereference 'current_tuple_' in that case.
     void Prev() {
       current_tuple_ -= parent_->tuple_size_;
       --index_;
@@ -328,6 +339,11 @@ class Sorter::TupleSorter {
   uint8_t* temp_tuple_buffer_;
   uint8_t* swap_buffer_;
 
+  /// Random number generator used to randomly choose pivots. We need a RNG that
+  /// can generate 64-bit ints. Quality of randomness doesn't need to be especially
+  /// high: Mersenne Twister should be more than adequate.
+  mt19937_64 rng_;
+
   /// Perform an insertion sort for rows in the range [first, last) in a run.
   void InsertionSort(const TupleIterator& first, const TupleIterator& last);
 
@@ -342,6 +358,12 @@ class Sorter::TupleSorter {
   /// for smaller groups of elements.
   /// Checks state_->is_cancelled() and returns early if true.
   void SortHelper(TupleIterator first, TupleIterator last);
+
+  /// Select a pivot to partition [first, last).
+  Tuple* SelectPivot(TupleIterator first, TupleIterator last);
+
+  /// Return median of three tuples according to the sort comparator.
+  Tuple* MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3);
 
   /// Swaps tuples pointed to by left and right using the swap buffer.
   void Swap(uint8_t* left, uint8_t* right);
@@ -926,18 +948,89 @@ void Sorter::TupleSorter::SortHelper(TupleIterator first, TupleIterator last) {
   if (UNLIKELY(state_->is_cancelled())) return;
   // Use insertion sort for smaller sequences.
   while (last.index_ - first.index_ > INSERTION_THRESHOLD) {
-    TupleIterator iter(this, first.index_ + (last.index_ - first.index_) / 2);
-    DCHECK(iter.current_tuple_ != NULL);
+    Tuple* pivot = SelectPivot(first, last);
+
     // Partition() splits the tuples in [first, last) into two groups (<= pivot
     // and >= pivot) in-place. 'cut' is the index of the first tuple in the second group.
-    TupleIterator cut = Partition(first, last,
-        reinterpret_cast<Tuple*>(iter.current_tuple_));
+    TupleIterator cut = Partition(first, last, pivot);
+
+    // Recurse on the smaller partition. This limits stack size to log(n) stack frames.
+    if (cut.index_ - first.index_ < last.index_ - cut.index_) {
+      // Left partition is smaller.
+      SortHelper(first, cut);
+      first = cut;
+    } else {
+      // Right partition is equal or smaller.
+      SortHelper(cut, last);
+      last = cut;
+    }
+
     SortHelper(cut, last);
     last = cut;
     if (UNLIKELY(state_->is_cancelled())) return;
   }
 
   InsertionSort(first, last);
+}
+
+Tuple* Sorter::TupleSorter::SelectPivot(TupleIterator first, TupleIterator last) {
+  // Select the median of three random tuples. The random selection avoids pathological
+  // behaviour associated with techniques that pick a fixed element (e.g. picking
+  // first/last/middle element) and taking the median tends to help us select better
+  // pivots that more evenly split the input range. This method makes selection of
+  // bad pivots very infrequent.
+  //
+  // To illustrate, if we define a bad pivot as one in the lower or upper 10% of values,
+  // then the median of three is a bad pivot only if all three randomly-selected values
+  // are in the lower or upper 10%. The probability of that is 0.2 * 0.2 * 0.2 = 0.008:
+  // less than 1%. Since selection is random each time, the chance of repeatedly picking
+  // bad pivots decreases exponentialy and becomes negligibly small after a few
+  // iterations.
+  Tuple* tuples[3];
+  for (int i = 0; i < 3; ++i) {
+    int64_t index = uniform_int<int64_t>(first.index_, last.index_ - 1)(rng_);
+    TupleIterator iter(this, index);
+    DCHECK(iter.current_tuple_ != NULL);
+    tuples[i] = reinterpret_cast<Tuple*>(iter.current_tuple_);
+  }
+
+  return MedianOfThree(tuples[0], tuples[1], tuples[2]);
+}
+
+Tuple* Sorter::TupleSorter::MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3) {
+  TupleRow* tr1 = reinterpret_cast<TupleRow*>(&t1);
+  TupleRow* tr2 = reinterpret_cast<TupleRow*>(&t2);
+  TupleRow* tr3 = reinterpret_cast<TupleRow*>(&t3);
+
+  bool t1_lt_t2 = less_than_comp_(tr1, tr2);
+  bool t2_lt_t3 = less_than_comp_(tr2, tr3);
+  bool t1_lt_t3 = less_than_comp_(tr1, tr3);
+
+  if (t1_lt_t2) {
+    // t1 < t2
+    if (t2_lt_t3) {
+      // t1 < t2 < t3
+      return t2;
+    } else if (t1_lt_t3) {
+      // t1 < t3 <= t2
+      return t3;
+    } else {
+      // t3 <= t1 < t2
+      return t1;
+    }
+  } else {
+    // t2 <= t1
+    if (t1_lt_t3) {
+      // t2 <= t1 < t3
+      return t1;
+    } else if (t2_lt_t3) {
+      // t2 < t3 <= t1
+      return t3;
+    } else {
+      // t3 <= t2 <= t1
+      return t2;
+    }
+  }
 }
 
 inline void Sorter::TupleSorter::Swap(uint8_t* left, uint8_t* right) {
