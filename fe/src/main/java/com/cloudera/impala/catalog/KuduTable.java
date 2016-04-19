@@ -146,6 +146,7 @@ public class KuduTable extends Table {
           + "(had %d).", keyColumns.size(), schema.size()));
     }
 
+    clearColumns();
     Set<String> columnNames = Sets.newHashSet();
     int pos = 0;
     for (FieldSchema field: schema) {

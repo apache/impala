@@ -22,3 +22,16 @@ INT,STRING,STRING,STRING,INT
 ---- LABELS
 # Rows,Start Key,Stop Key,Leader Replica,# Replicas
 ====
+---- QUERY
+# IMPALA-3373: Computing stats on a Kudu table lead to duplicate columns shown for the
+# table.
+compute stats simple;
+describe simple;
+---- RESULTS
+'id','int',''
+'name','string',''
+'valf','float',''
+'vali','bigint',''
+---- TYPES
+STRING,STRING,STRING
+====
