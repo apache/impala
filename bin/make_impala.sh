@@ -24,6 +24,7 @@ BUILD_TESTS=1
 CLEAN=0
 TARGET_BUILD_TYPE=${TARGET_BUILD_TYPE:-""}
 BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS:-""}
+CMAKE_ONLY=0
 
 # parse command line options
 for ARG in $*
@@ -44,12 +45,16 @@ do
     -build_static_libs)
       BUILD_SHARED_LIBS="OFF"
       ;;
+    -cmake_only)
+      CMAKE_ONLY=1
+      ;;
     -help)
       echo "make_impala.sh [-build_type=<build type> -notests -clean]"
       echo "[-build_type] : Target build type. Examples: Debug, Release, Address_sanitizer."
       echo "                If omitted, the last build target is built incrementally"
       echo "[-build_shared_libs] : Link all executables dynamically"
       echo "[-build_static_libs] : Link all executables statically (the default)"
+      echo "[-cmake_only] : Generate makefiles and exit"
       echo "[-notests] : Omits building the tests."
       echo "[-clean] : Cleans previous build artifacts."
       echo ""
@@ -113,14 +118,20 @@ fi
 
 $IMPALA_HOME/bin/gen_build_version.py --noclean
 
+if [ $CMAKE_ONLY -eq 1 ]; then
+  exit 0
+fi
+
 cd $IMPALA_HOME/common/function-registry
 make
 
 cd $IMPALA_HOME
+
 # With parallelism, make doesn't always make statestored and catalogd correctly if you
 # write make -jX impalad statestored catalogd. So we keep them separate and after impalad,
 # which they link to.
 make -j${IMPALA_BUILD_THREADS:-4} impalad
+
 make statestored
 make catalogd
 if [ $BUILD_TESTS -eq 1 ]

@@ -48,6 +48,7 @@ METASTORE_SNAPSHOT_FILE=
 MAKE_IMPALA_ARGS=""
 BUILD_COVERAGE=0
 BUILD_ASAN=0
+BUILD_FE_ONLY=0
 
 # Defaults that can be picked up from the environment, but are overridable through the
 # commandline.
@@ -139,6 +140,9 @@ do
       echo "Running in Debug mode"
       set -x
       ;;
+    -fe_only)
+      BUILD_FE_ONLY=1
+      ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
@@ -163,6 +167,7 @@ do
       echo "[-metastore_snapshot_file <file_name>]: Load the hive metastore snapshot"
       echo "[-so|-build_shared_libs] : Dynamically link executables (default is static)"
       echo "[-kerberize] : Enable kerberos on the cluster"
+      echo "[-fe_only] : Build just the frontend"
       echo "-----------------------------------------------------------------------------
 Examples of common tasks:
 
@@ -229,6 +234,11 @@ if [[ -z $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" != "hdfs" &&
   exit 1
 fi
 
+# option to clean everything first
+if [ $CLEAN_ACTION -eq 1 ]; then
+    $IMPALA_HOME/bin/clean.sh
+fi
+
 # Only build thirdparty if no toolchain is set
 if [[ -z $IMPALA_TOOLCHAIN ]]; then
   # Sanity check that thirdparty is built.
@@ -237,6 +247,14 @@ if [[ -z $IMPALA_TOOLCHAIN ]]; then
     echo "Couldn't find thirdparty build files.  Building thirdparty."
     $IMPALA_HOME/bin/build_thirdparty.sh $([ ${CLEAN_ACTION} -eq 0 ] && echo '-noclean')
   fi
+fi
+
+MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
+
+if [ $BUILD_FE_ONLY -eq 1 ]; then
+  $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS} -cmake_only
+  make fe
+  exit 0
 fi
 
 if [ -e $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.so ]
@@ -260,11 +278,6 @@ then
   set -e
 fi
 
-# option to clean everything first
-if [ $CLEAN_ACTION -eq 1 ]; then
-    $IMPALA_HOME/bin/clean.sh
-fi
-
 CREATE_TEST_CONFIG_ARGS=""
 if [[ $FORMAT_SENTRY_POLICY_DB -eq 1 ]]; then
   CREATE_TEST_CONFIG_ARGS+=" -create_sentry_policy_db"
@@ -284,7 +297,6 @@ if [ $METASTORE_SNAPSHOT_FILE ]; then
 fi
 
 # build common and backend
-MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
 echo "Calling make_impala.sh ${MAKE_IMPALA_ARGS}"
 $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 
@@ -309,7 +321,6 @@ popd
 pushd ${IMPALA_FE_DIR}
 ${IMPALA_HOME}/bin/mvn-quiet.sh package -DskipTests
 popd
-
 
 # Build the shell tarball
 echo "Creating shell tarball"

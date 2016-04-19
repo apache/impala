@@ -338,6 +338,7 @@ message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
 add_subdirectory(be)
+add_subdirectory(fe)
 
 # Run FE and BE tests
 add_custom_target(testall
