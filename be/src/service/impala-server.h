@@ -622,7 +622,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     /// Default constructor used only when participating in collections
     QueryStateRecord() { }
+  };
 
+  struct QueryStateRecordLessThan {
     /// Comparator that sorts by start time.
     bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
   };

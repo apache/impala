@@ -294,7 +294,7 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
 
 void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
-  set<QueryStateRecord, QueryStateRecord> sorted_query_records;
+  set<QueryStateRecord, QueryStateRecordLessThan> sorted_query_records;
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
     for(const QueryExecStateMap::value_type& exec_state: query_exec_state_map_) {

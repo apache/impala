@@ -73,9 +73,8 @@ Status TopNNode::Prepare(RuntimeState* state) {
     codegen_enabled = codegen_status.ok();
   }
   AddCodegenExecOption(codegen_enabled, codegen_status);
-  priority_queue_.reset(
-      new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
-          *tuple_row_less_than_));
+  priority_queue_.reset(new priority_queue<Tuple*, vector<Tuple*>,
+      ComparatorWrapper<TupleRowComparator> >(*tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   return Status::OK();
 }
@@ -176,7 +175,7 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
     Tuple* top_tuple = priority_queue_->top();
     tmp_tuple_->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
             sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), NULL);
-    if ((*tuple_row_less_than_)(tmp_tuple_, top_tuple)) {
+    if (tuple_row_less_than_->Less(tmp_tuple_, top_tuple)) {
       // TODO: DeepCopy() will allocate new buffers for the string data. This needs
       // to be fixed to use a freelist
       tmp_tuple_->DeepCopy(top_tuple, *materialized_tuple_desc_, tuple_pool_.get());

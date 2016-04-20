@@ -46,7 +46,7 @@ class SortedRunMerger {
   /// batch being returned.
   typedef boost::function<Status (RowBatch**)> RunBatchSupplier;
 
-  SortedRunMerger(const TupleRowComparator& compare_less_than, RowDescriptor* row_desc,
+  SortedRunMerger(const TupleRowComparator& comparator, RowDescriptor* row_desc,
       RuntimeProfile* profile, bool deep_copy_input);
 
   /// Prepare this merger to merge and return rows from the sorted runs in 'input_runs'.
@@ -72,13 +72,13 @@ class SortedRunMerger {
   /// stored in a 0-indexed array, the 0-th element is the minimum element in the heap,
   /// and the children of the element at index i are 2*i+1 and 2*i+2. The heap property is
   /// that row of the parent element is <= the rows of the child elements according to the
-  /// comparator compare_less_than_.
+  /// comparator comparator_.
   /// The BatchedRowSupplier objects used in the min_heap_ are owned by this
   /// SortedRunMerger instance.
   std::vector<BatchedRowSupplier*> min_heap_;
 
   /// Row comparator. Returns true if lhs < rhs.
-  TupleRowComparator compare_less_than_;
+  TupleRowComparator comparator_;
 
   /// Descriptor for the rows provided by the input runs. Owned by the exec-node through
   /// which this merger was created.

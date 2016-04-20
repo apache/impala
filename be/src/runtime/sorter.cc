@@ -221,7 +221,7 @@ class Sorter::Run {
 /// instance to check for cancellation during an in-memory sort.
 class Sorter::TupleSorter {
  public:
-  TupleSorter(const TupleRowComparator& less_than_comp, int64_t block_size,
+  TupleSorter(const TupleRowComparator& comparator, int64_t block_size,
       int tuple_size, RuntimeState* state);
 
   ~TupleSorter();
@@ -324,8 +324,8 @@ class Sorter::TupleSorter {
   /// Offset in bytes of the last tuple in a block, calculated from block and tuple sizes.
   const int last_tuple_block_offset_;
 
-  /// Tuple comparator that returns true if lhs < rhs.
-  const TupleRowComparator less_than_comp_;
+  /// Tuple comparator with method Less() that returns true if lhs < rhs.
+  const TupleRowComparator comparator_;
 
   /// Runtime state instance to check for cancellation. Not owned.
   RuntimeState* const state_;
@@ -862,7 +862,7 @@ Sorter::TupleSorter::TupleSorter(const TupleRowComparator& comp, int64_t block_s
   : tuple_size_(tuple_size),
     block_capacity_(block_size / tuple_size),
     last_tuple_block_offset_(tuple_size * ((block_size / tuple_size) - 1)),
-    less_than_comp_(comp),
+    comparator_(comp),
     state_(state) {
   temp_tuple_buffer_ = new uint8_t[tuple_size];
   temp_tuple_row_ = reinterpret_cast<TupleRow*>(&temp_tuple_buffer_);
@@ -902,8 +902,8 @@ void Sorter::TupleSorter::InsertionSort(const TupleIterator& first,
     TupleIterator iter = insert_iter;
     iter.Prev();
     uint8_t* copy_to = insert_iter.current_tuple_;
-    while (less_than_comp_(temp_tuple_row_,
-        reinterpret_cast<TupleRow*>(&iter.current_tuple_))) {
+    while (comparator_.Less(
+        temp_tuple_row_, reinterpret_cast<TupleRow*>(&iter.current_tuple_))) {
       memcpy(copy_to, iter.current_tuple_, tuple_size_);
       copy_to = iter.current_tuple_;
       // Break if 'iter' has reached the first row, meaning that temp_tuple_row_
@@ -924,12 +924,12 @@ Sorter::TupleSorter::TupleIterator Sorter::TupleSorter::Partition(TupleIterator 
   last.Prev();
   while (true) {
     // Search for the first and last out-of-place elements, and swap them.
-    while (less_than_comp_(reinterpret_cast<TupleRow*>(&first.current_tuple_),
-        temp_tuple_row_)) {
+    while (comparator_.Less(
+        reinterpret_cast<TupleRow*>(&first.current_tuple_), temp_tuple_row_)) {
       first.Next();
     }
-    while (less_than_comp_(temp_tuple_row_,
-        reinterpret_cast<TupleRow*>(&last.current_tuple_))) {
+    while (comparator_.Less(
+        temp_tuple_row_, reinterpret_cast<TupleRow*>(&last.current_tuple_))) {
       last.Prev();
     }
 
@@ -1002,9 +1002,9 @@ Tuple* Sorter::TupleSorter::MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3) {
   TupleRow* tr2 = reinterpret_cast<TupleRow*>(&t2);
   TupleRow* tr3 = reinterpret_cast<TupleRow*>(&t3);
 
-  bool t1_lt_t2 = less_than_comp_(tr1, tr2);
-  bool t2_lt_t3 = less_than_comp_(tr2, tr3);
-  bool t1_lt_t3 = less_than_comp_(tr1, tr3);
+  bool t1_lt_t2 = comparator_.Less(tr1, tr2);
+  bool t2_lt_t3 = comparator_.Less(tr2, tr3);
+  bool t1_lt_t3 = comparator_.Less(tr1, tr3);
 
   if (t1_lt_t2) {
     // t1 < t2

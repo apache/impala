@@ -100,8 +100,8 @@ void SortedRunMerger::Heapify(int parent_index) {
   int least_child;
   // Find the least child of parent.
   if (right_index >= min_heap_.size() ||
-      compare_less_than_(min_heap_[left_index]->current_row(),
-          min_heap_[right_index]->current_row())) {
+      comparator_.Less(
+          min_heap_[left_index]->current_row(), min_heap_[right_index]->current_row())) {
     least_child = left_index;
   } else {
     least_child = right_index;
@@ -109,16 +109,16 @@ void SortedRunMerger::Heapify(int parent_index) {
 
   // If the parent is out of place, swap it with the least child and invoke
   // Heapify recursively.
-  if (compare_less_than_(min_heap_[least_child]->current_row(),
-      min_heap_[parent_index]->current_row())) {
+  if (comparator_.Less(min_heap_[least_child]->current_row(),
+          min_heap_[parent_index]->current_row())) {
     iter_swap(min_heap_.begin() + least_child, min_heap_.begin() + parent_index);
     Heapify(least_child);
   }
 }
 
-SortedRunMerger::SortedRunMerger(const TupleRowComparator& compare_less_than,
+SortedRunMerger::SortedRunMerger(const TupleRowComparator& comparator,
     RowDescriptor* row_desc, RuntimeProfile* profile, bool deep_copy_input)
-  : compare_less_than_(compare_less_than),
+  : comparator_(comparator),
     input_row_desc_(row_desc),
     deep_copy_input_(deep_copy_input) {
   get_next_timer_ = ADD_TIMER(profile, "MergeGetNext");

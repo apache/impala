@@ -26,6 +26,30 @@
 
 namespace impala {
 
+/// A wrapper around types Comparator with a Less() method. This wrapper allows the use of
+/// type Comparator with STL containers which expect a type like std::less<T>, which uses
+/// operator() instead of Less() and is cheap to copy.
+///
+/// The C++ standard requires that std::priority_queue operations behave as wrappers to
+/// {push,pop,make,sort}_heap, which take their comparator object by value. Therefore, it
+/// is inefficient to use comparator objects that have expensive construction,
+/// destruction, and copying with std::priority_queue.
+///
+/// ComparatorWrapper takes a reference to an object of type Comparator, rather than
+/// copying that object. ComparatorWrapper<Comparator>(comp) is not safe to use beyond the
+/// lifetime of comp.
+template <typename Comparator>
+class ComparatorWrapper {
+  const Comparator& comp_;
+ public:
+  ComparatorWrapper(const Comparator& comp) : comp_(comp) {}
+
+  template <typename T>
+  bool operator()(const T& lhs, const T& rhs) const {
+    return comp_.Less(lhs, rhs);
+  }
+};
+
 /// Compares two TupleRows based on a set of exprs, in order.
 class TupleRowComparator {
  public:
@@ -89,17 +113,17 @@ class TupleRowComparator {
   /// Returns true if lhs is strictly less than rhs.
   /// All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
   /// before calling this.
-  bool operator() (TupleRow* lhs, TupleRow* rhs) const {
+  bool Less(TupleRow* lhs, TupleRow* rhs) const {
     int result = codegend_compare_fn_ == NULL ? Compare(lhs, rhs) :
         (*codegend_compare_fn_)(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
     if (result < 0) return true;
     return false;
   }
 
-  bool operator() (Tuple* lhs, Tuple* rhs) const {
+  bool Less(Tuple* lhs, Tuple* rhs) const {
     TupleRow* lhs_row = reinterpret_cast<TupleRow*>(&lhs);
     TupleRow* rhs_row = reinterpret_cast<TupleRow*>(&rhs);
-    return (*this)(lhs_row, rhs_row);
+    return Less(lhs_row, rhs_row);
   }
 
  private:
@@ -131,7 +155,7 @@ struct TupleEqualityChecker {
   TupleEqualityChecker(TupleDescriptor* tuple_desc) : tuple_desc_(tuple_desc) {
   }
 
-  bool operator() (Tuple* x, Tuple* y) {
+  bool Equal(Tuple* x, Tuple* y) {
     const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
     for (int i = 0; i < slots.size(); ++i) {
       SlotDescriptor* slot = slots[i];
@@ -169,11 +193,11 @@ struct RowEqualityChecker {
     }
   }
 
-  bool operator() (TupleRow* x, TupleRow* y) {
+  bool Equal(TupleRow* x, TupleRow* y) {
     for (int i = 0; i < tuple_checkers_.size(); ++i) {
       Tuple* x_tuple = x->GetTuple(i);
       Tuple* y_tuple = y->GetTuple(i);
-      if (!tuple_checkers_[i](x_tuple, y_tuple)) return false;
+      if (!tuple_checkers_[i].Equal(x_tuple, y_tuple)) return false;
     }
 
     return true;

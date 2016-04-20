@@ -1602,7 +1602,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   last_active_time = exec_state.last_active();
 }
 
-bool ImpalaServer::QueryStateRecord::operator() (
+bool ImpalaServer::QueryStateRecordLessThan::operator() (
     const QueryStateRecord& lhs, const QueryStateRecord& rhs) const {
   if (lhs.start_time == rhs.start_time) return lhs.id < rhs.id;
   return lhs.start_time < rhs.start_time;

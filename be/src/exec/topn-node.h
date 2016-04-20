@@ -99,9 +99,8 @@ class TopNNode : public ExecNode {
   /// The stl priority queue doesn't support a max size, so to get that functionality,
   /// the order of the queue is the opposite of what the ORDER BY clause specifies, such
   /// that the top of the queue is the last sorted element.
-  boost::scoped_ptr<
-      std::priority_queue<Tuple*, std::vector<Tuple*>, TupleRowComparator> >
-          priority_queue_;
+  boost::scoped_ptr<std::priority_queue<Tuple*, std::vector<Tuple*>,
+      ComparatorWrapper<TupleRowComparator> > > priority_queue_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
