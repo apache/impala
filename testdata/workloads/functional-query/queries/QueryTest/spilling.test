@@ -589,3 +589,42 @@ STRING
 row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
+---- QUERY
+# IMPALA-1346/IMPALA-1546: fix sorter memory management so that it can complete
+# successfully when in same pipeline as a spilling join.
+set num_nodes=0;
+set mem_limit=200m;
+set max_block_mgr_memory=50m;
+set disable_outermost_topn=1;
+select * from lineitem
+  inner join orders on l_orderkey = o_orderkey
+order by l_linenumber, l_suppkey, l_partkey, l_orderkey
+limit 20
+---- RESULTS
+4567296,2500,1,1,48.00,67320.00,0.06,0.05,'N','O','1997-05-15','1997-05-19','1997-05-27','DELIVER IN PERSON','REG AIR','ccounts cajole quickly ',4567296,100420,'O',113399.69,'1997-02-21','1-URGENT','Clerk#000000779',0,'ously ironic instructions. pa'
+5427587,2500,1,1,40.00,56100.00,0.05,0.07,'N','O','1997-04-01','1997-05-22','1997-04-29','TAKE BACK RETURN','RAIL','oxes wake even theodolites: bold requests',5427587,110356,'O',182983.43,'1997-03-10','1-URGENT','Clerk#000000279',0,'osits wake along the ca'
+3834597,7500,1,1,3.00,4222.50,0.03,0.01,'N','O','1998-07-03','1998-05-12','1998-07-04','COLLECT COD','AIR','sly final instructions boost about',3834597,29839,'O',147632.36,'1998-03-23','1-URGENT','Clerk#000000284',0,'le carefully blithel'
+4888512,10000,1,1,14.00,12740.00,0.03,0.01,'A','F','1993-02-07','1992-12-29','1993-02-19','NONE','SHIP','al braids. unusual, silent sentiments c',4888512,93742,'F',12481.37,'1992-11-21','4-NOT SPECIFIED','Clerk#000000591',0,' requests hinder blithely. closely ironic theodolites cajole among the car'
+693345,12497,1,1,14.00,19732.86,0.03,0.07,'N','O','1998-10-12','1998-08-18','1998-10-23','NONE','FOB','. blithely',693345,49472,'O',111825.01,'1998-07-06','4-NOT SPECIFIED','Clerk#000000132',0,'es wake regularly furiously pending orbits. quickly even requests according t'
+710784,12497,1,1,11.00,15504.39,0.02,0.07,'R','F','1992-08-21','1992-08-11','1992-09-05','TAKE BACK RETURN','SHIP','haggle furiously special accounts? final th',710784,82009,'F',91959.19,'1992-06-20','1-URGENT','Clerk#000000001',0,'rve quickly after the express theodolites. furiou'
+1240672,12497,1,1,41.00,57789.09,0.08,0.05,'N','O','1998-09-18','1998-08-04','1998-09-24','NONE','RAIL','o the furiously unusual requests sleep alo',1240672,59153,'O',55824.25,'1998-05-28','1-URGENT','Clerk#000000657',0,'ular pinto beans are above the furiously regular accounts: furiously even foxe'
+2024230,12497,1,1,16.00,22551.84,0.05,0.00,'A','F','1992-04-10','1992-04-14','1992-04-13','NONE','RAIL','pecial theodolites wake slyly. care',2024230,145955,'F',186715.47,'1992-02-22','5-LOW','Clerk#000000904',0,'uses. accounts are furiously. fluffily regular ideas haggle b'
+3039715,12497,1,1,14.00,19732.86,0.01,0.02,'R','F','1993-03-24','1993-02-12','1993-03-28','TAKE BACK RETURN','AIR','onic requests. furiously spe',3039715,27274,'F',80817.94,'1992-11-23','2-HIGH','Clerk#000000766',0,'lently regular packages believe slyly around the regular, regula'
+3105635,12497,1,1,16.00,22551.84,0.03,0.07,'R','F','1993-07-30','1993-08-28','1993-08-19','TAKE BACK RETURN','SHIP','nal, ironic theodolites solve carefully',3105635,23665,'F',256886.23,'1993-06-22','5-LOW','Clerk#000000029',0,'otes-- blithely special accounts cajole slyly furiously silent dugout'
+3764485,12497,1,1,22.00,31008.78,0.05,0.08,'R','F','1993-02-07','1993-03-18','1993-02-10','COLLECT COD','AIR',' pinto beans nag',3764485,19375,'F',107449.65,'1992-12-26','5-LOW','Clerk#000000364',0,' carefully regular foxes bo'
+4767393,12497,1,1,3.00,4228.47,0.09,0.06,'A','F','1992-09-15','1992-10-02','1992-09-17','DELIVER IN PERSON','FOB',' asymptotes. blithely',4767393,22522,'F',163054.32,'1992-08-10','2-HIGH','Clerk#000000174',0,'unusual foxes after the furiously regular multipliers detect ca'
+1955428,14998,1,1,47.00,89910.53,0.07,0.02,'R','F','1993-01-25','1993-04-02','1993-01-31','DELIVER IN PERSON','MAIL','thely regular frays',1955428,41801,'F',134123.84,'1993-01-08','4-NOT SPECIFIED','Clerk#000000422',0,'ld deposits are slyly. quickly bold ideas bo'
+4197636,14998,1,1,6.00,11477.94,0.03,0.01,'A','F','1993-11-28','1993-11-27','1993-12-03','TAKE BACK RETURN','SHIP','ly. slyly final ex',4197636,77494,'F',283248.52,'1993-10-18','1-URGENT','Clerk#000000087',0,'final asymptotes? packages doze against the ironic packages. ironic, bold dec'
+4899558,17499,1,1,12.00,16997.88,0.00,0.08,'A','F','1992-08-06','1992-08-09','1992-08-14','COLLECT COD','RAIL','ourts would sleep fluffily express accou',4899558,111973,'F',300951.70,'1992-05-21','1-URGENT','Clerk#000000826',0,'eodolites wake ironic sentiments. r'
+4725760,20000,1,1,48.00,44160.00,0.02,0.05,'R','F','1992-03-06','1992-03-04','1992-03-20','NONE','SHIP','liers. slyly regular request',4725760,45176,'F',202199.68,'1992-01-31','4-NOT SPECIFIED','Clerk#000000853',0,'riously regular accounts. ironic, bold requests was slyly; slyly regula'
+49444,22494,1,1,22.00,31162.78,0.06,0.08,'N','O','1997-03-03','1997-04-19','1997-03-25','TAKE BACK RETURN','MAIL','l requests among the blithely fin',49444,11725,'O',273794.80,'1997-01-23','2-HIGH','Clerk#000000814',0,'s. quickly bold packages integrate. furio'
+396839,24996,1,1,9.00,17288.91,0.03,0.07,'N','O','1996-06-19','1996-04-27','1996-07-13','COLLECT COD','MAIL',' accounts ',396839,63389,'O',193790.34,'1996-03-11','5-LOW','Clerk#000000436',0,'eans. instructions are quickly--'
+1109894,24996,1,1,22.00,42261.78,0.01,0.05,'A','F','1995-01-10','1995-03-01','1995-01-21','TAKE BACK RETURN','RAIL','nusual requests wake. qu',1109894,35489,'F',78070.57,'1994-12-23','2-HIGH','Clerk#000000524',0,' bold deposits engage fluffily among the s'
+5825859,24996,1,1,5.00,9604.95,0.02,0.00,'A','F','1995-05-05','1995-03-17','1995-05-21','TAKE BACK RETURN','MAIL','y special a',5825859,13285,'F',90407.81,'1995-01-15','3-MEDIUM','Clerk#000000818',0,'ajole. quickly ironic theodolites '
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT,DECIMAL,DECIMAL,DECIMAL,DECIMAL,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,BIGINT,BIGINT,STRING,DECIMAL,STRING,STRING,STRING,INT,STRING
+---- RUNTIME_PROFILE
+# Verify that the sort and join actually spilled
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+====

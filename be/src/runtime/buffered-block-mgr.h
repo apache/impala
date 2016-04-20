@@ -389,12 +389,6 @@ class BufferedBlockMgr {
   /// only for error reporting.
   Status MemLimitTooLowError(Client* client, int node_id);
 
-  /// TODO: Remove these two. Not clear what the sorter really needs.
-  /// TODO: Those are dirty, dangerous reads to two lists whose all other accesses are
-  /// protected by the lock_. Using those two functions is looking for trouble.
-  int available_allocated_buffers() const { return all_io_buffers_.size(); }
-  int num_free_buffers() const { return free_io_buffers_.size(); }
-
   int num_pinned_buffers(Client* client) const;
   int num_reserved_buffers_remaining(Client* client) const;
   MemTracker* get_tracker(Client* client) const;

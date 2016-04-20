@@ -32,20 +32,26 @@ using namespace strings;
 
 namespace impala {
 
-// Number of pinned blocks required for a merge.
-const int BLOCKS_REQUIRED_FOR_MERGE = 3;
+// Number of pinned blocks required for a merge with fixed-length data only.
+const int MIN_BUFFERS_PER_MERGE = 3;
 
-// Error message when pinning fixed or variable length blocks failed.
-// TODO: Add the node id that iniated the sort
-const string PIN_FAILED_ERROR_MSG = "Failed to pin block for $0-length data needed "
-    "for sorting. Reducing query concurrency or increasing the memory limit may help "
-    "this query to complete successfully.";
+// Maximum number of buffers to use in each merge to prevent sorter trying to grab
+// all the memory when spilling. Given 8mb buffers, this limits the sorter to using
+// 1GB of buffers when merging.
+// TODO: this is an arbitrary limit. Once we have reliable reservations (IMPALA-3200)
+// we should base this on the number of reservations.
+const int MAX_BUFFERS_PER_MERGE = 128;
 
 const string MEM_ALLOC_FAILED_ERROR_MSG = "Failed to allocate block for $0-length "
     "data needed for sorting. Reducing query concurrency or increasing the "
     "memory limit may help this query to complete successfully.";
 
-/// Delete all non-null blocks in 'blocks' and clear vector.
+const string MERGE_FAILED_ERROR_MSG = "Failed to allocate block to merge spilled runs "
+    "during sorting. Only $0 runs could be merged, but must be able to merge at least 2 "
+    "to make progress. Reducing query concurrency or increasing the memory limit may "
+    "help this query to complete successfully.";
+
+/// Delete all non-null blocks in blocks and clear vector.
 static void DeleteAndClearBlocks(vector<BufferedBlockMgr::Block*>* blocks) {
   for (BufferedBlockMgr::Block* block: *blocks) {
     if (block != NULL) block->Delete();
@@ -135,8 +141,12 @@ class Sorter::Run {
   void DeleteAllBlocks();
 
   /// Prepare to read a sorted run. Pins the first block(s) in the run if the run was
-  /// previously unpinned.
-  Status PrepareRead();
+  /// previously unpinned. If the run was unpinned, try to pin the initial fixed and
+  /// var len blocks in the run. If it couldn't pin them, set pinned_all_blocks to false.
+  /// In that case, none or one of the initial blocks may be pinned and it is valid to
+  /// call PrepareRead() again to retry pinning the remainder. pinned_all_blocks is
+  /// always set to true if the run is pinned.
+  Status PrepareRead(bool* pinned_all_blocks);
 
   /// Interface for merger - get the next batch of rows from this run. This run still
   /// owns the returned batch. Calls GetNext(RowBatch*, bool*).
@@ -723,7 +733,7 @@ Status Sorter::Run::UnpinAllBlocks() {
   return Status::OK();
 }
 
-Status Sorter::Run::PrepareRead() {
+Status Sorter::Run::PrepareRead(bool* pinned_all_blocks) {
   DCHECK(is_finalized_);
   DCHECK(is_sorted_);
 
@@ -737,33 +747,32 @@ Status Sorter::Run::PrepareRead() {
       sorter_->state_->batch_size(), sorter_->mem_tracker_));
 
   // If the run is pinned, all blocks are already pinned, so we're ready to read.
-  if (is_pinned_) return Status::OK();
+  if (is_pinned_) {
+    *pinned_all_blocks = true;
+    return Status::OK();
+  }
 
   // Attempt to pin the first fixed and var-length blocks. In either case, pinning may
   // fail if the number of reserved blocks is oversubscribed, see IMPALA-1590.
   if (fixed_len_blocks_.size() > 0) {
     bool pinned;
     RETURN_IF_ERROR(fixed_len_blocks_[0]->Pin(&pinned));
-    // Temporary work-around for IMPALA-1868. Fail the query with OOM rather than
-    // DCHECK in case block pin fails.
     if (!pinned) {
-      Status status = Status::MemLimitExceeded();
-      status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "fixed"));
-      return status;
+      *pinned_all_blocks = false;
+      return Status::OK();
     }
   }
 
   if (HasVarLenBlocks()) {
     bool pinned;
     RETURN_IF_ERROR(var_len_blocks_[0]->Pin(&pinned));
-    // Temporary work-around for IMPALA-1590. Fail the query with OOM rather than
-    // DCHECK in case block pin fails.
     if (!pinned) {
-      Status status = Status::MemLimitExceeded();
-      status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "variable"));
-      return status;
+      *pinned_all_blocks = false;
+      return Status::OK();
     }
   }
+
+  *pinned_all_blocks = true;
   return Status::OK();
 }
 
@@ -1328,6 +1337,7 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
     mem_tracker_(mem_tracker),
     output_row_desc_(output_row_desc),
     unsorted_run_(NULL),
+    merge_output_run_(NULL),
     profile_(profile),
     initial_runs_counter_(NULL),
     num_merges_counter_(NULL),
@@ -1339,6 +1349,7 @@ Sorter::~Sorter() {
   DCHECK(sorted_runs_.empty());
   DCHECK(merging_runs_.empty());
   DCHECK(unsorted_run_ == NULL);
+  DCHECK(merge_output_run_ == NULL);
 }
 
 Status Sorter::Init() {
@@ -1355,13 +1366,13 @@ Status Sorter::Init() {
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
 
-  int min_blocks_required = BLOCKS_REQUIRED_FOR_MERGE;
-  // Fixed and var-length blocks are separate, so we need BLOCKS_REQUIRED_FOR_MERGE
+  int min_buffers_required = MIN_BUFFERS_PER_MERGE;
+  // Fixed and var-length blocks are separate, so we need MIN_BUFFERS_PER_MERGE
   // blocks for both if there is var-length data.
-  if (has_var_len_slots_) min_blocks_required *= 2;
+  if (has_var_len_slots_) min_buffers_required *= 2;
 
   RETURN_IF_ERROR(block_mgr_->RegisterClient(Substitute("Sorter ptr=$0", this),
-      min_blocks_required, false, mem_tracker_, state_, &block_mgr_client_));
+      min_buffers_required, false, mem_tracker_, state_, &block_mgr_client_));
 
   DCHECK(unsorted_run_ != NULL);
   RETURN_IF_ERROR(unsorted_run_->Init());
@@ -1394,44 +1405,25 @@ Status Sorter::InputDone() {
   RETURN_IF_ERROR(SortCurrentInputRun());
 
   if (sorted_runs_.size() == 1) {
-    // The entire input fit in one run. Read sorted rows in GetNext() directly
-    // from the sorted run.
-    RETURN_IF_ERROR(sorted_runs_.back()->PrepareRead());
+    // The entire input fit in one run. Read sorted rows in GetNext() directly from the
+    // in-memory sorted run.
+    DCHECK(sorted_runs_.back()->is_pinned());
+    bool success;
+    RETURN_IF_ERROR(sorted_runs_.back()->PrepareRead(&success));
+    DCHECK(success) << "Should always be able to prepare pinned run for read.";
     return Status::OK();
   }
 
-  // At least one merge is necessary.
-  int blocks_per_run = has_var_len_slots_ ? 2 : 1;
-  int min_buffers_for_merge = sorted_runs_.size() * blocks_per_run;
-  // Check if the final run needs to be unpinned.
-  bool unpinned_final = false;
-  if (block_mgr_->num_free_buffers() < min_buffers_for_merge - blocks_per_run) {
-    // Number of available buffers is less than the size of the final run and
-    // the buffers needed to read the remainder of the runs in memory.
-    // Unpin the final run.
-    RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllBlocks());
-    unpinned_final = true;
-  } else {
-    // No need to unpin the current run. There is enough memory to stream the
-    // other runs.
-    // TODO: revisit. It might be better to unpin some from this run if it means
-    // we can get double buffering in the other runs.
-  }
+  // Unpin the final run to free up memory for the merge.
+  // TODO: we could keep it in memory in some circumstances as an optimisation, once
+  // we have a buffer pool with more reliable reservations (IMPALA-3200).
+  RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllBlocks());
 
-  // For an intermediate merge, intermediate_merge_batch contains deep-copied rows from
-  // the input runs. If (unmerged_sorted_runs_.size() > max_runs_per_final_merge),
-  // one or more intermediate merges are required.
+  // Merge intermediate runs until we have a final merge set-up.
   // TODO: Attempt to allocate more memory before doing intermediate merges. This may
   // be possible if other operators have relinquished memory after the sort has built
-  // its runs.
-  if (min_buffers_for_merge > block_mgr_->available_allocated_buffers()) {
-    DCHECK(unpinned_final);
-    RETURN_IF_ERROR(MergeIntermediateRuns());
-  }
-
-  // Create the final merger.
-  RETURN_IF_ERROR(CreateMerger(sorted_runs_.size()));
-  return Status::OK();
+  // its runs. This depends on more reliable reservations (IMPALA-3200)
+  return MergeIntermediateRuns();
 }
 
 Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
@@ -1444,7 +1436,7 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
 }
 
 Status Sorter::Reset() {
-  DCHECK(unsorted_run_ == NULL);
+  DCHECK(unsorted_run_ == NULL) << "Cannot Reset() before calling InputDone()";
   merger_.reset();
   // Free resources from the current runs.
   CleanupAllRuns();
@@ -1466,6 +1458,8 @@ void Sorter::CleanupAllRuns() {
   Run::CleanupRuns(&merging_runs_);
   if (unsorted_run_ != NULL) unsorted_run_->DeleteAllBlocks();
   unsorted_run_ = NULL;
+  if (merge_output_run_ != NULL) merge_output_run_->DeleteAllBlocks();
+  merge_output_run_ = NULL;
 }
 
 Status Sorter::SortCurrentInputRun() {
@@ -1484,55 +1478,52 @@ Status Sorter::SortCurrentInputRun() {
 }
 
 Status Sorter::MergeIntermediateRuns() {
-  int blocks_per_run = has_var_len_slots_ ? 2 : 1;
-  int max_runs_per_final_merge =
-      block_mgr_->available_allocated_buffers() / blocks_per_run;
+  DCHECK_GE(sorted_runs_.size(), 2);
+  int pinned_blocks_per_run = has_var_len_slots_ ? 2 : 1;
+  int max_runs_per_final_merge = MAX_BUFFERS_PER_MERGE / pinned_blocks_per_run;
 
-  // During an intermediate merge, blocks from the output sorted run will have to be
-  // pinned.
+  // During an intermediate merge, the one or two blocks from the output sorted run
+  // that are being written must be pinned.
   int max_runs_per_intermediate_merge = max_runs_per_final_merge - 1;
   DCHECK_GT(max_runs_per_intermediate_merge, 1);
-  // For an intermediate merge, intermediate_merge_batch contains deep-copied rows from
-  // the input runs. If (sorted_runs_.size() > max_runs_per_final_merge),
-  // one or more intermediate merges are required.
-  scoped_ptr<RowBatch> intermediate_merge_batch;
-  while (sorted_runs_.size() > max_runs_per_final_merge) {
+
+  while (true) {
     // An intermediate merge adds one merge to unmerged_sorted_runs_.
-    // Merging 'runs - (max_runs_final_ - 1)' number of runs is sufficient to guarantee
-    // that the final merge can be performed.
-    int num_runs_to_merge = min<int>(max_runs_per_intermediate_merge,
-        sorted_runs_.size() - max_runs_per_intermediate_merge);
-    RETURN_IF_ERROR(CreateMerger(num_runs_to_merge));
-    RowBatch intermediate_merge_batch(*output_row_desc_, state_->batch_size(),
-        mem_tracker_);
-    // 'merged_run' is the new sorted run that is produced by the intermediate merge.
-    // We added 'merged_run' to 'sorted_runs_' immediately so that it is cleaned up
-    // in Close().
-    Run* merged_run = obj_pool_.Add(
+    // TODO: once we have reliable reservations (IMPALA-3200), we should calculate this
+    // based on the available reservations.
+    int num_runs_to_merge =
+        min<int>(max_runs_per_intermediate_merge, sorted_runs_.size());
+
+    DCHECK(merge_output_run_ == NULL) << "Should have finished previous merge.";
+    // Create the merged run in case we need to do intermediate merges. We need the
+    // output run and at least two input runs in memory to make progress on the
+    // intermediate merges.
+    // TODO: this isn't optimal: we could defer creating the merged run if we have
+    // reliable reservations (IMPALA-3200).
+    merge_output_run_ = obj_pool_.Add(
         new Run(this, output_row_desc_->tuple_descriptors()[0], false));
-    sorted_runs_.push_back(merged_run);
-    RETURN_IF_ERROR(merged_run->Init());
-    bool eos = false;
-    while (!eos) {
-      // Copy rows into the new run until done.
-      int num_copied;
-      RETURN_IF_CANCELLED(state_);
-      RETURN_IF_ERROR(merger_->GetNext(&intermediate_merge_batch, &eos));
-      RETURN_IF_ERROR(
-          merged_run->AddIntermediateBatch(&intermediate_merge_batch, 0, &num_copied));
+    RETURN_IF_ERROR(merge_output_run_->Init());
+    RETURN_IF_ERROR(CreateMerger(num_runs_to_merge));
 
-      DCHECK_EQ(num_copied, intermediate_merge_batch.num_rows());
-      intermediate_merge_batch.Reset();
+    // If CreateMerger() consumed all the sorted runs, we have set up the final merge.
+    if (sorted_runs_.empty()) {
+      // Don't need intermediate run for final merge.
+      if (merge_output_run_ != NULL) {
+        merge_output_run_->DeleteAllBlocks();
+        merge_output_run_ = NULL;
+      }
+      return Status::OK();
     }
-
-    RETURN_IF_ERROR(merged_run->FinalizeInput());
+    RETURN_IF_ERROR(ExecuteIntermediateMerge(merge_output_run_));
+    sorted_runs_.push_back(merge_output_run_);
+    merge_output_run_ = NULL;
   }
-
   return Status::OK();
 }
 
-Status Sorter::CreateMerger(int num_runs) {
-  DCHECK_GT(num_runs, 1);
+Status Sorter::CreateMerger(int max_num_runs) {
+  DCHECK_GE(max_num_runs, 2);
+  DCHECK_GE(sorted_runs_.size(), 2);
   // Clean up the runs from the previous merge.
   Run::CleanupRuns(&merging_runs_);
 
@@ -1543,10 +1534,24 @@ Status Sorter::CreateMerger(int num_runs) {
       new SortedRunMerger(compare_less_than_, output_row_desc_, profile_, true));
 
   vector<function<Status (RowBatch**)> > merge_runs;
-  merge_runs.reserve(num_runs);
-  for (int i = 0; i < num_runs; ++i) {
+  merge_runs.reserve(max_num_runs);
+  for (int i = 0; i < max_num_runs; ++i) {
     Run* run = sorted_runs_.front();
-    RETURN_IF_ERROR(run->PrepareRead());
+    bool success;
+    RETURN_IF_ERROR(run->PrepareRead(&success));
+    if (!success) {
+      // If we can merge at least two runs, we can continue, otherwise we have a problem
+      // because we can't make progress on the merging.
+      // TODO: IMPALA-3200: we should not need this logic once we have reliable
+      // reservations (IMPALA-3200).
+      if (merging_runs_.size() < 2) {
+        Status status = Status::MemLimitExceeded();
+        status.AddDetail(Substitute(MERGE_FAILED_ERROR_MSG, merging_runs_.size()));
+        return status;
+      }
+      // Merge the runs that we were able to prepare.
+      break;
+    }
     // Run::GetNextBatch() is used by the merger to retrieve a batch of rows to merge
     // from this run.
     merge_runs.push_back(bind<Status>(mem_fn(&Run::GetNextBatch), run, _1));
@@ -1556,6 +1561,27 @@ Status Sorter::CreateMerger(int num_runs) {
   RETURN_IF_ERROR(merger_->Prepare(merge_runs));
 
   num_merges_counter_->Add(1);
+  return Status::OK();
+}
+
+
+Status Sorter::ExecuteIntermediateMerge(Sorter::Run* merged_run) {
+  RowBatch intermediate_merge_batch(*output_row_desc_, state_->batch_size(),
+      mem_tracker_);
+  bool eos = false;
+  while (!eos) {
+    // Copy rows into the new run until done.
+    int num_copied;
+    RETURN_IF_CANCELLED(state_);
+    RETURN_IF_ERROR(merger_->GetNext(&intermediate_merge_batch, &eos));
+    RETURN_IF_ERROR(
+        merged_run->AddIntermediateBatch(&intermediate_merge_batch, 0, &num_copied));
+
+    DCHECK_EQ(num_copied, intermediate_merge_batch.num_rows());
+    intermediate_merge_batch.Reset();
+  }
+
+  RETURN_IF_ERROR(merged_run->FinalizeInput());
   return Status::OK();
 }
 

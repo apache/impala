@@ -124,19 +124,27 @@ class Sorter {
   class TupleIterator;
   class TupleSorter;
 
-  /// Create a SortedRunMerger from the first 'num_runs' sorted runs in sorted_runs_ and
-  /// assign it to merger_. The runs to be merged are removed from sorted_runs_.
-  /// The Sorter sets the deep_copy_input flag to true for the merger, since the blocks
-  /// containing input run data will be unpinned as input runs are read.
-  Status CreateMerger(int num_runs);
+  /// Create a SortedRunMerger from sorted runs in 'sorted_runs_' and assign it to
+  /// 'merger_'. Attempts to set up merger with 'max_num_runs' runs but may set it
+  /// up with fewer if it cannot pin the initial blocks of all of the runs. Fails
+  /// if it cannot merge at least two runs. The runs to be merged are removed from
+  /// 'sorted_runs_'.  The Sorter sets the 'deep_copy_input' flag to true for the
+  /// merger, since the blocks containing input run data will be deleted as input
+  /// runs are read.
+  Status CreateMerger(int max_num_runs);
 
   /// Repeatedly replaces multiple smaller runs in sorted_runs_ with a single larger
-  /// merged run until the number of remaining runs is small enough for a single merge.
+  /// merged run until there are few enough runs to be merged with a single merger.
+  /// Returns when 'merger_' is set up to merge the final runs.
   /// At least 1 (2 if var-len slots) block from each sorted run must be pinned for
   /// a merge. If the number of sorted runs is too large, merge sets of smaller runs
   /// into large runs until a final merge can be performed. An intermediate row batch
   /// containing deep copied rows is used for the output of each intermediate merge.
   Status MergeIntermediateRuns();
+
+  /// Execute a single step of the intermediate merge, pulling rows from 'merger_'
+  /// and adding them to 'merged_run'.
+  Status ExecuteIntermediateMerge(Sorter::Run* merged_run);
 
   /// Called once there no more rows to be added to 'unsorted_run_'. Sorts
   /// 'unsorted_run_' and appends it to the list of sorted runs.
@@ -194,6 +202,10 @@ class Sorter {
   /// Runs that are currently processed by the merge_.
   /// These runs can be deleted when we are done with the current merge.
   std::deque<Run*> merging_runs_;
+
+  /// Output run for the merge. Stored in Sorter() so that it can be cleaned up
+  /// in Sorter::Close() in case of errors.
+  Run* merge_output_run_;
 
   /// Pool of owned Run objects. Maintains Runs objects across non-freeing Reset() calls.
   ObjectPool obj_pool_;
