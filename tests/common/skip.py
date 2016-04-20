@@ -80,6 +80,8 @@ class SkipIfOldAggsJoins:
       reason="Passthrough optimization not implemented by old agg")
   unsupported = pytest.mark.skipif(using_old_aggs_joins,
       reason="Query unsupported with old aggs and joins")
+  requires_spilling = pytest.mark.skipif(using_old_aggs_joins,
+      reason="Test case requires spilling to pass")
 
 class SkipIfLocal:
   # These ones are skipped due to product limitations.

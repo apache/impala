@@ -17,7 +17,7 @@ import time
 
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfLocal, SkipIfOldAggsJoins
 
 @SkipIfLocal.multiple_impalad
 @pytest.mark.execute_serially # IMPALA-3367
@@ -61,3 +61,8 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
 
   def test_row_filters(self, vector):
     self.run_test_case('QueryTest/runtime_row_filters', vector)
+
+  @SkipIfOldAggsJoins.requires_spilling
+  @SkipIfOldAggsJoins.nested_types
+  def test_row_filters_phj_only(self, vector):
+    self.run_test_case('QueryTest/runtime_row_filters_phj', vector)

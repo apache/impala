@@ -1,0 +1,47 @@
+====
+---- QUERY
+####################################################
+# Test case 1: PHJ nodes that spill should still produce filters.
+# Run this for Parquet only to avoid variable memory
+# consumption / spilling behaviour.
+####################################################
+
+SET MAX_BLOCK_MGR_MEMORY=275m;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_BLOOM_FILTER_SIZE=16M;
+select STRAIGHT_JOIN count(a.l_comment)
+    from tpch_parquet.lineitem a join tpch_parquet.lineitem b
+        on a.l_comment = b.l_comment AND b.l_linenumber < 5;
+---- RESULTS
+40419515
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: [1-9]\d* .*
+row_regex: .*Rows rejected: 305.87K .*
+row_regex: .*Build-Side Runtime-Filter Published.*
+====
+
+
+
+
+---- QUERY
+####################################################
+# Test case 2: Filters are still effective inside subplans
+# (in certain cases). The query has a HJ-scan pair inside a
+# subplan (on the LHS).
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select straight_join count(1)
+    from alltypes a join complextypestbl b
+        # b.id + 10 confuses planner, so it doesn't think it
+        # can transitively push a.id < 20 to scan of a.
+        on a.id = b.id + 10 join b.int_array where b.id < 10
+---- RESULTS
+10
+---- RUNTIME_PROFILE
+row_regex: .*Build-Side Runtime-Filter Published.*
+row_regex: .*Rows rejected: 2.43K \(2432\).*
+====
