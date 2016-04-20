@@ -72,7 +72,7 @@ FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX")
 NAMENODE = FILESYSTEM_PREFIX or CORE_CONF.get('fs.defaultFS')
 # Match any SET statement. Assume that query options' names
 # only contain alphabets and underscores.
-SET_PATTERN = re.compile(r'set\s*([a-zA-Z_]+)=*', re.I)
+SET_PATTERN = re.compile(r'\s*set\s*([a-zA-Z_]+)=*', re.I)
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):

@@ -26,6 +26,7 @@ string,string
 ====
 ---- QUERY
 # Renaming a column will cause the column to not be resolved
+set parquet_fallback_schema_resolution="NAME";
 alter table resolution_by_name_test change a new_a string;
 select new_a from resolution_by_name_test;
 ---- TYPES
@@ -131,6 +132,7 @@ bigint,int,int
 # Can add back a single field
 alter table nested_resolution_by_name_test change nested_struct nested_struct
 struct<b: array<int>, a: int, g: map<string, struct<h: struct<i: array<float>>>>>;
+set parquet_fallback_schema_resolution="name";
 select id, g.key
 from nested_resolution_by_name_test t, t.nested_struct.g
 ---- TYPES
@@ -148,6 +150,7 @@ bigint,string
 # Add back single more nested field (and remove 'g' field)
 alter table nested_resolution_by_name_test change nested_struct nested_struct
 struct<b: array<int>, a: int, c: struct<d: array<array<struct<f: string>>>>>;
+set parquet_fallback_schema_resolution="name";
 select tmp.f from nested_resolution_by_name_test.nested_struct.c.d.item tmp;
 ---- TYPES
 string
@@ -169,6 +172,7 @@ string
 # Can't rename nested field
 alter table nested_resolution_by_name_test change nested_struct nested_struct
 struct<b: array<int>, a: int, c: struct<d: array<array<struct<renamed: string>>>>>;
+set parquet_fallback_schema_resolution="name";
 select tmp.renamed from nested_resolution_by_name_test.nested_struct.c.d.item tmp;
 ---- TYPES
 string
