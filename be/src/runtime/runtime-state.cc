@@ -201,22 +201,6 @@ string RuntimeState::ErrorLog() {
   return PrintErrorMapToString(error_log_);
 }
 
-string RuntimeState::FileErrors() {
-  stringstream out;
-  {
-    lock_guard<SpinLock> l(file_errors_lock_);
-    for (int i = 0; i < file_errors_.size(); ++i) {
-      out << file_errors_[i].second << " errors in " << file_errors_[i].first << endl;
-    }
-  }
-  return out.str();
-}
-
-void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors) {
-  lock_guard<SpinLock> l(file_errors_lock_);
-  file_errors_.push_back(make_pair(file_name, num_errors));
-}
-
 bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
   lock_guard<SpinLock> l(error_log_lock_);
   // All errors go to the log, unreported_error_count_ is counted independently of the

@@ -39,7 +39,6 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_desc_(NULL),
       tuple_idx_(0),
       filters_(tnode.hbase_scan_node.filters),
-      num_errors_(0),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
       row_key_binary_encoded_(false),
@@ -183,11 +182,6 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     }
     RETURN_IF_ERROR(hbase_scanner_->Next(env, &has_next));
     if (!has_next) {
-      if (num_errors_ > 0) {
-        const HBaseTableDescriptor* hbase_table =
-            static_cast<const HBaseTableDescriptor*> (tuple_desc_->table_desc());
-        state->ReportFileErrors(hbase_table->table_name(), num_errors_);
-      }
       *eos = true;
       return Status::OK();
     }
@@ -237,7 +231,6 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     // Error logging: Flush error stream and add name of HBase table and current row key.
     if (error_in_row) {
       error_in_row = false;
-      ++num_errors_;
       if (state->LogHasSpace()) {
         stringstream ss;
         ss << "hbase table: " << table_name_ << endl;
@@ -247,10 +240,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
         ss << "row key: " << string(reinterpret_cast<const char*>(key), key_length);
         state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
       }
-      if (state->abort_on_error()) {
-        state->ReportFileErrors(table_name_, 1);
-        return Status(state->ErrorLog());
-      }
+      if (state->abort_on_error()) return Status(state->ErrorLog());
     }
 
     if (EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row)) {
@@ -285,9 +275,6 @@ void HBaseScanNode::Close(RuntimeState* state) {
     JNIEnv* env = getJNIEnv();
     hbase_scanner_->Close(env);
   }
-
-  // Report total number of errors.
-  if (num_errors_ > 0) state->ReportFileErrors(table_name_, num_errors_);
   ExecNode::Close(state);
 }
 

@@ -527,10 +527,7 @@ Status HdfsRCFileScanner::ProcessRange() {
             ss << "file: " << stream_->filename();
             state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()), 2);
           }
-          if (state_->abort_on_error()) {
-            state_->ReportFileErrors(stream_->filename(), 1);
-            return Status(state_->ErrorLog());
-          }
+          if (state_->abort_on_error()) return Status(state_->ErrorLog());
         }
 
         current_row->SetTuple(scan_node_->tuple_idx(), tuple);

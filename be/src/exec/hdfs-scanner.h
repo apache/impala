@@ -195,9 +195,6 @@ class HdfsScanner {
   /// The tuple memory of batch_.
   uint8_t* tuple_mem_;
 
-  /// number of errors in current file
-  int num_errors_in_file_;
-
   /// Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 

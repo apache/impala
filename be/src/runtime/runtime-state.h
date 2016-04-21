@@ -103,7 +103,6 @@ class RuntimeState {
   bool abort_on_default_limit_exceeded() const {
     return query_ctx().request.query_options.abort_on_default_limit_exceeded;
   }
-  int max_errors() const { return query_options().max_errors; }
   const TQueryCtx& query_ctx() const { return fragment_ctx().query_ctx; }
   const TPlanFragmentInstanceCtx& fragment_ctx() const {
     return fragment_params_.fragment_instance_ctx;
@@ -119,9 +118,6 @@ class RuntimeState {
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const ErrorLogMap& error_log() const { return error_log_; }
-  const std::vector<std::pair<std::string, int> >& file_errors() const {
-    return file_errors_;
-  }
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& fragment_instance_id() const {
     return fragment_ctx().fragment_instance_id;
@@ -205,12 +201,6 @@ class RuntimeState {
     return error_log_.size() < query_options().max_errors;
   }
 
-  /// Report that num_errors occurred while parsing file_name.
-  void ReportFileErrors(const std::string& file_name, int num_errors);
-
-  /// Clear the file errors.
-  void ClearFileErrors() { file_errors_.clear(); }
-
   /// Return true if error log is empty.
   bool ErrorLogIsEmpty();
 
@@ -220,9 +210,6 @@ class RuntimeState {
   /// Append all accumulated errors since the last call to this function to new_errors to
   /// be sent back to the coordinator
   void GetUnreportedErrors(ErrorLogMap* new_errors);
-
-  /// Returns a string representation of the file_errors_.
-  std::string FileErrors();
 
   bool is_cancelled() const { return is_cancelled_; }
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
@@ -296,12 +283,6 @@ class RuntimeState {
 
   /// Logs error messages.
   ErrorLogMap error_log_;
-
-  /// Lock protecting file_errors_
-  SpinLock file_errors_lock_;
-
-  /// Stores the number of parse errors per file.
-  std::vector<std::pair<std::string, int> > file_errors_;
 
   /// Original thrift descriptor for this fragment. Includes its unique id, the total
   /// number of fragment instances, the query context, the coordinator address, the

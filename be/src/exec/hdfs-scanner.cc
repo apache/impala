@@ -63,7 +63,6 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       tuple_(NULL),
       batch_(NULL),
       tuple_mem_(NULL),
-      num_errors_in_file_(0),
       num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
       parse_status_(Status::OK()),
       decompression_type_(THdfsCompression::NONE),
@@ -602,11 +601,7 @@ bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
     state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()), 2);
   }
 
-  ++num_errors_in_file_;
-  if (state_->abort_on_error()) {
-    state_->ReportFileErrors(stream_->filename(), 1);
-    DCHECK(!parse_status_.ok());
-  }
+  if (state_->abort_on_error()) DCHECK(!parse_status_.ok());
   return parse_status_.ok();
 }
 

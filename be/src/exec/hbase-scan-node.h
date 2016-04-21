@@ -81,9 +81,6 @@ class HBaseScanNode : public ScanNode {
   /// HBase Filters to be set in HBaseTableScanner.
   std::vector<THBaseFilter> filters_;
 
-  /// Counts the total number of conversion errors for this table.
-  int num_errors_;
-
   /// Jni helper for scanning an HBase table.
   boost::scoped_ptr<HBaseTableScanner> hbase_scanner_;
 
