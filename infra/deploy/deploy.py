@@ -62,11 +62,11 @@ def parse_args():
     parser.add_argument("--password", type=str,
                         default="admin",
                         help="Password with which to log into Cloudera Manager.")
+    parser.add_argument("--cluster", type=str,
+                        help="Name of existing cluster where the Impala_Kudu service "
+                        "should be added. If not specified, uses the only cluster or "
+                        "raises an exception if multiple clusters are found.")
     parents_parser = argparse.ArgumentParser(add_help=False)
-    parents_parser.add_argument("--cluster", type=str,
-                                help="Name of existing cluster where the Impala_Kudu service "
-                                "should be added. If not specified, uses the only cluster or "
-                                "raises an exception if multiple clusters are found.")
     parents_parser.add_argument("service_name", type=str,
                                 help="Name of Impala_Kudu service to create.")
     subparsers = parser.add_subparsers(dest="subparsers_name")
