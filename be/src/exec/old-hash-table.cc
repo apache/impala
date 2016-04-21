@@ -150,7 +150,7 @@ void OldHashTable::AddBloomFilters() {
       if (bloom_filters[i] == NULL) continue;
       void* e = filter_expr_ctxs_[i]->GetValue(row);
       uint32_t h =
-          RawValue::GetHashValue(e, build_expr_ctxs_[i]->root()->type(),
+          RawValue::GetHashValue(e, filter_expr_ctxs_[i]->root()->type(),
               RuntimeFilterBank::DefaultHashSeed());
       bloom_filters[i]->Insert(h);
     }
