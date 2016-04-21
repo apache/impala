@@ -416,7 +416,7 @@ struct TInsertExecStatus {
 struct TErrorLogEntry {
 
   // Number of error messages reported using the above identifier
-  1: i32 count
+  1: i32 count = 0
 
   // Sample messages from the above error code
   2: list<string> messages

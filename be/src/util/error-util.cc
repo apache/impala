@@ -20,6 +20,7 @@
 #include <string.h>
 #include <sstream>
 
+#include "common/logging.h"
 #include "common/names.h"
 
 namespace impala {
@@ -132,16 +133,20 @@ ErrorMsg ErrorMsg::Init(TErrorCode::type error, const ArgType& arg0,
 
 void PrintErrorMap(ostream* stream, const ErrorLogMap& errors) {
   BOOST_FOREACH(const ErrorLogMap::value_type& v, errors) {
+    const TErrorLogEntry& log_entry = v.second;
     if (v.first == TErrorCode::GENERAL) {
-      BOOST_FOREACH(const string& s, v.second.messages) {
+      DCHECK_EQ(log_entry.count, 0);
+      BOOST_FOREACH(const string& s, log_entry.messages) {
         *stream << s << "\n";
       }
-    } else {
-      *stream << v.second.messages.front();
-      if (v.second.count < 2) {
+    } else if (!log_entry.messages.empty()) {
+      DCHECK_GT(log_entry.count, 0);
+      DCHECK_EQ(log_entry.messages.size(), 1);
+      *stream << log_entry.messages.front();
+      if (log_entry.count == 1) {
         *stream << "\n";
       } else {
-        *stream << " (1 of " << v.second.count << " similar)\n";
+        *stream << " (1 of " << log_entry.count << " similar)\n";
       }
     }
   }
@@ -155,41 +160,46 @@ string PrintErrorMapToString(const ErrorLogMap& errors) {
 
 void MergeErrorMaps(ErrorLogMap* left, const ErrorLogMap& right) {
   BOOST_FOREACH(const ErrorLogMap::value_type& v, right) {
+    TErrorLogEntry& target = (*left)[v.first];
+    const TErrorLogEntry& source = v.second;
     // Append generic message, append specific codes or increment count if exists
     if (v.first == TErrorCode::GENERAL) {
-      (*left)[v.first].messages.insert(
-          (*left)[v.first].messages.end(), v.second.messages.begin(),
-          v.second.messages.end());
+      DCHECK_EQ(v.second.count, 0);
+      target.messages.insert(
+          target.messages.end(), source.messages.begin(), source.messages.end());
     } else {
-      if ((*left).count(v.first) > 0) {
-        (*left)[v.first].count += v.second.count;
-      } else {
-        (*left)[v.first].messages.push_back(v.second.messages.front());
-        (*left)[v.first].count = v.second.count;
+      DCHECK_EQ(source.messages.empty(), source.count == 0);
+      if (target.messages.empty()) {
+        target.messages = source.messages;
       }
+      target.count += source.count;
     }
   }
 }
 
 void AppendError(ErrorLogMap* map, const ErrorMsg& e) {
+  TErrorLogEntry& target = (*map)[e.error()];
   if (e.error() == TErrorCode::GENERAL) {
-    (*map)[e.error()].messages.push_back(e.msg());
+    target.messages.push_back(e.msg());
   } else {
-    ErrorLogMap::iterator it = map->find(e.error());
-    if (it != map->end()) {
-      ++(it->second.count);
-    } else {
-      (*map)[e.error()].messages.push_back(e.msg());
-      (*map)[e.error()].count = 1;
+    if (target.messages.empty()) {
+      target.messages.push_back(e.msg());
     }
+    ++target.count;
+  }
+}
+
+void ClearErrorMap(ErrorLogMap& errors) {
+  for (auto iter = errors.begin(); iter != errors.end(); ++iter) {
+    iter->second.messages.clear();
+    iter->second.count = 0;
   }
 }
 
 size_t ErrorCount(const ErrorLogMap& errors) {
   ErrorLogMap::const_iterator cit = errors.find(TErrorCode::GENERAL);
-  size_t general_errors = cit != errors.end() ?
-      errors.find(TErrorCode::GENERAL)->second.messages.size() - 1 : 0;
-  return errors.size() + general_errors;
+  if (cit == errors.end()) return errors.size();
+  return errors.size() + cit->second.messages.size() - 1;
 }
 
 string ErrorMsg::GetFullMessageDetails() const {

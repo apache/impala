@@ -60,7 +60,8 @@ enum TExecNodePhase {
 // what to do when hitting a debug point (TImpalaQueryOptions.DEBUG_ACTION)
 enum TDebugAction {
   WAIT,
-  FAIL
+  FAIL,
+  INJECT_ERROR_LOG
 }
 
 // Preference for replica selection

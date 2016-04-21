@@ -149,6 +149,10 @@ void AppendError(ErrorLogMap* map, const ErrorMsg& e);
 /// Helper method to print the contents of an ErrorMap to a stream.
 void PrintErrorMap(std::ostream* stream, const ErrorLogMap& errors);
 
+/// Reset all messages and count, but keep all keys to prevent sending already reported
+/// general errors and counting the same non-general error multiple times.
+void ClearErrorMap(ErrorLogMap& errors);
+
 /// Return the number of errors within this error maps. General errors are counted
 /// individually, while specific errors are counted once per distinct occurrence.
 size_t ErrorCount(const ErrorLogMap& errors);

@@ -1189,7 +1189,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   }
 
   status = scanner->ProcessSplit();
-  if (VLOG_QUERY_IS_ON && !status.ok() && !runtime_state_->error_log().empty()) {
+  if (VLOG_QUERY_IS_ON && !status.ok()) {
     // This thread hit an error, record it and bail
     stringstream ss;
     ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
@@ -1204,7 +1204,6 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
       ScannerContext::Stream* stream = context.GetStream();
       ss << " Processed " << stream->total_bytes_returned() << " bytes.";
     }
-    ss << endl << runtime_state_->ErrorLog();
     VLOG_QUERY << ss.str();
   }
 

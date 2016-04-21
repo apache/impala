@@ -117,7 +117,6 @@ class RuntimeState {
   }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
-  const ErrorLogMap& error_log() const { return error_log_; }
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& fragment_instance_id() const {
     return fragment_ctx().fragment_instance_id;
@@ -201,11 +200,11 @@ class RuntimeState {
     return error_log_.size() < query_options().max_errors;
   }
 
-  /// Return true if error log is empty.
-  bool ErrorLogIsEmpty();
-
   /// Returns the error log lines as a string joined with '\n'.
   std::string ErrorLog();
+
+  /// Copy error_log_ to *errors
+  void GetErrors(ErrorLogMap* errors);
 
   /// Append all accumulated errors since the last call to this function to new_errors to
   /// be sent back to the coordinator
@@ -278,7 +277,7 @@ class RuntimeState {
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
-  /// Lock protecting error_log_ and unreported_error_idx_
+  /// Lock protecting error_log_
   SpinLock error_log_lock_;
 
   /// Logs error messages.

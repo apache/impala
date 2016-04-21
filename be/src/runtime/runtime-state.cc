@@ -191,14 +191,14 @@ Status RuntimeState::CreateCodegen() {
   return Status::OK();
 }
 
-bool RuntimeState::ErrorLogIsEmpty() {
-  lock_guard<SpinLock> l(error_log_lock_);
-  return (error_log_.size() == 0);
-}
-
 string RuntimeState::ErrorLog() {
   lock_guard<SpinLock> l(error_log_lock_);
   return PrintErrorMapToString(error_log_);
+}
+
+void RuntimeState::GetErrors(ErrorLogMap* errors) {
+  lock_guard<SpinLock> l(error_log_lock_);
+  *errors = error_log_;
 }
 
 bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
@@ -217,12 +217,9 @@ bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
 void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
   lock_guard<SpinLock> l(error_log_lock_);
   *new_errors = error_log_;
-  // Reset the map, but keep all already reported keys so that we do not report the same
-  // errors multiple times.
-  for (auto iter = error_log_.begin(); iter != error_log_.end(); ++iter) {
-    iter->second.messages.clear();
-    iter->second.count = 0;
-  }
+  // Reset all messages, but keep all already reported keys so that we do not report the
+  // same errors multiple times.
+  ClearErrorMap(error_log_);
 }
 
 void RuntimeState::LogMemLimitExceeded(const MemTracker* tracker,

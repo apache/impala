@@ -1794,9 +1794,10 @@ string Coordinator::GetErrorLog() {
   ErrorLogMap merged;
   {
     lock_guard<mutex> l(lock_);
-    if (executor_.get() != NULL && executor_->runtime_state() != NULL &&
-        !executor_->runtime_state()->ErrorLogIsEmpty()) {
-      MergeErrorMaps(&merged, executor_->runtime_state()->error_log());
+    if (executor_.get() != NULL && executor_->runtime_state() != NULL) {
+      ErrorLogMap runtime_error_log;
+      executor_->runtime_state()->GetErrors(&runtime_error_log);
+      MergeErrorMaps(&merged, runtime_error_log);
     }
   }
   for (int i = 0; i < fragment_instance_states_.size(); ++i) {

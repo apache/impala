@@ -429,6 +429,11 @@ Status ExecNode::ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state
     }
     return Status::CANCELLED;
   }
+  if (debug_action_ == TDebugAction::INJECT_ERROR_LOG) {
+    state->LogError(
+        ErrorMsg(TErrorCode::INTERNAL_ERROR, "Debug Action: INJECT_ERROR_LOG"));
+    return Status::OK();
+  }
   return Status::OK();
 }
 

@@ -55,6 +55,40 @@ TEST(ErrorMsg, MergeMap) {
   ASSERT_EQ(2, left.size());
   ASSERT_EQ(2, left[TErrorCode::GENERAL].messages.size());
   ASSERT_EQ(6, left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
+
+  ErrorLogMap dummy, cleared;
+  dummy[TErrorCode::GENERAL].messages.push_back("2");
+  dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
+  dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 3;
+  ASSERT_EQ(2, dummy.size());
+  ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
+  ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
+  ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages.size());
+  cleared[TErrorCode::GENERAL].messages.push_back("1");
+  cleared[TErrorCode::RPC_TIMEOUT].messages.push_back("p");
+  ClearErrorMap(cleared);
+  ASSERT_EQ(2, cleared.size());
+  ASSERT_EQ(1, cleared.count(TErrorCode::RPC_TIMEOUT));
+
+  MergeErrorMaps(&dummy, cleared);
+  ASSERT_EQ(3, dummy.size());
+  ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
+  ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
+  ASSERT_EQ(1, dummy.count(TErrorCode::RPC_TIMEOUT));
+  ASSERT_EQ(0, dummy[TErrorCode::RPC_TIMEOUT].count);
+  ASSERT_EQ(0, dummy[TErrorCode::RPC_TIMEOUT].messages.size());
+  ASSERT_EQ(0, dummy[TErrorCode::GENERAL].count);
+  ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages.size());
+
+  MergeErrorMaps(&cleared, dummy);
+  ASSERT_EQ(3, cleared.size());
+  ASSERT_EQ(3, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
+  ASSERT_EQ(1, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
+  ASSERT_EQ(1, cleared.count(TErrorCode::RPC_TIMEOUT));
+  ASSERT_EQ(0, cleared[TErrorCode::RPC_TIMEOUT].count);
+  ASSERT_EQ(0, cleared[TErrorCode::RPC_TIMEOUT].messages.size());
+  ASSERT_EQ(0, cleared[TErrorCode::GENERAL].count);
+  ASSERT_EQ(1, cleared[TErrorCode::GENERAL].messages.size());
 }
 
 TEST(ErrorMsg, CountErrors) {
@@ -66,6 +100,8 @@ TEST(ErrorMsg, CountErrors) {
   m[TErrorCode::GENERAL].messages.push_back("1");
   m[TErrorCode::GENERAL].messages.push_back("2");
   ASSERT_EQ(3, ErrorCount(m));
+  ClearErrorMap(m);
+  ASSERT_EQ(1, ErrorCount(m));
 }
 
 TEST(ErrorMsg, AppendError) {
@@ -78,6 +114,8 @@ TEST(ErrorMsg, AppendError) {
   ASSERT_EQ(3, ErrorCount(m));
   AppendError(&m, ErrorMsg(TErrorCode::PARQUET_MULTIPLE_BLOCKS, "p2"));
   ASSERT_EQ(3, ErrorCount(m));
+  ClearErrorMap(m);
+  ASSERT_EQ(1, ErrorCount(m));
 }
 
 TEST(ErrorMsg, PrintMap) {
@@ -87,6 +125,8 @@ TEST(ErrorMsg, PrintMap) {
   left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
   left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 999;
   ASSERT_EQ("1\n2\np (1 of 999 similar)\n", PrintErrorMapToString(left));
+  ClearErrorMap(left);
+  ASSERT_EQ("", PrintErrorMapToString(left));
 }
 
 }
