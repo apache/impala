@@ -653,7 +653,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
 
     SCOPED_TIMER(partition_build_timer_);
     if (process_build_batch_fn_ == NULL) {
-      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch, true));
+      bool build_filters = ht_ctx_->level() == 0;
+      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch, build_filters));
     } else {
       DCHECK(process_build_batch_fn_level0_ != NULL);
       if (ht_ctx_->level() == 0) {
