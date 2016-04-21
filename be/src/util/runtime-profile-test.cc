@@ -601,8 +601,8 @@ class TimerCounterTest {
     workers_.clear();
   }
 
-  // Allow some timer inaccuracy (1ms) since thread join could take some time.
-  static const int MAX_TIMER_ERROR_NS = 1000000;
+  // Allow some timer inaccuracy (15ms) since thread join could take some time.
+  static const int MAX_TIMER_ERROR_NS = 15000000;
   vector<DummyWorker> workers_;
   ConcurrentStopWatch csw_;
   RuntimeProfile::ConcurrentTimerCounter timercounter_;
@@ -611,22 +611,22 @@ class TimerCounterTest {
 void ValidateTimerValue(const TimerCounterTest& timer, int64_t start) {
   int64_t expected_value = MonotonicNanos() - start;
   int64_t stopwatch_value = timer.csw_.TotalRunningTime();
-  EXPECT_TRUE(stopwatch_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
-      stopwatch_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_GE(stopwatch_value, expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_LE(stopwatch_value, expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
 
   int64_t timer_value = timer.timercounter_.value();
-  EXPECT_TRUE(timer_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
-      timer_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_GE(timer_value, expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_LE(timer_value, expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
 }
 
 void ValidateLapTime(TimerCounterTest* timer, int64_t expected_value) {
   int64_t stopwatch_value = timer->csw_.LapTime();
-  EXPECT_TRUE(stopwatch_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
-      stopwatch_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_GE(stopwatch_value, expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_LE(stopwatch_value, expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
 
   int64_t timer_value = timer->timercounter_.LapTime();
-  EXPECT_TRUE(timer_value >= expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS &&
-      timer_value <= expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_GE(timer_value, expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS);
+  EXPECT_LE(timer_value, expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
 }
 
 TEST(TimerCounterTest, CountersTestOneThread) {
