@@ -383,6 +383,13 @@ class HdfsParquetScanner : public HdfsScanner {
   /// need to issue another read.
   static const int64_t FOOTER_SIZE;
 
+  /// The repetition level is set to this value to indicate the end of a row group.
+  static const int16_t ROW_GROUP_END;
+  /// Indicates an invalid definition or repetition level.
+  static const int16_t INVALID_LEVEL;
+  /// Indicates an invalid position value.
+  static const int16_t INVALID_POS;
+
   /// Class that implements Parquet definition and repetition level decoding.
   class LevelDecoder;
 
@@ -424,6 +431,10 @@ class HdfsParquetScanner : public HdfsScanner {
 
     LocalFilterStats() : considered(0), rejected(0), total_possible(0), enabled(1) { }
   };
+
+  /// Pool used for allocating caches of definition/repetition levels that are
+  /// populated by the level readers. The pool is freed in Close().
+  boost::scoped_ptr<MemPool> level_cache_pool_;
 
   /// Track statistics of each filter (one for each filter in filter_ctxs_) per scanner so
   /// that expensive aggregation up to the scan node can be performed once, during

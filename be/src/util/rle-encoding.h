@@ -105,17 +105,17 @@ class RleDecoder {
   bool Get(T* val);
 
  protected:
+  /// Fills literal_count_ and repeat_count_ with next values. Returns false if there
+  /// are no more.
+  template<typename T>
+  bool NextCounts();
+
   BitReader bit_reader_;
   /// Number of bits needed to encode the value. Must be between 0 and 64.
   int bit_width_;
   uint64_t current_value_;
   uint32_t repeat_count_;
   uint32_t literal_count_;
- private:
-  /// Fills literal_count_ and repeat_count_ with next values. Returns false if there
-  /// are no more.
-  template<typename T>
-  bool NextCounts();
 };
 
 /// Class to incrementally build the rle data.   This class does not allocate any memory.
