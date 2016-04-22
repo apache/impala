@@ -27,8 +27,8 @@ class TestSpillStress(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
-    #start impala with args
-    cls._start_impala_cluster(['--impalad_args=--"read_size=200000"',
+    # Start with 256KB buffers, to reduce data size required to force spilling.
+    cls._start_impala_cluster(['--impalad_args=--"read_size=262144"',
         'catalogd_args="--load_catalog_in_background=false"'])
     super(CustomClusterTestSuite, cls).setup_class()
 

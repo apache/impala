@@ -1,7 +1,6 @@
 ====
 ---- QUERY
-set num_nodes=1;
-set max_block_mgr_memory=265m;
+set max_block_mgr_memory=25m;
 select l_orderkey, count(*)
 from lineitem
 group by 1
@@ -19,11 +18,18 @@ order by 1 limit 10
 34,3
 ---- TYPES
 BIGINT, BIGINT
+---- RUNTIME_PROFILE
+# Verify that spilling and passthrough were activated.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
+# Could only get it to spill reliably with num_nodes=1.
+# TODO: revisit with new buffer pool.
 set num_nodes=1;
-set max_block_mgr_memory=275m;
+set max_block_mgr_memory=25m;
 select l_returnflag, l_orderkey, avg(l_tax), min(l_shipmode)
 from lineitem
 group by 1,2
@@ -34,9 +40,12 @@ order by 1,2 limit 3
 'A',6,0.03,'TRUCK'
 ---- TYPES
 STRING, BIGINT, DECIMAL, STRING
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-set max_block_mgr_memory=275m;
+set max_block_mgr_memory=25m;
 select l_orderkey, count(*)
 from lineitem
 group by 1
@@ -54,11 +63,17 @@ order by 1 limit 10;
 34,3
 ---- TYPES
 BIGINT, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column
-set num_nodes=0;
-set max_block_mgr_memory=275m;
+# Could only get it to spill reliably with num_nodes=1.
+# TODO: revisit with new buffer pool.
+set num_nodes=1;
+set max_block_mgr_memory=25m;
 select l_comment, count(*)
 from lineitem
 group by 1
@@ -71,11 +86,16 @@ order by count(*) desc limit 5
 ' furiously ',845
 ---- TYPES
 STRING, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
-set num_nodes=0;
-set max_block_mgr_memory=80m;
+# Could only get it to spill reliably with num_nodes=1.
+# TODO: revisit with new buffer pool.
+set num_nodes=1;
+set max_block_mgr_memory=25m;
 select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
 from lineitem
 group by 1,2
@@ -87,15 +107,13 @@ order by 1,2 limit 3;
 ---- TYPES
 STRING, BIGINT, DECIMAL, STRING
 ---- RUNTIME_PROFILE
-# Verify that passthrough and spilling happened in the pre and merge agg.
-# TODO: reenable if we can get it to spill in a non-flaky way
-# row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-# row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+# Verify that spilling happened in the agg.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-# Test query with string intermediate state.
-set num_nodes=0;
-set max_block_mgr_memory=275m;
+# Test with string intermediate state (avg() uses string intermediate value).
+set max_block_mgr_memory=25m;
 select l_orderkey, avg(l_orderkey)
 from lineitem
 group by 1
@@ -108,6 +126,11 @@ order by 1 limit 5
 5,5
 ---- TYPES
 BIGINT, DOUBLE
+---- RUNTIME_PROFILE
+# Verify that passthrough and spilling happened in the pre and merge agg.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 set num_nodes=0;
@@ -128,6 +151,9 @@ l1.l_shipdate = l3.l_shipdate
 1846743
 ---- TYPES
 BIGINT
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 set num_nodes=0;
@@ -138,6 +164,10 @@ select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
 6001215,'TAKE BACK RETURN','zzle? slyly final platelets sleep quickly. '
 ---- TYPES
 BIGINT, STRING, STRING
+---- RUNTIME_PROFILE
+# Indirectly verify that the analytic spilled: if it spills a block, it must repin it.
+row_regex: .*PinTime: [1-9][0-9]*.*
+====
 ---- QUERY
 # Run this query with very low memory. Since the tables are small, the PA/PHJ should be
 # using buffers much smaller than the io buffer.
@@ -158,13 +188,16 @@ where a.id = b.id and b.id = c.id group by a.int_col
 9,8
 ---- TYPES
 INT, BIGINT
+---- RUNTIME_PROFILE
+# This query is not meant to spill.
+row_regex: .*SpilledPartitions: 0 .*
 ====
 ---- QUERY: TPCH-Q21
 # Adding TPCH-Q21 in the spilling test to check for IMPALA-1471 (spilling left anti
 # and left outer joins were returning wrong results).
 # Q21 - Suppliers Who Kept Orders Waiting Query
 set num_nodes=0;
-set max_block_mgr_memory=100m;
+set max_block_mgr_memory=65m;
 select
   s_name,
   count(*) as numwait
@@ -308,12 +341,14 @@ limit 100
 'Supplier#000002483',12
 ---- TYPES
 string, bigint
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test aggregation spill with group_concat distinct
-# TODO: get this to spill.
 set num_nodes=1;
-set max_block_mgr_memory=265m;
+set max_block_mgr_memory=100m;
 select l_orderkey, count(*), group_concat(distinct l_linestatus, '|')
 from lineitem
 group by 1
@@ -331,6 +366,9 @@ order by 1 limit 10
 34,3,'O'
 ---- TYPES
 BIGINT, BIGINT, STRING
+---- RUNTIME_PROFILE
+# Verify that at least one of the aggs spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Regression test for IMPALA-2612. The following query will cause CastToChar
@@ -348,4 +386,203 @@ from lineitem
 4502054
 ---- TYPES
 BIGINT
+---- RUNTIME_PROFILE
+# Verify that the agg spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test sort with inlined char column materialized by exprs.
+# Set low memory limit to force spilling.
+set num_nodes=0;
+set max_block_mgr_memory=4m;
+# IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
+# When IMPALA-3332 is fixed, can reenable this memory limit.
+#set mem_limit=200m;
+set disable_outermost_topn=1;
+select cast(l_comment as char(50))
+from lineitem
+order by 1
+limit 20;
+---- RESULTS
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias about the en                            '
+' Tiresias about the slyly ironic dinos ca         '
+' Tiresias about the slyly unus                    '
+' Tiresias above                                   '
+' Tiresias above the fox                           '
+' Tiresias above the furiously final th            '
+' Tiresias above the slyly expr                    '
+' Tiresias above the stealthily p                  '
+---- TYPES
+CHAR
+---- RUNTIME_PROFILE
+# Verify that the sort actually spilled
+row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test sort with input inlined char column materialized before sort.
+set num_nodes=0;
+set mem_limit=200m;
+set max_block_mgr_memory=4m;
+set disable_outermost_topn=1;
+select char_col
+from (select cast(l_comment as char(50)) char_col
+      from lineitem) subquery
+order by 1
+limit 20;
+---- RESULTS
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias                                         '
+' Tiresias about the en                            '
+' Tiresias about the slyly ironic dinos ca         '
+' Tiresias about the slyly unus                    '
+' Tiresias above                                   '
+' Tiresias above the fox                           '
+' Tiresias above the furiously final th            '
+' Tiresias above the slyly expr                    '
+' Tiresias above the stealthily p                  '
+---- TYPES
+CHAR
+---- RUNTIME_PROFILE
+# Verify that the sort actually spilled
+row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test sort with input non-inlined char column materialized before sort.
+# Set low memory limit to force spilling.
+set num_nodes=0;
+set mem_limit=200m;
+set max_block_mgr_memory=4m;
+set disable_outermost_topn=1;
+select char_col
+from (select cast(l_comment as char(200)) char_col
+      from lineitem) subquery
+order by 1
+limit 20;
+---- RESULTS
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias                                                                                                                                                                                               '
+' Tiresias about the en                                                                                                                                                                                  '
+' Tiresias about the slyly ironic dinos ca                                                                                                                                                               '
+' Tiresias about the slyly unus                                                                                                                                                                          '
+' Tiresias above                                                                                                                                                                                         '
+' Tiresias above the fox                                                                                                                                                                                 '
+' Tiresias above the furiously final th                                                                                                                                                                  '
+' Tiresias above the slyly expr                                                                                                                                                                          '
+' Tiresias above the stealthily p                                                                                                                                                                        '
+---- TYPES
+CHAR
+---- RUNTIME_PROFILE
+# Verify that the sort actually spilled
+row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test sort with varchar column materialized by exprs.
+# Set low memory limit to force spilling.
+set num_nodes=0;
+set max_block_mgr_memory=4m;
+# IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
+# When IMPALA-3332 is fixed, can reenable this memory limit.
+#set mem_limit=200m;
+set disable_outermost_topn=1;
+select cast(l_comment as varchar(50))
+from lineitem
+order by 1
+limit 20;
+---- RESULTS
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias about the en'
+' Tiresias about the slyly ironic dinos ca'
+' Tiresias about the slyly unus'
+' Tiresias above'
+' Tiresias above the fox'
+' Tiresias above the furiously final th'
+' Tiresias above the slyly expr'
+' Tiresias above the stealthily p'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+# Verify that the sort actually spilled
+row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test sort with input varchar column materialized before sort.
+# Set low memory limit to force spilling.
+set num_nodes=0;
+set mem_limit=200m;
+set max_block_mgr_memory=4m;
+set disable_outermost_topn=1;
+select char_col
+from (select cast(l_comment as varchar(50)) char_col
+      from lineitem) subquery
+order by 1
+limit 20;
+---- RESULTS
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias '
+' Tiresias about the en'
+' Tiresias about the slyly ironic dinos ca'
+' Tiresias about the slyly unus'
+' Tiresias above'
+' Tiresias above the fox'
+' Tiresias above the furiously final th'
+' Tiresias above the slyly expr'
+' Tiresias above the stealthily p'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+# Verify that the sort actually spilled
+row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
