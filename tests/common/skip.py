@@ -51,6 +51,7 @@ class SkipIf:
       reason="Default filesystem needed")
   kudu_not_supported = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
       reason="Kudu is not supported")
+  not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")
 
 class SkipIfIsilon:
   caching = pytest.mark.skipif(IS_ISILON, reason="SET CACHED not implemented for Isilon")

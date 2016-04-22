@@ -248,11 +248,10 @@ Status Webserver::Start() {
       options.push_back(FLAGS_webserver_private_key_file.c_str());
 
       if (!FLAGS_webserver_private_key_password_cmd.empty()) {
-        if (!RunShellProcess(FLAGS_webserver_private_key_password_cmd, &key_password)) {
+        if (!RunShellProcess(FLAGS_webserver_private_key_password_cmd, &key_password, true)) {
           return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED,
               FLAGS_webserver_private_key_password_cmd, key_password);
         }
-        trim_right(key_password);
         options.push_back("ssl_private_key_password");
         options.push_back(key_password.c_str());
       }

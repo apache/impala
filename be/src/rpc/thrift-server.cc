@@ -377,10 +377,9 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
   private_key_path_ = private_key;
 
   if (!pem_password_cmd.empty()) {
-    if (!RunShellProcess(pem_password_cmd, &key_password_)) {
+    if (!RunShellProcess(pem_password_cmd, &key_password_, true)) {
       return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED, pem_password_cmd, key_password_);
     } else {
-      trim_right(key_password_);
       LOG(INFO) << "Command '" << pem_password_cmd << "' executed successfully, "
                 << ".PEM password retrieved";
     }

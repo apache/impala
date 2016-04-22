@@ -207,7 +207,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 
   // Required for the FE's Catalog
   impala::LibCache::Init();
-  impala::HdfsFsCache::Init();
+  Status fs_cache_init_status = impala::HdfsFsCache::Init();
+  if (!fs_cache_init_status.ok()) CLEAN_EXIT_WITH_ERROR(fs_cache_init_status.GetDetail());
 
   if (init_jvm) {
     ABORT_IF_ERROR(JniUtil::Init());

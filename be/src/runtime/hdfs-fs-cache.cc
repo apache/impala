@@ -22,6 +22,7 @@
 #include "util/error-util.h"
 #include "util/hdfs-util.h"
 #include "util/test-info.h"
+#include "util/os-util.h"
 
 #include "common/names.h"
 
@@ -29,11 +30,36 @@ using namespace strings;
 
 namespace impala {
 
-scoped_ptr<HdfsFsCache> HdfsFsCache::instance_;
+DEFINE_string(s3a_access_key_cmd, "", "A Unix command whose output returns the "
+    "access key to S3, i.e. \"fs.s3a.access.key\".");
 
-void HdfsFsCache::Init() {
+DEFINE_string(s3a_secret_key_cmd, "", "A Unix command whose output returns the "
+    "secret key to S3, i.e. \"fs.s3a.secret.key\".");
+
+scoped_ptr<HdfsFsCache> HdfsFsCache::instance_;
+string HdfsFsCache::s3a_access_key_;
+string HdfsFsCache::s3a_secret_key_;
+
+Status HdfsFsCache::Init() {
   DCHECK(HdfsFsCache::instance_.get() == NULL);
   HdfsFsCache::instance_.reset(new HdfsFsCache());
+
+  if (!FLAGS_s3a_access_key_cmd.empty() && !FLAGS_s3a_secret_key_cmd.empty()) {
+    if (!RunShellProcess(FLAGS_s3a_access_key_cmd, &s3a_access_key_, true)) {
+      return Status(Substitute("Could not run command '$0' to retrieve S3 Access Key. "
+          "Impala will not be able to access S3.", FLAGS_s3a_access_key_cmd));
+    }
+    LOG(INFO) << "S3 Access Key retrieval command '" << FLAGS_s3a_access_key_cmd
+              << "' executed successfully.";
+
+    if (!RunShellProcess(FLAGS_s3a_secret_key_cmd, &s3a_secret_key_, true)) {
+      return Status(Substitute("Could not run command '$0' to retrieve S3 Access Key. "
+          "Impala will not be able to access S3.", FLAGS_s3a_secret_key_cmd));
+    }
+    LOG(INFO) << "S3 Secret Key retrieval command '" << FLAGS_s3a_secret_key_cmd
+              << "' executed successfully.";
+  }
+  return Status::OK();
 }
 
 Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
@@ -58,6 +84,10 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
     if (i == fs_map_.end()) {
       hdfsBuilder* hdfs_builder = hdfsNewBuilder();
       hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
+      if (!s3a_access_key_.empty()) {
+        hdfsBuilderConfSetStr(hdfs_builder, "fs.s3a.access.key", s3a_access_key_.c_str());
+        hdfsBuilderConfSetStr(hdfs_builder, "fs.s3a.secret.key", s3a_secret_key_.c_str());
+      }
       *fs = hdfsBuilderConnect(hdfs_builder);
       if (*fs == NULL) {
         return Status(GetHdfsErrorMsg("Failed to connect to FS: ", namenode));

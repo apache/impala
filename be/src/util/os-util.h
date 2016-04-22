@@ -43,7 +43,8 @@ Status GetThreadStats(int64_t tid, ThreadStats* stats);
 /// or non-0 exit code), and true otherwise. *msg is set to an error message including the
 /// OS error string, if any, and the first 1k of output if there was any error, or just
 /// the first 1k of output otherwise.
-bool RunShellProcess(const std::string& cmd, std::string* msg);
+/// If do_trim is 'true', all trailing whitespace is removed from the output.
+bool RunShellProcess(const std::string& cmd, std::string* msg, bool do_trim=false);
 
 }
 #endif

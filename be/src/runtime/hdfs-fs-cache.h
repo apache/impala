@@ -43,7 +43,7 @@ class HdfsFsCache {
   static HdfsFsCache* instance() { return HdfsFsCache::instance_.get(); }
 
   /// Initializes the cache. Must be called before any other APIs.
-  static void Init();
+  static Status Init();
 
   /// Get connection to the local filesystem.
   Status GetLocalConnection(hdfsFS* fs);
@@ -58,6 +58,16 @@ class HdfsFsCache {
   /// Get NameNode info from path, set error message if path is not valid.
   /// Exposed as a static method for testing purpose.
   static string GetNameNodeFromPath(const string& path, string* err);
+
+  /// S3A access key retrieved by running command in Init().
+  /// If either s3a_secret_key_ or this are empty, the default value is taken from the
+  /// local Hadoop client configuration.
+  static std::string s3a_access_key_;
+
+  /// S3A secret key retrieved by running command in Init().
+  /// If either s3a_access_key_ or this are empty, the default value is taken from the
+  /// local Hadoop client configuration.
+  static std::string s3a_secret_key_;
 
  private:
   /// Singleton instance. Instantiated in Init().
