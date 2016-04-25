@@ -89,7 +89,7 @@ Frontend::Frontend() {
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class_, &(methods[i])));
+    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class_, &(methods[i])));
   };
 
   jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
@@ -105,7 +105,7 @@ Frontend::Frontend() {
       policy_file_path, sentry_config, auth_provider_class, FlagToTLogLevel(FLAGS_v),
       FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   EXIT_IF_EXC(jni_env);
-  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
+  ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }
 
 Status Frontend::UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,

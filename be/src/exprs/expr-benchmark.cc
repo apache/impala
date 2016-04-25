@@ -50,7 +50,7 @@ class Planner {
     jboolean lazy = true;
     jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
     EXIT_IF_EXC(jni_env);
-    EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
+    ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
   }
 
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
@@ -106,8 +106,8 @@ static TestData* GenerateBenchmarkExprs(const string& query, bool codegen) {
   ss << "select " << query;
   TestData* test_data = new TestData;
   TExecRequest request;
-  EXIT_IF_ERROR(planner.GeneratePlan(ss.str(), &request));
-  EXIT_IF_ERROR(PrepareSelectList(request, &test_data->ctx));
+  ABORT_IF_ERROR(planner.GeneratePlan(ss.str(), &request));
+  ABORT_IF_ERROR(PrepareSelectList(request, &test_data->ctx));
   return test_data;
 }
 

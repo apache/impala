@@ -57,10 +57,10 @@ int ImpaladMain(int argc, char** argv) {
 
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
-  EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(HBaseTable::InitJNI());
-  EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
-  EXIT_IF_ERROR(HiveUdfCall::Init());
+  ABORT_IF_ERROR(HBaseTableScanner::Init());
+  ABORT_IF_ERROR(HBaseTable::InitJNI());
+  ABORT_IF_ERROR(HBaseTableWriter::InitJNI());
+  ABORT_IF_ERROR(HiveUdfCall::Init());
   InitFeSupport();
 
   // start backend service for the coordinator on be_port
@@ -72,10 +72,10 @@ int ImpaladMain(int argc, char** argv) {
   ThriftServer* hs2_server = NULL;
   ThriftServer* be_server = NULL;
   ImpalaServer* server = NULL;
-  EXIT_IF_ERROR(CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port,
+  ABORT_IF_ERROR(CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port,
       FLAGS_be_port, &beeswax_server, &hs2_server, &be_server, &server));
 
-  EXIT_IF_ERROR(be_server->Start());
+  ABORT_IF_ERROR(be_server->Start());
 
   Status status = exec_env.StartServices();
   if (!status.ok()) {
@@ -86,8 +86,8 @@ int ImpaladMain(int argc, char** argv) {
   }
 
   // this blocks until the beeswax and hs2 servers terminate
-  EXIT_IF_ERROR(beeswax_server->Start());
-  EXIT_IF_ERROR(hs2_server->Start());
+  ABORT_IF_ERROR(beeswax_server->Start());
+  ABORT_IF_ERROR(hs2_server->Start());
   ImpaladMetrics::IMPALA_SERVER_READY->set_value(true);
   LOG(INFO) << "Impala has started.";
   beeswax_server->Join();

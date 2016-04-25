@@ -52,9 +52,9 @@ int main(int argc, char** argv) {
 
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
-  EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(HBaseTable::InitJNI());
-  EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
+  ABORT_IF_ERROR(HBaseTableScanner::Init());
+  ABORT_IF_ERROR(HBaseTable::InitJNI());
+  ABORT_IF_ERROR(HBaseTableWriter::InitJNI());
   InitFeSupport();
 
   int base_be_port = FLAGS_be_port;
@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
   int hs2_port = 21050;
 
   scoped_ptr<InProcessStatestore> statestore(new InProcessStatestore(23000, 25100));
-  if (FLAGS_use_statestore) EXIT_IF_ERROR(statestore->Start());
+  if (FLAGS_use_statestore) ABORT_IF_ERROR(statestore->Start());
   LOG(INFO) << "Started in-process statestore";
 
   vector<InProcessImpalaServer*> impala_servers;
@@ -76,10 +76,10 @@ int main(int argc, char** argv) {
                                   FLAGS_hostname, 23000));
     // First server in the list runs client servers
     if (i == 0) {
-      EXIT_IF_ERROR(impala_servers[i]->StartWithClientServers(beeswax_port, hs2_port,
+      ABORT_IF_ERROR(impala_servers[i]->StartWithClientServers(beeswax_port, hs2_port,
                                                               FLAGS_use_statestore));
     } else {
-      EXIT_IF_ERROR(impala_servers[i]->StartAsBackendOnly(FLAGS_use_statestore));
+      ABORT_IF_ERROR(impala_servers[i]->StartAsBackendOnly(FLAGS_use_statestore));
     }
   }
 

@@ -5838,7 +5838,7 @@ int main(int argc, char **argv) {
   InProcessImpalaServer* impala_server = InProcessImpalaServer::StartWithEphemeralPorts();
   executor_ = new ImpaladQueryExecutor(impala_server->hostname(),
       impala_server->beeswax_port());
-  EXIT_IF_ERROR(executor_->Setup());
+  ABORT_IF_ERROR(executor_->Setup());
 
   vector<string> options;
   options.push_back("DISABLE_CODEGEN=1");

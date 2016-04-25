@@ -268,19 +268,32 @@ class Status {
   } while (false)
 
 
-#define EXIT_IF_ERROR(stmt) \
+#define ABORT_IF_ERROR(stmt) \
   do { \
     Status __status__ = (stmt); \
     if (UNLIKELY(!__status__.ok())) { \
-      EXIT_WITH_ERROR(__status__.GetDetail()); \
+      ABORT_WITH_ERROR(__status__.GetDetail()); \
     } \
   } while (false)
 
+// Log to FATAL and abort process, generating a core dump if enabled. This should be used
+// for unexpected error cases where we want a core dump.
 // LOG(FATAL) will call abort().
-#define EXIT_WITH_ERROR(msg) \
+#define ABORT_WITH_ERROR(msg) \
   do { \
     LOG(FATAL) << msg << ". Impalad exiting.\n"; \
   } while (false)
+
+// Log to ERROR and exit process with status 1 without calling abort() or dumping core.
+// This should be used for expected error cases, e.g. bad command-line arguments where
+// we just want to exit cleanly without generating core dumps.
+#define CLEAN_EXIT_WITH_ERROR(msg) \
+  do { \
+    LOG(ERROR) << msg << ". Impalad exiting.\n"; \
+    google::FlushLogFiles(google::ERROR); \
+    exit(1); \
+  } while (false)
+
 }
 
 #endif

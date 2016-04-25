@@ -59,21 +59,21 @@ int CatalogdMain(int argc, char** argv) {
   scoped_ptr<Webserver> webserver(new Webserver());
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver.get(), &process_mem_tracker);
-    EXIT_IF_ERROR(webserver->Start());
+    ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
 
   scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
-  EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
+  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
   StartThreadInstrumentation(metrics.get(), webserver.get());
 
   InitRpcEventTracing(webserver.get());
   metrics->AddProperty<string>("catalog.version", GetVersionString(true));
 
   CatalogServer catalog_server(metrics.get());
-  EXIT_IF_ERROR(catalog_server.Start());
+  ABORT_IF_ERROR(catalog_server.Start());
   catalog_server.RegisterWebpages(webserver.get());
   shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
@@ -85,10 +85,10 @@ int CatalogdMain(int argc, char** argv) {
       FLAGS_catalog_service_port, NULL, metrics.get(), 5);
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for CatalogService";
-    EXIT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
+    ABORT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
         FLAGS_ssl_private_key_password_cmd));
   }
-  EXIT_IF_ERROR(server->Start());
+  ABORT_IF_ERROR(server->Start());
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();
 

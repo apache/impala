@@ -249,7 +249,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
-      LOG(FATAL) << "Aborting Impala Server startup due to improper configuration";
+      CLEAN_EXIT_WITH_ERROR(
+          "Aborting Impala Server startup due to improper configuration");
     }
   }
 
@@ -257,8 +258,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
-      LOG(FATAL) << "Aborting Impala Server startup due to improperly "
-                 << "configured scratch directories.";
+      CLEAN_EXIT_WITH_ERROR("Aborting Impala Server startup due to improperly "
+           "configured scratch directories.");
     }
   }
 
@@ -268,13 +269,13 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 
   if (!InitAuditEventLogging().ok()) {
-    LOG(FATAL) << "Aborting Impala Server startup due to failure initializing "
-               << "audit event logging";
+    CLEAN_EXIT_WITH_ERROR("Aborting Impala Server startup due to failure initializing "
+        "audit event logging");
   }
 
   if (!InitLineageLogging().ok()) {
-    LOG(FATAL) << "Aborting Impala Server startup due to failure initializing "
-               << "lineage logging";
+    CLEAN_EXIT_WITH_ERROR("Aborting Impala Server startup due to failure initializing "
+        "lineage logging");
   }
 
   if (!FLAGS_authorized_proxy_user_config.empty()) {
@@ -288,9 +289,9 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       BOOST_FOREACH(const string& config, proxy_user_config) {
         size_t pos = config.find("=");
         if (pos == string::npos) {
-          LOG(FATAL) << "Invalid proxy user configuration. No mapping value specified "
-                     << "for the proxy user. For more information review usage of the "
-                     << "--authorized_proxy_user_config flag: " << config;
+          CLEAN_EXIT_WITH_ERROR(Substitute("Invalid proxy user configuration. No "
+              "mapping value specified for the proxy user. For more information review "
+              "usage of the --authorized_proxy_user_config flag: $0", config));
         }
         string proxy_user = config.substr(0, pos);
         string config_str = config.substr(pos + 1);
@@ -319,7 +320,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   ImpaladMetrics::IMPALA_SERVER_START_TIME->set_value(
       TimestampValue::LocalTime().DebugString());
 
-  EXIT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env->metrics()));
+  ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env->metrics()));
 
   // Register the membership callback if required
   if (exec_env->subscriber() != NULL) {
@@ -333,7 +334,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         CatalogServer::IMPALA_CATALOG_TOPIC, true, catalog_cb);
   }
 
-  EXIT_IF_ERROR(UpdateCatalogMetrics());
+  ABORT_IF_ERROR(UpdateCatalogMetrics());
 
   // Initialise the cancellation thread pool with 5 (by default) threads. The max queue
   // size is deliberately set so high that it should never fill; if it does the
@@ -386,7 +387,8 @@ Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
   if (!status.ok()) {
     LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_lineage_event) {
-      LOG(FATAL) << "Shutting down Impala Server due to abort_on_failed_lineage_event=true";
+      CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+          "abort_on_failed_lineage_event=true");
     }
   }
   return status;
@@ -477,7 +479,8 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   if (!status.ok()) {
     LOG(ERROR) << "Unable to record audit event record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_audit_event) {
-      LOG(FATAL) << "Shutting down Impala Server due to abort_on_failed_audit_event=true";
+      CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+          "abort_on_failed_audit_event=true");
     }
   }
   return status;
@@ -645,8 +648,8 @@ void ImpalaServer::AuditEventLoggerFlushThread() {
     if (!status.ok()) {
       LOG(ERROR) << "Error flushing audit event log: " << status.GetDetail();
       if (FLAGS_abort_on_failed_audit_event) {
-        LOG(FATAL) << "Shutting down Impala Server due to "
-                   << "abort_on_failed_audit_event=true";
+        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+             "abort_on_failed_audit_event=true");
       }
     }
   }
@@ -659,8 +662,8 @@ void ImpalaServer::LineageLoggerFlushThread() {
     if (!status.ok()) {
       LOG(ERROR) << "Error flushing lineage event log: " << status.GetDetail();
       if (FLAGS_abort_on_failed_lineage_event) {
-        LOG(FATAL) << "Shutting down Impala Server due to "
-                   << "abort_on_failed_lineage_event=true";
+        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+            "abort_on_failed_lineage_event=true");
       }
     }
   }
@@ -1145,8 +1148,8 @@ void ImpalaServer::InitializeConfigVariables() {
       &set_query_options);
   if (!status.ok()) {
     // Log error and exit if the default query options are invalid.
-    LOG(FATAL) << "Invalid default query options. Please check -default_query_options.\n"
-               << status.GetDetail();
+    CLEAN_EXIT_WITH_ERROR(Substitute("Invalid default query options. Please check "
+        "-default_query_options.\n $0", status.GetDetail()));
   }
   LOG(INFO) << "Default query options:" << ThriftDebugString(default_query_options_);
 

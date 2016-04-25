@@ -31,6 +31,7 @@
 #include "common/names.h"
 
 using namespace impala;
+using strings::Substitute;
 
 DEFINE_bool(require_username, false, "Requires that a user be provided in order to "
     "schedule requests. If enabled and a user is not provided, requests will be "
@@ -93,8 +94,8 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
     if (FLAGS_enable_rm) {
-      LOG(FATAL) << "If resource management is enabled, -fair_scheduler_allocation_path "
-                 << "is required.";
+      CLEAN_EXIT_WITH_ERROR("If resource management is enabled, "
+          "-fair_scheduler_allocation_path is required.");
     }
     default_pool_only_ = true;
     bool is_percent; // not used
@@ -102,8 +103,8 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
         &is_percent, MemInfo::physical_mem());
     // -1 indicates an error occurred
     if (bytes_limit < 0) {
-      LOG(FATAL) << "Unable to parse default pool mem limit from '"
-                 << FLAGS_default_pool_mem_limit << "'.";
+      CLEAN_EXIT_WITH_ERROR(Substitute("Unable to parse default pool mem limit from "
+          "'$0'.", FLAGS_default_pool_mem_limit));
     }
     // 0 indicates no limit or not set
     if (bytes_limit == 0) {
@@ -128,7 +129,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   EXIT_IF_EXC(jni_env);
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, request_pool_service_class_,
+    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, request_pool_service_class_,
         &(methods[i])));
   }
 
@@ -142,7 +143,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   jobject request_pool_service = jni_env->NewObject(request_pool_service_class_, ctor_,
       fair_scheduler_config_path, llama_site_path);
   EXIT_IF_EXC(jni_env);
-  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, request_pool_service,
+  ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, request_pool_service,
       &request_pool_service_));
   jni_env->CallObjectMethod(request_pool_service_, start_id);
   EXIT_IF_EXC(jni_env);
@@ -176,11 +177,11 @@ Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,
     return Status(boost::algorithm::join(result.status.error_msgs, "; "));
   }
   if (result.resolved_pool.empty()) {
-    return Status(strings::Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND,
+    return Status(Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND,
         user, requested_pool));
   }
   if (!result.has_access) {
-    return Status(strings::Substitute(ERROR_USER_NOT_ALLOWED_IN_POOL, user,
+    return Status(Substitute(ERROR_USER_NOT_ALLOWED_IN_POOL, user,
         requested_pool, result.resolved_pool));
   }
   *resolved_pool = result.resolved_pool;

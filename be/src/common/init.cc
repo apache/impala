@@ -173,18 +173,18 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   google::ParseCommandLineFlags(&argc, &argv, true);
   if (!FLAGS_redaction_rules_file.empty()) {
     if (VLOG_ROW_IS_ON || !FLAGS_vmodule.empty()) {
-      EXIT_WITH_ERROR("Redaction cannot be used in combination with log level 3 or "
+      CLEAN_EXIT_WITH_ERROR("Redaction cannot be used in combination with log level 3 or "
           "higher or the -vmodule option because these log levels may log data in "
           "ways redaction rules may not anticipate.");
     }
     const string& error_message = SetRedactionRulesFromFile(FLAGS_redaction_rules_file);
-    if (!error_message.empty()) EXIT_WITH_ERROR(error_message);
+    if (!error_message.empty()) CLEAN_EXIT_WITH_ERROR(error_message);
   }
   impala::InitGoogleLoggingSafe(argv[0]);
   AtomicOps_x86CPUFeaturesInit();
   impala::InitThreading();
   impala::TimestampParser::Init();
-  EXIT_IF_ERROR(impala::InitAuth(argv[0]));
+  ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize maintenance_thread after InitGoogleLoggingSafe and InitThreading.
   maintenance_thread.reset(
@@ -210,7 +210,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   impala::HdfsFsCache::Init();
 
   if (init_jvm) {
-    EXIT_IF_ERROR(JniUtil::Init());
+    ABORT_IF_ERROR(JniUtil::Init());
     InitJvmLoggingSupport();
   }
 

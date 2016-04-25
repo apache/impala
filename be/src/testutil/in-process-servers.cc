@@ -160,7 +160,7 @@ Status InProcessStatestore::Start() {
       statestore_port_, NULL, metrics_.get(), 5));
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
-    EXIT_IF_ERROR(statestore_server_->EnableSsl(
+    ABORT_IF_ERROR(statestore_server_->EnableSsl(
         FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
   }
   statestore_main_loop_.reset(

@@ -58,7 +58,7 @@ Catalog::Catalog() {
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, catalog_class_, &(methods[i])));
+    ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, catalog_class_, &(methods[i])));
   }
 
   jboolean load_in_background = FLAGS_load_catalog_in_background;
@@ -68,7 +68,7 @@ Catalog::Catalog() {
       load_in_background, num_metadata_loading_threads, sentry_config,
       FlagToTLogLevel(FLAGS_v), FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   EXIT_IF_EXC(jni_env);
-  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
+  ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }
 
 Status Catalog::GetCatalogObject(const TCatalogObject& req,

@@ -54,14 +54,14 @@ int StatestoredMain(int argc, char** argv) {
 
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver.get(), &mem_tracker);
-    EXIT_IF_ERROR(webserver->Start());
+    ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
 
   scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
-  EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false));
+  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false));
   StartThreadInstrumentation(metrics.get(), webserver.get());
   InitRpcEventTracing(webserver.get());
   // TODO: Add a 'common metrics' method to add standard metrics to
@@ -80,10 +80,10 @@ int StatestoredMain(int argc, char** argv) {
       FLAGS_state_store_port, NULL, metrics.get(), 5);
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
-    EXIT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
+    ABORT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
         FLAGS_ssl_private_key_password_cmd));
   }
-  EXIT_IF_ERROR(server->Start());
+  ABORT_IF_ERROR(server->Start());
 
   statestore.MainLoop();
 
