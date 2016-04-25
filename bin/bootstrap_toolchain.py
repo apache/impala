@@ -124,103 +124,6 @@ def bootstrap(packages):
     write_version_file(toolchain_root, pkg_name, pkg_version, compiler,
         get_platform_release_label())
 
-def build_kudu_stub(toolchain_root, kudu_version, compiler):
-  # When Kudu isn't supported, the CentOS 7 package will be downloaded and the client
-  # lib will be replaced with a stubbed client.
-  download_package(toolchain_root, "kudu", kudu_version, compiler,
-      platform_release="centos7")
-
-  # Find the client lib files in the extracted dir. There may be several files with
-  # various extensions. Also there will be a debug version.
-  kudu_dir = package_directory(toolchain_root, "kudu", kudu_version)
-  client_lib_paths = []
-  for path, _, files in os.walk(kudu_dir):
-    for file in files:
-      if not file.startswith("libkudu_client.so"):
-        continue
-      file_path = os.path.join(path, file)
-      if os.path.islink(file_path):
-        continue
-      client_lib_paths.append(file_path)
-  if not client_lib_paths:
-    raise Exception("Unable to find Kudu client lib under '%s'" % kudu_dir)
-
-  # The client stub will be create by inspecting a real client and extracting the
-  # symbols. The choice of which client file to use shouldn't matter.
-  client_lib_path = client_lib_paths[0]
-
-  # Use a newer version of binutils because on older systems the default binutils may
-  # not be able to read the newer binary.
-  binutils_dir = package_directory(
-      toolchain_root, "binutils", os.environ["IMPALA_BINUTILS_VERSION"])
-  nm_path = os.path.join(binutils_dir, "bin", "nm")
-  objdump_path = os.path.join(binutils_dir, "bin", "objdump")
-
-  # Extract the symbols and write the stubbed client source. There is a special method
-  # kudu::client::GetShortVersionString() that is overridden so that the stub can be
-  # identified by the caller.
-  get_short_version_symbol = "_ZN4kudu6client21GetShortVersionStringEv"
-  nm_out = check_output([nm_path, "--defined-only", "-D", client_lib_path])
-  stub_build_dir = tempfile.mkdtemp()
-  stub_client_src_file = open(os.path.join(stub_build_dir, "kudu_client.cc"), "w")
-  try:
-    stub_client_src_file.write("""
-#include <string>
-
-static const std::string kFakeKuduVersion = "__IMPALA_KUDU_STUB__";
-
-static void KuduNotSupported() {
-    *((char*)0) = 0;
-}
-
-namespace kudu { namespace client {
-std::string GetShortVersionString() { return kFakeKuduVersion; }
-}}
-""")
-    found_start_version_symbol = False
-    for line in nm_out.splitlines():
-      addr, sym_type, name = line.split(" ")
-      if name in ["_init", "_fini"]:
-        continue
-      if name == get_short_version_symbol:
-        found_start_version_symbol = True
-        continue
-      if sym_type.upper() in "TW":
-        stub_client_src_file.write("""
-extern "C" void %s() {
-  KuduNotSupported();
-}
-""" % name)
-    if not found_start_version_symbol:
-      raise Exception("Expected to find symbol " + get_short_version_symbol +
-          " corresponding to kudu::client::GetShortVersionString() but it was not found.")
-    stub_client_src_file.flush()
-
-    # The soname is needed to avoid problem in packaging builds. Without the soname,
-    # the library dependency as listed in the impalad binary will be a full path instead
-    # of a short name. Debian in particular has problems with packaging when that happens.
-    objdump_out = check_output([objdump_path, "-p", client_lib_path])
-    for line in objdump_out.splitlines():
-      if "SONAME" not in line:
-        continue
-      # The line that needs to be parsed should be something like:
-      # "  SONAME               libkudu_client.so.0"
-      so_name = line.split()[1]
-      break
-    else:
-      raise Exception("Unable to extract soname from %s" % client_lib_path)
-
-    # Compile the library.
-    stub_client_lib_path = os.path.join(stub_build_dir, "libkudu_client.so")
-    subprocess.check_call(["g++", stub_client_src_file.name, "-shared", "-fPIC",
-        "-Wl,-soname,%s" % so_name, "-o", stub_client_lib_path])
-
-    # Replace the real libs with the stub.
-    for client_lib_path in client_lib_paths:
-      shutil.copyfile(stub_client_lib_path, client_lib_path)
-  finally:
-    shutil.rmtree(stub_build_dir)
-
 def check_output(cmd_args):
   """Run the command and return the output. Raise an exception if the command returns
      a non-zero return code. Similar to subprocess.check_output() which is only provided
@@ -294,6 +197,111 @@ def unpack_name_and_version(package):
       raise Exception("Could not find version for {0} in environment var {1}".format(
         package, env_var))
   return package[0], package[1]
+
+def build_kudu_stub(toolchain_root, kudu_version, compiler):
+  # When Kudu isn't supported, the CentOS 7 package will be downloaded and the client
+  # lib will be replaced with a stubbed client.
+  download_package(toolchain_root, "kudu", kudu_version, compiler,
+      platform_release="centos7")
+
+  # Find the client lib files in the extracted dir. There may be several files with
+  # various extensions. Also there will be a debug version.
+  kudu_dir = package_directory(toolchain_root, "kudu", kudu_version)
+  client_lib_paths = []
+  for path, _, files in os.walk(kudu_dir):
+    for file in files:
+      if not file.startswith("libkudu_client.so"):
+        continue
+      file_path = os.path.join(path, file)
+      if os.path.islink(file_path):
+        continue
+      client_lib_paths.append(file_path)
+  if not client_lib_paths:
+    raise Exception("Unable to find Kudu client lib under '%s'" % kudu_dir)
+
+  # The client stub will be create by inspecting a real client and extracting the
+  # symbols. The choice of which client file to use shouldn't matter.
+  client_lib_path = client_lib_paths[0]
+
+  # Use a newer version of binutils because on older systems the default binutils may
+  # not be able to read the newer binary.
+  binutils_dir = package_directory(
+      toolchain_root, "binutils", os.environ["IMPALA_BINUTILS_VERSION"])
+  nm_path = os.path.join(binutils_dir, "bin", "nm")
+  objdump_path = os.path.join(binutils_dir, "bin", "objdump")
+
+  # Extract the symbols and write the stubbed client source. There is a special method
+  # kudu::client::GetShortVersionString() that is overridden so that the stub can be
+  # identified by the caller.
+  get_short_version_sig = "kudu::client::GetShortVersionString()"
+  nm_out = check_output([nm_path, "--defined-only", "-D", client_lib_path])
+  stub_build_dir = tempfile.mkdtemp()
+  stub_client_src_file = open(os.path.join(stub_build_dir, "kudu_client.cc"), "w")
+  try:
+    stub_client_src_file.write("""
+#include <string>
+
+static const std::string kFakeKuduVersion = "__IMPALA_KUDU_STUB__";
+
+static void KuduNotSupported() {
+    *((char*)0) = 0;
+}
+
+namespace kudu { namespace client {
+std::string GetShortVersionString() { return kFakeKuduVersion; }
+}}
+""")
+    found_start_version_symbol = False
+    cpp_filt_path = os.path.join(binutils_dir, "bin", "c++filt")
+    for line in nm_out.splitlines():
+      addr, sym_type, mangled_name = line.split(" ")
+      # Skip special functions an anything that isn't a strong symbol. Any symbols that
+      # get passed this check must be related to Kudu. If a symbol unrelated to Kudu
+      # (ex: a boost symbol) gets defined in the stub, there's a chance the symbol could
+      # get used and crash Impala.
+      if mangled_name in ["_init", "_fini"] or sym_type not in "Tt":
+        continue
+      demangled_name = check_output([cpp_filt_path, mangled_name]).strip()
+      assert "kudu" in demangled_name, \
+          "Symbol doesn't appear to be related to Kudu: " + demangled_name
+      if demangled_name == get_short_version_sig:
+        found_start_version_symbol = True
+        continue
+      stub_client_src_file.write("""
+extern "C" void %s() {
+  KuduNotSupported();
+}
+""" % mangled_name)
+
+    if not found_start_version_symbol:
+      raise Exception("Expected to find symbol a corresponding to"
+          " %s but it was not found." % get_short_version_sig)
+    stub_client_src_file.flush()
+
+    # The soname is needed to avoid problem in packaging builds. Without the soname,
+    # the library dependency as listed in the impalad binary will be a full path instead
+    # of a short name. Debian in particular has problems with packaging when that happens.
+    objdump_out = check_output([objdump_path, "-p", client_lib_path])
+    for line in objdump_out.splitlines():
+      if "SONAME" not in line:
+        continue
+      # The line that needs to be parsed should be something like:
+      # "  SONAME               libkudu_client.so.0"
+      so_name = line.split()[1]
+      break
+    else:
+      raise Exception("Unable to extract soname from %s" % client_lib_path)
+
+    # Compile the library.
+    stub_client_lib_path = os.path.join(stub_build_dir, "libkudu_client.so")
+    subprocess.check_call(["g++", stub_client_src_file.name, "-shared", "-fPIC",
+        "-Wl,-soname,%s" % so_name, "-o", stub_client_lib_path])
+
+    # Replace the real libs with the stub.
+    for client_lib_path in client_lib_paths:
+      shutil.copyfile(stub_client_lib_path, client_lib_path)
+  finally:
+    shutil.rmtree(stub_build_dir)
 
 if __name__ == "__main__":
   packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "gcc", "gflags", "glog",
