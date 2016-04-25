@@ -267,13 +267,18 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Codegen processing build batches.  Identical signature to ProcessBuildBatch.
   /// Returns non-OK status if codegen was not possible.
-  Status CodegenProcessBuildBatch(
-      RuntimeState* state, llvm::Function* hash_fn, llvm::Function* murmur_hash_fn);
+  Status CodegenProcessBuildBatch(RuntimeState* state, llvm::Function* hash_fn,
+      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn);
 
   /// Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
   /// Returns non-OK if codegen was not possible.
   Status CodegenProcessProbeBatch(
       RuntimeState* state, llvm::Function* hash_fn, llvm::Function* murmur_hash_fn);
+
+  /// Codegen inserting batches into a partition's hash table. Identical signature to
+  /// Partition::InsertBatch(). Returns non-OK if codegen was not possible.
+  Status CodegenInsertBatch(RuntimeState* state, llvm::Function* hash_fn,
+      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn);
 
   /// Returns the current state of the partition as a string.
   std::string PrintState() const;
@@ -494,27 +499,35 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// If NULL, ownership has been transfered.
     BufferedTupleStream* build_rows_;
     BufferedTupleStream* probe_rows_;
+
+    /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'indices' contains the
+    /// index of each row's index into the hash table's tuple stream. This function is
+    /// replaced with a codegen'd version.
+    bool InsertBatch(HashTableCtx* ctx, RowBatch* batch,
+        const std::vector<BufferedTupleStream::RowIdx>& indices);
   };
 
-  /// llvm function and signature for codegening build batch.
+  /// For the below codegen'd functions, xxx_fn_level0_ uses CRC hashing when available
+  /// and is used when the partition level is 0, otherwise xxx_fn_ uses murmur hash and is
+  /// used for subsequent levels.
+
   typedef Status (*ProcessBuildBatchFn)(PartitionedHashJoinNode*, RowBatch*,
       bool build_filters);
   /// Jitted ProcessBuildBatch function pointers.  NULL if codegen is disabled.
-  /// process_build_batch_fn_level0_ uses CRC hashing when available and is used when the
-  /// partition level is 0, otherwise process_build_batch_fn_ uses murmur hash and is used
-  /// for subsequent levels.
   ProcessBuildBatchFn process_build_batch_fn_;
   ProcessBuildBatchFn process_build_batch_fn_level0_;
 
-  /// llvm function and signature for codegening probe batch.
   typedef int (*ProcessProbeBatchFn)(
       PartitionedHashJoinNode*, RowBatch*, HashTableCtx*, Status*);
-  /// Jitted ProcessProbeBatch function pointer.  NULL if codegen is disabled.
-  /// process_probe_batch_fn_level0_ uses CRC hashing when available and is used when the
-  /// partition level is 0, otherwise process_probe_batch_fn_ uses murmur hash and is used
-  /// for subsequent levels.
+  /// Jitted ProcessProbeBatch function pointers.  NULL if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
   ProcessProbeBatchFn process_probe_batch_fn_level0_;
+
+  typedef bool (*InsertBatchFn)(Partition*, HashTableCtx*, RowBatch*,
+      const vector<BufferedTupleStream::RowIdx>&);
+  /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
+  InsertBatchFn insert_batch_fn_;
+  InsertBatchFn insert_batch_fn_level0_;
 };
 
 }

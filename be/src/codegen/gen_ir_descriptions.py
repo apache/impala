@@ -79,6 +79,7 @@ ir_functions = [
   ["PHJ_PROCESS_PROBE_BATCH_RIGHT_SEMI_JOIN", "ProcessProbeBatchILi6"],
   ["PHJ_PROCESS_PROBE_BATCH_RIGHT_ANTI_JOIN", "ProcessProbeBatchILi7"],
   ["PHJ_PROCESS_PROBE_BATCH_FULL_OUTER_JOIN", "ProcessProbeBatchILi8"],
+  ["PHJ_INSERT_BATCH", "9Partition11InsertBatch"],
   ["HASH_TABLE_GET_HASH_SEED", "GetHashSeed"],
   ["HLL_UPDATE_BOOLEAN", "HllUpdateIN10impala_udf10BooleanVal"],
   ["HLL_UPDATE_TINYINT", "HllUpdateIN10impala_udf10TinyIntVal"],

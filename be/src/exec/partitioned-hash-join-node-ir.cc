@@ -16,14 +16,14 @@
 
 #include "codegen/impala-ir.h"
 #include "exec/hash-table.inline.h"
-#include "runtime/row-batch.h"
 #include "runtime/raw-value.inline.h"
+#include "runtime/row-batch.h"
 #include "runtime/runtime-filter.h"
 #include "util/bloom-filter.h"
 
 #include "common/names.h"
 
-using namespace impala;
+namespace impala {
 
 // Wrapper around ExecNode's eval conjuncts with a different function name.
 // This lets us distinguish between the join conjuncts vs. non-join conjuncts
@@ -288,6 +288,7 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
       DCHECK_EQ(ht_ctx_->level(), 0)
           << "Runtime filters should not be built during repartitioning.";
       for (const FilterContext& ctx: filters_) {
+        // TODO: codegen expr evaluation and hashing
         if (ctx.local_bloom_filter == NULL) continue;
         void* e = ctx.expr->GetValue(build_row);
         uint32_t filter_hash = RawValue::GetHashValue(e, ctx.expr->root()->type(),
@@ -301,4 +302,18 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
     if (UNLIKELY(!result)) return build_status_;
   }
   return Status::OK();
+}
+
+bool PartitionedHashJoinNode::Partition::InsertBatch(HashTableCtx* ctx, RowBatch* batch,
+    const vector<BufferedTupleStream::RowIdx>& indices) {
+  int num_rows = batch->num_rows();
+  for (int i = 0; i < num_rows; ++i) {
+    TupleRow* row = batch->GetRow(i);
+    uint32_t hash = 0;
+    if (!ctx->EvalAndHashBuild(row, &hash)) continue;
+    if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) return false;
+  }
+  return true;
+}
+
 }
