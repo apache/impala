@@ -16,6 +16,7 @@
 #ifndef IMPALA_EXPRS_HIVE_UDF_CALL_H
 #define IMPALA_EXPRS_HIVE_UDF_CALL_H
 
+#include <jni.h>
 #include <string>
 #include <boost/scoped_ptr.hpp>
 
@@ -56,6 +57,10 @@ class RuntimeState;
 /// If the UDF ran into an error, the FE throws an exception.
 class HiveUdfCall : public Expr {
  public:
+  /// Must be called before creating any HiveUdfCall instances. This is called at impalad
+  /// startup time.
+  static Status Init();
+
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                          ExprContext* ctx);
   virtual Status Open(RuntimeState* state, ExprContext* context,
@@ -98,6 +103,13 @@ class HiveUdfCall : public Expr {
 
   /// The size of the buffer for passing in input arguments.
   int input_buffer_size_;
+
+  /// Global class reference to the UdfExecutor Java class and related method IDs. Set in
+  /// Init(). These have the lifetime of the process (i.e. 'executor_cl_' is never freed).
+  static jclass executor_cl_;
+  static jmethodID executor_ctor_id_;
+  static jmethodID executor_evaluate_id_;
+  static jmethodID executor_close_id_;
 };
 
 }

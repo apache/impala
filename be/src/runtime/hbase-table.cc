@@ -56,9 +56,7 @@ void HBaseTable::Close(RuntimeState* state) {
     env->CallObjectMethod(table_, table_close_id_);
     Status s = JniUtil::GetJniExceptionMsg(env, "HBaseTable::Close(): ");
     if (!s.ok()) state->LogError(s.msg());
-    env->DeleteGlobalRef(table_);
-
-    s = JniUtil::GetJniExceptionMsg(env, "HBaseTable::Close(): ");
+    s = JniUtil::FreeGlobalRef(env, table_);
     if (!s.ok()) state->LogError(s.msg());
   }
 

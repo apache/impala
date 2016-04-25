@@ -89,7 +89,7 @@ HBaseTableFactory::~HBaseTableFactory() {
   lock_guard<mutex> lock(connection_lock_);
   if (connection_ != NULL) {
     env->CallObjectMethod(connection_, connection_close_id_);
-    env->DeleteGlobalRef(connection_);
+    JniUtil::FreeGlobalRef(env, connection_);
     connection_ = NULL;
   }
 }

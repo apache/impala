@@ -73,13 +73,13 @@ Status HBaseTableWriter::Init(RuntimeState* state) {
     // Setup column family and qualifier byte array for non-rowkey column
     const HBaseTableDescriptor::HBaseColumnDescriptor& col = table_desc_->cols()[i];
     jbyteArray byte_array;
-    jobject global_ref;
+    jbyteArray global_ref;
     RETURN_IF_ERROR(CreateByteArray(env, col.family, &byte_array));
     RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, byte_array, &global_ref));
-    cf_arrays_.push_back(reinterpret_cast<jbyteArray>(global_ref));
+    cf_arrays_.push_back(global_ref);
     RETURN_IF_ERROR(CreateByteArray(env, col.qualifier, &byte_array));
     RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, byte_array, &global_ref));
-    qual_arrays_.push_back(reinterpret_cast<jbyteArray>(global_ref));
+    qual_arrays_.push_back(global_ref);
   }
 
   return Status::OK();
@@ -189,8 +189,7 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
     RETURN_IF_ERROR(table_->Put(put_list_));
   }
   // Now clean put_list_.
-  env->DeleteGlobalRef(put_list_);
-  RETURN_ERROR_IF_EXC(env);
+  RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, put_list_));
   put_list_ = NULL;
   return Status::OK();
 }
@@ -200,16 +199,15 @@ Status HBaseTableWriter::CleanUpJni() {
   if (env == NULL) return Status("Error getting JNIEnv.");
 
   if (put_list_ != NULL) {
-    env->DeleteGlobalRef(put_list_);
-    RETURN_ERROR_IF_EXC(env);
+    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, put_list_));
     put_list_ = NULL;
   }
 
   BOOST_FOREACH(jbyteArray ref, cf_arrays_) {
-    env->DeleteGlobalRef(reinterpret_cast<jobject>(ref));
+    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, ref));
   }
   BOOST_FOREACH(jbyteArray ref, qual_arrays_) {
-    env->DeleteGlobalRef(reinterpret_cast<jobject>(ref));
+    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, ref));
   }
 
   return Status::OK();

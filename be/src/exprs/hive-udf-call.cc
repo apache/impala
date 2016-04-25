@@ -37,11 +37,13 @@ const char* EXECUTOR_CLOSE_SIGNATURE = "()V";
 
 namespace impala {
 
+jclass HiveUdfCall::executor_cl_ = NULL;
+jmethodID HiveUdfCall::executor_ctor_id_ = NULL;
+jmethodID HiveUdfCall::executor_evaluate_id_ = NULL;
+jmethodID HiveUdfCall::executor_close_id_ = NULL;
+
 struct JniContext {
-  jclass cl;
   jobject executor;
-  jmethodID evalute_id;
-  jmethodID close_id;
 
   uint8_t* input_values_buffer;
   uint8_t* input_nulls_buffer;
@@ -52,10 +54,7 @@ struct JniContext {
   AnyVal* output_anyval;
 
   JniContext()
-    : cl(NULL),
-      executor(NULL),
-      evalute_id(NULL),
-      close_id(NULL),
+    : executor(NULL),
       input_values_buffer(NULL),
       input_nulls_buffer(NULL),
       output_value_buffer(NULL),
@@ -69,6 +68,7 @@ HiveUdfCall::HiveUdfCall(const TExprNode& node)
     input_buffer_size_(0) {
   DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
   DCHECK_EQ(node.fn.binary_type, TFunctionBinaryType::JAVA);
+  DCHECK(executor_cl_ != NULL) << "Init() was not called!";
 }
 
 AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {
@@ -127,7 +127,7 @@ AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {
   // Using this version of Call has the lowest overhead. This eliminates the
   // vtable lookup and setting up return stacks.
   env->CallNonvirtualVoidMethodA(
-      jni_ctx->executor, jni_ctx->cl, jni_ctx->evalute_id, NULL);
+      jni_ctx->executor, executor_cl_, executor_evaluate_id_, NULL);
   Status status = JniUtil::GetJniExceptionMsg(env);
   if (!status.ok()) {
     if (!jni_ctx->warning_logged) {
@@ -148,6 +148,23 @@ AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {
     AnyValUtil::SetAnyVal(jni_ctx->output_value_buffer, type(), jni_ctx->output_anyval);
   }
   return jni_ctx->output_anyval;
+}
+
+Status HiveUdfCall::Init() {
+  DCHECK(executor_cl_ == NULL) << "Init() already called!";
+  JNIEnv* env = getJNIEnv();
+  if (env == NULL) return Status("Failed to get/create JVM");
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, EXECUTOR_CLASS, &executor_cl_));
+  executor_ctor_id_ = env->GetMethodID(
+      executor_cl_, "<init>", EXECUTOR_CTOR_SIGNATURE);
+  RETURN_ERROR_IF_EXC(env);
+  executor_evaluate_id_ = env->GetMethodID(
+      executor_cl_, "evaluate", EXECUTOR_EVALUATE_SIGNATURE);
+  RETURN_ERROR_IF_EXC(env);
+  executor_close_id_ = env->GetMethodID(
+      executor_cl_, "close", EXECUTOR_CLOSE_SIGNATURE);
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
 }
 
 Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
@@ -185,17 +202,6 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
 
-  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, EXECUTOR_CLASS, &jni_ctx->cl));
-  jmethodID executor_ctor = env->GetMethodID(
-      jni_ctx->cl, "<init>", EXECUTOR_CTOR_SIGNATURE);
-  RETURN_ERROR_IF_EXC(env);
-  jni_ctx->evalute_id = env->GetMethodID(
-      jni_ctx->cl, "evaluate", EXECUTOR_EVALUATE_SIGNATURE);
-  RETURN_ERROR_IF_EXC(env);
-  jni_ctx->close_id = env->GetMethodID(
-      jni_ctx->cl, "close", EXECUTOR_CLOSE_SIGNATURE);
-  RETURN_ERROR_IF_EXC(env);
-
   THiveUdfExecutorCtorParams ctor_params;
   ctor_params.fn = fn_;
   ctor_params.local_location = local_location_;
@@ -219,10 +225,9 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
 
   RETURN_IF_ERROR(SerializeThriftMsg(env, &ctor_params, &ctor_params_bytes));
   // Create the java executor object
-  jni_ctx->executor = env->NewObject(jni_ctx->cl,
-      executor_ctor, ctor_params_bytes);
+  jni_ctx->executor = env->NewObject(executor_cl_, executor_ctor_id_, ctor_params_bytes);
   RETURN_ERROR_IF_EXC(env);
-  jni_ctx->executor = env->NewGlobalRef(jni_ctx->executor);
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, jni_ctx->executor, &jni_ctx->executor));
 
   jni_ctx->output_anyval = CreateAnyVal(type_);
 
@@ -240,11 +245,9 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
       JNIEnv* env = getJNIEnv();
       if (jni_ctx->executor != NULL) {
         env->CallNonvirtualVoidMethodA(
-            jni_ctx->executor, jni_ctx->cl, jni_ctx->close_id, NULL);
-        env->DeleteGlobalRef(jni_ctx->executor);
-        // Clear any exceptions. Not much we can do about them here.
-        Status status = JniUtil::GetJniExceptionMsg(env);
-        if (!status.ok()) VLOG_QUERY << status.GetDetail();
+            jni_ctx->executor, executor_cl_, executor_close_id_, NULL);
+        Status status = JniUtil::FreeGlobalRef(env, jni_ctx->executor);
+        if (!status.ok()) LOG(ERROR) << status.GetDetail();
       }
       if (jni_ctx->input_values_buffer != NULL) {
         delete[] jni_ctx->input_values_buffer;
@@ -262,6 +265,7 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
         delete jni_ctx->output_anyval;
         jni_ctx->output_anyval = NULL;
       }
+      delete jni_ctx;
     } else {
       DCHECK(!ctx->opened_);
     }

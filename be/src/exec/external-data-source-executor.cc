@@ -58,11 +58,9 @@ class ExternalDataSourceExecutor::JniState {
     JniLocalFrame jni_frame;
     RETURN_IF_ERROR(jni_frame.push(env));
 
-    jclass cl = env->FindClass(
-        "com/cloudera/impala/extdatasource/ExternalDataSourceExecutor");
-    RETURN_ERROR_IF_EXC(env);
-    executor_class_ = reinterpret_cast<jclass>(env->NewGlobalRef(cl));
-    RETURN_ERROR_IF_EXC(env);
+    RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
+        "com/cloudera/impala/extdatasource/ExternalDataSourceExecutor",
+        &executor_class_));
     uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
     for (int i = 0; i < num_methods; ++i) {
       RETURN_IF_ERROR(JniUtil::LoadJniMethod(env, executor_class_, &(methods[i])));
@@ -158,8 +156,7 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
   jobject local_exec = jni_env->NewObject(s.executor_class_, s.ctor_, jar_path_jstr,
       class_name_jstr, api_version_jstr, init_string_jstr);
   RETURN_ERROR_IF_EXC(jni_env);
-  executor_ = jni_env->NewGlobalRef(local_exec);
-  RETURN_ERROR_IF_EXC(jni_env);
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, local_exec, &executor_));
   RETURN_IF_ERROR(s.UpdateClassCacheMetrics());
   is_initialized_ = true;
   return Status::OK();
@@ -204,10 +201,7 @@ Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
   Status status = CallJniMethod(executor_, s.close_id_, params,
       result);
   JNIEnv* env = getJNIEnv();
-  if (executor_ != NULL) {
-    env->DeleteGlobalRef(executor_);
-    status.MergeStatus(JniUtil::GetJniExceptionMsg(env)); // no-op if Status == OK
-  }
+  if (executor_ != NULL) status.MergeStatus(JniUtil::FreeGlobalRef(env, executor_));
   is_initialized_ = false;
   return status;
 }

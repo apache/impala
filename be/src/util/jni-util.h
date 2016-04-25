@@ -142,7 +142,6 @@ struct JniMethodDescriptor {
 /// Utility class for JNI-related functionality.
 /// Init() should be called as soon as the native library is loaded.
 /// Creates global class references, and promotes local references to global references.
-/// Maintains a list of all global references for cleanup in Cleanup().
 /// Attention! Lifetime of JNI components and common pitfalls:
 /// 1. JNIEnv* cannot be shared among threads, so it should NOT be globally cached.
 /// 2. References created via jnienv->New*() calls are local references that go out of scope
@@ -167,16 +166,37 @@ class JniUtil {
   static bool ClassExists(JNIEnv* env, const char* class_str);
 
   /// Returns a global JNI reference to the class specified by class_str into class_ref.
-  /// The reference is added to global_refs_ for cleanup in Deinit().
-  /// Returns Status::OK if successful.
+  /// The returned reference must eventually be freed by calling FreeGlobalRef() (or have
+  /// the lifetime of the impalad process).
   /// Catches Java exceptions and converts their message into status.
   static Status GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* class_ref);
 
   /// Creates a global reference from a local reference returned into global_ref.
-  /// Adds global reference to global_refs_ for cleanup in Deinit().
-  /// Returns Status::OK if successful.
+  /// The returned reference must eventually be freed by calling FreeGlobalRef() (or have
+  /// the lifetime of the impalad process).
   /// Catches Java exceptions and converts their message into status.
   static Status LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global_ref);
+
+  /// Templated wrapper for jobject subclasses (e.g. jclass, jarray). This is necessary
+  /// because according to
+  /// http://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/types.html:
+  ///   class _jobject {};
+  ///   class _jclass : public _jobject {};
+  ///   ...
+  ///   typedef _jobject *jobject;
+  ///   typedef _jclass *jclass;
+  /// This mean jobject* is actually _jobject**, so we need the reinterpret_cast in order
+  /// to use a subclass like _jclass**. This is safe in this case because the returned
+  /// subclass is known to be correct.
+  template <typename jobject_subclass>
+  static Status LocalToGlobalRef(JNIEnv* env, jobject local_ref,
+      jobject_subclass* global_ref) {
+    return LocalToGlobalRef(env, local_ref, reinterpret_cast<jobject*>(global_ref));
+  }
+
+  /// Deletes 'global_ref'. Catches Java exceptions and converts their message into
+  /// status.
+  static Status FreeGlobalRef(JNIEnv* env, jobject global_ref);
 
   static jmethodID throwable_to_string_id() { return throwable_to_string_id_; }
   static jmethodID throwable_to_stack_trace_id() { return throwable_to_stack_trace_id_; }
@@ -186,9 +206,6 @@ class JniUtil {
 
   /// Global reference to InternalException class.
   static jclass internal_exc_class() { return internal_exc_cl_; }
-
-  /// Delete all global references: class members, and those stored in global_refs_.
-  static Status Cleanup();
 
   /// Returns the error message for 'e'. If no exception, returns Status::OK
   /// log_stack determines if the stack trace is written to the log
@@ -274,9 +291,6 @@ class JniUtil {
   static jmethodID throwable_to_string_id_;
   static jmethodID throwable_to_stack_trace_id_;
   static jmethodID get_jvm_metrics_id_;
-  /// List of global references created with GetGlobalClassRef() or LocalToGlobalRef.
-  /// All global references are deleted in Cleanup().
-  static std::vector<jobject> global_refs_;
 };
 
 }

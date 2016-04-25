@@ -234,3 +234,59 @@ string
 ---- RESULTS
 'abc'
 ====
+---- QUERY
+# IMPALA-3378: test many Java UDFs being opened and run concurrently
+select * from
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(bool_col) union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(tinyint_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(smallint_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(int_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(bigint_col) > 1 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(float_col) > 1.0 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(double_col) > 1.0 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(string_col) > '1' union all
+(select max(int_col) from functional.alltypesagg
+ where not udf_test.identity(bool_col) union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(tinyint_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(smallint_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(int_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(bigint_col) > 2 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(float_col) > 2.0 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(double_col) > 2.0 union all
+(select max(int_col) from functional.alltypesagg
+ where udf_test.identity(string_col) > '2'
+)))))))))))))))) v
+---- TYPES
+INT
+---- RESULTS
+998
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+999
+====

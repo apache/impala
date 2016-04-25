@@ -23,6 +23,7 @@
 #include "common/init.h"
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
+#include "exprs/hive-udf-call.h"
 #include "runtime/hbase-table.h"
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
@@ -59,6 +60,7 @@ int ImpaladMain(int argc, char** argv) {
   EXIT_IF_ERROR(HBaseTableScanner::Init());
   EXIT_IF_ERROR(HBaseTable::InitJNI());
   EXIT_IF_ERROR(HBaseTableWriter::InitJNI());
+  EXIT_IF_ERROR(HiveUdfCall::Init());
   InitFeSupport();
 
   // start backend service for the coordinator on be_port

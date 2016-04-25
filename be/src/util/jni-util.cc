@@ -29,7 +29,6 @@ jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::get_jvm_metrics_id_ = NULL;
 jmethodID JniUtil::throwable_to_string_id_ = NULL;
 jmethodID JniUtil::throwable_to_stack_trace_id_ = NULL;
-vector<jobject> JniUtil::global_refs_;
 
 Status JniLocalFrame::push(JNIEnv* env, int max_local_ref) {
   DCHECK(env_ == NULL);
@@ -57,8 +56,7 @@ Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* cl
   *class_ref = NULL;
   jclass local_cl = env->FindClass(class_str);
   RETURN_ERROR_IF_EXC(env);
-  RETURN_IF_ERROR(LocalToGlobalRef(env, reinterpret_cast<jobject>(local_cl),
-      reinterpret_cast<jobject*>(class_ref)));
+  RETURN_IF_ERROR(LocalToGlobalRef(env, local_cl, class_ref));
   env->DeleteLocalRef(local_cl);
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
@@ -67,7 +65,12 @@ Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* cl
 Status JniUtil::LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global_ref) {
   *global_ref = env->NewGlobalRef(local_ref);
   RETURN_ERROR_IF_EXC(env);
-  global_refs_.push_back(*global_ref);
+  return Status::OK();
+}
+
+Status JniUtil::FreeGlobalRef(JNIEnv* env, jobject global_ref) {
+  env->DeleteGlobalRef(global_ref);
+  RETURN_ERROR_IF_EXC(env);
   return Status::OK();
 }
 
@@ -142,20 +145,6 @@ void JniUtil::InitLibhdfs() {
   // null; see xxx for an explanation
   hdfsFS fs = hdfsConnect("default", 0);
   hdfsDisconnect(fs);
-}
-
-Status JniUtil::Cleanup() {
-  // Get the JNIEnv* corresponding to current thread.
-  JNIEnv* env = getJNIEnv();
-  if (env == NULL) {
-    return Status("Failed to get/create JVM");
-  }
-  vector<jobject>::iterator it;
-  for (it = global_refs_.begin(); it != global_refs_.end(); ++it) {
-    env->DeleteGlobalRef(*it);
-  }
-  global_refs_.clear();
-  return Status::OK();
 }
 
 Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {

@@ -306,9 +306,9 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
   // Setup an Scan object without the range
   // scan_ = new Scan();
   DCHECK(scan_ == NULL);
-  scan_ = env->NewObject(scan_cl_, scan_ctor_);
+  jobject local_scan = env->NewObject(scan_cl_, scan_ctor_);
   RETURN_ERROR_IF_EXC(env);
-  scan_ = env->NewGlobalRef(scan_);
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_scan, &scan_));
 
   // scan_.setMaxVersions(1);
   env->CallObjectMethod(scan_, scan_set_max_versions_id_, 1);
@@ -457,14 +457,13 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, jbyteArray start_bytes,
   if (resultscanner_ != NULL) {
     // resultscanner_.close();
     env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
-    env->DeleteGlobalRef(resultscanner_);
-    RETURN_ERROR_IF_EXC(env);
+    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, resultscanner_));
     resultscanner_ = NULL;
   }
   // resultscanner_ = htable_.getScanner(scan_);
-  RETURN_IF_ERROR(htable_->GetResultScanner(scan_, &resultscanner_));
-  resultscanner_ = env->NewGlobalRef(resultscanner_);
-  RETURN_ERROR_IF_EXC(env);
+  jobject local_resultscanner;
+  RETURN_IF_ERROR(htable_->GetResultScanner(scan_, &local_resultscanner));
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_resultscanner, &resultscanner_));
   return Status::OK();
 }
 
@@ -543,11 +542,11 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
     return Status::OK();
   }
 
-  if (cells_ != NULL) env->DeleteGlobalRef(cells_);
+  if (cells_ != NULL) RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, cells_));
   // cells_ = result.raw();
-  cells_ = reinterpret_cast<jobjectArray>(
+  jobject local_cells = reinterpret_cast<jobjectArray>(
       env->CallObjectMethod(result, result_raw_cells_id_));
-  cells_ = reinterpret_cast<jobjectArray>(env->NewGlobalRef(cells_));
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_cells, &cells_));
   num_cells_ = env->GetArrayLength(cells_);
   // Check that raw() didn't return more cells than expected.
   // If num_requested_cells_ is 0 then only row key is asked for and this check
@@ -760,11 +759,11 @@ void HBaseTableScanner::Close(JNIEnv* env) {
             "Unknown error occurred while closing ResultScanner: ");
       }
     }
-    env->DeleteGlobalRef(resultscanner_);
+    JniUtil::FreeGlobalRef(env, resultscanner_);
     resultscanner_ = NULL;
   }
-  if (scan_ != NULL) env->DeleteGlobalRef(scan_);
-  if (cells_ != NULL) env->DeleteGlobalRef(cells_);
+  if (scan_ != NULL) JniUtil::FreeGlobalRef(env, scan_);
+  if (cells_ != NULL) JniUtil::FreeGlobalRef(env, cells_);
 
   // Close the HTable so that the connections are not kept around.
   if (htable_.get() != NULL) htable_->Close(state_);
