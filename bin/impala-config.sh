@@ -251,7 +251,7 @@ if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   IMPALA_AVRO_VERSION+=-p4
   IMPALA_BZIP2_VERSION+=-p1
   IMPALA_GLOG_VERSION+=-p1
-  IMPALA_THRIFT_VERSION+=-p2
+  IMPALA_THRIFT_VERSION+=-p4
   IMPALA_RE2_VERSION+=-p1
   IMPALA_LLVM_VERSION+=-no-asserts-p1
   # Debug builds should use the default release-with-assertions build from the toolchain
