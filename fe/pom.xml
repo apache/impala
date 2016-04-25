@@ -198,7 +198,7 @@
     <dependency>
       <groupId>net.sourceforge.czt.dev</groupId>
       <artifactId>java-cup</artifactId>
-      <version>0.11-a-czt02-20150912.002524-39</version>
+      <version>0.11-a-czt02-cdh</version>
     </dependency>
 
     <!-- Moved above Hive, because Hive bundles its own Thrift version
@@ -401,7 +401,7 @@
       <plugin>
         <groupId>net.sourceforge.czt.dev</groupId>
         <artifactId>cup-maven-plugin</artifactId>
-        <version>1.6-20150912.002559-50</version>
+        <version>1.6-cdh</version>
         <executions>
           <execution>
             <id>cup</id>
