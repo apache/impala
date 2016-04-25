@@ -416,8 +416,8 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
   int64_t fvn_seed = HashUtil::FNV_SEED;
 
   if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
-    Value* dst_ptr = builder->CreateStructGEP(NULL, dst, 0, "string_ptr");
-    Value* dst_len = builder->CreateStructGEP(NULL, dst, 1, "string_len");
+    Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
+    Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
     Value* null_len = codegen->GetIntConstant(TYPE_INT, fvn_seed);
     Value* null_ptr = builder->CreateIntToPtr(null_len, codegen->ptr_type());
     builder->CreateStore(null_ptr, dst_ptr);
@@ -654,8 +654,7 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
   // Call GetHashSeed() to get seeds_[level_]
   Function* get_hash_seed_fn =
       codegen->GetFunction(IRFunction::HASH_TABLE_GET_HASH_SEED, false);
-  Value* seed = builder.CreateCall(get_hash_seed_fn, ArrayRef<Value*>({this_arg}),
-      "seed");
+  Value* seed = builder.CreateCall(get_hash_seed_fn, this_arg, "seed");
 
   Value* hash_result = seed;
   Value* data = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), expr_values_buffer_);
@@ -666,8 +665,7 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
                           codegen->GetMurmurHashFunction(results_buffer_size_) :
                           codegen->GetHashFunction(results_buffer_size_);
       Value* len = codegen->GetIntConstant(TYPE_INT, results_buffer_size_);
-      hash_result = builder.CreateCall(hash_fn,
-          ArrayRef<Value*>({data, len, hash_result}), "hash");
+      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result, "hash");
     }
   } else {
     if (var_result_begin_ > 0) {
@@ -675,8 +673,7 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
                           codegen->GetMurmurHashFunction(var_result_begin_) :
                           codegen->GetHashFunction(var_result_begin_);
       Value* len = codegen->GetIntConstant(TYPE_INT, var_result_begin_);
-      hash_result = builder.CreateCall(hash_fn,
-          ArrayRef<Value*>({data, len, hash_result}), "hash");
+      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result, "hash");
     }
 
     // Hash string slots
@@ -714,8 +711,8 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
                                  codegen->GetHashFunction(sizeof(StringValue));
         Value* llvm_loc = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), loc);
         Value* len = codegen->GetIntConstant(TYPE_INT, sizeof(StringValue));
-        str_null_result = builder.CreateCall(null_hash_fn,
-            ArrayRef<Value*>({llvm_loc, len, hash_result}), "str_null");
+        str_null_result =
+            builder.CreateCall3(null_hash_fn, llvm_loc, len, hash_result, "str_null");
         builder.CreateBr(continue_block);
 
         builder.SetInsertPoint(not_null_block);
@@ -724,16 +721,16 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
       // Convert expr_values_buffer_ loc to llvm value
       Value* str_val = codegen->CastPtrToLlvmPtr(codegen->GetPtrType(TYPE_STRING), loc);
 
-      Value* ptr = builder.CreateStructGEP(NULL, str_val, 0);
-      Value* len = builder.CreateStructGEP(NULL, str_val, 1);
+      Value* ptr = builder.CreateStructGEP(str_val, 0);
+      Value* len = builder.CreateStructGEP(str_val, 1);
       ptr = builder.CreateLoad(ptr, "ptr");
       len = builder.CreateLoad(len, "len");
 
       // Call hash(ptr, len, hash_result);
       Function* general_hash_fn = use_murmur ? codegen->GetMurmurHashFunction() :
                                   codegen->GetHashFunction();
-      Value* string_hash_result = builder.CreateCall(general_hash_fn,
-          ArrayRef<Value*>({ptr, len, hash_result}), "string_hash");
+      Value* string_hash_result =
+          builder.CreateCall3(general_hash_fn, ptr, len, hash_result, "string_hash");
 
       if (stores_nulls_) {
         builder.CreateBr(continue_block);

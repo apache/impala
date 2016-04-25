@@ -1491,14 +1491,14 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
 
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
-  Value* dst_ptr = builder.CreateStructGEP(NULL, agg_tuple_arg, slot_desc->llvm_field_idx(),
-      "dst_slot_ptr");
+  Value* dst_ptr =
+      builder.CreateStructGEP(agg_tuple_arg, slot_desc->field_idx(), "dst_slot_ptr");
   Value* result = NULL;
 
   if (slot_desc->is_nullable()) {
     // Dst is NULL, just update dst slot to src slot and clear null bit
     Function* clear_null_fn = slot_desc->GetUpdateNullFn(codegen, false);
-    builder.CreateCall(clear_null_fn, ArrayRef<Value*>({agg_tuple_arg}));
+    builder.CreateCall(clear_null_fn, agg_tuple_arg);
   }
 
   // Update the slot
@@ -1574,8 +1574,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
           builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
 
       // Call 'ir_fn'
-      builder.CreateCall(ir_fn,
-          ArrayRef<Value*>({fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr}));
+      builder.CreateCall3(ir_fn, fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr);
 
       // Convert StringVal intermediate 'dst_arg' back to StringValue
       Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
@@ -1712,9 +1711,9 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
     if (evaluator->is_count_star()) {
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.
-      int field_idx = slot_desc->llvm_field_idx();
+      int field_idx = slot_desc->field_idx();
       Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
-      Value* slot_ptr = builder.CreateStructGEP(NULL, tuple_arg, field_idx, "src_slot");
+      Value* slot_ptr = builder.CreateStructGEP(tuple_arg, field_idx, "src_slot");
       Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
@@ -1723,7 +1722,7 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
       RETURN_IF_ERROR(CodegenUpdateSlot(evaluator, slot_desc, &update_slot_fn));
       Value* fn_ctx_ptr = builder.CreateConstGEP1_32(agg_fn_ctxs_arg, i);
       Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
-      builder.CreateCall(update_slot_fn, ArrayRef<Value*>({fn_ctx, tuple_arg, row_arg}));
+      builder.CreateCall3(update_slot_fn, fn_ctx, tuple_arg, row_arg);
     }
   }
   builder.CreateRetVoid();
@@ -1783,7 +1782,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
 
   replaced = codegen->ReplaceCallSites(process_batch_fn, update_tuple_fn, "UpdateTuple");
   DCHECK_GE(replaced, 1);
-  *fn = codegen->FinalizeFunction(process_batch_fn);
+  *fn = codegen->OptimizeFunctionWithExprs(process_batch_fn);
   if (*fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenProcessBatch(): codegen'd "
         "ProcessBatch() function failed verification, see log");
@@ -1838,7 +1837,7 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
   DCHECK_EQ(replaced, 1);
 
   DCHECK(process_batch_streaming_fn != NULL);
-  *fn = codegen->FinalizeFunction(process_batch_streaming_fn);
+  *fn = codegen->OptimizeFunctionWithExprs(process_batch_streaming_fn);
   if (*fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenProcessBatchStreaming(): codegen'd "
         "ProcessBatchStreaming() function failed verification, see log");

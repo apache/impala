@@ -231,9 +231,9 @@ export IMPALA_GLOG_VERSION=0.3.2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
 export IMPALA_KUDU_VERSION=0.8.0-RC1
-export IMPALA_LLVM_VERSION=3.8.0
-export IMPALA_LLVM_DEBUG_VERSION=3.8.0
-export IMPALA_LLVM_ASAN_VERSION=3.8.0
+export IMPALA_LLVM_VERSION=3.3
+export IMPALA_LLVM_DEBUG_VERSION=3.3
+export IMPALA_LLVM_ASAN_VERSION=3.7.0
 export IMPALA_LZ4_VERSION=svn
 export IMPALA_MIN_BOOST_VERSION=1.46.0
 export IMPALA_OPENLDAP_VERSION=2.4.25
@@ -246,18 +246,18 @@ export IMPALA_THRIFT_VERSION=0.9.0
 export IMPALA_THRIFT_JAVA_VERSION=0.9.0
 export IMPALA_ZLIB_VERSION=1.2.8
 
-# Some of the variables need to be overwritten to explicitly mark the patch level
+# Some of the variables need to be overwritten to explicitely mark the patch level
 if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   IMPALA_AVRO_VERSION+=-p4
   IMPALA_BZIP2_VERSION+=-p1
   IMPALA_GLOG_VERSION+=-p1
   IMPALA_THRIFT_VERSION+=-p2
   IMPALA_RE2_VERSION+=-p1
-  IMPALA_LLVM_VERSION+=-p1
-  IMPALA_LLVM_ASAN_VERSION+=-p1
-  # Debug builds should use the release+asserts build to get additional coverage.
-  # Don't use the LLVM debug build because the binaries are too large to distribute.
-  IMPALA_LLVM_DEBUG_VERSION+=-asserts-p1
+  IMPALA_LLVM_VERSION+=-no-asserts-p1
+  # Debug builds should use the default release-with-assertions build from the toolchain
+  # Note that the default toolchain build of 3.7 and trunk is release with no assertions,
+  # so this will need to be revisited when upgrading the LLVM version.
+  IMPALA_LLVM_DEBUG_VERSION+=-p1
 fi
 
 export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
@@ -270,6 +270,7 @@ export KUDU_JAVA_VERSION=0.6.0
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
   IMPALA_GPERFTOOLS_VERSION=2.3
+  IMPALA_LLVM_VERSION=3.3-p1
   IMPALA_OPENSSL_VERSION=1.0.1p
   IMPALA_THRIFT_VERSION=0.9.2
   IMPALA_THRIFT_JAVA_VERSION=0.9.2

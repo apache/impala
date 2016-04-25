@@ -1607,13 +1607,13 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(
       ConstantInt::get(Type::getInt1Ty(codegen->context()), false));
 
   // Finalize ProcessBuildBatch functions
-  process_build_batch_fn = codegen->FinalizeFunction(process_build_batch_fn);
+  process_build_batch_fn = codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
   if (process_build_batch_fn == NULL) {
     return Status("Codegen'd PartitionedHashJoinNode::ProcessBuildBatch() function "
         "failed verification, see log");
   }
   process_build_batch_fn_level0 =
-      codegen->FinalizeFunction(process_build_batch_fn_level0);
+      codegen->OptimizeFunctionWithExprs(process_build_batch_fn_level0);
   if (process_build_batch_fn == NULL) {
     return Status("Codegen'd level-zero PartitionedHashJoinNode::ProcessBuildBatch() "
         "function failed verification, see log");
@@ -1765,13 +1765,13 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   DCHECK_EQ(replaced, 1);
 
   // Finalize ProcessProbeBatch functions
-  process_probe_batch_fn = codegen->FinalizeFunction(process_probe_batch_fn);
+  process_probe_batch_fn = codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);
   if (process_probe_batch_fn == NULL) {
     return Status("PartitionedHashJoinNode::CodegenProcessProbeBatch(): codegen'd "
         "ProcessProbeBatch() function failed verification, see log");
   }
   process_probe_batch_fn_level0 =
-      codegen->FinalizeFunction(process_probe_batch_fn_level0);
+      codegen->OptimizeFunctionWithExprs(process_probe_batch_fn_level0);
   if (process_probe_batch_fn_level0 == NULL) {
     return Status("PartitionedHashJoinNode::CodegenProcessProbeBatch(): codegen'd "
         "level-zero ProcessProbeBatch() function failed verification, see log");

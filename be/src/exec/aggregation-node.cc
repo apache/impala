@@ -557,14 +557,14 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
 
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
-  Value* dst_ptr = builder.CreateStructGEP(NULL, agg_tuple_arg,
-      slot_desc->llvm_field_idx(), "dst_slot_ptr");
+  Value* dst_ptr =
+      builder.CreateStructGEP(agg_tuple_arg, slot_desc->field_idx(), "dst_slot_ptr");
   Value* result = NULL;
 
   if (slot_desc->is_nullable()) {
     // Dst is NULL, just update dst slot to src slot and clear null bit
     Function* clear_null_fn = slot_desc->GetUpdateNullFn(codegen, false);
-    builder.CreateCall(clear_null_fn, ArrayRef<Value*>({agg_tuple_arg}));
+    builder.CreateCall(clear_null_fn, agg_tuple_arg);
   }
 
   // Update the slot
@@ -629,8 +629,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
           builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
 
       // Call 'hll_fn'
-      builder.CreateCall(hll_fn,
-          ArrayRef<Value*>({fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr}));
+      builder.CreateCall3(hll_fn, fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr);
 
       // Convert StringVal intermediate 'dst_arg' back to StringValue
       Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
@@ -749,9 +748,9 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
     if (evaluator->is_count_star()) {
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.
-      int field_idx = slot_desc->llvm_field_idx();
+      int field_idx = slot_desc->field_idx();
       Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
-      Value* slot_ptr = builder.CreateStructGEP(NULL, args[1], field_idx, "src_slot");
+      Value* slot_ptr = builder.CreateStructGEP(args[1], field_idx, "src_slot");
       Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
@@ -761,8 +760,7 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
       Value* fn_ctx_arg = codegen->CastPtrToLlvmPtr(
           codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME),
           agg_fn_ctxs_[i]);
-      builder.CreateCall(update_slot_fn,
-          ArrayRef<Value*>({fn_ctx_arg, args[1], args[2]}));
+      builder.CreateCall3(update_slot_fn, fn_ctx_arg, args[1], args[2]);
     }
   }
   builder.CreateRetVoid();
@@ -828,7 +826,7 @@ Function* AggregationNode::CodegenProcessRowBatch(
   replaced = codegen->ReplaceCallSites(process_batch_fn, update_tuple_fn, "UpdateTuple");
   DCHECK_EQ(replaced, 1);
 
-  return codegen->FinalizeFunction(process_batch_fn);
+  return codegen->OptimizeFunctionWithExprs(process_batch_fn);
 }
 
 }

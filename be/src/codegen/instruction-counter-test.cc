@@ -18,8 +18,10 @@
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/PassManager.h"
 #include "llvm/IR/CallingConv.h"
+#include "llvm/Analysis/Verifier.h"
+#include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/IR/IRBuilder.h"
 
 #include "codegen/llvm-codegen.h"
@@ -50,14 +52,11 @@ Module* CodegenMulAdd(LLVMContext* context) {
   Function* mul_add = cast<Function>(c);
   mul_add->setCallingConv(CallingConv::C);
   Function::arg_iterator args = mul_add->arg_begin();
-  Value* x = &*args;
-  ++args;
+  Value* x = args++;
   x->setName("x");
-  Value* y = &*args;
-  ++args;
+  Value* y = args++;
   y->setName("y");
-  Value* z = &*args;
-  ++args;
+  Value* z = args++;
   z->setName("z");
   BasicBlock* block = BasicBlock::Create(*context, "entry", mul_add);
   IRBuilder<> builder(block);
@@ -114,11 +113,9 @@ Module* CodegenGcd(LLVMContext* context) {
       IntegerType::get(*context, 32), IntegerType::get(*context, 32), NULL);
   Function* gcd = cast<Function>(c);
   Function::arg_iterator args = gcd->arg_begin();
-  Value* x = &*args;
-  ++args;
+  Value* x = args++;
   x->setName("x");
-  Value* y = &*args;
-  ++args;
+  Value* y = args++;
   y->setName("y");
   BasicBlock* entry = BasicBlock::Create(*context, "entry", gcd);
   BasicBlock* ret = BasicBlock::Create(*context, "return", gcd);

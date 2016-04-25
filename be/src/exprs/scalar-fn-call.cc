@@ -291,7 +291,7 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
 
   // First argument is always FunctionContext*.
   // Index into our registered offset in the ExprContext.
-  llvm::Value* expr_ctx_gep = builder.CreateStructGEP(NULL, expr_ctx, 1, "expr_ctx_gep");
+  llvm::Value* expr_ctx_gep = builder.CreateStructGEP(expr_ctx, 1, "expr_ctx_gep");
   llvm::Value* fn_ctxs_base = builder.CreateLoad(expr_ctx_gep, "fn_ctxs_base");
   // Use GEP to add our index to the base pointer
   llvm::Value* fn_ctx_ptr =
@@ -305,12 +305,12 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
   if (vararg_start_idx_ != -1) {
     // FunctionContextImpl is first field of FunctionContext
     // fn_ctx_impl_ptr has type FunctionContextImpl**
-    llvm::Value* fn_ctx_impl_ptr = builder.CreateStructGEP(NULL, fn_ctx, 0, "fn_ctx_impl_ptr");
+    llvm::Value* fn_ctx_impl_ptr = builder.CreateStructGEP(fn_ctx, 0, "fn_ctx_impl_ptr");
     llvm::Value* fn_ctx_impl = builder.CreateLoad(fn_ctx_impl_ptr, "fn_ctx_impl");
     // varargs_buffer is first field of FunctionContextImpl
     // varargs_buffer_ptr has type i8**
-    llvm::Value* varargs_buffer_ptr = builder.CreateStructGEP(NULL, fn_ctx_impl, 0,
-        "varargs_buffer");
+    llvm::Value* varargs_buffer_ptr =
+        builder.CreateStructGEP(fn_ctx_impl, 0, "varargs_buffer");
     varargs_buffer = builder.CreateLoad(varargs_buffer_ptr);
   }
   // Tracks where to write the next vararg to
@@ -387,10 +387,7 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
   builder.CreateRet(result_val);
 
   *fn = codegen->FinalizeFunction(*fn);
-  if (*fn == NULL) {
-    return Status(
-        TErrorCode::UDF_VERIFY_FAILED, fn_.scalar_fn.symbol, fn_.hdfs_location);
-  }
+  DCHECK(*fn != NULL);
   ir_compute_fn_ = *fn;
   return Status::OK();
 }
@@ -543,7 +540,7 @@ void ScalarFnCall::EvaluateChildren(ExprContext* context, TupleRow* row,
 
 template<typename RETURN_TYPE>
 RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, TupleRow* row) {
-  DCHECK(scalar_fn_ != NULL) << DebugString();
+  DCHECK(scalar_fn_ != NULL);
   FunctionContext* fn_ctx = context->fn_context(fn_context_index_);
   vector<AnyVal*>* input_vals = fn_ctx->impl()->staging_input_vals();
   EvaluateChildren(context, row, input_vals);

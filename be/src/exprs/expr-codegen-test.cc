@@ -113,14 +113,6 @@ class ExprCodegenTest : public ::testing::Test {
     EXPECT_EQ(constants_.arg2_type_size, 0); // varlen
   }
 
-  static bool VerifyFunction(LlvmCodeGen* codegen, llvm::Function* fn) {
-    return codegen->VerifyFunction(fn);
-  }
-
-  static void ResetVerification(LlvmCodeGen* codegen) {
-    codegen->ResetVerification();
-  }
-
   FunctionContext* fn_ctx_;
   Constants constants_;
 };
@@ -247,19 +239,19 @@ TEST_F(ExprCodegenTest, TestInlineConstants) {
   stringstream test_udf_file;
   test_udf_file << getenv("IMPALA_HOME") << "/be/build/latest/exprs/expr-codegen-test.ll";
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateFromFile(&pool, test_udf_file.str(), "test", &codegen));
+  ASSERT_OK(LlvmCodeGen::LoadFromFile(&pool, test_udf_file.str(), "test", &codegen));
   Function* fn = codegen->module()->getFunction(TEST_GET_CONSTANT_SYMBOL);
   ASSERT_TRUE(fn != NULL);
 
   // Function verification should fail because we haven't inlined GetConstant() calls
-  bool verification_succeeded = VerifyFunction(codegen.get(), fn);
+  bool verification_succeeded = codegen->VerifyFunction(fn);
   EXPECT_FALSE(verification_succeeded);
 
   // Call InlineConstants() and rerun verification
   int replaced = InlineConstants(ctx->root(), codegen.get(), fn);
   EXPECT_EQ(replaced, 4);
-  ResetVerification(codegen.get());
-  verification_succeeded = VerifyFunction(codegen.get(), fn);
+  codegen->ResetVerification();
+  verification_succeeded = codegen->VerifyFunction(fn);
   EXPECT_TRUE(verification_succeeded) << LlvmCodeGen::Print(fn);
 
   // Compile module

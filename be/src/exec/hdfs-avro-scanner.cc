@@ -768,8 +768,8 @@ Status HdfsAvroScanner::CodegenReadRecord(
           codegen->GetFunction(IRFunction::READ_UNION_TYPE, false);
       Value* null_union_pos_val =
           codegen->GetIntConstant(TYPE_INT, field->null_union_position);
-      Value* is_not_null_val = builder->CreateCall(read_union_fn,
-          ArrayRef<Value*>({this_val, null_union_pos_val, data_val}), "is_not_null");
+      Value* is_not_null_val = builder->CreateCall3(
+          read_union_fn, this_val, null_union_pos_val, data_val, "is_not_null");
       builder->CreateCondBr(is_not_null_val, read_field_block, null_block);
 
       // Write null field IR
@@ -777,7 +777,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
       if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
         Function* set_null_fn = slot_desc->GetUpdateNullFn(codegen, true);
         DCHECK(set_null_fn != NULL);
-        builder->CreateCall(set_null_fn, ArrayRef<Value*>({tuple_val}));
+        builder->CreateCall(set_null_fn, tuple_val);
       }
       // LLVM requires all basic blocks to end with a terminating instruction
       builder->CreateBr(end_field_block);
@@ -858,8 +858,8 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
     } else {
       slot_type_val = builder->getInt32(slot_desc->type().type);
     }
-    Value* slot_val = builder->CreateStructGEP(NULL, tuple_val, slot_desc->llvm_field_idx(),
-        "slot");
+    Value* slot_val =
+        builder->CreateStructGEP(tuple_val, slot_desc->field_idx(), "slot");
     opaque_slot_val =
         builder->CreateBitCast(slot_val, codegen->ptr_type(), "opaque_slot");
   }
@@ -911,7 +911,7 @@ Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
   DCHECK_EQ(replaced, 1);
 
   decode_avro_data_fn->setName("DecodeAvroData");
-  decode_avro_data_fn = codegen->FinalizeFunction(decode_avro_data_fn);
+  decode_avro_data_fn = codegen->OptimizeFunctionWithExprs(decode_avro_data_fn);
   DCHECK(decode_avro_data_fn != NULL);
   return decode_avro_data_fn;
 }
