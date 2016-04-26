@@ -1833,12 +1833,12 @@ Status PartitionedHashJoinNode::CodegenInsertBatch(RuntimeState* state,
   replaced = codegen->ReplaceCallSites(insert_batch_fn, murmur_hash_fn, "HashCurrentRow");
   DCHECK_EQ(replaced, 1);
 
-  insert_batch_fn = codegen->OptimizeFunctionWithExprs(insert_batch_fn);
+  insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
   if (insert_batch_fn == NULL) {
     return Status("PartitionedHashJoinNode::CodegenInsertBatch(): codegen'd "
         "InsertBatch() function failed verification, see log");
   }
-  insert_batch_fn_level0 = codegen->OptimizeFunctionWithExprs(insert_batch_fn_level0);
+  insert_batch_fn_level0 = codegen->FinalizeFunction(insert_batch_fn_level0);
   if (insert_batch_fn_level0 == NULL) {
     return Status("PartitionedHashJoinNode::CodegenInsertBatch(): codegen'd zero-level "
         "InsertBatch() function failed verification, see log");
