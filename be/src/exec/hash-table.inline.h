@@ -23,14 +23,14 @@
 
 namespace impala {
 
-inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) const {
+inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalBuildRow(row);
   if (!stores_nulls_ && has_null) return false;
   *hash = HashCurrentRow();
   return true;
 }
 
-inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) const {
+inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalProbeRow(row);
   if (has_null && !(stores_nulls_ && finds_some_nulls_)) return false;
   *hash = HashCurrentRow();
@@ -39,7 +39,7 @@ inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) const 
 
 template <bool FORCE_NULL_EQUALITY>
 inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
-    const HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
+    bool is_build, HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, bool* found) {
   DCHECK(buckets != NULL);
   DCHECK_GT(num_buckets, 0);
   *found = false;
@@ -49,12 +49,22 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
   // for knowing when to exit the loop (e.g. by capping the total travel length). In case
   // of quadratic probing it is also used for calculating the length of the next jump.
   int64_t step = 0;
+  bool need_eval = row != NULL;
   do {
     Bucket* bucket = &buckets[bucket_idx];
-    if (!bucket->filled) return bucket_idx;
+    if (LIKELY(!bucket->filled)) return bucket_idx;
     if (hash == bucket->hash) {
+      // Evaluate 'row' if needed before calling Equals() for the first time in this loop.
+      if (need_eval) {
+        if (is_build) {
+          ht_ctx->EvalBuildRow(row);
+        } else {
+          ht_ctx->EvalProbeRow(row);
+        }
+        need_eval = false;
+      }
       if (ht_ctx != NULL &&
-          ht_ctx->Equals<FORCE_NULL_EQUALITY>(GetRow(bucket, ht_ctx->row_))) {
+          ht_ctx->Equals<FORCE_NULL_EQUALITY>(GetRow(bucket, ht_ctx->scratch_row_))) {
         *found = true;
         return bucket_idx;
       }
@@ -80,10 +90,11 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
 }
 
 inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx,
-    uint32_t hash) {
+    TupleRow* row, uint32_t hash) {
   ++num_probes_;
   bool found = false;
-  int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, &found);
+  int64_t bucket_idx =
+      Probe<true>(buckets_, num_buckets_, true, ht_ctx, row, hash, &found);
   DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND);
   if (found) {
     // We need to insert a duplicate node, note that this may fail to allocate memory.
@@ -98,59 +109,65 @@ inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx,
 
 inline bool HashTable::Insert(HashTableCtx* ht_ctx,
     const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash) {
-  if (stores_tuples_) return Insert(ht_ctx, row->GetTuple(0), hash);
-  HtData* htdata = InsertInternal(ht_ctx, hash);
+  HtData* htdata = InsertInternal(ht_ctx, row, hash);
   // If successful insert, update the contents of the newly inserted entry with 'idx'.
   if (LIKELY(htdata != NULL)) {
-    htdata->idx = idx;
+    if (stores_tuples_) {
+      htdata->tuple = row->GetTuple(0);
+    } else {
+      htdata->idx = idx;
+    }
     return true;
   }
   return false;
 }
 
-inline bool HashTable::Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash) {
-  DCHECK(stores_tuples_);
-  HtData* htdata = InsertInternal(ht_ctx, hash);
-  // If successful insert, update the contents of the newly inserted entry with 'tuple'.
-  if (LIKELY(htdata != NULL)) {
-    htdata->tuple = tuple;
-    return true;
-  }
-  return false;
+template<const bool READ>
+inline void HashTable::PrefetchBucket(uint32_t hash) {
+  int64_t bucket_idx = hash & (num_buckets_ - 1);
+  // Two optional arguments:
+  // 'rw': 1 means the memory access is write
+  // 'locality': 0-3. 0 means no temporal locality. 3 means high temporal locality.
+  // On x86, they map to instructions prefetchnta and prefetch{2-0} respectively.
+  // TODO: Reconsider the locality level with smaller prefetch batch size.
+  __builtin_prefetch(&buckets_[bucket_idx], READ ? 0 : 1, 1);
 }
 
-inline HashTable::Iterator HashTable::FindProbeRow(const HashTableCtx* ht_ctx, uint32_t hash) {
+inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash) {
   ++num_probes_;
   bool found = false;
-  int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
+  int64_t bucket_idx =
+      Probe<false>(buckets_, num_buckets_, false, ht_ctx, NULL, hash, &found);
   if (found) {
-    return Iterator(this, ht_ctx->row(), bucket_idx,
+    return Iterator(this, ht_ctx->scratch_row(), bucket_idx,
         buckets_[bucket_idx].bucketData.duplicates);
   }
   return End();
 }
 
+// TODO: support lazy evaluation like HashTable::Insert().
 inline HashTable::Iterator HashTable::FindBuildRowBucket(
-    const HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
+    HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   ++num_probes_;
-  int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
+  int64_t bucket_idx =
+      Probe<true>(buckets_, num_buckets_, false, ht_ctx, NULL, hash, found);
   DuplicateNode* duplicates = LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND) ?
       buckets_[bucket_idx].bucketData.duplicates : NULL;
-  return Iterator(this, ht_ctx->row(), bucket_idx, duplicates);
+  return Iterator(this, ht_ctx->scratch_row(), bucket_idx, duplicates);
 }
 
 inline HashTable::Iterator HashTable::Begin(const HashTableCtx* ctx) {
   int64_t bucket_idx = Iterator::BUCKET_NOT_FOUND;
   DuplicateNode* node = NULL;
   NextFilledBucket(&bucket_idx, &node);
-  return Iterator(this, ctx->row(), bucket_idx, node);
+  return Iterator(this, ctx->scratch_row(), bucket_idx, node);
 }
 
 inline HashTable::Iterator HashTable::FirstUnmatched(HashTableCtx* ctx) {
   int64_t bucket_idx = Iterator::BUCKET_NOT_FOUND;
   DuplicateNode* node = NULL;
   NextFilledBucket(&bucket_idx, &node);
-  Iterator it(this, ctx->row(), bucket_idx, node);
+  Iterator it(this, ctx->scratch_row(), bucket_idx, node);
   // Check whether the bucket, or its first duplicate node, is matched. If it is not
   // matched, then return. Otherwise, move to the first unmatched entry (node or bucket).
   Bucket* bucket = &buckets_[bucket_idx];
@@ -244,13 +261,13 @@ inline TupleRow* HashTable::GetRow(Bucket* bucket, TupleRow* row) const {
 inline TupleRow* HashTable::Iterator::GetRow() const {
   DCHECK(!AtEnd());
   DCHECK(table_ != NULL);
-  DCHECK(row_ != NULL);
+  DCHECK(scratch_row_ != NULL);
   Bucket* bucket = &table_->buckets_[bucket_idx_];
   if (UNLIKELY(bucket->hasDuplicates)) {
     DCHECK(node_ != NULL);
-    return table_->GetRow(node_->htdata, row_);
+    return table_->GetRow(node_->htdata, scratch_row_);
   } else {
-    return table_->GetRow(bucket->bucketData.htdata, row_);
+    return table_->GetRow(bucket->bucketData.htdata, scratch_row_);
   }
 }
 

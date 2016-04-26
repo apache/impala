@@ -93,7 +93,7 @@ HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
       finds_some_nulls_(std::accumulate(
           finds_nulls_.begin(), finds_nulls_.end(), false, std::logical_or<bool>())),
       level_(0),
-      row_(reinterpret_cast<TupleRow*>(malloc(sizeof(Tuple*) * num_build_tuples))) {
+      scratch_row_(reinterpret_cast<TupleRow*>(malloc(sizeof(Tuple*) * num_build_tuples))) {
   DCHECK(!finds_some_nulls_ || stores_nulls_);
   // Compute the layout and buffer size to store the evaluated expr results
   DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
@@ -124,11 +124,11 @@ void HashTableCtx::Close() {
   DCHECK(expr_value_null_bits_ != NULL);
   delete[] expr_value_null_bits_;
   expr_value_null_bits_ = NULL;
-  free(row_);
-  row_ = NULL;
+  free(scratch_row_);
+  scratch_row_ = NULL;
 }
 
-bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) const {
+bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
   bool has_null = false;
   for (int i = 0; i < ctxs.size(); ++i) {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
@@ -306,7 +306,7 @@ bool HashTable::ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx) {
     Bucket* bucket_to_copy = &buckets_[iter.bucket_idx_];
     bool found = false;
     int64_t bucket_idx =
-        Probe<true>(new_buckets, num_buckets, NULL, bucket_to_copy->hash, &found);
+        Probe<true>(new_buckets, num_buckets, false, NULL, NULL, bucket_to_copy->hash, &found);
     DCHECK(!found);
     DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND) << " Probe failed even though "
         " there are free buckets. " << num_buckets << " " << num_filled_buckets_;
@@ -874,7 +874,7 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
           codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
       Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
       row_is_null = builder.CreateICmpNE(null_byte,
-                                           codegen->GetIntConstant(TYPE_TINYINT, 0));
+          codegen->GetIntConstant(TYPE_TINYINT, 0));
     }
 
     // Get llvm value for row_val from 'expr_values_buffer_'

@@ -242,7 +242,9 @@ class HashTableTest : public testing::Test {
     for (int i = 0; i < 2; ++i) {
       uint32_t hash = 0;
       if (!ht_ctx.EvalAndHashBuild(build_rows[i], &hash)) continue;
-      bool inserted = hash_table->Insert(&ht_ctx, build_rows[i]->GetTuple(0), hash);
+      BufferedTupleStream::RowIdx dummy_row_idx;
+      EXPECT_TRUE(hash_table->stores_tuples_);
+      bool inserted = hash_table->Insert(&ht_ctx, dummy_row_idx, build_rows[i], hash);
       EXPECT_TRUE(inserted);
     }
     EXPECT_EQ(hash_table->num_buckets() - hash_table->EmptyBuckets(), 1);
@@ -275,7 +277,9 @@ class HashTableTest : public testing::Test {
     ASSERT_TRUE(success);
     for (int i = 0; i < 5; ++i) {
       if (!ht_ctx.EvalAndHashBuild(build_rows[i], &hash)) continue;
-      bool inserted = hash_table->Insert(&ht_ctx, build_rows[i]->GetTuple(0), hash);
+      BufferedTupleStream::RowIdx dummy_row_idx;
+      EXPECT_TRUE(hash_table->stores_tuples_);
+      bool inserted = hash_table->Insert(&ht_ctx, dummy_row_idx, build_rows[i], hash);
       EXPECT_TRUE(inserted);
     }
     EXPECT_EQ(hash_table->size(), 5);
@@ -333,7 +337,9 @@ class HashTableTest : public testing::Test {
       for (int i = 0; i < val; ++i) {
         TupleRow* row = CreateTupleRow(val);
         if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-        hash_table->Insert(&ht_ctx, row->GetTuple(0), hash);
+        BufferedTupleStream::RowIdx dummy_row_idx;
+        EXPECT_TRUE(hash_table->stores_tuples_);
+        hash_table->Insert(&ht_ctx, dummy_row_idx, row, hash);
         build_rows.push_back(row);
         probe_rows[val].expected_build_rows.push_back(row);
       }
@@ -390,7 +396,9 @@ class HashTableTest : public testing::Test {
       for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
         TupleRow* row = CreateTupleRow(build_row_val);
         if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-        bool inserted = hash_table->Insert(&ht_ctx, row->GetTuple(0), hash);
+        BufferedTupleStream::RowIdx dummy_row_idx;
+        EXPECT_TRUE(hash_table->stores_tuples_);
+        bool inserted = hash_table->Insert(&ht_ctx, dummy_row_idx, row, hash);
         if (!inserted) goto done_inserting;
       }
       expected_size += num_to_add;
@@ -438,7 +446,9 @@ class HashTableTest : public testing::Test {
 
       // Insert using both Insert() and FindBucket() methods.
       if (build_row_val % 2 == 0) {
-        bool inserted = hash_table->Insert(&ht_ctx, row->GetTuple(0), hash);
+        BufferedTupleStream::RowIdx dummy_row_idx;
+        EXPECT_TRUE(hash_table->stores_tuples_);
+        bool inserted = hash_table->Insert(&ht_ctx, dummy_row_idx, row, hash);
         EXPECT_TRUE(inserted);
       } else {
         iter = hash_table->FindBuildRowBucket(&ht_ctx, hash, &found);

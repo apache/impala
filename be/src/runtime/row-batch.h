@@ -400,10 +400,9 @@ class RowBatch {
 /// Macro for iterating through '_row_batch', starting at '_start_row_idx'.
 /// '_row_batch' is the row batch to iterate through.
 /// '_start_row_idx' is the starting row index.
-/// '_row' is the current row which the iterator is pointing to.
-#define FOREACH_ROW(_row_batch, _start_row_idx, _row)                              \
-  RowBatch::Iterator _##_row_batch##_iter(_row_batch, _start_row_idx);             \
-  for (TupleRow* _row = _##_row_batch##_iter.Get(); !_##_row_batch##_iter.AtEnd(); \
-      _row = _##_row_batch##_iter.Next())
+/// '_iter' is the iterator.
+#define FOREACH_ROW(_row_batch, _start_row_idx, _iter)                  \
+    for (RowBatch::Iterator _iter(_row_batch, _start_row_idx);          \
+         !_iter.AtEnd(); _iter.Next())
 
 #endif

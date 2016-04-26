@@ -220,7 +220,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
 
 template<int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
-    const HashTableCtx* ht_ctx, RowBatch::Iterator* probe_batch_iterator,
+    HashTableCtx* ht_ctx, RowBatch::Iterator* probe_batch_iterator,
     int* remaining_capacity, int num_other_join_conjuncts, Status* status) {
   while (!probe_batch_iterator->AtEnd()) {
     // Establish current_probe_row_ and find its corresponding partition.
@@ -279,7 +279,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
 // codegen.
 template<int const JoinOp>
 int PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch,
-    const HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
+    HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
   ExprContext* const* other_join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
@@ -348,7 +348,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch,
 
 int PartitionedHashJoinNode::ProcessProbeBatch(
     const TJoinOp::type join_op, RowBatch* out_batch,
-    const HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
+    HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
   switch (join_op) {
     case TJoinOp::INNER_JOIN:
       return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx, status);
@@ -377,9 +377,10 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
 
 Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
     bool build_filters) {
-  FOREACH_ROW(build_batch, 0, build_row) {
+  FOREACH_ROW(build_batch, 0, build_batch_iter) {
     DCHECK(build_status_.ok());
     uint32_t hash;
+    TupleRow* build_row = build_batch_iter.Get();
     if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) {
       if (null_aware_partition_ != NULL) {
         // TODO: remove with codegen/template
@@ -412,14 +413,35 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
   return Status::OK();
 }
 
-bool PartitionedHashJoinNode::Partition::InsertBatch(HashTableCtx* ctx, RowBatch* batch,
-    const vector<BufferedTupleStream::RowIdx>& indices) {
-  int num_rows = batch->num_rows();
-  for (int i = 0; i < num_rows; ++i) {
-    TupleRow* row = batch->GetRow(i);
-    uint32_t hash = 0;
-    if (!ctx->EvalAndHashBuild(row, &hash)) continue;
-    if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) return false;
+bool PartitionedHashJoinNode::Partition::InsertBatch(HashTableCtx* ht_ctx,
+    RowBatch* batch, const vector<BufferedTupleStream::RowIdx>& indices) {
+  DCHECK_LE(batch->num_rows(), hash_values_.size());
+  DCHECK_LE(batch->num_rows(), null_bitmap_.num_bits());
+  // Compute the hash values and prefetch the hash table buckets.
+  int i = 0;
+  uint32_t* hash_values = hash_values_.data();
+  null_bitmap_.SetAllBits(false);
+  FOREACH_ROW(batch, 0, batch_iter) {
+    if (ht_ctx->EvalAndHashBuild(batch_iter.Get(), &hash_values[i])) {
+      // TODO: Find the optimal prefetch batch size. This may be something
+      // processor dependent so we may need calibration at Impala startup time.
+      hash_tbl_->PrefetchBucket<false>(hash_values[i]);
+    } else {
+      null_bitmap_.Set<false>(i, true);
+    }
+    ++i;
+  }
+  // Do the insertion.
+  i = 0;
+  const BufferedTupleStream::RowIdx* row_idx = indices.data();
+  FOREACH_ROW(batch, 0, batch_iter) {
+    if (LIKELY(!null_bitmap_.Get<false>(i))) {
+      TupleRow* row = batch_iter.Get();
+      if (UNLIKELY(!hash_tbl_->Insert(ht_ctx, row_idx[i], row, hash_values[i]))) {
+        return false;
+      }
+    }
+    ++i;
   }
   return true;
 }

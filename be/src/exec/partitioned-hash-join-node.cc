@@ -76,7 +76,6 @@ PartitionedHashJoinNode::~PartitionedHashJoinNode() {
   DCHECK(null_probe_rows_ == NULL);
 }
 
-
 Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
   DCHECK(tnode.__isset.hash_join_node);
@@ -321,11 +320,12 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
 }
 
 PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
-        PartitionedHashJoinNode* parent, int level)
+    PartitionedHashJoinNode* parent, int level)
   : parent_(parent),
     is_closed_(false),
     is_spilled_(false),
-    level_(level) {
+    level_(level),
+    null_bitmap_(state->batch_size()) {
   build_rows_ = new BufferedTupleStream(state, parent_->child(1)->row_desc(),
       state->block_mgr(), parent_->block_mgr_client_,
       true /* use_initial_small_buffers */, false /* read_write */);
@@ -334,6 +334,8 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
       state->block_mgr(), parent_->block_mgr_client_,
       true /* use_initial_small_buffers */, false /* read_write */ );
   DCHECK(probe_rows_ != NULL);
+  hash_values_.resize(state->batch_size());
+  null_bitmap_.SetAllBits(false);
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {
@@ -465,16 +467,16 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
         << build_rows()->RowConsumesMemory();
     SCOPED_TIMER(parent_->build_timer_);
     if (parent_->insert_batch_fn_ != NULL) {
-      DCHECK(parent_->insert_batch_fn_level0_ != NULL);
-      InsertBatchFn insert_batch_fn = NULL;
+      InsertBatchFn insert_batch_fn;
       if (ctx->level() == 0) {
         insert_batch_fn = parent_->insert_batch_fn_level0_;
       } else {
         insert_batch_fn = parent_->insert_batch_fn_;
       }
-      if (!insert_batch_fn(this, ctx, &batch, indices)) goto not_built;
+      DCHECK(insert_batch_fn != NULL);
+      if (UNLIKELY(!insert_batch_fn(this, ctx, &batch, indices))) goto not_built;
     } else {
-      if (!InsertBatch(ctx, &batch, indices)) goto not_built;
+      if (UNLIKELY(!InsertBatch(ctx, &batch, indices))) goto not_built;
     }
     RETURN_IF_ERROR(state->GetQueryStatus());
     parent_->FreeLocalAllocations();
@@ -1823,15 +1825,11 @@ Status PartitionedHashJoinNode::CodegenInsertBatch(RuntimeState* state,
 
   // Use codegen'd EvalBuildRow() function
   int replaced = codegen->ReplaceCallSites(insert_batch_fn, eval_row_fn, "EvalBuildRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_EQ(replaced, 2);
 
   // Use codegen'd Equals() function
   replaced = codegen->ReplaceCallSites(insert_batch_fn, build_equals_fn, "Equals");
-  // There are two Equals() calls because the HashTable::Insert() method that takes a
-  // RowIdx parameter either calls the other Insert() method or InsertInternal()
-  // directly. This generates two InsertInternal() calls in the IR => two Probe() calls =>
-  // two Equals() calls after inlining. Only one will actually be called.
-  DCHECK_EQ(replaced, 2);
+  DCHECK_EQ(replaced, 1);
 
   Function* insert_batch_fn_level0 = codegen->CloneFunction(insert_batch_fn);
 

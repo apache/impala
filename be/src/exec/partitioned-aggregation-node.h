@@ -463,13 +463,13 @@ class PartitionedAggregationNode : public ExecNode {
   /// This function is replaced by codegen. It's inlined into ProcessBatch_true/false in
   /// the IR module. We pass in ht_ctx_.get() as an argument for performance.
   template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, const HashTableCtx* ht_ctx);
+  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx);
 
   /// This function processes each individual row in ProcessBatch(). Must be inlined into
   /// ProcessBatch for codegen to substitute function calls with codegen'd versions.
   /// May spill partitions if not enough memory is available.
   template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, const HashTableCtx* ht_ctx);
+  Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, HashTableCtx* ht_ctx);
 
   /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
   /// the context for the partition's hash table and hash is the precomputed hash of
@@ -534,7 +534,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// of how many more entries can be added to the hash table so we can avoid retrying
   /// inserts. It is decremented if an insert succeeds and set to zero if an insert
   /// fails. If an error occurs, returns false and sets 'status'.
-  bool IR_ALWAYS_INLINE TryAddToHashTable(const HashTableCtx* ht_ctx,
+  bool IR_ALWAYS_INLINE TryAddToHashTable(HashTableCtx* ht_ctx,
       Partition* partition, TupleRow* in_row, uint32_t hash, int* remaining_capacity,
       Status* status);
 

@@ -26,15 +26,15 @@ using namespace impala;
 Status PartitionedAggregationNode::ProcessBatchNoGrouping(RowBatch* batch,
     const HashTableCtx* ht_ctx) { // 'ht_ctx' is unused
   Tuple* output_tuple = singleton_output_tuple_;
-  FOREACH_ROW(batch, 0, row) {
-    UpdateTuple(&agg_fn_ctxs_[0], output_tuple, row);
+  FOREACH_ROW(batch, 0, batch_iter) {
+    UpdateTuple(&agg_fn_ctxs_[0], output_tuple, batch_iter.Get());
   }
   return Status::OK();
 }
 
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
-    const HashTableCtx* __restrict__ ht_ctx) {
+    HashTableCtx* __restrict__ ht_ctx) {
   DCHECK(!hash_partitions_.empty());
   DCHECK(!is_streaming_preagg_);
 
@@ -44,15 +44,15 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
   // TODO: Once we have a histogram with the number of rows per partition, we will have
   // accurate resize calls.
   RETURN_IF_ERROR(CheckAndResizeHashPartitions(batch->num_rows(), ht_ctx));
-  FOREACH_ROW(batch, 0, row) {
-    RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(row, ht_ctx));
+  FOREACH_ROW(batch, 0, batch_iter) {
+    RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(batch_iter.Get(), ht_ctx));
   }
   return Status::OK();
 }
 
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
-    const HashTableCtx* __restrict__ ht_ctx) {
+    HashTableCtx* __restrict__ ht_ctx) {
   uint32_t hash = 0;
   if (AGGREGATED_ROWS) {
     if (!ht_ctx->EvalAndHashBuild(row, &hash)) return Status::OK();
@@ -148,8 +148,9 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
   DCHECK_LE(in_batch->num_rows(), out_batch->capacity());
 
   RowBatch::Iterator out_batch_iterator(out_batch, out_batch->num_rows());
-  FOREACH_ROW(in_batch, 0, in_row) {
+  FOREACH_ROW(in_batch, 0, in_batch_iter) {
     uint32_t hash;
+    TupleRow* in_row = in_batch_iter.Get();
     if (!ht_ctx->EvalAndHashProbe(in_row, &hash)) continue;
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
 
@@ -174,9 +175,9 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
   }
 
   if (needs_serialize) {
-    FOREACH_ROW(out_batch, 0, serialize_row) {
+    FOREACH_ROW(out_batch, 0, out_batch_iter) {
       AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_,
-          serialize_row->GetTuple(0));
+          out_batch_iter.Get()->GetTuple(0));
     }
   }
 
@@ -184,12 +185,13 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
 }
 
 bool PartitionedAggregationNode::TryAddToHashTable(
-    const HashTableCtx* __restrict__ ht_ctx, Partition* __restrict__ partition,
+    HashTableCtx* __restrict__ ht_ctx, Partition* __restrict__ partition,
     TupleRow* __restrict__ in_row, uint32_t hash, int* __restrict__ remaining_capacity,
     Status* status) {
   DCHECK(remaining_capacity != NULL);
   DCHECK_GE(*remaining_capacity, 0);
   bool found;
+  // This is called from ProcessBatchStreaming() so the rows are not aggregated.
   HashTable::Iterator it = partition->hash_tbl->FindBuildRowBucket(ht_ctx, hash, &found);
   Tuple* intermediate_tuple;
   if (found) {
