@@ -94,17 +94,15 @@ class TestInsertWideTable(ImpalaTestSuite):
       cls.TestMatrix.add_constraint(lambda v: False);
 
   @SkipIfLocal.parquet_file_size
-  def test_insert_wide_table(self, vector):
+  def test_insert_wide_table(self, vector, unique_database):
     table_format = vector.get_value('table_format')
 
     # Text can't handle as many columns as Parquet (codegen takes forever)
     num_cols = 1000 if table_format.file_format == 'text' else 2000
 
-    db_name = QueryTestSectionReader.get_db_name(vector.get_value('table_format'))
-    table_name = db_name + ".insert_widetable"
+    table_name = unique_database + ".insert_widetable"
     if vector.get_value('exec_option')['disable_codegen']:
       table_name += "_codegen_disabled"
-    self.client.execute("drop table if exists " + table_name)
 
     col_descs = widetable.get_columns(num_cols)
     create_stmt = "CREATE TABLE " + table_name + "(" + ','.join(col_descs) + ")"
