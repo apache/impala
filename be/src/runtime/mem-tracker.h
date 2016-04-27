@@ -399,8 +399,10 @@ class MemTracker {
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   boost::mutex gc_lock_;
 
-  /// Protects request_to_mem_trackers_ and pool_to_mem_trackers_
-  static boost::mutex static_mem_trackers_lock_;
+  /// Protects request_to_mem_trackers_ and pool_to_mem_trackers_.
+  /// IMPALA-3068: Use SpinLock instead of boost::mutex so that it won't automatically
+  /// destroy itself as part of process teardown, which could cause races.
+  static SpinLock static_mem_trackers_lock_;
 
   /// All per-request MemTracker objects that are in use.  For memory management, this map
   /// contains only weak ptrs.  MemTrackers that are handed out via GetQueryMemTracker()

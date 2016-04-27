@@ -30,15 +30,10 @@ DEFINE_int32(periodic_counter_update_period_ms, 500, "Period to update rate coun
 
 PeriodicCounterUpdater PeriodicCounterUpdater::state_;
 
-PeriodicCounterUpdater::PeriodicCounterUpdater() : done_(0) {
+PeriodicCounterUpdater::PeriodicCounterUpdater() {
   DCHECK_EQ(this, &state_);
   state_.update_thread_.reset(
       new thread(&PeriodicCounterUpdater::UpdateLoop, this));
-}
-
-PeriodicCounterUpdater::~PeriodicCounterUpdater() {
-  done_.Store(1);
-  update_thread_->join();
 }
 
 void PeriodicCounterUpdater::RegisterPeriodicCounter(
@@ -126,7 +121,7 @@ void PeriodicCounterUpdater::StopTimeSeriesCounter(
 }
 
 void PeriodicCounterUpdater::UpdateLoop() {
-  while (done_.Load() == 0) {
+  while (true) {
     system_time before_time = get_system_time();
     SleepForMs(FLAGS_periodic_counter_update_period_ms);
     posix_time::time_duration elapsed = get_system_time() - before_time;

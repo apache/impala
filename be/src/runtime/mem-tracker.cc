@@ -37,7 +37,7 @@ namespace impala {
 const string MemTracker::COUNTER_NAME = "PeakMemoryUsage";
 MemTracker::RequestTrackersMap MemTracker::request_to_mem_trackers_;
 MemTracker::PoolTrackersMap MemTracker::pool_to_mem_trackers_;
-mutex MemTracker::static_mem_trackers_lock_;
+SpinLock MemTracker::static_mem_trackers_lock_;
 
 AtomicInt64 MemTracker::released_memory_since_gc_;
 
@@ -160,7 +160,7 @@ int64_t MemTracker::GetPoolMemReserved() const {
 MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
     MemTracker* parent) {
   DCHECK(!pool_name.empty());
-  lock_guard<mutex> l(static_mem_trackers_lock_);
+  lock_guard<SpinLock> l(static_mem_trackers_lock_);
   PoolTrackersMap::iterator it = pool_to_mem_trackers_.find(pool_name);
   if (it != pool_to_mem_trackers_.end()) {
     MemTracker* tracker = it->second;
@@ -193,7 +193,7 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
                << PrettyPrinter::Print(byte_limit, TUnit::BYTES);
   }
 
-  lock_guard<mutex> l(static_mem_trackers_lock_);
+  lock_guard<SpinLock> l(static_mem_trackers_lock_);
   RequestTrackersMap::iterator it = request_to_mem_trackers_.find(id);
   if (it != request_to_mem_trackers_.end()) {
     // Return the existing MemTracker object for this id, converting the weak ptr
@@ -218,7 +218,7 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
 
 MemTracker::~MemTracker() {
   DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n" << GetStackTrace();
-  lock_guard<mutex> l(static_mem_trackers_lock_);
+  lock_guard<SpinLock> l(static_mem_trackers_lock_);
   if (auto_unregister_) UnregisterFromParent();
   // Erase the weak ptr reference from the map.
   request_to_mem_trackers_.erase(query_id_);

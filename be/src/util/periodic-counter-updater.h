@@ -41,9 +41,6 @@ class PeriodicCounterUpdater {
     SAMPLING_COUNTER,
   };
 
-  /// Tears down the update thread.
-  ~PeriodicCounterUpdater();
-
   /// Registers a periodic counter to be updated by the update thread.
   /// Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
   /// is updated, it either gets the value from the dst_counter or calls the sample
@@ -96,6 +93,8 @@ class PeriodicCounterUpdater {
     /// TODO: customize bucketing
   };
 
+  // Starts the counter update thread. We only have a single static object, so this
+  // is executed automatically when the process starts up.
   PeriodicCounterUpdater();
 
   /// Loop for periodic counter update thread.  This thread wakes up once in a while
@@ -135,9 +134,6 @@ class PeriodicCounterUpdater {
   /// Set of time series counters that need to be updated
   typedef boost::unordered_set<RuntimeProfile::TimeSeriesCounter*> TimeSeriesCounters;
   TimeSeriesCounters time_series_counters_;
-
-  /// If 1, tear down the update thread.
-  AtomicInt32 done_;
 
   /// Singleton object that keeps track of all rate counters and the thread
   /// for updating them.

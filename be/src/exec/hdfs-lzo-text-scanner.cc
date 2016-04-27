@@ -37,7 +37,7 @@ const string HdfsLzoTextScanner::LIB_IMPALA_LZO = "libimpalalzo.so";
 namespace impala {
 Status HdfsLzoTextScanner::library_load_status_;
 
-mutex HdfsLzoTextScanner::lzo_load_lock_;
+SpinLock HdfsLzoTextScanner::lzo_load_lock_;
 
 const char* (*GetImpalaBuildVersion)();
 
@@ -60,7 +60,7 @@ HdfsScanner* HdfsLzoTextScanner::GetHdfsLzoTextScanner(
 Status HdfsLzoTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const vector<HdfsFileDesc*>& files) {
   if (LzoIssueInitialRanges == NULL) {
-    lock_guard<mutex> l(lzo_load_lock_);
+    lock_guard<SpinLock> l(lzo_load_lock_);
     if (library_load_status_.ok()) {
       // LzoIssueInitialRanges && library_load_status_.ok() means we haven't tried loading
       // the library yet.
