@@ -92,7 +92,7 @@ RM_ARGS = ("-enable_rm=true -llama_addresses=%s -cgroup_hierarchy_path=%s "
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
 # It is set to a high value to avoid failing if processes are slow to shut down.
-KILL_TIMEOUT_IN_SECONDS = 120
+KILL_TIMEOUT_IN_SECONDS = 240
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching
