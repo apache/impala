@@ -165,7 +165,7 @@ Status TupleRowComparator::CodegenCompare(RuntimeState* state, Function** fn) {
     Status status =
         key_expr_ctxs_lhs_[i]->root()->GetCodegendComputeFn(state, &key_fns[i]);
     if (!status.ok()) {
-      return Status(Substitute("Could not codegen TupleRowComparator::Compare(): %s",
+      return Status(Substitute("Could not codegen TupleRowComparator::Compare(): $0",
           status.GetDetail()));
     }
   }

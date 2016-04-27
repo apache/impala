@@ -64,12 +64,13 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     return Status(ss.str());
   }
 
+  // Check if the function takes CHAR as input or returns CHAR.
   FunctionContext::TypeDesc return_type = AnyValUtil::ColumnTypeToTypeDesc(type_);
   vector<FunctionContext::TypeDesc> arg_types;
-  bool char_arg = false;
+  bool has_char_arg_or_result = type_.type == TYPE_CHAR;
   for (int i = 0; i < children_.size(); ++i) {
     arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(children_[i]->type_));
-    char_arg = char_arg || (children_[i]->type_.type == TYPE_CHAR);
+    has_char_arg_or_result |= children_[i]->type_.type == TYPE_CHAR;
   }
 
   // Compute buffer size for varargs
@@ -101,7 +102,7 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
   // TODO: remove condition 2 above and put a flag in the RuntimeState to indicate
   // if codegen should be enabled for the entire fragment.
   bool skip_codegen = false;
-  if (char_arg) {
+  if (has_char_arg_or_result) {
     skip_codegen = true;
   } else if (!state->codegen_created() && !state->ShouldCodegenExpr()) {
     skip_codegen = fn_.binary_type != TFunctionBinaryType::IR && NumFixedArgs() <= 8;
@@ -109,7 +110,7 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
   if (skip_codegen) {
     // Builtins with char arguments must still have <= 8 arguments.
     // TODO: delete when we have codegen for char arguments
-    if (char_arg) {
+    if (has_char_arg_or_result) {
       DCHECK(NumFixedArgs() <= 8 && fn_.binary_type == TFunctionBinaryType::BUILTIN);
     }
     Status status = LibCache::instance()->GetSoFunctionPtr(
@@ -261,6 +262,9 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
+  }
+  if (type_.type == TYPE_CHAR) {
+    return Status("ScalarFnCall Codegen not supported for CHAR");
   }
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (children_[i]->type().type == TYPE_CHAR) {

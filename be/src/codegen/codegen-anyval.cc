@@ -49,8 +49,10 @@ Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
       return StructType::get(cg->tinyint_type(), cg->double_type(), NULL);
     case TYPE_STRING: // { i64, i8* }
     case TYPE_VARCHAR: // { i64, i8* }
-    case TYPE_CHAR:
       return StructType::get(cg->bigint_type(), cg->ptr_type(), NULL);
+    case TYPE_CHAR:
+      DCHECK(false) << "NYI:" << type.DebugString();
+      return NULL;
     case TYPE_TIMESTAMP: // { i64, i64 }
       return StructType::get(cg->bigint_type(), cg->bigint_type(), NULL);
     case TYPE_DECIMAL: // %"struct.impala_udf::DecimalVal" (isn't lowered)
@@ -92,9 +94,11 @@ Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type) {
       break;
     case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_CHAR:
       result = cg->GetType(LLVM_STRINGVAL_NAME);
       break;
+    case TYPE_CHAR:
+      DCHECK(false) << "NYI:" << type.DebugString();
+      return NULL;
     case TYPE_TIMESTAMP:
       result = cg->GetType(LLVM_TIMESTAMPVAL_NAME);
       break;
@@ -186,13 +190,15 @@ Value* CodegenAnyVal::GetIsNull(const char* name) {
     }
     case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_CHAR:
     case TYPE_TIMESTAMP: {
       // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
       Value* v = builder_->CreateExtractValue(value_, 0);
       DCHECK(v->getType() == codegen_->bigint_type());
       return builder_->CreateTrunc(v, codegen_->boolean_type(), name);
     }
+    case TYPE_CHAR:
+      DCHECK(false) << "NYI:" << type_.DebugString();
+      return NULL;
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
@@ -228,7 +234,6 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
     }
     case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_CHAR:
     case TYPE_TIMESTAMP: {
       // Lowered type is of the form { i64, * }. Set the first byte of the i64 value to
       // 'is_null'
@@ -239,6 +244,9 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
       value_ = builder_->CreateInsertValue(value_, v, 0, name_);
       break;
     }
+    case TYPE_CHAR:
+      DCHECK(false) << "NYI:" << type_.DebugString();
+      break;
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
@@ -461,13 +469,15 @@ void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
       << endl << type_ << " => " << LlvmCodeGen::Print(codegen_->GetType(type_));
   switch (type_.type) {
     case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_CHAR: {
+    case TYPE_VARCHAR: {
       // Convert StringValue to StringVal
       SetPtr(builder_->CreateExtractValue(raw_val, 0, "ptr"));
       SetLen(builder_->CreateExtractValue(raw_val, 1, "len"));
       break;
     }
+    case TYPE_CHAR:
+      DCHECK(false) << "NYI:" << type_.DebugString();
+      break;
     case TYPE_TIMESTAMP: {
       // Convert TimestampValue to TimestampVal
       // TimestampValue has type

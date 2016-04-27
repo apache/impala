@@ -1246,3 +1246,16 @@ select * from functional.alltypestiny order by 2,1 limit 10
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# Test that codegen of ordering expression with intermediate char value doesn't crash.
+# The cast expression is evaluated as part of tuple comparison.
+select cast(string_col as char(20)) from alltypes order by 1 limit 5
+---- RESULTS
+'0                   '
+'0                   '
+'0                   '
+'0                   '
+'0                   '
+---- TYPES
+CHAR
+====
