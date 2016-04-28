@@ -26,6 +26,7 @@ inline void PartitionedHashJoinNode::ResetForProbe() {
   probe_batch_pos_ = 0;
   matched_probe_ = true;
   hash_tbl_iterator_.SetAtEnd();
+  ht_ctx_->expr_values_cache()->Reset();
 }
 
 inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,

@@ -390,6 +390,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
             iequals(value, "true") || iequals(value, "1"));
         break;
       }
+      case TImpalaQueryOptions::PREFETCH_MODE: {
+        if (iequals(value, "NONE") || iequals(value, "0")) {
+          query_options->__set_prefetch_mode(TPrefetchMode::NONE);
+        } else if (iequals(value, "HT_BUCKET") || iequals(value, "1")) {
+          query_options->__set_prefetch_mode(TPrefetchMode::HT_BUCKET);
+        } else {
+          return Status(Substitute("Invalid prefetch mode '$0'. Valid modes are "
+              "NONE(0) or HT_BUCKET(1)", value));
+        }
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

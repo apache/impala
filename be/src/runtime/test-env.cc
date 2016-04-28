@@ -78,6 +78,7 @@ Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_si
       block_mgr_parent_tracker_.get(), (*runtime_state)->runtime_profile(),
       tmp_file_mgr_.get(), CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
   (*runtime_state)->set_block_mgr(mgr);
+  (*runtime_state)->InitMemTrackers(TUniqueId(), NULL, -1);
 
   query_states_.push_back(shared_ptr<RuntimeState>(*runtime_state));
   return Status::OK();

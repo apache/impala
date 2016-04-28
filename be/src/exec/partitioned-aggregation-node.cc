@@ -252,9 +252,9 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
   } else {
-    ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, grouping_expr_ctxs_, true,
-        std::vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
-        MAX_PARTITION_DEPTH, 1));
+    RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, grouping_expr_ctxs_,
+        true, vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
+        MAX_PARTITION_DEPTH, 1, mem_tracker(), &ht_ctx_));
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
         Substitute("PartitionedAggregationNode id=$0 ptr=$1", id_, this),
         MinRequiredBuffers(), true, mem_tracker(), state, &block_mgr_client_));
@@ -984,9 +984,9 @@ int PartitionedAggregationNode::GroupingExprsVarlenSize() {
   int varlen_size = 0;
   // TODO: The hash table could compute this as it hashes.
   for (int expr_idx: string_grouping_exprs_) {
-    StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->last_expr_value(expr_idx));
+    StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->ExprValue(expr_idx));
     // Avoid branching by multiplying length by null bit.
-    varlen_size += sv->len * !ht_ctx_->last_expr_value_null(expr_idx);
+    varlen_size += sv->len * !ht_ctx_->ExprValueNull(expr_idx);
   }
   return varlen_size;
 }
@@ -997,17 +997,17 @@ void PartitionedAggregationNode::CopyGroupingValues(Tuple* intermediate_tuple,
   // Copy over all grouping slots (the variable length data is copied below).
   for (int i = 0; i < grouping_expr_ctxs_.size(); ++i) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[i];
-    if (ht_ctx_->last_expr_value_null(i)) {
+    if (ht_ctx_->ExprValueNull(i)) {
       intermediate_tuple->SetNull(slot_desc->null_indicator_offset());
     } else {
-      void* src = ht_ctx_->last_expr_value(i);
+      void* src = ht_ctx_->ExprValue(i);
       void* dst = intermediate_tuple->GetSlot(slot_desc->tuple_offset());
       memcpy(dst, src, slot_desc->slot_size());
     }
   }
 
   for (int expr_idx: string_grouping_exprs_) {
-    if (ht_ctx_->last_expr_value_null(expr_idx)) continue;
+    if (ht_ctx_->ExprValueNull(expr_idx)) continue;
 
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[expr_idx];
     // ptr and len were already copied to the fixed-len part of string value

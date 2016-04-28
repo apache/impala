@@ -219,67 +219,145 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
 }
 
 template<int const JoinOp>
+bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRow(
+    ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
+    ExprContext* const* conjunct_ctxs, int num_conjuncts,
+    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status) {
+  if (JoinOp == TJoinOp::INNER_JOIN) {
+    return ProcessProbeRowInnerJoin(other_join_conjunct_ctxs, num_other_join_conjuncts,
+        conjunct_ctxs, num_conjuncts, out_batch_iterator, remaining_capacity);
+  } else if (JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
+             JoinOp == TJoinOp::RIGHT_ANTI_JOIN) {
+    return ProcessProbeRowRightSemiJoins<JoinOp>(other_join_conjunct_ctxs,
+        num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, out_batch_iterator,
+        remaining_capacity);
+  } else if (JoinOp == TJoinOp::LEFT_SEMI_JOIN ||
+             JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
+             JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    return ProcessProbeRowLeftSemiJoins<JoinOp>(other_join_conjunct_ctxs,
+        num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, out_batch_iterator,
+        remaining_capacity, status);
+  } else {
+    DCHECK(JoinOp == TJoinOp::RIGHT_OUTER_JOIN ||
+           JoinOp == TJoinOp::LEFT_OUTER_JOIN || TJoinOp::FULL_OUTER_JOIN);
+    return ProcessProbeRowOuterJoins<JoinOp>(other_join_conjunct_ctxs,
+        num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, out_batch_iterator,
+        remaining_capacity);
+  }
+}
+
+template<int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
     HashTableCtx* ht_ctx, RowBatch::Iterator* probe_batch_iterator,
-    int* remaining_capacity, int num_other_join_conjuncts, Status* status) {
-  while (!probe_batch_iterator->AtEnd()) {
+    int* remaining_capacity, Status* status) {
+  HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
+  while (!expr_vals_cache->AtEnd()) {
     // Establish current_probe_row_ and find its corresponding partition.
+    DCHECK(!probe_batch_iterator->AtEnd());
     current_probe_row_ = probe_batch_iterator->Get();
-    probe_batch_iterator->Next();
     matched_probe_ = false;
 
-    uint32_t hash;
-    if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) {
+    // True if the current row should be skipped for probing.
+    bool skip_row = false;
+
+    // The hash of the expressions results for the current probe row.
+    uint32_t hash = expr_vals_cache->ExprValuesHash();
+    // Hoist the followings out of the else statement below to speed up non-null case.
+    const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
+    HashTable* hash_tbl = hash_tbls_[partition_idx];
+
+    // Fetch the hash and expr values' nullness for this row.
+    if (expr_vals_cache->IsRowNull()) {
       if (JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && non_empty_build_) {
+        const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
         // For NAAJ, we need to treat NULLs on the probe carefully. The logic is:
-        // 1. No build rows -> Return this row.
+        // 1. No build rows -> Return this row. The check for 'non_empty_build_'
+        //    is for this case.
         // 2. Has build rows & no other join predicates, skip row.
         // 3. Has build rows & other join predicates, we need to evaluate against all
         // build rows. First evaluate it against this partition, and if there is not
         // a match, save it to evaluate against other partitions later. If there
         // is a match, the row is skipped.
-        if (num_other_join_conjuncts > 0) {
-          if (UNLIKELY(!AppendRow(null_probe_rows_, current_probe_row_, status))) {
+        if (num_other_join_conjuncts == 0) {
+          // Condition 2 above.
+          skip_row = true;
+        } else if (LIKELY(AppendRow(null_probe_rows_, current_probe_row_, status))) {
+          // Condition 3 above.
+          matched_null_probe_.push_back(false);
+          skip_row = true;
+        } else {
+          // Condition 3 above but failed to append to 'null_probe_rows_'. Bail out.
+          DCHECK(!status->ok());
+          return false;
+        }
+      }
+    } else {
+      // The build partition is in memory. Return this row for probing.
+      if (LIKELY(hash_tbl != NULL)) {
+        hash_tbl_iterator_ = hash_tbl->FindProbeRow(ht_ctx);
+      } else {
+        // The build partition is either empty or spilled.
+        Partition* partition = hash_partitions_[partition_idx];
+        // This partition is closed, meaning the build side for this partition was empty.
+        if (UNLIKELY(partition->is_closed())) {
+          DCHECK(state_ == PROCESSING_PROBE || state_ == REPARTITIONING);
+        } else {
+          // This partition is not in memory, spill the probe row and move to the next row.
+          DCHECK(partition->is_spilled());
+          DCHECK(partition->probe_rows() != NULL);
+          // Skip the current row if we manage to append to the spilled partition's BTS.
+          // Otherwise, we need to bail out and report the failure.
+          if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_, status))) {
             DCHECK(!status->ok());
             return false;
           }
-          matched_null_probe_.push_back(false);
+          skip_row = true;
         }
-        continue;
       }
-      return true;
     }
-    const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
-    // The build partition is in memory. Return this row for probing.
-    if (LIKELY(hash_tbls_[partition_idx] != NULL)) {
-      hash_tbl_iterator_ = hash_tbls_[partition_idx]->FindProbeRow(ht_ctx, hash);
-      return true;
-    }
-    // The build partition is either empty or spilled.
-    Partition* partition = hash_partitions_[partition_idx];
-    // This partition is closed, meaning the build side for this partition was empty.
-    if (UNLIKELY(partition->is_closed())) {
-      DCHECK(state_ == PROCESSING_PROBE || state_ == REPARTITIONING);
-      return true;
-    }
-    // This partition is not in memory, spill the probe row and move to the next row.
-    DCHECK(partition->is_spilled());
-    DCHECK(partition->probe_rows() != NULL);
-    if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_, status))) {
-      DCHECK(!status->ok());
-      return false;
-    }
+    // Move to the next probe row and hash table context's cached value.
+    probe_batch_iterator->Next();
+    expr_vals_cache->NextRow();
+    if (skip_row) continue;
+    DCHECK(status->ok());
+    return true;
   }
-  // Finished this batch.
-  current_probe_row_ = NULL;
+  if (probe_batch_iterator->AtEnd()) {
+    // No more probe row.
+    current_probe_row_ = NULL;
+  }
   return false;
 }
 
-// CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
-// codegen.
+void IR_ALWAYS_INLINE PartitionedHashJoinNode::EvalAndHashProbePrefetchGroup(
+    TPrefetchMode::type prefetch_mode, HashTableCtx* ht_ctx) {
+  RowBatch* probe_batch = probe_batch_.get();
+  HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
+  const int prefetch_size = expr_vals_cache->capacity();
+  DCHECK(expr_vals_cache->AtEnd());
+
+  expr_vals_cache->Reset();
+  FOREACH_ROW_LIMIT(probe_batch, probe_batch_pos_, prefetch_size, batch_iter) {
+    TupleRow* row = batch_iter.Get();
+    if (ht_ctx->EvalAndHashProbe(row)) {
+      if (prefetch_mode != TPrefetchMode::NONE) {
+        uint32_t hash = expr_vals_cache->ExprValuesHash();
+        const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
+        HashTable* hash_tbl = hash_tbls_[partition_idx];
+        if (LIKELY(hash_tbl != NULL)) hash_tbl->PrefetchBucket<true>(hash);
+      }
+    } else {
+      expr_vals_cache->SetRowNull();
+    }
+    expr_vals_cache->NextRow();
+  }
+  expr_vals_cache->ResetForRead();
+}
+
+// CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by codegen.
 template<int const JoinOp>
-int PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch,
-    HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
+int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode,
+    RowBatch* out_batch, HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
   ExprContext* const* other_join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
@@ -292,48 +370,51 @@ int PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch,
   // Note that 'probe_batch_pos_' is the row no. of the row after 'current_probe_row_'.
   RowBatch::Iterator probe_batch_iterator(probe_batch_.get(), probe_batch_pos_);
   int remaining_capacity = max_rows;
+  bool has_probe_rows = current_probe_row_ != NULL || !probe_batch_iterator.AtEnd();
+  HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
 
-  do {
-    if (current_probe_row_ != NULL) {
-      if (JoinOp == TJoinOp::INNER_JOIN) {
-        if (!ProcessProbeRowInnerJoin(other_join_conjunct_ctxs, num_other_join_conjuncts,
-            conjunct_ctxs, num_conjuncts, &out_batch_iterator, &remaining_capacity)) {
-          break;
-        }
-      } else if (JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
-                 JoinOp == TJoinOp::RIGHT_ANTI_JOIN) {
-        if (!ProcessProbeRowRightSemiJoins<JoinOp>(other_join_conjunct_ctxs,
-            num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, &out_batch_iterator,
-            &remaining_capacity)) {
-          break;
-        }
-      } else if (JoinOp == TJoinOp::LEFT_SEMI_JOIN ||
-                 JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
-                 JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-        if (!ProcessProbeRowLeftSemiJoins<JoinOp>(other_join_conjunct_ctxs,
-            num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, &out_batch_iterator,
-            &remaining_capacity, status)) {
-          break;
-        }
-      } else {
-        DCHECK(JoinOp == TJoinOp::RIGHT_OUTER_JOIN ||
-            JoinOp == TJoinOp::LEFT_OUTER_JOIN || TJoinOp::FULL_OUTER_JOIN);
-        if (!ProcessProbeRowOuterJoins<JoinOp>(other_join_conjunct_ctxs,
-            num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, &out_batch_iterator,
-            &remaining_capacity)) {
+  // Keep processing more probe rows if there are more to process and the output batch
+  // has room and we haven't hit any error yet.
+  while (has_probe_rows && remaining_capacity > 0 && status->ok()) {
+    // Prefetch for the current hash_tbl_iterator_.
+    if (prefetch_mode != TPrefetchMode::NONE) {
+      hash_tbl_iterator_.PrefetchBucket<true>();
+    }
+    // Evaluate and hash more rows if prefetch group is empty. A prefetch group is a cache
+    // of probe expressions results, nullness of the expression values and hash values
+    // against some consecutive number of rows in the probe batch. Prefetching, if
+    // enabled, is interleaved with the rows' evaluation and hashing. If the prefetch
+    // group is partially full (e.g. we returned before the current prefetch group was
+    // exhausted in the previous iteration), we will proceed with the remaining items in
+    // the values cache.
+    if (expr_vals_cache->AtEnd()) {
+      EvalAndHashProbePrefetchGroup(prefetch_mode, ht_ctx);
+    }
+    // Process the prefetch group.
+    do {
+      // 'current_probe_row_' can be NULL on the first iteration through this loop.
+      if (current_probe_row_ != NULL) {
+        if (!ProcessProbeRow<JoinOp>(other_join_conjunct_ctxs, num_other_join_conjuncts,
+            conjunct_ctxs, num_conjuncts, &out_batch_iterator, &remaining_capacity,
+            status)) {
+          if (status->ok()) DCHECK_EQ(remaining_capacity, 0);
           break;
         }
       }
-    }
-    // Must have reached the end of the hash table iterator for the current row before
-    // moving to the next row.
-    DCHECK(hash_tbl_iterator_.AtEnd());
-    DCHECK(status->ok());
-  } while (NextProbeRow<JoinOp>(ht_ctx, &probe_batch_iterator, &remaining_capacity,
-      num_other_join_conjuncts, status));
-  // Update where we are in the probe batch.
-  probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0)) /
-      probe_batch_->num_tuples_per_row();
+      // Must have reached the end of the hash table iterator for the current row before
+      // moving to the next row.
+      DCHECK(hash_tbl_iterator_.AtEnd());
+      DCHECK(status->ok());
+    } while (NextProbeRow<JoinOp>(ht_ctx, &probe_batch_iterator, &remaining_capacity,
+        status));
+    // Update whether there are more probe rows to process in the current batch.
+    has_probe_rows = current_probe_row_ != NULL;
+    if (!has_probe_rows) DCHECK(probe_batch_iterator.AtEnd());
+    // Update where we are in the probe batch.
+    probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0)) /
+        probe_batch_->num_tuples_per_row();
+  }
+
   int num_rows_added;
   if (LIKELY(status->ok())) {
     num_rows_added = max_rows - remaining_capacity;
@@ -346,42 +427,14 @@ int PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch,
   return num_rows_added;
 }
 
-int PartitionedHashJoinNode::ProcessProbeBatch(
-    const TJoinOp::type join_op, RowBatch* out_batch,
-    HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
-  switch (join_op) {
-    case TJoinOp::INNER_JOIN:
-      return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::LEFT_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::LEFT_SEMI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::LEFT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN>(out_batch, ht_ctx,
-          status);
-    case TJoinOp::RIGHT_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::RIGHT_SEMI_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_SEMI_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::RIGHT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_ANTI_JOIN>(out_batch, ht_ctx, status);
-    case TJoinOp::FULL_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch, ht_ctx, status);
-    default:
-      DCHECK(false) << "Unknown join type";
-      return -1;
-  }
-}
-
 Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
     bool build_filters) {
+  HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx_->expr_values_cache();
+  expr_vals_cache->Reset();
   FOREACH_ROW(build_batch, 0, build_batch_iter) {
     DCHECK(build_status_.ok());
-    uint32_t hash;
     TupleRow* build_row = build_batch_iter.Get();
-    if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) {
+    if (!ht_ctx_->EvalAndHashBuild(build_row)) {
       if (null_aware_partition_ != NULL) {
         // TODO: remove with codegen/template
         // If we are NULL aware and this build row has NULL in the eq join slot,
@@ -405,6 +458,7 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
         ctx.local_bloom_filter->Insert(filter_hash);
       }
     }
+    const uint32_t hash = expr_vals_cache->ExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];
     const bool result = AppendRow(partition->build_rows(), build_row, &build_status_);
@@ -413,37 +467,69 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
   return Status::OK();
 }
 
-bool PartitionedHashJoinNode::Partition::InsertBatch(HashTableCtx* ht_ctx,
-    RowBatch* batch, const vector<BufferedTupleStream::RowIdx>& indices) {
-  DCHECK_LE(batch->num_rows(), hash_values_.size());
-  DCHECK_LE(batch->num_rows(), null_bitmap_.num_bits());
+bool PartitionedHashJoinNode::Partition::InsertBatch(
+    TPrefetchMode::type prefetch_mode, HashTableCtx* ht_ctx, RowBatch* batch,
+    const vector<BufferedTupleStream::RowIdx>& indices) {
   // Compute the hash values and prefetch the hash table buckets.
-  int i = 0;
-  uint32_t* hash_values = hash_values_.data();
-  null_bitmap_.SetAllBits(false);
-  FOREACH_ROW(batch, 0, batch_iter) {
-    if (ht_ctx->EvalAndHashBuild(batch_iter.Get(), &hash_values[i])) {
-      // TODO: Find the optimal prefetch batch size. This may be something
-      // processor dependent so we may need calibration at Impala startup time.
-      hash_tbl_->PrefetchBucket<false>(hash_values[i]);
-    } else {
-      null_bitmap_.Set<false>(i, true);
+  const int num_rows = batch->num_rows();
+  HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
+  const int prefetch_size = expr_vals_cache->capacity();
+  const BufferedTupleStream::RowIdx* row_indices = indices.data();
+  for (int prefetch_group_row = 0; prefetch_group_row < num_rows;
+       prefetch_group_row += prefetch_size) {
+    int cur_row = prefetch_group_row;
+    expr_vals_cache->Reset();
+    FOREACH_ROW_LIMIT(batch, cur_row, prefetch_size, batch_iter) {
+      if (ht_ctx->EvalAndHashBuild(batch_iter.Get())) {
+        if (prefetch_mode != TPrefetchMode::NONE) {
+          hash_tbl_->PrefetchBucket<false>(expr_vals_cache->ExprValuesHash());
+        }
+      } else {
+        expr_vals_cache->SetRowNull();
+      }
+      expr_vals_cache->NextRow();
     }
-    ++i;
-  }
-  // Do the insertion.
-  i = 0;
-  const BufferedTupleStream::RowIdx* row_idx = indices.data();
-  FOREACH_ROW(batch, 0, batch_iter) {
-    if (LIKELY(!null_bitmap_.Get<false>(i))) {
+    // Do the insertion.
+    expr_vals_cache->ResetForRead();
+    FOREACH_ROW_LIMIT(batch, cur_row, prefetch_size, batch_iter) {
       TupleRow* row = batch_iter.Get();
-      if (UNLIKELY(!hash_tbl_->Insert(ht_ctx, row_idx[i], row, hash_values[i]))) {
+      BufferedTupleStream::RowIdx row_idx = row_indices[cur_row];
+      if (!expr_vals_cache->IsRowNull() &&
+          UNLIKELY(!hash_tbl_->Insert(ht_ctx, row_idx, row))) {
         return false;
       }
+      expr_vals_cache->NextRow();
+      ++cur_row;
     }
-    ++i;
   }
   return true;
 }
 
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::INNER_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::RIGHT_SEMI_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::RIGHT_ANTI_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
+template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(
+    TPrefetchMode::type prefetch_mode, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status);
 }

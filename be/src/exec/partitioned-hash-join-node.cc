@@ -143,7 +143,9 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   // Although ConstructBuildSide() maybe be run in a separate thread, it is safe to free
   // local allocations in QueryMaintenance() since the build thread is not run
   // concurrently with other expr evaluation in this join node.
-  AddExprCtxsToFree(probe_expr_ctxs_);
+  // Probe side expr is not included in QueryMaintenance(). We cache the probe expression
+  // values in ExprValuesCache. Local allocations need to survive until the cache is reset
+  // so we need to manually free probe expr local allocations.
   AddExprCtxsToFree(build_expr_ctxs_);
 
   // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
@@ -162,10 +164,10 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN ||
       std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(), false,
                       std::logical_or<bool>());
-  ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, should_store_nulls,
-      is_not_distinct_from_, state->fragment_hash_seed(), MAX_PARTITION_DEPTH,
-      child(1)->row_desc().tuple_descriptors().size()));
-
+  RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, probe_expr_ctxs_,
+      should_store_nulls, is_not_distinct_from_, state->fragment_hash_seed(),
+      MAX_PARTITION_DEPTH, child(1)->row_desc().tuple_descriptors().size(), mem_tracker(),
+      &ht_ctx_));
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
@@ -206,20 +208,20 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
         ht_ctx_->CodegenHashCurrentRow(state, true, &murmur_hash_fn));
 
     // Codegen for evaluating build rows
-    Function* eval_row_fn;
-    codegen_status.MergeStatus(ht_ctx_->CodegenEvalRow(state, true, &eval_row_fn));
+    Function* eval_build_row_fn;
+    codegen_status.MergeStatus(ht_ctx_->CodegenEvalRow(state, true, &eval_build_row_fn));
 
     if (codegen_status.ok()) {
       // Codegen for build path
       build_codegen_status =
-          CodegenProcessBuildBatch(state, hash_fn, murmur_hash_fn, eval_row_fn);
+          CodegenProcessBuildBatch(state, hash_fn, murmur_hash_fn, eval_build_row_fn);
       if (build_codegen_status.ok()) build_codegen_enabled = true;
       // Codegen for probe path
       probe_codegen_status = CodegenProcessProbeBatch(state, hash_fn, murmur_hash_fn);
       if (probe_codegen_status.ok()) probe_codegen_enabled = true;
       // Codegen for InsertBatch()
       insert_codegen_status = CodegenInsertBatch(state, hash_fn, murmur_hash_fn,
-          eval_row_fn);
+          eval_build_row_fn);
       if (insert_codegen_status.ok()) ht_construction_codegen_enabled = true;
     } else {
       build_codegen_status = codegen_status;
@@ -324,8 +326,7 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
   : parent_(parent),
     is_closed_(false),
     is_spilled_(false),
-    level_(level),
-    null_bitmap_(state->batch_size()) {
+    level_(level) {
   build_rows_ = new BufferedTupleStream(state, parent_->child(1)->row_desc(),
       state->block_mgr(), parent_->block_mgr_client_,
       true /* use_initial_small_buffers */, false /* read_write */);
@@ -334,8 +335,6 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
       state->block_mgr(), parent_->block_mgr_client_,
       true /* use_initial_small_buffers */, false /* read_write */ );
   DCHECK(probe_rows_ != NULL);
-  hash_values_.resize(state->batch_size());
-  null_bitmap_.SetAllBits(false);
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {
@@ -465,6 +464,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
     DCHECK_EQ(batch.num_rows(), indices.size());
     DCHECK_LE(batch.num_rows(), hash_tbl_->EmptyBuckets())
         << build_rows()->RowConsumesMemory();
+    TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
     SCOPED_TIMER(parent_->build_timer_);
     if (parent_->insert_batch_fn_ != NULL) {
       InsertBatchFn insert_batch_fn;
@@ -474,9 +474,13 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
         insert_batch_fn = parent_->insert_batch_fn_;
       }
       DCHECK(insert_batch_fn != NULL);
-      if (UNLIKELY(!insert_batch_fn(this, ctx, &batch, indices))) goto not_built;
+      if (UNLIKELY(!insert_batch_fn(this, prefetch_mode, ctx, &batch, indices))) {
+        goto not_built;
+      }
     } else {
-      if (UNLIKELY(!InsertBatch(ctx, &batch, indices))) goto not_built;
+      if (UNLIKELY(!InsertBatch(prefetch_mode, ctx, &batch, indices))) {
+        goto not_built;
+      }
     }
     RETURN_IF_ERROR(state->GetQueryStatus());
     parent_->FreeLocalAllocations();
@@ -652,7 +656,6 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     DCHECK(new_partition != NULL);
     hash_partitions_.push_back(partition_pool_->Add(new_partition));
     RETURN_IF_ERROR(new_partition->build_rows()->Init(id(), runtime_profile(), true));
-
     // Initialize a buffer for the probe here to make sure why have it if we need it.
     // While this is not strictly necessary (there are some cases where we won't need this
     // buffer), the benefit is low. Not grabbing this buffer means there is an additional
@@ -671,6 +674,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   while (!eos) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
+    // 'probe_expr_ctxs_' should have made no local allocations in this function.
+    DCHECK(!ExprContext::HasLocalAllocations(probe_expr_ctxs_));
     if (input_partition_ == NULL) {
       // If we are still consuming batches from the build side.
       {
@@ -887,6 +892,43 @@ int64_t PartitionedHashJoinNode::LargestSpilledPartition() const {
   return max_rows;
 }
 
+int PartitionedHashJoinNode::ProcessProbeBatch(
+    const TJoinOp::type join_op, TPrefetchMode::type prefetch_mode,
+    RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status) {
+  switch (join_op) {
+    case TJoinOp::INNER_JOIN:
+      return ProcessProbeBatch<TJoinOp::INNER_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::LEFT_OUTER_JOIN:
+      return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::LEFT_SEMI_JOIN:
+      return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::LEFT_ANTI_JOIN:
+      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
+      return ProcessProbeBatch<TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN>(prefetch_mode,
+          out_batch, ht_ctx, status);
+    case TJoinOp::RIGHT_OUTER_JOIN:
+      return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::RIGHT_SEMI_JOIN:
+      return ProcessProbeBatch<TJoinOp::RIGHT_SEMI_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::RIGHT_ANTI_JOIN:
+      return ProcessProbeBatch<TJoinOp::RIGHT_ANTI_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    case TJoinOp::FULL_OUTER_JOIN:
+      return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(prefetch_mode, out_batch,
+          ht_ctx, status);
+    default:
+      DCHECK(false) << "Unknown join type";
+      return -1;
+  }
+}
+
 Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch,
     bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -951,16 +993,19 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       // Putting SCOPED_TIMER in ProcessProbeBatch() causes weird exception handling IR
       // in the xcompiled function, so call it here instead.
       int rows_added = 0;
+      TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
       SCOPED_TIMER(probe_timer_);
       if (process_probe_batch_fn_ == NULL) {
-        rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get(), &status);
+        rows_added = ProcessProbeBatch(join_op_, prefetch_mode, out_batch, ht_ctx_.get(),
+            &status);
       } else {
         DCHECK(process_probe_batch_fn_level0_ != NULL);
         if (ht_ctx_->level() == 0) {
-          rows_added = process_probe_batch_fn_level0_(this, out_batch, ht_ctx_.get(),
-              &status);
+          rows_added = process_probe_batch_fn_level0_(this, prefetch_mode, out_batch,
+              ht_ctx_.get(), &status);
         } else {
-          rows_added = process_probe_batch_fn_(this, out_batch, ht_ctx_.get(), &status);
+          rows_added = process_probe_batch_fn_(this, prefetch_mode, out_batch,
+              ht_ctx_.get(), &status);
         }
       }
       if (UNLIKELY(rows_added < 0)) {
@@ -982,6 +1027,10 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     } else {
       RETURN_IF_ERROR(NextSpilledProbeRowBatch(state, out_batch));
     }
+    // Free local allocations of the probe side expressions only after ExprValuesCache
+    // has been reset.
+    DCHECK(ht_ctx_->expr_values_cache()->AtEnd());
+    ExprContext::FreeLocalAllocations(probe_expr_ctxs_);
 
     // We want to return as soon as we have attached a tuple stream to the out_batch
     // (before preparing a new partition). The attached tuple stream will be recycled
@@ -1615,6 +1664,7 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
       codegen->CloneFunction(process_build_batch_fn);
 
   // Always build runtime filters at level0 (if there are any).
+  // Note that the first argument of this function is the return value.
   Value* build_filters_l0_arg = codegen->GetArgument(process_build_batch_fn_level0, 3);
   build_filters_l0_arg->replaceAllUsesWith(
       ConstantInt::get(Type::getInt1Ty(codegen->context()), filters_.size() > 0));
@@ -1630,7 +1680,8 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
   DCHECK_EQ(replaced, 1);
 
   // Never build filters after repartitioning, as all rows have already been added to the
-  // filters during the level0 build.
+  // filters during the level0 build. Note that the first argument of this function is the
+  // return value.
   Value* build_filters_arg = codegen->GetArgument(process_build_batch_fn, 3);
   build_filters_arg->replaceAllUsesWith(
       ConstantInt::get(Type::getInt1Ty(codegen->context()), false));
@@ -1698,21 +1749,26 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   DCHECK(process_probe_batch_fn != NULL);
   process_probe_batch_fn->setName("ProcessProbeBatch");
 
-  // Since ProcessProbeBatch() is a templated function, it has linkonce_odr linkage, which
-  // means the function can be removed if it's not referenced. Change to weak_odr, which
-  // has the same semantics except it can't be removed.
-  // See http://llvm.org/docs/LangRef.html#linkage-types
-  DCHECK(process_probe_batch_fn->getLinkage() == GlobalValue::LinkOnceODRLinkage)
+  // Verifies that ProcessProbeBatch() has weak_odr linkage so it's not discarded even
+  // if it's not referenced. See http://llvm.org/docs/LangRef.html#linkage-types
+  DCHECK(process_probe_batch_fn->getLinkage() == GlobalValue::WeakODRLinkage)
       << LlvmCodeGen::Print(process_probe_batch_fn);
-  process_probe_batch_fn->setLinkage(GlobalValue::WeakODRLinkage);
 
   // Bake in %this pointer argument to process_probe_batch_fn.
   Value* this_arg = codegen->GetArgument(process_probe_batch_fn, 0);
   Value* this_loc = codegen->CastPtrToLlvmPtr(this_arg->getType(), this);
   this_arg->replaceAllUsesWith(this_loc);
 
+  // Replace the parameter 'prefetch_mode' with constant.
+  Value* prefetch_mode_arg = codegen->GetArgument(process_probe_batch_fn, 1);
+  TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
+  DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
+  DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
+  prefetch_mode_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+
   // Bake in %ht_ctx pointer argument to process_probe_batch_fn
-  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 2);
+  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 3);
   Value* ht_ctx_loc = codegen->CastPtrToLlvmPtr(ht_ctx_arg->getType(), ht_ctx_.get());
   ht_ctx_arg->replaceAllUsesWith(ht_ctx_loc);
 
@@ -1823,9 +1879,17 @@ Status PartitionedHashJoinNode::CodegenInsertBatch(RuntimeState* state,
   Function* build_equals_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state, true, &build_equals_fn));
 
+  // Replace the parameter 'prefetch_mode' with constant.
+  Value* prefetch_mode_arg = codegen->GetArgument(insert_batch_fn, 1);
+  TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
+  DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
+  DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
+  prefetch_mode_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+
   // Use codegen'd EvalBuildRow() function
   int replaced = codegen->ReplaceCallSites(insert_batch_fn, eval_row_fn, "EvalBuildRow");
-  DCHECK_EQ(replaced, 2);
+  DCHECK_EQ(replaced, 1);
 
   // Use codegen'd Equals() function
   replaced = codegen->ReplaceCallSites(insert_batch_fn, build_equals_fn, "Equals");

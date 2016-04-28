@@ -193,6 +193,9 @@ struct TQueryOptions {
 
   // Maximum runtime filter size, in bytes
   47: optional i32 runtime_filter_max_size = 16777216
+
+  // Prefetching behavior during hash tables' building and probing.
+  48: optional Types.TPrefetchMode prefetch_mode = Types.TPrefetchMode.HT_BUCKET
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

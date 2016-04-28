@@ -123,10 +123,16 @@ class ExprContext {
   TimestampVal GetTimestampVal(TupleRow* row);
   DecimalVal GetDecimalVal(TupleRow* row);
 
+  /// Returns true if any of the expression contexts in the array has local allocations.
+  /// The last two are helper functions.
+  static bool HasLocalAllocations(const std::vector<ExprContext*>& ctxs);
+  bool HasLocalAllocations();
+  static bool HasLocalAllocations(const std::vector<FunctionContext*>& fn_ctxs);
+
   /// Frees all local allocations made by fn_contexts_. This can be called when result
-  /// data from this context is no longer needed.
-  void FreeLocalAllocations();
+  /// data from this context is no longer needed. The last two are helper functions.
   static void FreeLocalAllocations(const std::vector<ExprContext*>& ctxs);
+  void FreeLocalAllocations();
   static void FreeLocalAllocations(const std::vector<FunctionContext*>& ctxs);
 
   static const char* LLVM_CLASS_NAME;

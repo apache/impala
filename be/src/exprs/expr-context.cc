@@ -110,14 +110,33 @@ Status ExprContext::Clone(RuntimeState* state, ExprContext** new_ctx) {
   return root_->Open(state, *new_ctx, FunctionContext::THREAD_LOCAL);
 }
 
-void ExprContext::FreeLocalAllocations() {
-  FreeLocalAllocations(fn_contexts_);
+bool ExprContext::HasLocalAllocations(const vector<ExprContext*>& ctxs) {
+  for (int i = 0; i < ctxs.size(); ++i) {
+    if (ctxs[i]->HasLocalAllocations()) return true;
+  }
+  return false;
+}
+
+bool ExprContext::HasLocalAllocations() {
+  return HasLocalAllocations(fn_contexts_);
+}
+
+bool ExprContext::HasLocalAllocations(const std::vector<FunctionContext*>& fn_ctxs) {
+  for (int i = 0; i < fn_ctxs.size(); ++i) {
+    if (fn_ctxs[i]->impl()->closed()) continue;
+    if (fn_ctxs[i]->impl()->HasLocalAllocations()) return true;
+  }
+  return false;
 }
 
 void ExprContext::FreeLocalAllocations(const vector<ExprContext*>& ctxs) {
   for (int i = 0; i < ctxs.size(); ++i) {
     ctxs[i]->FreeLocalAllocations();
   }
+}
+
+void ExprContext::FreeLocalAllocations() {
+  FreeLocalAllocations(fn_contexts_);
 }
 
 void ExprContext::FreeLocalAllocations(const vector<FunctionContext*>& fn_ctxs) {

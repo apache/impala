@@ -53,13 +53,13 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
     HashTableCtx* __restrict__ ht_ctx) {
-  uint32_t hash = 0;
   if (AGGREGATED_ROWS) {
-    if (!ht_ctx->EvalAndHashBuild(row, &hash)) return Status::OK();
+    if (!ht_ctx->EvalAndHashBuild(row)) return Status::OK();
   } else {
-    if (!ht_ctx->EvalAndHashProbe(row, &hash)) return Status::OK();
+    if (!ht_ctx->EvalAndHashProbe(row)) return Status::OK();
   }
 
+  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
   // To process this row, we first see if it can be aggregated or inserted into this
   // partition's hash table. If we need to insert it and that fails, due to OOM, we
   // spill the partition. The partition to spill is not necessarily dst_partition,
@@ -76,7 +76,7 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
   bool found;
   // Find the appropriate bucket in the hash table. There will always be a free
   // bucket because we checked the size above.
-  HashTable::Iterator it = ht->FindBuildRowBucket(ht_ctx, hash, &found);
+  HashTable::Iterator it = ht->FindBuildRowBucket(ht_ctx, &found);
   DCHECK(!it.AtEnd()) << "Hash table had no free buckets";
   if (AGGREGATED_ROWS) {
     // If the row is already an aggregate row, it cannot match anything in the
@@ -149,9 +149,9 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
 
   RowBatch::Iterator out_batch_iterator(out_batch, out_batch->num_rows());
   FOREACH_ROW(in_batch, 0, in_batch_iter) {
-    uint32_t hash;
     TupleRow* in_row = in_batch_iter.Get();
-    if (!ht_ctx->EvalAndHashProbe(in_row, &hash)) continue;
+    if (!ht_ctx->EvalAndHashProbe(in_row)) continue;
+    uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
 
     if (TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx], in_row, hash,
@@ -192,7 +192,7 @@ bool PartitionedAggregationNode::TryAddToHashTable(
   DCHECK_GE(*remaining_capacity, 0);
   bool found;
   // This is called from ProcessBatchStreaming() so the rows are not aggregated.
-  HashTable::Iterator it = partition->hash_tbl->FindBuildRowBucket(ht_ctx, hash, &found);
+  HashTable::Iterator it = partition->hash_tbl->FindBuildRowBucket(ht_ctx, &found);
   Tuple* intermediate_tuple;
   if (found) {
     intermediate_tuple = it.GetTuple();

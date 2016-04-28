@@ -219,7 +219,10 @@ enum TImpalaQueryOptions {
   RUNTIME_FILTER_MAX_SIZE,
 
   // Minimum runtime filter size, in bytes.
-  RUNTIME_FILTER_MIN_SIZE
+  RUNTIME_FILTER_MIN_SIZE,
+
+  // Prefetching behavior during hash tables' building and probing.
+  PREFETCH_MODE
 }
 
 // The summary of an insert.

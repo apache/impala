@@ -143,16 +143,21 @@ class RowBatch {
   }
 
   /// An iterator for going through a row batch, starting at 'row_idx'.
-  /// This is more efficient than using GetRow() as it avoids loading the
-  /// row batch state and doing multiplication on each loop with GetRow().
+  /// If 'limit' is specified, it will iterate up to row number 'row_idx + limit'
+  /// or the last row, whichever comes first. Otherwise, it will iterate till the last
+  /// row in the batch. This is more efficient than using GetRow() as it avoids loading
+  /// the row batch state and doing multiplication on each loop with GetRow().
   class Iterator {
    public:
-    IR_ALWAYS_INLINE Iterator(RowBatch* parent, int row_idx) :
+    Iterator(RowBatch* parent, int row_idx, int limit = -1) :
         num_tuples_per_row_(parent->num_tuples_per_row_),
-        row_(parent->tuple_ptrs_ + row_idx * num_tuples_per_row_),
-        row_batch_end_(parent->tuple_ptrs_ + parent->num_rows_ * num_tuples_per_row_),
+        row_(parent->tuple_ptrs_ + num_tuples_per_row_ * row_idx),
+        row_batch_end_(parent->tuple_ptrs_ + num_tuples_per_row_ *
+            (limit == -1 ? parent->num_rows_ :
+                           std::min<int>(row_idx + limit, parent->num_rows_))),
         parent_(parent) {
       DCHECK_GE(row_idx, 0);
+      DCHECK_GT(num_tuples_per_row_, 0);
       /// We allow empty row batches with num_rows_ == capacity_ == 0.
       /// That's why we cannot call GetRow() above to initialize 'row_'.
       DCHECK_LE(row_idx, parent->capacity_);
@@ -397,12 +402,17 @@ class RowBatch {
 
 }
 
-/// Macro for iterating through '_row_batch', starting at '_start_row_idx'.
+/// Macros for iterating through '_row_batch', starting at '_start_row_idx'.
 /// '_row_batch' is the row batch to iterate through.
 /// '_start_row_idx' is the starting row index.
 /// '_iter' is the iterator.
+/// '_limit' is the max number of rows to iterate over.
 #define FOREACH_ROW(_row_batch, _start_row_idx, _iter)                  \
     for (RowBatch::Iterator _iter(_row_batch, _start_row_idx);          \
+         !_iter.AtEnd(); _iter.Next())
+
+#define FOREACH_ROW_LIMIT(_row_batch, _start_row_idx, _limit, _iter)    \
+    for (RowBatch::Iterator _iter(_row_batch, _start_row_idx, _limit);  \
          !_iter.AtEnd(); _iter.Next())
 
 #endif

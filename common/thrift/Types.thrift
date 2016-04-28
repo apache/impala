@@ -120,6 +120,14 @@ enum TRuntimeFilterMode {
   GLOBAL
 }
 
+enum TPrefetchMode {
+  // No prefetching at all.
+  NONE,
+
+  // Prefetch the hash table buckets.
+  HT_BUCKET
+}
+
 // A TNetworkAddress is the standard host, port representation of a
 // network address. The hostname field must be resolvable to an IPv4
 // address.

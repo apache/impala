@@ -189,7 +189,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Probes and updates the hash table for the current probe row for either
   /// RIGHT_SEMI_JOIN or RIGHT_ANTI_JOIN. For RIGHT_SEMI_JOIN, all matching build
-  /// rows will be appended to the 'out_batch'; For RIGHT_ANTI_JOIN, update the
+  /// rows will be appended to the output batch; For RIGHT_ANTI_JOIN, update the
   /// hash table only if matches are found. The actual output happens in
   /// OutputUnmatchedBuild(). Returns true if probing is done for the current
   /// probe row and should continue to next row.
@@ -207,8 +207,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Probes the hash table for the current probe row for LEFT_SEMI_JOIN,
   /// LEFT_ANTI_JOIN or NULL_AWARE_LEFT_ANTI_JOIN. The probe row will be appended
-  /// to 'out_batch' if it's part of the output. Returns true if probing
-  /// is done for the current probe row and should continue to next row.
+  /// to output batch if there is a match (for LEFT_SEMI_JOIN) or if there is no
+  /// match (for LEFT_ANTI_JOIN). Returns true if probing is done for the current
+  /// probe row and should continue to next row.
   ///
   /// 'out_batch_iterator' is the iterator for the output batch.
   /// 'remaining_capacity' tracks the number of additional rows that can be added to
@@ -223,7 +224,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Probes the hash table for the current probe row for LEFT_OUTER_JOIN,
   /// RIGHT_OUTER_JOIN or FULL_OUTER_JOIN. The matching build and/or probe row
-  /// will appended to 'out_batch'. For RIGHT/FULL_OUTER_JOIN, some of the outputs
+  /// will be appended to output batch. For RIGHT/FULL_OUTER_JOIN, some of the outputs
   /// are added in OutputUnmatchedBuild(). Returns true if probing is done for the
   /// current probe row and should continue to next row.
   ///
@@ -239,6 +240,25 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
       ExprContext* const* conjunct_ctxs, int num_conjuncts,
       RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
 
+  /// Probes 'current_probe_row_' against the the hash tables and append outputs
+  /// to output batch. Wrapper around the join-type specific probe row functions
+  /// declared above.
+  template<int const JoinOp>
+  bool inline ProcessProbeRow(
+      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
+      ExprContext* const* conjunct_ctxs, int num_conjuncts,
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status);
+
+  /// Evaluates some number of rows in 'probe_batch_' against the probe expressions
+  /// and hashes the results to 32-bit hash values. The evaluation results and the hash
+  /// values are stored in the expression values cache in 'ht_ctx'. The number of rows
+  /// processed depends on the capacity available in 'ht_ctx->expr_values_cache_'.
+  /// 'prefetch_mode' specifies the prefetching mode in use. If it's not PREFETCH_NONE,
+  /// hash table buckets will be prefetched based on the hash values computed. Note
+  /// that 'prefetch_mode' will be substituted with constants during codegen time.
+  void EvalAndHashProbePrefetchGroup(TPrefetchMode::type prefetch_mode,
+      HashTableCtx* ctx);
+
   /// Find the next probe row. Returns true if a probe row is found. In which case,
   /// 'current_probe_row_' and 'hash_tbl_iterator_' have been set up to point to the
   /// next probe row and its corresponding partition. 'status' may be updated if
@@ -246,7 +266,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   template<int const JoinOp>
   bool inline NextProbeRow(
       HashTableCtx* ht_ctx, RowBatch::Iterator* probe_batch_iterator,
-      int* remaining_capacity, int num_other_join_conjuncts, Status* status);
+      int* remaining_capacity, Status* status);
 
   /// Process probe rows from probe_batch_. Returns either if out_batch is full or
   /// probe_batch_ is entirely consumed.
@@ -256,11 +276,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// set). This function doesn't commit rows to the output batch so it's the caller's
   /// responsibility to do so.
   template<int const JoinOp>
-  int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
+  int ProcessProbeBatch(TPrefetchMode::type, RowBatch* out_batch, HashTableCtx* ht_ctx,
+      Status* status);
 
   /// Wrapper that calls the templated version of ProcessProbeBatch() based on 'join_op'.
-  int ProcessProbeBatch(const TJoinOp::type join_op, RowBatch* out_batch,
-      HashTableCtx* ht_ctx, Status* status);
+  int ProcessProbeBatch(const TJoinOp::type join_op, TPrefetchMode::type,
+      RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
 
   /// Sweep the hash_tbl_ of the partition that is at the front of
   /// output_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
@@ -553,9 +574,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
     /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'indices' is an array
     /// containing the index of each row's index into the hash table's tuple stream.
-    /// This function is replaced with a codegen'd version.
-    bool InsertBatch(HashTableCtx* ctx, RowBatch* batch,
-        const std::vector<BufferedTupleStream::RowIdx>& indices);
+    /// 'prefetch_mode' is the prefetching mode in use. If it's not PREFETCH_NONE, hash
+    /// table buckets which the rows hashes to will be prefetched. This parameter is
+    /// replaced with a constant during codegen time. This function may be replaced with
+    /// a codegen'd version. Returns true if all rows in 'batch' are successfully
+    /// inserted.
+    bool InsertBatch(TPrefetchMode::type prefetch_mode, HashTableCtx* ctx,
+        RowBatch* batch, const std::vector<BufferedTupleStream::RowIdx>& indices);
 
     PartitionedHashJoinNode* parent_;
 
@@ -581,13 +606,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// If NULL, ownership has been transfered.
     BufferedTupleStream* build_rows_;
     BufferedTupleStream* probe_rows_;
-
-    /// Store hash values of each row for the current batch computed during prefetching.
-    std::vector<uint32_t> hash_values_;
-
-    /// Bitmap to indicate rows evaluated to NULL for the current batch when building
-    /// hash tables.
-    Bitmap null_bitmap_;
   };
 
   /// For the below codegen'd functions, xxx_fn_level0_ uses CRC hashing when available
@@ -600,14 +618,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ProcessBuildBatchFn process_build_batch_fn_;
   ProcessBuildBatchFn process_build_batch_fn_level0_;
 
-  typedef int (*ProcessProbeBatchFn)(
-      PartitionedHashJoinNode*, RowBatch*, HashTableCtx*, Status*);
+  typedef int (*ProcessProbeBatchFn)(PartitionedHashJoinNode*,
+      TPrefetchMode::type, RowBatch*, HashTableCtx*, Status*);
   /// Jitted ProcessProbeBatch function pointers.  NULL if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
   ProcessProbeBatchFn process_probe_batch_fn_level0_;
 
-  typedef bool (*InsertBatchFn)(Partition*, HashTableCtx*, RowBatch*,
-      const std::vector<BufferedTupleStream::RowIdx>&);
+  typedef bool (*InsertBatchFn)(Partition*, TPrefetchMode::type, HashTableCtx*,
+      RowBatch*, const std::vector<BufferedTupleStream::RowIdx>&);
   /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
   InsertBatchFn insert_batch_fn_;
   InsertBatchFn insert_batch_fn_level0_;

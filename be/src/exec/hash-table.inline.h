@@ -23,23 +23,30 @@
 
 namespace impala {
 
-inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
+inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row) {
   bool has_null = EvalBuildRow(row);
   if (!stores_nulls_ && has_null) return false;
-  *hash = HashCurrentRow();
+  expr_values_cache_.SetExprValuesHash(HashCurrentRow());
   return true;
 }
 
-inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
+inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row) {
   bool has_null = EvalProbeRow(row);
   if (has_null && !(stores_nulls_ && finds_some_nulls_)) return false;
-  *hash = HashCurrentRow();
+  expr_values_cache_.SetExprValuesHash(HashCurrentRow());
   return true;
+}
+
+inline void HashTableCtx::ExprValuesCache::NextRow() {
+  cur_expr_values_ += expr_values_bytes_per_row_;
+  cur_expr_values_null_ += num_exprs_;
+  ++cur_expr_values_hash_;
+  DCHECK_LE(cur_expr_values_hash_ - expr_values_hash_array_.get(), capacity_);
 }
 
 template <bool FORCE_NULL_EQUALITY>
 inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
-    bool is_build, HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, bool* found) {
+    HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   DCHECK(buckets != NULL);
   DCHECK_GT(num_buckets, 0);
   *found = false;
@@ -49,20 +56,10 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
   // for knowing when to exit the loop (e.g. by capping the total travel length). In case
   // of quadratic probing it is also used for calculating the length of the next jump.
   int64_t step = 0;
-  bool need_eval = row != NULL;
   do {
     Bucket* bucket = &buckets[bucket_idx];
     if (LIKELY(!bucket->filled)) return bucket_idx;
     if (hash == bucket->hash) {
-      // Evaluate 'row' if needed before calling Equals() for the first time in this loop.
-      if (need_eval) {
-        if (is_build) {
-          ht_ctx->EvalBuildRow(row);
-        } else {
-          ht_ctx->EvalProbeRow(row);
-        }
-        need_eval = false;
-      }
       if (ht_ctx != NULL &&
           ht_ctx->Equals<FORCE_NULL_EQUALITY>(GetRow(bucket, ht_ctx->scratch_row_))) {
         *found = true;
@@ -89,12 +86,11 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
   return Iterator::BUCKET_NOT_FOUND;
 }
 
-inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx,
-    TupleRow* row, uint32_t hash) {
+inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx) {
   ++num_probes_;
   bool found = false;
-  int64_t bucket_idx =
-      Probe<true>(buckets_, num_buckets_, true, ht_ctx, row, hash, &found);
+  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+  int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, &found);
   DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND);
   if (found) {
     // We need to insert a duplicate node, note that this may fail to allocate memory.
@@ -108,8 +104,8 @@ inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx,
 }
 
 inline bool HashTable::Insert(HashTableCtx* ht_ctx,
-    const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash) {
-  HtData* htdata = InsertInternal(ht_ctx, row, hash);
+    const BufferedTupleStream::RowIdx& idx, TupleRow* row) {
+  HtData* htdata = InsertInternal(ht_ctx);
   // If successful insert, update the contents of the newly inserted entry with 'idx'.
   if (LIKELY(htdata != NULL)) {
     if (stores_tuples_) {
@@ -133,11 +129,11 @@ inline void HashTable::PrefetchBucket(uint32_t hash) {
   __builtin_prefetch(&buckets_[bucket_idx], READ ? 0 : 1, 1);
 }
 
-inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash) {
+inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx) {
   ++num_probes_;
   bool found = false;
-  int64_t bucket_idx =
-      Probe<false>(buckets_, num_buckets_, false, ht_ctx, NULL, hash, &found);
+  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+  int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
   if (found) {
     return Iterator(this, ht_ctx->scratch_row(), bucket_idx,
         buckets_[bucket_idx].bucketData.duplicates);
@@ -147,10 +143,10 @@ inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx, uint32_
 
 // TODO: support lazy evaluation like HashTable::Insert().
 inline HashTable::Iterator HashTable::FindBuildRowBucket(
-    HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
+    HashTableCtx* ht_ctx, bool* found) {
   ++num_probes_;
-  int64_t bucket_idx =
-      Probe<true>(buckets_, num_buckets_, false, ht_ctx, NULL, hash, found);
+  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+  int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
   DuplicateNode* duplicates = LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND) ?
       buckets_[bucket_idx].bucketData.duplicates : NULL;
   return Iterator(this, ht_ctx->scratch_row(), bucket_idx, duplicates);
@@ -316,6 +312,16 @@ inline bool HashTable::Iterator::IsMatched() const {
 inline void HashTable::Iterator::SetAtEnd() {
   bucket_idx_ = BUCKET_NOT_FOUND;
   node_ = NULL;
+}
+
+template<const bool READ>
+inline void HashTable::Iterator::PrefetchBucket() {
+  if (LIKELY(!AtEnd())) {
+    // HashTable::PrefetchBucket() takes a hash value to index into the hash bucket
+    // array. Passing 'bucket_idx_' here is sufficient.
+    DCHECK_EQ((bucket_idx_ & ~(table_->num_buckets_ - 1)), 0);
+    table_->PrefetchBucket<READ>(bucket_idx_);
+  }
 }
 
 inline void HashTable::Iterator::Next() {

@@ -111,10 +111,12 @@ class HashTableCtx {
   ///  - probe_exprs are used during FindProbeRow()
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   ///  - finds_nulls: if finds_nulls[i] is false, FindProbeRow() returns End() for
-  ///      TupleRows with nulls in position i even if stores_nulls is true.
-  ///  - initial_seed: Initial seed value to use when computing hashes for rows with
+  ///        TupleRows with nulls in position i even if stores_nulls is true.
+  ///  - initial_seed: initial seed value to use when computing hashes for rows with
   ///    level 0. Other levels have their seeds derived from this seed.
-  ///  - The max levels we will hash with.
+  ///  - max_levels: the max levels we will hash with.
+  ///  - tracker: the memory tracker of the exec node which owns this hash table context.
+  ///        Memory usage of expression values cache is charged against it.
   /// TODO: stores_nulls is too coarse: for a hash table in which some columns are joined
   ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
   ///       in which nulls are stored and columns in which they are not, which could save
@@ -122,7 +124,18 @@ class HashTableCtx {
   HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
       const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
       const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
-      int num_build_tuples);
+      MemTracker* tracker);
+
+  /// Create a hash table context with the specified parameters, invoke Init() to
+  /// initialize the new hash table context and return it in 'ht_ctx'. Please see header
+  /// comments of HashTableCtx constructor for details of the parameters.
+  /// 'num_build_tuples' is the number of tuples of a row in the build side, used for
+  /// computing the size of a scratch row.
+  static Status Create(RuntimeState* state,
+      const std::vector<ExprContext*>& build_expr_ctxs,
+      const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
+      const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
+      int num_build_tuples, MemTracker* tracker, boost::scoped_ptr<HashTableCtx>* ht_ctx);
 
   /// Call to cleanup any resources.
   void Close();
@@ -135,29 +148,28 @@ class HashTableCtx {
 
   TupleRow* ALWAYS_INLINE scratch_row() const { return scratch_row_; }
 
-  /// Returns the results of the exprs at 'expr_idx' evaluated over the last row
-  /// processed.
+  /// Returns the results of the expression at 'expr_idx' evaluated at the current row.
   /// This value is invalid if the expr evaluated to NULL.
   /// TODO: this is an awkward abstraction but aggregation node can take advantage of
   /// it and save some expr evaluation calls.
-  void* ALWAYS_INLINE last_expr_value(int expr_idx) const {
-    return expr_values_buffer_ + expr_values_buffer_offsets_[expr_idx];
+  void* ALWAYS_INLINE ExprValue(int expr_idx) const {
+    return expr_values_cache_.ExprValuePtr(expr_idx);
   }
 
-  /// Returns if the expr at 'expr_idx' evaluated to NULL for the last row.
-  bool ALWAYS_INLINE last_expr_value_null(int expr_idx) const {
-    return expr_value_null_bits_[expr_idx];
+  /// Returns if the expression at 'expr_idx' is evaluated to NULL for the current row.
+  bool ALWAYS_INLINE ExprValueNull(int expr_idx) const {
+    return static_cast<bool>(*expr_values_cache_.ExprValueNullPtr(expr_idx));
   }
 
-  /// Evaluate and hash the build/probe row, returning in *hash. Returns false if this
-  /// row should be rejected (doesn't need to be processed further) because it
-  /// contains NULL.
-  /// These need to be inlined in the IR module so we can find and replace the calls to
-  /// EvalBuildRow()/EvalProbeRow().
-  bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row, uint32_t* hash);
-  bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash);
-
-  int ALWAYS_INLINE results_buffer_size() const { return results_buffer_size_; }
+  /// Evaluate and hash the build/probe row, saving the evaluation to the current row of
+  /// the ExprValuesCache in this hash table context: the results are saved in
+  /// 'cur_expr_values_', the nullness of expressions values in 'cur_expr_values_null_',
+  /// and the hashed expression values in 'cur_expr_values_hash_'. Returns false if this
+  /// row should be rejected  (doesn't need to be processed further) because it contains
+  /// NULL. These need to be inlined in the IR module so we can find and replace the
+  /// calls to EvalBuildRow()/EvalProbeRow().
+  bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row);
+  bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row);
 
   /// Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
@@ -165,13 +177,13 @@ class HashTableCtx {
   Status CodegenEvalRow(RuntimeState* state, bool build_row, llvm::Function** fn);
 
   /// Codegen for evaluating a TupleRow and comparing equality against
-  /// 'expr_values_buffer_'.  Function signature matches HashTable::Equals().
+  /// 'cur_expr_values_'.  Function signature matches HashTable::Equals().
   /// 'force_null_equality' is true if the generated equality function should treat
   /// all NULLs as equal. See the template parameter to HashTable::Equals().
   Status CodegenEquals(RuntimeState* state, bool force_null_equality,
       llvm::Function** fn);
 
-  /// Codegen for hashing the expr values in 'expr_values_buffer_'. Function prototype
+  /// Codegen for hashing the expr values in 'cur_expr_values_'. Function prototype
   /// matches HashCurrentRow identically. Unlike HashCurrentRow(), the returned function
   /// only uses a single hash function, rather than switching based on level_.
   /// If 'use_murmur' is true, murmur hash is used, otherwise CRC is used if the hardware
@@ -180,36 +192,198 @@ class HashTableCtx {
 
   static const char* LLVM_CLASS_NAME;
 
+  /// To enable prefetching, the hash table building and probing are pipelined by the
+  /// exec nodes. A set of rows in a row batch will be evaluated and hashed first and
+  /// the corresponding hash table buckets are prefetched before they are probed against
+  /// the hash table. ExprValuesCache is a container for caching the results of
+  /// expressions evaluations for the rows in a prefetch set to avoid re-evaluating the
+  /// rows again during probing. Expressions evaluation can be very expensive.
+  ///
+  /// The expression evaluation results are cached in the following data structures:
+  ///
+  /// - 'expr_values_array_' is an array caching the results of the rows
+  /// evaluated against either the build or probe expressions. 'cur_expr_values_'
+  /// is a pointer into this array.
+  /// - 'expr_values_null_array_' is an array caching the nullness of each evaluated
+  /// expression in each row. 'cur_expr_values_null_' is a pointer into this array.
+  /// - 'expr_values_hash_array_' is an array of cached hash values of the rows.
+  /// 'cur_expr_values_hash_' is a pointer into this array.
+  /// - 'null_bitmap_' is a bitmap which indicates rows evaluated to NULL.
+  ///
+  /// ExprValuesCache provides an iterator like interface for performing a write pass
+  /// followed by a read pass. We refrain from providing an interface for random accesses
+  /// as there isn't a use case for it now and we want to avoid expensive multiplication
+  /// as the buffer size of each row is not necessarily power of two:
+  /// - Reset(), ResetForRead(): reset the iterators before writing / reading cached values.
+  /// - NextRow(): moves the iterators to point to the next row of cached values.
+  /// - AtEnd(): returns true if all cached rows have been read. Valid in read mode only.
+  ///
+  /// Various metadata information such as layout of results buffer is also stored in
+  /// this class. Note that the result buffer doesn't store variable length data. It only
+  /// contains pointers to the variable length data (e.g. if an expression value is a
+  /// StringValue).
+  ///
+  class ExprValuesCache {
+   public:
+    ExprValuesCache();
+
+    /// Allocates memory and initializes various data structures. Return error status
+    /// if memory allocation leads to the memory limits of the exec node to be exceeded.
+    /// 'tracker' is the memory tracker of the exec node which owns this HashTableCtx.
+    Status Init(RuntimeState* state, MemTracker* tracker,
+        const std::vector<ExprContext*>& build_expr_ctxs);
+
+    /// Frees up various resources and updates memory tracker with proper accounting.
+    /// 'tracker' should be the same memory tracker which was passed in for Init().
+    void Close(MemTracker* tracker);
+
+    /// Resets the cache states (iterators, end pointers etc) before writing.
+    void Reset();
+
+    /// Resets the iterators to the start before reading. Will record the current position
+    /// of the iterators in end pointer before resetting so AtEnd() can determine if all
+    /// cached values have been read.
+    void ResetForRead();
+
+    /// Advances the iterators to the next row by moving to the next entries in the
+    /// arrays of cached values.
+    void ALWAYS_INLINE NextRow();
+
+    /// Compute the total memory usage of this ExprValuesCache.
+    static int MemUsage(int capacity, int results_buffer_size, int num_build_exprs);
+
+    /// Returns the maximum number rows of expression values states which can be cached.
+    int ALWAYS_INLINE capacity() const { return capacity_; }
+
+    /// Returns the total size in bytes of a row of evaluated expressions' values.
+    int ALWAYS_INLINE expr_values_bytes_per_row() const {
+      return expr_values_bytes_per_row_;
+    }
+
+    /// Returns the offset into the result buffer of the first variable length
+    /// data results.
+    int ALWAYS_INLINE var_result_offset() const { return var_result_offset_; }
+
+    /// Returns true if the current read pass is complete, meaning all cached values
+    /// have been read.
+    bool ALWAYS_INLINE AtEnd() const {
+      return cur_expr_values_hash_ == cur_expr_values_hash_end_;
+    }
+
+    /// Returns true if the current row is null but nulls are not considered in the current
+    /// phase (build or probe).
+    bool ALWAYS_INLINE IsRowNull() const { return null_bitmap_.Get<false>(CurIdx()); }
+
+    /// Record in a bitmap that the current row is null but nulls are not considered in
+    /// the current phase (build or probe).
+    void ALWAYS_INLINE SetRowNull() { null_bitmap_.Set<false>(CurIdx(), true); }
+
+    /// Returns the hash values of the current row.
+    uint32_t ALWAYS_INLINE ExprValuesHash() const { return *cur_expr_values_hash_; }
+
+    /// Sets the hash values for the current row.
+    void ALWAYS_INLINE SetExprValuesHash(uint32_t hash) { *cur_expr_values_hash_ = hash; }
+
+    /// Returns a pointer to the expression value at 'expr_idx' for the current row.
+    uint8_t* ExprValuePtr(int expr_idx) const;
+
+    /// Returns a pointer to the boolean indicating the nullness of the expression value
+    /// at 'expr_idx'.
+    uint8_t* ExprValueNullPtr(int expr_idx) const;
+
+    /// Returns the offset into the results buffer of the expression value at 'expr_idx'.
+    int ALWAYS_INLINE expr_values_offsets(int expr_idx) const {
+      return expr_values_offsets_[expr_idx];
+    }
+
+   private:
+    friend class HashTableCtx;
+
+    /// Resets the iterators to the beginning of the cache values' arrays.
+    void ResetIterators();
+
+    /// Returns the offset in number of rows into the cached values' buffer.
+    int ALWAYS_INLINE CurIdx() const {
+      return cur_expr_values_hash_ - expr_values_hash_array_.get();
+    }
+
+    /// Max amount of memory in bytes for caching evaluated expression values.
+    static const int MAX_EXPR_VALUES_ARRAY_SIZE = 256 << 10;
+
+    /// Maximum number of rows of expressions evaluation states which this
+    /// ExprValuesCache can cache.
+    int capacity_;
+
+    /// Byte size of a row of evaluated expression values. Never changes once set,
+    /// can be used for constant substitution during codegen.
+    int expr_values_bytes_per_row_;
+
+    /// Number of build/probe expressions.
+    int num_exprs_;
+
+    /// Pointer into 'expr_values_array_' for the current row's expression values.
+    uint8_t* cur_expr_values_;
+
+    /// Pointer into 'expr_values_null_array_' for the current row's nullness of each
+    /// expression value.
+    uint8_t* cur_expr_values_null_;
+
+    /// Pointer into 'expr_hash_value_array_' for the hash value of current row's
+    /// expression values.
+    uint32_t* cur_expr_values_hash_;
+
+    /// Pointer to the buffer one beyond the end of the last entry of cached expressions'
+    /// hash values.
+    uint32_t* cur_expr_values_hash_end_;
+
+    /// Array for caching up to 'capacity_' number of rows worth of evaluated expression
+    /// values. Each row consumes 'expr_values_bytes_per_row_' number of bytes.
+    boost::scoped_array<uint8_t> expr_values_array_;
+
+    /// Array for caching up to 'capacity_' number of rows worth of null booleans.
+    /// Each row contains 'num_exprs_' booleans to indicate nullness of expression values.
+    /// Used when the hash table supports NULL. Use 'uint8_t' to guarantee each entry is 1
+    /// byte as sizeof(bool) is implementation dependent. The IR depends on this
+    /// assumption.
+    boost::scoped_array<uint8_t> expr_values_null_array_;
+
+    /// Array for caching up to 'capacity_' number of rows worth of hashed values.
+    boost::scoped_array<uint32_t> expr_values_hash_array_;
+
+    /// One bit for each row. A bit is set if that row is not hashed as it's evaluated
+    /// to NULL but the hash table doesn't support NULL. Such rows may still be included
+    /// in outputs for certain join types (e.g. left anti joins).
+    Bitmap null_bitmap_;
+
+    /// Maps from expression index to the byte offset into a row of expression values.
+    /// One entry per build/probe expression.
+    std::vector<int> expr_values_offsets_;
+
+    /// Byte offset into 'cur_expr_values_' that begins the variable length results for
+    /// a row. If -1, there are no variable length slots. Never changes once set, can be
+    /// constant substituted with codegen.
+    int var_result_offset_;
+  };
+
+  ExprValuesCache* ALWAYS_INLINE expr_values_cache() { return &expr_values_cache_; }
+
  private:
   friend class HashTable;
   friend class HashTableTest_HashEmpty_Test;
 
+  /// Allocate various buffers for storing expression evaluation results, hash values,
+  /// null bits etc. Returns error if allocation causes query memory limit to be exceeded.
+  Status Init(RuntimeState* state, int num_build_tuples);
+
   /// Compute the hash of the values in expr_values_buffer_.
   /// This will be replaced by codegen.  We don't want this inlined for replacing
   /// with codegen'd functions so the function name does not change.
-  uint32_t IR_NO_INLINE HashCurrentRow() const {
-    DCHECK_LT(level_, seeds_.size());
-    if (var_result_begin_ == -1) {
-      /// This handles NULLs implicitly since a constant seed value was put
-      /// into results buffer for nulls.
-      /// TODO: figure out which hash function to use. We need to generate uncorrelated
-      /// hashes by changing just the seed. CRC does not have this property and FNV is
-      /// okay. We should switch to something else.
-      return Hash(expr_values_buffer_, results_buffer_size_, seeds_[level_]);
-    } else {
-      return HashTableCtx::HashVariableLenRow();
-    }
-  }
+  uint32_t IR_NO_INLINE HashCurrentRow() const;
 
   /// Wrapper function for calling correct HashUtil function in non-codegen'd case.
-  uint32_t inline Hash(const void* input, int len, uint32_t hash) const {
-    /// Use CRC hash at first level for better performance. Switch to murmur hash at
-    /// subsequent levels since CRC doesn't randomize well with different seed inputs.
-    if (level_ == 0) return HashUtil::Hash(input, len, hash);
-    return HashUtil::MurmurHash2_64(input, len, hash);
-  }
+  uint32_t Hash(const void* input, int len, uint32_t hash) const;
 
-  /// Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
+  /// Evaluate 'row' over build exprs caching the results in 'cur_expr_values_' This
   /// will be replaced by codegen.  We do not want this function inlined when cross
   /// compiled because we need to be able to differentiate between EvalBuildRow and
   /// EvalProbeRow by name and the build/probe exprs are baked into the codegen'd
@@ -218,7 +392,7 @@ class HashTableCtx {
     return EvalRow(row, build_expr_ctxs_);
   }
 
-  /// Evaluate 'row' over probe exprs caching the results in 'expr_values_buffer_'
+  /// Evaluate 'row' over probe exprs caching the results in 'cur_expr_values_'
   /// This will be replaced by codegen.
   bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
     return EvalRow(row, probe_expr_ctxs_);
@@ -228,15 +402,15 @@ class HashTableCtx {
   /// fields (e.g. strings).
   uint32_t HashVariableLenRow() const;
 
-  /// Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
+  /// Evaluate the exprs over row and cache the results in 'cur_expr_values_'.
   /// Returns whether any expr evaluated to NULL.
   /// This will be replaced by codegen.
   bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
 
   /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
-  /// values cached in 'expr_values_buffer_'.  This will be replaced by codegen.
+  /// values cached in 'cur_expr_values_'.  This will be replaced by codegen.
   /// FORCE_NULL_EQUALITY is true if all nulls should be treated as equal, regardless
-  /// of the values of finds_nulls_
+  /// of the values of 'finds_nulls_'.
   template<bool FORCE_NULL_EQUALITY>
   bool IR_NO_INLINE Equals(TupleRow* build_row) const;
 
@@ -263,29 +437,16 @@ class HashTableCtx {
   /// The seeds to use for hashing. Indexed by the level.
   std::vector<uint32_t> seeds_;
 
-  /// Cache of exprs values for the current row being evaluated.  This can either
-  /// be a build row (during Insert()) or probe row (during FindProbeRow()).
-  std::vector<int> expr_values_buffer_offsets_;
-
-  /// Byte offset into 'expr_values_buffer_' that begins the variable length results.
-  /// If -1, there are no variable length slots. Never changes once set, can be removed
-  /// with codegen.
-  int var_result_begin_;
-
-  /// Byte size of 'expr_values_buffer_'. Never changes once set, can be removed with
-  /// codegen.
-  int results_buffer_size_;
-
-  /// Buffer to store evaluated expr results.  This address must not change once
-  /// allocated since the address is baked into the codegen.
-  uint8_t* expr_values_buffer_;
-
-  /// Use bytes instead of bools to be compatible with llvm.  This address must
-  /// not change once allocated.
-  uint8_t* expr_value_null_bits_;
+  /// The ExprValuesCache for caching expression evaluation results, null bytes and hash
+  /// values for rows. Used to store results of batch evaluations of rows.
+  ExprValuesCache expr_values_cache_;
 
   /// Scratch buffer to generate rows on the fly.
   TupleRow* scratch_row_;
+
+  /// Memory tracker of the exec node which owns this hash table context. Account the
+  /// memory usage of expression values cache towards it.
+  MemTracker* tracker_;
 };
 
 /// The hash table consists of a contiguous array of buckets that contain a pointer to the
@@ -381,26 +542,27 @@ class HashTable {
   /// the insert fails and this function returns false.
   /// Used during the build phase of hash joins.
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx,
-      const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash);
+      const BufferedTupleStream::RowIdx& idx, TupleRow* row);
 
   /// Prefetch the hash table bucket which the given hash value 'hash' maps to.
   template<const bool READ>
   void IR_ALWAYS_INLINE PrefetchBucket(uint32_t hash);
 
-  /// Returns an iterator to the bucket matching the last row evaluated in 'ht_ctx'.
-  /// Returns HashTable::End() if no match is found. The iterator can be iterated until
-  /// HashTable::End() to find all the matching rows. Advancing the returned iterator will
-  /// go to the next matching row. The matching rows do not need to be evaluated since all
-  /// the nodes of a bucket are duplicates. One scan can be in progress for each 'ht_ctx'.
-  /// Used during the probe phase of hash joins.
-  Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* ht_ctx, uint32_t hash);
+  /// Returns an iterator to the bucket that matches the probe expression results that
+  /// are cached at the current position of the ExprValuesCache in 'ht_ctx'. Assumes that
+  /// the ExprValuesCache was filled using EvalAndHashProbe(). Returns HashTable::End()
+  /// if no match is found. The iterator can be iterated until HashTable::End() to find
+  /// all the matching rows. Advancing the returned iterator will go to the next matching
+  /// row. The matching rows do not need to be evaluated since all the nodes of a bucket
+  /// are duplicates. One scan can be in progress for each 'ht_ctx'. Used in the probe
+  /// phase of hash joins.
+  Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* ht_ctx);
 
   /// If a match is found in the table, return an iterator as in FindProbeRow(). If a
   /// match was not present, return an iterator pointing to the empty bucket where the key
   /// should be inserted. Returns End() if the table is full. The caller can set the data
   /// in the bucket using a Set*() method on the iterator.
-  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(HashTableCtx* ht_ctx, uint32_t hash,
-      bool* found);
+  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(HashTableCtx* ht_ctx, bool* found);
 
   /// Returns number of elements inserted in the hash table
   int64_t size() const {
@@ -531,6 +693,10 @@ class HashTable {
     /// Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
     bool ALWAYS_INLINE AtEnd() const { return bucket_idx_ == BUCKET_NOT_FOUND; }
 
+    /// Prefetch the hash table bucket which the iterator is pointing to now.
+    template<const bool READ>
+    void IR_ALWAYS_INLINE PrefetchBucket();
+
    private:
     friend class HashTable;
 
@@ -579,28 +745,24 @@ class HashTable {
   /// Using the returned index value, the caller can create an iterator that can be
   /// iterated until End() to find all the matching rows.
   ///
-  /// If 'row' is not NULL, 'row' will be evaluated once against either the build or
-  /// probe exprs (determined by the parameter 'is_build') before calling Equals().
-  /// If 'row' is NULL, EvalAndHashBuild() or EvalAndHashProbe() must have been called
-  /// before calling this function.
+  /// EvalAndHashBuild() or EvalAndHashProbe() must have been called before calling
+  /// this function. The values of the expression values cache in 'ht_ctx' will be
+  /// used to probe the hash table.
   ///
   /// 'FORCE_NULL_EQUALITY' is true if NULLs should always be considered equal when
   /// comparing two rows.
   ///
-  /// 'is_build' indicates which of build or probe exprs is used for lazy evaluation.
-  /// 'row' is the row being probed against the hash table. Used for lazy evaluation.
   /// 'hash' is the hash computed by EvalAndHashBuild() or EvalAndHashProbe().
   /// 'found' indicates that a bucket that contains an equal row is found.
   ///
   /// There are wrappers of this function that perform the Find and Insert logic.
   template <bool FORCE_NULL_EQUALITY>
-  int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets, bool is_build,
-      HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash, bool* found);
+  int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
+      HashTableCtx* ht_ctx, uint32_t hash, bool* found);
 
   /// Performs the insert logic. Returns the HtData* of the bucket or duplicate node
   /// where the data should be inserted. Returns NULL if the insert was not successful.
-  HtData* IR_ALWAYS_INLINE InsertInternal(HashTableCtx* ht_ctx, TupleRow* row,
-      uint32_t hash);
+  HtData* IR_ALWAYS_INLINE InsertInternal(HashTableCtx* ht_ctx);
 
   /// Updates 'bucket_idx' to the index of the next non-empty bucket. If the bucket has
   /// duplicates, 'node' will be pointing to the head of the linked list of duplicates.

@@ -84,6 +84,9 @@ class FunctionContextImpl {
   /// Frees all allocations returned by AllocateLocal().
   void FreeLocalAllocations();
 
+  /// Returns true if there are any allocations returned by AllocateLocal().
+  bool HasLocalAllocations() const { return !local_allocations_.empty(); }
+
   /// Sets constant_args_. The AnyVal* values are owned by the caller.
   void SetConstantArgs(const std::vector<impala_udf::AnyVal*>& constant_args);
 
