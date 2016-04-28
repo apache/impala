@@ -21,37 +21,37 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 
 add_library(Exprs
   agg-fn-evaluator.cc
-  aggregate-functions.cc
+  aggregate-functions-ir.cc
   anyval-util.cc
   bit-byte-functions.cc
   case-expr.cc
-  cast-functions.cc
+  cast-functions-ir.cc
   compound-predicates.cc
   compound-predicates-ir.cc
   conditional-functions.cc
   conditional-functions-ir.cc
-  decimal-functions.cc
-  decimal-operators.cc
+  decimal-functions-ir.cc
+  decimal-operators-ir.cc
   expr.cc
   expr-context.cc
   expr-ir.cc
   hive-udf-call.cc
   in-predicate-ir.cc
   is-not-empty-predicate.cc
-  is-null-predicate.cc
-  like-predicate.cc
+  is-null-predicate-ir.cc
+  like-predicate-ir.cc
   literal.cc
-  math-functions.cc
+  math-functions-ir.cc
   null-literal.cc
-  operators.cc
+  operators-ir.cc
   slot-ref.cc
-  string-functions.cc
-  timestamp-functions.cc
+  string-functions-ir.cc
+  timestamp-functions-ir.cc
   timezone_db.cc
   tuple-is-null-predicate.cc
   scalar-fn-call.cc
-  udf-builtins.cc
-  utility-functions.cc
+  udf-builtins-ir.cc
+  utility-functions-ir.cc
 )
 add_dependencies(Exprs thrift-deps gen_ir_descriptions)
 
