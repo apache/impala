@@ -17,7 +17,6 @@
 
 #include <map>
 
-#include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "gutil/bits.h"
@@ -294,7 +293,7 @@ inline bool DictDecoder<Decimal16Value>::GetValue(Decimal16Value* value) {
 
 template<typename T>
 inline void DictEncoder<T>::WriteDict(uint8_t* buffer) {
-  BOOST_FOREACH(const Node& node, nodes_) {
+  for (const Node& node: nodes_) {
     buffer += ParquetPlainEncoder::Encode(buffer, encoded_value_size_, node.value);
   }
 }
@@ -306,7 +305,7 @@ inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
   --buffer_len;
 
   RleEncoder encoder(buffer, buffer_len, bit_width());
-  BOOST_FOREACH(int index, buffered_indices_) {
+  for (int index: buffered_indices_) {
     if (!encoder.Put(index)) return -1;
   }
   encoder.Flush();

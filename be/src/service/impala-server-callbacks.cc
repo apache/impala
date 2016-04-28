@@ -114,7 +114,7 @@ void ImpalaServer::HadoopVarzUrlCallback(const Webserver::ArgumentMap& args,
 
   Value configs(kArrayType);
   typedef map<string, string> ConfigMap;
-  BOOST_FOREACH(const ConfigMap::value_type& config, response.configs) {
+  for (const ConfigMap::value_type& config: response.configs) {
     Value key(config.first.c_str(), document->GetAllocator());
     Value value(config.second.c_str(), document->GetAllocator());
     Value config_json(kObjectType);
@@ -204,7 +204,7 @@ void ImpalaServer::InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& arg
     Document* document) {
   lock_guard<mutex> l(query_exec_state_map_lock_);
   stringstream ss;
-  BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
+  for (const QueryExecStateMap::value_type& exec_state: query_exec_state_map_) {
     ss << exec_state.second->query_id() << "\n";
   }
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
@@ -297,8 +297,7 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
   set<QueryStateRecord, QueryStateRecord> sorted_query_records;
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
-    BOOST_FOREACH(
-        const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
+    for(const QueryExecStateMap::value_type& exec_state: query_exec_state_map_) {
       // TODO: Do this in the browser so that sorts on other keys are possible.
       sorted_query_records.insert(QueryStateRecord(*exec_state.second));
     }
@@ -306,7 +305,7 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
 
   Value in_flight_queries(kArrayType);
   int64_t num_waiting_queries = 0;
-  BOOST_FOREACH(const QueryStateRecord& record, sorted_query_records) {
+  for (const QueryStateRecord& record: sorted_query_records) {
     Value record_json(kObjectType);
     QueryStateToJson(record, &record_json, document);
 
@@ -332,7 +331,7 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
   Value completed_queries(kArrayType);
   {
     lock_guard<mutex> l(query_log_lock_);
-    BOOST_FOREACH(const QueryStateRecord& log_entry, query_log_) {
+    for (const QueryStateRecord& log_entry: query_log_) {
       Value record_json(kObjectType);
       QueryStateToJson(log_entry, &record_json, document);
       completed_queries.PushBack(record_json, document->GetAllocator());
@@ -345,7 +344,7 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
   Value query_locations(kArrayType);
   {
     lock_guard<mutex> l(query_locations_lock_);
-    BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
+    for (const QueryLocations::value_type& location: query_locations_) {
       Value location_json(kObjectType);
       Value location_name(lexical_cast<string>(location.first).c_str(),
           document->GetAllocator());
@@ -363,7 +362,7 @@ void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
   lock_guard<mutex> l(session_state_map_lock_);
   Value sessions(kArrayType);
-  BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
+  for (const SessionStateMap::value_type& session: session_state_map_) {
     shared_ptr<SessionState> state = session.second;
     Value session_json(kObjectType);
     Value type(PrintTSessionType(state->session_type).c_str(),
@@ -424,7 +423,7 @@ void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
   }
 
   Value databases(kArrayType);
-  BOOST_FOREACH(const TDatabase& db, get_dbs_result.dbs) {
+  for (const TDatabase& db: get_dbs_result.dbs) {
     Value database(kObjectType);
     Value str(db.db_name.c_str(), document->GetAllocator());
     database.AddMember("name", str, document->GetAllocator());
@@ -439,7 +438,7 @@ void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     }
 
     Value table_array(kArrayType);
-    BOOST_FOREACH(const string& table, get_table_results.tables) {
+    for (const string& table: get_table_results.tables) {
       Value table_obj(kObjectType);
       Value fq_name(Substitute("$0.$1", db.db_name, table).c_str(),
           document->GetAllocator());
@@ -503,7 +502,7 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
     int64_t cardinality = 0;
     int64_t max_time = 0L;
     int64_t total_time = 0;
-    BOOST_FOREACH(const TExecStats& stat, summary->second.exec_stats) {
+    for (const TExecStats& stat: summary->second.exec_stats) {
       if (summary->second.is_broadcast) {
         // Avoid multiple-counting for recipients of broadcasts.
         cardinality = ::max(cardinality, stat.cardinality);
@@ -576,19 +575,19 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
   // Build a map from id to label so that we can resolve the targets of data-stream sinks
   // and connect plan fragments.
   map<TPlanNodeId, string> label_map;
-  BOOST_FOREACH(const TPlanFragment& fragment, fragments) {
-    BOOST_FOREACH(const TPlanNode& node, fragment.plan.nodes) {
+  for (const TPlanFragment& fragment: fragments) {
+    for (const TPlanNode& node: fragment.plan.nodes) {
       label_map[node.node_id] = node.label;
     }
   }
 
   map<TPlanNodeId, TPlanNodeExecSummary> exec_summaries;
-  BOOST_FOREACH(const TPlanNodeExecSummary& s, summary.nodes) {
+  for (const TPlanNodeExecSummary& s: summary.nodes) {
     exec_summaries[s.node_id] = s;
   }
 
   Value nodes(kArrayType);
-  BOOST_FOREACH(const TPlanFragment& fragment, fragments) {
+  for (const TPlanFragment& fragment: fragments) {
     Value plan_fragment(kObjectType);
     vector<TPlanNode>::const_iterator it = fragment.plan.nodes.begin();
     PlanToJsonHelper(exec_summaries, fragment.plan.nodes, &it, document, &plan_fragment);

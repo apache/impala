@@ -79,7 +79,7 @@ void DiskIoMgr::RequestContext::Cancel(const Status& status) {
     }
   }
 
-  BOOST_FOREACH(const WriteRange::WriteDoneCallback& write_callback, write_callbacks) {
+  for (const WriteRange::WriteDoneCallback& write_callback: write_callbacks) {
     write_callback(status_);
   }
 

@@ -15,7 +15,6 @@
 #include "exec/kudu-scan-node.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/foreach.hpp>
 #include <kudu/client/row_result.h>
 #include <kudu/client/schema.h>
 #include <kudu/client/value.h>
@@ -99,7 +98,7 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
   // Convert TScanRangeParams to ScanRanges.
   CHECK(scan_range_params_ != NULL)
       << "Must call SetScanRanges() before calling Prepare()";
-  BOOST_FOREACH(const TScanRangeParams& params, *scan_range_params_) {
+  for (const TScanRangeParams& params: *scan_range_params_) {
     const TKuduKeyRange& key_range = params.scan_range.kudu_key_range;
     key_ranges_.push_back(key_range);
   }
@@ -127,7 +126,7 @@ Status KuduScanNode::Open(RuntimeState* state) {
       static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
 
   kudu::client::KuduClientBuilder b;
-  BOOST_FOREACH(const string& address, table_desc->kudu_master_addresses()) {
+  for (const string& address: table_desc->kudu_master_addresses()) {
     b.add_master_server_addr(address);
   }
 
@@ -200,7 +199,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
 Status KuduScanNode::TransformPushableConjunctsToRangePredicates() {
   // The only supported pushable predicates are binary operators with a SlotRef and a
   // literal as the left and right operands respectively.
-  BOOST_FOREACH(const TExpr& predicate, pushable_conjuncts_) {
+  for (const TExpr& predicate: pushable_conjuncts_) {
     DCHECK_EQ(predicate.nodes.size(), 3);
     const TExprNode& function_call = predicate.nodes[0];
 
@@ -247,7 +246,7 @@ void KuduScanNode::GetSlotRefColumnName(const TExprNode& node, string* col_name)
   const KuduTableDescriptor* table_desc =
       static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
   TSlotId slot_id = node.slot_ref.slot_id;
-  BOOST_FOREACH(SlotDescriptor* slot, tuple_desc_->slots()) {
+  for (SlotDescriptor* slot: tuple_desc_->slots()) {
     if (slot->id() == slot_id) {
       int col_idx = slot->col_pos();
       *col_name = table_desc->col_descs()[col_idx].name();
@@ -375,7 +374,7 @@ Status KuduScanNode::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
 
 void KuduScanNode::ClonePredicates(vector<KuduPredicate*>* predicates) {
   unique_lock<mutex> l(lock_);
-  BOOST_FOREACH(KuduPredicate* predicate, kudu_predicates_) {
+  for (KuduPredicate* predicate: kudu_predicates_) {
     predicates->push_back(predicate->Clone());
   }
 }

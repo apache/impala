@@ -17,7 +17,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/thread/locks.hpp>
@@ -92,7 +91,7 @@ DEFINE_string(webserver_password_file, "",
     "(Optional) Location of .htpasswd file containing user names and hashed passwords for"
     " debug webserver authentication");
 
-DEFINE_string(webserver_x_frame_options, "DENY", 
+DEFINE_string(webserver_x_frame_options, "DENY",
     "webserver will add X-Frame-Options HTTP header with this value");
 
 static const char* DOC_FOLDER = "/www/";
@@ -198,7 +197,7 @@ void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
   vector<string> arg_pairs;
   split(arg_pairs, args, is_any_of("&"));
 
-  BOOST_FOREACH(const string& arg_pair, arg_pairs) {
+  for (const string& arg_pair: arg_pairs) {
     vector<string> key_value;
     split(key_value, arg_pair, is_any_of("="));
     if (key_value.empty()) continue;
@@ -247,10 +246,10 @@ Status Webserver::Start() {
       options.push_back("ssl_private_key");
       options.push_back(FLAGS_webserver_private_key_file.c_str());
 
-      if (!FLAGS_webserver_private_key_password_cmd.empty()) {
-        if (!RunShellProcess(FLAGS_webserver_private_key_password_cmd, &key_password, true)) {
-          return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED,
-              FLAGS_webserver_private_key_password_cmd, key_password);
+      const string& password_cmd = FLAGS_webserver_private_key_password_cmd;
+      if (!password_cmd.empty()) {
+        if (!RunShellProcess(password_cmd, &key_password, true)) {
+          return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED, password_cmd, key_password);
         }
         options.push_back("ssl_private_key_password");
         options.push_back(key_password.c_str());
@@ -333,7 +332,7 @@ void Webserver::GetCommonJson(Document* document) {
       document->GetAllocator());
 
   Value lst(kArrayType);
-  BOOST_FOREACH(const UrlHandlerMap::value_type& handler, url_handlers_) {
+  for (const UrlHandlerMap::value_type& handler: url_handlers_) {
     if (handler.second.is_on_nav_bar()) {
       Value obj(kObjectType);
       obj.AddMember("link", handler.first.c_str(), document->GetAllocator());

@@ -115,10 +115,10 @@ void MetricGroup::CMCompatibleCallback(const Webserver::ArgumentMap& args,
     // expected by CM before we introduced metric groups.
     MetricGroup* group = groups.top();
     groups.pop();
-    BOOST_FOREACH(const ChildGroupMap::value_type& child, group->children_) {
+    for (const ChildGroupMap::value_type& child: group->children_) {
       groups.push(child.second);
     }
-    BOOST_FOREACH(const MetricMap::value_type& m, group->metric_map_) {
+    for (const MetricMap::value_type& m: group->metric_map_) {
       m.second->ToLegacyJson(document);
     }
   } while (!groups.empty());
@@ -148,7 +148,7 @@ void MetricGroup::TemplateCallback(const Webserver::ArgumentMap& args,
     // expected by CM before we introduced metric groups.
     MetricGroup* group = groups.top();
     groups.pop();
-    BOOST_FOREACH(const ChildGroupMap::value_type& child, group->children_) {
+    for (const ChildGroupMap::value_type& child: group->children_) {
       if (child.first == metric_group->second) {
         found_group = child.second;
         break;
@@ -169,7 +169,7 @@ void MetricGroup::TemplateCallback(const Webserver::ArgumentMap& args,
 
 void MetricGroup::ToJson(bool include_children, Document* document, Value* out_val) {
   Value metric_list(kArrayType);
-  BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
+  for (const MetricMap::value_type& m: metric_map_) {
     Value metric_value;
     m.second->ToJson(document, &metric_value);
     metric_list.PushBack(metric_value, document->GetAllocator());
@@ -180,7 +180,7 @@ void MetricGroup::ToJson(bool include_children, Document* document, Value* out_v
   container.AddMember("name", name_.c_str(), document->GetAllocator());
   if (include_children) {
     Value child_groups(kArrayType);
-    BOOST_FOREACH(const ChildGroupMap::value_type& child, children_) {
+    for (const ChildGroupMap::value_type& child: children_) {
       Value child_value;
       child.second->ToJson(true, document, &child_value);
       child_groups.PushBack(child_value, document->GetAllocator());

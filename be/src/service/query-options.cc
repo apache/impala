@@ -22,7 +22,6 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 #include <sstream>
-#include <boost/foreach.hpp>
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -409,7 +408,7 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
   if (options.length() == 0) return Status::OK();
   vector<string> kv_pairs;
   split(kv_pairs, options, is_any_of(","), token_compress_on);
-  BOOST_FOREACH(string& kv_string, kv_pairs) {
+  for (string& kv_string: kv_pairs) {
     trim(kv_string);
     if (kv_string.length() == 0) continue;
     vector<string> key_value;

@@ -14,7 +14,6 @@
 
 #include "exec/data-source-scan-node.h"
 
-#include <boost/foreach.hpp>
 #include <vector>
 #include <gutil/strings/substitute.h>
 
@@ -94,7 +93,7 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
 
   // Prepare the schema for TOpenParams.row_schema
   vector<extdatasource::TColumnDesc> cols;
-  BOOST_FOREACH(const SlotDescriptor* slot, tuple_desc_->slots()) {
+  for (const SlotDescriptor* slot: tuple_desc_->slots()) {
     extdatasource::TColumnDesc col;
     int col_idx = slot->col_pos();
     col.__set_name(tuple_desc_->table_desc()->col_descs()[col_idx].name());

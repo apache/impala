@@ -486,8 +486,8 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
 
         // Sorting of tuples containing array values is not implemented. The planner
         // combined with projection should guarantee that none are in each tuple.
-        BOOST_FOREACH(const SlotDescriptor* collection_slot,
-            sort_tuple_desc_->collection_slots()) {
+        for (const SlotDescriptor* collection_slot:
+             sort_tuple_desc_->collection_slots()) {
           DCHECK(new_tuple->IsNull(collection_slot->null_indicator_offset()));
         }
 
@@ -522,11 +522,11 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
 
 void Sorter::Run::TransferResources(RowBatch* row_batch) {
   DCHECK(row_batch != NULL);
-  BOOST_FOREACH(BufferedBlockMgr::Block* block, fixed_len_blocks_) {
+  for (BufferedBlockMgr::Block* block: fixed_len_blocks_) {
     if (block != NULL) row_batch->AddBlock(block);
   }
   fixed_len_blocks_.clear();
-  BOOST_FOREACH(BufferedBlockMgr::Block* block, var_len_blocks_) {
+  for (BufferedBlockMgr::Block* block: var_len_blocks_) {
     if (block != NULL) row_batch->AddBlock(block);
   }
   var_len_blocks_.clear();
@@ -537,11 +537,11 @@ void Sorter::Run::TransferResources(RowBatch* row_batch) {
 }
 
 void Sorter::Run::DeleteAllBlocks() {
-  BOOST_FOREACH(BufferedBlockMgr::Block* block, fixed_len_blocks_) {
+  for (BufferedBlockMgr::Block* block: fixed_len_blocks_) {
     if (block != NULL) block->Delete();
   }
   fixed_len_blocks_.clear();
-  BOOST_FOREACH(BufferedBlockMgr::Block* block, var_len_blocks_) {
+  for (BufferedBlockMgr::Block* block: var_len_blocks_) {
     if (block != NULL) block->Delete();
   }
   var_len_blocks_.clear();
@@ -597,7 +597,7 @@ Status Sorter::Run::UnpinAllBlocks() {
   }
 
   // Clear var_len_blocks_ and replace with it with the contents of sorted_var_len_blocks
-  BOOST_FOREACH(BufferedBlockMgr::Block* var_block, var_len_blocks_) {
+  for (BufferedBlockMgr::Block* var_block: var_len_blocks_) {
     var_block->Delete();
   }
   var_len_blocks_.clear();
@@ -797,7 +797,7 @@ void Sorter::Run::CollectNonNullVarSlots(Tuple* src,
     vector<StringValue*>* string_values, int* total_var_len) {
   string_values->clear();
   *total_var_len = 0;
-  BOOST_FOREACH(const SlotDescriptor* string_slot, sort_tuple_desc_->string_slots()) {
+  for (const SlotDescriptor* string_slot: sort_tuple_desc_->string_slots()) {
     if (!src->IsNull(string_slot->null_indicator_offset())) {
       StringValue* string_val =
           reinterpret_cast<StringValue*>(src->GetSlot(string_slot->tuple_offset()));
@@ -832,7 +832,7 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
 
 void Sorter::Run::CopyVarLenData(const vector<StringValue*>& string_values,
     uint8_t* dest) {
-  BOOST_FOREACH(StringValue* string_val, string_values) {
+  for (StringValue* string_val: string_values) {
     memcpy(dest, string_val->ptr, string_val->len);
     string_val->ptr = reinterpret_cast<char*>(dest);
     dest += string_val->len;
@@ -844,7 +844,7 @@ void Sorter::Run::CopyVarLenDataConvertOffset(const vector<StringValue*>& string
   DCHECK_GE(block_index, 0);
   DCHECK_GE(dest - block_start, 0);
 
-  BOOST_FOREACH(StringValue* string_val, string_values) {
+  for (StringValue* string_val: string_values) {
     memcpy(dest, string_val->ptr, string_val->len);
     DCHECK_LE(dest - block_start, sorter_->block_mgr_->max_block_size());
     DCHECK_LE(dest - block_start, INT_MAX);

@@ -18,7 +18,6 @@
 #include <iostream>
 
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
 
@@ -119,14 +118,14 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
   }
 
   if (node.__isset.event_sequences) {
-    BOOST_FOREACH(const TEventSequence& sequence, node.event_sequences) {
+    for (const TEventSequence& sequence: node.event_sequences) {
       profile->event_sequence_map_[sequence.name] =
           pool->Add(new EventSequence(sequence.timestamps, sequence.labels));
     }
   }
 
   if (node.__isset.time_series_counters) {
-    BOOST_FOREACH(const TTimeSeriesCounter& val, node.time_series_counters) {
+    for (const TTimeSeriesCounter& val: node.time_series_counters) {
       profile->time_series_counter_map_[val.name] =
           pool->Add(new TimeSeriesCounter(val.name, val.unit, val.period_ms, val.values));
     }
@@ -253,7 +252,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
   {
     const InfoStrings& info_strings = node.info_strings;
     lock_guard<SpinLock> l(info_strings_lock_);
-    BOOST_FOREACH(const string& key, node.info_strings_display_order) {
+    for (const string& key: node.info_strings_display_order) {
       // Look for existing info strings and update in place. If there
       // are new strings, add them to the end of the display order.
       // TODO: Is nodes.info_strings always a superset of
@@ -551,7 +550,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
 
   {
     lock_guard<SpinLock> l(info_strings_lock_);
-    BOOST_FOREACH(const string& key, info_strings_display_order_) {
+    for (const string& key: info_strings_display_order_) {
       stream << prefix << "  " << key << ": " << info_strings_.find(key)->second << endl;
     }
   }
@@ -565,8 +564,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     // The times in parentheses are the time elapsed since the last event.
     vector<EventSequence::Event> events;
     lock_guard<SpinLock> l(event_sequence_lock_);
-    BOOST_FOREACH(
-        const EventSequenceMap::value_type& event_sequence, event_sequence_map_) {
+    for (const EventSequenceMap::value_type& event_sequence: event_sequence_map_) {
       // If the stopwatch has never been started (e.g. because this sequence came from
       // Thrift), look for the last element to tell us the total runtime. For
       // currently-updating sequences, it's better to use the stopwatch value because that
@@ -580,7 +578,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
 
       int64_t prev = 0L;
       event_sequence.second->GetEvents(&events);
-      BOOST_FOREACH(const EventSequence::Event& event, events) {
+      for (const EventSequence::Event& event: events) {
         stream << prefix << "     - " << event.first << ": "
                << PrettyPrinter::Print(event.second, TUnit::TIME_NS) << " ("
                << PrettyPrinter::Print(event.second - prev, TUnit::TIME_NS) << ")"
@@ -596,7 +594,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     SpinLock* lock;
     int num, period;
     lock_guard<SpinLock> l(time_series_counter_map_lock_);
-    BOOST_FOREACH(const TimeSeriesCounterMap::value_type& v, time_series_counter_map_) {
+    for (const TimeSeriesCounterMap::value_type& v: time_series_counter_map_) {
       const int64_t* samples = v.second->samples_.GetSamples(&num, &period, &lock);
       if (num > 0) {
         stream << prefix << "  " << v.first << "("
@@ -706,11 +704,11 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
       node.__set_event_sequences(vector<TEventSequence>());
       node.event_sequences.resize(event_sequence_map_.size());
       int idx = 0;
-      BOOST_FOREACH(const EventSequenceMap::value_type& val, event_sequence_map_) {
+      for (const EventSequenceMap::value_type& val: event_sequence_map_) {
         TEventSequence* seq = &node.event_sequences[idx++];
         seq->name = val.first;
         val.second->GetEvents(&events);
-        BOOST_FOREACH(const EventSequence::Event& ev, events) {
+        for (const EventSequence::Event& ev: events) {
           seq->labels.push_back(ev.first);
           seq->timestamps.push_back(ev.second);
         }
@@ -724,8 +722,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
       node.__set_time_series_counters(vector<TTimeSeriesCounter>());
       node.time_series_counters.resize(time_series_counter_map_.size());
       int idx = 0;
-      BOOST_FOREACH(const TimeSeriesCounterMap::value_type& val,
-          time_series_counter_map_) {
+      for (const TimeSeriesCounterMap::value_type& val: time_series_counter_map_) {
         val.second->ToThrift(&node.time_series_counters[idx++]);
       }
     }
@@ -846,7 +843,7 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
   ChildCounterMap::const_iterator itr = child_counter_map.find(counter_name);
   if (itr != child_counter_map.end()) {
     const set<string>& child_counters = itr->second;
-    BOOST_FOREACH(const string& child_counter, child_counters) {
+    for (const string& child_counter: child_counters) {
       CounterMap::const_iterator iter = counter_map.find(child_counter);
       if (iter == counter_map.end()) continue;
       stream << prefix << "   - " << iter->first << ": "
@@ -901,7 +898,7 @@ string RuntimeProfile::TimeSeriesCounter::DebugString() const {
 }
 
 void RuntimeProfile::EventSequence::ToThrift(TEventSequence* seq) const {
-  BOOST_FOREACH(const EventSequence::Event& ev, events_) {
+  for (const EventSequence::Event& ev: events_) {
     seq->labels.push_back(ev.first);
     seq->timestamps.push_back(ev.second);
   }

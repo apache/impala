@@ -21,8 +21,6 @@
 #include <thrift/transport/TTransportUtils.h>
 #include <memory>
 
-#include <boost/foreach.hpp>
-
 #include "common/logging.h"
 #include "util/container-util.h"
 #include "util/network-util.h"
@@ -159,7 +157,7 @@ void ClientCacheHelper::CloseConnections(const TNetworkAddress& address) {
             << address;
     lock_guard<mutex> entry_lock(cache->lock);
     lock_guard<mutex> map_lock(client_map_lock_);
-    BOOST_FOREACH(ClientKey client_key, cache->clients) {
+    for (ClientKey client_key: cache->clients) {
       ClientMap::iterator client_map_entry = client_map_.find(client_key);
       DCHECK(client_map_entry != client_map_.end());
       client_map_entry->second->Close();
@@ -173,7 +171,7 @@ string ClientCacheHelper::DebugString() {
   out << "ClientCacheHelper(#hosts=" << per_host_caches_.size()
       << " [";
   bool first = true;
-  BOOST_FOREACH(const PerHostCacheMap::value_type& cache, per_host_caches_) {
+  for (const PerHostCacheMap::value_type& cache: per_host_caches_) {
     lock_guard<mutex> host_cache_lock(cache.second->lock);
     if (!first) out << " ";
     out << cache.first << ":" << cache.second->clients.size();
@@ -187,11 +185,11 @@ void ClientCacheHelper::TestShutdown() {
   vector<TNetworkAddress> addresses;
   {
     lock_guard<mutex> lock(cache_lock_);
-    BOOST_FOREACH(const PerHostCacheMap::value_type& cache_entry, per_host_caches_) {
+    for (const PerHostCacheMap::value_type& cache_entry: per_host_caches_) {
       addresses.push_back(cache_entry.first);
     }
   }
-  BOOST_FOREACH(const TNetworkAddress& address, addresses) {
+  for (const TNetworkAddress& address: addresses) {
     CloseConnections(address);
   }
 }

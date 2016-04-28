@@ -28,7 +28,6 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -259,8 +258,8 @@ void Coordinator::FragmentInstanceState::ComputeTotalSplitSize(
     const PerNodeScanRanges& per_node_scan_ranges) {
   total_split_size_ = 0;
 
-  BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
-    BOOST_FOREACH(const TScanRangeParams& scan_range_params, entry.second) {
+  for (const PerNodeScanRanges::value_type& entry: per_node_scan_ranges) {
+    for (const TScanRangeParams& scan_range_params: entry.second) {
       if (!scan_range_params.scan_range.__isset.hdfs_file_split) continue;
       total_split_size_ += scan_range_params.scan_range.hdfs_file_split.length;
     }
@@ -485,7 +484,7 @@ void Coordinator::UpdateFilterRoutingTable(const vector<TPlanNode>& plan_nodes,
       << "UpdateFilterRoutingTable() called after setting filter_routing_table_complete_";
   for (const TPlanNode& plan_node: plan_nodes) {
     if (!plan_node.__isset.runtime_filters) continue;
-    BOOST_FOREACH(const TRuntimeFilterDesc& filter, plan_node.runtime_filters) {
+    for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
       if (filter_mode_ == TRuntimeFilterMode::LOCAL && !filter.has_local_target) {
         continue;
       }
@@ -585,7 +584,7 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   const TMetricDef& def =
       MakeTMetricDef("fragment-latencies", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
   HistogramMetric latencies(def, 20000, 3);
-  BOOST_FOREACH(FragmentInstanceState* exec_state, fragment_instance_states_) {
+  for (FragmentInstanceState* exec_state: fragment_instance_states_) {
     lock_guard<mutex> l(*exec_state->lock());
     // Preserve the first non-OK status, if there is one
     if (status.ok()) status = *exec_state->status();
@@ -618,7 +617,7 @@ string Coordinator::FilterDebugString() {
     table_printer.AddColumn("Completed", false);
   }
   lock_guard<SpinLock> l(filter_lock_);
-  BOOST_FOREACH(const FilterRoutingTable::value_type& v, filter_routing_table_) {
+  for (const FilterRoutingTable::value_type& v: filter_routing_table_) {
     vector<string> row;
     const FilterState& state = v.second;
     row.push_back(lexical_cast<string>(v.first));
@@ -719,7 +718,7 @@ void Coordinator::PopulatePathPermissionCache(hdfsFS fs, const string& path_str,
   vector<string> prefixes;
   // Stores the current prefix
   stringstream accumulator;
-  BOOST_FOREACH(const string& component, components) {
+  for (const string& component: components) {
     if (component.empty()) continue;
     accumulator << "/" << component;
     prefixes.push_back(accumulator.str());
@@ -737,7 +736,7 @@ void Coordinator::PopulatePathPermissionCache(hdfsFS fs, const string& path_str,
   // Set to the permission of the immediate parent (i.e. the permissions to inherit if the
   // current dir doesn't exist).
   short permissions = 0;
-  BOOST_FOREACH(const string& path, prefixes) {
+  for (const string& path: prefixes) {
     PermissionCache::const_iterator it = permissions_cache->find(path);
     if (it == permissions_cache->end()) {
       hdfsFileInfo* info = hdfsGetPathInfo(fs, path.c_str());
@@ -775,7 +774,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
 
   // Loop over all partitions that were updated by this insert, and create the set of
   // filesystem operations required to create the correct partition structure on disk.
-  BOOST_FOREACH(const PartitionStatusMap::value_type& partition, per_partition_status_) {
+  for (const PartitionStatusMap::value_type& partition: per_partition_status_) {
     SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",
           "FinalizationTimer"));
     // INSERT allows writes to tables that have partitions on multiple filesystems.
@@ -877,7 +876,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
     SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",
           "FinalizationTimer"));
     if (!partition_create_ops.Execute(exec_env_->hdfs_op_thread_pool(), false)) {
-      BOOST_FOREACH(const HdfsOperationSet::Error& err, partition_create_ops.errors()) {
+      for (const HdfsOperationSet::Error& err: partition_create_ops.errors()) {
         // It's ok to ignore errors creating the directories, since they may already
         // exist. If there are permission errors, we'll run into them later.
         if (err.first->op() != CREATE_DIR) {
@@ -893,7 +892,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   HdfsOperationSet move_ops(&filesystem_connection_cache);
   HdfsOperationSet dir_deletion_ops(&filesystem_connection_cache);
 
-  BOOST_FOREACH(FileMoveMap::value_type& move, files_to_move_) {
+  for (FileMoveMap::value_type& move: files_to_move_) {
     // Empty destination means delete, so this is a directory. These get deleted in a
     // separate pass to ensure that we have moved all the contents of the directory first.
     if (move.second.empty()) {
@@ -936,7 +935,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   // Do this last so that we don't make a dir unwritable before we write to it.
   if (FLAGS_insert_inherit_permissions) {
     HdfsOperationSet chmod_ops(&filesystem_connection_cache);
-    BOOST_FOREACH(const PermissionCache::value_type& perm, permissions_cache) {
+    for (const PermissionCache::value_type& perm: permissions_cache) {
       bool new_dir = perm.second.first;
       if (new_dir) {
         short permissions = perm.second.second;
@@ -1274,10 +1273,10 @@ void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
 
 void Coordinator::CreateAggregateCounters(
     const vector<TPlanFragment>& fragments) {
-  BOOST_FOREACH(const TPlanFragment& fragment, fragments) {
+  for (const TPlanFragment& fragment: fragments) {
     if (!fragment.__isset.plan) continue;
     const vector<TPlanNode>& nodes = fragment.plan.nodes;
-    BOOST_FOREACH(const TPlanNode& node, nodes) {
+    for (const TPlanNode& node: nodes) {
       if (node.node_type != TPlanNodeType::HDFS_SCAN_NODE
           && node.node_type != TPlanNodeType::HBASE_SCAN_NODE) {
         continue;
@@ -1539,8 +1538,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     // Merge in table update data (partitions written to, files to be moved as part of
     // finalization)
-    BOOST_FOREACH(const PartitionStatusMap::value_type& partition,
-        params.insert_exec_status.per_partition_status) {
+    for (const PartitionStatusMap::value_type& partition:
+         params.insert_exec_status.per_partition_status) {
       TInsertPartitionStatus* status = &(per_partition_status_[partition.first]);
       status->num_appended_rows += partition.second.num_appended_rows;
       status->id = partition.second.id;
@@ -1626,7 +1625,7 @@ bool Coordinator::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
   // Assume we are called only after all fragments have completed
   DCHECK(has_called_wait_);
 
-  BOOST_FOREACH(const PartitionStatusMap::value_type& partition, per_partition_status_) {
+  for (const PartitionStatusMap::value_type& partition: per_partition_status_) {
     catalog_update->created_partitions.insert(partition.first);
   }
 
@@ -1799,7 +1798,7 @@ void Coordinator::ReportQuerySummary() {
       }
     }
     stringstream info;
-    BOOST_FOREACH(PerNodePeakMemoryUsage::value_type entry, per_node_peak_mem_usage) {
+    for (PerNodePeakMemoryUsage::value_type entry: per_node_peak_mem_usage) {
       info << entry.first << "("
            << PrettyPrinter::Print(entry.second, TUnit::BYTES) << ") ";
     }
@@ -1906,7 +1905,7 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
 
   // Collect the TTupleId(s) for ScanNode(s).
   unordered_set<TTupleId> tuple_ids;
-  BOOST_FOREACH(const TPlanNode& plan_node, fragment.plan.nodes) {
+  for (const TPlanNode& plan_node: fragment.plan.nodes) {
     switch (plan_node.node_type) {
       case TPlanNodeType::HDFS_SCAN_NODE:
         tuple_ids.insert(plan_node.hdfs_scan_node.tuple_id);
@@ -1941,8 +1940,8 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
 
   // Collect TTableId(s) matching the TTupleId(s).
   unordered_set<TTableId> table_ids;
-  BOOST_FOREACH(const TTupleId& tuple_id, tuple_ids) {
-    BOOST_FOREACH(const TTupleDescriptor& tuple_desc, desc_tbl_.tupleDescriptors) {
+  for (const TTupleId& tuple_id: tuple_ids) {
+    for (const TTupleDescriptor& tuple_desc: desc_tbl_.tupleDescriptors) {
       if (tuple_desc.__isset.tableId &&  tuple_id == tuple_desc.id) {
         table_ids.insert(tuple_desc.tableId);
       }
@@ -1956,7 +1955,7 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
   }
 
   // Iterate over all TTableDescriptor(s) and add the ones that are needed.
-  BOOST_FOREACH(const TTableDescriptor& table_desc, desc_tbl_.tableDescriptors) {
+  for (const TTableDescriptor& table_desc: desc_tbl_.tableDescriptors) {
     if (table_ids.find(table_desc.id) == table_ids.end()) continue;
     thrift_desc_tbl.tableDescriptors.push_back(table_desc);
     thrift_desc_tbl.__isset.tableDescriptors = true;

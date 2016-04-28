@@ -219,7 +219,7 @@ class InPredicateBenchmark {
 
     vector<AnyVal*> constant_args;
     constant_args.push_back(NULL);
-    BOOST_FOREACH(AnyVal* p, data.anyval_ptrs) constant_args.push_back(p);
+    for (AnyVal* p: data.anyval_ptrs) constant_args.push_back(p);
     UdfTestHarness::SetConstantArgs(ctx, constant_args);
 
     InPredicate::SetLookupPrepare<T, SetType>(ctx, FunctionContext::FRAGMENT_LOCAL);
@@ -234,7 +234,7 @@ class InPredicateBenchmark {
   static void TestSetLookup(int batch_size, void* d) {
     TestData<T, SetType>* data = reinterpret_cast<TestData<T, SetType>*>(d);
     for (int i = 0; i < batch_size; ++i) {
-      BOOST_FOREACH(const T& search_val, data->search_vals) {
+      for (const T& search_val: data->search_vals) {
         BooleanVal found = InPredicate::SetLookup(&data->state, search_val);
         if (found.val) ++data->total_found_set;
         ++data->total_set;
@@ -246,7 +246,7 @@ class InPredicateBenchmark {
   static void TestIterate(int batch_size, void* d) {
     TestData<T, SetType>* data = reinterpret_cast<TestData<T, SetType>*>(d);
     for (int i = 0; i < batch_size; ++i) {
-      BOOST_FOREACH(const T& search_val, data->search_vals) {
+      for (const T& search_val: data->search_vals) {
         BooleanVal found = InPredicate::Iterate(
             data->state.type, search_val, data->anyvals.size(), &data->anyvals[0]);
         if (found.val) ++data->total_found_iter;

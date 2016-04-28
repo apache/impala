@@ -229,7 +229,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
     LOG_EVERY_N(INFO, 300) << "Catalog Version: " << catalog_objects_max_version_
                            << " Last Catalog Version: " << last_sent_catalog_version_;
 
-    BOOST_FOREACH(const TTopicItem& catalog_object, pending_topic_updates_) {
+    for (const TTopicItem& catalog_object: pending_topic_updates_) {
       if (subscriber_topic_updates->size() == 0) {
         subscriber_topic_updates->push_back(TTopicDelta());
         subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
@@ -294,7 +294,7 @@ void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_obje
   unordered_set<string> current_entry_keys;
 
   // Add any new/updated catalog objects to the topic.
-  BOOST_FOREACH(const TCatalogObject& catalog_object, catalog_objects) {
+  for (const TCatalogObject& catalog_object: catalog_objects) {
     const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
     if (entry_key.empty()) {
       LOG_EVERY_N(WARNING, 60) << "Unable to build topic entry key for TCatalogObject: "
@@ -325,7 +325,7 @@ void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_obje
 
   // Any remaining items in catalog_topic_entry_keys_ indicate the object was removed
   // since the last update.
-  BOOST_FOREACH(const string& key, catalog_topic_entry_keys_) {
+  for (const string& key: catalog_topic_entry_keys_) {
     pending_topic_updates_.push_back(TTopicItem());
     TTopicItem& item = pending_topic_updates_.back();
     item.key = key;
@@ -345,7 +345,7 @@ void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     return;
   }
   Value databases(kArrayType);
-  BOOST_FOREACH(const TDatabase& db, get_dbs_result.dbs) {
+  for (const TDatabase& db: get_dbs_result.dbs) {
     Value database(kObjectType);
     Value str(db.db_name.c_str(), document->GetAllocator());
     database.AddMember("name", str, document->GetAllocator());
@@ -359,7 +359,7 @@ void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     }
 
     Value table_array(kArrayType);
-    BOOST_FOREACH(const string& table, get_table_results.tables) {
+    for (const string& table: get_table_results.tables) {
       Value table_obj(kObjectType);
       Value fq_name(Substitute("$0.$1", db.db_name, table).c_str(),
           document->GetAllocator());

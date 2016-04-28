@@ -14,7 +14,6 @@
 
 #include "util/logging-support.h"
 
-#include <boost/foreach.hpp>
 #include <glob.h>
 #include <sys/stat.h>
 
@@ -132,7 +131,7 @@ void LoggingSupport::DeleteOldLogs(const string& path_pattern, int max_log_files
   if (log_file_mtime.size() <= max_log_files) return;
   int files_to_delete = log_file_mtime.size() - max_log_files;
   DCHECK_GT(files_to_delete, 0);
-  BOOST_FOREACH(LogFileMap::const_reference val, log_file_mtime) {
+  for (LogFileMap::const_reference val: log_file_mtime) {
     if (unlink(val.second.c_str()) == 0) {
       LOG(INFO) << "Old log file deleted during log rotation: " << val.second;
     } else {

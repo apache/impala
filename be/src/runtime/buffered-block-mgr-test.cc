@@ -344,9 +344,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
 
     EXPECT_EQ(block_mgr->bytes_allocated(), max_num_buffers * block_size);
-    BOOST_FOREACH(BufferedBlockMgr::Block* block, blocks) {
-      block->Unpin();
-    }
+    for (BufferedBlockMgr::Block* block: blocks) block->Unpin();
 
     // Re-pinning all blocks
     for (int i = 0; i < blocks.size(); ++i) {
@@ -359,9 +357,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     EXPECT_EQ(buffered_pin->value(), buffered_pins_expected);
 
     // Unpin all blocks
-    BOOST_FOREACH(BufferedBlockMgr::Block* block, blocks) {
-      block->Unpin();
-    }
+    for (BufferedBlockMgr::Block* block: blocks) block->Unpin();
     // Get two new blocks.
     AllocateBlocks(block_mgr, client, 2, &blocks);
     // At least two writes must be issued. The first (num_blocks - 2) must be in memory.

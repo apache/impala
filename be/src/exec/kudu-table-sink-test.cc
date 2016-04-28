@@ -185,7 +185,7 @@ class KuduTableSinkTest : public testing::Test {
     while (scanner.HasMoreRows()) {
       vector<kudu::client::KuduRowResult> rows;
       KUDU_ASSERT_OK(scanner.NextBatch(&rows));
-      BOOST_FOREACH(const kudu::client::KuduRowResult& row, rows) {
+      for (const kudu::client::KuduRowResult& row: rows) {
         switch(num_columns) {
           case 1:
             ASSERT_EQ(row.ToString(), strings::Substitute(

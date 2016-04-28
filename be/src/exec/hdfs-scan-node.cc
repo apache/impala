@@ -25,7 +25,6 @@
 #include <avro/errors.h>
 #include <avro/schema.h>
 #include <boost/algorithm/string.hpp>
-#include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -145,7 +144,7 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   }
 
   const TQueryOptions& query_options = state->query_options();
-  BOOST_FOREACH(const TRuntimeFilterDesc& filter, tnode.runtime_filters) {
+  for (const TRuntimeFilterDesc& filter: tnode.runtime_filters) {
     if (query_options.disable_row_runtime_filtering &&
         !filter.is_bound_by_partition_columns) {
       continue;
@@ -232,9 +231,9 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     if (filter_ctxs_.size() > 0) WaitForRuntimeFilters(wait_time_ms);
     // Apply dynamic partition-pruning per-file.
     FileFormatsMap matching_per_type_files;
-    BOOST_FOREACH(const FileFormatsMap::value_type& v, per_type_files_) {
+    for (const FileFormatsMap::value_type& v: per_type_files_) {
       vector<HdfsFileDesc*>* matching_files = &matching_per_type_files[v.first];
-      BOOST_FOREACH(HdfsFileDesc* file, v.second) {
+      for (HdfsFileDesc* file: v.second) {
         if (FilePassesFilterPredicates(filter_ctxs_, v.first, file)) {
           matching_files->push_back(file);
         }
@@ -602,7 +601,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // will need to be decompressed at once). For all other formats, we use a constant.
   // TODO: can we do something better?
   int64_t scanner_thread_mem_usage = SCANNER_THREAD_MEM_USAGE;
-  BOOST_FOREACH(HdfsFileDesc* file, per_type_files_[THdfsFileFormat::TEXT]) {
+  for (HdfsFileDesc* file: per_type_files_[THdfsFileFormat::TEXT]) {
     if (file->file_compression != THdfsCompression::NONE) {
       int64_t bytes_required = file->file_length * COMPRESSED_TEXT_COMPRESSION_RATIO;
       scanner_thread_mem_usage = ::max(bytes_required, scanner_thread_mem_usage);
@@ -611,7 +610,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   scanner_thread_bytes_required_ += scanner_thread_mem_usage;
 
   // Prepare all the partitions scanned by the scan node
-  BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
+  for (int64_t partition_id: partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     // This is IMPALA-1702, but will have been caught earlier in this method.
     DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
@@ -716,7 +715,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
 
   // Open all the partition exprs used by the scan node
-  BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
+  for (int64_t partition_id: partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
                                    << " partition_id=" << partition_id
@@ -834,7 +833,7 @@ void HdfsScanNode::Close(RuntimeState* state) {
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
   // Close all the partitions scanned by the scan node
-  BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
+  for (int64_t partition_id: partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     if (partition_desc == NULL) {
       // TODO: Revert when IMPALA-1702 is fixed.
@@ -875,7 +874,7 @@ void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
 
 void HdfsScanNode::InitNullCollectionValues(const TupleDescriptor* tuple_desc,
     Tuple* tuple) const {
-  BOOST_FOREACH(const SlotDescriptor* slot_desc, tuple_desc->collection_slots()) {
+  for (const SlotDescriptor* slot_desc: tuple_desc->collection_slots()) {
     CollectionValue* slot = reinterpret_cast<CollectionValue*>(
         tuple->GetSlot(slot_desc->tuple_offset()));
     if (tuple->IsNull(slot_desc->null_indicator_offset())) {
@@ -1348,7 +1347,7 @@ void HdfsScanNode::UpdateHdfsSplitStats(
     const vector<TScanRangeParams>& scan_range_params_list,
     PerVolumnStats* per_volume_stats) {
   pair<int, int64_t> init_value(0, 0);
-  BOOST_FOREACH(const TScanRangeParams& scan_range_params, scan_range_params_list) {
+  for (const TScanRangeParams& scan_range_params: scan_range_params_list) {
     const TScanRange& scan_range = scan_range_params.scan_range;
     if (!scan_range.__isset.hdfs_file_split) continue;
     const THdfsFileSplit& split = scan_range.hdfs_file_split;

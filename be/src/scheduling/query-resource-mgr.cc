@@ -14,7 +14,6 @@
 
 #include "scheduling/query-resource-mgr.h"
 
-#include <boost/foreach.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <gutil/strings/substitute.h>
@@ -64,7 +63,7 @@ void ResourceResolver::CreateLocalLlamaNodeMapping(
       ExecEnv::GetInstance()->resource_broker()->llama_nodes();
   DCHECK(!llama_nodes.empty());
   int llama_node_ix = 0;
-  BOOST_FOREACH(const TNetworkAddress& host, unique_hosts) {
+  for (const TNetworkAddress& host: unique_hosts) {
     TNetworkAddress dn_hostport = MakeNetworkAddress(llama_nodes[llama_node_ix]);
     impalad_to_dn_[host] = dn_hostport;
     dn_to_impalad_[dn_hostport] = host;

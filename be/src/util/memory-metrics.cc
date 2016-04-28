@@ -15,7 +15,6 @@
 #include "util/memory-metrics.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/foreach.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "util/jni-util.h"
@@ -83,7 +82,7 @@ Status JvmMetric::InitMetrics(MetricGroup* metrics) {
   request.get_all = true;
   TGetJvmMetricsResponse response;
   RETURN_IF_ERROR(JniUtil::GetJvmMetrics(request, &response));
-  BOOST_FOREACH(const TJvmMemoryPool& usage, response.memory_pools) {
+  for (const TJvmMemoryPool& usage: response.memory_pools) {
     JvmMetric::CreateAndRegister(metrics, "jvm.$0.max-usage-bytes", usage.name, MAX);
     JvmMetric::CreateAndRegister(metrics, "jvm.$0.current-usage-bytes", usage.name,
         CURRENT);

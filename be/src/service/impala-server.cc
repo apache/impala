@@ -21,7 +21,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
@@ -286,7 +285,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     split(proxy_user_config, FLAGS_authorized_proxy_user_config, is_any_of(";"),
         token_compress_on);
     if (proxy_user_config.size() > 0) {
-      BOOST_FOREACH(const string& config, proxy_user_config) {
+      for (const string& config: proxy_user_config) {
         size_t pos = config.find("=");
         if (pos == string::npos) {
           CLEAN_EXIT_WITH_ERROR(Substitute("Invalid proxy user configuration. No "
@@ -462,7 +461,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.String(stmt.c_str());
   writer.String("catalog_objects");
   writer.StartArray();
-  BOOST_FOREACH(const TAccessEvent& event, request.access_events) {
+  for (const TAccessEvent& event: request.access_events) {
     writer.StartObject();
     writer.String("name");
     writer.String(event.name.c_str());
@@ -830,7 +829,7 @@ Status ImpalaServer::ExecuteInternal(
         (*exec_state)->schedule()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      BOOST_FOREACH(const TNetworkAddress& port, unique_hosts) {
+      for (const TNetworkAddress& port: unique_hosts) {
         query_locations_[port].insert((*exec_state)->query_id());
       }
     }
@@ -963,7 +962,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
         exec_state->schedule()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      BOOST_FOREACH(const TNetworkAddress& hostport, unique_hosts) {
+      for (const TNetworkAddress& hostport: unique_hosts) {
         // Query may have been removed already by cancellation path. In particular, if
         // node to fail was last sender to an exchange, the coordinator will realise and
         // fail the query at the same time the failure detection path does the same
@@ -984,7 +983,7 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   RETURN_IF_ERROR(exec_env_->frontend()->GetDbs(NULL, NULL, &dbs));
   ImpaladMetrics::CATALOG_NUM_DBS->set_value(dbs.dbs.size());
   ImpaladMetrics::CATALOG_NUM_TABLES->set_value(0L);
-  BOOST_FOREACH(const TDatabase& db, dbs.dbs) {
+  for (const TDatabase& db: dbs.dbs) {
     TGetTablesResult table_names;
     RETURN_IF_ERROR(exec_env_->frontend()->GetTableNames(db.db_name, NULL, NULL,
         &table_names));
@@ -1046,7 +1045,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   }
   // Unregister all open queries from this session.
   Status status("Session closed");
-  BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
+  for (const TUniqueId& query_id: inflight_queries) {
     UnregisterQuery(query_id, false, &status);
   }
   // Reconfigure the poll period of session_timeout_thread_ if necessary.
@@ -1228,7 +1227,7 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
   ProxyUserMap::const_iterator proxy_user =
       authorized_proxy_user_config_.find(short_user);
   if (proxy_user != authorized_proxy_user_config_.end()) {
-    BOOST_FOREACH(const string& user, proxy_user->second) {
+    for (const string& user: proxy_user->second) {
       if (user == "*" || user == do_as_user) return Status::OK();
     }
   }
@@ -1251,7 +1250,7 @@ void ImpalaServer::CatalogUpdateCallback(
     // Process all Catalog updates (new and modified objects) and determine what the
     // new catalog version will be.
     int64_t new_catalog_version = catalog_update_info_.catalog_version;
-    BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
+    for (const TTopicItem& item: delta.topic_entries) {
       uint32_t len = item.value.size();
       TCatalogObject catalog_object;
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
@@ -1286,7 +1285,7 @@ void ImpalaServer::CatalogUpdateCallback(
 
     // Process all Catalog deletions (dropped objects). We only know the keys (object
     // names) so must parse each key to determine the TCatalogObject.
-    BOOST_FOREACH(const string& key, delta.topic_deletions) {
+    for (const string& key: delta.topic_deletions) {
       LOG(INFO) << "Catalog topic entry deletion: " << key;
       TCatalogObject catalog_object;
       Status status = TCatalogObjectFromEntryKey(key, &catalog_object);
@@ -1340,7 +1339,7 @@ void ImpalaServer::CatalogUpdateCallback(
       UpdateCatalogMetrics();
       // Remove all dropped objects from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
-      BOOST_FOREACH(TCatalogObject& object, dropped_objects) {
+      for (TCatalogObject& object: dropped_objects) {
         if (object.type == TCatalogObjectType::FUNCTION) {
           LibCache::instance()->RemoveEntry(object.fn.hdfs_location);
         } else if (object.type == TCatalogObjectType::DATA_SOURCE) {
@@ -1463,7 +1462,7 @@ void ImpalaServer::MembershipCallback(
     if (!delta.is_delta) known_backends_.clear();
 
     // Process membership additions.
-    BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
+    for (const TTopicItem& item: delta.topic_entries) {
       uint32_t len = item.value.size();
       TBackendDescriptor backend_descriptor;
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
@@ -1476,7 +1475,7 @@ void ImpalaServer::MembershipCallback(
       known_backends_.insert(make_pair(item.key, backend_descriptor));
     }
     // Process membership deletions.
-    BOOST_FOREACH(const string& backend_id, delta.topic_deletions) {
+    for (const string& backend_id: delta.topic_deletions) {
       known_backends_.erase(backend_id);
     }
 
@@ -1487,7 +1486,7 @@ void ImpalaServer::MembershipCallback(
     TUpdateMembershipRequest update_req;
     bool any_changes = !delta.topic_entries.empty() || !delta.topic_deletions.empty() ||
         !delta.is_delta;
-    BOOST_FOREACH(const BackendDescriptorMap::value_type& backend, known_backends_) {
+    for (const BackendDescriptorMap::value_type& backend: known_backends_) {
       current_membership.insert(backend.second.address);
       if (any_changes) {
         update_req.hostnames.insert(backend.second.address.hostname);
@@ -1658,7 +1657,7 @@ void ImpalaServer::ConnectionEnd(
   LOG(INFO) << "Connection from client " << connection_context.network_address
             << " closed, closing " << it->second.size() << " associated session(s)";
 
-  BOOST_FOREACH(const TUniqueId& session_id, it->second) {
+  for (const TUniqueId& session_id: it->second) {
     Status status = CloseSessionInternal(session_id, true);
     if (!status.ok()) {
       LOG(WARNING) << "Error closing session " << session_id << ": "
@@ -1695,7 +1694,7 @@ void ImpalaServer::ExpireSessions() {
     VLOG(3) << "Session expiration thread waking up";
     // TODO: If holding session_state_map_lock_ for the duration of this loop is too
     // expensive, consider a priority queue.
-    BOOST_FOREACH(SessionStateMap::value_type& session_state, session_state_map_) {
+    for (SessionStateMap::value_type& session_state: session_state_map_) {
       unordered_set<TUniqueId> inflight_queries;
       {
         lock_guard<mutex> state_lock(session_state.second->lock);
@@ -1719,7 +1718,7 @@ void ImpalaServer::ExpireSessions() {
       }
       // Unregister all open queries from this session.
       Status status("Session expired due to inactivity");
-      BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
+      for (const TUniqueId& query_id: inflight_queries) {
         cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
       }
     }

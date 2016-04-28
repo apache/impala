@@ -79,7 +79,7 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
 
-  BOOST_FOREACH(const TRuntimeFilterDesc& tfilter, tnode.runtime_filters) {
+  for (const TRuntimeFilterDesc& tfilter: tnode.runtime_filters) {
     // If filter propagation not enabled, only consider building broadcast joins (that may
     // be consumed by this fragment).
     if (state->query_options().runtime_filter_mode != TRuntimeFilterMode::GLOBAL &&

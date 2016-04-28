@@ -14,8 +14,6 @@
 
 #include "codegen/instruction-counter.h"
 
-#include <boost/foreach.hpp>
-
 #include "common/logging.h"
 
 #include "common/names.h"
@@ -147,9 +145,7 @@ void InstructionCounter::visit(const Instruction& I) {
 }
 
 void InstructionCounter::ResetCount() {
-  BOOST_FOREACH(CounterMap::value_type& counter, counters_) {
-    counter.second = 0;
-  }
+  for (CounterMap::value_type& counter: counters_) counter.second = 0;
 }
 
 void InstructionCounter::PrintCounter(const char* name, int count, int max_count_len,
@@ -165,7 +161,7 @@ string InstructionCounter::PrintCounters() const {
   // Find the longest length of all the InstructionCount count_ strings.
   int max_count_len = 0;
   stringstream count_stream;
-  BOOST_FOREACH(const CounterMap::value_type& counter, counters_) {
+  for (const CounterMap::value_type& counter: counters_) {
     count_stream << counter.second;
     max_count_len =
         max(max_count_len, static_cast<int>(strlen(count_stream.str().c_str())));
@@ -177,7 +173,7 @@ string InstructionCounter::PrintCounters() const {
          << "                          ... Instruction Counts ...\n\n"
          << "===" << string(73, '-') << "===\n\n";
 
-  BOOST_FOREACH(const CounterMap::value_type& counter, counters_) {
+  for (const CounterMap::value_type& counter: counters_) {
     // Conditional is only used in order to print the top level counters
     // separate from the other counters.
     if (strcmp(counter.first.c_str(), TOTAL_BLOCKS) == 0) {

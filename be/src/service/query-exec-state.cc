@@ -238,7 +238,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       vector<string> names, comments;
       names.reserve(dbs.dbs.size());
       comments.reserve(dbs.dbs.size());
-      BOOST_FOREACH(const TDatabase& db, dbs.dbs) {
+      for (const TDatabase& db: dbs.dbs) {
         names.push_back(db.db_name);
         comments.push_back(db.metastore_db.description);
       }
@@ -833,7 +833,7 @@ Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* r
 
 void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
   // Cancel and close child queries before cancelling parent.
-  BOOST_FOREACH(ChildQuery& child_query, child_queries_) {
+  for (ChildQuery& child_query: child_queries_) {
     child_query.Cancel();
   }
 
@@ -971,8 +971,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   // operation.
   if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(coord_.get());
-    BOOST_FOREACH(
-        const PartitionStatusMap::value_type& p, coord_->per_partition_status()) {
+    for (const PartitionStatusMap::value_type& p: coord_->per_partition_status()) {
       total_num_rows_inserted += p.second.num_appended_rows;
     }
   }

@@ -1000,7 +1000,7 @@ void HdfsParquetScanner::Close() {
 
   // Visit each column reader, including collection reader children.
   stack<ColumnReader*> readers;
-  BOOST_FOREACH(ColumnReader* r, column_readers_) readers.push(r);
+  for (ColumnReader* r: column_readers_) readers.push(r);
   while (!readers.empty()) {
     ColumnReader* col_reader = readers.top();
     readers.pop();
@@ -1008,7 +1008,7 @@ void HdfsParquetScanner::Close() {
     if (col_reader->IsCollectionReader()) {
       CollectionColumnReader* collection_reader =
           static_cast<CollectionColumnReader*>(col_reader);
-      BOOST_FOREACH(ColumnReader* r, *collection_reader->children()) readers.push(r);
+      for (ColumnReader* r: *collection_reader->children()) readers.push(r);
       continue;
     }
 
@@ -1616,14 +1616,14 @@ int HdfsParquetScanner::CountScalarColumns(const vector<ColumnReader*>& column_r
   DCHECK(!column_readers.empty());
   int num_columns = 0;
   stack<ColumnReader*> readers;
-  BOOST_FOREACH(ColumnReader* r, column_readers_) readers.push(r);
+  for (ColumnReader* r: column_readers_) readers.push(r);
   while (!readers.empty()) {
     ColumnReader* col_reader = readers.top();
     readers.pop();
     if (col_reader->IsCollectionReader()) {
       CollectionColumnReader* collection_reader =
           static_cast<CollectionColumnReader*>(col_reader);
-      BOOST_FOREACH(ColumnReader* r, *collection_reader->children()) readers.push(r);
+      for (ColumnReader* r: *collection_reader->children()) readers.push(r);
       continue;
     }
     ++num_columns;
@@ -1680,7 +1680,7 @@ Status HdfsParquetScanner::ProcessSplit() {
 
     // Prepare column readers for first read
     bool continue_execution = true;
-    BOOST_FOREACH(ColumnReader* col_reader, column_readers_) {
+    for (ColumnReader* col_reader: column_readers_) {
       continue_execution = col_reader->NextLevels();
       if (!continue_execution) break;
       DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
@@ -2453,7 +2453,7 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
   // Each tuple can have at most one position slot. We'll process this slot desc last.
   SlotDescriptor* pos_slot_desc = NULL;
 
-  BOOST_FOREACH(SlotDescriptor* slot_desc, tuple_desc.slots()) {
+  for (SlotDescriptor* slot_desc: tuple_desc.slots()) {
     // Skip partition columns
     if (&tuple_desc == scan_node_->tuple_desc() &&
         slot_desc->col_pos() < scan_node_->num_partition_keys()) continue;
@@ -2553,7 +2553,7 @@ Status HdfsParquetScanner::CreateCountingReader(
         node = nodes.front();
         nodes.pop();
         if (node->children.size() > 0) {
-          BOOST_FOREACH(const SchemaNode& child, node->children) nodes.push(&child);
+          for (const SchemaNode& child: node->children) nodes.push(&child);
         } else {
           // node is the least-nested scalar descendent of 'target_node'
           break;
@@ -2586,7 +2586,7 @@ Status HdfsParquetScanner::InitColumns(
   // Used to validate we issued the right number of scan ranges
   int num_scalar_readers = 0;
 
-  BOOST_FOREACH(ColumnReader* col_reader, column_readers) {
+  for (ColumnReader* col_reader: column_readers) {
     if (col_reader->IsCollectionReader()) {
       CollectionColumnReader* collection_reader =
           static_cast<CollectionColumnReader*>(col_reader);

@@ -22,7 +22,6 @@
 #include <vector>
 #include <set>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/foreach.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/count.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
@@ -76,7 +75,7 @@ class SetMetric : public Metric {
     rapidjson::Value container(rapidjson::kObjectType);
     AddStandardFields(document, &container);
     rapidjson::Value metric_list(rapidjson::kArrayType);
-    BOOST_FOREACH(const T& s, value_) {
+    for (const T& s: value_) {
       rapidjson::Value entry_value;
       ToJsonValue(s, TUnit::NONE, document, &entry_value);
       metric_list.PushBack(entry_value, document->GetAllocator());
@@ -87,7 +86,7 @@ class SetMetric : public Metric {
 
   virtual void ToLegacyJson(rapidjson::Document* document) {
     rapidjson::Value metric_list(rapidjson::kArrayType);
-    BOOST_FOREACH(const T& s, value_) {
+    for (const T& s: value_) {
       rapidjson::Value entry_value;
       ToJsonValue(s, TUnit::NONE, document, &entry_value);
       metric_list.PushBack(entry_value, document->GetAllocator());

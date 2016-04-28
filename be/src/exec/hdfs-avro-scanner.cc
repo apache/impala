@@ -16,7 +16,6 @@
 
 #include <avro/errors.h>
 #include <avro/legacy.h>
-#include <boost/foreach.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
@@ -191,7 +190,7 @@ Status HdfsAvroScanner::ResolveSchemas(const AvroSchemaElement& table_root,
 
   // Associate each slot descriptor with a field in the file schema, or fill in the
   // template tuple with a default value from the table schema.
-  BOOST_FOREACH(SlotDescriptor* slot_desc, scan_node_->materialized_slots()) {
+  for (SlotDescriptor* slot_desc: scan_node_->materialized_slots()) {
     // Traverse the column path, simultaneously traversing the table schema by ordinal and
     // the file schema by field name from the table schema.
     const SchemaPath& path = slot_desc->col_path();
@@ -519,7 +518,7 @@ Status HdfsAvroScanner::ProcessRange() {
 bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
     MemPool* pool, uint8_t** data, Tuple* tuple) {
   DCHECK_EQ(record_schema.schema->type, AVRO_RECORD);
-  BOOST_FOREACH(const AvroSchemaElement& element, record_schema.children) {
+  for (const AvroSchemaElement& element: record_schema.children) {
     const SlotDescriptor* slot_desc = element.slot_desc;
     bool write_slot = false;
     void* slot = NULL;

@@ -152,7 +152,7 @@ string TableDescriptor::fully_qualified_name() const {
 
 string TableDescriptor::DebugString() const {
   vector<string> cols;
-  BOOST_FOREACH(const ColumnDescriptor& col_desc, col_descs_) {
+  for (const ColumnDescriptor& col_desc: col_descs_) {
     cols.push_back(col_desc.DebugString());
   }
   stringstream out;

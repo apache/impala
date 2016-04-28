@@ -113,7 +113,7 @@ string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
   stringstream ss;
   ss << prefix;
   bool first = true;
-  BOOST_FOREACH(const PartitionStatusMap::value_type& val, stats) {
+  for (const PartitionStatusMap::value_type& val: stats) {
     if (!first) ss << endl;
     first = false;
     ss << "Partition: ";

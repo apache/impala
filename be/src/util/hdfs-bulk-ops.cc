@@ -15,7 +15,6 @@
 #include "util/hdfs-bulk-ops.h"
 
 #include <vector>
-#include <boost/foreach.hpp>
 
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -156,9 +155,7 @@ bool HdfsOperationSet::Execute(ThreadPool<HdfsOp>* pool, bool abort_on_error) {
   if (num_ops == 0) return true;
 
   ops_complete_barrier_.reset(new CountingBarrier(num_ops));
-  BOOST_FOREACH(const HdfsOp& op, ops_) {
-    pool->Offer(op);
-  }
+  for (const HdfsOp& op: ops_) pool->Offer(op);
 
   ops_complete_barrier_->Wait();
   return errors().size() == 0;

@@ -356,7 +356,7 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
     return false;
   }
 
-  BOOST_FOREACH(const MemTracker* tracker, limit_trackers_) {
+  for (const MemTracker* tracker: limit_trackers_) {
     if (tracker == this) continue;
     if (tracker->consumption_->current_value() + bytes_allocated > tracker->limit_) {
       // TODO: Allocation may be larger than needed and might exceed some parent

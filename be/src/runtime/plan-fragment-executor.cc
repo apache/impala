@@ -17,7 +17,6 @@
 #include <thrift/protocol/TDebugProtocol.h>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_map.hpp>
-#include <boost/foreach.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
@@ -219,7 +218,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
   plan_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);
-  BOOST_FOREACH(ExecNode* exch_node, exch_nodes)
+  for (ExecNode* exch_node: exch_nodes)
   {
     DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
     int num_senders = FindWithDefault(params.per_exch_num_senders,
@@ -294,7 +293,7 @@ void PlanFragmentExecutor::PrintVolumeIds(
   if (per_node_scan_ranges.empty()) return;
 
   HdfsScanNode::PerVolumnStats per_volume_stats;
-  BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
+  for (const PerNodeScanRanges::value_type& entry: per_node_scan_ranges) {
     HdfsScanNode::UpdateHdfsSplitStats(entry.second, &per_volume_stats);
   }
 
@@ -588,8 +587,7 @@ void PlanFragmentExecutor::Close() {
           runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
     }
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
-    BOOST_FOREACH(DiskIoMgr::RequestContext* context,
-        *runtime_state_->reader_contexts()) {
+    for (DiskIoMgr::RequestContext* context: *runtime_state_->reader_contexts()) {
       runtime_state_->io_mgr()->UnregisterContext(context);
     }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());

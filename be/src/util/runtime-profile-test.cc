@@ -17,7 +17,6 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 #include "common/object-pool.h"
 #include "util/cpu-info.h"
 #include "util/periodic-counter-updater.h"
@@ -455,7 +454,7 @@ TEST(CountersTest, EventSequences) {
 
   uint64_t last_timestamp = 0;
   string last_string = "";
-  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, events) {
+  for (const RuntimeProfile::EventSequence::Event& ev: events) {
     EXPECT_TRUE(ev.second >= last_timestamp);
     last_timestamp = ev.second;
     EXPECT_TRUE(ev.first > last_string);
@@ -477,7 +476,7 @@ TEST(CountersTest, EventSequences) {
   EXPECT_TRUE(seq != NULL);
   seq->GetEvents(&events);
   EXPECT_EQ(3, events.size());
-  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, events) {
+  for (const RuntimeProfile::EventSequence::Event& ev: events) {
     EXPECT_TRUE(ev.second >= last_timestamp);
     last_timestamp = ev.second;
     EXPECT_TRUE(ev.first > last_string);

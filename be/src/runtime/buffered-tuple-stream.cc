@@ -467,7 +467,7 @@ Status BufferedTupleStream::UnpinStream(bool all) {
   DCHECK(!closed_);
   SCOPED_TIMER(unpin_timer_);
 
-  BOOST_FOREACH(BufferedBlockMgr::Block* block, blocks_) {
+  for (BufferedBlockMgr::Block* block: blocks_) {
     if (!block->is_pinned()) continue;
     if (!all && (block == write_block_ || (read_write_ && block == *read_block_))) {
       continue;

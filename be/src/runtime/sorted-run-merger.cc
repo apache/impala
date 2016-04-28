@@ -128,7 +128,7 @@ SortedRunMerger::SortedRunMerger(const TupleRowComparator& compare_less_than,
 Status SortedRunMerger::Prepare(const vector<RunBatchSupplier>& input_runs) {
   DCHECK_EQ(min_heap_.size(), 0);
   min_heap_.reserve(input_runs.size());
-  BOOST_FOREACH(const RunBatchSupplier& input_run, input_runs) {
+  for (const RunBatchSupplier& input_run: input_runs) {
     BatchedRowSupplier* new_elem = pool_.Add(new BatchedRowSupplier(this, input_run));
     DCHECK(new_elem != NULL);
     bool empty;

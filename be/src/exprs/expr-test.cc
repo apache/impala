@@ -1707,7 +1707,7 @@ TEST_F(ExprTest, InPredicate) {
   dec_strs.push_back("cast(-1.23 as decimal(18,2))");
   dec_strs.push_back("cast(-1.23 as decimal(19,2))");
   dec_strs.push_back("cast(-1.23 as decimal(32,2))");
-  BOOST_FOREACH(const string& dec_str, dec_strs) {
+  for (const string& dec_str: dec_strs) {
     TestValue(dec_str + "in (0)", TYPE_BOOLEAN, false);
     TestValue(dec_str + "in (-1.23)", TYPE_BOOLEAN, true);
     TestValue(dec_str + "in (-1.230)", TYPE_BOOLEAN, true);
@@ -3035,7 +3035,7 @@ TEST_F(ExprTest, MathFunctions) {
   // Test all int types.
   string val_list;
   val_list = "0";
-  BOOST_FOREACH(IntValMap::value_type& entry, min_int_values_) {
+  for (IntValMap::value_type& entry: min_int_values_) {
     string val_str = lexical_cast<string>(entry.second);
     val_list.append(", " + val_str);
     PrimitiveType t = static_cast<PrimitiveType>(entry.first);
@@ -3091,7 +3091,7 @@ TEST_F(ExprTest, MathFunctions) {
   // Test all int types. A list of values will be built, each iteration adds a bigger
   // value. This requires min_int_values_ to be an ordered map.
   val_list = "0";
-  BOOST_FOREACH(IntValMap::value_type& entry, min_int_values_) {
+  for (IntValMap::value_type& entry: min_int_values_) {
     string val_str = lexical_cast<string>(entry.second);
     val_list.append(", " + val_str);
     PrimitiveType t = static_cast<PrimitiveType>(entry.first);
@@ -4759,7 +4759,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   types.push_back(ColumnType::CreateVarcharType(255));
 
   expected_offsets.clear();
-  BOOST_FOREACH(const ColumnType& t, types) {
+  for (const ColumnType& t: types) {
     exprs.clear();
     expected_offsets.clear();
     // With one expr, all offsets should be 0.

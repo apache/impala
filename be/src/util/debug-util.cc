@@ -16,7 +16,6 @@
 
 #include <iomanip>
 #include <sstream>
-#include <boost/foreach.hpp>
 
 #include "common/version.h"
 #include "runtime/collection-value.h"
@@ -124,7 +123,7 @@ bool ParseId(const string& s, TUniqueId* id) {
     char_separator<char> sep(" ");
     tokenizer< char_separator<char> > tokens(s, sep);
     int i = 0;
-    BOOST_FOREACH(const string& token, tokens) {
+    for (const string& token: tokens) {
       StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
       int64_t component = StringParser::StringToInt<int64_t>(
           token.c_str(), token.length(), &parse_result);

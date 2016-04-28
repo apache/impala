@@ -14,7 +14,6 @@
 
 #include "exec/kudu-scanner.h"
 
-#include <boost/foreach.hpp>
 #include <kudu/client/row_result.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <vector>
@@ -168,7 +167,7 @@ Status KuduScanner::OpenNextRange(const TKuduKeyRange& key_range)  {
 
   vector<KuduPredicate*> predicates;
   scan_node_->ClonePredicates(&predicates);
-  BOOST_FOREACH(KuduPredicate* predicate, predicates) {
+  for (KuduPredicate* predicate: predicates) {
     KUDU_RETURN_IF_ERROR(scanner_->AddConjunctPredicate(predicate),
                          "Unable to add conjunct predicate.");
   }

@@ -15,7 +15,6 @@
 #include "runtime/lib-cache.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "codegen/llvm-codegen.h"
@@ -261,7 +260,7 @@ void LibCache::RemoveEntryInternal(const string& hdfs_lib_file,
 
 void LibCache::DropCache() {
   unique_lock<mutex> lib_cache_lock(lock_);
-  BOOST_FOREACH(LibMap::value_type& v, lib_cache_) {
+  for (LibMap::value_type& v: lib_cache_) {
     bool can_delete = false;
     {
       // Lock to wait for any threads currently processing the entry.

@@ -194,7 +194,7 @@ TExprNode CreateFunctionCall(vector<TExprNode> children) {
   TFunction fn;
   fn.name = fn_name;
   fn.binary_type = TFunctionBinaryType::IR;
-  BOOST_FOREACH(const TExprNode& child, children) {
+  for (const TExprNode& child: children) {
     fn.arg_types.push_back(child.type);
   }
   fn.ret_type = col_type;

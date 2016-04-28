@@ -93,7 +93,7 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
 
-  BOOST_FOREACH(const TRuntimeFilterDesc& filter, tnode.runtime_filters) {
+  for (const TRuntimeFilterDesc& filter: tnode.runtime_filters) {
     // If filter propagation not enabled, only consider building broadcast joins (that may
     // be consumed by this fragment).
     if (state->query_options().runtime_filter_mode != TRuntimeFilterMode::GLOBAL &&
@@ -135,7 +135,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
   RETURN_IF_ERROR(
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
-  BOOST_FOREACH(const FilterContext& ctx, filters_) {
+  for (const FilterContext& ctx: filters_) {
     RETURN_IF_ERROR(ctx.expr->Prepare(state, child(1)->row_desc(), expr_mem_tracker()));
     AddExprCtxToFree(ctx.expr);
   }
@@ -313,7 +313,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(other_join_conjunct_ctxs_, state);
-  BOOST_FOREACH(const FilterContext& ctx, filters_) {
+  for (const FilterContext& ctx: filters_) {
     ctx.expr->Close(state);
   }
   BlockingJoinNode::Close(state);
@@ -611,7 +611,7 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
-  BOOST_FOREACH(const FilterContext& filter, filters_) {
+  for (const FilterContext& filter: filters_) {
     RETURN_IF_ERROR(filter.expr->Open(state));
   }
   AllocateRuntimeFilters(state);
@@ -1238,7 +1238,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
 
   // First loop over the partitions and build hash tables for the partitions that did
   // not already spill.
-  BOOST_FOREACH(Partition* partition, hash_partitions_) {
+  for (Partition* partition: hash_partitions_) {
     if (partition->build_rows()->num_rows() == 0) {
       // This partition is empty, no need to do anything else.
       partition->Close(NULL);
@@ -1259,7 +1259,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   // an IO buffer for those partitions. Reserving an IO buffer can cause more partitions
   // to spill so this process is recursive.
   list<Partition*> spilled_partitions;
-  BOOST_FOREACH(Partition* partition, hash_partitions_) {
+  for (Partition* partition: hash_partitions_) {
     if (partition->is_closed()) continue;
     if (partition->is_spilled() && partition->probe_rows()->using_small_buffers()) {
       spilled_partitions.push_back(partition);
@@ -1290,7 +1290,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   // 2. in_mem. The build side is pinned and has a hash table built.
   // 3. spilled. The build side is fully unpinned and the probe side has an io
   //    sized buffer.
-  BOOST_FOREACH(Partition* partition, hash_partitions_) {
+  for (Partition* partition: hash_partitions_) {
     if (partition->hash_tbl() != NULL) partition->probe_rows()->Close();
   }
 

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <boost/foreach.hpp>
 #include <boost/algorithm/string/join.hpp>
 
 #include "common/status.h"
@@ -185,9 +184,7 @@ void Status::MergeStatus(const Status& status) {
     msg_ = new ErrorMsg(*status.msg_);
   } else {
     msg_->AddDetail(status.msg().msg());
-    BOOST_FOREACH(const string& s, status.msg_->details()) {
-      msg_->AddDetail(s);
-    }
+    for (const string& s: status.msg_->details()) msg_->AddDetail(s);
   }
 }
 
@@ -202,9 +199,7 @@ void Status::ToThrift(TStatus* status) const {
   } else {
     status->status_code = msg_->error();
     status->error_msgs.push_back(msg_->msg());
-    BOOST_FOREACH(const string& s, msg_->details()) {
-      status->error_msgs.push_back(s);
-    }
+    for (const string& s: msg_->details()) status->error_msgs.push_back(s);
     status->__isset.error_msgs = true;
   }
 }

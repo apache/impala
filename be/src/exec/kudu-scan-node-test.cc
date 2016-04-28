@@ -204,7 +204,7 @@ class KuduScanNodeTest : public testing::Test {
           GetSlotDescriptor(KEY_SLOT_ID)->tuple_offset();
 
       std::sort(row_batches.begin(), row_batches.end(), comp);
-      BOOST_FOREACH(RowBatch* batch, row_batches) {
+      for (RowBatch* batch: row_batches) {
         VerifyBatch(batch, first_row, first_row + batch->num_rows(),
             num_cols_to_materialize, num_notnull_cols);
         first_row += batch->num_rows();

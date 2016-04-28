@@ -16,7 +16,6 @@
 
 #include <boost/bind.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
@@ -90,7 +89,7 @@ void RpcEventHandlerManager::JsonCallback(const Webserver::ArgumentMap& args,
     Document* document) {
   lock_guard<mutex> l(lock_);
   Value servers(kArrayType);
-  BOOST_FOREACH(RpcEventHandler* handler, event_handlers_) {
+  for (RpcEventHandler* handler: event_handlers_) {
     Value server(kObjectType);
     handler->ToJson(&server, document);
     servers.PushBack(server, document->GetAllocator());
@@ -105,7 +104,7 @@ void RpcEventHandlerManager::ResetCallback(const Webserver::ArgumentMap& args,
   Webserver::ArgumentMap::const_iterator method_it = args.find("method");
   bool reset_all_in_server = (method_it == args.end());
   lock_guard<mutex> l(lock_);
-  BOOST_FOREACH(RpcEventHandler* handler, event_handlers_) {
+  for (RpcEventHandler* handler: event_handlers_) {
     if (reset_all_servers || handler->server_name() == server_it->second) {
       if (reset_all_in_server) {
         handler->ResetAll();
@@ -127,7 +126,7 @@ void RpcEventHandler::Reset(const string& method_name) {
 
 void RpcEventHandler::ResetAll() {
   lock_guard<mutex> l(method_map_lock_);
-  BOOST_FOREACH(const MethodMap::value_type& method, method_map_) {
+  for (const MethodMap::value_type& method: method_map_) {
     method.second->time_stats->Reset();
     method.second->num_in_flight.Store(0L);
   }
@@ -143,7 +142,7 @@ void RpcEventHandler::ToJson(Value* server, Document* document) {
   Value name(server_name_.c_str(), document->GetAllocator());
   server->AddMember("name", name, document->GetAllocator());
   Value methods(kArrayType);
-  BOOST_FOREACH(const MethodMap::value_type& rpc, method_map_) {
+  for (const MethodMap::value_type& rpc: method_map_) {
     Value method(kObjectType);
     Value method_name(rpc.first.c_str(), document->GetAllocator());
     method.AddMember("name", method_name, document->GetAllocator());

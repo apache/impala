@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <boost/algorithm/string.hpp>
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/uuid/uuid_io.hpp>

@@ -16,7 +16,6 @@
 
 #include <ostream>
 #include <sstream>
-#include <boost/foreach.hpp>
 
 #include "gen-cpp/TCLIService_constants.h"
 #include "codegen/llvm-codegen.h"
@@ -195,12 +194,12 @@ void ColumnType::ToThrift(TColumnType* thrift_type) const {
       DCHECK_EQ(type, TYPE_STRUCT);
       node.type = TTypeNodeType::STRUCT;
       node.__set_struct_fields(vector<TStructField>());
-      BOOST_FOREACH(const string& field_name, field_names) {
+      for (const string& field_name: field_names) {
         node.struct_fields.push_back(TStructField());
         node.struct_fields.back().name = field_name;
       }
     }
-    BOOST_FOREACH(const ColumnType& child, children) {
+    for (const ColumnType& child: children) {
       child.ToThrift(thrift_type);
     }
   } else {

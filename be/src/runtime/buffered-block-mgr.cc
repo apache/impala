@@ -561,7 +561,7 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   // See IMPALA-1890.
   DCHECK_EQ(non_local_outstanding_writes_, 0) << endl << DebugInternal();
   // Delete tmp files.
-  BOOST_FOREACH(TmpFileMgr::File& file, tmp_files_) {
+  for (TmpFileMgr::File& file: tmp_files_) {
     file.Remove();
   }
   tmp_files_.clear();
@@ -575,7 +575,7 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   }
 
   // Free memory resources.
-  BOOST_FOREACH(BufferDescriptor* buffer, all_io_buffers_) {
+  for (BufferDescriptor* buffer: all_io_buffers_) {
     mem_tracker_->Release(buffer->len);
     delete[] buffer->buffer;
   }
@@ -1160,7 +1160,7 @@ bool BufferedBlockMgr::Validate() const {
     return false;
   }
 
-  BOOST_FOREACH(BufferDescriptor* buffer, all_io_buffers_) {
+  for (BufferDescriptor* buffer: all_io_buffers_) {
     bool is_free = free_io_buffers_.Contains(buffer);
     num_free_io_buffers += is_free;
 

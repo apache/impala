@@ -48,8 +48,7 @@ const Codec::CodecMap Codec::CODEC_MAP = map_list_of
   (SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED);
 
 string Codec::GetCodecName(THdfsCompression::type type) {
-  BOOST_FOREACH(const CodecMap::value_type& codec,
-      g_CatalogObjects_constants.COMPRESSION_MAP) {
+  for (const CodecMap::value_type& codec: g_CatalogObjects_constants.COMPRESSION_MAP) {
     if (codec.second == type) return codec.first;
   }
   DCHECK(false) << "Missing codec in COMPRESSION_MAP: " << type;
@@ -57,7 +56,7 @@ string Codec::GetCodecName(THdfsCompression::type type) {
 }
 
 Status Codec::GetHadoopCodecClassName(THdfsCompression::type type, string* out_name) {
-  BOOST_FOREACH(const CodecMap::value_type& codec, CODEC_MAP) {
+  for (const CodecMap::value_type& codec: CODEC_MAP) {
     if (codec.second == type) {
       out_name->assign(codec.first);
       return Status::OK();

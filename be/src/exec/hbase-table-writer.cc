@@ -14,7 +14,6 @@
 
 #include "exec/hbase-table-writer.h"
 
-#include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
 #include <sstream>
 
@@ -203,10 +202,10 @@ Status HBaseTableWriter::CleanUpJni() {
     put_list_ = NULL;
   }
 
-  BOOST_FOREACH(jbyteArray ref, cf_arrays_) {
+  for (jbyteArray ref: cf_arrays_) {
     RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, ref));
   }
-  BOOST_FOREACH(jbyteArray ref, qual_arrays_) {
+  for (jbyteArray ref: qual_arrays_) {
     RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, ref));
   }
 

@@ -16,7 +16,6 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 #include <boost/mem_fn.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -292,7 +291,7 @@ void AdmissionController::PoolStats::Dequeue(const QuerySchedule& schedule,
 void AdmissionController::UpdateHostMemAdmitted(const QuerySchedule& schedule,
     int64_t per_node_mem) {
   const unordered_set<TNetworkAddress>& hosts = schedule.unique_hosts();
-  BOOST_FOREACH(const TNetworkAddress& host_addr, hosts) {
+  for (const TNetworkAddress& host_addr: hosts) {
     const string host = TNetworkAddressToString(host_addr);
     VLOG_ROW << "Update admitted mem reserved for host=" << host
              << " prev=" << PrintBytes(host_mem_admitted_[host])
@@ -332,7 +331,7 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
 
   // Case 2:
   int64_t proc_mem_limit = GetProcMemLimit();
-  BOOST_FOREACH(const TNetworkAddress& host, schedule.unique_hosts()) {
+  for (const TNetworkAddress& host: schedule.unique_hosts()) {
     const string host_id = TNetworkAddressToString(host);
     int64_t mem_reserved = host_mem_reserved_[host_id];
     int64_t mem_admitted = host_mem_admitted_[host_id];
@@ -555,7 +554,7 @@ void AdmissionController::UpdatePoolStats(
       // and then re-compute the pool stats for any pools that changed.
       if (!delta.is_delta) {
         VLOG_ROW << "Full impala-request-queue stats update";
-        BOOST_FOREACH(PoolStatsMap::value_type& entry, pool_stats_) {
+        for (PoolStatsMap::value_type& entry: pool_stats_) {
           entry.second.ClearRemoteStats();
         }
       }
@@ -591,7 +590,7 @@ void AdmissionController::PoolStats::UpdateRemoteStats(const string& host_id,
 }
 
 void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_updates) {
-  BOOST_FOREACH(const TTopicItem& item, topic_updates) {
+  for (const TTopicItem& item: topic_updates) {
     string pool_name;
     string topic_backend_id;
     if (!ParsePoolTopicKey(item.key, &pool_name, &topic_backend_id)) continue;
@@ -611,7 +610,7 @@ void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_upd
 }
 
 void AdmissionController::HandleTopicDeletions(const vector<string>& topic_deletions) {
-  BOOST_FOREACH(const string& topic_key, topic_deletions) {
+  for (const string& topic_key: topic_deletions) {
     string pool_name;
     string topic_backend_id;
     if (!ParsePoolTopicKey(topic_key, &pool_name, &topic_backend_id)) continue;
@@ -626,8 +625,8 @@ void AdmissionController::PoolStats::UpdateAggregates(
   int64_t num_running = 0;
   int64_t num_queued = 0;
   int64_t mem_reserved = 0;
-  BOOST_FOREACH(const PoolStats::RemoteStatsMap::value_type& remote_entry,
-      remote_stats_) {
+  for (const PoolStats::RemoteStatsMap::value_type& remote_entry:
+       remote_stats_) {
     const string& host = remote_entry.first;
     // Skip an update from this subscriber as the information may be outdated.
     // The stats from this coordinator will be added below.
@@ -675,7 +674,7 @@ void AdmissionController::PoolStats::UpdateAggregates(
 void AdmissionController::UpdateClusterAggregates() {
   // Recompute the host mem reserved.
   HostMemMap updated_mem_reserved;
-  BOOST_FOREACH(PoolStatsMap::value_type& entry, pool_stats_) {
+  for (PoolStatsMap::value_type& entry: pool_stats_) {
     entry.second.UpdateAggregates(&updated_mem_reserved);
   }
 
@@ -683,7 +682,7 @@ void AdmissionController::UpdateClusterAggregates() {
     stringstream ss;
     ss << "Updated mem reserved for hosts:";
     int i = 0;
-    BOOST_FOREACH(const HostMemMap::value_type& e, updated_mem_reserved) {
+    for (const HostMemMap::value_type& e: updated_mem_reserved) {
       if (host_mem_reserved_[e.first] == e.second) continue;
       ss << endl << e.first << ": " << PrintBytes(host_mem_reserved_[e.first]);
       ss << " -> " << PrintBytes(e.second);
@@ -715,14 +714,14 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
 void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
   // local_stats_ are updated eagerly except for backend_mem_reserved (which isn't used
   // for local admission control decisions). Update that now before sending local_stats_.
-  BOOST_FOREACH(PoolStatsMap::value_type& entry, pool_stats_) {
+  for (PoolStatsMap::value_type& entry: pool_stats_) {
     entry.second.UpdateMemTrackerStats();
   }
   if (pools_for_updates_.empty()) return;
   topic_updates->push_back(TTopicDelta());
   TTopicDelta& topic_delta = topic_updates->back();
   topic_delta.topic_name = IMPALA_REQUEST_QUEUE_TOPIC;
-  BOOST_FOREACH(const string& pool_name, pools_for_updates_) {
+  for (const string& pool_name: pools_for_updates_) {
     DCHECK(pool_stats_.find(pool_name) != pool_stats_.end());
     PoolStats* stats = GetPoolStats(pool_name);
     VLOG_ROW << "Sending topic update " << stats->DebugString();
@@ -744,7 +743,7 @@ void AdmissionController::DequeueLoop() {
     unique_lock<mutex> lock(admission_ctrl_lock_);
     if (done_) break;
     dequeue_cv_.wait(lock);
-    BOOST_FOREACH(const PoolConfigMap::value_type& entry, pool_config_map_) {
+    for (const PoolConfigMap::value_type& entry: pool_config_map_) {
       const string& pool_name = entry.first;
       const TPoolConfig& pool_config = entry.second;
       const int64_t max_requests = pool_config.max_requests;

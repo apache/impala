@@ -16,7 +16,6 @@
 #include <gtest/gtest.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
@@ -53,7 +52,7 @@ bool CheckHistogramDistribution(const StringVal& actual,
 
   accumulator_set<int, stats<tag::variance> > acc;
   int prev_val = -1;
-  BOOST_FOREACH(string& s, str_vals) {
+  for (string& s: str_vals) {
     trim(s);
     int val = lexical_cast<int>(s);
     if (prev_val != -1) acc(val - prev_val);

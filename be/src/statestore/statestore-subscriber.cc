@@ -18,7 +18,6 @@
 #include <utility>
 
 #include <boost/algorithm/string/join.hpp>
-#include <boost/foreach.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <gutil/strings/substitute.h>
@@ -141,7 +140,7 @@ Status StatestoreSubscriber::Register() {
 
   TRegisterSubscriberRequest request;
   request.topic_registrations.reserve(update_callbacks_.size());
-  BOOST_FOREACH(const UpdateCallbacks::value_type& topic, update_callbacks_) {
+  for (const UpdateCallbacks::value_type& topic: update_callbacks_) {
     TTopicRegistration thrift_topic;
     thrift_topic.topic_name = topic.first;
     thrift_topic.is_transient = topic_registrations_[topic.first];
@@ -314,7 +313,7 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
     // to this subscriber. If any invalid ranges are found, request new update(s) with
     // version ranges applicable to this subscriber.
     bool found_unexpected_delta = false;
-    BOOST_FOREACH(const TopicDeltaMap::value_type& delta, incoming_topic_deltas) {
+    for (const TopicDeltaMap::value_type& delta: incoming_topic_deltas) {
       TopicVersionMap::const_iterator itr = current_topic_versions_.find(delta.first);
       if (itr != current_topic_versions_.end()) {
         if (delta.second.is_delta && delta.second.from_version != itr->second) {
@@ -337,10 +336,10 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
 
     // Skip calling the callbacks when an unexpected delta update is found.
     if (!found_unexpected_delta) {
-      BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
+      for (const UpdateCallbacks::value_type& callbacks: update_callbacks_) {
         MonotonicStopWatch sw;
         sw.Start();
-        BOOST_FOREACH(const UpdateCallback& callback, callbacks.second.callbacks) {
+        for (const UpdateCallback& callback: callbacks.second.callbacks) {
           // TODO: Consider filtering the topics to only send registered topics to
           // callbacks
           callback(incoming_topic_deltas, subscriber_topic_updates);

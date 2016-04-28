@@ -96,9 +96,8 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
       table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
 
   // Prepare literal partition key exprs
-  BOOST_FOREACH(
-      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
-      table_desc_->partition_descriptors()) {
+  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
+       table_desc_->partition_descriptors()) {
     HdfsPartitionDescriptor* partition = id_to_desc.second;
     RETURN_IF_ERROR(partition->PrepareExprs(state));
   }
@@ -163,9 +162,8 @@ Status HdfsTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(partition_key_expr_ctxs_, state));
   // Open literal partition key exprs
-  BOOST_FOREACH(
-      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
-      table_desc_->partition_descriptors()) {
+  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
+       table_desc_->partition_descriptors()) {
     HdfsPartitionDescriptor* partition = id_to_desc.second;
     RETURN_IF_ERROR(partition->OpenExprs(state));
   }
@@ -174,9 +172,8 @@ Status HdfsTableSink::Open(RuntimeState* state) {
   // partition key values to partition descriptor for multiple output format support. The
   // map is keyed on the concatenation of the non-constant keys of the PARTITION clause of
   // the INSERT statement.
-  BOOST_FOREACH(
-      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
-      table_desc_->partition_descriptors()) {
+  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
+       table_desc_->partition_descriptors()) {
     if (id_to_desc.first == g_ImpalaInternalService_constants.DEFAULT_PARTITION_ID) {
       default_partition_ = id_to_desc.second;
     } else {
@@ -648,9 +645,8 @@ void HdfsTableSink::Close(RuntimeState* state) {
   partition_keys_to_output_partitions_.clear();
 
   // Close literal partition key exprs
-  BOOST_FOREACH(
-      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
-      table_desc_->partition_descriptors()) {
+  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
+       table_desc_->partition_descriptors()) {
     HdfsPartitionDescriptor* partition = id_to_desc.second;
     partition->CloseExprs(state);
   }

@@ -16,7 +16,6 @@
 
 #include <set>
 #include <map>
-#include <boost/foreach.hpp>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -201,7 +200,7 @@ void ThreadMgr::ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args,
         document->GetAllocator());
   }
   Value lst(kArrayType);
-  BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {
+  for (const ThreadCategoryMap::value_type& category: thread_categories_) {
     Value val(kObjectType);
     val.AddMember("name", category.first.c_str(), document->GetAllocator());
     val.AddMember("size", static_cast<uint64_t>(category.second.size()),
@@ -231,14 +230,14 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     document->AddMember("thread-group", val, document->GetAllocator());
   } else {
-    BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {
+    for (const ThreadCategoryMap::value_type& category: thread_categories_) {
       categories_to_print.push_back(&category.second);
     }
   }
 
   Value lst(kArrayType);
-  BOOST_FOREACH(const ThreadCategory* category, categories_to_print) {
-    BOOST_FOREACH(const ThreadCategory::value_type& thread, *category) {
+  for (const ThreadCategory* category: categories_to_print) {
+    for (const ThreadCategory::value_type& thread: *category) {
       Value val(kObjectType);
       val.AddMember("name", thread.second.name().c_str(), document->GetAllocator());
       ThreadStats stats;
@@ -327,18 +326,14 @@ Status ThreadGroup::AddThread(Thread* thread) {
 }
 
 void ThreadGroup::JoinAll() {
-  BOOST_FOREACH(const Thread& thread, threads_) {
-    thread.Join();
-  }
+  for (const Thread& thread: threads_) thread.Join();
 }
 
 Status ThreadGroup::SetCgroup(const string& cgroup) {
   DCHECK(cgroups_mgr_ != NULL);
   cgroup_path_ = cgroup;
-  // BOOST_FOREACH + ptr_vector + const are not compatible
-  for (ptr_vector<Thread>::const_iterator it = threads_.begin();
-       it != threads_.end(); ++it) {
-    RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(*it, cgroup));
+  for (const Thread& t: threads_) {
+    RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(t, cgroup));
   }
   return Status::OK();
 }

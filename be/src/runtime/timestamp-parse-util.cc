@@ -17,7 +17,6 @@
 #include <boost/assign/list_of.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "runtime/string-value.inline.h"
@@ -363,7 +362,7 @@ int TimestampParser::Format(const DateTimeFormatContext& dt_ctx,
   if (dt_ctx.has_date_toks && d.is_special()) return -1;
   if (dt_ctx.has_time_toks && t.is_special()) return -1;
   char* str = buff;
-  BOOST_FOREACH(const DateTimeFormatToken& tok, dt_ctx.toks) {
+  for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     int32_t num_val = -1;
     const char* str_val = NULL;
     int str_val_len = 0;
@@ -420,7 +419,7 @@ bool TimestampParser::ParseDateTime(const char* str, int str_len,
   // Keep track of the number of characters we need to shift token positions by.
   // Variable-length tokens will result in values > 0;
   int shift_len = 0;
-  BOOST_FOREACH(const DateTimeFormatToken& tok, dt_ctx.toks) {
+  for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     const char* tok_val = str + tok.pos + shift_len;
     if (tok.type == SEPARATOR) {
       if (UNLIKELY(*tok_val != *tok.val)) return false;

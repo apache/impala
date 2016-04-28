@@ -16,7 +16,6 @@
 #ifndef IMPALA_UTIL_ERROR_UTIL_H
 #define IMPALA_UTIL_ERROR_UTIL_H
 
-
 #include <string>
 #include <vector>
 

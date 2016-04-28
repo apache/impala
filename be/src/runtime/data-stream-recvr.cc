@@ -272,7 +272,7 @@ Status DataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
 }
 
 void DataStreamRecvr::TransferAllResources(RowBatch* transfer_batch) {
-  BOOST_FOREACH(SenderQueue* sender_queue, sender_queues_) {
+  for (SenderQueue* sender_queue: sender_queues_) {
     if (sender_queue->current_batch() != NULL) {
       sender_queue->current_batch()->TransferResourceOwnership(transfer_batch);
     }

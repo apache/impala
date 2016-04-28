@@ -114,7 +114,7 @@ Status KuduTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
 
   kudu::client::KuduClientBuilder b;
-  BOOST_FOREACH(const string& address, table_desc_->kudu_master_addresses()) {
+  for (const string& address: table_desc_->kudu_master_addresses()) {
     b.add_master_server_addr(address);
   }
 

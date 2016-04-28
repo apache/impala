@@ -22,7 +22,6 @@
 #include "util/stopwatch.h"
 
 #include <boost/thread/thread.hpp>
-#include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 
 #include "common/names.h"
@@ -90,7 +89,7 @@ void ImpalaThreadStarter(int num_threads, const function<void ()>& f) {
   for (int i=0; i < num_threads; ++i) {
     threads.push_back(new Thread("mythreadgroup", "thread", f));
   }
-  BOOST_FOREACH(Thread* thread, threads) {
+  for (Thread* thread: threads) {
     thread->Join();
     delete thread;
   }

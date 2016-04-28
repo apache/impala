@@ -22,7 +22,6 @@
 #include <sstream>
 #include <vector>
 #include <boost/algorithm/string.hpp>
-#include <boost/foreach.hpp>
 
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -90,7 +89,7 @@ Status HostnameToIpAddrs(const string& name, vector<string>* addresses) {
 }
 
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {
-  BOOST_FOREACH(const string& candidate, addresses) {
+  for (const string& candidate: addresses) {
     if (candidate != LOCALHOST) {
       *addr = candidate;
       return true;

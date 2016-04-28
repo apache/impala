@@ -16,7 +16,6 @@
 
 #include <sstream>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/foreach.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
@@ -72,7 +71,7 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
   // fragment's plan's nodes list.
   for (int i = 0; i < request.fragments.size(); ++i) {
     int node_idx = 0;
-    BOOST_FOREACH(const TPlanNode& node, request.fragments[i].plan.nodes) {
+    for (const TPlanNode& node: request.fragments[i].plan.nodes) {
       if (plan_node_to_fragment_idx_.size() < node.node_id + 1) {
         plan_node_to_fragment_idx_.resize(node.node_id + 1);
         plan_node_to_plan_node_idx_.resize(node.node_id + 1);
@@ -195,7 +194,7 @@ void QuerySchedule::PrepareReservationRequest(const string& pool, const string& 
   DCHECK(resource_resolver_.get() != NULL)
       << "resource_resolver_ is NULL, didn't call SetUniqueHosts()?";
   random_generator uuid_generator;
-  BOOST_FOREACH(const TNetworkAddress& host, unique_hosts_) {
+  for (const TNetworkAddress& host: unique_hosts_) {
     reservation_request_.resources.push_back(llama::TResource());
     llama::TResource& resource = reservation_request_.resources.back();
     uuid id = uuid_generator();
@@ -217,8 +216,8 @@ Status QuerySchedule::ValidateReservation() {
   if (!HasReservation()) return Status("Query schedule does not have a reservation.");
   vector<TNetworkAddress> hosts_missing_resources;
   ResourceResolver resolver(unique_hosts_);
-  BOOST_FOREACH(const FragmentExecParams& params, fragment_exec_params_) {
-    BOOST_FOREACH(const TNetworkAddress& host, params.hosts) {
+  for (const FragmentExecParams& params: fragment_exec_params_) {
+    for (const TNetworkAddress& host: params.hosts) {
       // Ignore the coordinator host which is not contained in unique_hosts_.
       if (unique_hosts_.find(host) == unique_hosts_.end()) continue;
       TNetworkAddress resource_hostport;

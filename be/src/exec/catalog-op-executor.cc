@@ -193,7 +193,7 @@ void CatalogOpExecutor::SetTableStats(const TTableSchema& tbl_stats_schema,
   // Accumulate total number of rows in the table.
   long total_num_rows = 0;
   // Set per-partition stats.
-  BOOST_FOREACH(const TRow& row, tbl_stats_data.rows) {
+  for (const TRow& row: tbl_stats_data.rows) {
     DCHECK_GT(row.colVals.size(), 0);
     // The first column is the COUNT(*) expr of the original query.
     DCHECK(row.colVals[0].__isset.i64Val);
@@ -210,7 +210,7 @@ void CatalogOpExecutor::SetTableStats(const TTableSchema& tbl_stats_schema,
     total_num_rows += num_rows;
   }
 
-  BOOST_FOREACH(const TPartitionStats& existing_stats, existing_part_stats) {
+  for (const TPartitionStats& existing_stats: existing_part_stats) {
     total_num_rows += existing_stats.stats.num_rows;
   }
 
