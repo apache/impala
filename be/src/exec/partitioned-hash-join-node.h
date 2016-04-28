@@ -173,12 +173,88 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// structures.
   Status BuildHashTables(RuntimeState* state);
 
+  /// Probes the hash table for rows matching the current probe row and appends
+  /// all the matching build rows (with probe row) to output batch. Returns true
+  /// if probing is done for the current probe row and should continue to next row.
+  ///
+  /// 'out_batch_iterator' is the iterator for the output batch.
+  /// 'remaining_capacity' tracks the number of additional rows that can be added to
+  /// the output batch. It's updated as rows are added to the output batch.
+  /// Using a separate variable is probably faster than calling
+  /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
+  bool inline ProcessProbeRowInnerJoin(
+      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
+      ExprContext* const* conjunct_ctxs, int num_conjuncts,
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
+
+  /// Probes and updates the hash table for the current probe row for either
+  /// RIGHT_SEMI_JOIN or RIGHT_ANTI_JOIN. For RIGHT_SEMI_JOIN, all matching build
+  /// rows will be appended to the 'out_batch'; For RIGHT_ANTI_JOIN, update the
+  /// hash table only if matches are found. The actual output happens in
+  /// OutputUnmatchedBuild(). Returns true if probing is done for the current
+  /// probe row and should continue to next row.
+  ///
+  /// 'out_batch_iterator' is the iterator for the output batch.
+  /// 'remaining_capacity' tracks the number of additional rows that can be added to
+  /// the output batch. It's updated as rows are added to the output batch.
+  /// Using a separate variable is probably faster than calling
+  /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
+  template<int const JoinOp>
+  bool inline ProcessProbeRowRightSemiJoins(
+      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
+      ExprContext* const* conjunct_ctxs, int num_conjuncts,
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
+
+  /// Probes the hash table for the current probe row for LEFT_SEMI_JOIN,
+  /// LEFT_ANTI_JOIN or NULL_AWARE_LEFT_ANTI_JOIN. The probe row will be appended
+  /// to 'out_batch' if it's part of the output. Returns true if probing
+  /// is done for the current probe row and should continue to next row.
+  ///
+  /// 'out_batch_iterator' is the iterator for the output batch.
+  /// 'remaining_capacity' tracks the number of additional rows that can be added to
+  /// the output batch. It's updated as rows are added to the output batch.
+  /// Using a separate variable is probably faster than calling
+  /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
+  template<int const JoinOp>
+  bool inline ProcessProbeRowLeftSemiJoins(
+      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
+      ExprContext* const* conjunct_ctxs, int num_conjuncts,
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status);
+
+  /// Probes the hash table for the current probe row for LEFT_OUTER_JOIN,
+  /// RIGHT_OUTER_JOIN or FULL_OUTER_JOIN. The matching build and/or probe row
+  /// will appended to 'out_batch'. For RIGHT/FULL_OUTER_JOIN, some of the outputs
+  /// are added in OutputUnmatchedBuild(). Returns true if probing is done for the
+  /// current probe row and should continue to next row.
+  ///
+  /// 'out_batch_iterator' is the iterator for the output batch.
+  /// 'remaining_capacity' tracks the number of additional rows that can be added to
+  /// the output batch. It's updated as rows are added to the output batch.
+  /// Using a separate variable is probably faster than calling
+  /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
+  /// 'status' may be updated if appending to null aware BTS fails.
+  template<int const JoinOp>
+  bool inline ProcessProbeRowOuterJoins(
+      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
+      ExprContext* const* conjunct_ctxs, int num_conjuncts,
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
+
+  /// Find the next probe row. Returns true if a probe row is found. In which case,
+  /// 'current_probe_row_' and 'hash_tbl_iterator_' have been set up to point to the
+  /// next probe row and its corresponding partition. 'status' may be updated if
+  /// append to the spilled partitions' BTS or null probe rows' BTS fail.
+  template<int const JoinOp>
+  bool inline NextProbeRow(
+      const HashTableCtx* ht_ctx, RowBatch::Iterator* probe_batch_iterator,
+      int* remaining_capacity, int num_other_join_conjuncts, Status* status);
+
   /// Process probe rows from probe_batch_. Returns either if out_batch is full or
   /// probe_batch_ is entirely consumed.
   /// For RIGHT_ANTI_JOIN, all this function does is to mark whether each build row
   /// had a match.
   /// Returns the number of rows added to out_batch; -1 on error (and *status will be
-  /// set).
+  /// set). This function doesn't commit rows to the output batch so it's the caller's
+  /// responsibility to do so.
   template<int const JoinOp>
   int ProcessProbeBatch(RowBatch* out_batch, const HashTableCtx* ht_ctx, Status* status);
 
@@ -475,6 +551,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
    private:
     friend class PartitionedHashJoinNode;
 
+    /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'indices' contains the
+    /// index of each row's index into the hash table's tuple stream. This function is
+    /// replaced with a codegen'd version.
+    bool InsertBatch(HashTableCtx* ctx, RowBatch* batch,
+        const std::vector<BufferedTupleStream::RowIdx>& indices);
+
     PartitionedHashJoinNode* parent_;
 
     /// This partition is completely processed and nothing needs to be done for it again.
@@ -499,12 +581,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// If NULL, ownership has been transfered.
     BufferedTupleStream* build_rows_;
     BufferedTupleStream* probe_rows_;
-
-    /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'indices' contains the
-    /// index of each row's index into the hash table's tuple stream. This function is
-    /// replaced with a codegen'd version.
-    bool InsertBatch(HashTableCtx* ctx, RowBatch* batch,
-        const std::vector<BufferedTupleStream::RowIdx>& indices);
   };
 
   /// For the below codegen'd functions, xxx_fn_level0_ uses CRC hashing when available

@@ -173,6 +173,9 @@ class RowBatch {
     /// RowBatch::AtCapacity() instead.
     bool IR_ALWAYS_INLINE AtEnd() { return row_ >= row_batch_end_; }
 
+    /// Returns the row batch which this iterator is iterating through.
+    RowBatch* parent() { return parent_; }
+
    private:
     /// Number of tuples per row.
     const int num_tuples_per_row_;
