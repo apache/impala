@@ -256,3 +256,35 @@ insert into tdata values
 delete ignore a from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ====
+---- QUERY
+# IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
+# if the Kudu columns are of different types.
+create table impala_3454
+(key_1 tinyint, key_2 bigint)
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'impala_3454',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'key_1,key_2'
+ )
+---- RESULTS
+====
+---- QUERY
+insert into impala_3454 values
+(1, 1),
+(2, 2),
+(3, 3)
+---- RESULTS
+: 3
+====
+---- QUERY
+delete from impala_3454 where key_1 < (select max(key_2) from impala_3454)
+---- RESULTS
+====
+---- QUERY
+select * from impala_3454
+---- RESULTS
+3,3
+---- TYPES
+TINYINT,BIGINT
+====

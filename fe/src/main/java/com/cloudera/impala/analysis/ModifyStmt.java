@@ -79,13 +79,13 @@ public abstract class ModifyStmt extends StatementBase {
   // concrete table class. Result of analysis.
   protected KuduTable table_;
 
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   // Position mapping of output expressions of the sourceStmt_ to column indices in the
   // target table. The i'th position in this list maps to the referencedColumns_[i]'th
   // position in the target table. Set in createSourceStmt() during analysis.
   protected ArrayList<Integer> referencedColumns_;
-
-  // END: Members that need to be reset()
-  /////////////////////////////////////////
 
   // On tables with a primary key, ignore key not found errors.
   protected final boolean ignoreNotFound_;
@@ -163,7 +163,6 @@ public abstract class ModifyStmt extends StatementBase {
     fromClause_.reset();
     if (sourceStmt_ != null) sourceStmt_.reset();
     table_ = null;
-    referencedColumns_.clear();
   }
 
   /**
