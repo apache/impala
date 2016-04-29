@@ -57,15 +57,27 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
     super(TestScannersAllTableFormatsWithLimit, cls).add_test_dimensions()
 
   def test_limit(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self._test_limit(vector)
+    # IMPALA-3337: when continuing on error, the error log should not show errors
+    # (e.g. "Cancelled").
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self._test_limit(vector)
+
+  def _test_limit(self, vector):
     # Use a small batch size so changing the limit affects the timing of cancellation
     vector.get_value('exec_option')['batch_size'] = 100
     iterations = 50
     query_template = "select * from alltypes limit %s"
     for i in range(1, iterations):
       # Vary the limit to vary the timing of cancellation
-      query = query_template % ((iterations * 100) % 1000 + 1)
-      self.execute_query(query, vector.get_value('exec_option'),
+      limit = (iterations * 100) % 1000 + 1
+      query = query_template % limit
+      result = self.execute_query(query, vector.get_value('exec_option'),
           table_format=vector.get_value('table_format'))
+      assert len(result.data) == limit
+      # IMPALA-3337: The error log should be empty.
+      assert not result.log
 
 # Test case to verify the scanners work properly when the table metadata (specifically the
 # number of columns in the table) does not match the number of columns in the data file.

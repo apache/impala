@@ -405,6 +405,12 @@ class HdfsScanner {
     return reinterpret_cast<TupleRow*>(mem + batch_->row_byte_size());
   }
 
+  /// Given an error message, determine whether execution should be aborted and, if so,
+  /// return the corresponding error status. Otherwise, log the error and return
+  /// Status::OK(). Execution is aborted if the ABORT_ON_ERROR query option is set to
+  /// true or the error is not recoverable and should be handled upstream.
+  Status LogOrReturnError(const ErrorMsg& message) const;
+
   // Convenience function for calling the PrintPath() function in
   // debug-util. 'subpath_idx' can be specified in order to truncate the output to end on
   // the i-th element of 'path' (inclusive).

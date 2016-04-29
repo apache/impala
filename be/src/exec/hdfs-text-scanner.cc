@@ -269,11 +269,7 @@ Status HdfsTextScanner::FinishScanRange() {
         stringstream ss;
         ss << "Read failed while trying to finish scan range: " << stream_->filename()
            << ":" << stream_->file_offset() << endl << status.GetDetail();
-        if (state_->abort_on_error()) {
-          return Status(ss.str());
-        } else {
-          state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
-        }
+        RETURN_IF_ERROR(LogOrReturnError(ErrorMsg(TErrorCode::GENERAL, ss.str())));
       } else if (!partial_tuple_empty_ || !boundary_column_.Empty() ||
           !boundary_row_.Empty() ||
           (delimited_text_parser_->HasUnfinishedTuple() &&

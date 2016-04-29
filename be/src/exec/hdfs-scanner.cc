@@ -648,6 +648,20 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
   }
 }
 
+Status HdfsScanner::LogOrReturnError(const ErrorMsg& message) const {
+  DCHECK_NE(message.error(), TErrorCode::OK);
+  // If either abort_on_error=true or the error necessitates execution stops
+  // immediately, return an error status.
+  if (state_->abort_on_error() ||
+      message.error() == TErrorCode::MEM_LIMIT_EXCEEDED ||
+      message.error() == TErrorCode::CANCELLED) {
+    return Status(message);
+  }
+  // Otherwise, add the error to the error log and continue.
+  state_->LogError(message);
+  return Status::OK();
+}
+
 string HdfsScanner::PrintPath(const SchemaPath& path, int subpath_idx) const {
   SchemaPath::const_iterator subpath_end =
       subpath_idx == -1 ? path.end() : path.begin() + subpath_idx + 1;

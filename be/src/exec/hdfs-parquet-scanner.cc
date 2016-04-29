@@ -82,18 +82,6 @@ static_assert(
     !(ROWS_PER_FILTER_SELECTIVITY_CHECK & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)),
     "ROWS_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
 
-// TODO: refactor error reporting across all scanners to be more consistent (e.g. make
-// sure file name is always included, errors are reported exactly once)
-// TODO: rename these macros so its easier to tell them apart
-
-#define LOG_OR_RETURN_ON_ERROR(error_msg, runtime_state)                \
-  do {                                                                  \
-    if (runtime_state->abort_on_error()) {                              \
-      return Status(error_msg.msg());                                   \
-    }                                                                   \
-    runtime_state->LogError(error_msg);                                 \
-  } while (false)                                                       \
-
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
 // input file. They differentiate these cases from DCHECKs, which indicate conditions that
 // are true unless there's a bug in Impala. We would ideally always return a bad Status
@@ -1182,7 +1170,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
     } else if (num_values_read_ > metadata_->num_values) {
       ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
           metadata_->num_values, num_values_read_, node_.element->name, filename());
-      LOG_OR_RETURN_ON_ERROR(msg, parent_->state_);
+      RETURN_IF_ERROR(parent_->LogOrReturnError(msg));
       return Status::OK();
     }
 
@@ -1195,7 +1183,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
       // TODO for 2.3: node_.element->name isn't necessarily useful
       ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
           metadata_->num_values, num_values_read_, node_.element->name, filename());
-      LOG_OR_RETURN_ON_ERROR(msg, parent_->state_);
+      RETURN_IF_ERROR(parent_->LogOrReturnError(msg));
       return Status::OK();
     }
 
@@ -1701,11 +1689,9 @@ Status HdfsParquetScanner::ProcessSplit() {
     // Store UDF error in thread local storage or make UDF return status so it can merge
     // with parse_status_.
     RETURN_IF_ERROR(state_->GetQueryStatus());
-    if (UNLIKELY(parse_status_.IsMemLimitExceeded())) return parse_status_;
     if (UNLIKELY(!parse_status_.ok())) {
-      LOG_OR_RETURN_ON_ERROR(parse_status_.msg(), state_);
+      RETURN_IF_ERROR(LogOrReturnError(parse_status_.msg()));
     }
-
     if (scan_node_->ReachedLimit()) return Status::OK();
     if (context_->cancelled()) return Status::OK();
     if (!filters_pass) return Status::OK();
@@ -2897,13 +2883,13 @@ Status HdfsParquetScanner::ValidateColumn(
     if (!schema_element.__isset.precision) {
       ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION, filename(),
           schema_element.name);
-      LOG_OR_RETURN_ON_ERROR(msg, state_);
+      RETURN_IF_ERROR(LogOrReturnError(msg));
     } else {
       if (schema_element.precision != slot_desc->type().precision) {
         // TODO: we could allow a mismatch and do a conversion at this step.
         ErrorMsg msg(TErrorCode::PARQUET_WRONG_PRECISION, filename(), schema_element.name,
             schema_element.precision, slot_desc->type().precision);
-        LOG_OR_RETURN_ON_ERROR(msg, state_);
+        RETURN_IF_ERROR(LogOrReturnError(msg));
       }
     }
 
@@ -2912,13 +2898,13 @@ Status HdfsParquetScanner::ValidateColumn(
       // might only serve to reject otherwise perfectly readable files.
       ErrorMsg msg(TErrorCode::PARQUET_BAD_CONVERTED_TYPE, filename(),
           schema_element.name);
-      LOG_OR_RETURN_ON_ERROR(msg, state_);
+      RETURN_IF_ERROR(LogOrReturnError(msg));
     }
   } else if (schema_element.__isset.scale || schema_element.__isset.precision ||
       is_converted_type_decimal) {
     ErrorMsg msg(TErrorCode::PARQUET_INCOMPATIBLE_DECIMAL, filename(),
         schema_element.name, slot_desc->type().DebugString());
-    LOG_OR_RETURN_ON_ERROR(msg, state_);
+    RETURN_IF_ERROR(LogOrReturnError(msg));
   }
   return Status::OK();
 }
