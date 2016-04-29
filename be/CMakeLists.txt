@@ -135,9 +135,11 @@ add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 #  -Wno-c++11-extensions: c++11 extensions are ok as long as clang supports them
 #  -Wno-return-type-c-linkage: UDFs return C++ classes but use C linkage to prevent
 #       mangling
+#  -DBOOST_NO_EXCEPTIONS: call a custom error handler for exceptions in codegen'd code.
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-DIR_COMPILE" "-DNDEBUG"
   "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG"
-  "-Wno-deprecated" "-Wno-c++11-extensions" "-Wno-return-type-c-linkage" "-O1")
+  "-DBOOST_NO_EXCEPTIONS" "-fcolor-diagnostics" "-Wno-deprecated" "-Wno-c++11-extensions"
+  "-Wno-return-type-c-linkage" "-O1")
 if (IMPALA_TOOLCHAIN)
   # -Werror: compile warnings should be errors when using the toolchain compiler.
   SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")

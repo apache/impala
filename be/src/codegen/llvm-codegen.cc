@@ -1145,3 +1145,14 @@ Value* LlvmCodeGen::GetPtrTo(LlvmBuilder* builder, Value* v, const char* name) {
 }
 
 }
+
+namespace boost {
+
+/// Handler for exceptions in cross-compiled functions.
+/// When boost is configured with BOOST_NO_EXCEPTIONS, it calls this handler instead of
+/// throwing the exception.
+void throw_exception(std::exception const &e) {
+  LOG(FATAL) << "Cannot handle exceptions in codegen'd code " << e.what();
+}
+
+}
