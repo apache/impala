@@ -194,6 +194,11 @@ Status LlvmCodeGen::LoadModuleFromMemory(MemoryBufferRef module_ir, string modul
   }
 
   *module = std::move(tmp_module.get());
+
+  // We never run global constructors or destructors so let's strip them out for all
+  // modules when we load them.
+  StripGlobalCtorsDtors((*module).get());
+
   (*module)->setModuleIdentifier(module_name);
   COUNTER_ADD(module_bitcode_size_, module_ir.getBufferSize());
   return Status::OK();
@@ -218,6 +223,13 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   }
   linked_modules_.insert(file);
   return Status::OK();
+}
+
+void LlvmCodeGen::StripGlobalCtorsDtors(llvm::Module* module) {
+  GlobalVariable* constructors = module->getGlobalVariable("llvm.global_ctors");
+  if (constructors != NULL) constructors->eraseFromParent();
+  GlobalVariable* destructors = module->getGlobalVariable("llvm.global_dtors");
+  if (destructors != NULL) destructors->eraseFromParent();
 }
 
 Status LlvmCodeGen::CreateImpalaCodegen(

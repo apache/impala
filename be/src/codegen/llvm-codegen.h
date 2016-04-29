@@ -425,6 +425,10 @@ class LlvmCodeGen {
   Status LoadModuleFromMemory(llvm::MemoryBufferRef module_ir, std::string module_name,
       std::unique_ptr<llvm::Module>* module);
 
+  /// Strip global constructors and destructors from an LLVM module. We never run them
+  /// anyway (they must be explicitly invoked) so it is dead code.
+  static void StripGlobalCtorsDtors(llvm::Module* module);
+
   /// Load the intrinsics impala needs.  This is a one time initialization.
   /// Values are stored in 'llvm_intrinsics_'
   Status LoadIntrinsics();
