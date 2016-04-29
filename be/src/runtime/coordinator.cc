@@ -861,7 +861,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
           partition_create_ops.Add(CREATE_DIR, part_path);
         }
       }
-    } else {
+    } else if (!is_s3_path || !query_ctx_.request.query_options.s3_skip_insert_staging) {
+      // If the S3_SKIP_INSERT_STAGING query option is set, then the partition directories
+      // would have already been created by the table sinks.
       if (FLAGS_insert_inherit_permissions && !is_s3_path) {
         PopulatePathPermissionCache(
             partition_fs_connection, part_path, &permissions_cache);

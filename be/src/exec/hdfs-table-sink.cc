@@ -278,11 +278,21 @@ void HdfsTableSink::BuildHdfsFileNames(
 Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     OutputPartition* output_partition) {
   SCOPED_TIMER(ADD_TIMER(profile(), "TmpFileCreateTimer"));
-  stringstream filename;
-  filename << output_partition->tmp_hdfs_file_name_prefix
-           << "." << output_partition->num_files
-           << "." << output_partition->writer->file_extension();
-  output_partition->current_file_name = filename.str();
+  string final_location = Substitute("$0.$1.$2",
+      output_partition->final_hdfs_file_name_prefix, output_partition->num_files,
+      output_partition->writer->file_extension());
+
+  // If ShouldSkipStaging() is true, then the table sink will write the file(s) for this
+  // partition to the final location directly. If it is false, the file(s) will be written
+  // to a temporary staging location which will be moved by the coordinator to the final
+  // location.
+  if (ShouldSkipStaging(state, output_partition)) {
+    output_partition->current_file_name = final_location;
+  } else {
+    output_partition->current_file_name = Substitute("$0.$1.$2",
+      output_partition->tmp_hdfs_file_name_prefix, output_partition->num_files,
+      output_partition->writer->file_extension());
+  }
   // Check if tmp_hdfs_file_name exists.
   const char* tmp_hdfs_file_name_cstr =
       output_partition->current_file_name.c_str();
@@ -323,12 +333,10 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(1);
   COUNTER_ADD(files_created_counter_, 1);
 
-  // Save the ultimate destination for this file (it will be moved by the coordinator)
-  stringstream dest;
-  dest << output_partition->final_hdfs_file_name_prefix
-       << "." << output_partition->num_files
-       << "." << output_partition->writer->file_extension();
-  (*state->hdfs_files_to_move())[output_partition->current_file_name] = dest.str();
+  if (!ShouldSkipStaging(state, output_partition)) {
+    // Save the ultimate destination for this file (it will be moved by the coordinator)
+    (*state->hdfs_files_to_move())[output_partition->current_file_name] = final_location;
+  }
 
   ++output_partition->num_files;
   output_partition->num_rows = 0;
@@ -498,7 +506,7 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
     state->per_partition_status()->insert(
         make_pair(partition->partition_name, partition_status));
 
-    if (!no_more_rows) {
+    if (!no_more_rows && ShouldSkipStaging(state, partition)) {
       // Indicate that temporary directory is to be deleted after execution
       (*state->hdfs_files_to_move())[partition->tmp_hdfs_dir_name] = "";
     }
@@ -658,6 +666,11 @@ void HdfsTableSink::Close(RuntimeState* state) {
   }
   DataSink::Close(state);
   closed_ = true;
+}
+
+bool HdfsTableSink::ShouldSkipStaging(RuntimeState* state, OutputPartition* partition) {
+  return IsS3APath(partition->final_hdfs_file_name_prefix.c_str()) && !overwrite_ &&
+      state->query_options().s3_skip_insert_staging;
 }
 
 string HdfsTableSink::DebugString() const {

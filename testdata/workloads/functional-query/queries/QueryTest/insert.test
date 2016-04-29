@@ -768,3 +768,79 @@ select * from table_with_header_insert;
 ---- TYPES
 INT
 ====
+---- QUERY
+# The following 4 queries are to test IMPALA-3452 which test S3 INSERTs with staging.
+SET S3_SKIP_INSERT_STAGING=false;
+# static partition overwrite
+insert overwrite table alltypesinsert
+partition (year=2009, month=4)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=4
+---- SETUP
+DROP PARTITIONS alltypesinsert
+RESET alltypesinsert
+---- RESULTS
+year=2009/month=4/: 25
+====
+---- QUERY
+# search the overwritten partition to verify the results
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from alltypesinsert
+where year=2009 and month=4
+---- RESULTS
+75,false,0,0,0,0,0,0,'04/01/09','0'
+76,true,1,1,1,10,1.100000023841858,10.1,'04/01/09','1'
+77,false,2,2,2,20,2.200000047683716,20.2,'04/01/09','2'
+78,true,3,3,3,30,3.299999952316284,30.3,'04/01/09','3'
+79,false,4,4,4,40,4.400000095367432,40.4,'04/01/09','4'
+80,true,5,5,5,50,5.5,50.5,'04/01/09','5'
+81,false,6,6,6,60,6.599999904632568,60.6,'04/01/09','6'
+82,true,7,7,7,70,7.699999809265137,70.7,'04/01/09','7'
+83,false,8,8,8,80,8.800000190734863,80.8,'04/01/09','8'
+84,true,9,9,9,90,9.899999618530273,90.90000000000001,'04/01/09','9'
+85,false,0,0,0,0,0,0,'04/02/09','0'
+86,true,1,1,1,10,1.100000023841858,10.1,'04/02/09','1'
+87,false,2,2,2,20,2.200000047683716,20.2,'04/02/09','2'
+88,true,3,3,3,30,3.299999952316284,30.3,'04/02/09','3'
+89,false,4,4,4,40,4.400000095367432,40.4,'04/02/09','4'
+90,true,5,5,5,50,5.5,50.5,'04/02/09','5'
+91,false,6,6,6,60,6.599999904632568,60.6,'04/02/09','6'
+92,true,7,7,7,70,7.699999809265137,70.7,'04/02/09','7'
+93,false,8,8,8,80,8.800000190734863,80.8,'04/02/09','8'
+94,true,9,9,9,90,9.899999618530273,90.90000000000001,'04/02/09','9'
+95,false,0,0,0,0,0,0,'04/03/09','0'
+96,true,1,1,1,10,1.100000023841858,10.1,'04/03/09','1'
+97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2'
+98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
+99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string
+====
+---- QUERY
+SET S3_SKIP_INSERT_STAGING=false;
+# fully dynamic partition insert$TABLE, check partition creation
+insert into table alltypesinsert
+partition (year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+from alltypessmall
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- RESULTS
+year=2009/month=1/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
+year=2009/month=4/: 25
+====
+---- QUERY
+# search the partitions to verify they contain all 100 rows
+select count(timestamp_col) from alltypesinsert
+where year=2009 and month>=1 and month<=4
+---- RESULTS
+100
+---- TYPES
+bigint
+====

@@ -204,14 +204,21 @@ enum TImpalaQueryOptions {
 
   // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
   // always use the annotation.
-  PARQUET_ANNOTATE_STRINGS_UTF8
+  PARQUET_ANNOTATE_STRINGS_UTF8,
 
   // Determines how to resolve Parquet files' schemas in the absence of field IDs (which
   // is always, since fields IDs are NYI). Valid values are "position" and "name".
-  PARQUET_FALLBACK_SCHEMA_RESOLUTION
+  PARQUET_FALLBACK_SCHEMA_RESOLUTION,
 
   // Multi-threaded execution: number of cores per machine
-  MT_NUM_CORES
+  MT_NUM_CORES,
+
+  // If true, INSERT writes to S3 go directly to their final location rather than being
+  // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for
+  // those queries, the coordinator deletes all files in the final location before copying
+  // the files there.
+  // TODO: Find a way to get this working for INSERT OVERWRITEs too.
+  S3_SKIP_INSERT_STAGING
 }
 
 // The summary of an insert.

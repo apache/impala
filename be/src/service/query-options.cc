@@ -400,6 +400,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_mt_num_cores(num_cores);
         break;
       }
+      case TImpalaQueryOptions::S3_SKIP_INSERT_STAGING: {
+        query_options->__set_s3_skip_insert_staging(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

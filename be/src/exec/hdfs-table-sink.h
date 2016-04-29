@@ -56,6 +56,7 @@ struct OutputPartition {
 
   /// Name of the temporary directory that files for this partition are staged to before
   /// the coordinator moves them to their permanent location once the query completes.
+  /// Not used if 'skip_staging' is true.
   /// Path: <base_table_dir/<staging_dir>/<unique_id>_dir/
   std::string tmp_hdfs_dir_name;
 
@@ -209,6 +210,14 @@ class HdfsTableSink : public DataSink {
 
   /// Closes the hdfs file for this partition as well as the writer.
   void ClosePartitionFile(RuntimeState* state, OutputPartition* partition);
+
+  // Returns TRUE if the staging step should be skipped for this partition. This allows
+  // for faster INSERT query completion time for the S3A filesystem as the coordinator
+  // does not have to copy the file(s) from the staging locaiton to the final location. We
+  // do not skip for INSERT OVERWRITEs because the coordinator will delete all files in
+  // the final location before moving the staged files there, so we cannot write directly
+  // to the final location and need to write to the temporary staging location.
+  bool ShouldSkipStaging(RuntimeState* state, OutputPartition* partition);
 
   /// Descriptor of target table. Set in Prepare().
   const HdfsTableDescriptor* table_desc_;

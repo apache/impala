@@ -186,6 +186,12 @@ struct TQueryOptions {
   // 1: single-threaded execution mode
   // 0: multi-threaded execution mode, number of cores is the pool default
   44: optional i32 mt_num_cores = 1
+
+  // If true, INSERT writes to S3 go directly to their final location rather than being
+  // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for
+  // those queries, the coordinator deletes all files in the final location before copying
+  // the files there.
+  45: optional bool s3_skip_insert_staging = true
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
