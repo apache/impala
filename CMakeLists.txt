@@ -339,6 +339,7 @@ add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
 add_subdirectory(be)
 add_subdirectory(fe)
+add_subdirectory(ext-data-source)
 
 # Run FE and BE tests
 add_custom_target(testall

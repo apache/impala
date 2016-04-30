@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_custom_target(fe DEPENDS thrift-deps function-registry ext-data-source
-  COMMAND mvn package -DskipTests
+add_custom_target(ext-data-source DEPENDS thrift-deps
+  COMMAND mvn install -DskipTests
 )
