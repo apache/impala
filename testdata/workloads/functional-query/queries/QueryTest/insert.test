@@ -752,14 +752,14 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 ====
 ---- QUERY
 # IMPALA-1740: Test inserting into table with the skip.header.line.count tblproperty
-drop table if exists i1740_insert;
-create table i1740_insert (i1 integer) tblproperties('skip.header.line.count'='2');
-insert into i1740_insert values (1), (2), (3), (4);
+insert into table_with_header_insert values (1), (2), (3), (4);
+---- SETUP
+RESET table_with_header_insert
 ---- RESULTS
 : 4
 ====
 ---- QUERY
-select * from i1740_insert;
+select * from table_with_header_insert;
 ---- RESULTS
 1
 2

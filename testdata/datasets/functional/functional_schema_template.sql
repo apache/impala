@@ -1889,3 +1889,12 @@ ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='2');
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+table_with_header_insert
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i1 integer)
+STORED AS {file_format}
+TBLPROPERTIES('skip.header.line.count'='2');
+====
