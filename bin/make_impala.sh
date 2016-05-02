@@ -25,6 +25,7 @@ CLEAN=0
 TARGET_BUILD_TYPE=${TARGET_BUILD_TYPE:-""}
 BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS:-""}
 CMAKE_ONLY=0
+MAKE_CMD=make
 
 # parse command line options
 for ARG in $*
@@ -45,22 +46,26 @@ do
     -build_static_libs)
       BUILD_SHARED_LIBS="OFF"
       ;;
+    -ninja)
+      MAKE_CMD=ninja
+      ;;
     -cmake_only)
       CMAKE_ONLY=1
       ;;
-    -help)
+    -help|*)
       echo "make_impala.sh [-build_type=<build type> -notests -clean]"
       echo "[-build_type] : Target build type. Examples: Debug, Release, Address_sanitizer."
       echo "                If omitted, the last build target is built incrementally"
       echo "[-build_shared_libs] : Link all executables dynamically"
       echo "[-build_static_libs] : Link all executables statically (the default)"
       echo "[-cmake_only] : Generate makefiles and exit"
+      echo "[-ninja] : Use the Ninja build tool instead of Make"
       echo "[-notests] : Omits building the tests."
       echo "[-clean] : Cleans previous build artifacts."
       echo ""
       echo "If either -build_type or -build_*_libs is set, cmake will be re-run for the "
       echo "project. Otherwise the last cmake configuration will continue to take effect."
-      exit
+      exit 1
       ;;
   esac
 done
@@ -87,7 +92,8 @@ echo "**************************************************************************
 
 cd ${IMPALA_HOME}
 
-if [ "x${TARGET_BUILD_TYPE}" != "x" ] || [ "x${BUILD_SHARED_LIBS}" != "x" ]
+if [ "x${TARGET_BUILD_TYPE}" != "x" ] || [ "x${BUILD_SHARED_LIBS}" != "x" ] || \
+  [ "${MAKE_CMD}" != "make" ]
 then
     rm -f ./CMakeCache.txt
     CMAKE_ARGS=()
@@ -97,6 +103,10 @@ then
 
     if [ "x${BUILD_SHARED_LIBS}" != "x" ]; then
       CMAKE_ARGS+=(-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS})
+    fi
+
+    if [ "${MAKE_CMD}" = "ninja" ]; then
+      CMAKE_ARGS+=" -GNinja"
     fi
 
     if [[ ! -z $IMPALA_TOOLCHAIN ]]; then
@@ -113,7 +123,7 @@ fi
 
 if [ $CLEAN -eq 1 ]
 then
-  make clean
+  ${MAKE_CMD} clean
 fi
 
 $IMPALA_HOME/bin/gen_build_version.py --noclean
@@ -122,21 +132,18 @@ if [ $CMAKE_ONLY -eq 1 ]; then
   exit 0
 fi
 
-cd $IMPALA_HOME/common/function-registry
-make
-
-cd $IMPALA_HOME
+${MAKE_CMD} function-registry
 
 # With parallelism, make doesn't always make statestored and catalogd correctly if you
 # write make -jX impalad statestored catalogd. So we keep them separate and after impalad,
 # which they link to.
-make -j${IMPALA_BUILD_THREADS:-4} impalad
+${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} impalad
 
-make statestored
-make catalogd
+${MAKE_CMD} statestored
+${MAKE_CMD} catalogd
 if [ $BUILD_TESTS -eq 1 ]
 then
-  make -j${IMPALA_BUILD_THREADS:-4}
+  ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4}
 else
-  make -j${IMPALA_BUILD_THREADS:-4} fesupport loggingsupport ImpalaUdf
+  ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} fesupport loggingsupport ImpalaUdf
 fi

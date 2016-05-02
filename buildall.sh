@@ -49,6 +49,8 @@ MAKE_IMPALA_ARGS=""
 BUILD_COVERAGE=0
 BUILD_ASAN=0
 BUILD_FE_ONLY=0
+MAKE_CMD=make
+LZO_CMAKE_ARGS=
 
 # Defaults that can be picked up from the environment, but are overridable through the
 # commandline.
@@ -142,6 +144,11 @@ do
       ;;
     -fe_only)
       BUILD_FE_ONLY=1
+      ;;
+    -ninja)
+      MAKE_IMPALA_ARGS+=" -ninja"
+      LZO_CMAKE_ARGS+=" -GNinja"
+      MAKE_CMD=ninja
       ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
@@ -253,7 +260,7 @@ MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
 
 if [ $BUILD_FE_ONLY -eq 1 ]; then
   $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS} -cmake_only
-  make fe
+  ${MAKE_CMD} fe
   exit 0
 fi
 
@@ -304,11 +311,11 @@ if [ -e $IMPALA_LZO ]
 then
   pushd $IMPALA_LZO
   if [[ ! -z $IMPALA_TOOLCHAIN ]]; then
-    cmake -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake
-  else
-    cmake .
+    LZO_CMAKE_ARGS+=" -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake"
   fi
-  make
+  rm -f CMakeCache.txt
+  cmake ${LZO_CMAKE_ARGS}
+  ${MAKE_CMD}
   popd
 fi
 
