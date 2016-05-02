@@ -120,13 +120,13 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
   if (current_chunk_idx_ == static_cast<int>(chunks_.size())) {
     // need to allocate new chunk.
     int64_t chunk_size;
-    DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
     DCHECK_LE(next_chunk_size_, MAX_CHUNK_SIZE);
 
     if (FLAGS_disable_mem_pools) {
       // Disable pooling by sizing the chunk to fit only this allocation.
       chunk_size = min_size;
     } else {
+      DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
       chunk_size = max<int64_t>(min_size, next_chunk_size_);
     }
 
