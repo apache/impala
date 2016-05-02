@@ -148,6 +148,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col > 1
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -203,6 +204,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col > 1
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -228,6 +230,7 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -252,6 +255,7 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.id
 |
 05:EXCHANGE [HASH(functional.alltypes.id)]
 |
@@ -278,6 +282,7 @@ inner join functional.alltypes_view t3 using(id)
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -302,6 +307,7 @@ inner join functional.alltypes_view t3 using(id)
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.id
 |
 05:EXCHANGE [HASH(functional.alltypes.id)]
 |
@@ -374,6 +380,7 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -400,6 +407,7 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

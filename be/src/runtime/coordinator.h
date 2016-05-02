@@ -361,17 +361,28 @@ class Coordinator {
   /// returned, successfully or not. Initialised during StartRemoteFragments().
   boost::scoped_ptr<CountingBarrier> exec_complete_barrier_;
 
+  // Represents a runtime filter target.
+  struct FilterTarget {
+    TPlanNodeId node_id;
+    bool is_local;
+    bool is_bound_by_partition_columns;
+    boost::unordered_set<int> fragment_instance_idxs;
+
+    FilterTarget(const TRuntimeFilterTargetDesc& tFilterTarget) {
+      node_id = tFilterTarget.node_id;
+      is_bound_by_partition_columns = tFilterTarget.is_bound_by_partition_columns;
+      is_local = tFilterTarget.is_local_target;
+    }
+  };
+
   struct FilterState {
     TRuntimeFilterDesc desc;
 
     TPlanNodeId src;
-    TPlanNodeId target;
+    std::vector<FilterTarget> targets;
 
     // Index into fragment_instance_states_ for source fragment instances.
     boost::unordered_set<int> src_fragment_instance_idxs;
-
-    // Index into fragment_instance_states_ for target fragment instances.
-    boost::unordered_set<int> target_fragment_instance_idxs;
 
     /// Number of remaining backends to hear from before filter is complete.
     int pending_count;

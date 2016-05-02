@@ -1116,6 +1116,7 @@ on (aid < bid and aid = c.id)
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> b.id
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
@@ -1145,6 +1146,7 @@ on (t1.id = v.id and v.int_col is null and v.int_col < 10 and v.id < 10)
 |--02:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: b.int_col < 10
+|     runtime filters: RF000 -> b.int_col
 |
 01:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB

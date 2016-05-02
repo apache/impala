@@ -626,8 +626,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     StringBuilder output = new StringBuilder();
     List<String> filtersStr = Lists.newArrayList();
     for (RuntimeFilter filter: runtimeFilters_) {
-      Expr expr =
-          (isBuildNode) ? filter.getSrcExpr() : filter.getTargetExpr();
+      Expr expr = null;
+      if (isBuildNode) {
+        expr = filter.getSrcExpr();
+      } else {
+        expr = filter.getTargetExpr(getId());
+      }
+      Preconditions.checkNotNull(expr);
       filtersStr.add(String.format(format, filter.getFilterId(), expr.toSql()));
     }
     output.append(Joiner.on(", ").join(filtersStr) + "\n");

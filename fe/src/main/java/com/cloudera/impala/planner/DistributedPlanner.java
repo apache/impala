@@ -513,7 +513,7 @@ public class DistributedPlanner {
 
     for (RuntimeFilter filter: node.getRuntimeFilters()) {
       filter.setIsBroadcast(doBroadcast);
-      filter.computeHasLocalTarget();
+      filter.computeHasLocalTargets();
       // Work around IMPALA-3450, where cardinalities might be wrong in single-node plans
       // with UNION and LIMITs.
       // TODO: Remove.

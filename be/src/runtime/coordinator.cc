@@ -489,39 +489,46 @@ void Coordinator::UpdateFilterRoutingTable(const vector<TPlanNode>& plan_nodes,
   for (const TPlanNode& plan_node: plan_nodes) {
     if (!plan_node.__isset.runtime_filters) continue;
     for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
-      if (filter_mode_ == TRuntimeFilterMode::LOCAL && !filter.has_local_target) {
+      if (filter_mode_ == TRuntimeFilterMode::LOCAL && !filter.has_local_targets) {
         continue;
       }
       FilterState* f = &(filter_routing_table_[filter.filter_id]);
       if (plan_node.__isset.hash_join_node) {
         f->desc = filter;
         f->src = plan_node.node_id;
-        f->pending_count = filter.is_broadcast_join ? 1 : num_hosts;
+        // Set the 'pending_count' to zero to indicate that for a filter with local-only
+        // targets the coordinator does not expect to receive any filter updates.
+        f->pending_count = filter.is_broadcast_join ?
+            (filter.has_remote_targets ? 1 : 0) : num_hosts;
         vector<int> src_idxs;
         for (int i = 0; i < num_hosts; ++i) {
           src_idxs.push_back(start_fragment_instance_idx + i);
         }
 
-        // If this is a broadcast join with a non-local target, only build and publish it
-        // on MAX_BROADCAST_FILTER_PRODUCERS instances. If this is an intra-fragment
-        // filter for a broadcast join, it is short-circuited in every fragment instance
-        // and therefore will not be published globally, and should be generated
-        // everywhere it can be used.
-        if (filter.is_broadcast_join && !filter.has_local_target
+        // If this is a broadcast join with only non-local targets, build and publish it
+        // on MAX_BROADCAST_FILTER_PRODUCERS instances. If this is not a broadcast join
+        // or it is a broadcast join with local targets, it should be generated
+        // everywhere the join is executed.
+        if (filter.is_broadcast_join && !filter.has_local_targets
             && num_hosts > MAX_BROADCAST_FILTER_PRODUCERS) {
           random_shuffle(src_idxs.begin(), src_idxs.end());
           src_idxs.resize(MAX_BROADCAST_FILTER_PRODUCERS);
         }
         f->src_fragment_instance_idxs.insert(src_idxs.begin(), src_idxs.end());
       } else if (plan_node.__isset.hdfs_scan_node) {
-        f->target = plan_node.node_id;
-        for (int i = 0; i < num_hosts; ++i) {
-          f->target_fragment_instance_idxs.insert(start_fragment_instance_idx + i);
+        auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
+        DCHECK(it != filter.planid_to_target_ndx.end());
+        const TRuntimeFilterTargetDesc& tFilterTarget = filter.targets[it->second];
+        if (filter_mode_ == TRuntimeFilterMode::LOCAL && !tFilterTarget.is_local_target) {
+          continue;
         }
+        FilterTarget target(tFilterTarget);
+        for (int i = 0; i < num_hosts; ++i) {
+          target.fragment_instance_idxs.insert(start_fragment_instance_idx + i);
+        }
+        f->targets.push_back(target);
       } else {
-        // TODO: Frontend should not target filters at HBase scan nodes.
-        DCHECK(plan_node.__isset.hbase_scan_node)
-            << "Unexpected plan node with runtime filters: "
+        DCHECK(false) << "Unexpected plan node with runtime filters: "
             << ThriftDebugString(plan_node);
       }
     }
@@ -619,14 +626,14 @@ string Coordinator::FilterDebugString() {
   TablePrinter table_printer;
   table_printer.AddColumn("ID", false);
   table_printer.AddColumn("Src. Node", false);
-  table_printer.AddColumn("Tgt. Node", false);
+  table_printer.AddColumn("Tgt. Node(s)", false);
   table_printer.AddColumn("Targets", false);
-  table_printer.AddColumn("Type", false);
+  table_printer.AddColumn("Target type", false);
   table_printer.AddColumn("Partition filter", false);
 
   // Distribution metrics are only meaningful if the coordinator is routing the filter.
   if (filter_mode_ == TRuntimeFilterMode::GLOBAL) {
-    table_printer.AddColumn("Pending", false);
+    table_printer.AddColumn("Pending (Expected)", false);
     table_printer.AddColumn("First arrived", false);
     table_printer.AddColumn("Completed", false);
   }
@@ -636,16 +643,21 @@ string Coordinator::FilterDebugString() {
     const FilterState& state = v.second;
     row.push_back(lexical_cast<string>(v.first));
     row.push_back(lexical_cast<string>(state.src));
-    row.push_back(lexical_cast<string>(state.target));
-    row.push_back(lexical_cast<string>(state.target_fragment_instance_idxs.size()));
-
-    if (state.desc.has_local_target) {
-      row.push_back("LOCAL");
-    } else {
-      row.push_back(
-          state.desc.is_broadcast_join ? "GLOBAL (Broadcast)" : "GLOBAL (Partition)");
+    vector<string> target_ids;
+    vector<string> num_target_instances;
+    vector<string> target_types;
+    vector<string> partition_filter;
+    for (const auto& target: state.targets) {
+      target_ids.push_back(lexical_cast<string>(target.node_id));
+      num_target_instances.push_back(
+          lexical_cast<string>(target.fragment_instance_idxs.size()));
+      target_types.push_back(target.is_local ? "LOCAL" : "REMOTE");
+      partition_filter.push_back(target.is_bound_by_partition_columns ? "true" : "false");
     }
-    row.push_back(state.desc.is_bound_by_partition_columns ? "true" : "false");
+    row.push_back(join(target_ids, ", "));
+    row.push_back(join(num_target_instances, ", "));
+    row.push_back(join(target_types, ", "));
+    row.push_back(join(partition_filter, ", "));
 
     if (filter_mode_ == TRuntimeFilterMode::GLOBAL) {
       int pending_count = state.completion_time != 0L ? 0 : state.pending_count;
@@ -2017,8 +2029,9 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
       return;
     }
     FilterState* state = &it->second;
-    DCHECK(!state->desc.has_local_target)
-        << "Coordinator received filter that has local target";
+
+    DCHECK(state->desc.has_remote_targets)
+          << "Coordinator received filter that has only local targets";
 
     // Check if the filter has already been sent, which could happen in two cases: if one
     // local filter had always_true set - no point waiting for other local filters that
@@ -2051,16 +2064,21 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     // offer it to the queue.
     DCHECK_EQ(state->pending_count, 0);
     state->completion_time = query_events_->ElapsedTime();
-    target_fragment_instance_idxs = state->target_fragment_instance_idxs;
+    for (const auto& target: state->targets) {
+      // Don't publish the filter to targets that are in the same fragment as the join
+      // that produced it.
+      if (target.is_local) continue;
+      target_fragment_instance_idxs.insert(target.fragment_instance_idxs.begin(),
+          target.fragment_instance_idxs.end());
+    }
     BloomFilter::ToThrift(state->bloom_filter, &rpc_params->bloom_filter);
   }
 
   rpc_params->filter_id = params.filter_id;
 
-  for (int idx: target_fragment_instance_idxs) {
-    FragmentInstanceState* fragment_inst = fragment_instance_states_[idx];
-    DCHECK(fragment_inst != NULL) << "Missing fragment instance: " << idx;
-
+  for (const auto& target_idx: target_fragment_instance_idxs) {
+    FragmentInstanceState* fragment_inst = fragment_instance_states_[target_idx];
+    DCHECK(fragment_inst != NULL) << "Missing fragment instance: " << target_idx;
     exec_env_->rpc_pool()->Offer(bind<void>(DistributeFilters, rpc_params,
         fragment_inst->impalad_address(), fragment_inst->fragment_instance_id()));
   }

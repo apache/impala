@@ -84,6 +84,7 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -108,6 +109,7 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -202,6 +204,7 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
@@ -226,6 +229,7 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 05:EXCHANGE [HASH(int_col)]
 |
@@ -251,6 +255,7 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
@@ -275,6 +280,7 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 05:EXCHANGE [HASH(int_col)]
 |
@@ -345,6 +351,7 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
@@ -371,6 +378,7 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B

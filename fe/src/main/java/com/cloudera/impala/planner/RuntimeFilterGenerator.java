@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -34,9 +35,12 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.thrift.TRuntimeFilterDesc;
+import com.cloudera.impala.thrift.TRuntimeFilterTargetDesc;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +50,9 @@ import org.slf4j.LoggerFactory;
  * runtime filter propagation. Runtime filter propagation is an optimization technique
  * used to filter scanned tuples or scan ranges based on information collected at
  * runtime. A runtime filter is constructed during the build phase of a join node, and is
- * applied at a scan node on the probe side of that join node. Runtime filters are
- * generated from equi-join predicates but they do not replace the original predicates.
+ * applied at, potentially, multiple scan nodes on the probe side of that join node.
+ * Runtime filters are generated from equi-join predicates but they do not replace the
+ * original predicates.
  *
  * Example: select * from T1, T2 where T1.a = T2.b and T2.c = '1';
  * Assuming that T1 is a fact table and T2 is a significantly smaller dimension table, a
@@ -69,9 +74,6 @@ public final class RuntimeFilterGenerator {
   private final Map<TupleId, List<RuntimeFilter>> runtimeFiltersByTid_ =
       Maps.newHashMap();
 
-  // List of runtime filters generated
-  private final List<RuntimeFilter> runtimeFilters_ = Lists.newArrayList();
-
   // Generator for filter ids
   private final IdGenerator<RuntimeFilterId> filterIdGenerator =
       RuntimeFilterId.createGenerator();
@@ -85,43 +87,92 @@ public final class RuntimeFilterGenerator {
    * the left plan subtree of the associated join node, while rhs_expr is the expr on
    * which the filter is built and can be bound by any number of tuple ids from the
    * right plan subtree. Every runtime filter must record the join node that constructs
-   * the filter and the scan node that applies the filter (destination node).
+   * the filter and the scan nodes that apply the filter (destination nodes).
    */
   public static class RuntimeFilter {
     // Identifier of the filter (unique within a query)
     private final RuntimeFilterId id_;
     // Join node that builds the filter
     private final JoinNode src_;
-    // Scan node that applies the filter
-    private ScanNode target_;
     // Expr (rhs of join predicate) on which the filter is built
     private final Expr srcExpr_;
-    // Expr (lhs of join predicate) on which the filter is applied
-    private Expr targetExpr_;
-    // Slots from base table tuples that are in the same equivalent classes as the slots
-    // of 'targetExpr_'. The slots are grouped by tuple id.
-    private Map<TupleId, List<SlotId>> targetSlotsByTid_;
+    // Expr (lhs of join predicate) from which the targetExprs_ are generated.
+    private final Expr origTargetExpr_;
+    // Runtime filter targets
+    private final List<RuntimeFilterTarget> targets_ = Lists.newArrayList();
+    // Slots from base table tuples that have value transfer from the slots
+    // of 'origTargetExpr_'. The slots are grouped by tuple id.
+    private final Map<TupleId, List<SlotId>> targetSlotsByTid_;
     // If true, the join node building this filter is executed using a broadcast join;
     // set in the DistributedPlanner.createHashJoinFragment()
     private boolean isBroadcastJoin_;
-    // If true, targetExpr_ is bound by only partition columns
-    private boolean isBoundByPartitionColumns_;
-    // If true, the filter is applied by a scan in the same fragment as the join node
-    // which produced it. Set in DistributedPlanner.createHashJoinFragment() if there is a
-    // distributed plan, otherwise always true by definition.
-    private boolean hasLocalTarget_ = true;
     // Estimate of the number of distinct values that will be inserted into this filter,
     // globally across all instances of the source node. Used to compute an optimal size
     // for the filter. A value of -1 means no estimate is available, and default filter
     // parameters should be used.
     private long ndvEstimate_ = -1;
+    // If true, the filter is produced by a broadcast join and there is at least one
+    // destination scan node which is in the same fragment as the join; set in
+    // DistributedPlanner.createHashJoinFragment().
+    private boolean hasLocalTargets_ = false;
+    // If true, there is at least one destination scan node which is not in the same
+    // fragment as the join that produced the filter; set in
+    // DistributedPlanner.createHashJoinFragment().
+    private boolean hasRemoteTargets_ = false;
+    // If set, indicates that the filter can't be assigned to another scan node.
+    // Once set, it can't be unset.
+    private boolean finalized_ = false;
+
+    /**
+     * Internal representation of a runtime filter target.
+     */
+    private static class RuntimeFilterTarget {
+      // Scan node that applies the filter
+      public ScanNode node;
+      // Expr on which the filter is applied
+      public Expr expr;
+      // Indicates if 'expr' is bound only by partition columns
+      public boolean isBoundByPartitionColumns = false;
+      // Indicates if 'node' is in the same fragment as the join that produces the
+      // filter
+      public boolean isLocalTarget = false;
+
+      public RuntimeFilterTarget(ScanNode targetNode, Expr targetExpr) {
+        node = targetNode;
+        expr = targetExpr;
+      }
+
+      public TRuntimeFilterTargetDesc toThrift() {
+        TRuntimeFilterTargetDesc tFilterTarget = new TRuntimeFilterTargetDesc();
+        tFilterTarget.setNode_id(node.getId().asInt());
+        tFilterTarget.setTarget_expr(expr.treeToThrift());
+        List<SlotId> sids = Lists.newArrayList();
+        expr.getIds(null, sids);
+        List<Integer> tSlotIds = Lists.newArrayListWithCapacity(sids.size());
+        for (SlotId sid: sids) tSlotIds.add(sid.asInt());
+        tFilterTarget.setTarget_expr_slotids(tSlotIds);
+        tFilterTarget.setIs_bound_by_partition_columns(isBoundByPartitionColumns);
+        tFilterTarget.setIs_local_target(isLocalTarget);
+        return tFilterTarget;
+      }
+
+      @Override
+      public String toString() {
+        StringBuilder output = new StringBuilder();
+        return output.append("Target Id: " + node.getId() + " ")
+            .append("Target expr: " + expr.debugString() + " ")
+            .append("Partition columns: " + isBoundByPartitionColumns)
+            .append("Is local: " + isLocalTarget)
+            .toString();
+      }
+    }
 
     private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode,
-        Expr srcExpr, Expr targetExpr, Map<TupleId, List<SlotId>> targetSlots) {
+        Expr srcExpr, Expr origTargetExpr, Map<TupleId, List<SlotId>> targetSlots) {
       id_ = filterId;
       src_ = filterSrcNode;
       srcExpr_ = srcExpr;
-      targetExpr_ = targetExpr;
+      origTargetExpr_ = origTargetExpr;
       targetSlotsByTid_ = targetSlots;
       computeNdvEstimate();
     }
@@ -135,20 +186,29 @@ public final class RuntimeFilterGenerator {
     @Override
     public int hashCode() { return id_.hashCode(); }
 
+    public void markFinalized() { finalized_ = true; }
+    public boolean isFinalized() { return finalized_; }
+
+    /**
+     * Serializes a runtime filter to Thrift.
+     */
     public TRuntimeFilterDesc toThrift() {
       TRuntimeFilterDesc tFilter = new TRuntimeFilterDesc();
       tFilter.setFilter_id(id_.asInt());
-      tFilter.setTarget_expr(targetExpr_.treeToThrift());
       tFilter.setSrc_expr(srcExpr_.treeToThrift());
-      tFilter.setIs_bound_by_partition_columns(isBoundByPartitionColumns_);
       tFilter.setIs_broadcast_join(isBroadcastJoin_);
-      tFilter.setHas_local_target(hasLocalTarget_);
       tFilter.setNdv_estimate(ndvEstimate_);
-      List<SlotId> sids = Lists.newArrayList();
-      targetExpr_.getIds(null, sids);
-      List<Integer> tSlotIds = Lists.newArrayList();
-      for (SlotId sid: sids) tSlotIds.add(sid.asInt());
-      tFilter.setTarget_expr_slotids(tSlotIds);
+      tFilter.setHas_local_targets(hasLocalTargets_);
+      tFilter.setHas_remote_targets(hasRemoteTargets_);
+      boolean appliedOnPartitionColumns = true;
+      for (int i = 0; i < targets_.size(); ++i) {
+        RuntimeFilterTarget target = targets_.get(i);
+        tFilter.addToTargets(target.toThrift());
+        tFilter.putToPlanid_to_target_ndx(target.node.getId().asInt(), i);
+        appliedOnPartitionColumns =
+            appliedOnPartitionColumns && target.isBoundByPartitionColumns;
+      }
+      tFilter.setApplied_on_partition_columns(appliedOnPartitionColumns);
       return tFilter;
     }
 
@@ -228,31 +288,36 @@ public final class RuntimeFilterGenerator {
 
     /**
      * Static function that returns the ids of slots bound by base table tuples for which
-     * there is a value transfer from 'slotId'. The slots are grouped by tuple id.
+     * there is a value transfer from 'srcSid'. The slots are grouped by tuple id.
      */
     private static Map<TupleId, List<SlotId>> getBaseTblEquivSlots(Analyzer analyzer,
-        SlotId slotId) {
+        SlotId srcSid) {
       Map<TupleId, List<SlotId>> slotsByTid = Maps.newHashMap();
-      for (SlotId equivSlotId: analyzer.getEquivSlots(slotId)) {
-        TupleDescriptor tupleDesc = analyzer.getSlotDesc(equivSlotId).getParent();
-        if (tupleDesc.getTable() == null
-            || !analyzer.hasValueTransfer(slotId, equivSlotId)) {
-          continue;
-        }
+      for (SlotId targetSid: analyzer.getValueTransferTargets(srcSid)) {
+        TupleDescriptor tupleDesc = analyzer.getSlotDesc(targetSid).getParent();
+        if (tupleDesc.getTable() == null) continue;
         List<SlotId> sids = slotsByTid.get(tupleDesc.getId());
         if (sids == null) {
           sids = Lists.newArrayList();
           slotsByTid.put(tupleDesc.getId(), sids);
         }
-        sids.add(equivSlotId);
+        sids.add(targetSid);
       }
       return slotsByTid;
     }
 
-    public ScanNode getTarget() { return target_; }
-    public boolean hasTarget() { return target_ != null; }
+    public Expr getTargetExpr(PlanNodeId targetPlanNodeId) {
+      for (RuntimeFilterTarget target: targets_) {
+        if (target.node.getId() != targetPlanNodeId) continue;
+        return target.expr;
+      }
+      return null;
+    }
+
+    public List<RuntimeFilterTarget> getTargets() { return targets_; }
+    public boolean hasTargets() { return !targets_.isEmpty(); }
     public Expr getSrcExpr() { return srcExpr_; }
-    public Expr getTargetExpr() { return targetExpr_; }
+    public Expr getOrigTargetExpr() { return origTargetExpr_; }
     public Map<TupleId, List<SlotId>> getTargetSlots() { return targetSlotsByTid_; }
     public RuntimeFilterId getFilterId() { return id_; }
 
@@ -268,61 +333,60 @@ public final class RuntimeFilterGenerator {
       return src_.getCardinality() / (double) src_.getChild(0).getCardinality();
     }
 
-    public void setFilterTarget(ScanNode node, Analyzer analyzer) {
-      target_ = node;
+    public void addTarget(ScanNode node, Analyzer analyzer, Expr targetExpr) {
+      Preconditions.checkState(targetExpr.isBoundByTupleIds(node.getTupleIds()));
+      RuntimeFilterTarget target = new RuntimeFilterTarget(node, targetExpr);
+      targets_.add(target);
       // Check if all the slots of targetExpr_ are bound by partition columns
       TupleDescriptor baseTblDesc = node.getTupleDesc();
       Table tbl = baseTblDesc.getTable();
-      if (tbl.getNumClusteringCols() == 0) {
-        isBoundByPartitionColumns_ = false;
-        return;
-      }
+      if (tbl.getNumClusteringCols() == 0) return;
       List<SlotId> sids = Lists.newArrayList();
-      targetExpr_.getIds(null, sids);
+      targetExpr.getIds(null, sids);
       for (SlotId sid: sids) {
         SlotDescriptor slotDesc = analyzer.getSlotDesc(sid);
         if (slotDesc.getColumn() == null
             || slotDesc.getColumn().getPosition() >= tbl.getNumClusteringCols()) {
-          isBoundByPartitionColumns_ = false;
           return;
         }
       }
-      isBoundByPartitionColumns_ = true;
-    }
-
-    public void setTargetExpr(Expr expr) {
-      Preconditions.checkNotNull(expr);
-      targetExpr_ = expr;
+      target.isBoundByPartitionColumns = true;
     }
 
     public void setIsBroadcast(boolean isBroadcast) { isBroadcastJoin_ = isBroadcast; }
 
     public void computeNdvEstimate() { ndvEstimate_ = src_.getChild(1).getCardinality(); }
 
-    public void computeHasLocalTarget() {
+    public void computeHasLocalTargets() {
       Preconditions.checkNotNull(src_.getFragment());
-      Preconditions.checkNotNull(target_.getFragment());
-      hasLocalTarget_ = src_.getFragment().getId().equals(target_.getFragment().getId());
+      Preconditions.checkState(hasTargets());
+      for (RuntimeFilterTarget target: targets_) {
+        Preconditions.checkNotNull(target.node.getFragment());
+        boolean isLocal =
+            src_.getFragment().getId().equals(target.node.getFragment().getId());
+        target.isLocalTarget = isLocal;
+        hasLocalTargets_ = hasLocalTargets_ || isLocal;
+        hasRemoteTargets_ = hasRemoteTargets_ || !isLocal;
+      }
     }
 
     /**
      * Assigns this runtime filter to the corresponding plan nodes.
      */
     public void assignToPlanNodes() {
-      Preconditions.checkNotNull(target_);
+      Preconditions.checkState(hasTargets());
       src_.addRuntimeFilter(this);
-      target_.addRuntimeFilter(this);
+      for (RuntimeFilterTarget target: targets_) target.node.addRuntimeFilter(this);
     }
 
     public String debugString() {
       StringBuilder output = new StringBuilder();
       return output.append("FilterID: " + id_ + " ")
           .append("Source: " + src_.getId() + " ")
-          .append("Target: " + target_.getId() + " ")
           .append("SrcExpr: " + getSrcExpr().debugString() +  " ")
-          .append("TargetExpr: " + getTargetExpr().debugString())
-          .append("Selectivity: " + getSelectivity())
-          .toString();
+          .append("Target(s): ")
+          .append(Joiner.on(", ").join(targets_) + " ")
+          .append("Selectivity: " + getSelectivity()).toString();
     }
   }
 
@@ -334,7 +398,7 @@ public final class RuntimeFilterGenerator {
     Preconditions.checkArgument(maxNumFilters >= 0);
     RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator();
     filterGenerator.generateFilters(analyzer, plan);
-    List<RuntimeFilter> filters = filterGenerator.getRuntimeFilters();
+    List<RuntimeFilter> filters = Lists.newArrayList(filterGenerator.getRuntimeFilters());
     if (filters.size() > maxNumFilters) {
       // If more than 'maxNumFilters' were generated, sort them by increasing selectivity
       // and keep the 'maxNumFilters' most selective.
@@ -357,7 +421,16 @@ public final class RuntimeFilterGenerator {
     }
   }
 
-  public List<RuntimeFilter> getRuntimeFilters() { return runtimeFilters_; }
+  /**
+   * Returns a set of all the registered runtime filters.
+   */
+  public Set<RuntimeFilter> getRuntimeFilters() {
+    Set<RuntimeFilter> result = Sets.newHashSet();
+    for (List<RuntimeFilter> filters: runtimeFiltersByTid_.values()) {
+      result.addAll(filters);
+    }
+    return result;
+  }
 
   /**
    * Generates the runtime filters for a query by recursively traversing the single-node
@@ -388,13 +461,10 @@ public final class RuntimeFilterGenerator {
         filters.add(filter);
       }
       generateFilters(analyzer, root.getChild(0));
-      // Unregister all the runtime filters for which no destination scan node could be
-      // found in the left subtree of the join node. This is to ensure that we don't
+      // Finalize every runtime filter of that join. This is to ensure that we don't
       // assign a filter to a scan node from the right subtree of joinNode or ancestor
       // join nodes in case we don't find a destination node in the left subtree.
-      for (RuntimeFilter runtimeFilter: filters) {
-        if (!runtimeFilter.hasTarget()) unregisterRuntimeFilter(runtimeFilter);
-      }
+      for (RuntimeFilter runtimeFilter: filters) finalizeRuntimeFilter(runtimeFilter);
       generateFilters(analyzer, root.getChild(1));
     } else if (root instanceof ScanNode) {
       assignRuntimeFilters(analyzer, (ScanNode) root);
@@ -413,70 +483,101 @@ public final class RuntimeFilterGenerator {
     Map<TupleId, List<SlotId>> targetSlotsByTid = filter.getTargetSlots();
     Preconditions.checkState(targetSlotsByTid != null && !targetSlotsByTid.isEmpty());
     for (TupleId tupleId: targetSlotsByTid.keySet()) {
-      List<RuntimeFilter> filters = runtimeFiltersByTid_.get(tupleId);
-      if (filters == null) {
-        filters = Lists.newArrayList();
-        runtimeFiltersByTid_.put(tupleId, filters);
-      }
-      filters.add(filter);
+      registerRuntimeFilter(filter, tupleId);
     }
   }
 
-  private void unregisterRuntimeFilter(RuntimeFilter runtimeFilter) {
-    for (TupleId tupleId: runtimeFilter.getTargetSlots().keySet()) {
-      runtimeFiltersByTid_.get(tupleId).remove(runtimeFilter);
+  /**
+   * Registers a runtime filter with a specific target tuple id.
+   */
+  private void registerRuntimeFilter(RuntimeFilter filter, TupleId targetTid) {
+    Preconditions.checkState(filter.getTargetSlots().containsKey(targetTid));
+    List<RuntimeFilter> filters = runtimeFiltersByTid_.get(targetTid);
+    if (filters == null) {
+      filters = Lists.newArrayList();
+      runtimeFiltersByTid_.put(targetTid, filters);
     }
+    Preconditions.checkState(!filter.isFinalized());
+    filters.add(filter);
+  }
+
+  /**
+   * Finalizes a runtime filter by disassociating it from all the candidate target scan
+   * nodes that haven't been used as destinations for that filter. Also sets the
+   * finalized_ flag of that filter so that it can't be assigned to any other scan nodes.
+   */
+  private void finalizeRuntimeFilter(RuntimeFilter runtimeFilter) {
+    Set<TupleId> targetTupleIds = Sets.newHashSet();
+    for (RuntimeFilter.RuntimeFilterTarget target: runtimeFilter.getTargets()) {
+      targetTupleIds.addAll(target.node.getTupleIds());
+    }
+    for (TupleId tupleId: runtimeFilter.getTargetSlots().keySet()) {
+      if (!targetTupleIds.contains(tupleId)) {
+        runtimeFiltersByTid_.get(tupleId).remove(runtimeFilter);
+      }
+    }
+    runtimeFilter.markFinalized();
   }
 
   /**
    * Assigns runtime filters to a specific scan node 'scanNode'.
    * The assigned filters are the ones for which 'scanNode' can be used a destination
    * node. A scan node may be used as a destination node for multiple runtime filters.
+   * Currently, runtime filters can only be assigned to HdfsScanNodes.
    */
   private void assignRuntimeFilters(Analyzer analyzer, ScanNode scanNode) {
-    Preconditions.checkNotNull(scanNode);
+    if (!(scanNode instanceof HdfsScanNode)) return;
     TupleId tid = scanNode.getTupleIds().get(0);
-    // Return if no runtime filter is associated with this scan tuple.
     if (!runtimeFiltersByTid_.containsKey(tid)) return;
     for (RuntimeFilter filter: runtimeFiltersByTid_.get(tid)) {
-      if (filter.getTarget() != null) continue;
-      if (!filter.getTargetExpr().isBound(tid)) {
-        Preconditions.checkState(filter.getTargetSlots().containsKey(tid));
-        // Modify the filter target expr using the equivalent slots from the scan node
-        // on which the filter will be applied.
-        ExprSubstitutionMap smap = new ExprSubstitutionMap();
-        Expr targetExpr = filter.getTargetExpr();
-        List<SlotRef> exprSlots = Lists.newArrayList();
-        targetExpr.collect(SlotRef.class, exprSlots);
-        List<SlotId> sids = filter.getTargetSlots().get(tid);
-        for (SlotRef slotRef: exprSlots) {
-          for (SlotId sid: sids) {
-            if (analyzer.hasValueTransfer(slotRef.getSlotId(), sid)) {
-              SlotRef newSlotRef = new SlotRef(analyzer.getSlotDesc(sid));
-              newSlotRef.analyzeNoThrow(analyzer);
-              smap.put(slotRef, newSlotRef);
-              break;
-            }
+      if (filter.isFinalized()) continue;
+      Expr targetExpr = computeTargetExpr(filter, tid, analyzer);
+      if (targetExpr == null) continue;
+      filter.addTarget(scanNode, analyzer, targetExpr);
+    }
+  }
+
+  /**
+   * Computes the target expr for a specified runtime filter 'filter' to be applied at
+   * the scan node with target tuple descriptor 'targetTid'.
+   */
+  private Expr computeTargetExpr(RuntimeFilter filter, TupleId targetTid,
+      Analyzer analyzer) {
+    Expr targetExpr = filter.getOrigTargetExpr();
+    if (!targetExpr.isBound(targetTid)) {
+      Preconditions.checkState(filter.getTargetSlots().containsKey(targetTid));
+      // Modify the filter target expr using the equivalent slots from the scan node
+      // on which the filter will be applied.
+      ExprSubstitutionMap smap = new ExprSubstitutionMap();
+      List<SlotRef> exprSlots = Lists.newArrayList();
+      targetExpr.collect(SlotRef.class, exprSlots);
+      List<SlotId> sids = filter.getTargetSlots().get(targetTid);
+      for (SlotRef slotRef: exprSlots) {
+        for (SlotId sid: sids) {
+          if (analyzer.hasValueTransfer(slotRef.getSlotId(), sid)) {
+            SlotRef newSlotRef = new SlotRef(analyzer.getSlotDesc(sid));
+            newSlotRef.analyzeNoThrow(analyzer);
+            smap.put(slotRef, newSlotRef);
+            break;
           }
         }
-        Preconditions.checkState(exprSlots.size() == smap.size());
-        try {
-          filter.setTargetExpr(targetExpr.substitute(smap, analyzer, true));
-        } catch (Exception e) {
-          // An exception is thrown if we cannot generate a target expr from this
-          // scan node that has the same type as the lhs expr of the join predicate
-          // from which the runtime filter was generated. We skip that scan node and will
-          // try to assign the filter to a different scan node.
-          //
-          // TODO: Investigate if we can generate a type-compatible source/target expr
-          // pair from that scan node instead of skipping it.
-          continue;
-        }
       }
-      Preconditions.checkState(
-          filter.getTargetExpr().getType().matchesType(filter.getSrcExpr().getType()));
-      filter.setFilterTarget(scanNode, analyzer);
-      runtimeFilters_.add(filter);
+      Preconditions.checkState(exprSlots.size() == smap.size());
+      try {
+        targetExpr = targetExpr.substitute(smap, analyzer, true);
+      } catch (Exception e) {
+        // An exception is thrown if we cannot generate a target expr from this
+        // scan node that has the same type as the lhs expr of the join predicate
+        // from which the runtime filter was generated. We skip that scan node and will
+        // try to assign the filter to a different scan node.
+        //
+        // TODO: Investigate if we can generate a type-compatible source/target expr
+        // pair from that scan node instead of skipping it.
+        return null;
+      }
     }
+    Preconditions.checkState(
+        targetExpr.getType().matchesType(filter.getSrcExpr().getType()));
+    return targetExpr;
   }
 }

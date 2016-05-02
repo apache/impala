@@ -100,8 +100,8 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
         !filter.is_broadcast_join) {
       continue;
     }
-    if (state->query_options().disable_row_runtime_filtering &&
-        !filter.is_bound_by_partition_columns) {
+    if (state->query_options().disable_row_runtime_filtering
+        && !filter.applied_on_partition_columns) {
       continue;
     }
     FilterContext filter_ctx;

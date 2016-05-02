@@ -2549,6 +2549,7 @@ limit 100
 |--05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|     runtime filters: RF000 -> d.d_week_seq
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = s_store_sk
@@ -2643,6 +2644,7 @@ limit 100
 |  05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|     runtime filters: RF000 -> d.d_week_seq
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
@@ -2769,6 +2771,7 @@ limit 100
 |  05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|     runtime filters: RF000 -> d.d_week_seq
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
@@ -3128,6 +3131,7 @@ limit 100
 |
 |--00:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
+|     runtime filters: RF000 -> tpcds.store.s_store_sk
 |
 10:AGGREGATE [FINALIZE]
 |  output: sum(ss_sales_price)
@@ -3210,6 +3214,7 @@ limit 100
 |  |
 |  00:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
+|     runtime filters: RF000 -> tpcds.store.s_store_sk
 |
 17:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_sales_price)
@@ -3316,6 +3321,7 @@ limit 100
 |  |
 |  00:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
+|     runtime filters: RF000 -> tpcds.store.s_store_sk
 |
 17:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_sales_price)

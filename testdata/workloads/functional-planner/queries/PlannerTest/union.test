@@ -19,6 +19,7 @@ where b.month = 1
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=2/24 files=2 size=40.32KB
+|     runtime filters: RF000 -> functional.alltypes.month
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
@@ -39,6 +40,7 @@ where b.month = 1
 |
 |--02:SCAN HDFS [functional.alltypes]
 |     partitions=2/24 files=2 size=40.32KB
+|     runtime filters: RF000 -> functional.alltypes.month
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB

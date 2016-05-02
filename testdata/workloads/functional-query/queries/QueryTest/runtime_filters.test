@@ -426,3 +426,37 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 row_regex: .*0 of 1 Runtime Filter Published.*
 row_regex: .*Filter 0 \(8.00 KB\).*
 ====
+
+
+---- QUERY
+####################################################
+# Test case 17: Filter with two targers (one local, one remote)
+# In this three-way join the filter produced by the top-level
+# join has both a local and a remote target.
+####################################################
+set RUNTIME_FILTER_WAIT_TIME_MS=15000;
+set RUNTIME_FILTER_MODE=GLOBAL;
+select straight_join count(*)
+from functional.alltypes a join [BROADCAST] functional.alltypessmall c
+    on a.month = c.month join [BROADCAST] functional.alltypesagg b
+    on a.month = b.id where b.int_col < 0;
+---- RESULTS
+0
+====
+
+
+---- QUERY
+####################################################
+# Test case 18: Runtime filter pushed to all union operands
+####################################################
+set RUNTIME_FILTER_WAIT_TIME_MS=15000;
+set RUNTIME_FILTER_MODE=GLOBAL;
+select straight_join count(*)
+from (select month, year from functional.alltypes
+      union all
+      select month, year from functional.alltypes) a
+    join functional.alltypessmall b on a.month = b.month
+where b.int_col = 1;
+---- RESULTS
+14400
+====

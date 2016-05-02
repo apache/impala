@@ -269,3 +269,35 @@ select STRAIGHT_JOIN count(*) from
 row_regex: .*1 of 1 Runtime Filter Published.*
 row_regex: .*Filter 0 \(16.00 MB\).*
 ====
+
+
+---- QUERY
+###################################################
+# Test case 12: filter with both remote and local targets
+###################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select straight_join count(*)
+from functional_parquet.alltypes a join [BROADCAST] functional_parquet.alltypessmall c
+    on a.id = c.id join [BROADCAST] functional_parquet.alltypesagg b
+    on a.id = b.id where b.int_col < 100;
+---- RESULTS
+108
+====
+
+
+---- QUERY
+###################################################
+# Test case 13: filter with multiple remote targets
+###################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+select straight_join count(*)
+from functional_parquet.alltypes a join [SHUFFLE] functional_parquet.alltypessmall c
+    on a.id = c.id join [SHUFFLE] functional_parquet.alltypesagg b
+    on a.id = b.id where b.int_col < 100;
+---- RESULTS
+108
+====

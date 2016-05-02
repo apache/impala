@@ -145,13 +145,20 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 
   const TQueryOptions& query_options = state->query_options();
   for (const TRuntimeFilterDesc& filter: tnode.runtime_filters) {
+    auto it = filter.planid_to_target_ndx.find(tnode.node_id);
+    DCHECK(it != filter.planid_to_target_ndx.end());
+    const TRuntimeFilterTargetDesc& target = filter.targets[it->second];
+    if (state->query_options().runtime_filter_mode == TRuntimeFilterMode::LOCAL &&
+        !target.is_local_target) {
+      continue;
+    }
     if (query_options.disable_row_runtime_filtering &&
-        !filter.is_bound_by_partition_columns) {
+        !target.is_bound_by_partition_columns) {
       continue;
     }
 
     FilterContext filter_ctx;
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, filter.target_expr, &filter_ctx.expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, target.target_expr, &filter_ctx.expr));
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, false);
 
     string filter_profile_title = Substitute("Filter $0 ($1)", filter.filter_id,
@@ -159,8 +166,8 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     RuntimeProfile* profile = state->obj_pool()->Add(
         new RuntimeProfile(state->obj_pool(), filter_profile_title));
     runtime_profile_->AddChild(profile);
-    filter_ctx.stats = state->obj_pool()->Add(
-        new FilterStats(profile, filter.is_bound_by_partition_columns));
+    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile,
+        target.is_bound_by_partition_columns));
 
     filter_ctxs_.push_back(filter_ctx);
   }
@@ -1133,7 +1140,10 @@ bool HdfsScanNode::PartitionPassesFilterPredicates(int32_t partition_id,
   if (template_tuple == NULL) return true;
   TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&template_tuple);
   for (const FilterContext& ctx: filter_ctxs) {
-    if (!ctx.filter->filter_desc().is_bound_by_partition_columns) continue;
+    int target_ndx = ctx.filter->filter_desc().planid_to_target_ndx.at(id_);
+    if (!ctx.filter->filter_desc().targets[target_ndx].is_bound_by_partition_columns) {
+      continue;
+    }
     void* e = ctx.expr->GetValue(tuple_row_mem);
 
     // Not quite right because bitmap could arrive after Eval(), but we're ok with

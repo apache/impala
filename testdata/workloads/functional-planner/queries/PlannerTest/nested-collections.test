@@ -80,6 +80,7 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |
 |--06:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=111.08MB
+|     runtime filters: RF000 -> s.s_nationkey, RF001 -> s_comment
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.13MB
@@ -1522,7 +1523,7 @@ where c.c_custkey in
 |  04:UNNEST [c.c_orders o2]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
 ====
 # IMPALA-2412: Test join ordering in nested subplans. Same as above
 # but with a few inner joins.
@@ -1566,7 +1567,7 @@ where c.c_custkey in
 |  04:UNNEST [c.c_orders o2]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: !empty(c.c_orders)
 ====
 # IMPALA-2412: Test join ordering in nested subplans.
@@ -1608,7 +1609,7 @@ where c.c_custkey in
 |  04:UNNEST [c.c_orders o2]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
 ====
 # IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
 # the ON clause and there are predicates in the WHERE clause that can be assigned to
@@ -1715,7 +1716,7 @@ inner join o.o_lineitems
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
 ====
 # IMPALA-3065/IMPALA-3062: Test correct assignment of !empty() predicates.
 # Predicates should not be generated if the parent tuple is outer joined.
@@ -1729,7 +1730,7 @@ right outer join tpch_nested_parquet.customer c2
 |  runtime filters: RF000 <- c2.c_custkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.customer c2]
-|     partitions=1/1 files=4 size=554.13MB
+|     partitions=1/1 files=4 size=577.87MB
 |
 01:SUBPLAN
 |
@@ -1740,7 +1741,7 @@ right outer join tpch_nested_parquet.customer c2
 |  03:UNNEST [c1.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c1]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    runtime filters: RF000 -> c1.c_custkey
 ====
 # IMPALA-3065/IMPALA-3062: Test correct assignment of !empty() predicates.
@@ -1767,8 +1768,8 @@ left semi join c2.c_orders o2
 |  hash predicates: c1.c_custkey = c2.c_custkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.customer c2]
-|     partitions=1/1 files=4 size=554.13MB
+|     partitions=1/1 files=4 size=577.87MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c1]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
 ====

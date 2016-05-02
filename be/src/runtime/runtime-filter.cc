@@ -72,8 +72,14 @@ RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filte
     DCHECK(produced_filters_.find(filter_desc.filter_id) == produced_filters_.end());
     produced_filters_[filter_desc.filter_id] = ret;
   } else {
-    DCHECK(consumed_filters_.find(filter_desc.filter_id) == consumed_filters_.end());
-    consumed_filters_[filter_desc.filter_id] = ret;
+    if (consumed_filters_.find(filter_desc.filter_id) == consumed_filters_.end()) {
+      consumed_filters_[filter_desc.filter_id] = ret;
+    } else {
+      // The filter has already been registered in this filter bank by another
+      // target node.
+      DCHECK_GT(filter_desc.targets.size(), 1);
+      ret = consumed_filters_[filter_desc.filter_id];
+    }
   }
   return ret;
 }
@@ -104,14 +110,17 @@ void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
   DCHECK_NE(state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
       << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
   TUpdateFilterParams params;
+  // A runtime filter may have both local and remote targets.
   bool has_local_target = false;
+  bool has_remote_target = false;
   {
     lock_guard<mutex> l(runtime_filter_lock_);
     RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
     DCHECK(it != produced_filters_.end()) << "Tried to update unregistered filter: "
                                           << filter_id;
     it->second->SetBloomFilter(bloom_filter);
-    has_local_target = it->second->filter_desc().has_local_target;
+    has_local_target = it->second->filter_desc().has_local_targets;
+    has_remote_target = it->second->filter_desc().has_remote_targets;
   }
 
   if (has_local_target) {
@@ -123,14 +132,15 @@ void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
       RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
       if (it == consumed_filters_.end()) return;
       filter = it->second;
-      // Check if the filter already showed up.
-      DCHECK(!filter->HasBloomFilter());
     }
     filter->SetBloomFilter(bloom_filter);
     state_->runtime_profile()->AddInfoString(
         Substitute("Filter $0 arrival", filter_id),
         PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
-  } else if (state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
+  }
+
+  if (has_remote_target
+      && state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
     BloomFilter::ToThrift(bloom_filter, &params.bloom_filter);
     params.filter_id = filter_id;
     params.query_id = query_ctx_.query_id;

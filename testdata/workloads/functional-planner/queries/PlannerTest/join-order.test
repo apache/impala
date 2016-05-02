@@ -248,6 +248,7 @@ limit 100
 |
 |--03:SCAN HDFS [tpch.supplier s]
 |     partitions=1/1 files=1 size=1.33MB
+|     runtime filters: RF001 -> s_nationkey
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -315,6 +316,7 @@ limit 100
 |  |
 |  03:SCAN HDFS [tpch.supplier s]
 |     partitions=1/1 files=1 size=1.33MB
+|     runtime filters: RF001 -> s_nationkey
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -802,6 +804,7 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> t5.id
 |
 08:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t4.id = t3.id
@@ -812,6 +815,7 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |  |
 |  |--02:SCAN HDFS [functional.alltypessmall t3]
 |  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF000 -> t3.id, RF001 -> t3.id
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t1.id
@@ -819,10 +823,11 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |  |
 |  |--00:SCAN HDFS [functional.alltypestiny t1]
 |  |     partitions=4/4 files=4 size=460B
+|  |     runtime filters: RF000 -> t1.id, RF001 -> t1.id, RF002 -> t1.id
 |  |
 |  01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF002 -> t2.id, RF003 -> t2.id
+|     runtime filters: RF000 -> t2.id, RF001 -> t2.id, RF002 -> t2.id, RF003 -> t2.id
 |
 03:SCAN HDFS [functional.alltypesagg t4]
    partitions=11/11 files=11 size=814.73KB
@@ -861,6 +866,7 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |  |  |
 |  |  |--02:SCAN HDFS [functional.alltypessmall t3]
 |  |  |     partitions=4/4 files=4 size=6.32KB
+|  |  |     runtime filters: RF000 -> t3.id
 |  |  |
 |  |  06:HASH JOIN [RIGHT OUTER JOIN]
 |  |  |  hash predicates: t2.id = t1.id
@@ -871,7 +877,7 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |  |  |
 |  |  01:SCAN HDFS [functional.alltypes t2]
 |  |     partitions=24/24 files=24 size=478.45KB
-|  |     runtime filters: RF002 -> t2.id, RF003 -> t2.id
+|  |     runtime filters: RF000 -> t2.id, RF002 -> t2.id, RF003 -> t2.id
 |  |
 |  03:SCAN HDFS [functional.alltypesagg t4]
 |     partitions=11/11 files=11 size=814.73KB
@@ -910,6 +916,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |
 |  |--03:SCAN HDFS [functional.alltypessmall t4]
 |  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF000 -> t4.id
 |  |
 |  08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t3.id
@@ -917,6 +924,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |
 |  |--02:SCAN HDFS [functional.alltypesagg t3]
 |  |     partitions=11/11 files=11 size=814.73KB
+|  |     runtime filters: RF000 -> t3.id, RF002 -> t3.id
 |  |
 |  07:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.id = t1.id
@@ -927,7 +935,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |
 |  01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF002 -> t2.id, RF003 -> t2.id, RF004 -> t2.id
+|     runtime filters: RF000 -> t2.id, RF002 -> t2.id, RF003 -> t2.id, RF004 -> t2.id
 |
 04:SCAN HDFS [functional.alltypes t5]
    partitions=24/24 files=24 size=478.45KB
@@ -961,6 +969,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |
 |  |--03:SCAN HDFS [functional.alltypessmall t4]
 |  |     partitions=4/4 files=4 size=6.32KB
+|  |     runtime filters: RF000 -> t4.id
 |  |
 |  08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t3.id
@@ -968,6 +977,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |
 |  |--02:SCAN HDFS [functional.alltypesagg t3]
 |  |     partitions=11/11 files=11 size=814.73KB
+|  |     runtime filters: RF000 -> t3.id, RF001 -> t3.id
 |  |
 |  07:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.id = t1.id
@@ -978,7 +988,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |
 |  01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF001 -> t2.id, RF002 -> t2.id, RF003 -> t2.id
+|     runtime filters: RF000 -> t2.id, RF001 -> t2.id, RF002 -> t2.id, RF003 -> t2.id
 |
 04:SCAN HDFS [functional.alltypes t5]
    partitions=24/24 files=24 size=478.45KB
@@ -1163,10 +1173,11 @@ where t2.month = 1
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny a]
 |  |     partitions=4/4 files=4 size=460B
+|  |     runtime filters: RF000 -> a.id, RF002 -> a.id
 |  |
 |  06:SCAN HDFS [functional.alltypes b]
 |     partitions=2/24 files=2 size=40.32KB
-|     runtime filters: RF002 -> b.id, RF003 -> b.id
+|     runtime filters: RF000 -> b.id, RF002 -> b.id, RF003 -> b.id
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 files=24 size=478.45KB
@@ -1224,6 +1235,7 @@ where t2.month = 1
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny a]
 |  |     partitions=4/4 files=4 size=460B
+|  |     runtime filters: RF000 -> a.id, RF001 -> a.id
 |  |
 |  06:SCAN HDFS [functional.alltypes b]
 |     partitions=2/24 files=2 size=40.32KB
@@ -1231,6 +1243,7 @@ where t2.month = 1
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t3.id
 ====
 # Regression test for IMPALA-1343.
 SELECT sum(t4.tinyint_col)

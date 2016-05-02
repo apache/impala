@@ -1988,6 +1988,21 @@ public class Analyzer {
     return result;
   }
 
+  /**
+   * Returns the ids of all the slots for which there is a value transfer from 'srcSid'.
+   */
+  public List<SlotId> getValueTransferTargets(SlotId srcSid) {
+    List<SlotId> result = Lists.newArrayList();
+    int maxSlotId = globalState_.valueTransferGraph.getNumSlots();
+    if (srcSid.asInt() >= maxSlotId) return result;
+    for (SlotDescriptor slot: globalState_.descTbl.getSlotDescs()) {
+      SlotId targetSid = slot.getId();
+      if (targetSid.asInt() >= maxSlotId) continue;
+      if (hasValueTransfer(srcSid, targetSid)) result.add(targetSid);
+    }
+    return result;
+  }
+
   public EquivalenceClassId getEquivClassId(SlotId slotId) {
     return globalState_.equivClassBySlotId.get(slotId);
   }
@@ -2434,6 +2449,13 @@ public class Analyzer {
     return globalState_.valueTransferGraph.hasValueTransfer(a, b);
   }
 
+  public boolean validateValueTransferGraph() {
+    StringBuilder actual = new StringBuilder();
+    StringBuilder expected = new StringBuilder();
+    boolean res = globalState_.valueTransferGraph.validate(actual, expected);
+    return res;
+  }
+
   public EventSequence getTimeline() { return globalState_.timeline; }
 
   /**
@@ -2488,6 +2510,12 @@ public class Analyzer {
     // Condensed DAG of value transfers in the new slot domain.
     private boolean[][] valueTransfer_;
 
+    // Number of slots registered at the time when the value transfer graph was
+    // computed.
+    private int numSlots_ = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+
+    public int getNumSlots() { return numSlots_; }
+
     /**
      * Computes all direct and transitive value transfers based on the registered
      * conjuncts of the form <slotref> = <slotref>. The high-level steps are:
@@ -2512,8 +2540,7 @@ public class Analyzer {
       partitionValueTransfers(completeSubGraphs_, origValueTransfers);
 
       // Coalesce complete subgraphs into a single slot and assign new slot ids.
-      int origNumSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
-      coalescedSlots_ = new int[origNumSlots];
+      coalescedSlots_ = new int[numSlots_];
       Arrays.fill(coalescedSlots_, -1);
       for (Set<SlotId> equivClass: completeSubGraphs_.getSets()) {
         int representative = nextCoalescedSlotId_;

@@ -752,6 +752,7 @@ order by
 |
 |--03:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
+|     runtime filters: RF001 -> s_nationkey
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -818,6 +819,7 @@ order by
 |  |
 |  03:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
+|     runtime filters: RF001 -> s_nationkey
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -900,6 +902,7 @@ order by
 |  |
 |  03:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
+|     runtime filters: RF001 -> s_nationkey
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -1617,7 +1620,7 @@ order by
 |
 |--01:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
-|     runtime filters: RF000 -> s_nationkey
+|     runtime filters: RF000 -> s_nationkey, RF001 -> tpch.supplier.s_suppkey
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
@@ -1633,6 +1636,7 @@ order by
 |--00:SCAN HDFS [tpch.part]
 |     partitions=1/1 files=1 size=22.83MB
 |     predicates: p_name LIKE '%green%'
+|     runtime filters: RF002 -> tpch.part.p_partkey
 |
 02:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
@@ -1680,7 +1684,7 @@ order by
 |  |
 |  01:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
-|     runtime filters: RF000 -> s_nationkey
+|     runtime filters: RF000 -> s_nationkey, RF001 -> tpch.supplier.s_suppkey
 |
 07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -1702,6 +1706,7 @@ order by
 |  00:SCAN HDFS [tpch.part]
 |     partitions=1/1 files=1 size=22.83MB
 |     predicates: p_name LIKE '%green%'
+|     runtime filters: RF002 -> tpch.part.p_partkey
 |
 02:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
@@ -1761,7 +1766,7 @@ order by
 |  |
 |  01:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
-|     runtime filters: RF000 -> s_nationkey
+|     runtime filters: RF000 -> s_nationkey, RF001 -> tpch.supplier.s_suppkey
 |
 07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
@@ -1791,6 +1796,7 @@ order by
 |  00:SCAN HDFS [tpch.part]
 |     partitions=1/1 files=1 size=22.83MB
 |     predicates: p_name LIKE '%green%'
+|     runtime filters: RF002 -> tpch.part.p_partkey
 |
 02:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
@@ -3117,7 +3123,7 @@ limit 100
 |
 |--01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
-|     runtime filters: RF001 -> o_custkey
+|     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
 |
 02:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
@@ -3175,7 +3181,7 @@ limit 100
 |  |
 |  01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
-|     runtime filters: RF001 -> o_custkey
+|     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
 |
 10:EXCHANGE [HASH(l_orderkey)]
 |
@@ -3247,7 +3253,7 @@ limit 100
 |  |
 |  01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
-|     runtime filters: RF001 -> o_custkey
+|     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
 |
 10:EXCHANGE [HASH(l_orderkey)]
 |
@@ -3430,7 +3436,7 @@ order by
 |  |
 |  02:SCAN HDFS [tpch.partsupp]
 |     partitions=1/1 files=1 size=112.71MB
-|     runtime filters: RF003 -> ps_partkey
+|     runtime filters: RF000 -> ps_suppkey, RF003 -> ps_partkey
 |
 05:AGGREGATE [FINALIZE]
 |  output: sum(l_quantity)
@@ -3488,7 +3494,7 @@ order by
 |  |
 |  02:SCAN HDFS [tpch.partsupp]
 |     partitions=1/1 files=1 size=112.71MB
-|     runtime filters: RF003 -> ps_partkey
+|     runtime filters: RF000 -> ps_suppkey, RF003 -> ps_partkey
 |
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)
@@ -3568,7 +3574,7 @@ order by
 |  |
 |  02:SCAN HDFS [tpch.partsupp]
 |     partitions=1/1 files=1 size=112.71MB
-|     runtime filters: RF003 -> ps_partkey
+|     runtime filters: RF000 -> ps_suppkey, RF003 -> ps_partkey
 |
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)

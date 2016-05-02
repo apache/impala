@@ -518,7 +518,7 @@ where t.int_col < 10 and t.int_col in
 ---- PLAN
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.int_col = int_col, t.id = s.id
-|  runtime filters: RF001 <- s.id, RF000 <- int_col
+|  runtime filters: RF000 <- int_col, RF001 <- s.id
 |
 |--02:SCAN HDFS [functional.alltypessmall s]
 |     partitions=4/4 files=4 size=6.32KB
@@ -531,7 +531,7 @@ where t.int_col < 10 and t.int_col in
 |--01:SCAN HDFS [functional.alltypes t]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: t.int_col < 10
-|     runtime filters: RF000 -> t.int_col
+|     runtime filters: RF000 -> t.int_col, RF001 -> t.id
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
@@ -819,6 +819,7 @@ having count(*) < 100
 |  |  |--00:SCAN HDFS [functional.alltypesagg g]
 |  |  |     partitions=11/11 files=11 size=814.73KB
 |  |  |     predicates: g.int_col < 100
+|  |  |     runtime filters: RF003 -> g.id
 |  |  |
 |  |  01:SCAN HDFS [functional.alltypes a]
 |  |     partitions=24/24 files=24 size=478.45KB

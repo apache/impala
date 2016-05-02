@@ -86,8 +86,8 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
         !tfilter.is_broadcast_join) {
       continue;
     }
-    if (state->query_options().disable_row_runtime_filtering &&
-        !tfilter.is_bound_by_partition_columns) {
+    if (state->query_options().disable_row_runtime_filtering
+        && !tfilter.applied_on_partition_columns) {
       continue;
     }
     filters_.push_back(state->filter_bank()->RegisterFilter(tfilter, true));

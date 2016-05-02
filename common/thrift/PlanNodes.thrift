@@ -73,35 +73,57 @@ enum TReplicaPreference {
   REMOTE
 }
 
-// Specification of a runtime filter
+// Specification of a runtime filter target.
+struct TRuntimeFilterTargetDesc {
+  // Target node id
+  1: Types.TPlanNodeId node_id
+
+  // Expr on which the filter is applied
+  2: required Exprs.TExpr target_expr
+
+  // Indicates if 'target_expr' is bound only by partition columns
+  3: required bool is_bound_by_partition_columns
+
+  // Slot ids on which 'target_expr' is bound on
+  4: required list<Types.TSlotId> target_expr_slotids
+
+  // Indicates if this target is on the same fragment as the join that
+  // produced the runtime filter
+  5: required bool is_local_target
+}
+
+// Specification of a runtime filter.
 struct TRuntimeFilterDesc {
   // Filter unique id (within a query)
   1: required i32 filter_id
 
-  // Expr on which the filter is applied; it is fully bound by a scan node.
-  2: required Exprs.TExpr target_expr
-
   // Expr on which the filter is built on a hash join.
-  3: required Exprs.TExpr src_expr
+  2: required Exprs.TExpr src_expr
 
-  // If set, indicates if the source join node of this filter is a broadcast or
+  // List of targets for this runtime filter
+  3: required list<TRuntimeFilterTargetDesc> targets
+
+  // Map of target node id to the corresponding index in 'targets'
+  4: required map<Types.TPlanNodeId, i32> planid_to_target_ndx
+
+  // Indicates if the source join node of this filter is a broadcast or
   // a partitioned join.
-  4: optional bool is_broadcast_join
+  5: required bool is_broadcast_join
 
-  // If set, indicates if filter_expr is bound only by partition columns
-  5: optional bool is_bound_by_partition_columns
+  // Indicates if there is at least one target scan node that is in the
+  // same fragment as the broadcast join that produced the runtime filter
+  6: required bool has_local_targets
 
-  // SlotIds on which the target expr is bound on
-  6: optional list<Types.TSlotId> target_expr_slotids
+  // Indicates if there is at least one target scan node that is not in the same
+  // fragment as the broadcast join that produced the runtime filter
+  7: required bool has_remote_targets
 
-  // If set, indicates that the filter should not be sent to the coordinator because it
-  // is produced by a broadcast join and the target scan node is in the same fragment
-  // as the join.
-  7: optional bool has_local_target
+  // Indicates if this filter is applied only on partition columns
+  8: required bool applied_on_partition_columns
 
   // The estimated number of distinct values that the planner expects the filter to hold.
   // Used to compute the size of the filter.
-  8: optional i64 ndv_estimate
+  9: optional i64 ndv_estimate
 }
 
 // The information contained in subclasses of ScanNode captured in two separate

@@ -660,10 +660,4 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
-
-  @Override
-  protected void addRuntimeFilter(RuntimeFilter filter) {
-    Preconditions.checkState(filter.getTargetExpr().isBoundByTupleIds(tupleIds_));
-    super.addRuntimeFilter(filter);
-  }
 }

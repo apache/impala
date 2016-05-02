@@ -52,7 +52,6 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
-|  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.testtbl b]
 |     partitions=1/1 files=0 size=0B
@@ -66,7 +65,6 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
-|  runtime filters: RF000 <- b.id
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -115,7 +113,6 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.zip = zip
-|  runtime filters: RF000 <- zip
 |
 |--01:SCAN HDFS [functional.testtbl]
 |     partitions=1/1 files=0 size=0B
@@ -128,7 +125,6 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: a.zip = zip
-|  runtime filters: RF000 <- zip
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
