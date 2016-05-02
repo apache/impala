@@ -86,7 +86,7 @@ class DelimitedTextParser {
   /// This function is used to parse sequence file records which do not need to
   /// parse for tuple delimiters.
   template <bool process_escapes>
-  void ParseSingleTuple(int64_t len, char* buffer, FieldLocation* field_locations, 
+  void ParseSingleTuple(int64_t len, char* buffer, FieldLocation* field_locations,
       int* num_fields);
 
   /// FindFirstInstance returns the position after the first non-escaped tuple
@@ -150,13 +150,16 @@ class DelimitedTextParser {
       FieldLocation* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
 
-  /// SSE(xmm) register containing the tuple search character.
+  /// SSE(xmm) register containing the tuple search character(s).
   __m128i xmm_tuple_search_;
 
-  /// SSE(xmm) register containing the delimiter search character.
+  /// The number of delimiters contained in xmm_tuple_search_, i.e. its length.
+  int num_tuple_delims_;
+
+  /// SSE(xmm) register containing the delimiter search character(s).
   __m128i xmm_delim_search_;
 
-  /// The number of delimiters contained in xmm_delim_search_, i.e. its length
+  /// The number of delimiters contained in xmm_delim_search_, i.e. its length.
   int num_delims_;
 
   /// SSE(xmm) register containing the escape search character.

@@ -22,20 +22,26 @@
 
 namespace impala {
 
-void Validate(DelimitedTextParser* parser, const string& data, 
+void Validate(DelimitedTextParser* parser, const string& data,
     int expected_offset, char tuple_delim, int expected_num_tuples,
     int expected_num_fields) {
   parser->ParserReset();
   char* data_ptr = const_cast<char*>(data.c_str());
   int remaining_len = data.size();
   int offset = parser->FindFirstInstance(data_ptr, remaining_len);
-  
+
   EXPECT_EQ(offset, expected_offset) << data;
   if (offset == -1) return;
 
   EXPECT_GE(offset, 1) << data;
   EXPECT_LT(offset, data.size()) << data;
-  EXPECT_EQ(data[offset - 1], tuple_delim) << data;
+  if (tuple_delim != '\n') {
+    EXPECT_EQ(data[offset - 1], tuple_delim) << data;
+  } else {
+    EXPECT_TRUE(data[offset - 1] == '\n' || data[offset - 1] == '\r')
+        << data[offset - 1] << endl << data;
+    if (data[offset - 1] == '\r' && offset < data.size()) EXPECT_NE(data[offset], '\n');
+  }
 
   data_ptr += offset;
   remaining_len -= offset;
@@ -71,7 +77,7 @@ TEST(DelimitedTextParser, Basic) {
   Validate(&no_escape_parser, "abc||abc", 4, TUPLE_DELIM, 1, 1);
   Validate(&no_escape_parser, "|abcd", 1, TUPLE_DELIM, 0, 0);
   Validate(&no_escape_parser, "a|bcd", 2, TUPLE_DELIM, 0, 0);
-  
+
   // Test with escape char
   DelimitedTextParser escape_parser(NUM_COLS, 0, is_materialized_col,
                                     TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM,
@@ -82,7 +88,7 @@ TEST(DelimitedTextParser, Basic) {
   Validate(&escape_parser, "a@@@@|a|bcd", 6, TUPLE_DELIM, 1, 1);
   Validate(&escape_parser, "a|@@@|a|bcd", 2, TUPLE_DELIM, 1, 1);
 
-  // // The parser doesn't support this case.  
+  // // The parser doesn't support this case.
   // // TODO: update test when it is fixed
   // Validate(&escape_parser, "@|no_delims", -1, TUPLE_DELIM);
 
@@ -138,6 +144,40 @@ TEST(DelimitedTextParser, Fields) {
   Validate(&escape_parser, "a|b,c|d@,e", 2, TUPLE_DELIM, 1, 2);
 }
 
+TEST(DelimitedTextParser, SpecialDelimiters) {
+  const char TUPLE_DELIM = '\n'; // implies '\r' and "\r\n" are also delimiters
+  const int NUM_COLS = 1;
+
+  bool is_materialized_col[NUM_COLS];
+  for (int i = 0; i < NUM_COLS; ++i) is_materialized_col[i] = true;
+
+  DelimitedTextParser tuple_delim_parser(NUM_COLS, 0, is_materialized_col,
+      TUPLE_DELIM);
+
+  // Non-SSE case
+  Validate(&tuple_delim_parser, "A\r\nB", 3, TUPLE_DELIM, 0, 0);
+  Validate(&tuple_delim_parser, "A\rB", 2, TUPLE_DELIM, 0, 0);
+  Validate(&tuple_delim_parser, "A\nB", 2, TUPLE_DELIM, 0, 0);
+  Validate(&tuple_delim_parser, "A\nB\r\nC", 2, TUPLE_DELIM, 1, 1);
+  Validate(&tuple_delim_parser, "A\r\nB\r\nC", 3, TUPLE_DELIM, 1, 1);
+  Validate(&tuple_delim_parser, "A\rB\nC\r\nD", 2, TUPLE_DELIM, 2, 2);
+  Validate(&tuple_delim_parser, "\r\r\n\n", 1, TUPLE_DELIM, 2, 2);
+
+  // SSE case
+  string data = "\rAAAAAAAAAAAAAAA";
+  DCHECK_EQ(data.size(), SSEUtil::CHARS_PER_128_BIT_REGISTER);
+  Validate(&tuple_delim_parser, data, 1, TUPLE_DELIM, 0, 0);
+  data = "\nAAAAAAAAAAAAAAA";
+  DCHECK_EQ(data.size(), SSEUtil::CHARS_PER_128_BIT_REGISTER);
+  Validate(&tuple_delim_parser, data, 1, TUPLE_DELIM, 0, 0);
+  data = "\r\nAAAAAAAAAAAAAA";
+  DCHECK_EQ(data.size(), SSEUtil::CHARS_PER_128_BIT_REGISTER);
+  Validate(&tuple_delim_parser, data, 2, TUPLE_DELIM, 0, 0);
+  data = "\r\nAAA\n\r\r\nAAAAAAA";
+  DCHECK_EQ(data.size(), SSEUtil::CHARS_PER_128_BIT_REGISTER);
+  Validate(&tuple_delim_parser, data, 2, TUPLE_DELIM, 3, 3);
+}
+
 // TODO: expand test for other delimited text parser functions/cases.
 // Not all of them work without creating a HdfsScanNode but we can expand
 // these tests quite a bit more.
@@ -149,4 +189,3 @@ int main(int argc, char **argv) {
   impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
-

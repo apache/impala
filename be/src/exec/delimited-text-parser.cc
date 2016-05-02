@@ -24,7 +24,8 @@ using namespace impala;
 DelimitedTextParser::DelimitedTextParser(
     int num_cols, int num_partition_keys, const bool* is_materialized_col,
     char tuple_delim, char field_delim, char collection_item_delim, char escape_char)
-    : num_delims_(0),
+    : num_tuple_delims_(0),
+      num_delims_(0),
       field_delim_(field_delim),
       process_escapes_(escape_char != '\0'),
       escape_char_(escape_char),
@@ -70,9 +71,13 @@ DelimitedTextParser::DelimitedTextParser(
 
   if (tuple_delim != '\0') {
     search_chars[num_delims_++] = tuple_delim_;
+    ++num_tuple_delims_;
     // Hive will treats \r (^M) as an alternate tuple delimiter, but \r\n is a
     // single tuple delimiter.
-    if (tuple_delim_ == '\n') search_chars[num_delims_++] = '\r';
+    if (tuple_delim_ == '\n') {
+      search_chars[num_delims_++] = '\r';
+      ++num_tuple_delims_;
+    }
     xmm_tuple_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
   }
 
@@ -212,8 +217,8 @@ restart:
       // Load the next 16 bytes into the xmm register and do strchr for the
       // tuple delimiter.
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
-      xmm_tuple_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_tuple_search_, 1,
-          xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
+      xmm_tuple_mask = SSE4_cmpestrm<SSEUtil::STRCHR_MODE>(xmm_tuple_search_,
+          num_tuple_delims_, xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       if (tuple_mask != 0) {
         found = true;
