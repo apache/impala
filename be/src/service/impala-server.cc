@@ -1525,7 +1525,7 @@ void ImpalaServer::MembershipCallback(
 
     // Maps from query id (to be cancelled) to a list of failed Impalads that are
     // the cause of the cancellation.
-    map<TUniqueId, vector<TNetworkAddress> > queries_to_cancel;
+    map<TUniqueId, vector<TNetworkAddress>> queries_to_cancel;
     {
       // Build a list of queries that are running on failed hosts (as evidenced by their
       // absence from the membership list).
@@ -1562,7 +1562,7 @@ void ImpalaServer::MembershipCallback(
       // Since we are the only producer for this pool, we know that this cannot block
       // indefinitely since the queue is large enough to accept all new cancellation
       // requests.
-      map<TUniqueId, vector<TNetworkAddress> >::iterator cancellation_entry;
+      map<TUniqueId, vector<TNetworkAddress>>::iterator cancellation_entry;
       for (cancellation_entry = queries_to_cancel.begin();
           cancellation_entry != queries_to_cancel.end();
           ++cancellation_entry) {

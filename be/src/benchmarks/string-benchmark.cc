@@ -92,7 +92,7 @@ struct CompactStringValue {
 
 struct TestData {
   vector<StringValue> normal_strings;
-  vector<CompactStringValue<8> > compact_strings;
+  vector<CompactStringValue<8>> compact_strings;
   vector<int> random_order;
   uint32_t hash_normal;
   uint32_t hash_compact;

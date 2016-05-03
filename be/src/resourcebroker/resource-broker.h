@@ -262,7 +262,7 @@ class ResourceBroker {
   boost::scoped_ptr<ThriftServer> llama_callback_server_;
 
   /// Cache of Llama client connections.
-  boost::scoped_ptr<ClientCache<llama::LlamaAMServiceClient> > llama_client_cache_;
+  boost::scoped_ptr<ClientCache<llama::LlamaAMServiceClient>> llama_client_cache_;
 
   /// Lock to ensure that only a single registration with Llama is sent, e.g.,
   /// when multiple concurrent requests realize that Llama has restarted.
@@ -352,7 +352,7 @@ class ResourceBroker {
 
   /// Map from reservation IDs to pending expansion IDs. All pending request IDs have a
   /// PendingRequest in pending_requests_.
-  typedef boost::unordered_map<llama::TUniqueId, boost::unordered_set<llama::TUniqueId> >
+  typedef boost::unordered_map<llama::TUniqueId, boost::unordered_set<llama::TUniqueId>>
       PendingExpansionIdsMap;
   PendingExpansionIdsMap pending_expansion_ids_;
 
@@ -390,13 +390,13 @@ class ResourceBroker {
   /// Map from reservation ID to all satisfied requests - reservation and expansion -
   /// associated with that reservation. Used only for bookkeeping so that Impala can report
   /// on the current resource usage.
-  typedef boost::unordered_map<llama::TUniqueId, std::vector<AllocatedRequest> >
+  typedef boost::unordered_map<llama::TUniqueId, std::vector<AllocatedRequest>>
       AllocatedRequestMap;
   AllocatedRequestMap allocated_requests_;
 
   /// Protects query_resource_mgrs_
   boost::mutex query_resource_mgrs_lock_;
-  typedef boost::unordered_map<TUniqueId, std::pair<int32_t, QueryResourceMgr*> >
+  typedef boost::unordered_map<TUniqueId, std::pair<int32_t, QueryResourceMgr*>>
       QueryResourceMgrsMap;
 
   /// Map from query ID to a (ref_count, QueryResourceMgr*) pair, i.e. one QueryResourceMgr

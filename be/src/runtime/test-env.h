@@ -74,7 +74,7 @@ class TestEnv {
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
 
   /// Per-query states with associated block managers.
-  vector<boost::shared_ptr<RuntimeState> > query_states_;
+  vector<boost::shared_ptr<RuntimeState>> query_states_;
 };
 
 }

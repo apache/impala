@@ -174,7 +174,7 @@ class TSaslServerTransport : public TSaslTransport {
 
     /* Map from a transport to its Sasl Transport (wrapped by a TBufferedTransport). */
     std::map<boost::shared_ptr<TTransport>,
-        boost::shared_ptr<TBufferedTransport> > transportMap_;
+        boost::shared_ptr<TBufferedTransport>> transportMap_;
 
     /* Lock to synchronize the transport map. */
     boost::mutex transportMap_mutex_;

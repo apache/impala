@@ -127,7 +127,7 @@ class MultiThreadTest {
   }
 
  private:
-  typedef vector<shared_ptr<thread> > ThreadVector;
+  typedef vector<shared_ptr<thread>> ThreadVector;
 
   int iterations_;
   int nthreads_;

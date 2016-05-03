@@ -87,7 +87,7 @@ class ImpaladQueryExecutor {
 
  private:
   /// fe service-related
-  boost::scoped_ptr<ThriftClient<ImpalaServiceClient> > client_;
+  boost::scoped_ptr<ThriftClient<ImpalaServiceClient>> client_;
 
   /// Execution options
   std::vector<std::string> exec_options_;

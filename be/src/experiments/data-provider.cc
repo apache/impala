@@ -47,7 +47,7 @@ void DataProvider::SetSeed(int seed) {
 
 void RandString(MemPool* pool, StringValue* result,
     const StringValue& min, const StringValue& max, double r,
-    variate_generator<minstd_rand&, uniform_real<> >& rand) {
+    variate_generator<minstd_rand&, uniform_real<>>& rand) {
   int min_len = min.len;
   int max_len = max.len;
   int len = r * (max_len - min_len) + min_len;
@@ -69,7 +69,7 @@ void* DataProvider::NextBatch(int* rows_returned) {
   COUNTER_ADD(bytes_generated_, num_rows * row_size_);
 
   uniform_real<> dist(0,1);
-  variate_generator<minstd_rand&, uniform_real<> > rand_double(rand_generator_, dist);
+  variate_generator<minstd_rand&, uniform_real<>> rand_double(rand_generator_, dist);
 
   char* data = data_.get();
   for (int i = 0, row_idx = rows_returned_; i < num_rows; ++i, ++row_idx) {

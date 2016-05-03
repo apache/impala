@@ -96,7 +96,7 @@ class SetMetric : public Metric {
 
   virtual std::string ToHumanReadable() {
     std::stringstream out;
-    PrettyPrinter::PrintStringList<std::set<T> >(
+    PrettyPrinter::PrintStringList<std::set<T>>(
         value_, TUnit::NONE, &out);
     return out.str();
   }
@@ -273,7 +273,7 @@ class StatsMetric : public Metric {
                                     boost::accumulators::tag::count,
                                     boost::accumulators::tag::min,
                                     boost::accumulators::tag::max,
-                                    boost::accumulators::tag::variance> > Accumulator;
+                                    boost::accumulators::tag::variance>> Accumulator;
   Accumulator acc_;
 
 };

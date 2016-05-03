@@ -1534,7 +1534,7 @@ Status Sorter::CreateMerger(int max_num_runs) {
   merger_.reset(
       new SortedRunMerger(compare_less_than_, output_row_desc_, profile_, true));
 
-  vector<function<Status (RowBatch**)> > merge_runs;
+  vector<function<Status (RowBatch**)>> merge_runs;
   merge_runs.reserve(max_num_runs);
   for (int i = 0; i < max_num_runs; ++i) {
     Run* run = sorted_runs_.front();

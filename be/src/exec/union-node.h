@@ -51,10 +51,10 @@ class UnionNode : public ExecNode {
   const TupleDescriptor* tuple_desc_;
 
   /// Const exprs materialized by this node. These exprs don't refer to any children.
-  std::vector<std::vector<ExprContext*> > const_result_expr_ctx_lists_;
+  std::vector<std::vector<ExprContext*>> const_result_expr_ctx_lists_;
 
   /// Exprs materialized by this node. The i-th result expr list refers to the i-th child.
-  std::vector<std::vector<ExprContext*> > result_expr_ctx_lists_;
+  std::vector<std::vector<ExprContext*>> result_expr_ctx_lists_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

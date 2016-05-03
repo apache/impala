@@ -111,7 +111,7 @@ TEST(StitchNullsTest, StitchWithOffset) {
 TEST(PrintTColumnValueTest, TestAllTypes) {
   using namespace apache::hive::service::cli::thrift;
 
-  vector<pair<apache::hive::service::cli::thrift::TColumnValue, string> > values;
+  vector<pair<apache::hive::service::cli::thrift::TColumnValue, string>> values;
   values.resize(9);
 
   values[0].first.__set_boolVal(TBoolValue());

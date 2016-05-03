@@ -71,7 +71,7 @@ class FragmentMgr {
 
   /// Map from fragment instance id to exec state; FragmentExecState is owned by us and
   /// referenced as a shared_ptr to allow asynchronous calls to CancelPlanFragment()
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<FragmentExecState> >
+  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<FragmentExecState>>
   FragmentExecStateMap;
   FragmentExecStateMap fragment_exec_state_map_;
 

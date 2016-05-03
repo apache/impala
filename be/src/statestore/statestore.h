@@ -350,7 +350,7 @@ class Statestore {
   /// Subscribers are held in shared_ptrs so that RegisterSubscriber() may overwrite their
   /// entry in this map while UpdateSubscriber() tries to update an existing registration
   /// without risk of use-after-free.
-  typedef boost::unordered_map<SubscriberId, boost::shared_ptr<Subscriber> >
+  typedef boost::unordered_map<SubscriberId, boost::shared_ptr<Subscriber>>
     SubscriberMap;
   SubscriberMap subscribers_;
 
@@ -396,13 +396,13 @@ class Statestore {
 
   /// Cache of subscriber clients used for UpdateState() RPCs. Only one client per
   /// subscriber should be used, but the cache helps with the client lifecycle on failure.
-  boost::scoped_ptr<ClientCache<StatestoreSubscriberClient> > update_state_client_cache_;
+  boost::scoped_ptr<ClientCache<StatestoreSubscriberClient>> update_state_client_cache_;
 
   /// Cache of subscriber clients used for Heartbeat() RPCs. Separate from
   /// update_state_client_cache_ because we enable TCP-level timeouts for these calls,
   /// whereas they are not safe for UpdateState() RPCs which can take an unbounded amount
   /// of time.
-  boost::scoped_ptr<ClientCache<StatestoreSubscriberClient> > heartbeat_client_cache_;
+  boost::scoped_ptr<ClientCache<StatestoreSubscriberClient>> heartbeat_client_cache_;
 
   /// Thrift API implementation which proxies requests onto this Statestore
   boost::shared_ptr<StatestoreServiceIf> thrift_iface_;

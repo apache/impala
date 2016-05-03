@@ -87,7 +87,7 @@ class DataStreamRecvr::SenderQueue {
 
   // queue of (batch length, batch) pairs.  The SenderQueue block owns memory to
   // these batches. They are handed off to the caller via GetBatch.
-  typedef list<pair<int, RowBatch*> > RowBatchQueue;
+  typedef list<pair<int, RowBatch*>> RowBatchQueue;
   RowBatchQueue batch_queue_;
 
   // The batch that was most recently returned via GetBatch(), i.e. the current batch

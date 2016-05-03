@@ -733,7 +733,7 @@ class DiskIoMgr {
   ///  free_buffers_[10] => list of free buffers with size 1 MB
   ///  free_buffers_[13] => list of free buffers with size 8 MB
   ///  free_buffers_[n]  => list of free buffers with size 2^n * 1024 B
-  std::vector<std::list<char*> > free_buffers_;
+  std::vector<std::list<char*>> free_buffers_;
 
   /// List of free buffer desc objects that can be handed out to clients
   std::list<BufferDescriptor*> free_buffer_descs_;

@@ -50,7 +50,7 @@ class TablePrinter {
   /// -1 to indicate unlimited.
   int max_output_width_;
 
-  std::vector<std::vector<std::string> > rows_;
+  std::vector<std::vector<std::string>> rows_;
   std::vector<int> max_col_widths_;
 
   /// Helper function to print one row to ss.

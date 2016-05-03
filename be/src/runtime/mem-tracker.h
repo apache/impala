@@ -408,7 +408,7 @@ class MemTracker {
   /// contains only weak ptrs.  MemTrackers that are handed out via GetQueryMemTracker()
   /// are shared ptrs.  When all the shared ptrs are no longer referenced, the MemTracker
   /// d'tor will be called at which point the weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<MemTracker> >
+  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<MemTracker>>
   RequestTrackersMap;
   static RequestTrackersMap request_to_mem_trackers_;
 

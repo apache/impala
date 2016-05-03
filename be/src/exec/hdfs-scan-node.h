@@ -164,7 +164,7 @@ class HdfsScanNode : public ScanNode {
 
   DiskIoRequestContext* reader_context() { return reader_context_; }
 
-  typedef std::map<TupleId, std::vector<ExprContext*> > ConjunctsMap;
+  typedef std::map<TupleId, std::vector<ExprContext*>> ConjunctsMap;
   const ConjunctsMap& conjuncts_map() const { return conjuncts_map_; }
 
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length() {
@@ -284,7 +284,7 @@ class HdfsScanNode : public ScanNode {
   }
 
   /// map from volume id to <number of split, per volume split lengths>
-  typedef boost::unordered_map<int32_t, std::pair<int, int64_t> > PerVolumnStats;
+  typedef boost::unordered_map<int32_t, std::pair<int, int64_t>> PerVolumnStats;
 
   /// Update the per volume stats with the given scan range params list
   static void UpdateHdfsSplitStats(
@@ -352,7 +352,7 @@ class HdfsScanNode : public ScanNode {
   FileDescMap file_descs_;
 
   /// File format => file descriptors.
-  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
+  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*>> FileFormatsMap;
   FileFormatsMap per_type_files_;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection

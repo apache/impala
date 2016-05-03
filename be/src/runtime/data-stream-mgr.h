@@ -122,7 +122,7 @@ class DataStreamMgr {
   /// we don't want to create a map<pair<TUniqueId, PlanNodeId>, DataStreamRecvr*>,
   /// because that requires a bunch of copying of ids for lookup
   typedef boost::unordered_multimap<uint32_t,
-      boost::shared_ptr<DataStreamRecvr> > RecvrMap;
+      boost::shared_ptr<DataStreamRecvr>> RecvrMap;
   RecvrMap receiver_map_;
 
   /// (Fragment instance id, Plan node id) pair that uniquely identifies a stream.
@@ -182,7 +182,7 @@ class DataStreamMgr {
   inline uint32_t GetHashValue(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 
   /// The coordination primitive used to signal the arrival of a waited-for receiver
-  typedef Promise<boost::shared_ptr<DataStreamRecvr> > RendezvousPromise;
+  typedef Promise<boost::shared_ptr<DataStreamRecvr>> RendezvousPromise;
 
   /// A reference-counted promise-wrapper used to coordinate between senders and
   /// receivers. The ref_count field tracks the number of senders waiting for the arrival

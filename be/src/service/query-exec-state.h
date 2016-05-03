@@ -241,7 +241,7 @@ class ImpalaServer::QueryExecState {
 
   /// Result set used for requests that return results and are not QUERY
   /// statements. For example, EXPLAIN, LOAD, and SHOW use this.
-  boost::scoped_ptr<std::vector<TResultRow> > request_result_set_;
+  boost::scoped_ptr<std::vector<TResultRow>> request_result_set_;
 
   /// Cache of the first result_cache_max_size_ query results to allow clients to restart
   /// fetching from the beginning of the result set. This cache is appended to in

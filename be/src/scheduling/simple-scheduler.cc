@@ -422,7 +422,7 @@ void SimpleScheduler::GetAllKnownBackends(BackendList* backends) {
 
 Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
     QuerySchedule* schedule) {
-  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry;
+  map<TPlanNodeId, vector<TScanRangeLocations>>::const_iterator entry;
   for (entry = exec_request.per_node_scan_ranges.begin();
       entry != exec_request.per_node_scan_ranges.end(); ++entry) {
     const TPlanNodeId node_id = entry->first;
@@ -815,7 +815,7 @@ void SimpleScheduler::FindNodes(const TPlan& plan,
 void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
     const TQueryExecRequest& exec_request, const FragmentExecParams& params,
     vector<TNetworkAddress>* scan_hosts) {
-  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry =
+  map<TPlanNodeId, vector<TScanRangeLocations>>::const_iterator entry =
       exec_request.per_node_scan_ranges.find(scan_id);
   if (entry == exec_request.per_node_scan_ranges.end() || entry->second.empty()) {
     // this scan node doesn't have any scan ranges; run it on the coordinator

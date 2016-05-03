@@ -141,9 +141,9 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
 
   // Add collection item conjuncts
-  const map<TTupleId, vector<TExpr> >& collection_conjuncts =
+  const map<TTupleId, vector<TExpr>>& collection_conjuncts =
       tnode.hdfs_scan_node.collection_conjuncts;
-  map<TTupleId, vector<TExpr> >::const_iterator iter = collection_conjuncts.begin();
+  map<TTupleId, vector<TExpr>>::const_iterator iter = collection_conjuncts.begin();
   for (; iter != collection_conjuncts.end(); ++iter) {
     DCHECK(conjuncts_map_[iter->first].empty());
     RETURN_IF_ERROR(

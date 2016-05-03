@@ -135,7 +135,7 @@ shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // ensure that when ret_transport is eventually deleted, its corresponding map entry is
   // removed. That is likely to be error prone given the locking involved; for now we go
   // with the simple solution.
-  map<shared_ptr<TTransport>, shared_ptr<TBufferedTransport> >::iterator trans_map =
+  map<shared_ptr<TTransport>, shared_ptr<TBufferedTransport>>::iterator trans_map =
       transportMap_.find(trans);
   VLOG_EVERY_N(2, 100) << "getTransport(): transportMap_ size is: "
                        << transportMap_.size();

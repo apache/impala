@@ -161,11 +161,11 @@ class ThreadPool {
 };
 
 /// Utility thread-pool that accepts callable work items, and simply invokes them.
-class CallableThreadPool : public ThreadPool<boost::function<void()> > {
+class CallableThreadPool : public ThreadPool<boost::function<void()>> {
  public:
   CallableThreadPool(const std::string& group, const std::string& thread_prefix,
       uint32_t num_threads, uint32_t queue_size) :
-      ThreadPool<boost::function<void()> >(
+      ThreadPool<boost::function<void()>>(
           group, thread_prefix, num_threads, queue_size, &CallableThreadPool::Worker) {
   }
 

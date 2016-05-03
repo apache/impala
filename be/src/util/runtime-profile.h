@@ -320,7 +320,7 @@ class RuntimeProfile {
 
   /// Map from parent counter name to a set of child counter name.
   /// All top level counters are the child of "" (root).
-  typedef std::map<std::string, std::set<std::string> > ChildCounterMap;
+  typedef std::map<std::string, std::set<std::string>> ChildCounterMap;
   ChildCounterMap child_counter_map_;
 
   /// A set of bucket counters registered in this runtime profile.
@@ -336,7 +336,7 @@ class RuntimeProfile {
   ChildMap child_map_;
 
   /// Vector of (profile, indentation flag).
-  typedef std::vector<std::pair<RuntimeProfile*, bool> > ChildVector;
+  typedef std::vector<std::pair<RuntimeProfile*, bool>> ChildVector;
   ChildVector children_;
 
   /// Protects child_map_ and children_.

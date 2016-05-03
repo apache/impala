@@ -57,7 +57,7 @@ public class HdfsPartitionTest {
 
   @Test
   public void testCompare() {
-    List< List<LiteralExpr> > allLists = Lists.newArrayList();
+    List<List<LiteralExpr>> allLists = Lists.newArrayList();
     allLists.add(valuesNull_);
     allLists.add(valuesDecimal_);
     allLists.add(valuesDecimal1_);

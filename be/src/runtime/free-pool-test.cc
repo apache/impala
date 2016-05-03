@@ -112,7 +112,7 @@ TEST(FreePoolTest, Loop) {
   MemPool mem_pool(&tracker);
   FreePool pool(&mem_pool);
 
-  map<int64_t, pair<uint8_t*, uint8_t*> > primed_allocations;
+  map<int64_t, pair<uint8_t*, uint8_t*>> primed_allocations;
   vector<int64_t> allocation_sizes;
 
   int64_t expected_pool_size = 0;
@@ -193,4 +193,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

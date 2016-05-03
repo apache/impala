@@ -94,7 +94,7 @@ class SimpleScheduler : public Scheduler {
 
   /// Map from a datanode's IP address to a list of backend addresses running on that
   /// node.
-  typedef boost::unordered_map<std::string, std::list<TBackendDescriptor> > BackendMap;
+  typedef boost::unordered_map<std::string, std::list<TBackendDescriptor>> BackendMap;
   BackendMap backend_map_;
 
   /// Map from a datanode's hostname to its IP address to support both hostname based

@@ -204,7 +204,7 @@ class ThriftServer {
 
   /// Map of active connection context to a shared_ptr containing that context; when an
   /// item is removed from the map, it is automatically freed.
-  typedef boost::unordered_map<ConnectionContext*, boost::shared_ptr<ConnectionContext> >
+  typedef boost::unordered_map<ConnectionContext*, boost::shared_ptr<ConnectionContext>>
       ConnectionContextSet;
   ConnectionContextSet connection_contexts_;
 

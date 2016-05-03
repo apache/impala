@@ -165,7 +165,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
   vector<string>* result_set_;
 
   // Set to result_set_ if result_set_ is owned.
-  scoped_ptr<vector<string> > owned_result_set_;
+  scoped_ptr<vector<string>> owned_result_set_;
 };
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {

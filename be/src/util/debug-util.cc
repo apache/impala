@@ -124,7 +124,7 @@ bool ParseId(const string& s, TUniqueId* id) {
   if (separator == NULL) {
     // Legacy compatibility branch
     char_separator<char> sep(" ");
-    tokenizer< char_separator<char> > tokens(s, sep);
+    tokenizer< char_separator<char>> tokens(s, sep);
     int i = 0;
     for (const string& token: tokens) {
       StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;

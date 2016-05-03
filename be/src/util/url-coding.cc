@@ -107,7 +107,7 @@ bool UrlDecode(const string& in, string* out, bool hive_compat) {
 }
 
 static inline void Base64Encode(const char* in, int in_len, stringstream* out) {
-  typedef base64_from_binary<transform_width<const char*, 6, 8> > base64_encode;
+  typedef base64_from_binary<transform_width<const char*, 6, 8>> base64_encode;
   // Base64 encodes 8 byte chars as 6 bit values.
   stringstream::pos_type len_before = out->tellp();
   copy(base64_encode(in), base64_encode(in + in_len), std::ostream_iterator<char>(*out));

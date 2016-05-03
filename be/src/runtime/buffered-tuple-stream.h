@@ -358,11 +358,11 @@ class BufferedTupleStream {
 
   /// Vectors of all the strings slots that have their varlen data stored in stream
   /// grouped by tuple_idx.
-  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > inlined_string_slots_;
+  std::vector<std::pair<int, std::vector<SlotDescriptor*>>> inlined_string_slots_;
 
   /// Vectors of all the collection slots that have their varlen data stored in the
   /// stream, grouped by tuple_idx.
-  std::vector<std::pair<int, std::vector<SlotDescriptor*> > > inlined_coll_slots_;
+  std::vector<std::pair<int, std::vector<SlotDescriptor*>>> inlined_coll_slots_;
 
   /// Block manager and client used to allocate, pin and release blocks. Not owned.
   BufferedBlockMgr* block_mgr_;

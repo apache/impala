@@ -56,8 +56,8 @@ TEST(SessionTest, TestExpiry) {
   EXPECT_EQ(beeswax_session_metric->value(), 0L);
 
   {
-    scoped_ptr<ThriftClient<ImpalaServiceClient> > beeswax_clients[5];
-    scoped_ptr<ThriftClient<ImpalaHiveServer2ServiceClient> > hs2_clients[5];
+    scoped_ptr<ThriftClient<ImpalaServiceClient>> beeswax_clients[5];
+    scoped_ptr<ThriftClient<ImpalaHiveServer2ServiceClient>> hs2_clients[5];
 
     // Create five Beeswax clients and five HS2 clients (each HS2 gets one session each)
     for (int i = 0; i < 5; ++i) {

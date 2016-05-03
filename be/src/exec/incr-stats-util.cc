@@ -188,7 +188,7 @@ namespace impala {
 
 void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
     const vector<TPartitionStats>& existing_part_stats,
-    const vector<vector<string> >& expected_partitions, const TRowSet& rowset,
+    const vector<vector<string>>& expected_partitions, const TRowSet& rowset,
     int32_t num_partition_cols, TAlterTableUpdateStatsParams* params) {
   // The rowset should have the following schema: for every column in the source table,
   // five columns are produced, one row per partition.
@@ -197,7 +197,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
 
   const int num_cols =
       (col_stats_schema.columns.size() - num_partition_cols) / COLUMNS_PER_STAT;
-  unordered_set<vector<string> > seen_partitions;
+  unordered_set<vector<string>> seen_partitions;
   vector<PerColumnStats> stats(num_cols);
 
   if (rowset.rows.size() > 0) {

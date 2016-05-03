@@ -33,7 +33,7 @@ using namespace impala;
 // for the current node and on return, will contain the id of the next node.
 void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
     int new_indent_level, int* node_idx,
-    vector<vector<string> >* result) {
+    vector<vector<string>>* result) {
   DCHECK_LT(*node_idx, exec_summary.nodes.size());
   const TPlanNodeExecSummary& node = exec_summary.nodes[*node_idx];
   const TExecStats& est_stats = node.estimated_stats;
@@ -94,7 +94,7 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
   if (node.num_children == 0) return;
 
   // Print the non-left children to the stream first.
-  vector<vector<string> > child0_result;
+  vector<vector<string>> child0_result;
   PrintExecSummary(exec_summary, indent_level, false, node_idx, &child0_result);
 
   for (int i = 1; i < node.num_children; ++i) {
@@ -121,7 +121,7 @@ string impala::PrintExecSummary(const TExecSummary& exec_summary) {
   printer.AddColumn("Est. Peak Mem", false);
   printer.AddColumn("Detail", true);
 
-  vector<vector<string> > rows;
+  vector<vector<string>> rows;
   int node_idx = 0;
   ::PrintExecSummary(exec_summary, 0, false, &node_idx, &rows);
   for (int i = 0; i < rows.size(); ++i) {

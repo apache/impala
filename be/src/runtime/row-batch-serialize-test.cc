@@ -244,7 +244,7 @@ class RowBatchSerializeTest : public testing::Test {
   // Create a row batch from preconstructed tuples. Each tuple instance for tuple i
   // is consecutively repeated repeats[i] times. The tuple instances are used in the
   // order provided, starting at the beginning once all are used.
-  void AddTuplesToRowBatch(int num_rows, const vector<vector<Tuple*> >& tuples,
+  void AddTuplesToRowBatch(int num_rows, const vector<vector<Tuple*>>& tuples,
       const vector<int>& repeats, RowBatch* batch) {
     int tuples_per_row = batch->row_desc().tuple_descriptors().size();
     ASSERT_EQ(tuples_per_row, tuples.size());
@@ -268,7 +268,7 @@ class RowBatchSerializeTest : public testing::Test {
   // Helper to build a row batch with only one tuple per row.
   void AddTuplesToRowBatch(int num_rows, const vector<Tuple*>& tuples, int repeats,
       RowBatch* batch) {
-    vector<vector<Tuple*> > tmp_tuples(1, tuples);
+    vector<vector<Tuple*>> tmp_tuples(1, tuples);
     vector<int> tmp_repeats(1, repeats);
     AddTuplesToRowBatch(num_rows, tmp_tuples, tmp_repeats, batch);
   }
@@ -435,7 +435,7 @@ void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   // All string dups are consecutive
   repeats.push_back(num_rows / distinct_string_tuples + 1);
   RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));
-  vector<vector<Tuple*> > distinct_tuples(2);
+  vector<vector<Tuple*>> distinct_tuples(2);
   CreateTuples(*row_desc.tuple_descriptors()[0], batch->tuple_data_pool(),
       distinct_int_tuples, 0, 10, &distinct_tuples[0]);
   CreateTuples(*row_desc.tuple_descriptors()[1], batch->tuple_data_pool(),
@@ -571,7 +571,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   string huge_string;
   LOG(INFO) << "Try to resize to " << huge_string_size;
   huge_string.resize(huge_string_size, 'z');
-  vector<vector<Tuple*> > tuples(num_tuples);
+  vector<vector<Tuple*>> tuples(num_tuples);
   vector<int> repeats(num_tuples, 1); // Don't repeat tuples adjacently
   int64_t total_byte_size = 0;
   RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));

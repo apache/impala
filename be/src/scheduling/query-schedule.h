@@ -35,7 +35,7 @@ namespace impala {
 class Coordinator;
 
 /// map from scan node id to a list of scan ranges
-typedef std::map<TPlanNodeId, std::vector<TScanRangeParams> > PerNodeScanRanges;
+typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
 /// map from an impalad host address to the per-node assigned scan ranges;
 /// records scan range assignment for a single fragment
 typedef boost::unordered_map<TNetworkAddress, PerNodeScanRanges>

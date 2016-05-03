@@ -575,7 +575,7 @@ class LlvmCodeGen {
   std::set<std::string> linked_modules_;
 
   /// The vector of functions to automatically JIT compile after FinalizeModule().
-  std::vector<std::pair<llvm::Function*, void**> > fns_to_jit_compile_;
+  std::vector<std::pair<llvm::Function*, void**>> fns_to_jit_compile_;
 
   /// Debug strings that will be outputted by jitted code.  This is a copy of all
   /// strings passed to CodegenDebugTrace.

@@ -54,7 +54,7 @@ typedef __int128_t int128_t;
 typedef boost::multiprecision::number<
     boost::multiprecision::cpp_int_backend<256, 256,
     boost::multiprecision::signed_magnitude,
-    boost::multiprecision::unchecked, void> > int256_t;
+    boost::multiprecision::unchecked, void>> int256_t;
 
 /// There is no implicit assignment from int128_t to int256_t (or in general, the boost
 /// multi precision types and __int128_t).

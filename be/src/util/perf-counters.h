@@ -129,7 +129,7 @@ class PerfCounters {
   std::vector<CounterData> counters_;
   std::vector<std::string> counter_names_;
   std::vector<std::string> snapshot_names_;
-  std::vector<std::vector<int64_t> > snapshots_;
+  std::vector<std::vector<int64_t>> snapshots_;
   /// System perf counters can be grouped together.  The OS will update all grouped counters
   /// at the same time.  This is useful to better correlate counter values.
   int group_fd_;

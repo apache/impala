@@ -298,7 +298,7 @@ class HdfsParquetTableWriter::ColumnWriter :
   static const int DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD = 100;
 
   // Encoder for dictionary encoding for different columns. Only one is set.
-  scoped_ptr<DictEncoder<T> > dict_encoder_;
+  scoped_ptr<DictEncoder<T>> dict_encoder_;
 
   // The number of values added since we last checked the dictionary.
   int num_values_since_dict_size_check_;

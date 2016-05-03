@@ -306,7 +306,7 @@ string AnalyticEvalNode::DebugStateString(bool detailed = false) const {
      << " last_result_idx=" << last_result_idx_;
   if (detailed) {
     ss << " result_tuples idx: [";
-    for (list<pair<int64_t, Tuple*> >::const_iterator it = result_tuples_.begin();
+    for (list<pair<int64_t, Tuple*>>::const_iterator it = result_tuples_.begin();
         it != result_tuples_.end(); ++it) {
       ss << it->first;
       if (*it != result_tuples_.back()) ss << ", ";
@@ -314,7 +314,7 @@ string AnalyticEvalNode::DebugStateString(bool detailed = false) const {
     ss << "]";
     if (fn_scope_ == ROWS && window_.__isset.window_start) {
       ss << " window_tuples idx: [";
-      for (list<pair<int64_t, Tuple*> >::const_iterator it = window_tuples_.begin();
+      for (list<pair<int64_t, Tuple*>>::const_iterator it = window_tuples_.begin();
           it != window_tuples_.end(); ++it) {
         ss << it->first;
         if (*it != window_tuples_.back()) ss << ", ";

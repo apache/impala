@@ -242,7 +242,7 @@ class PlanFragmentExecutor {
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 
   /// typedef for TPlanFragmentInstanceCtx.per_node_scan_ranges
-  typedef std::map<TPlanNodeId, std::vector<TScanRangeParams> > PerNodeScanRanges;
+  typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
 
   /// Main loop of profile reporting thread.
   /// Exits when notified on done_cv_.

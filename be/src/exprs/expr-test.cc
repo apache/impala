@@ -4795,7 +4795,7 @@ TEST_F(ExprTest, ConditionalFunctionIsNotFalse) {
 //   - expected_offsets: mapping of byte sizes to a set valid offsets
 //     exprs that have the same byte size can end up in a number of locations
 void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size,
-    int expected_var_begin, const map<int, set<int> >& expected_offsets) {
+    int expected_var_begin, const map<int, set<int>>& expected_offsets) {
 
   vector<int> offsets;
   set<int> offsets_found;
@@ -4809,7 +4809,7 @@ void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size,
   // Walk the computed offsets and make sure the resulting sets match expected_offsets
   for (int i = 0; i < exprs.size(); ++i) {
     int expr_byte_size = exprs[i]->type().GetByteSize();
-    map<int, set<int> >::const_iterator iter = expected_offsets.find(expr_byte_size);
+    map<int, set<int>>::const_iterator iter = expected_offsets.find(expr_byte_size);
     EXPECT_TRUE(iter != expected_offsets.end());
 
     const set<int>& possible_offsets = iter->second;
@@ -4827,7 +4827,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   ObjectPool pool;
 
   vector<Expr*> exprs;
-  map<int, set<int> > expected_offsets;
+  map<int, set<int>> expected_offsets;
 
   // Test empty exprs
   ValidateLayout(exprs, 0, -1, expected_offsets);

@@ -50,7 +50,7 @@ bool CheckHistogramDistribution(const StringVal& actual,
   vector<string> str_vals;
   split(str_vals, result, is_any_of(","));
 
-  accumulator_set<int, stats<tag::variance> > acc;
+  accumulator_set<int, stats<tag::variance>> acc;
   int prev_val = -1;
   for (string& s: str_vals) {
     trim(s);

@@ -637,7 +637,7 @@ class BufferedBlockMgr {
   /// map contains only weak ptrs. BufferedBlockMgrs that are handed out are shared ptrs.
   /// When all the shared ptrs are no longer referenced, the BufferedBlockMgr
   /// d'tor will be called at which point the weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<BufferedBlockMgr> >
+  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<BufferedBlockMgr>>
       BlockMgrsMap;
   static BlockMgrsMap query_to_block_mgrs_;
 

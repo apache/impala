@@ -49,7 +49,7 @@ class TmpFileMgrTest : public ::testing::Test {
         "tmp-file-mgr.active-scratch-dirs");
     EXPECT_EQ(active.size(), active_metric->value());
     SetMetric<string>* active_set_metric =
-        metrics_->FindMetricForTesting<SetMetric<string> >(
+        metrics_->FindMetricForTesting<SetMetric<string>>(
         "tmp-file-mgr.active-scratch-dirs.list");
     set<string> active_set = active_set_metric->value();
     EXPECT_EQ(active.size(), active_set.size());

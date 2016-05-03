@@ -677,7 +677,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// Thread pool to process cancellation requests that come from failed Impala demons to
   /// avoid blocking the statestore callback.
-  boost::scoped_ptr<ThreadPool<CancellationWork> > cancellation_thread_pool_;
+  boost::scoped_ptr<ThreadPool<CancellationWork>> cancellation_thread_pool_;
 
   /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
   /// which are idle for more their timeout values.
@@ -695,7 +695,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// map from query id to exec state; QueryExecState is owned by us and referenced
   /// as a shared_ptr to allow asynchronous deletion
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<QueryExecState> >
+  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<QueryExecState>>
       QueryExecStateMap;
   QueryExecStateMap query_exec_state_map_;
   boost::mutex query_exec_state_map_lock_;  // protects query_exec_state_map_
@@ -827,7 +827,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::mutex session_state_map_lock_;
 
   /// A map from session identifier to a structure containing per-session information
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<SessionState> >
+  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<SessionState>>
     SessionStateMap;
   SessionStateMap session_state_map_;
 
@@ -838,7 +838,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// when the connection ends. HS2 allows for multiplexing several sessions across a
   /// single connection. If a session has already been closed (only possible via HS2) it is
   /// not removed from this map to avoid the cost of looking it up.
-  typedef boost::unordered_map<TUniqueId, std::vector<TUniqueId> >
+  typedef boost::unordered_map<TUniqueId, std::vector<TUniqueId>>
     ConnectionToSessionMap;
   ConnectionToSessionMap connection_to_sessions_map_;
 
@@ -863,7 +863,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::mutex query_locations_lock_;
 
   /// A map from backend to the list of queries currently running there.
-  typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId> >
+  typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId>>
       QueryLocations;
   QueryLocations query_locations_;
 
@@ -918,7 +918,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// Map of short usernames of authorized proxy users to the set of user(s) they are
   /// allowed to delegate to. Populated by parsing the --authorized_proxy_users_config
   /// flag.
-  typedef boost::unordered_map<std::string, boost::unordered_set<std::string> >
+  typedef boost::unordered_map<std::string, boost::unordered_set<std::string>>
       ProxyUserMap;
   ProxyUserMap authorized_proxy_user_config_;
 

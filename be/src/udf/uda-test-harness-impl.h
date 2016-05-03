@@ -181,7 +181,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteSingleNode(
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes,
     ScopedFunctionContext* result_context) {
-  std::vector<boost::shared_ptr<ScopedFunctionContext> > contexts;
+  std::vector<boost::shared_ptr<ScopedFunctionContext>> contexts;
   std::vector<INTERMEDIATE> intermediates;
   contexts.resize(num_nodes);
 
@@ -237,7 +237,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes,
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
     int num1, int num2, ScopedFunctionContext* result_context) {
-  std::vector<boost::shared_ptr<ScopedFunctionContext> > level1_contexts, level2_contexts;
+  std::vector<boost::shared_ptr<ScopedFunctionContext>> level1_contexts, level2_contexts;
   std::vector<INTERMEDIATE> level1_intermediates, level2_intermediates;
   level1_contexts.resize(num1);
   level2_contexts.resize(num2);
