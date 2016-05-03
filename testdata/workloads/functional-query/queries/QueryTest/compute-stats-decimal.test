@@ -1,17 +1,17 @@
 ====
 ---- QUERY
 # test compute stats on a partitioned decimal text table
-create table compute_stats_db.decimal_tbl like functional.decimal_tbl;
-insert into compute_stats_db.decimal_tbl partition(d6)
+create table decimal_tbl like functional.decimal_tbl;
+insert into decimal_tbl partition(d6)
 select * from functional.decimal_tbl;
 ====
 ---- QUERY
-compute stats compute_stats_db.decimal_tbl
+compute stats decimal_tbl
 ---- RESULTS
 'Updated 1 partition(s) and 5 column(s).'
 ====
 ---- QUERY
-show table stats compute_stats_db.decimal_tbl
+show table stats decimal_tbl
 ---- LABELS
 d6, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
 ---- RESULTS
@@ -21,7 +21,7 @@ d6, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental St
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.decimal_tbl
+show column stats decimal_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -36,16 +36,16 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test compute stats on a mixed-type parquet table
-create table compute_stats_db.mixed_types(a int, b decimal(10,0)) stored as parquet;
-insert into compute_stats_db.mixed_types values (1, 2), (3, 4);
+create table mixed_types(a int, b decimal(10,0)) stored as parquet;
+insert into mixed_types values (1, 2), (3, 4);
 ====
 ---- QUERY
-compute stats compute_stats_db.mixed_types
+compute stats mixed_types
 ---- RESULTS
 'Updated 1 partition(s) and 2 column(s).'
 ====
 ---- QUERY
-show table stats compute_stats_db.mixed_types
+show table stats mixed_types
 ---- LABELS
 #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
 ---- RESULTS
@@ -54,7 +54,7 @@ show table stats compute_stats_db.mixed_types
 BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.mixed_types
+show column stats mixed_types
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS

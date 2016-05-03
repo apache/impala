@@ -304,6 +304,8 @@ class ImpalaTestSuite(BaseTestSuite):
         test_section['RESULTS'] = test_section['RESULTS'] \
             .replace('$NAMENODE', NAMENODE) \
             .replace('$IMPALA_HOME', IMPALA_HOME)
+        if use_db:
+          test_section['RESULTS'] = test_section['RESULTS'].replace('$DATABASE', use_db)
         verify_raw_results(test_section, result,
                          vector.get_value('table_format').file_format,
                          pytest.config.option.update_results)

@@ -1,19 +1,19 @@
 ====
 ---- QUERY
 # test computing stats on a partitioned text table with all types
-create table compute_stats_db.alltypes_incremental like functional.alltypes;
-insert into compute_stats_db.alltypes_incremental partition(year, month)
+create table alltypes_incremental like functional.alltypes;
+insert into alltypes_incremental partition(year, month)
 select * from functional.alltypes;
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.alltypes_incremental
+compute incremental stats alltypes_incremental
 ---- RESULTS
 'Updated 24 partition(s) and 11 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.alltypes_incremental
+show table stats alltypes_incremental
 ---- RESULTS
 '2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 '2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
@@ -44,7 +44,7 @@ show table stats compute_stats_db.alltypes_incremental
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.alltypes_incremental
+show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -65,10 +65,10 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
-drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=12)
+drop incremental stats alltypes_incremental partition(year=2010, month=12)
 ====
 ---- QUERY
-show table stats compute_stats_db.alltypes_incremental;
+show table stats alltypes_incremental;
 ---- RESULTS
 '2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 '2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
@@ -99,14 +99,14 @@ show table stats compute_stats_db.alltypes_incremental;
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.alltypes_incremental
+compute incremental stats alltypes_incremental
 ---- RESULTS
 'Updated 1 partition(s) and 11 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.alltypes_incremental;
+show table stats alltypes_incremental;
 ---- RESULTS
 '2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 '2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
@@ -137,7 +137,7 @@ show table stats compute_stats_db.alltypes_incremental;
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.alltypes_incremental
+show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -158,18 +158,18 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
-create table compute_stats_db.incremental_empty_partitioned (i int) partitioned by (j int);
-alter table compute_stats_db.incremental_empty_partitioned add partition (j=1);
+create table incremental_empty_partitioned (i int) partitioned by (j int);
+alter table incremental_empty_partitioned add partition (j=1);
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.incremental_empty_partitioned;
+compute incremental stats incremental_empty_partitioned;
 ---- RESULTS
 'Updated 1 partition(s) and 1 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.incremental_empty_partitioned;
+show table stats incremental_empty_partitioned;
 ---- RESULTS
 '1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total',0,0,'0B','0B','','','',''
@@ -177,18 +177,18 @@ show table stats compute_stats_db.incremental_empty_partitioned;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-drop stats compute_stats_db.incremental_empty_partitioned;
+drop stats incremental_empty_partitioned;
 ====
 ---- QUERY
 # IMPALA-2199: Test that compute incremental stats with a partition spec on an empty partition populates the row count.
-compute incremental stats compute_stats_db.incremental_empty_partitioned partition(j=1);
+compute incremental stats incremental_empty_partitioned partition(j=1);
 ---- RESULTS
 'Updated 1 partition(s) and 1 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.incremental_empty_partitioned;
+show table stats incremental_empty_partitioned;
 ---- RESULTS
 '1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total',0,0,'0B','0B','','','',''
@@ -196,18 +196,18 @@ show table stats compute_stats_db.incremental_empty_partitioned;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=1);
-drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=2);
+drop incremental stats alltypes_incremental partition(year=2010, month=1);
+drop incremental stats alltypes_incremental partition(year=2010, month=2);
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=2);
+compute incremental stats alltypes_incremental partition(year=2010, month=2);
 ---- RESULTS
 'Updated 1 partition(s) and 11 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.alltypes_incremental;
+show table stats alltypes_incremental;
 ---- RESULTS
 '2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 '2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
@@ -238,7 +238,7 @@ show table stats compute_stats_db.alltypes_incremental;
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.alltypes_incremental
+show column stats alltypes_incremental
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -260,8 +260,8 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Confirm that dropping stats drops incremental stats as well
-drop stats compute_stats_db.alltypes_incremental;
-show table stats compute_stats_db.alltypes_incremental;
+drop stats alltypes_incremental;
+show table stats alltypes_incremental;
 ---- RESULTS
 '2009','1',-1,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
 '2009','2',-1,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
@@ -293,14 +293,14 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test that many partition keys work correctly
-create table compute_stats_db.incremental_many_part_keys(col int)
+create table incremental_many_part_keys(col int)
 partitioned by (p1 int, p2 int, p3 int, p4 int, p5 int, p6 int);
-insert into compute_stats_db.incremental_many_part_keys
+insert into incremental_many_part_keys
 partition(p1=1, p2=2, p3=3, p4=4, p5=5, p6=6) values(1);
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.incremental_many_part_keys;
-show table stats compute_stats_db.incremental_many_part_keys;
+compute incremental stats incremental_many_part_keys;
+show table stats incremental_many_part_keys;
 ---- RESULTS
 '1','2','3','4','5','6',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total','','','','','',1,1,'2B','0B','','','',''
@@ -308,13 +308,13 @@ show table stats compute_stats_db.incremental_many_part_keys;
 STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table compute_stats_db.incremental_null_part_key(col int) partitioned by (p int);
-insert into compute_stats_db.incremental_null_part_key partition(p) values(1,NULL), (1,2);
-compute incremental stats compute_stats_db.incremental_null_part_key partition(p=2);
+create table incremental_null_part_key(col int) partitioned by (p int);
+insert into incremental_null_part_key partition(p) values(1,NULL), (1,2);
+compute incremental stats incremental_null_part_key partition(p=2);
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.incremental_null_part_key partition(p=NULL);
-show table stats compute_stats_db.incremental_null_part_key;
+compute incremental stats incremental_null_part_key partition(p=NULL);
+show table stats incremental_null_part_key;
 ---- RESULTS
 'NULL',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 '2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
@@ -324,12 +324,12 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that incremental stats queries handle partitions with keyword names
-create table compute_stats_db.incremental_keyword_part_key(col int) partitioned by
+create table incremental_keyword_part_key(col int) partitioned by
 (`date` int);
-insert into compute_stats_db.incremental_keyword_part_key partition(`date`=1) values(2);
-compute incremental stats compute_stats_db.incremental_keyword_part_key
+insert into incremental_keyword_part_key partition(`date`=1) values(2);
+compute incremental stats incremental_keyword_part_key
 partition(`date`=1);
-show table stats compute_stats_db.incremental_keyword_part_key;
+show table stats incremental_keyword_part_key;
 ---- RESULTS
 '1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total',1,1,'2B','0B','','','',''
@@ -337,9 +337,9 @@ show table stats compute_stats_db.incremental_keyword_part_key;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-drop stats compute_stats_db.incremental_keyword_part_key;
-compute incremental stats compute_stats_db.incremental_keyword_part_key;
-show table stats compute_stats_db.incremental_keyword_part_key;
+drop stats incremental_keyword_part_key;
+compute incremental stats incremental_keyword_part_key;
+show table stats incremental_keyword_part_key;
 ---- RESULTS
 '1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total',1,1,'2B','0B','','','',''
@@ -347,13 +347,13 @@ show table stats compute_stats_db.incremental_keyword_part_key;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table compute_stats_db.incremental_string_part_value(col int) partitioned by
+create table incremental_string_part_value(col int) partitioned by
 (p string);
-insert into compute_stats_db.incremental_string_part_value partition(p="test_string")
+insert into incremental_string_part_value partition(p="test_string")
 values(2);
-compute incremental stats compute_stats_db.incremental_string_part_value
+compute incremental stats incremental_string_part_value
 partition(p="test_string");
-show table stats compute_stats_db.incremental_string_part_value;
+show table stats incremental_string_part_value;
 ---- RESULTS
 'test_string',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total',1,1,'2B','0B','','','',''
@@ -362,15 +362,15 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that dropping a column still allows stats to be computed
-create table compute_stats_db.incremental_drop_column (a int, b int, c int)
+create table incremental_drop_column (a int, b int, c int)
 partitioned by (d int);
-alter table compute_stats_db.incremental_drop_column add partition (d=1);
-insert into compute_stats_db.incremental_drop_column partition(d=1) values (4,4,4);
-compute incremental stats compute_stats_db.incremental_drop_column;
-alter table compute_stats_db.incremental_drop_column drop column c;
-alter table compute_stats_db.incremental_drop_column drop column b;
-compute incremental stats compute_stats_db.incremental_drop_column;
-show table stats compute_stats_db.incremental_drop_column;
+alter table incremental_drop_column add partition (d=1);
+insert into incremental_drop_column partition(d=1) values (4,4,4);
+compute incremental stats incremental_drop_column;
+alter table incremental_drop_column drop column c;
+alter table incremental_drop_column drop column b;
+compute incremental stats incremental_drop_column;
+show table stats incremental_drop_column;
 ---- RESULTS
 '1',1,1,'6B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 'Total',1,1,'6B','0B','','','',''
@@ -379,13 +379,13 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that adding a column invalidates all incremental stats
-create table compute_stats_db.incremental_add_column (col int) partitioned by (p int);
-insert into compute_stats_db.incremental_add_column partition(p) values(1,1),(2,2);
-compute incremental stats compute_stats_db.incremental_add_column;
-insert into compute_stats_db.incremental_add_column partition(p) values(1,1);
-alter table compute_stats_db.incremental_add_column add columns (c int);
-compute incremental stats compute_stats_db.incremental_add_column;
-show table stats compute_stats_db.incremental_add_column;
+create table incremental_add_column (col int) partitioned by (p int);
+insert into incremental_add_column partition(p) values(1,1),(2,2);
+compute incremental stats incremental_add_column;
+insert into incremental_add_column partition(p) values(1,1);
+alter table incremental_add_column add columns (c int);
+compute incremental stats incremental_add_column;
+show table stats incremental_add_column;
 ---- RESULTS
 '1',2,2,'4B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
 '2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
@@ -394,19 +394,19 @@ show table stats compute_stats_db.incremental_add_column;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table compute_stats_db.incremental_no_partitions (col int) partitioned by (p int);
-compute incremental stats compute_stats_db.incremental_no_partitions;
-show table stats compute_stats_db.incremental_no_partitions;
+create table incremental_no_partitions (col int) partitioned by (p int);
+compute incremental stats incremental_no_partitions;
+show table stats incremental_no_partitions;
 ---- RESULTS
 'Total',0,0,'0B','0B','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table compute_stats_db.incremental_not_partitioned (col int);
-insert into compute_stats_db.incremental_not_partitioned values(1),(2);
-compute incremental stats compute_stats_db.incremental_not_partitioned;
-show table stats compute_stats_db.incremental_not_partitioned;
+create table incremental_not_partitioned (col int);
+insert into incremental_not_partitioned values(1),(2);
+compute incremental stats incremental_not_partitioned;
+show table stats incremental_not_partitioned;
 ---- RESULTS
 2,1,'4B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
 ---- TYPES
@@ -418,7 +418,7 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # The values of date_string_col always have exactly 8 characters. The CHAR/VARCHAR
 # sizes below are chosen such that they are smaller, equal, and greater than the
 # source data values, in particular, to test the CHAR padding behavior.
-create table compute_stats_db.chars_tbl (
+create table chars_tbl (
   id int,
   ch1 char(1),
   ch2 char(8),
@@ -433,7 +433,7 @@ partitioned by (
   day varchar(13)
 );
 
-insert overwrite compute_stats_db.chars_tbl partition(year, day)
+insert overwrite chars_tbl partition(year, day)
 select
 id,
 cast(date_string_col as char(1)),
@@ -453,14 +453,14 @@ year=2010 /day=3/: 1000
 year=2010 /day=__HIVE_DEFAULT_PARTITION__/: 1000
 ====
 ---- QUERY
-compute incremental stats compute_stats_db.chars_tbl
+compute incremental stats chars_tbl
 ---- RESULTS
 'Updated 3 partition(s) and 8 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.chars_tbl
+show column stats chars_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -479,18 +479,18 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Populate a new partition to verify the incremental stats update
-insert into compute_stats_db.chars_tbl partition(year, day)
+insert into chars_tbl partition(year, day)
 select null, cast('x' as char(1)), cast('x' as char(8)), cast('x' as char(20)),
 null, cast('x' as varchar(1)), cast('x' as varchar(8)), cast('x' as varchar(20)),
 cast('abc' as char(5)), cast('xyz' as varchar(13));
-compute incremental stats compute_stats_db.chars_tbl;
+compute incremental stats chars_tbl;
 ---- RESULTS
 'Updated 1 partition(s) and 8 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.chars_tbl
+show column stats chars_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS

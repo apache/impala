@@ -24,9 +24,6 @@ from tests.util.filesystem_utils import WAREHOUSE
 # TODO: Merge this test file with test_col_stats.py
 @SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestComputeStats(ImpalaTestSuite):
-  TEST_DB_NAME = "compute_stats_db"
-  TEST_ALIASING_DB_NAME = "parquet"
-
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -39,40 +36,38 @@ class TestComputeStats(ImpalaTestSuite):
     # are different for different file formats.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  def setup_method(self, method):
-    # cleanup and create a fresh test database
-    self.cleanup_db(self.TEST_DB_NAME)
-    self.execute_query("create database {0} location '{1}/{0}.db'"
-        .format(self.TEST_DB_NAME, WAREHOUSE))
-    # cleanup and create a fresh test database whose name is a keyword
-    self.cleanup_db(self.TEST_ALIASING_DB_NAME)
-    self.execute_query("create database `{0}` location '{1}/{0}.db'"
-        .format(self.TEST_ALIASING_DB_NAME, WAREHOUSE))
-
-  def teardown_method(self, method):
-    self.cleanup_db(self.TEST_DB_NAME)
-    self.cleanup_db(self.TEST_ALIASING_DB_NAME)
-
   @SkipIfLocal.hdfs_blocks
-  @pytest.mark.execute_serially
-  def test_compute_stats(self, vector):
-    self.run_test_case('QueryTest/compute-stats', vector)
+  def test_compute_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/compute-stats', vector, unique_database)
     # Test compute stats on decimal columns separately so we can vary between CDH4/5
-    self.run_test_case('QueryTest/compute-stats-decimal', vector)
+    self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
+
+  def test_compute_stats_incremental(self, vector, unique_database):
+    self.run_test_case('QueryTest/compute-stats-incremental', vector, unique_database)
+
+  @pytest.mark.execute_serially
+  def test_compute_stats_many_partitions(self, vector):
     # To cut down on test execution time, only run the compute stats test against many
     # partitions if performing an exhaustive test run.
     if self.exploration_strategy() != 'exhaustive': return
     self.run_test_case('QueryTest/compute-stats-many-partitions', vector)
 
   @pytest.mark.execute_serially
-  def test_compute_stats_incremental(self, vector):
-    self.run_test_case('QueryTest/compute-stats-incremental', vector)
+  def test_compute_stats_keywords(self, vector):
+    """IMPALA-1055: Tests compute stats with a db/table name that are keywords."""
+    self.execute_query("drop database if exists `parquet` cascade")
+    self.execute_query("create database `parquet`")
+    self.execute_query("create table `parquet`.impala_1055 (id INT)")
+    self.execute_query("create table `parquet`.`parquet` (id INT)")
+    try:
+      self.run_test_case('QueryTest/compute-stats-keywords', vector)
+    finally:
+      self.cleanup_db("parquet")
 
-  @pytest.mark.execute_serially
   @SkipIfS3.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
-  def test_compute_stats_impala_2201(self, vector):
+  def test_compute_stats_impala_2201(self, vector, unique_database):
     """IMPALA-2201: Tests that the results of compute incremental stats are properly
     persisted when the data was loaded from Hive with hive.stats.autogather=true.
     """
@@ -89,31 +84,31 @@ class TestComputeStats(ImpalaTestSuite):
       create table {0}.{1} (c int) partitioned by (p1 int, p2 string);
       insert overwrite table {0}.{1} partition (p1=1, p2="pval")
       select id from functional.alltypestiny;
-    """.format(self.TEST_DB_NAME, table_name)
+    """.format(unique_database, table_name)
     check_call(["hive", "-e", create_load_data_stmts])
 
     # Make the table visible in Impala.
-    self.execute_query("invalidate metadata %s.%s" % (self.TEST_DB_NAME, table_name))
+    self.execute_query("invalidate metadata %s.%s" % (unique_database, table_name))
 
     # Check that the row count was populated during the insert. We expect 8 rows
     # because functional.alltypestiny has 8 rows, but Hive's auto stats gathering
     # is known to be flaky and sometimes sets the row count to 0. So we check that
     # the row count is not -1 instead of checking for 8 directly.
     show_result = \
-      self.execute_query("show table stats %s.%s" % (self.TEST_DB_NAME, table_name))
+      self.execute_query("show table stats %s.%s" % (unique_database, table_name))
     assert(len(show_result.data) == 2)
     assert("1\tpval\t-1" not in show_result.data[0])
 
     # Compute incremental stats on the single test partition.
     self.execute_query("compute incremental stats %s.%s partition (p1=1, p2='pval')"
-      % (self.TEST_DB_NAME, table_name))
+      % (unique_database, table_name))
 
     # Invalidate metadata to force reloading the stats from the Hive Metastore.
-    self.execute_query("invalidate metadata %s.%s" % (self.TEST_DB_NAME, table_name))
+    self.execute_query("invalidate metadata %s.%s" % (unique_database, table_name))
 
     # Check that the row count is still 8.
     show_result = \
-      self.execute_query("show table stats %s.%s" % (self.TEST_DB_NAME, table_name))
+      self.execute_query("show table stats %s.%s" % (unique_database, table_name))
     assert(len(show_result.data) == 2)
     assert("1\tpval\t8" in show_result.data[0])
 
@@ -130,9 +125,8 @@ class TestCorruptTableStats(TestComputeStats):
     # are different for different file formats.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  @pytest.mark.execute_serially
-  def test_corrupted_stats(self, vector):
+  def test_corrupt_stats(self, vector, unique_database):
     """IMPALA-1983: Test that in the presence of corrupt table statistics a warning is
     issued and the small query optimization is disabled."""
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
-    self.run_test_case('QueryTest/corrupt_stats', vector)
+    self.run_test_case('QueryTest/corrupt-stats', vector, unique_database)

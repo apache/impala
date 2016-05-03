@@ -1,0 +1,15 @@
+====
+---- QUERY
+COMPUTE STATS `parquet`.impala_1055
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+COMPUTE STATS `parquet`.`parquet`
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
