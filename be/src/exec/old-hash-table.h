@@ -211,8 +211,9 @@ class OldHashTable {
   }
 
   /// Can be called after all insert calls to generate runtime filters, which are then
-  /// published to the local runtime state's RuntimeFilterBank.
-  void AddBloomFilters();
+  /// published to the local runtime state's RuntimeFilterBank. Returns the number of
+  /// filters that are enabled.
+  int AddBloomFilters();
 
   /// Returns an iterator at the beginning of the hash table.  Advancing this iterator
   /// will traverse all elements.

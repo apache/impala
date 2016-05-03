@@ -136,7 +136,8 @@ bool OldHashTable::EvalRow(
   return has_null;
 }
 
-void OldHashTable::AddBloomFilters() {
+int OldHashTable::AddBloomFilters() {
+  int num_enabled_filters = 0;
   vector<BloomFilter*> bloom_filters;
   bloom_filters.resize(filters_.size());
   for (int i = 0; i < filters_.size(); ++i) {
@@ -145,6 +146,7 @@ void OldHashTable::AddBloomFilters() {
     } else {
       bloom_filters[i] =
           state_->filter_bank()->AllocateScratchBloomFilter(filters_[i]->id());
+      ++num_enabled_filters;
     }
   }
 
@@ -166,6 +168,8 @@ void OldHashTable::AddBloomFilters() {
   for (int i = 0; i < filters_.size(); ++i) {
     state_->filter_bank()->UpdateFilterFromLocal(filters_[i]->id(), bloom_filters[i]);
   }
+
+  return num_enabled_filters;
 }
 
 // Helper function to store a value into the results buffer if the expr

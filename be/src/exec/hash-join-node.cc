@@ -21,6 +21,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/old-hash-table.inline.h"
 #include "exprs/expr.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
@@ -36,6 +37,7 @@ DEFINE_bool(enable_probe_side_filtering, true, "Deprecated.");
 
 using namespace impala;
 using namespace llvm;
+using namespace strings;
 
 const char* HashJoinNode::LLVM_CLASS_NAME = "class.impala::HashJoinNode";
 
@@ -227,7 +229,19 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
     if (eos) break;
   }
 
-  hash_tbl_->AddBloomFilters();
+  if (filters_.size() > 0) {
+    int num_enabled_filters = hash_tbl_->AddBloomFilters();
+    if (num_enabled_filters == filters_.size()) {
+      AddRuntimeExecOption(Substitute("$0 of $0 Runtime Filter$1 Published",
+              filters_.size(), filters_.size() == 1 ? "" : "s"));
+    } else {
+      string exec_option = Substitute("$0 of $1 Runtime Filter$2 Published, $3 Disabled",
+          num_enabled_filters, filters_.size(), filters_.size() == 1 ? "" : "s",
+          filters_.size() - num_enabled_filters);
+      AddRuntimeExecOption(exec_option);
+    }
+  }
+
   return Status::OK();
 }
 
