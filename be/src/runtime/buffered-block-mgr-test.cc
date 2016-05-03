@@ -93,7 +93,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
       const string& dir = Substitute("/tmp/buffered-block-mgr-test.$0", i);
       // Fix permissions in case old directories were left from previous runs of test.
       chmod((dir + SCRATCH_SUFFIX).c_str(), S_IRWXU);
-      EXPECT_TRUE(FileSystemUtil::CreateDirectory(dir).ok());
+      EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(dir).ok());
       tmp_dirs.push_back(dir);
       created_tmp_dirs_.push_back(dir);
     }

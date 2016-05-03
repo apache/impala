@@ -34,7 +34,7 @@ using namespace strings;
 // of those functions that throw exceptions.
 namespace impala {
 
-Status FileSystemUtil::CreateDirectory(const string& directory) {
+Status FileSystemUtil::RemoveAndCreateDirectory(const string& directory) {
   error_code errcode;
   bool exists = filesystem::exists(directory, errcode);
   // Need to check for no_such_file_or_directory error case - Boost's exists() sometimes

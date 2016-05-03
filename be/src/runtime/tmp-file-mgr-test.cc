@@ -104,7 +104,7 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
   for (int i = 0; i < tmp_dirs.size(); ++i) {
-    EXPECT_TRUE(FileSystemUtil::CreateDirectory(tmp_dirs[i]).ok());
+    EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dirs[i]).ok());
   }
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get());
@@ -128,7 +128,7 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
   for (int i = 0; i < tmp_dirs.size(); ++i) {
-    EXPECT_TRUE(FileSystemUtil::CreateDirectory(tmp_dirs[i]).ok());
+    EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dirs[i]).ok());
   }
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
@@ -156,7 +156,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
   tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
   for (int i = 0; i < tmp_dirs.size(); ++i) {
-    EXPECT_TRUE(FileSystemUtil::CreateDirectory(tmp_dirs[i]).ok());
+    EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dirs[i]).ok());
   }
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
@@ -201,7 +201,7 @@ TEST_F(TmpFileMgrTest, TestAllocateFails) {
   string tmp_dir("/tmp/tmp-file-mgr-test.1");
   string scratch_subdir = tmp_dir + "/impala-scratch";
   vector<string> tmp_dirs(1, tmp_dir);
-  EXPECT_TRUE(FileSystemUtil::CreateDirectory(tmp_dir).ok());
+  EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dir).ok());
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
 

@@ -100,11 +100,11 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
       }
       // Create the directory, destroying if already present. If this succeeds, we will
       // have an empty writable scratch directory.
-      status = FileSystemUtil::CreateDirectory(scratch_subdir_path.string());
+      status = FileSystemUtil::RemoveAndCreateDirectory(scratch_subdir_path.string());
       if (status.ok()) {
         if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
-        LOG(INFO) << "Using scratch directory " << scratch_subdir_path.string() << " on disk "
-                  << disk_id;
+        LOG(INFO) << "Using scratch directory " << scratch_subdir_path.string() << " on "
+                  << "disk " << disk_id;
         tmp_dirs_.push_back(Dir(scratch_subdir_path.string(), false));
       } else {
         LOG(WARNING) << "Could not remove and recreate directory "
