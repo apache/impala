@@ -75,7 +75,4 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
   def test_grant_revoke(self, vector):
-    if IS_S3:
-      self.run_test_case('QueryTest/grant_revoke_no_insert', vector, use_db="default")
-    else:
-      self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
+    self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
