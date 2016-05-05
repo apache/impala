@@ -316,7 +316,7 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
     RowBatch* output_batch) {
   ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
   size_t num_join_ctxs = join_conjunct_ctxs_.size();
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
   while (!eos_) {
     DCHECK(HasValidProbeRow());
@@ -361,7 +361,7 @@ Status NestedLoopJoinNode::GetNextLeftAntiJoin(RuntimeState* state,
     RowBatch* output_batch) {
   ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
   size_t num_join_ctxs = join_conjunct_ctxs_.size();
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
   while (!eos_) {
     DCHECK(HasValidProbeRow());
@@ -414,7 +414,7 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
   ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
   size_t num_join_ctxs = join_conjunct_ctxs_.size();
   DCHECK(matching_build_rows_ != NULL);
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
   while (!eos_) {
     DCHECK(HasValidProbeRow());
@@ -471,7 +471,7 @@ Status NestedLoopJoinNode::GetNextRightAntiJoin(RuntimeState* state,
   ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
   size_t num_join_ctxs = join_conjunct_ctxs_.size();
   DCHECK(matching_build_rows_ != NULL);
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
   while (!eos_ && HasMoreProbeRows()) {
     DCHECK(HasValidProbeRow());
@@ -557,7 +557,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
   size_t num_ctxs = conjunct_ctxs_.size();
   DCHECK(matching_build_rows_ != NULL);
 
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
   while (!build_row_iterator_.AtEnd()) {
     // This loop can go on for a long time if the conjuncts are very selective. Do query
     // maintenance every N iterations.
@@ -612,7 +612,7 @@ Status NestedLoopJoinNode::FindBuildMatches(
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   size_t num_ctxs = conjunct_ctxs_.size();
 
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
   while (!build_row_iterator_.AtEnd()) {
     DCHECK(current_probe_row_ != NULL);
     TupleRow* output_row = output_batch->GetRow(output_batch->AddRow());

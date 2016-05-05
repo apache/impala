@@ -32,8 +32,8 @@ DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability o
 
 const int RuntimeFilter::SLEEP_PERIOD_MS = 20;
 
-const int32_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
-const int32_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
+const int64_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
+const int64_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
 
 RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state)
     : query_ctx_(query_ctx), state_(state), closed_(false) {
@@ -41,10 +41,26 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
       state->runtime_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES);
 
   // Clamp bloom filter size down to the limits {MIN,MAX}_BLOOM_FILTER_SIZE
-  int32_t bloom_filter_size = query_ctx_.request.query_options.runtime_bloom_filter_size;
-  bloom_filter_size = std::max(bloom_filter_size, MIN_BLOOM_FILTER_SIZE);
-  bloom_filter_size = std::min(bloom_filter_size, MAX_BLOOM_FILTER_SIZE);
-  default_log_filter_size_ = Bits::Log2Ceiling64(bloom_filter_size);
+  max_filter_size_ = query_ctx_.request.query_options.runtime_filter_max_size;
+  max_filter_size_ = max<int64_t>(max_filter_size_, MIN_BLOOM_FILTER_SIZE);
+  max_filter_size_ =
+      BitUtil::RoundUpToPowerOfTwo(min<int64_t>(max_filter_size_, MAX_BLOOM_FILTER_SIZE));
+
+  min_filter_size_ = query_ctx_.request.query_options.runtime_filter_min_size;
+  min_filter_size_ = max<int64_t>(min_filter_size_, MIN_BLOOM_FILTER_SIZE);
+  min_filter_size_ =
+      BitUtil::RoundUpToPowerOfTwo(min<int64_t>(min_filter_size_, MAX_BLOOM_FILTER_SIZE));
+
+  // Make sure that min <= max
+  min_filter_size_ = min<int64_t>(min_filter_size_, max_filter_size_);
+
+  DCHECK_GT(min_filter_size_, 0);
+  DCHECK_GT(max_filter_size_, 0);
+
+  default_filter_size_ = query_ctx_.request.query_options.runtime_bloom_filter_size;
+  default_filter_size_ = max<int64_t>(default_filter_size_, min_filter_size_);
+  default_filter_size_ =
+      BitUtil::RoundUpToPowerOfTwo(min<int64_t>(default_filter_size_, max_filter_size_));
 }
 
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,
@@ -172,11 +188,11 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
 }
 
 int64_t RuntimeFilterBank::GetFilterSizeForNdv(int64_t ndv) {
-  if (ndv == -1) return 1LL << default_log_filter_size_;
+  if (ndv == -1) return default_filter_size_;
   int64_t required_space =
       1LL << BloomFilter::MinLogSpace(ndv, FLAGS_max_filter_error_rate);
-  if (required_space > MAX_BLOOM_FILTER_SIZE) required_space = MAX_BLOOM_FILTER_SIZE;
-  if (required_space < MIN_BLOOM_FILTER_SIZE) required_space = MIN_BLOOM_FILTER_SIZE;
+  required_space = max<int64_t>(required_space, min_filter_size_);
+  required_space = min<int64_t>(required_space, max_filter_size_);
   return required_space;
 }
 

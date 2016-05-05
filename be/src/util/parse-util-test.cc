@@ -31,7 +31,8 @@ TEST(ParseMemSpecs, Basic) {
   bool is_percent;
   int64_t bytes;
 
-  int64_t megabytes = 1024 * 1024;
+  int64_t kilobytes = 1024;
+  int64_t megabytes = 1024 * kilobytes;
   int64_t gigabytes = 1024 * megabytes;
 
   bytes = ParseUtil::ParseMemSpec("1", &is_percent, MemInfo::physical_mem());
@@ -40,6 +41,14 @@ TEST(ParseMemSpecs, Basic) {
 
   bytes = ParseUtil::ParseMemSpec("100b", &is_percent, MemInfo::physical_mem());
   ASSERT_EQ(100, bytes);
+  ASSERT_FALSE(is_percent);
+
+  bytes = ParseUtil::ParseMemSpec("100kb", &is_percent, MemInfo::physical_mem());
+  ASSERT_EQ(100 * 1024, bytes);
+  ASSERT_FALSE(is_percent);
+
+  bytes = ParseUtil::ParseMemSpec("5KB", &is_percent, MemInfo::physical_mem());
+  ASSERT_EQ(5 * 1024, bytes);
   ASSERT_FALSE(is_percent);
 
   bytes = ParseUtil::ParseMemSpec("4MB", &is_percent, MemInfo::physical_mem());
@@ -77,6 +86,7 @@ TEST(ParseMemSpecs, Basic) {
   bad_values.push_back("gb");
   bad_values.push_back("1GMb");
   bad_values.push_back("1b1Mb");
+  bad_values.push_back("1kib");
   bad_values.push_back("1Bb");
   bad_values.push_back("1%%");
   bad_values.push_back("1.1");

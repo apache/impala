@@ -219,6 +219,12 @@ enum TImpalaQueryOptions {
   // the files there.
   // TODO: Find a way to get this working for INSERT OVERWRITEs too.
   S3_SKIP_INSERT_STAGING
+
+  // Maximum runtime filter size, in bytes.
+  RUNTIME_FILTER_MAX_SIZE,
+
+  // Minimum runtime filter size, in bytes.
+  RUNTIME_FILTER_MIN_SIZE
 }
 
 // The summary of an insert.

@@ -46,8 +46,8 @@ class FixedSizeHashTable {
     DCHECK_GT(min_capacity, 0);
     // Capacity cannot be greater than largest uint32_t power of two.
     capacity_ = static_cast<uint32_t>(std::min(static_cast<int64_t>(1) << 31,
-        BitUtil::NextPowerOfTwo(min_capacity)));
-    DCHECK_EQ(capacity_, BitUtil::NextPowerOfTwo(capacity_));
+        BitUtil::RoundUpToPowerOfTwo(min_capacity)));
+    DCHECK_EQ(capacity_, BitUtil::RoundUpToPowerOfTwo(capacity_));
     if (tbl_ != NULL) free(tbl_);
     int64_t tbl_byte_size = capacity_ * sizeof(Entry);
     tbl_ = reinterpret_cast<Entry*>(malloc(tbl_byte_size));

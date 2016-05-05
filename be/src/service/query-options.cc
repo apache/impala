@@ -325,17 +325,26 @@ Status impala::SetQueryOption(const string& key, const string& value,
               " OFF(0), LOCAL(1) or GLOBAL(2).", value));
         }
         break;
+      case TImpalaQueryOptions::RUNTIME_FILTER_MAX_SIZE:
+      case TImpalaQueryOptions::RUNTIME_FILTER_MIN_SIZE:
       case TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE: {
         int64_t size;
         RETURN_IF_ERROR(ParseMemValue(value, "Bloom filter size", &size));
         if (size < RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE ||
             size > RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE) {
-          return Status(Substitute(
-              "$0 is not a valid Bloom filter size. Valid sizes are in [$1, $2].", value,
-              RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
-              RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE));
+          return Status(Substitute("$0 is not a valid Bloom filter size for $1. "
+                  "Valid sizes are in [$2, $3].", value, PrintTImpalaQueryOptions(
+                      static_cast<TImpalaQueryOptions::type>(option)),
+                  RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
+                  RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE));
         }
-        query_options->__set_runtime_bloom_filter_size(size);
+        if (option == TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE) {
+          query_options->__set_runtime_bloom_filter_size(size);
+        } else if (option == TImpalaQueryOptions::RUNTIME_FILTER_MIN_SIZE) {
+          query_options->__set_runtime_filter_min_size(size);
+        } else if (option == TImpalaQueryOptions::RUNTIME_FILTER_MAX_SIZE) {
+          query_options->__set_runtime_filter_max_size(size);
+        }
         break;
       }
       case TImpalaQueryOptions::RUNTIME_FILTER_WAIT_TIME_MS: {

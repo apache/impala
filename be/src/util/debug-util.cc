@@ -56,7 +56,8 @@ namespace impala {
 // Macro to stamp out operator<< for thrift enums.  Why doesn't thrift do this?
 #define THRIFT_ENUM_OUTPUT_FN(E) THRIFT_ENUM_OUTPUT_FN_IMPL(E , _##E##_VALUES_TO_NAMES)
 
-// Macro to implement Print function that returns string for thrift enums
+// Macro to implement Print function that returns string for thrift enums. Make sure you
+// define a corresponding THRIFT_ENUM_OUTPUT_FN.
 #define THRIFT_ENUM_PRINT_FN(E) \
   string Print##E(const E::type& e) {\
     stringstream ss;\
@@ -78,6 +79,7 @@ THRIFT_ENUM_OUTPUT_FN(CompressionCodec);
 THRIFT_ENUM_OUTPUT_FN(Type);
 THRIFT_ENUM_OUTPUT_FN(TMetricKind);
 THRIFT_ENUM_OUTPUT_FN(TUnit);
+THRIFT_ENUM_OUTPUT_FN(TImpalaQueryOptions);
 
 THRIFT_ENUM_PRINT_FN(TCatalogObjectType);
 THRIFT_ENUM_PRINT_FN(TDdlType);
@@ -88,6 +90,7 @@ THRIFT_ENUM_PRINT_FN(QueryState);
 THRIFT_ENUM_PRINT_FN(Encoding);
 THRIFT_ENUM_PRINT_FN(TMetricKind);
 THRIFT_ENUM_PRINT_FN(TUnit);
+THRIFT_ENUM_PRINT_FN(TImpalaQueryOptions);
 
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {

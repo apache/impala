@@ -29,30 +29,38 @@ using namespace std;
 
 TEST(QueryOptions, SetBloomSize) {
   TQueryOptions options;
+  vector<pair<string, int*>> option_list = {
+    {"RUNTIME_BLOOM_FILTER_SIZE", &options.runtime_bloom_filter_size},
+    {"RUNTIME_FILTER_MAX_SIZE", &options.runtime_filter_max_size},
+    {"RUNTIME_FILTER_MIN_SIZE", &options.runtime_filter_min_size}};
+  for (const auto& option: option_list) {
 
-  // The upper and lower bound of the allowed values:
-  EXPECT_FALSE(SetQueryOption("RUNTIME_BLOOM_FILTER_SIZE",
-     lexical_cast<string>(RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE - 1), &options, NULL)
-     .ok());
+    // The upper and lower bound of the allowed values:
+    EXPECT_FALSE(SetQueryOption(option.first,
+        lexical_cast<string>(RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE - 1), &options,
+        NULL)
+        .ok());
 
-  EXPECT_FALSE(SetQueryOption("RUNTIME_BLOOM_FILTER_SIZE",
-      lexical_cast<string>(RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE + 1), &options, NULL)
-      .ok());
+    EXPECT_FALSE(SetQueryOption(option.first,
+        lexical_cast<string>(RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE + 1), &options,
+        NULL)
+        .ok());
 
-  EXPECT_OK(SetQueryOption("RUNTIME_BLOOM_FILTER_SIZE",
-      lexical_cast<string>(RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE), &options, NULL));
-  EXPECT_EQ(RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE, options.runtime_bloom_filter_size);
+    EXPECT_OK(SetQueryOption(option.first,
+        lexical_cast<string>(RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE), &options, NULL));
+    EXPECT_EQ(RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE, *option.second);
 
-  EXPECT_OK(SetQueryOption("RUNTIME_BLOOM_FILTER_SIZE",
-      lexical_cast<string>(RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE), &options, NULL));
-  EXPECT_EQ(RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE, options.runtime_bloom_filter_size);
+    EXPECT_OK(SetQueryOption(option.first,
+        lexical_cast<string>(RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE), &options, NULL));
+    EXPECT_EQ(RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE, *option.second);
 
-  // Parsing memory values works in a reasonable way:
-  EXPECT_OK(SetQueryOption("RUNTIME_BLOOM_FILTER_SIZE", "1MB", &options, NULL));
-  EXPECT_EQ(1 << 20, options.runtime_bloom_filter_size);
+    // Parsing memory values works in a reasonable way:
+    EXPECT_OK(SetQueryOption(option.first, "1MB", &options, NULL));
+    EXPECT_EQ(1 << 20, *option.second);
 
-  // Bloom filters cannot occupy a percentage of memory:
-  EXPECT_FALSE(SetQueryOption("RUNTIME_BLOOM_FILTER_SIZE", "10%", &options, NULL).ok());
+    // Bloom filters cannot occupy a percentage of memory:
+    EXPECT_FALSE(SetQueryOption(option.first, "10%", &options, NULL).ok());
+  }
 }
 
 TEST(QueryOptions, SetFilterWait) {

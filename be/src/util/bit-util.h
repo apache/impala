@@ -51,11 +51,10 @@ class BitUtil {
     return (value / factor) * factor;
   }
 
-  /// Returns the smallest power of two that contains v. Taken from
+  /// Returns the smallest power of two that contains v. If v is a power of two, v is
+  /// returned. Taken from
   /// http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-  /// TODO: Pick a better name, as it is not clear what happens when the input is
-  /// already a power of two.
-  static inline int64_t NextPowerOfTwo(int64_t v) {
+  static inline int64_t RoundUpToPowerOfTwo(int64_t v) {
     --v;
     v |= v >> 1;
     v |= v >> 2;

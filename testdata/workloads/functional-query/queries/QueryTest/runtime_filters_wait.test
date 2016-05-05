@@ -24,6 +24,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 
 SET RUNTIME_FILTER_WAIT_TIME_MS=600000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_MAX_SIZE=4096;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST]
     # Build-side needs to be sufficiently large to trigger FP check.

@@ -49,6 +49,12 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent,
       number_str_len--;
       multiplier = 1024L * 1024L;
       break;
+    case 'k':
+    case 'K':
+      // Kilobytes
+      number_str_len--;
+      multiplier = 1024L;
+      break;
     case '%':
       // Don't allow a suffix of "%B".
       if (suffix_char != mem_spec_str.rbegin()) return -1;

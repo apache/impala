@@ -432,7 +432,7 @@ Status PartitionedAggregationNode::GetRowsFromPartition(RuntimeState* state,
 
   SCOPED_TIMER(get_results_timer_);
   int count = 0;
-  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
+  const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
   // Keeping returning rows from the current partition.
   while (!output_iterator_.AtEnd()) {
     // This loop can go on for a long time if the conjuncts are very selective. Do query

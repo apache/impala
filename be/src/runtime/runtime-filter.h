@@ -100,8 +100,8 @@ class RuntimeFilterBank {
   /// Releases all memory allocated for BloomFilters.
   void Close();
 
-  static const int32_t MIN_BLOOM_FILTER_SIZE = 4 * 1024;           // 4KB
-  static const int32_t MAX_BLOOM_FILTER_SIZE = 16 * 1024 * 1024;   // 16MB
+  static const int64_t MIN_BLOOM_FILTER_SIZE = 4 * 1024;           // 4KB
+  static const int64_t MAX_BLOOM_FILTER_SIZE = 16 * 1024 * 1024;   // 16MB
 
  private:
   /// Returns the the space (in bytes) required for a filter to achieve the configured
@@ -136,8 +136,14 @@ class RuntimeFilterBank {
   /// Total amount of memory allocated to Bloom Filters
   RuntimeProfile::Counter* memory_allocated_;
 
-  /// Precomputed logarithm of default BloomFilter heap size.
-  int default_log_filter_size_;
+  /// Precomputed default BloomFilter size.
+  int64_t default_filter_size_;
+
+  /// Maximum filter size, in bytes, rounded up to a power of two.
+  int64_t max_filter_size_;
+
+  /// Minimum filter size, in bytes, rounded up to a power of two.
+  int64_t min_filter_size_;
 };
 
 /// RuntimeFilters represent set-membership predicates (implemented with bloom filters)

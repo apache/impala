@@ -27,6 +27,7 @@ class ParseUtil {
   /// Sets *is_percent to indicate whether the given spec is in percent.
   /// Accepted formats:
   /// '<int>[bB]?'  -> bytes (default if no unit given)
+  /// '<float>[kK(bB)]' -> kilobytes
   /// '<float>[mM(bB)]' -> megabytes
   /// '<float>[gG(bB)]' -> in gigabytes
   /// '<int>%'      -> in percent of relative_reference

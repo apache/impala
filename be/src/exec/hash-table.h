@@ -423,7 +423,7 @@ class HashTable {
   /// rounded up to a power of two, and also assumes that there are no duplicates.
   static int64_t EstimateNumBuckets(int64_t num_rows) {
     /// Assume max 66% fill factor and no duplicates.
-    return BitUtil::NextPowerOfTwo(3 * num_rows / 2);
+    return BitUtil::RoundUpToPowerOfTwo(3 * num_rows / 2);
   }
   static int64_t EstimateSize(int64_t num_rows) {
     int64_t num_buckets = EstimateNumBuckets(num_rows);

@@ -192,6 +192,12 @@ struct TQueryOptions {
   // those queries, the coordinator deletes all files in the final location before copying
   // the files there.
   45: optional bool s3_skip_insert_staging = true
+
+  // Minimum runtime filter size, in bytes
+  46: optional i32 runtime_filter_min_size = 1048576
+
+  // Maximum runtime filter size, in bytes
+  47: optional i32 runtime_filter_max_size = 16777216
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

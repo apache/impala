@@ -189,7 +189,7 @@ class HashTableTest : public testing::Test {
         &tracker_, runtime_state_, &client).ok());
 
     // Initial_num_buckets must be a power of two.
-    EXPECT_EQ(initial_num_buckets, BitUtil::NextPowerOfTwo(initial_num_buckets));
+    EXPECT_EQ(initial_num_buckets, BitUtil::RoundUpToPowerOfTwo(initial_num_buckets));
     int64_t max_num_buckets = 1L << 31;
     table->reset(new HashTable(quadratic, runtime_state_, client, 1, NULL,
           max_num_buckets, initial_num_buckets));
@@ -354,12 +354,12 @@ class HashTableTest : public testing::Test {
     ProbeTest(hash_table.get(), &ht_ctx, probe_rows, total_rows, true);
 
     // Resize and try again.
-    int target_size = BitUtil::NextPowerOfTwo(2 * total_rows);
+    int target_size = BitUtil::RoundUpToPowerOfTwo(2 * total_rows);
     ResizeTable(hash_table.get(), target_size, &ht_ctx);
     EXPECT_EQ(hash_table->num_buckets(), target_size);
     ProbeTest(hash_table.get(), &ht_ctx, probe_rows, total_rows, true);
 
-    target_size = BitUtil::NextPowerOfTwo(total_rows + 1);
+    target_size = BitUtil::RoundUpToPowerOfTwo(total_rows + 1);
     ResizeTable(hash_table.get(), target_size, &ht_ctx);
     EXPECT_EQ(hash_table->num_buckets(), target_size);
     ProbeTest(hash_table.get(), &ht_ctx, probe_rows, total_rows, true);
