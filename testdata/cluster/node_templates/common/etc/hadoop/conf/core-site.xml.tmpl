@@ -78,6 +78,11 @@ DEFAULT</value>
     <value>${AWS_SECRET_ACCESS_KEY}</value>
   </property>
 
+  <property>
+    <name>fs.s3a.connection.maximum</name>
+    <value>1500</value>
+  </property>
+
   <!-- Location of the KMS key provider -->
   <property>
     <name>hadoop.security.key.provider.path</name>
