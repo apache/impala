@@ -53,7 +53,7 @@ TEST(HdfsUtilTest, CheckFilesystemsMatch) {
   EXPECT_TRUE(FilesystemsMatch("file:///path/to/dir/filename.parq",
                                "file:/path_2/to/dir/filename.parq"));
   EXPECT_FALSE(FilesystemsMatch("file:/path/to/dir/filename.parq",
-                                "file2:/path/to/dir/filename.parq"));
+                                "file2://path/to/dir/filename.parq"));
   EXPECT_FALSE(FilesystemsMatch("hdfs://", "s3a://dummybucket/temp_dir/temp_path"));
   EXPECT_TRUE(FilesystemsMatch("hdfs://namenode", "hdfs://namenode/"));
 
