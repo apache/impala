@@ -46,6 +46,7 @@ pytest == 2.7.2
   py == 1.4.30
 pytest-random == 0.02
 pytest-xdist == 1.12
+python-magic == 0.4.11
 pywebhdfs == 0.3.2
   pbr == 1.8.1
 requests == 2.7.0
