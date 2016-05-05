@@ -45,6 +45,10 @@ IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wl,-fuse-ld=gold")
 ENDIF()
 
+if (IMPALA_TOOLCHAIN)
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN}/binutils-$ENV{IMPALA_BINUTILS_VERSION}/bin/")
+endif()
+
 # On Apple we build with clang and need libstdc++ instead of libc++
 if (APPLE)
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -stdlib=libstdc++")
