@@ -25,7 +25,7 @@ KUDU_COMMON_ARGS=("-webserver_doc_root=$KUDU_WWW_DIR")
 # identifiable in case the pid file is removed.
 KUDU_COMMON_ARGS+=("-vmodule=IBelongToTheMiniCluster")
 
-HOLE_PUNCH_TEST_FILE=$(mktemp)
+HOLE_PUNCH_TEST_FILE=${NODE_DIR}/var/lib/kudu/hole_punch_test
 if ! fallocate -p -o 1 -l 1 "$HOLE_PUNCH_TEST_FILE" &>/dev/null; then
   KUDU_COMMON_ARGS+=("-block_manager=file")
 fi
