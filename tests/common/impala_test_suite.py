@@ -22,6 +22,7 @@ import pytest
 import grp
 import re
 import string
+import subprocess
 import time
 from getpass import getuser
 from functools import wraps
@@ -487,6 +488,25 @@ class ImpalaTestSuite(BaseTestSuite):
     assert table is not None
     self.hive_client.drop_table(db_name, table_name, True)
     self.hive_client.create_table(table)
+
+  def run_stmt_in_hive(self, stmt):
+    """
+    Run a statement in Hive, returning stdout if successful and throwing
+    RuntimeError(stderr) if not.
+    """
+    call = subprocess.Popen(
+        ['beeline',
+         '--outputformat=csv2',
+         '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
+         '-n', getuser(),
+         '-e', stmt],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    (stdout, stderr) = call.communicate()
+    call.wait()
+    if call.returncode != 0:
+      raise RuntimeError(stderr)
+    return stdout
 
   @classmethod
   def create_table_info_dimension(cls, exploration_strategy):
