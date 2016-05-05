@@ -21,7 +21,6 @@ from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIf, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
-# TODO: Merge this test file with test_col_stats.py
 @SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestComputeStats(ImpalaTestSuite):
   @classmethod
@@ -115,7 +114,6 @@ class TestComputeStats(ImpalaTestSuite):
 
 @SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestCorruptTableStats(TestComputeStats):
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestComputeStats, cls).add_test_dimensions()
@@ -130,3 +128,43 @@ class TestCorruptTableStats(TestComputeStats):
     issued and the small query optimization is disabled."""
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
     self.run_test_case('QueryTest/corrupt-stats', vector, unique_database)
+
+
+class TestIncompatibleColStats(TestComputeStats):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIncompatibleColStats, cls).add_test_dimensions()
+    # There is no reason to run these tests using all dimensions.
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+
+  def test_incompatible_col_stats(self, vector, unique_database):
+    """Tests Impala is able to use tables when the column stats data is not compatible
+    with the column type. Regression test for IMPALA-588."""
+
+    # Create a table with a string column and populate it with some data.
+    table_name = unique_database + ".badstats"
+    self.client.execute("create table %s (s string)" % table_name)
+    self.client.execute("insert into table %s select cast(int_col as string) "
+        "from functional.alltypes limit 10" % table_name)
+
+    # Compute stats for this table, they will be for the string column type.
+    self.client.execute("compute stats %s" % table_name)
+
+    # Change the column type to int which will cause a mismatch between the column
+    # stats data and the column type metadata.
+    self.client.execute("alter table %s change s s int" % table_name)
+    # Force a reload of the table metadata.
+    self.client.execute("invalidate metadata %s" % table_name)
+    # Should still be able to load the metadata and query the table.
+    result = self.client.execute("select s from %s" % table_name)
+    assert len(result.data) == 10
+
+    # Recompute stats with the new column type. Impala should now have stats for this
+    # column and should be able to access the table.
+    # TODO: Currently this just verifies Impala can query the table, it does not
+    # verify the stats are there or correct. Expand the verification once Impala has a
+    # mechanism to expose this metadata.
+    self.client.execute("compute stats %s" % table_name)
+    result = self.client.execute("select s from %s" % table_name)
+    assert len(result.data) == 10
