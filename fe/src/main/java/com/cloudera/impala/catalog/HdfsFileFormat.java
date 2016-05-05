@@ -225,9 +225,8 @@ public enum HdfsFileFormat {
       case RC_FILE:
       case SEQUENCE_FILE:
       case AVRO:
-        return true;
       case PARQUET:
-        return false;
+        return true;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
