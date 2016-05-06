@@ -39,8 +39,9 @@ using boost::filesystem::path;
 using boost::filesystem::remove;
 using boost::system::error_code;
 
-DECLARE_int32(max_minidumps);
 DECLARE_string(minidump_path);
+DECLARE_int32(max_minidumps);
+DECLARE_int32(minidump_size_limit_hint_kb);
 
 #define MINIDUMP_LOG_BUF_SIZE 256
 
@@ -185,6 +186,13 @@ Status RegisterMinidump(const char* cmd_line_path) {
   CheckAndRemoveMinidumps(FLAGS_max_minidumps);
 
   google_breakpad::MinidumpDescriptor desc(FLAGS_minidump_path.c_str());
+
+  // Limit filesize if configured.
+  if (FLAGS_minidump_size_limit_hint_kb > 0) {
+    size_t size_limit = 1024 * static_cast<int64_t>(FLAGS_minidump_size_limit_hint_kb);
+    LOG(INFO) << "Setting minidump size limit to " << size_limit << ".";
+    desc.set_size_limit(size_limit);
+  }
 
   // Intentionally leaked. We want this to have the lifetime of the process.
   google_breakpad::ExceptionHandler* eh =

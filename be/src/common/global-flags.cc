@@ -76,6 +76,11 @@ DEFINE_string(minidump_path, "/tmp/impala-minidumps", "Directory to write minidu
 DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
     "Older files are removed first. Set to 0 to keep all minidump files.");
 
+DEFINE_int32(minidump_size_limit_hint_kb, 20480, "Size limit hint for minidump files in "
+    "KB. If a minidump exceeds this value, then breakpad will reduce the stack memory it "
+    "collects for each thread from 8KB to 2KB. However it will always include the full "
+    "stack memory for the first 20 threads, including the thread that crashed.");
+
 DEFINE_bool(load_auth_to_local_rules, false, "If true, load auth_to_local configuration "
     "from hdfs' core-site.xml. When enabled, impalad reads the rules from the property "
     "hadoop.security.auth_to_local and applies them to translate the Kerberos principal "
