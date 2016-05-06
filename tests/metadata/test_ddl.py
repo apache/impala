@@ -61,6 +61,7 @@ class TestDdlStatements(ImpalaTestSuite):
 
   def _cleanup(self):
     map(self.cleanup_db, self.TEST_DBS)
+    if IS_LOCAL: return
     # Cleanup the test table HDFS dirs between test runs so there are no errors the next
     # time a table is created with the same location. This also helps remove any stale
     # data from the last test run.
