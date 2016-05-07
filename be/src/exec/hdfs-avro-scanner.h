@@ -86,6 +86,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
   HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state);
 
+  virtual Status Prepare(ScannerContext* context);
+
   /// Codegen parsing records, writing tuples and evaluating predicates.
   static llvm::Function* Codegen(HdfsScanNode*,
                                  const std::vector<ExprContext*>& conjunct_ctxs);

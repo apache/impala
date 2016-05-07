@@ -41,3 +41,13 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
     doesn't match file schema.
     """
     self.run_test_case('QueryTest/avro-schema-resolution', vector)
+
+  def test_avro_stale_schema(self, vector, unique_database):
+    """Test for IMPALA-3314 and IMPALA-3513. Impalad shouldn't crash with stale avro
+    metadata. Instead, should provide a meaningful error message.
+    """
+    # Create a table with default fileformat and later change it to avro using
+    # alter sql. The query runs with stale metadata and a warning should be raised.
+    # Invalidating metadata should cause the Avro schema to be properly set upon the
+    # next metadata load.
+    self.run_test_case('QueryTest/avro-stale-schema', vector, unique_database)

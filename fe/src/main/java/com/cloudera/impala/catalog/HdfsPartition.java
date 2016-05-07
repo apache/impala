@@ -400,6 +400,10 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fileFormatDescriptor_.getFileFormat().serializationLib());
   }
 
+  public HdfsFileFormat getFileFormat() {
+    return fileFormatDescriptor_.getFileFormat();
+  }
+
   public void setLocation(String place) {
     location_ = table_.getPartitionLocationCompressor().new Location(place);
   }

@@ -134,6 +134,9 @@ public class HdfsTable extends Table {
   // Avro schema of this table if this is an Avro table, otherwise null. Set in load().
   private String avroSchema_ = null;
 
+  // Set to true if any of the partitions have Avro data.
+  private boolean hasAvroData_ = false;
+
   // True if this table's metadata is marked as cached. Does not necessarily mean the
   // data is cached or that all/any partitions are cached.
   private boolean isMarkedCached_ = false;
@@ -1032,6 +1035,7 @@ public class HdfsTable extends Table {
           updatePartitionsFromHms(client, partitionsToUpdate, loadFileMetadata);
         }
       }
+      if (loadTableSchema) setAvroSchema(client, msTbl);
       updateStatsFromHmsTable(msTbl);
     } catch (TableLoadingException e) {
       throw e;
@@ -1245,25 +1249,17 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Loads table schema from Hive Metastore. It also loads column stats.
+   * Sets avroSchema_ if the table or any of the partitions in the table are stored
+   * as Avro. Additionally, this method also reconciles the schema if the column
+   * definitions from the metastore differ from the Avro schema.
    */
-  private void loadSchema(HiveMetaStoreClient client,
+  private void setAvroSchema(HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
-    nonPartFieldSchemas_.clear();
-    // set nullPartitionKeyValue from the hive conf.
-    nullPartitionKeyValue_ = client.getConfigValue(
-        "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
-
-    // set NULL indicator string from table properties
-    nullColumnValue_ =
-        msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
-    if (nullColumnValue_ == null) nullColumnValue_ = DEFAULT_NULL_COLUMN_VALUE;
-
-    // Excludes partition columns.
-    List<FieldSchema> msColDefs = msTbl.getSd().getCols();
+    Preconditions.checkState(!nonPartFieldSchemas_.isEmpty());
     String inputFormat = msTbl.getSd().getInputFormat();
-    if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-      // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+    if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO
+        || hasAvroData_) {
+      // Look for Avro schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
       // taking precedence.
       List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
       schemaSearchLocations.add(
@@ -1271,6 +1267,7 @@ public class HdfsTable extends Table {
       schemaSearchLocations.add(getMetaStoreTable().getParameters());
 
       avroSchema_ = AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
+
       if (avroSchema_ == null) {
         // No Avro schema was explicitly set in the table metadata, so infer the Avro
         // schema from the column definitions.
@@ -1285,7 +1282,7 @@ public class HdfsTable extends Table {
         // indicates there is an issue with the table metadata since Avro table need a
         // non-native serde. Instead of failing to load the table, fall back to
         // using the fields from the storage descriptor (same as Hive).
-        nonPartFieldSchemas_.addAll(msColDefs);
+        return;
       } else {
         // Generate new FieldSchemas from the Avro schema. This step reconciles
         // differences in the column definitions and the Avro schema. For
@@ -1303,11 +1300,36 @@ public class HdfsTable extends Table {
               getFullName(), warning.toString()));
         }
         AvroSchemaUtils.setFromSerdeComment(reconciledColDefs);
+        // Reset and update nonPartFieldSchemas_ to the reconcicled colDefs.
+        nonPartFieldSchemas_.clear();
         nonPartFieldSchemas_.addAll(ColumnDef.toFieldSchemas(reconciledColDefs));
+        // Update the columns as per the reconciled colDefs and re-load stats.
+        clearColumns();
+        addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
+        addColumnsFromFieldSchemas(nonPartFieldSchemas_);
+        loadAllColumnStats(client);
       }
-    } else {
-      nonPartFieldSchemas_.addAll(msColDefs);
     }
+  }
+
+  /**
+   * Loads table schema and column stats from Hive Metastore.
+   */
+  private void loadSchema(HiveMetaStoreClient client,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
+    nonPartFieldSchemas_.clear();
+    // set nullPartitionKeyValue from the hive conf.
+    nullPartitionKeyValue_ = client.getConfigValue(
+        "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
+
+    // set NULL indicator string from table properties
+    nullColumnValue_ =
+        msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
+    if (nullColumnValue_ == null) nullColumnValue_ = DEFAULT_NULL_COLUMN_VALUE;
+
+    // Excludes partition columns.
+    nonPartFieldSchemas_.addAll(msTbl.getSd().getCols());
+
     // The number of clustering columns is the number of partition keys.
     numClusteringCols_ = msTbl.getPartitionKeys().size();
     partitionLocationCompressor_.setClusteringColumns(numClusteringCols_);
@@ -1358,6 +1380,7 @@ public class HdfsTable extends Table {
       // If the partition is null, its HDFS path does not exist, and it was not added to
       // this table's partition list. Skip the partition.
       if (partition == null) continue;
+      if (partition.getFileFormat() == HdfsFileFormat.AVRO) hasAvroData_ = true;
       if (msPartition.getParameters() != null) {
         partition.setNumRows(getRowCount(msPartition.getParameters()));
       }

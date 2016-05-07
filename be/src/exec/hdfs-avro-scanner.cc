@@ -57,6 +57,15 @@ HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
     codegend_decode_avro_data_(NULL) {
 }
 
+Status HdfsAvroScanner::Prepare(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
+  if (scan_node_->avro_schema().schema == NULL) {
+    return Status("Missing Avro schema in scan node. This could be due to stale "
+        "metadata. Running 'invalidate metadata <tablename>' may resolve the problem.");
+  }
+  return Status::OK();
+}
+
 Function* HdfsAvroScanner::Codegen(HdfsScanNode* node,
                                    const vector<ExprContext*>& conjunct_ctxs) {
   if (!node->runtime_state()->codegen_enabled()) return NULL;
@@ -728,6 +737,10 @@ Status HdfsAvroScanner::CodegenReadRecord(
     LlvmCodeGen* codegen, void* void_builder, Function* fn, BasicBlock* insert_before,
     BasicBlock* bail_out, Value* this_val, Value* pool_val, Value* tuple_val,
     Value* data_val) {
+  if (record.schema == NULL) {
+    return Status("Missing Avro schema in scan node. This could be due to stale "
+        "metadata. Running 'invalidate metadata <tablename>' may resolve the problem.");
+  }
   DCHECK_EQ(record.schema->type, AVRO_RECORD);
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder* builder =
