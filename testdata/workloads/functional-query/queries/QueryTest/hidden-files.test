@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-show partitions hidden_files_db.hf
+show partitions test_hidden_files
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
@@ -11,7 +11,7 @@ YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCRE
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-select count(*) from hidden_files_db.hf
+select count(*) from test_hidden_files
 ---- RESULTS
 310
 ---- TYPES

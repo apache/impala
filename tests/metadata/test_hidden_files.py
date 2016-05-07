@@ -6,14 +6,14 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 
-TEST_DB = 'hidden_files_db'
-TEST_TBL = 'hf'
-
 class TestHiddenFiles(ImpalaTestSuite):
   """
   Tests that files with special prefixes/suffixes are considered 'hidden' when
   loading table metadata and running queries.
   """
+
+  # The .test file run in these tests relies this table name.
+  TBL_NAME = "test_hidden_files"
 
   @classmethod
   def get_workload(self):
@@ -28,28 +28,20 @@ class TestHiddenFiles(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive' and not IS_S3:
       cls.TestMatrix.clear()
 
-  def setup_method(self, method):
-    self.cleanup_db(TEST_DB)
-    self.client.execute("create database %s location '%s/%s'" % (TEST_DB, WAREHOUSE,
-      TEST_DB))
-    self.client.execute(
-      "create table %s.%s like functional.alltypes" % (TEST_DB, TEST_TBL))
-    self.client.execute(
-      "alter table %s.%s add partition (year=2010, month=1)" % (TEST_DB, TEST_TBL))
-    self.client.execute(
-      "alter table %s.%s add partition (year=2010, month=2)" % (TEST_DB, TEST_TBL))
+  def __prepare_test_table(self, db_name, tbl_name):
+    """Creates a test table with two partitions, and copies files into the HDFS
+    directories of the two partitions. The goal is to have both an empty and non-empty
+    partition with hidden files."""
 
-    self.__populate_test_table()
-
-  def teardown_method(self, method):
-    self.cleanup_db(TEST_DB)
-
-  def __populate_test_table(self):
-    """Copy files into the HDFS directories of two partitions of the table.
-    The goal is to have both an empty and non-empty partition with hidden files."""
+    self.client.execute(
+      "create table %s.%s like functional.alltypes" % (db_name, tbl_name))
+    self.client.execute(
+      "alter table %s.%s add partition (year=2010, month=1)" % (db_name, tbl_name))
+    self.client.execute(
+      "alter table %s.%s add partition (year=2010, month=2)" % (db_name, tbl_name))
 
     ALLTYPES_LOC = "%s/alltypes" % WAREHOUSE
-    TEST_TBL_LOC = "%s/%s/%s" % (WAREHOUSE, TEST_DB, TEST_TBL)
+    TEST_TBL_LOC = "%s/%s.db/%s" % (WAREHOUSE, db_name, tbl_name)
     # Copy a visible file into one of the partitions.
     check_call(["hadoop", "fs", "-cp",
           "%s/year=2010/month=1/100101.txt" % ALLTYPES_LOC,
@@ -81,15 +73,16 @@ class TestHiddenFiles(ImpalaTestSuite):
           "%s/year=2010/month=2/100201.txt" % ALLTYPES_LOC,
           "%s/year=2010/month=2/100201.txt.tmp" % TEST_TBL_LOC], shell=False)
 
-  @pytest.mark.execute_serially
-  def test_hidden_files_load(self, vector):
+  def test_hidden_files_load(self, vector, unique_database):
     """Tests that an incremental refresh ignores hidden files."""
-    self.client.execute("invalidate metadata %s.%s" % (TEST_DB, TEST_TBL))
-    self.run_test_case('QueryTest/hidden-files', vector)
+    self.__prepare_test_table(unique_database, self.TBL_NAME)
+    self.client.execute("invalidate metadata %s.%s" % (unique_database, self.TBL_NAME))
+    self.run_test_case('QueryTest/hidden-files', vector, unique_database)
 
   # This test runs on one dimension. Therefore, running in it parallel is safe, given no
   # other method in this test class is run.
-  def test_hidden_files_refresh(self, vector):
+  def test_hidden_files_refresh(self, vector, unique_database):
     """Tests that an incremental refresh ignores hidden files."""
-    self.client.execute("refresh %s.%s" % (TEST_DB, TEST_TBL))
-    self.run_test_case('QueryTest/hidden-files', vector)
+    self.__prepare_test_table(unique_database, self.TBL_NAME)
+    self.client.execute("refresh %s.%s" % (unique_database, self.TBL_NAME))
+    self.run_test_case('QueryTest/hidden-files', vector, unique_database)
