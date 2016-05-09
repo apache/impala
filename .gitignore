@@ -14,6 +14,9 @@ org.eclipse.jdt.ui.prefs
 load-*-generated.sql
 bin/version.info
 
+# Cloudera distcc options
+.impala_compiler_opts
+
 pprof.out
 
 TempStatsStore
