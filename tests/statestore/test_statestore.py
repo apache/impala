@@ -21,6 +21,8 @@ import uuid
 import urllib2
 import json
 
+from tests.common.environ import specific_build_type_timeout
+
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -58,6 +60,9 @@ def get_statestore_subscribers(host='localhost', port=25010):
 STATUS_OK = TStatus(TErrorCode.OK)
 DEFAULT_UPDATE_STATE_RESPONSE = TUpdateStateResponse(status=STATUS_OK, topic_updates=[],
                                                      skipped=False)
+
+# IMPALA-3501: the timeout needs to be higher in code coverage builds
+WAIT_FOR_FAILURE_TIMEOUT = specific_build_type_timeout(40, code_coverage_build_timeout=60)
 
 class WildcardServerSocket(TSocket.TSocketBase, TTransport.TServerTransportBase):
   """Specialised server socket that binds to a random port at construction"""
@@ -292,7 +297,8 @@ class StatestoreSubscriber(object):
     finally:
       self.update_event.release()
 
-  def wait_for_failure(self, timeout=40):
+
+  def wait_for_failure(self, timeout=WAIT_FOR_FAILURE_TIMEOUT):
     """Waits until this subscriber no longer appears in the statestore's subscriber
     list. If 'timeout' seconds pass, throws an exception."""
     start = time.time()

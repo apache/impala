@@ -14,9 +14,9 @@
 
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfNotDebugBuild
+from tests.common.skip import SkipIfBuildType
 
-@SkipIfNotDebugBuild.debug_only
+@SkipIfBuildType.not_dev_build
 class TestExchangeDelays(CustomClusterTestSuite):
   """Tests for handling delays in finding data stream receivers"""
 
