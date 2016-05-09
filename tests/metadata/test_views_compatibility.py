@@ -42,7 +42,6 @@ from tests.util.filesystem_utils import WAREHOUSE
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 class TestViewCompatibility(ImpalaTestSuite):
-  TEST_DB_NAME = "view_compat_test_db"
   VALID_SECTION_NAMES = ["CREATE_VIEW", "CREATE_VIEW_RESULTS",\
                         "QUERY_HIVE_VIEW_RESULTS", "QUERY_IMPALA_VIEW_RESULTS"]
 
@@ -62,19 +61,11 @@ class TestViewCompatibility(ImpalaTestSuite):
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  def setup_method(self, method):
-    # cleanup and create a fresh test database
-    self.cleanup_db(self.TEST_DB_NAME)
-    self.execute_query("create database %s location '%s/%s'" % (self.TEST_DB_NAME,
-      WAREHOUSE, self.TEST_DB_NAME))
+  def test_view_compatibility(self, vector, unique_database):
+    self._run_view_compat_test_case('QueryTest/views-compatibility', vector,
+      unique_database)
 
-  def teardown_method(self, method):
-    self.cleanup_db(self.TEST_DB_NAME)
-
-  def test_view_compatibility(self, vector):
-    self._run_view_compat_test_case('QueryTest/views-compatibility', vector)
-
-  def _run_view_compat_test_case(self, test_file_name, vector):
+  def _run_view_compat_test_case(self, test_file_name, vector, test_db_name):
     """
     Runs a view-compatibility test file, containing the following sections:
 
@@ -93,7 +84,7 @@ class TestViewCompatibility(ImpalaTestSuite):
 
     for test_section in sections:
       # validate the test
-      test_case = ViewCompatTestCase(test_section, test_file_name, self.TEST_DB_NAME)
+      test_case = ViewCompatTestCase(test_section, test_file_name, test_db_name)
 
       # create views in Hive and Impala checking against the expected results
       self._exec_in_hive(test_case.get_create_view_sql('HIVE'),\
