@@ -506,7 +506,7 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
     state->per_partition_status()->insert(
         make_pair(partition->partition_name, partition_status));
 
-    if (!no_more_rows && ShouldSkipStaging(state, partition)) {
+    if (!no_more_rows && !ShouldSkipStaging(state, partition)) {
       // Indicate that temporary directory is to be deleted after execution
       (*state->hdfs_files_to_move())[partition->tmp_hdfs_dir_name] = "";
     }
