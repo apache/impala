@@ -1,11 +1,11 @@
 ====
----- QUERY: conjunct_ordering_1
+---- QUERY: primitive_conjunct_ordering_1
 -- Description : A simple select with one expensive conjunct and one cheap conjunct.
 SELECT *
 FROM lineitem
 WHERE (l_shipdate < current_timestamp() - interval 1 day) AND l_orderkey = -1;
 ====
----- QUERY: conjunct_ordering_2
+---- QUERY: primitive_conjunct_ordering_2
 -- Description: Based on TPCH-Q19
 SELECT sum(l_extendedprice * (1 - l_discount)) AS revenue
 FROM lineitem, part
@@ -30,7 +30,7 @@ WHERE p_partkey = l_partkey
       AND l_shipinstruct = 'DELIVER IN PERSON'))
   AND (p_partkey = 0 OR l_partkey = 0)
 ====
----- QUERY: conjunct_ordering_3
+---- QUERY: primitive_conjunct_ordering_3
 -- Description: Based on TPCDS-Q28
 SELECT avg(l_extendedprice), count(l_extendedprice), count(distinct l_extendedprice)
 FROM lineitem
@@ -41,7 +41,7 @@ WHERE
     OR l_tax BETWEEN 0 AND 0.09)
   AND l_extendedprice BETWEEN 100 AND 500
 ====
----- QUERY: conjunct_ordering_4
+---- QUERY: primitive_conjunct_ordering_4
 -- Description: Based on TPCDS-Q41
 SELECT p_mfgr, count(*) as item_cnt
 FROM part
@@ -60,7 +60,7 @@ WHERE ((p_type LIKE '%STEEL%'
   AND p_partkey = -1
 GROUP BY p_mfgr
 ====
----- QUERY: conjunct_ordering_5
+---- QUERY: primitive_conjunct_ordering_5
 -- Description: Based on TPCDS-Q48
 SELECT sum(l_quantity)
 FROM orders, lineitem,
