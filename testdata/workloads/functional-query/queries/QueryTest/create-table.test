@@ -1,0 +1,296 @@
+====
+---- QUERY
+# This database is expected to have been created.
+show databases like 'ddl_test_db'
+---- RESULTS
+'ddl_test_db',''
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+show tables in ddl_test_db
+---- RESULTS
+====
+---- QUERY
+create table ddl_test_db.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
+---- RESULTS
+====
+---- QUERY
+# Make sure creating a table with the same name doesn't throw an error when
+# IF NOT EXISTS is specified.
+create table if not exists ddl_test_db.testtbl(i int, s string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+ESCAPED BY '\\'
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+---- RESULTS
+====
+---- QUERY
+show tables in ddl_test_db
+---- RESULTS
+'testtbl'
+---- TYPES
+STRING
+====
+---- QUERY
+describe ddl_test_db.testtbl
+---- RESULTS
+'i','int',''
+'s','string','String col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+insert overwrite table ddl_test_db.testtbl SELECT 1, 'Hi'
+from functional.alltypes limit 10
+---- RESULTS
+: 10
+====
+---- QUERY
+select * from ddl_test_db.testtbl
+---- RESULTS
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+1,'Hi'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
+---- RESULTS
+====
+---- QUERY
+# Partition columns are displayed as part of DESCRIBE <table>
+describe ddl_test_db.testtbl_part
+---- RESULTS
+'i','int',''
+'s','string',''
+'id','int','C'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+insert overwrite table ddl_test_db.testtbl_part partition(id=1)
+select 10, 'Ten' from functional.alltypes limit 1
+---- RESULTS
+id=1/: 1
+====
+---- QUERY
+insert overwrite table ddl_test_db.testtbl_part partition(id=2)
+select 20, 'Twenty' from functional.alltypes limit 2
+---- RESULTS
+id=2/: 2
+====
+---- QUERY
+select * from ddl_test_db.testtbl_part
+---- RESULTS
+10,'Ten',1
+20,'Twenty',2
+20,'Twenty',2
+---- TYPES
+INT, STRING, INT
+====
+---- QUERY
+select * from ddl_test_db.testtbl_part where id = 1
+---- RESULTS
+10,'Ten',1
+---- TYPES
+INT, STRING, INT
+====
+---- QUERY
+use ddl_test_db
+---- RESULTS
+====
+---- QUERY
+show tables
+---- RESULTS
+'testtbl'
+'testtbl_part'
+---- TYPES
+STRING
+====
+---- QUERY
+# Make sure we create the table in the proper database after a "use"
+create table testtbl2(f float, d double) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
+---- RESULTS
+====
+---- QUERY
+show tables
+---- RESULTS
+'testtbl'
+'testtbl2'
+'testtbl_part'
+---- TYPES
+STRING
+====
+---- QUERY
+drop table testtbl2
+---- RESULTS
+====
+---- QUERY
+show tables
+---- RESULTS
+'testtbl'
+'testtbl_part'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test creating an unpartitioned Avro table without column definitions.
+create table avro_alltypes_nopart
+with serdeproperties
+('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro
+---- RESULTS
+====
+---- QUERY
+describe avro_alltypes_nopart
+---- RESULTS
+'bigint_col','bigint','from deserializer'
+'bool_col','boolean','from deserializer'
+'date_string_col','string','from deserializer'
+'double_col','double','from deserializer'
+'float_col','float','from deserializer'
+'id','int','from deserializer'
+'int_col','int','from deserializer'
+'smallint_col','int','from deserializer'
+'string_col','string','from deserializer'
+'timestamp_col','string','from deserializer'
+'tinyint_col','int','from deserializer'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test creating a partitioned Avro table without column definitions.
+create table avro_alltypes_part
+partitioned by (year int, month int)
+with serdeproperties
+('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro
+---- RESULTS
+====
+---- QUERY
+describe avro_alltypes_part
+---- RESULTS
+'bigint_col','bigint','from deserializer'
+'bool_col','boolean','from deserializer'
+'date_string_col','string','from deserializer'
+'double_col','double','from deserializer'
+'float_col','float','from deserializer'
+'id','int','from deserializer'
+'int_col','int','from deserializer'
+'month','int',''
+'smallint_col','int','from deserializer'
+'string_col','string','from deserializer'
+'timestamp_col','string','from deserializer'
+'tinyint_col','int','from deserializer'
+'year','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table avro_alltypes_part
+---- RESULTS
+====
+---- QUERY
+drop table avro_alltypes_nopart
+---- RESULTS
+====
+---- QUERY
+drop table testtbl
+---- RESULTS
+====
+---- QUERY
+drop table testtbl_part
+---- RESULTS
+====
+---- QUERY
+show tables
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+drop table if exists non_existent_db.tbl
+---- RESULTS
+====
+---- QUERY
+# Test table creation with tblproperty and serdeproperty lengths just within limits
+create table ddl_test_db.short_properties (i int)
+with serdeproperties(
+'keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeyk'
+=
+'valuevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevalue'
+) tblproperties(
+'keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeyk'
+=
+'valuevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevalue'
+)
+---- RESULTS
+====
+---- QUERY
+drop table if exists test_property_length_db.short_properties
+---- RESULTS
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty
+create table skip_header_test_a (i1 integer) tblproperties('skip.header.line.count'='2')
+---- RESULTS
+====
+---- QUERY
+# IMPALA-1740: Test setting the skip.header.line.count tblproperty on a Parquet table
+create table skip_header_test_d (i1 integer) stored as parquet
+tblproperties('skip.header.line.count'='2')
+---- RESULTS
+====
+---- QUERY
+# IMPALA-1740: Test setting an invalid skip.header.line.count tblproperty
+create table skip_header_test_b (i1 integer) tblproperties('skip.header.line.count'='-1')
+---- CATCH
+Invalid value for table property skip.header.line.count:
+====
+---- QUERY
+# IMPALA-1740: Test setting an invalid skip.header.line.count tblproperty
+create table skip_header_test_c (i1 integer) tblproperties('skip.header.line.count'='foo')
+---- CATCH
+Invalid value for table property skip.header.line.count:
+====
+---- QUERY
+# IMPALA-2820: Test keywords as struct-field names. All field names below are
+# Impala keywords, but only some of them are quoted to show that a mix of
+# quoted/unquoted identifiers is possible.
+create table ddl_test_db.struct_keywords (
+  s struct<table:int,`comment`:string,`select`:decimal(8,2)>,
+  a array<struct<`replace`:boolean,`location`:varchar(10)>>,
+  m map<string,struct<`fields`:int,from:timestamp>>
+)
+partitioned by (year int, month int);
+describe ddl_test_db.struct_keywords;
+---- RESULTS
+'s','struct<\n  table:int,\n  comment:string,\n  select:decimal(8,2)\n>',''
+'a','array<struct<\n  replace:boolean,\n  location:varchar(10)\n>>',''
+'m','map<string,struct<\n  fields:int,\n  from:timestamp\n>>',''
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select
+  s.`table`, s.`comment`, s.`select`,
+  a.`replace`, a.`location`,
+  m.key, m.`fields`, m.`from`,
+  year, month
+from ddl_test_db.struct_keywords t, t.a, t.m
+---- RESULTS
+---- TYPES
+INT, STRING, DECIMAL, BOOLEAN, STRING, STRING, INT, TIMESTAMP, INT, INT
+====

@@ -1,0 +1,189 @@
+====
+---- QUERY
+# Ensure that a table can be created using CTAS
+create table ctas_join stored as parquet as
+select j.*, a.int_col, 1*2
+from functional.jointbl j join functional_seq_snap.alltypes a
+  on (j.alltypes_id=a.id)
+---- RESULTS
+'Inserted 12 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+describe ctas_join
+---- RESULTS
+'test_id','bigint',''
+'test_name','string',''
+'test_zip','int',''
+'alltypes_id','int',''
+'int_col','int',''
+'_c2','smallint',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select * from ctas_join
+---- RESULTS
+1001,'Name1',94611,5000,0,2
+1002,'Name2',94611,5000,0,2
+1003,'Name3',94611,5000,0,2
+1004,'Name4',94611,5000,0,2
+1005,'Name5',94611,5000,0,2
+1106,'Name6',94612,5000,0,2
+1006,'Name16',94612,5000,0,2
+1006,'Name6',94616,5000,0,2
+1106,'Name16',94612,5000,0,2
+1106,'Name6',94616,5000,0,2
+1006,'Name16',94616,5000,0,2
+1106,'Name16',94616,5000,0,2
+---- TYPES
+BIGINT, STRING, INT, INT, INT, SMALLINT
+====
+---- QUERY
+# Since the table already exists, the second CTAS should be a no-op
+create table if not exists ctas_join stored as parquet as
+select j.*, a.int_col, 1*2
+from functional.jointbl j join functional_seq_snap.alltypes a
+  on (j.alltypes_id=a.id) limit 1
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_join
+---- RESULTS
+1001,'Name1',94611,5000,0,2
+1002,'Name2',94611,5000,0,2
+1003,'Name3',94611,5000,0,2
+1004,'Name4',94611,5000,0,2
+1005,'Name5',94611,5000,0,2
+1106,'Name6',94612,5000,0,2
+1006,'Name16',94612,5000,0,2
+1006,'Name6',94616,5000,0,2
+1106,'Name16',94612,5000,0,2
+1106,'Name6',94616,5000,0,2
+1006,'Name16',94616,5000,0,2
+1106,'Name16',94616,5000,0,2
+---- TYPES
+BIGINT, STRING, INT, INT, INT, SMALLINT
+====
+---- QUERY
+# Validate CTAS with LIMIT 0
+create table if not exists ctas_join_limit0 stored as textfile as
+select * from functional.jointbl limit 0
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+describe ctas_join_limit0
+---- RESULTS
+'test_id','bigint',''
+'test_name','string',''
+'test_zip','int',''
+'alltypes_id','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select * from ctas_join_limit0
+---- RESULTS
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+# Validate CTAS with LIMIT 0 and IF NOT EXISTS when the target
+# table already exists.
+create table if not exists ctas_join_limit0 stored as textfile as
+select * from functional.jointbl limit 0
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_join_limit0
+---- RESULTS
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+create table if not exists ctas_join_limit0 stored as textfile as
+select * from functional.jointbl limit 4
+---- RESULTS
+'Inserted 0 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_join_limit0
+---- RESULTS
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+# IMPALA-2203: Test CTAS from a select statement that has outer-joined inline views with
+# constant exprs in the select list. The non-matches of the outer join should be NULL.
+create table ctas_impala_2203 as
+select a.id, a.bool_col, a.tinyint_col, a.smallint_col, a.int_col, a.bigint_col,
+  b.float_col, b.double_col, b.date_string_col, b.string_col, b.timestamp_col
+from
+(select id, false bool_col, 1 tinyint_col, 2 smallint_col, 3 int_col, 4 bigint_col
+ from functional.alltypestiny where id between 0 and 2) a
+full outer join
+(select id, 5 float_col, 6 double_col, "s1" date_string_col, "s2" string_col,
+   cast("2009-02-06 00:01:00" as timestamp) timestamp_col
+ from functional.alltypestiny where id between 1 and 3) b
+on (a.id = b.id)
+---- RESULTS
+'Inserted 4 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_impala_2203
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,false,1,2,3,4,NULL,NULL,'NULL','NULL',NULL
+1,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00
+2,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00
+NULL,NULL,NULL,NULL,NULL,NULL,5,6,'s1','s2',2009-02-06 00:01:00
+---- TYPES
+INT, BOOLEAN, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+# Test creating a partitioned Parquet table with CTAS.
+create table ddl_test_db.ctas_part_alltypestiny
+partitioned by (year,month) stored as parquet
+as select * from functional.alltypestiny
+---- RESULTS
+'Inserted 8 row(s)'
+====
+---- QUERY
+select id, float_col, timestamp_col, string_col, year, month
+from ddl_test_db.ctas_part_alltypestiny
+---- RESULTS
+0,0,2009-01-01 00:00:00,'0',2009,1
+1,1.100000023841858,2009-01-01 00:01:00,'1',2009,1
+2,0,2009-02-01 00:00:00,'0',2009,2
+3,1.100000023841858,2009-02-01 00:01:00,'1',2009,2
+4,0,2009-03-01 00:00:00,'0',2009,3
+5,1.100000023841858,2009-03-01 00:01:00,'1',2009,3
+6,0,2009-04-01 00:00:00,'0',2009,4
+7,1.100000023841858,2009-04-01 00:01:00,'1',2009,4
+---- TYPES
+INT,FLOAT,TIMESTAMP,STRING,INT,INT
+====
+---- QUERY
+# IMPALA-2711: Make sure no memory leak from Rand().
+create table ddl_test_db.rand_ctas as select rand() from functional.alltypes;
+---- RESULTS
+'Inserted 7300 row(s)'
+---- ERRORS
+====
+---- QUERY
+drop table if exists ddl_test_db.rand_ctas;
+---- RESULTS
+====

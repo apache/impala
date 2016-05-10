@@ -21,17 +21,61 @@
 # Impala, in all the possible ways of validating that metadata.
 
 
-import logging
 import pytest
 import random
-import shlex
 import string
-import subprocess
+from subprocess import call
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 
+@SkipIfS3.hive
+@SkipIfIsilon.hive
+@SkipIfLocal.hive
+class TestHmsIntegrationSanity(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHmsIntegrationSanity, cls).add_test_dimensions()
+    # There is no reason to run these tests using all dimensions.
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.TestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  @pytest.mark.execute_serially
+  def test_sanity(self, vector):
+    """Verifies that creating a catalog entity (database, table) in Impala using
+    'IF NOT EXISTS' while the entity exists in HMS, does not throw an error."""
+    # Create a database in Hive
+    ret = call(["hive", "-e", "create database test_db"])
+    assert ret == 0
+    # Creating a database with the same name using 'IF NOT EXISTS' in Impala should
+    # not fail
+    self.client.execute("create database if not exists test_db")
+    # The database should appear in the catalog (IMPALA-2441)
+    assert 'test_db' in self.all_db_names()
+    # Ensure a table can be created in this database from Impala and that it is
+    # accessable in both Impala and Hive
+    self.client.execute("create table if not exists test_db.test_tbl_in_impala(a int)")
+    ret = call(["hive", "-e", "select * from test_db.test_tbl_in_impala"])
+    assert ret == 0
+    self.client.execute("select * from test_db.test_tbl_in_impala")
+
+    # Create a table in Hive
+    ret = call(["hive", "-e", "create table test_db.test_tbl (a int)"])
+    assert ret == 0
+    # Creating a table with the same name using 'IF NOT EXISTS' in Impala should
+    # not fail
+    self.client.execute("create table if not exists test_db.test_tbl (a int)")
+    # The table should not appear in the catalog unless invalidate metadata is
+    # executed
+    assert 'test_tbl' not in self.client.execute("show tables in test_db").data
+    self.client.execute("invalidate metadata test_db.test_tbl")
+    assert 'test_tbl' in self.client.execute("show tables in test_db").data
 
 @SkipIfS3.hive
 @SkipIfIsilon.hive

@@ -1,0 +1,215 @@
+====
+---- QUERY
+# CREATE TABLE LIKE on partitioned table
+create table alltypes_test like functional_seq_snap.alltypes
+stored as parquet
+---- RESULTS
+====
+---- QUERY
+# Make sure no data exists for this table
+select count(*) from alltypes_test
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Should be able to insert into this table
+insert overwrite table alltypes_test
+partition (year=2009, month=4)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes where year=2009 and month=4
+---- RESULTS
+year=2009/month=4/: 300
+====
+---- QUERY
+# Make sure we can read the new data.
+select count(*) from alltypes_test
+---- RESULTS
+300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# CREATE TABLE LIKE on a view
+create table like_view like functional.view_view
+---- RESULTS
+====
+---- QUERY
+describe like_view
+---- RESULTS
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+show table stats like_view
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table like_view_parquet like functional.view_view stored as parquet
+---- RESULTS
+====
+---- QUERY
+show table stats like_view_parquet
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+-1,0,'0B','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# This should copy the file format from the source table (rc)
+create external table jointbl_rc_like like functional_rc_gzip.jointbl
+location '$FILESYSTEM_PREFIX/test-warehouse/jointbl_rc_gzip'
+---- RESULTS
+====
+---- QUERY
+# should get some results back
+select * from jointbl_rc_like order by test_id limit 3
+---- RESULTS
+1001,'Name1',94611,5000
+1002,'Name2',94611,5000
+1003,'Name3',94611,5000
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+# CREATE TABLE LIKE on unpartitioned table.
+create table jointbl_like like functional.jointbl
+---- RESULTS
+====
+---- QUERY
+# Make sure the new table can be queried and no data exists for this table.
+select count(*) from jointbl_like
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# No error is thrown when IF NOT EXISTS is specified and the table already exists.
+create table if not exists jointbl_like like functional.jointbl
+---- RESULTS
+====
+---- QUERY
+# IF NOT EXISTS also applies when the src table is the same as the new table.
+create table if not exists jointbl_like like jointbl_like
+---- RESULTS
+====
+---- QUERY
+insert overwrite table jointbl_like
+select * from functional.jointbl order by test_id limit 5
+---- RESULTS
+: 5
+====
+---- QUERY
+# Make sure we can read the data.
+select * from jointbl_like
+---- RESULTS
+1001,'Name1',94611,5000
+1002,'Name2',94611,5000
+1003,'Name3',94611,5000
+1004,'Name4',94611,5000
+1005,'Name5',94611,5000
+---- TYPES
+BIGINT, STRING, INT, INT
+====
+---- QUERY
+# Test creating a partitioned Avro table without an Avro schema.
+# The Avro schema is inferred from the column definitions.
+create table no_avro_schema (
+  c1 tinyint,
+  c2 smallint comment 'becomes int',
+  c3 int,
+  c4 bigint,
+  c5 float,
+  c6 double,
+  c7 timestamp comment 'becomes string',
+  c8 string,
+  c9 char(10) comment 'preserved',
+  c10 varchar(20),
+  c11 decimal(10, 5),
+  c12 struct<f1:int,f2:string>,
+  c13 array<int>,
+  c14 map<string,string>)
+partitioned by (year int, month int)
+stored as avro
+---- RESULTS
+====
+---- QUERY
+describe no_avro_schema
+---- RESULTS
+'c1','int','from deserializer'
+'c2','int','becomes int'
+'c3','int','from deserializer'
+'c4','bigint','from deserializer'
+'c5','float','from deserializer'
+'c6','double','from deserializer'
+'c7','string','becomes string'
+'c8','string','from deserializer'
+'c9','char(10)','preserved'
+'c10','varchar(20)','from deserializer'
+'c11','decimal(10,5)','from deserializer'
+'c12','struct<\n  f1:int,\n  f2:string\n>','from deserializer'
+'c13','array<int>','from deserializer'
+'c14','map<string,string>','from deserializer'
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test creating an Avro table without an Avro schema via CREATE TABLE LIKE (IMPALA-1813)
+create table like_no_avro_schema like no_avro_schema stored as avro
+---- RESULTS
+====
+---- QUERY
+describe like_no_avro_schema
+---- RESULTS
+'c1','int','from deserializer'
+'c2','int','becomes int'
+'c3','int','from deserializer'
+'c4','bigint','from deserializer'
+'c5','float','from deserializer'
+'c6','double','from deserializer'
+'c7','string','becomes string'
+'c8','string','from deserializer'
+'c9','char(10)','preserved'
+'c10','varchar(20)','from deserializer'
+'c11','decimal(10,5)','from deserializer'
+'c12','struct<\n  f1:int,\n  f2:string\n>','from deserializer'
+'c13','array<int>','from deserializer'
+'c14','map<string,string>','from deserializer'
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table like_no_avro_schema
+---- RESULTS
+====
+---- QUERY
+drop table no_avro_schema
+---- RESULTS
+====

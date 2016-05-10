@@ -12,46 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Impala tests for DDL statements
-import logging
 import pytest
-import shlex
 import time
 import getpass
-from tests.common.test_result_verifier import *
-from subprocess import call
 from tests.common.test_vector import *
-from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal, SkipIfOldAggsJoins
 from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
+from test_ddl_base import TestDdlBase
 
 # Validates DDL statements (create, drop)
-class TestDdlStatements(ImpalaTestSuite):
+class TestDdlStatements(TestDdlBase):
   TEST_DBS = ['ddl_test_db', 'ddl_purge_db', 'alter_table_test_db',
               'alter_table_test_db2', 'function_ddl_test', 'udf_test', 'data_src_test',
               'truncate_table_test_db', 'test_db', 'alter_purge_db', 'db_with_comment']
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestDdlStatements, cls).add_test_dimensions()
-    sync_ddl_opts = [0, 1]
-    if cls.exploration_strategy() != 'exhaustive':
-      # Only run with sync_ddl on exhaustive since it increases test runtime.
-      sync_ddl_opts = [0]
-
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=ALL_NODES_ONLY,
-        disable_codegen_options=[False],
-        batch_sizes=[0],
-        sync_ddl=sync_ddl_opts))
-
-    # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     self._cleanup()
@@ -61,12 +35,6 @@ class TestDdlStatements(ImpalaTestSuite):
 
   def _cleanup(self):
     map(self.cleanup_db, self.TEST_DBS)
-    if IS_LOCAL: return
-    # Cleanup the test table HDFS dirs between test runs so there are no errors the next
-    # time a table is created with the same location. This also helps remove any stale
-    # data from the last test run.
-    for dir_ in ['part_data', 't1_tmp1', 't_part_tmp']:
-      self.filesystem_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
 
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
@@ -223,66 +191,46 @@ class TestDdlStatements(ImpalaTestSuite):
         multiple_impalad=self._use_multiple_impalad(vector))
 
   @pytest.mark.execute_serially
+  def test_create_database(self, vector):
+    self.run_test_case('QueryTest/create-database', vector,
+        multiple_impalad=self._use_multiple_impalad(vector))
+
+  @pytest.mark.execute_serially
   def test_create_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     test_db_name = 'ddl_test_db'
     self._create_db(test_db_name, sync=True)
-    try:
-      self.run_test_case('QueryTest/create', vector, use_db=test_db_name,
-          multiple_impalad=self._use_multiple_impalad(vector))
-    finally:
-      self.cleanup_db(test_db_name)
+    self.run_test_case('QueryTest/create-table', vector, use_db=test_db_name,
+        multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIfOldAggsJoins.nested_types
   @pytest.mark.execute_serially
-  def test_create_table_nested_types(self, vector):
+  def test_create_table_like_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     test_db_name = 'ddl_test_db'
     self._create_db(test_db_name, sync=True)
-    try:
-      self.run_test_case('QueryTest/create-nested', vector, use_db=test_db_name,
-          multiple_impalad=self._use_multiple_impalad(vector))
-    finally:
-      self.cleanup_db(test_db_name)
+    self.run_test_case('QueryTest/create-table-like-table', vector, use_db=test_db_name,
+        multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIfS3.hive
-  @SkipIfIsilon.hive
-  @SkipIfLocal.hive
   @pytest.mark.execute_serially
-  def test_create_hive_integration(self, vector):
-    """Verifies that creating a catalog entity (database, table) in Impala using
-    'IF NOT EXISTS' while the entity exists in HMS, does not throw an error.
-    TODO: This test should be eventually subsumed by the Impala/Hive integration
-    tests."""
-    # Create a database in Hive
-    ret = call(["hive", "-e", "create database test_db"])
-    assert ret == 0
-    # Creating a database with the same name using 'IF NOT EXISTS' in Impala should
-    # not fail
-    self.client.execute("create database if not exists test_db")
-    # The database should appear in the catalog (IMPALA-2441)
-    assert 'test_db' in self.all_db_names()
-    # Ensure a table can be created in this database from Impala and that it is
-    # accessable in both Impala and Hive
-    self.client.execute("create table if not exists test_db.test_tbl_in_impala(a int)")
-    ret = call(["hive", "-e", "select * from test_db.test_tbl_in_impala"])
-    assert ret == 0
-    self.client.execute("select * from test_db.test_tbl_in_impala")
+  def test_create_table_like_file(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
+    test_db_name = 'ddl_test_db'
+    self._create_db(test_db_name, sync=True)
+    self.run_test_case('QueryTest/create-table-like-file', vector, use_db=test_db_name,
+        multiple_impalad=self._use_multiple_impalad(vector))
 
-    # Create a table in Hive
-    ret = call(["hive", "-e", "create table test_db.test_tbl (a int)"])
-    assert ret == 0
-    # Creating a table with the same name using 'IF NOT EXISTS' in Impala should
-    # not fail
-    self.client.execute("create table if not exists test_db.test_tbl (a int)")
-    # The table should not appear in the catalog unless invalidate metadata is
-    # executed
-    assert 'test_tbl' not in self.client.execute("show tables in test_db").data
-    self.client.execute("invalidate metadata test_db.test_tbl")
-    assert 'test_tbl' in self.client.execute("show tables in test_db").data
+  @pytest.mark.execute_serially
+  def test_create_table_as_select(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
+    test_db_name = 'ddl_test_db'
+    self._create_db(test_db_name, sync=True)
+    self.run_test_case('QueryTest/create-table-as-select', vector, use_db=test_db_name,
+        multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIf.kudu_not_supported
   @pytest.mark.execute_serially
+  # TODO: Move this and other Kudu-related DDL tests into a separate py test
+  # under test_ddl_base.py.
   def test_create_kudu(self, vector):
     self.expected_exceptions = 2
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -306,17 +254,29 @@ class TestDdlStatements(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
+    self.__test_alter_table_cleanup()
     # Create directory for partition data that does not use the (key=value)
     # format.
     self.filesystem_client.make_dir("test-warehouse/part_data/", permission=777)
     self.filesystem_client.create_file(
         "test-warehouse/part_data/data.txt", file_data='1984')
 
-    # Create test databases
-    self._create_db('alter_table_test_db', sync=True)
-    self._create_db('alter_table_test_db2', sync=True)
-    self.run_test_case('QueryTest/alter-table', vector, use_db='alter_table_test_db',
-        multiple_impalad=self._use_multiple_impalad(vector))
+    try:
+      # Create test databases
+      self._create_db('alter_table_test_db', sync=True)
+      self._create_db('alter_table_test_db2', sync=True)
+      self.run_test_case('QueryTest/alter-table', vector, use_db='alter_table_test_db',
+          multiple_impalad=self._use_multiple_impalad(vector))
+    finally:
+      self.__test_alter_table_cleanup()
+
+  def __test_alter_table_cleanup(self):
+    if IS_LOCAL: return
+    # Cleanup the test table HDFS dirs between test runs so there are no errors the next
+    # time a table is created with the same location. This also helps remove any stale
+    # data from the last test run.
+    for dir_ in ['part_data', 't1_tmp1', 't_part_tmp']:
+      self.filesystem_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
 
   @pytest.mark.execute_serially
   @SkipIf.not_default_fs
@@ -455,28 +415,6 @@ class TestDdlStatements(ImpalaTestSuite):
     service.wait_for_metric_value(class_cache_hits_metric, class_cache_hits + 2)
     service.wait_for_metric_value(class_cache_misses_metric, class_cache_misses)
 
-  def create_drop_ddl(self, vector, db_name, create_stmts, drop_stmts, select_stmt,
-      num_iterations=3):
-    """ Helper method to run CREATE/DROP DDL commands repeatedly and exercise the lib
-    cache create_stmts is the list of CREATE statements to be executed in order
-    drop_stmts is the list of DROP statements to be executed in order. Each statement
-    should have a '%s' placeholder to insert "IF EXISTS" or "". The select_stmt is just a
-    single statement to test after executing the CREATE statements.
-    TODO: it's hard to tell that the cache is working (i.e. if it did nothing to drop
-    the cache, these tests would still pass). Testing that is a bit harder and requires
-    us to update the udf binary in the middle.
-    """
-    # The db may already exist, clean it up.
-    self.cleanup_db(db_name)
-    self._create_db(db_name, sync=True)
-    self.client.set_configuration(vector.get_value('exec_option'))
-    self.client.execute("use %s" % (db_name,))
-    for drop_stmt in drop_stmts: self.client.execute(drop_stmt % ("if exists"))
-    for i in xrange(0, num_iterations):
-      for create_stmt in create_stmts: self.client.execute(create_stmt)
-      self.client.execute(select_stmt)
-      for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))
-
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_create_alter_bulk_partition(self, vector):
@@ -560,56 +498,3 @@ class TestDdlStatements(ImpalaTestSuite):
     assert properties['prop1'] == 'val1'
     assert properties['p2'] == 'val3'
     assert properties[''] == ''
-
-  @pytest.mark.execute_serially
-  def test_create_db_comment(self, vector):
-    DB_NAME = 'db_with_comment'
-    COMMENT = 'A test comment'
-    self._create_db(DB_NAME, sync=True, comment=COMMENT)
-    result = self.client.execute("show databases like '{0}'".format(DB_NAME))
-    assert len(result.data) == 1
-    cols = result.data[0].split('\t')
-    assert len(cols) == 2
-    assert cols[0] == DB_NAME
-    assert cols[1] == COMMENT
-
-  @classmethod
-  def _use_multiple_impalad(cls, vector):
-    return vector.get_value('exec_option')['sync_ddl'] == 1
-
-  def _create_db(self, db_name, sync=False, comment=None):
-    """Creates a database using synchronized DDL to ensure all nodes have the test
-    database available for use before executing the .test file(s).
-    """
-    impala_client = self.create_impala_client()
-    sync and impala_client.set_configuration({'sync_ddl': 1})
-    if comment is None:
-      ddl = "create database {0} location '{1}/{0}.db'".format(db_name, WAREHOUSE)
-    else:
-      ddl = "create database {0} comment '{1}' location '{2}/{0}.db'".format(
-        db_name, comment, WAREHOUSE)
-    impala_client.execute(ddl)
-    impala_client.close()
-
-  def _get_tbl_properties(self, table_name):
-    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
-    return self._get_properties('Table Parameters:', table_name)
-
-  def _get_serde_properties(self, table_name):
-    """Extracts the serde properties mapping from the output of DESCRIBE FORMATTED"""
-    return self._get_properties('Storage Desc Params:', table_name)
-
-  def _get_properties(self, section_name, table_name):
-    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
-    result = self.client.execute("describe formatted " + table_name)
-    match = False
-    properties = dict();
-    for row in result.data:
-      if section_name in row:
-        match = True
-      elif match:
-        row = row.split('\t')
-        if (row[1] == 'NULL'):
-          break
-        properties[row[1].rstrip()] = row[2].rstrip()
-    return properties
