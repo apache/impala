@@ -420,8 +420,10 @@ Status Coordinator::Exec(QuerySchedule& schedule,
     // chance to register with the stream mgr.
     // TODO: This is no longer necessary (see IMPALA-1599). Consider starting all
     // fragments in the same way with no coordinator special case.
-    UpdateFilterRoutingTable(request.fragments[0].plan.nodes, 1, 0);
-    if (schedule.num_fragment_instances() == 0) MarkFilterRoutingTableComplete();
+    if (filter_mode_ != TRuntimeFilterMode::OFF) {
+      UpdateFilterRoutingTable(request.fragments[0].plan.nodes, 1, 0);
+      if (schedule.num_fragment_instances() == 0) MarkFilterRoutingTableComplete();
+    }
     TExecPlanFragmentParams rpc_params;
     SetExecPlanFragmentParams(schedule, request.fragments[0],
         (*schedule.exec_params())[0], 0, 0, 0, coord, &rpc_params);
@@ -480,6 +482,8 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
 void Coordinator::UpdateFilterRoutingTable(const vector<TPlanNode>& plan_nodes,
     int num_hosts, int start_fragment_instance_idx) {
+  DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
+      << "UpdateFilterRoutingTable() called although runtime filters are disabled";
   DCHECK(!filter_routing_table_complete_)
       << "UpdateFilterRoutingTable() called after setting filter_routing_table_complete_";
   for (const TPlanNode& plan_node: plan_nodes) {
@@ -542,24 +546,35 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   int fragment_instance_idx = 0;
   bool has_coordinator_fragment =
       request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
+  int first_remote_fragment_idx = has_coordinator_fragment ? 1 : 0;
+  if (filter_mode_ != TRuntimeFilterMode::OFF) {
+    // Populate the runtime filter routing table. This should happen before
+    // starting the remote fragments.
+    for (int fragment_idx = first_remote_fragment_idx;
+         fragment_idx < request.fragments.size(); ++fragment_idx) {
+      const FragmentExecParams* params = &(*schedule->exec_params())[fragment_idx];
+      int num_hosts = params->hosts.size();
+      DCHECK_GT(num_hosts, 0);
+      UpdateFilterRoutingTable(request.fragments[fragment_idx].plan.nodes, num_hosts,
+          fragment_instance_idx);
+      fragment_instance_idx += num_hosts;
+    }
+    MarkFilterRoutingTableComplete();
+  }
+
+  fragment_instance_idx = 0;
   // Start one fragment instance per fragment per host (number of hosts running each
   // fragment may not be constant).
-  for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
+  for (int fragment_idx = first_remote_fragment_idx;
        fragment_idx < request.fragments.size(); ++fragment_idx) {
     const FragmentExecParams* params = &(*schedule->exec_params())[fragment_idx];
     int num_hosts = params->hosts.size();
     DCHECK_GT(num_hosts, 0);
-
-    if (filter_mode_ != TRuntimeFilterMode::OFF) {
-      UpdateFilterRoutingTable(request.fragments[fragment_idx].plan.nodes, num_hosts,
-          fragment_instance_idx);
-    }
-
     fragment_profiles_[fragment_idx].num_instances = num_hosts;
     // Start one fragment instance for every fragment_instance required by the
     // schedule. Each fragment instance is assigned a unique ID, numbered from 0, with
     // instances for fragment ID 0 being assigned IDs [0 .. num_hosts(fragment_id_0)] and
-    // so on. This enumeration scheme is relied upon by UpdateFilterRoutingTable().
+    // so on.
     for (int per_fragment_instance_idx = 0; per_fragment_instance_idx < num_hosts;
          ++per_fragment_instance_idx) {
       DebugOptions* fragment_instance_debug_options =
@@ -575,7 +590,6 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
               per_fragment_instance_idx));
     }
   }
-  MarkFilterRoutingTableComplete();
   exec_complete_barrier_->Wait();
   query_events_->MarkEvent(
       Substitute("All $0 remote fragments started", fragment_instance_idx));
@@ -656,12 +670,12 @@ string Coordinator::FilterDebugString() {
 }
 
 void Coordinator::MarkFilterRoutingTableComplete() {
-  if (filter_mode_ != TRuntimeFilterMode::OFF) {
-    query_profile_->AddInfoString(
-        "Number of filters", Substitute("$0", filter_routing_table_.size()));
-    query_profile_->AddInfoString("Filter routing table", FilterDebugString());
-    if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
-  }
+  DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
+      << "MarkFilterRoutingTableComplete() called although runtime filters are disabled";
+  query_profile_->AddInfoString(
+      "Number of filters", Substitute("$0", filter_routing_table_.size()));
+  query_profile_->AddInfoString("Filter routing table", FilterDebugString());
+  if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
   filter_routing_table_complete_ = true;
 }
 
@@ -1984,6 +1998,8 @@ void DistributeFilters(shared_ptr<TPublishFilterParams> params, TNetworkAddress 
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
+  DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
+      << "UpdateFilter() called although runtime filters are disabled";
   DCHECK(exec_complete_barrier_.get() != NULL)
       << "Filters received before fragments started!";
   exec_complete_barrier_->Wait();
