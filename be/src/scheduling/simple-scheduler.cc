@@ -872,7 +872,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
     RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
   }
   if (!FLAGS_enable_rm) return Status::OK();
-  string user = coord->runtime_state()->effective_user();
+  string user = GetEffectiveUser(schedule->request().query_ctx.session);
   if (user.empty()) user = "default";
   schedule->PrepareReservationRequest(resolved_pool, user);
   const TResourceBrokerReservationRequest& reservation_request =
