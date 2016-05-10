@@ -155,7 +155,7 @@ INT, BOOLEAN, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, STRING, STRI
 ====
 ---- QUERY
 # Test creating a partitioned Parquet table with CTAS.
-create table ddl_test_db.ctas_part_alltypestiny
+create table $DATABASE.ctas_part_alltypestiny
 partitioned by (year,month) stored as parquet
 as select * from functional.alltypestiny
 ---- RESULTS
@@ -163,7 +163,7 @@ as select * from functional.alltypestiny
 ====
 ---- QUERY
 select id, float_col, timestamp_col, string_col, year, month
-from ddl_test_db.ctas_part_alltypestiny
+from $DATABASE.ctas_part_alltypestiny
 ---- RESULTS
 0,0,2009-01-01 00:00:00,'0',2009,1
 1,1.100000023841858,2009-01-01 00:01:00,'1',2009,1
@@ -178,12 +178,8 @@ INT,FLOAT,TIMESTAMP,STRING,INT,INT
 ====
 ---- QUERY
 # IMPALA-2711: Make sure no memory leak from Rand().
-create table ddl_test_db.rand_ctas as select rand() from functional.alltypes;
+create table $DATABASE.rand_ctas as select rand() from functional.alltypes;
 ---- RESULTS
 'Inserted 7300 row(s)'
 ---- ERRORS
-====
----- QUERY
-drop table if exists ddl_test_db.rand_ctas;
----- RESULTS
 ====

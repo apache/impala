@@ -46,28 +46,6 @@ class TestDdlBase(ImpalaTestSuite):
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  def create_drop_ddl(self, vector, db_name, create_stmts, drop_stmts, select_stmt,
-      num_iterations=3):
-    """Helper method to run CREATE/DROP DDL commands repeatedly and exercise the lib
-    cache. create_stmts is the list of CREATE statements to be executed in order
-    drop_stmts is the list of DROP statements to be executed in order. Each statement
-    should have a '%s' placeholder to insert "IF EXISTS" or "". The select_stmt is just a
-    single statement to test after executing the CREATE statements.
-    TODO: it's hard to tell that the cache is working (i.e. if it did nothing to drop
-    the cache, these tests would still pass). Testing that is a bit harder and requires
-    us to update the udf binary in the middle.
-    """
-    # The db may already exist, clean it up.
-    self.cleanup_db(db_name)
-    self._create_db(db_name, sync=True)
-    self.client.set_configuration(vector.get_value('exec_option'))
-    self.client.execute("use %s" % (db_name,))
-    for drop_stmt in drop_stmts: self.client.execute(drop_stmt % ("if exists"))
-    for i in xrange(0, num_iterations):
-      for create_stmt in create_stmts: self.client.execute(create_stmt)
-      self.client.execute(select_stmt)
-      for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))
-
   @classmethod
   def _use_multiple_impalad(cls, vector):
     return vector.get_value('exec_option')['sync_ddl'] == 1

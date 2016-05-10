@@ -1,11 +1,11 @@
 ====
 ---- QUERY
-create table ddl_test_db.temp_decimal_table like parquet
+create table $DATABASE.temp_decimal_table like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/decimal.parquet'
 ---- RESULTS
 ====
 ---- QUERY
-describe ddl_test_db.temp_decimal_table
+describe $DATABASE.temp_decimal_table
 ---- RESULTS
 'd32','decimal(3,2)','Inferred from Parquet file.'
 'd11','decimal(1,1)','Inferred from Parquet file.'
@@ -14,12 +14,12 @@ describe ddl_test_db.temp_decimal_table
 STRING, STRING, STRING
 ====
 ---- QUERY
-create table ddl_test_db.like_zipcodes_file like parquet
+create table $DATABASE.like_zipcodes_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/zipcode_incomes.parquet'
 ---- RESULTS
 ====
 ---- QUERY
-describe ddl_test_db.like_zipcodes_file
+describe $DATABASE.like_zipcodes_file
 ---- RESULTS
 'id','string','Inferred from Parquet file.'
 'zip','string','Inferred from Parquet file.'
@@ -30,12 +30,12 @@ describe ddl_test_db.like_zipcodes_file
 STRING, STRING, STRING
 ====
 ---- QUERY
-create table ddl_test_db.like_alltypestiny_file like parquet
+create table $DATABASE.like_alltypestiny_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/alltypestiny.parquet'
 ---- RESULTS
 ====
 ---- QUERY
-describe ddl_test_db.like_alltypestiny_file
+describe $DATABASE.like_alltypestiny_file
 ---- RESULTS
 'id','int','Inferred from Parquet file.'
 'bool_col','boolean','Inferred from Parquet file.'
@@ -54,13 +54,13 @@ STRING, STRING, STRING
 ---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
-create table if not exists ddl_test_db.like_alltypestiny_file like parquet
+create table if not exists $DATABASE.like_alltypestiny_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/zipcode_incomes.parquet'
 ---- RESULTS
 ====
 ---- QUERY
 # Should not have changed since last statement was IF NOT EXISTS.
-describe ddl_test_db.like_alltypestiny_file
+describe $DATABASE.like_alltypestiny_file
 ---- RESULTS
 'id','int','Inferred from Parquet file.'
 'bool_col','boolean','Inferred from Parquet file.'
@@ -111,16 +111,16 @@ drop table allcomplextypes_clone
 ---- RESULTS
 ====
 ---- QUERY
-drop table if exists ddl_test_db.temp_legacy_table
+drop table if exists $DATABASE.temp_legacy_table
 ---- RESULTS
 ====
 ---- QUERY
-create table ddl_test_db.temp_legacy_table like parquet
+create table $DATABASE.temp_legacy_table like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/legacy_nested.parquet'
 ---- RESULTS
 ====
 ---- QUERY
-describe ddl_test_db.temp_legacy_table
+describe $DATABASE.temp_legacy_table
 ---- RESULTS
 't_long','bigint','Inferred from Parquet file.'
 't_struct','struct<\n  f_int:int,\n  t_struct:struct<\n    f_int:int,\n    f_int2:int\n  >,\n  int_arr:array<int>,\n  int_map:map<string,int>\n>','Inferred from Parquet file.'
@@ -136,20 +136,20 @@ describe ddl_test_db.temp_legacy_table
 STRING, STRING, STRING
 ====
 ---- QUERY
-drop table if exists ddl_test_db.temp_legacy_table
+drop table if exists $DATABASE.temp_legacy_table
 ---- RESULTS
 ====
 ---- QUERY
-drop table if exists ddl_test_db.temp_modern_table
+drop table if exists $DATABASE.temp_modern_table
 ---- RESULTS
 ====
 ---- QUERY
-create table ddl_test_db.temp_modern_table like parquet
+create table $DATABASE.temp_modern_table like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/modern_nested.parquet'
 ---- RESULTS
 ====
 ---- QUERY
-describe ddl_test_db.temp_modern_table
+describe $DATABASE.temp_modern_table
 ---- RESULTS
 't_long','bigint','Inferred from Parquet file.'
 't_struct','struct<\n  f_int:int,\n  t_struct:struct<\n    f_int:int,\n    f_int2:int\n  >,\n  int_arr:array<int>,\n  int_map:map<string,int>\n>','Inferred from Parquet file.'
@@ -165,6 +165,6 @@ describe ddl_test_db.temp_modern_table
 STRING, STRING, STRING
 ====
 ---- QUERY
-drop table if exists ddl_test_db.temp_modern_table
+drop table if exists $DATABASE.temp_modern_table
 ---- RESULTS
 ====

@@ -1,65 +1,58 @@
 ====
 ---- QUERY
-create database create_db_test comment "For testing"
+create database $DATABASE_2 comment "For testing"
 ---- RESULTS
 ====
 ---- QUERY
-show databases like "create_db_test"
+show databases like "$DATABASE_2"
 ---- RESULTS
-'create_db_test','For testing'
+'$DATABASE_2','For testing'
 ---- TYPES
 STRING, STRING
 ====
 ---- QUERY
 # Make sure creating a database with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
-create database if not exists create_db_test
+create database if not exists $DATABASE_2
 ---- RESULTS
 ====
 ---- QUERY
 # Test dropping the database.
-drop database create_db_test
+drop database $DATABASE_2
 ---- RESULTS
 ====
 ---- QUERY
-show databases like "create_db_test"
+show databases like "$DATABASE_2"
 ---- RESULTS
 ---- TYPES
 STRING, STRING
 ====
 ---- QUERY
 # Dropping a non-existent databases is ok with IF EXISTS
-drop database if exists create_db_test
+drop database if exists $DATABASE_2
 ---- RESULTS
 ====
 ---- QUERY
 # Test DROP DATABASE ... CASCADE
-create database if not exists test_drop_cascade_db
+create database if not exists $DATABASE_cascade
 ====
 ---- QUERY
-show databases like 'test_drop_cascade_db'
----- RESULTS
-'test_drop_cascade_db',''
----- TYPES
-STRING,STRING
-====
----- QUERY
-create table if not exists test_drop_cascade_db.t1 (i int);
-create table if not exists test_drop_cascade_db.t2 (i int)
+create table if not exists $DATABASE_cascade.t1 (i int);
+create table if not exists $DATABASE_cascade.t2 (i int)
   partitioned by (year smallint, month smallint);
-insert into test_drop_cascade_db.t2 partition (year=2015, month=8) values(1);
-create external table if not exists test_drop_cascade_db.t3 like functional.alltypes
+insert into $DATABASE_cascade.t2 partition (year=2015, month=8) values(1);
+create external table if not exists $DATABASE_cascade.t3 like functional.alltypes
   location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_external';
-create view if not exists test_drop_cascade_db.v1 as
+create view if not exists $DATABASE_cascade.v1 as
   select int_col from functional.alltypes;
-create function if not exists test_drop_cascade_db.f1() returns string
+create function if not exists $DATABASE_cascade.f1() returns string
   location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' symbol='NoArgs';
-create aggregate function if not exists test_drop_cascade_db.f2(int, string) RETURNS int
+create aggregate function if not exists $DATABASE_cascade.f2(int, string) RETURNS int
   location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ---- RESULTS
 ====
 ---- QUERY
-show tables in test_drop_cascade_db
+show tables in $DATABASE_cascade
 ---- RESULTS
 't1'
 't2'
@@ -69,14 +62,14 @@ show tables in test_drop_cascade_db
 STRING
 ====
 ---- QUERY
-show functions in test_drop_cascade_db
+show functions in $DATABASE_cascade
 ---- RESULTS
 'STRING','f1()','NATIVE','true'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show aggregate functions in test_drop_cascade_db
+show aggregate functions in $DATABASE_cascade
 ---- RESULTS
 'INT','f2(INT, STRING)','NATIVE','true'
 ---- TYPES
@@ -85,29 +78,29 @@ STRING, STRING, STRING, STRING
 ---- QUERY
 # Should drop all tables, functions, and aggregate functions, as well
 # as the database itself.
-drop database test_drop_cascade_db cascade
+drop database $DATABASE_cascade cascade
 ---- RESULTS
 ====
 ---- QUERY
-show databases like 'test_drop_cascade_db'
+show databases like '$DATABASE_cascade'
 ---- RESULTS
 ====
 ---- QUERY
 # Test that DROP DATABASE ... RESTRICT executes ok.
-create database if not exists test_drop_restrict_db
+create database if not exists $DATABASE_restrict
 ====
 ---- QUERY
-show databases like 'test_drop_restrict_db'
+show databases like '$DATABASE_restrict'
 ---- RESULTS
-'test_drop_restrict_db',''
+'$DATABASE_restrict',''
 ---- TYPES
 STRING,STRING
 ====
 ---- QUERY
-drop database test_drop_restrict_db restrict
+drop database $DATABASE_restrict restrict
 ---- RESULTS
 ====
 ---- QUERY
-show databases like 'test_drop_restrict_db'
+show databases like '$DATABASE_restrict'
 ---- RESULTS
 ====

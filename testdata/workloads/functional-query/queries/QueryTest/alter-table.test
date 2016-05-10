@@ -1,11 +1,8 @@
 ====
 ---- QUERY
-use alter_table_test_db
----- RESULTS
-====
----- QUERY
 # First create an unpartitioned table
-create external table t1 (i int) location '$FILESYSTEM_PREFIX/test-warehouse/t1_tmp1'
+create external table t1 (i int)
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t1_tmp1'
 ---- RESULTS
 ====
 ---- QUERY
@@ -37,24 +34,26 @@ alter table t1 rename to t2
 show tables
 ---- RESULTS
 't2'
+'part_data'
 ---- TYPES
 string
 ====
 ---- QUERY
 # Move the table to a different database
-alter table t2 rename to alter_table_test_db2.t1_inotherdb
+alter table t2 rename to $DATABASE2.t1_inotherdb
 ---- RESULTS
 ====
 ---- QUERY
 # No longer appears in this database
 show tables
 ---- RESULTS
+'part_data'
 ---- TYPES
 string
 ====
 ---- QUERY
 # Shows up in the second database
-show tables in alter_table_test_db2
+show tables in $DATABASE2
 ---- RESULTS
 't1_inotherdb'
 ---- TYPES
@@ -62,7 +61,7 @@ string
 ====
 ---- QUERY
 # Move the table back to this database
-alter table alter_table_test_db2.t1_inotherdb rename to t2
+alter table $DATABASE2.t1_inotherdb rename to t2
 ---- RESULTS
 ====
 ---- QUERY
@@ -263,37 +262,25 @@ bigint,string,int,int
 # Create a partitioned table. Specify the location so we know what dirs need
 # to be cleaned after the test finishes executing.
 create external table t_part (i int) partitioned by (j int, s string)
-location '$FILESYSTEM_PREFIX/test-warehouse/t_part_tmp'
----- RESULTS
-====
----- QUERY
-alter table t_part add partition (j=cast(2-1 as int), s='2012')
----- RESULTS
-====
----- QUERY
-alter table t_part add if not exists partition (j=1, s='2012')
----- RESULTS
-====
----- QUERY
-alter table t_part add if not exists partition (j=1, s='2012/withslash')
----- RESULTS
-====
----- QUERY
-alter table t_part add partition (j=1, s=substring('foo2013bar', 4, 8))
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t_part_tmp';
+alter table t_part add partition (j=cast(2-1 as int), s='2012');
+alter table t_part add if not exists partition (j=1, s='2012');
+alter table t_part add if not exists partition (j=1, s='2012/withslash');
+alter table t_part add partition (j=1, s=substring('foo2013bar', 4, 8));
 ---- RESULTS
 ====
 ---- QUERY
 # Add another partition that points to the same location as another partition.
 # This will cause the data to be read twice, but shouldn't result in an error.
 alter table t_part add partition (j=100, s='same_location')
-location '$FILESYSTEM_PREFIX/test-warehouse/t_part_tmp/j=1/s=2012'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t_part_tmp/j=1/s=2012'
 ---- RESULTS
 ====
 ---- QUERY
 # Add another partition that points to an existing data location that does not
 # follow the key=value directory structure.
 alter table t_part add partition (j=101, s='different_part_dir')
-location '$FILESYSTEM_PREFIX/test-warehouse/part_data/'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/part_data/'
 ---- RESULTS
 ====
 ---- QUERY
@@ -735,34 +722,34 @@ bigint,bigint
 # Tests that renaming a table with column stats across databases
 # preserves table and column stats, and allows the renamed table
 # to be dropped (IMPALA-1711/HIVE-9720).
-create table alter_table_test_db.mv (x int, y string);
-insert into alter_table_test_db.mv values(1, 'a'), (2, 'b'), (NULL, NULL);
-compute stats alter_table_test_db.mv;
-alter table alter_table_test_db.mv rename to alter_table_test_db2.mv2;
-invalidate metadata alter_table_test_db2.mv2
+create table $DATABASE.mv (x int, y string);
+insert into $DATABASE.mv values(1, 'a'), (2, 'b'), (NULL, NULL);
+compute stats $DATABASE.mv;
+alter table $DATABASE.mv rename to $DATABASE2.mv2;
+invalidate metadata $DATABASE2.mv2
 ---- RESULTS
 ====
 ---- QUERY
-show tables in alter_table_test_db like '%mv%'
----- RESULTS
----- TYPES
-STRING
-====
----- QUERY
-show tables in alter_table_test_db2 like '%mv%'
+show tables in $DATABASE like '%mv%'
 ---- RESULTS
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats alter_table_test_db2.mv2
+show tables in $DATABASE2 like '%mv%'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats $DATABASE2.mv2
 ---- RESULTS
 3,1,'14B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
 ---- TYPES
 BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats alter_table_test_db2.mv2
+show column stats $DATABASE2.mv2
 ---- RESULTS
 'x','INT',2,-1,4,4
 'y','STRING',2,-1,1,1
@@ -770,34 +757,19 @@ show column stats alter_table_test_db2.mv2
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
-drop table alter_table_test_db2.mv2
+drop table $DATABASE2.mv2
 ---- RESULTS
 ====
 ---- QUERY
-show tables in alter_table_test_db2 like '%mv%'
+show tables in $DATABASE2 like '%mv%'
 ---- RESULTS
 ---- TYPES
 STRING
 ====
 ---- QUERY
-# Test tblproperties and serdeproperties key and property value length
-create database if not exists test_alter_property_length_db
-====
----- QUERY
-show databases like 'test_alter_property_length_db'
----- RESULTS
-'test_alter_property_length_db',''
----- TYPES
-STRING,STRING
-====
----- QUERY
-drop table if exists test_alter_property_length_db.property_length
----- RESULTS
-====
----- QUERY
 # alter with serde property lengths just within limits
-create table test_alter_property_length_db.property_length (i int);
-alter table test_alter_property_length_db.property_length
+create table $DATABASE.property_length (i int);
+alter table $DATABASE.property_length
 set serdeproperties(
 'keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeyk'
 =
@@ -807,7 +779,7 @@ set serdeproperties(
 ====
 ---- QUERY
 # alter with property lengths just within limits
-alter table test_alter_property_length_db.property_length
+alter table $DATABASE.property_length
 set tblproperties(
 'keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeyk'
 =
@@ -816,28 +788,12 @@ set tblproperties(
 ---- RESULTS
 ====
 ---- QUERY
-drop table if exists test_alter_property_length_db.property_length
----- RESULTS
-====
----- QUERY
-# Need to switch databases before dropping
-use default;
-drop database if exists test_alter_property_length_db
----- RESULTS
-====
----- QUERY
-show databases like 'test_alter_property_length_db'
----- RESULTS
----- TYPES
-STRING,STRING
-====
----- QUERY
 -- Change table location after a partition has been created in the original table location
-create table alter_table_test_db.change_loc (s string) partitioned by (i int);
-insert into alter_table_test_db.change_loc partition (i=1) values ('a');
-alter table alter_table_test_db.change_loc
-  set location '$FILESYSTEM_PREFIX/test-warehouse/alter_table_test_db.db/garbage';
-select * from alter_table_test_db.change_loc;
+create table $DATABASE.change_loc (s string) partitioned by (i int);
+insert into $DATABASE.change_loc partition (i=1) values ('a');
+alter table $DATABASE.change_loc
+  set location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/garbage';
+select * from $DATABASE.change_loc;
 ---- RESULTS
 'a',1
 ---- TYPES
@@ -847,21 +803,21 @@ STRING,INT
 -- ALTER TABLE .. SET LOCATION works when setting the location of a partition to be the
 -- the same as a partition of a different table with a different number of clustering
 -- columns.
-create table alter_table_test_db.table_one_part (s string) partitioned by (i int);
-create table alter_table_test_db.table_many_part (s string) partitioned by
+create table $DATABASE.table_one_part (s string) partitioned by (i int);
+create table $DATABASE.table_many_part (s string) partitioned by
   (i0 int, i1 int, i2 int, i3 int, i4 int, i5 int, i6 int, i7 int, i8 int, i9 int);
-insert into alter_table_test_db.table_one_part partition (i=0) values ('a');
-insert into alter_table_test_db.table_one_part partition (i=1) values ('b');
-insert into alter_table_test_db.table_many_part partition
+insert into $DATABASE.table_one_part partition (i=0) values ('a');
+insert into $DATABASE.table_one_part partition (i=1) values ('b');
+insert into $DATABASE.table_many_part partition
   (i0=0, i1=1, i2=2, i3=3, i4=4, i5=5, i6=6, i7=7, i8=8, i9=9) values ('c');
-insert into alter_table_test_db.table_many_part partition
+insert into $DATABASE.table_many_part partition
   (i0=10, i1=11, i2=12, i3=13, i4=14, i5=15, i6=16, i7=17, i8=18, i9=19) values ('d');
-alter table alter_table_test_db.table_one_part partition (i=1)
-  set location '$FILESYSTEM_PREFIX/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19';
-alter table alter_table_test_db.table_many_part partition
+alter table $DATABASE.table_one_part partition (i=1)
+  set location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19';
+alter table $DATABASE.table_many_part partition
   (i0=10, i1=11, i2=12, i3=13, i4=14, i5=15, i6=16, i7=17, i8=18, i9=19)
-  set location '$FILESYSTEM_PREFIX/test-warehouse/alter_table_test_db.db/table_one_part/i=0/';
-select i,s from alter_table_test_db.table_one_part order by i;
+  set location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/table_one_part/i=0/';
+select i,s from $DATABASE.table_one_part order by i;
 ---- RESULTS
 0,'a'
 1,'d'
@@ -870,7 +826,7 @@ INT,STRING
 ====
 ---- QUERY
 select i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, s
-from alter_table_test_db.table_many_part order by i0;
+from $DATABASE.table_many_part order by i0;
 ---- RESULTS
 0,1,2,3,4,5,6,7,8,9,'c'
 10,11,12,13,14,15,16,17,18,19,'a'
@@ -878,28 +834,28 @@ from alter_table_test_db.table_many_part order by i0;
 INT,INT,INT,INT,INT,INT,INT,INT,INT,INT,STRING
 ====
 ---- QUERY
-show partitions alter_table_test_db.table_one_part
+show partitions $DATABASE.table_one_part
 ---- RESULTS
-'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
-'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_one_part/i=0
+'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
 'Total',-1,2,regex:.+,regex:.+,'','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show partitions alter_table_test_db.table_many_part
+show partitions $DATABASE.table_many_part
 ---- RESULTS
-'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
-'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
+'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_one_part/i=0
 'Total','','','','','','','','','',-1,2,regex:.+,regex:.+,'','','',''
 ---- TYPES
 STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 -- Refreshing the tables does not create invalid partition locations
-refresh alter_table_test_db.table_one_part;
-refresh alter_table_test_db.table_many_part;
-select i,s from alter_table_test_db.table_one_part order by i;
+refresh $DATABASE.table_one_part;
+refresh $DATABASE.table_many_part;
+select i,s from $DATABASE.table_one_part order by i;
 ---- RESULTS
 0,'a'
 1,'d'
@@ -908,7 +864,7 @@ INT,STRING
 ====
 ---- QUERY
 select i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, s
-from alter_table_test_db.table_many_part order by i0;
+from $DATABASE.table_many_part order by i0;
 ---- RESULTS
 0,1,2,3,4,5,6,7,8,9,'c'
 10,11,12,13,14,15,16,17,18,19,'a'
@@ -916,28 +872,28 @@ from alter_table_test_db.table_many_part order by i0;
 INT,INT,INT,INT,INT,INT,INT,INT,INT,INT,STRING
 ====
 ---- QUERY
-show partitions alter_table_test_db.table_one_part
+show partitions $DATABASE.table_one_part
 ---- RESULTS
-'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
-'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_one_part/i=0
+'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
 'Total',-1,2,regex:.+,regex:.+,'','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show partitions alter_table_test_db.table_many_part
+show partitions $DATABASE.table_many_part
 ---- RESULTS
-'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
-'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
+'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_one_part/i=0
 'Total','','','','','','','','','',-1,2,regex:.+,regex:.+,'','','',''
 ---- TYPES
 STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 -- Altering the table location does not alter the partition locations
-alter table alter_table_test_db.table_one_part set location '$FILESYSTEM_PREFIX/garbage/';
-alter table alter_table_test_db.table_many_part set location '$FILESYSTEM_PREFIX/garbage/';
-select i,s from alter_table_test_db.table_one_part order by i;
+alter table $DATABASE.table_one_part set location '$FILESYSTEM_PREFIX/garbage/';
+alter table $DATABASE.table_many_part set location '$FILESYSTEM_PREFIX/garbage/';
+select i,s from $DATABASE.table_one_part order by i;
 ---- RESULTS
 0,'a'
 1,'d'
@@ -946,7 +902,7 @@ INT,STRING
 ====
 ---- QUERY
 select i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, s
-from alter_table_test_db.table_many_part order by i0;
+from $DATABASE.table_many_part order by i0;
 ---- RESULTS
 0,1,2,3,4,5,6,7,8,9,'c'
 10,11,12,13,14,15,16,17,18,19,'a'
@@ -954,19 +910,19 @@ from alter_table_test_db.table_many_part order by i0;
 INT,INT,INT,INT,INT,INT,INT,INT,INT,INT,STRING
 ====
 ---- QUERY
-show partitions alter_table_test_db.table_one_part
+show partitions $DATABASE.table_one_part
 ---- RESULTS
-'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
-'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_one_part/i=0
+'1',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_many_part/i0=10/i1=11/i2=12/i3=13/i4=14/i5=15/i6=16/i7=17/i8=18/i9=19
 'Total',-1,2,regex:.+,regex:.+,'','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show partitions alter_table_test_db.table_many_part
+show partitions $DATABASE.table_many_part
 ---- RESULTS
-'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
-'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/alter_table_test_db.db/table_one_part/i=0
+'0','1','2','3','4','5','6','7','8','9',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_many_part/i0=0/i1=1/i2=2/i3=3/i4=4/i5=5/i6=6/i7=7/i8=8/i9=9
+'10','11','12','13','14','15','16','17','18','19',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/$DATABASE.db/table_one_part/i=0
 'Total','','','','','','','','','',-1,2,regex:.+,regex:.+,'','','',''
 ---- TYPES
 STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING

@@ -1,13 +1,13 @@
 ====
 ---- QUERY
 # Create a simple view without renaming the columns.
-create view ddl_test_db.simple_view as
+create view $DATABASE.simple_view as
 select * from functional.alltypes
 ---- RESULTS
 ====
 ---- QUERY
 # Test that 'if not exists' swallows the error (view already exists)
-create view if not exists ddl_test_db.simple_view as
+create view if not exists $DATABASE.simple_view as
 select * from functional.alltypesagg
 ---- RESULTS
 ====
@@ -15,19 +15,19 @@ select * from functional.alltypesagg
 # Create another simple view with 'if not exists' on a subset of
 # alltypes' columns using custom column names and comments
 create view if not exists
-ddl_test_db.simple_view_sub (x, y comment 'hello', z) as
+$DATABASE.simple_view_sub (x, y comment 'hello', z) as
 select int_col, string_col, timestamp_col from functional.alltypes
 ---- RESULTS
 ====
 ---- QUERY
 # Create a view on a parquet table (Hive cannot create/read/write parquet)
-create view ddl_test_db.parquet_view as
+create view $DATABASE.parquet_view as
 select * from functional_parquet.alltypes where id < 20
 ---- RESULTS
 ====
 ---- QUERY
 # Create a complex view with predicates, joins, aggregates and order by
-create view ddl_test_db.complex_view (abc comment 'agg', xyz comment 'gby') as
+create view $DATABASE.complex_view (abc comment 'agg', xyz comment 'gby') as
 select count(a.bigint_col), b.string_col from
 functional.alltypesagg a inner join functional.alltypestiny b
 on a.id = b.id where a.bigint_col < 50
@@ -37,13 +37,13 @@ order by b.string_col limit 100
 ====
 ---- QUERY
 # Create a view on a view
-create view ddl_test_db.view_view (aaa, bbb) as
-select * from ddl_test_db.complex_view
+create view $DATABASE.view_view (aaa, bbb) as
+select * from $DATABASE.complex_view
 ---- RESULTS
 ====
 ---- QUERY
 # Test that the views are displayed by 'show tables'
-show tables in ddl_test_db
+show tables in $DATABASE
 ---- RESULTS
 'complex_view'
 'parquet_view'
@@ -53,7 +53,7 @@ show tables in ddl_test_db
 ====
 ---- QUERY
 # Test that the views can be described
-describe ddl_test_db.simple_view
+describe $DATABASE.simple_view
 ---- RESULTS
 'id','int',''
 'bool_col','boolean',''
@@ -72,7 +72,7 @@ describe ddl_test_db.simple_view
 string,string,string
 ====
 ---- QUERY
-describe ddl_test_db.simple_view_sub
+describe $DATABASE.simple_view_sub
 ---- RESULTS
 'x','int',''
 'y','string','hello'
@@ -81,7 +81,7 @@ describe ddl_test_db.simple_view_sub
 string,string,string
 ====
 ---- QUERY
-describe ddl_test_db.complex_view
+describe $DATABASE.complex_view
 ---- RESULTS
 'abc','bigint','agg'
 'xyz','string','gby'
@@ -89,7 +89,7 @@ describe ddl_test_db.complex_view
 string,string,string
 ====
 ---- QUERY
-describe ddl_test_db.parquet_view
+describe $DATABASE.parquet_view
 ---- RESULTS
 'id','int',''
 'bool_col','boolean',''
@@ -108,7 +108,7 @@ describe ddl_test_db.parquet_view
 string,string,string
 ====
 ---- QUERY
-describe ddl_test_db.view_view
+describe $DATABASE.view_view
 ---- RESULTS
 'aaa','bigint',''
 'bbb','string',''
@@ -117,35 +117,35 @@ string,string,string
 ====
 ---- QUERY
 # Test that the views can be queried.
-select count(*) from ddl_test_db.simple_view
+select count(*) from $DATABASE.simple_view
 ---- RESULTS
 7300
 ---- TYPES
 bigint
 ====
 ---- QUERY
-select count(*) from ddl_test_db.simple_view_sub
+select count(*) from $DATABASE.simple_view_sub
 ---- RESULTS
 7300
 ---- TYPES
 bigint
 ====
 ---- QUERY
-select count(*) from ddl_test_db.complex_view
+select count(*) from $DATABASE.complex_view
 ---- RESULTS
 2
 ---- TYPES
 bigint
 ====
 ---- QUERY
-select count(*) from ddl_test_db.parquet_view
+select count(*) from $DATABASE.parquet_view
 ---- RESULTS
 20
 ---- TYPES
 bigint
 ====
 ---- QUERY
-select count(*) from ddl_test_db.view_view
+select count(*) from $DATABASE.view_view
 ---- RESULTS
 2
 ---- TYPES
@@ -153,12 +153,12 @@ bigint
 ====
 ---- QUERY
 # Test dropping a view
-drop view ddl_test_db.simple_view_sub
+drop view $DATABASE.simple_view_sub
 ---- RESULTS
 ====
 ---- QUERY
 # Test that the view is gone
-show tables in ddl_test_db
+show tables in $DATABASE
 ---- RESULTS
 'complex_view'
 'parquet_view'
@@ -167,28 +167,28 @@ show tables in ddl_test_db
 ====
 ---- QUERY
 # Test 'if exists' for dropping a view (view does not exist)
-drop view if exists ddl_test_db.bad_view
+drop view if exists $DATABASE.bad_view
 ---- RESULTS
 ====
 ---- QUERY
 # Test 'if exists' does not drop a table with same name
-create table ddl_test_db.drop_tbl_test(a int)
+create table $DATABASE.drop_tbl_test(a int)
 ---- RESULTS
 ====
 ---- QUERY
-drop view if exists ddl_test_db.drop_tbl_test
+drop view if exists $DATABASE.drop_tbl_test
 ---- RESULTS
 ====
 ---- QUERY
 # Test drop table 'if exists' does not drop a view with same name.
 # We try to drop a table with name complex_view and it should should
 # still be listed in the subsequent show tables output (as a view).
-drop table if exists ddl_test_db.complex_view
+drop table if exists $DATABASE.complex_view
 ---- RESULTS
 ====
 ---- QUERY
 # Test that the table is present
-show tables in ddl_test_db
+show tables in $DATABASE
 ---- RESULTS
 'drop_tbl_test'
 'complex_view'
@@ -198,17 +198,17 @@ show tables in ddl_test_db
 ====
 ---- QUERY
 # Test renaming a view
-alter view ddl_test_db.view_view rename to ddl_test_db.view_on_view
+alter view $DATABASE.view_view rename to $DATABASE.view_on_view
 ---- RESULTS
 ====
 ---- QUERY
 # Test renaming a parquet view
-alter view ddl_test_db.parquet_view rename to ddl_test_db.new_parquet_view
+alter view $DATABASE.parquet_view rename to $DATABASE.new_parquet_view
 ---- RESULTS
 ====
 ---- QUERY
 # Test that the view was renamed
-show tables in ddl_test_db
+show tables in $DATABASE
 ---- RESULTS
 'drop_tbl_test'
 'complex_view'
@@ -218,14 +218,14 @@ show tables in ddl_test_db
 ====
 ---- QUERY
 # Test altering a with a new definition
-alter view ddl_test_db.new_parquet_view as
+alter view $DATABASE.new_parquet_view as
 select bigint_col, string_col from functional_parquet.alltypesagg
 where bigint_col is null limit 10
 ---- RESULTS
 ====
 ---- QUERY
 # Test querying the altered view
-select count(bigint_col), count(string_col) from ddl_test_db.new_parquet_view
+select count(bigint_col), count(string_col) from $DATABASE.new_parquet_view
 ---- RESULTS
 0,10
 ---- TYPES
@@ -233,12 +233,12 @@ bigint,bigint
 ====
 ---- QUERY
 # Create a view on a constant select and try to query it.
-create view ddl_test_db.const_view
+create view $DATABASE.const_view
 as select 1, 'a', cast(10.0 as float)
 ---- RESULTS
 ====
 ---- QUERY
-select * from ddl_test_db.const_view
+select * from $DATABASE.const_view
 ---- RESULTS
 1,'a',10
 ---- TYPES
@@ -247,14 +247,14 @@ tinyint,string,float
 ---- QUERY
 # Test that parentheses are preserved in view creation.
 # If the parentheses were ignored the query would return a count > 0.
-create view ddl_test_db.paren_view as
+create view $DATABASE.paren_view as
 select count(*) from functional.alltypessmall
 where true and (true or false) and false
 ---- RESULTS
 ====
 ---- QUERY
 # Test that parentheses are preserved in view creation.
-select * from ddl_test_db.paren_view
+select * from $DATABASE.paren_view
 ---- RESULTS
 0
 ---- TYPES
@@ -262,13 +262,13 @@ bigint
 ====
 ---- QUERY
 # Create a view with decimal columns. Regression test for IMPALA-1021.
-create view ddl_test_db.decimal_view as
+create view $DATABASE.decimal_view as
 select * from functional.decimal_tbl
 ---- RESULTS
 ====
 ---- QUERY
 # Query a view with decimal columns. Regression test for IMPALA-1021.
-select * from ddl_test_db.decimal_view
+select * from $DATABASE.decimal_view
 ---- RESULTS
 1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
 12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000,1
@@ -281,14 +281,14 @@ decimal,decimal,decimal,decimal,decimal,decimal
 ---- QUERY
 # Test that plan hints are stored in the view as end-of-line commented hints
 # for view-compatibility with Hive.
-create view ddl_test_db.hints_test as
+create view $DATABASE.hints_test as
 select /* +straight_join */ a.* from functional.alltypestiny a
 inner join /* +broadcast */ functional.alltypes b on a.id = b.id
 inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
 ---- RESULTS
 ====
 ---- QUERY
-describe formatted ddl_test_db.hints_test
+describe formatted $DATABASE.hints_test
 ---- TYPES
 string,string,string
 ---- RESULTS: VERIFY_IS_SUBSET
@@ -310,7 +310,7 @@ string,string,string
 ====
 ---- QUERY
 # Test querying the hinted view.
-select count(*) from ddl_test_db.hints_test
+select count(*) from $DATABASE.hints_test
 ---- RESULTS
 8
 ---- TYPES

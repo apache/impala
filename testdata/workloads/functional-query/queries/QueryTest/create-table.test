@@ -1,24 +1,12 @@
 ====
 ---- QUERY
-# This database is expected to have been created.
-show databases like 'ddl_test_db'
----- RESULTS
-'ddl_test_db',''
----- TYPES
-STRING,STRING
-====
----- QUERY
-show tables in ddl_test_db
----- RESULTS
-====
----- QUERY
-create table ddl_test_db.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
+create table $DATABASE.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
 ---- RESULTS
 ====
 ---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
-create table if not exists ddl_test_db.testtbl(i int, s string)
+create table if not exists $DATABASE.testtbl(i int, s string)
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY '\t'
 ESCAPED BY '\\'
@@ -27,14 +15,14 @@ STORED AS TEXTFILE
 ---- RESULTS
 ====
 ---- QUERY
-show tables in ddl_test_db
+show tables in $DATABASE
 ---- RESULTS
 'testtbl'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-describe ddl_test_db.testtbl
+describe $DATABASE.testtbl
 ---- RESULTS
 'i','int',''
 's','string','String col'
@@ -42,13 +30,13 @@ describe ddl_test_db.testtbl
 STRING, STRING, STRING
 ====
 ---- QUERY
-insert overwrite table ddl_test_db.testtbl SELECT 1, 'Hi'
+insert overwrite table $DATABASE.testtbl SELECT 1, 'Hi'
 from functional.alltypes limit 10
 ---- RESULTS
 : 10
 ====
 ---- QUERY
-select * from ddl_test_db.testtbl
+select * from $DATABASE.testtbl
 ---- RESULTS
 1,'Hi'
 1,'Hi'
@@ -64,12 +52,12 @@ select * from ddl_test_db.testtbl
 INT, STRING
 ====
 ---- QUERY
-create table ddl_test_db.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
+create table $DATABASE.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
 ---- RESULTS
 ====
 ---- QUERY
 # Partition columns are displayed as part of DESCRIBE <table>
-describe ddl_test_db.testtbl_part
+describe $DATABASE.testtbl_part
 ---- RESULTS
 'i','int',''
 's','string',''
@@ -78,19 +66,19 @@ describe ddl_test_db.testtbl_part
 STRING, STRING, STRING
 ====
 ---- QUERY
-insert overwrite table ddl_test_db.testtbl_part partition(id=1)
+insert overwrite table $DATABASE.testtbl_part partition(id=1)
 select 10, 'Ten' from functional.alltypes limit 1
 ---- RESULTS
 id=1/: 1
 ====
 ---- QUERY
-insert overwrite table ddl_test_db.testtbl_part partition(id=2)
+insert overwrite table $DATABASE.testtbl_part partition(id=2)
 select 20, 'Twenty' from functional.alltypes limit 2
 ---- RESULTS
 id=2/: 2
 ====
 ---- QUERY
-select * from ddl_test_db.testtbl_part
+select * from $DATABASE.testtbl_part
 ---- RESULTS
 10,'Ten',1
 20,'Twenty',2
@@ -99,15 +87,11 @@ select * from ddl_test_db.testtbl_part
 INT, STRING, INT
 ====
 ---- QUERY
-select * from ddl_test_db.testtbl_part where id = 1
+select * from $DATABASE.testtbl_part where id = 1
 ---- RESULTS
 10,'Ten',1
 ---- TYPES
 INT, STRING, INT
-====
----- QUERY
-use ddl_test_db
----- RESULTS
 ====
 ---- QUERY
 show tables
@@ -224,7 +208,7 @@ drop table if exists non_existent_db.tbl
 ====
 ---- QUERY
 # Test table creation with tblproperty and serdeproperty lengths just within limits
-create table ddl_test_db.short_properties (i int)
+create table $DATABASE.short_properties (i int)
 with serdeproperties(
 'keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeyk'
 =
@@ -234,10 +218,6 @@ with serdeproperties(
 =
 'valuevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevalue'
 )
----- RESULTS
-====
----- QUERY
-drop table if exists test_property_length_db.short_properties
 ---- RESULTS
 ====
 ---- QUERY
@@ -267,13 +247,13 @@ Invalid value for table property skip.header.line.count:
 # IMPALA-2820: Test keywords as struct-field names. All field names below are
 # Impala keywords, but only some of them are quoted to show that a mix of
 # quoted/unquoted identifiers is possible.
-create table ddl_test_db.struct_keywords (
+create table $DATABASE.struct_keywords (
   s struct<table:int,`comment`:string,`select`:decimal(8,2)>,
   a array<struct<`replace`:boolean,`location`:varchar(10)>>,
   m map<string,struct<`fields`:int,from:timestamp>>
 )
 partitioned by (year int, month int);
-describe ddl_test_db.struct_keywords;
+describe $DATABASE.struct_keywords;
 ---- RESULTS
 's','struct<\n  table:int,\n  comment:string,\n  select:decimal(8,2)\n>',''
 'a','array<struct<\n  replace:boolean,\n  location:varchar(10)\n>>',''
@@ -289,7 +269,7 @@ select
   a.`replace`, a.`location`,
   m.key, m.`fields`, m.`from`,
   year, month
-from ddl_test_db.struct_keywords t, t.a, t.m
+from $DATABASE.struct_keywords t, t.a, t.m
 ---- RESULTS
 ---- TYPES
 INT, STRING, DECIMAL, BOOLEAN, STRING, STRING, INT, TIMESTAMP, INT, INT

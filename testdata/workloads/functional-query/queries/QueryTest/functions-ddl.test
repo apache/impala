@@ -1,85 +1,43 @@
 ====
 ---- QUERY
-# Drop the dummy udfs this test uses.
-drop function if exists default.fn();
-drop function if exists function_ddl_test.fn();
-drop function if exists function_ddl_test.fn(int);
-drop function if exists function_ddl_test.fn(int, string);
-drop function if exists function_ddl_test.fn(string, int);
-drop function if exists function_ddl_test.fn2(int);
-drop function if exists function_ddl_test.fn2(int, string);
-drop function if exists function_ddl_test.fn_var_arg(int...);
-drop function if exists function_ddl_test.agg_fn(int);
-drop function if exists function_ddl_test.agg_fn(int, string);
-====
----- QUERY
-# Verify all the test functions are removed
-show functions in function_ddl_test
----- LABELS
-return type, signature, binary type, is persistent
----- RESULTS
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-# Verify all the test functions are removed
-show aggregate functions in function_ddl_test
----- RESULTS
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-# Add them and test function overloading and scoping.
-create function default.fn() RETURNS int
+# Add functions and test function overloading and scoping.
+create function $DATABASE.fn() RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn() RETURNS int
+create function $DATABASE.fn(int) RETURNS double
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int) RETURNS double
+create function $DATABASE.fn(int, string) RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn(int, string) RETURNS int
+create function $DATABASE.fn(string, int) RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
-create function function_ddl_test.fn(string, int) RETURNS int
-LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
-====
----- QUERY
-create function function_ddl_test.fn2(int) RETURNS int
+create function $DATABASE.fn2(int) RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
 ====
 ---- QUERY
-create function function_ddl_test.fn2(int, string) RETURNS int
+create function $DATABASE.fn2(int, string) RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
 ====
 ---- QUERY
-create function function_ddl_test.fn_var_arg(int...) RETURNS int
+create function $DATABASE.fn_var_arg(int...) RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='VarSum'
 ====
 ---- QUERY
-create aggregate function function_ddl_test.agg_fn(int) RETURNS bigint
+create aggregate function $DATABASE.agg_fn(int) RETURNS bigint
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libudasample.so' UPDATE_FN='CountUpdate'
 ====
 ---- QUERY
-create aggregate function function_ddl_test.agg_fn(int, string) RETURNS int
+create aggregate function $DATABASE.agg_fn(int, string) RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ====
 ---- QUERY
-show functions in default
----- LABELS
-return type, signature, binary type, is persistent
----- RESULTS
-'INT','fn()','NATIVE','true'
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-show functions in function_ddl_test
+show functions in $DATABASE
 ---- LABELS
 return type, signature, binary type, is persistent
 ---- RESULTS
@@ -94,7 +52,7 @@ return type, signature, binary type, is persistent
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show aggregate functions in function_ddl_test
+show aggregate functions in $DATABASE
 ---- RESULTS
 'BIGINT','agg_fn(INT)','NATIVE','true'
 'INT','agg_fn(INT, STRING)','NATIVE','true'
@@ -103,26 +61,15 @@ STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that none of the functions show up as analytic functions.
-show analytic functions in function_ddl_test
+show analytic functions in $DATABASE
 ---- RESULTS
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show create function default.fn
+show create function $DATABASE.fn_var_arg
 ---- RESULTS: MULTI_LINE
-['CREATE FUNCTION default.fn()
- RETURNS INT
- LOCATION '$NAMENODE/test-warehouse/libTestUdfs.so'
- SYMBOL='_Z2FnPN10impala_udf15FunctionContextE'
-']
----- TYPES
-STRING
-====
----- QUERY
-show create function function_ddl_test.fn_var_arg
----- RESULTS: MULTI_LINE
-['CREATE FUNCTION function_ddl_test.fn_var_arg(INT...)
+['CREATE FUNCTION $DATABASE.fn_var_arg(INT...)
  RETURNS INT
  LOCATION '$NAMENODE/test-warehouse/libTestUdfs.so'
  SYMBOL='_Z6VarSumPN10impala_udf15FunctionContextEiPKNS_6IntValE'
@@ -131,16 +78,16 @@ show create function function_ddl_test.fn_var_arg
 STRING
 ====
 ---- QUERY
-show create aggregate function function_ddl_test.agg_fn
+show create aggregate function $DATABASE.agg_fn
 ---- RESULTS: MULTI_LINE
-['CREATE AGGREGATE FUNCTION function_ddl_test.agg_fn(INT)
+['CREATE AGGREGATE FUNCTION $DATABASE.agg_fn(INT)
  RETURNS BIGINT
  LOCATION '$NAMENODE/test-warehouse/libudasample.so'
  UPDATE_FN='_Z11CountUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPNS_9BigIntValE'
  INIT_FN='_Z9CountInitPN10impala_udf15FunctionContextEPNS_9BigIntValE'
  MERGE_FN='_Z10CountMergePN10impala_udf15FunctionContextERKNS_9BigIntValEPS2_'
  FINALIZE_FN='_Z13CountFinalizePN10impala_udf15FunctionContextERKNS_9BigIntValE'
-CREATE AGGREGATE FUNCTION function_ddl_test.agg_fn(INT, STRING)
+CREATE AGGREGATE FUNCTION $DATABASE.agg_fn(INT, STRING)
  RETURNS INT
  LOCATION '$NAMENODE/test-warehouse/libTestUdas.so'
  UPDATE_FN='_Z12TwoArgUpdatePN10impala_udf15FunctionContextERKNS_6IntValERKNS_9StringValEPS2_'
@@ -205,7 +152,7 @@ CREATE AGGREGATE FUNCTION _impala_builtins.avg(TIMESTAMP)
 STRING
 ====
 ---- QUERY
-drop function function_ddl_test.fn2(int, string)
+drop function $DATABASE.fn2(int, string)
 ====
 ---- QUERY
 show functions
@@ -222,10 +169,10 @@ return type, signature, binary type, is persistent
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-drop function if exists function_ddl_test.fn2(int, string)
+drop function if exists $DATABASE.fn2(int, string)
 ====
 ---- QUERY
-show functions in function_ddl_test
+show functions in $DATABASE
 ---- LABELS
 return type, signature, binary type, is persistent
 ---- RESULTS
@@ -239,27 +186,7 @@ return type, signature, binary type, is persistent
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show functions in default;
----- LABELS
-return type, signature, binary type, is persistent
----- RESULTS
-'INT','fn()','NATIVE','true'
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-drop function default.fn()
-====
----- QUERY
-show functions in default;
----- LABELS
-return type, signature, binary type, is persistent
----- RESULTS
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-show functions in function_ddl_test;
+show functions in $DATABASE;
 ---- LABELS
 return type, signature, binary type, is persistent
 ---- RESULTS
@@ -310,37 +237,6 @@ drop function agg_fn(int)
 show aggregate functions
 ---- RESULTS
 'INT','agg_fn(INT, STRING)','NATIVE','true'
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-# Call invalidate metadata and make sure the functions are still there
-invalidate metadata
----- RESULTS
----- TYPES
-====
----- QUERY
-show functions
----- LABELS
-return type, signature, binary type, is persistent
----- RESULTS
-'INT','fn2(INT)','NATIVE','true'
-'DOUBLE','fn(INT)','NATIVE','true'
-'INT','fn(INT, STRING)','NATIVE','true'
-'INT','fn(STRING, INT)','NATIVE','true'
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-show aggregate functions
----- RESULTS
-'INT','agg_fn(INT, STRING)','NATIVE','true'
----- TYPES
-STRING, STRING, STRING, STRING
-====
----- QUERY
-show analytic functions
----- RESULTS
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
