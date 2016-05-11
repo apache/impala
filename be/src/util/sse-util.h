@@ -18,6 +18,10 @@
 
 #include <emmintrin.h>
 
+#if defined(IR_COMPILE) && defined(__SSE4_2__) // IR_COMPILE for SSE 4.2.
+#include <smmintrin.h>
+#endif
+
 namespace impala {
 
 /// This class contains constants useful for text processing with SSE4.2 intrinsics.
@@ -144,8 +148,6 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
 /// support it.  However, the cross-compiled IR is compiled twice: with and without
 /// -msse4.2.  When -msse4.2 is enabled in the cross-compile, we can just use the
 /// compiler intrinsics.
-
-#include <smmintrin.h>
 
 template<int MODE>
 static inline __m128i SSE4_cmpestrm(
