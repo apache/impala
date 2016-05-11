@@ -618,7 +618,7 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
       SleepForMs(diff_ms);
       diff_ms = update_deadline - UnixMillis();
     }
-    diff_ms = abs(diff_ms);
+    diff_ms = std::abs(diff_ms);
     VLOG(3) << "Sending " << hb_type << " message to: " << update.second
             << " (deadline accuracy: " << diff_ms << "ms)";
 

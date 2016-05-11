@@ -60,7 +60,10 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #        makes extra calls to clang which may have extra includes (-I) that are unused.
 #   -fcolor-diagnostics: ensure clang generates colorized output, which is necessary
 #        when using ccache as clang thinks it is not called from a terminal.
+#   -Wno-mismatched-tags: ignore harmless class/struct mismatch for forward declarations.
+#        Disabling to be consistent with gcc, which doesn't have this warning.
 SET(CXX_CLANG_FLAGS "-Qunused-arguments -fcolor-diagnostics -Wno-unused-local-typedef")
+SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-mismatched-tags")
 # For any gcc builds:
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
@@ -103,7 +106,7 @@ if (ENABLE_CODE_COVERAGE)
 endif()
 
 # Add flags that are common across build types
-#  - fverboase-asm creates better annotated assembly.  This doesn't seem to affect
+#  - fverbose-asm creates better annotated assembly.  This doesn't seem to affect
 #    when building the binary.
 # LLMV_CFLAGS - Adding llvm compile flags
 SET(CMAKE_CXX_FLAGS "${CXX_COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")

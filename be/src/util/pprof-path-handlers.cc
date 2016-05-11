@@ -32,7 +32,7 @@ using namespace rapidjson;
 
 DECLARE_string(heap_profile_dir);
 
-const int PPROF_DEFAULT_SAMPLE_SECS = 30; // pprof default sample time in seconds.
+static const int PPROF_DEFAULT_SAMPLE_SECS = 30; // pprof default sample time in seconds.
 
 // pprof asks for the url /pprof/cmdline to figure out what application it's profiling.
 // The server should respond by reading the contents of /proc/self/cmdline.
@@ -52,6 +52,7 @@ void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* outpu
 // seconds later, call GetHeapProfile() followed by HeapProfilerStop().
 void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) {
 #ifdef ADDRESS_SANITIZER
+  (void)PPROF_DEFAULT_SAMPLE_SECS; // Avoid unused variable warning.
   (*output) << "Heap profiling is not available with address sanitizer builds.";
 #else
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");

@@ -27,8 +27,7 @@ set(CMAKE_C_COMPILER ${LLVM_ASAN_ROOT}/bin/clang)
 set(CMAKE_CXX_COMPILER ${LLVM_ASAN_ROOT}/bin/clang++)
 
 # Add the GCC root location to the compiler flags
-# TODO: remove no-c++11-extensions when we enable c++11
-set(CXX_COMMON_FLAGS "-Wno-unused-local-typedef -Wno-c++11-extensions --gcc-toolchain=${GCC_ROOT}")
+set(CXX_COMMON_FLAGS "--gcc-toolchain=${GCC_ROOT}")
 
 # The rpath is needed to be able to run the binaries produced by the toolchain without
 # specifying an LD_LIBRARY_PATH
