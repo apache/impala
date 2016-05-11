@@ -21,7 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "gutil/bits.h"
-#include "util/bit-util.h"
+#include "util/bit-util.inline.h"
 #include "util/cpu-info.h"
 
 #include "common/names.h"
@@ -111,6 +111,28 @@ TEST(BitUtil, ByteSwap) {
 
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0x1122)), 0x2211);
+
+  // Test ByteSwap() with an input/output buffer, swapping up to 32 bytes.
+  int buf_size = 32;
+  uint8_t src_buf[buf_size];
+  for (int i = 0; i < buf_size; ++i) {
+    src_buf[i] = i;
+  }
+  uint8_t dst_buf[buf_size];
+  for (int i = 0; i < buf_size; ++i) {
+    // Init dst buffer and swap i bytes.
+    memset(dst_buf, 0, buf_size);
+    BitUtil::ByteSwap(dst_buf, src_buf, i);
+    // Validate the swap results.
+    for (int j = 0; j < i; ++j) {
+      EXPECT_EQ(dst_buf[j], i - j - 1);
+      EXPECT_EQ(dst_buf[j], src_buf[i - j - 1]);
+    }
+    // Check that the dst buffer is otherwise unmodified.
+    for (int j = i; j < buf_size; ++j) {
+      EXPECT_EQ(dst_buf[j], 0);
+    }
+  }
 }
 
 TEST(BitUtil, Log2) {

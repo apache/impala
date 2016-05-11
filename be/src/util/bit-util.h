@@ -148,49 +148,25 @@ class BitUtil {
     return __builtin_bswap64(value);
   }
   static inline uint64_t ByteSwap(uint64_t value) {
-    return static_cast<uint64_t>(__builtin_bswap64(value));
+    return __builtin_bswap64(value);
   }
   static inline int32_t ByteSwap(int32_t value) {
     return __builtin_bswap32(value);
   }
   static inline uint32_t ByteSwap(uint32_t value) {
-    return static_cast<uint32_t>(__builtin_bswap32(value));
+    return __builtin_bswap32(value);
   }
   static inline int16_t ByteSwap(int16_t value) {
-    return (((value >> 8) & 0xff) | ((value & 0xff) << 8));
+    return __builtin_bswap16(value);
   }
   static inline uint16_t ByteSwap(uint16_t value) {
-    return static_cast<uint16_t>(ByteSwap(static_cast<int16_t>(value)));
+    return __builtin_bswap16(value);
   }
 
-  /// Write the swapped bytes into dst. Src and st cannot overlap.
-  static inline void ByteSwap(void* dst, const void* src, int len) {
-    switch (len) {
-      case 1:
-        *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<const int8_t*>(src);
-        return;
-      case 2:
-        *reinterpret_cast<int16_t*>(dst) =
-            ByteSwap(*reinterpret_cast<const int16_t*>(src));
-        return;
-      case 4:
-        *reinterpret_cast<int32_t*>(dst) =
-            ByteSwap(*reinterpret_cast<const int32_t*>(src));
-        return;
-      case 8:
-        *reinterpret_cast<int64_t*>(dst) =
-            ByteSwap(*reinterpret_cast<const int64_t*>(src));
-        return;
-      default: break;
-    }
-
-    uint8_t* d = reinterpret_cast<uint8_t*>(dst);
-    const uint8_t* s = reinterpret_cast<const uint8_t*>(src);
-    for (int i = 0; i < len; ++i) {
-      d[i] = s[len - i - 1];
-    }
-
-  }
+  /// Write the swapped bytes into dest; source and dest must not overlap.
+  /// This function is optimized for len <= 16. It reverts to a slow loop-based
+  /// swap for len > 16.
+  static inline void ByteSwap(void* dest, const void* source, int len);
 
   /// Converts to big endian format (if not already in big endian) from the
   /// machine's native endian format.

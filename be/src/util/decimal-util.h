@@ -22,7 +22,7 @@
 
 #include "runtime/multi-precision.h"
 #include "runtime/types.h"
-#include "util/bit-util.h"
+#include "util/bit-util.inline.h"
 
 namespace impala {
 
