@@ -348,13 +348,16 @@ Status Tuple::CodegenMaterializeExprs(RuntimeState* state, bool collect_string_v
   prototype.AddArgument("num_non_null_string_values", int_ptr_type);
 
   LlvmCodeGen::LlvmBuilder builder(context);
-  Value* args[7];
+  Value* args[8];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* opaque_tuple_arg = args[0];
   Value* row_arg = args[1];
+  // Value* desc_arg = args[2]; // unused
   Value* expr_ctxs_arg = args[3];
-  // 'desc', 'pool', 'non_null_string_values', 'total_string_lengths', and
-  // 'num_non_null_string_values' are unused
+  // Value* pool_arg = args[4]; // unused
+  // Value* non_null_string_values_arg = args[5]; // unused
+  // Value* total_string_lengths_arg = args[6]; // unused
+  // Value* num_non_null_string_values_arg = args[7]; // unused
 
   // Cast the opaque Tuple* argument to the generated struct type
   Type* tuple_struct_type = desc.GetLlvmStruct(codegen);
