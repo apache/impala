@@ -952,7 +952,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       // in the xcompiled function, so call it here instead.
       int rows_added = 0;
       SCOPED_TIMER(probe_timer_);
-      if (process_probe_batch_fn_ == NULL || ht_ctx_->level() != 0) {
+      if (process_probe_batch_fn_ == NULL) {
         rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get(), &status);
       } else {
         DCHECK(process_probe_batch_fn_level0_ != NULL);
