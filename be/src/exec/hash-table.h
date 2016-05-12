@@ -202,7 +202,7 @@ class HashTableCtx {
   }
 
   /// Wrapper function for calling correct HashUtil function in non-codegen'd case.
-  uint32_t inline Hash(const void* input, int len, int32_t hash) const {
+  uint32_t inline Hash(const void* input, int len, uint32_t hash) const {
     /// Use CRC hash at first level for better performance. Switch to murmur hash at
     /// subsequent levels since CRC doesn't randomize well with different seed inputs.
     if (level_ == 0) return HashUtil::Hash(input, len, hash);
