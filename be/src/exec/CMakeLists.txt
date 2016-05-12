@@ -80,6 +80,7 @@ add_library(Exec
   subplan-node.cc
   text-converter.cc
   topn-node.cc
+  topn-node-ir.cc
   union-node.cc
   unnest-node.cc
 )

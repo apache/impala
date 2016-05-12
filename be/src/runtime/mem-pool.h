@@ -229,6 +229,10 @@ class MemPool {
   }
 };
 
+// Stamp out templated implementations here so they're included in IR module
+template uint8_t* MemPool::Allocate<false>(int64_t size);
+template uint8_t* MemPool::Allocate<true>(int64_t size);
+
 }
 
 #endif

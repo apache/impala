@@ -454,7 +454,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       TupleRow* input_row = batch->GetRow(cur_input_index);
       Tuple* new_tuple = cur_fixed_len_block->Allocate<Tuple>(sort_tuple_size_);
       if (materialize_slots_) {
-        new_tuple->MaterializeExprs<has_var_len_data>(input_row, *sort_tuple_desc_,
+        new_tuple->MaterializeExprs<has_var_len_data, true>(input_row, *sort_tuple_desc_,
             sorter_->sort_tuple_slot_expr_ctxs_, NULL, &string_values, &total_var_len);
         if (total_var_len > sorter_->block_mgr_->max_block_size()) {
           return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, Substitute(

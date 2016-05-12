@@ -151,8 +151,8 @@ Value* CodegenAnyVal::CreateCall(
 
 CodegenAnyVal CodegenAnyVal::CreateCallWrapped(
     LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type,
-    Function* fn, ArrayRef<Value*> args, const char* name, Value* result_ptr) {
-  Value* v = CreateCall(cg, builder, fn, args, name, result_ptr);
+    Function* fn, ArrayRef<Value*> args, const char* name) {
+  Value* v = CreateCall(cg, builder, fn, args, name);
   return CodegenAnyVal(cg, builder, type, v, name);
 }
 
@@ -514,15 +514,24 @@ void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
   }
 }
 
-Value* CodegenAnyVal::ToNativeValue() {
+Value* CodegenAnyVal::ToNativeValue(MemPool* pool) {
   Type* raw_type = codegen_->GetType(type_);
   Value* raw_val = Constant::getNullValue(raw_type);
   switch (type_.type) {
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       // Convert StringVal to StringValue
-      raw_val = builder_->CreateInsertValue(raw_val, GetPtr(), 0);
-      raw_val = builder_->CreateInsertValue(raw_val, GetLen(), 1);
+      Value* len = GetLen();
+      raw_val = builder_->CreateInsertValue(raw_val, len, 1);
+      if (pool == NULL) {
+        // Set raw_val.ptr from this->ptr
+        raw_val = builder_->CreateInsertValue(raw_val, GetPtr(), 0);
+      } else {
+        // Allocate raw_val.ptr from 'pool' and copy this->ptr
+        Value* new_ptr = codegen_->CodegenAllocate(builder_, pool, len, "new_ptr");
+        codegen_->CodegenMemcpy(builder_, new_ptr, GetPtr(), len);
+        raw_val = builder_->CreateInsertValue(raw_val, new_ptr, 0);
+      }
       break;
     }
     case TYPE_TIMESTAMP: {
@@ -554,13 +563,66 @@ Value* CodegenAnyVal::ToNativeValue() {
   return raw_val;
 }
 
-Value* CodegenAnyVal::ToNativePtr(Value* native_ptr) {
-  Value* v = ToNativeValue();
+Value* CodegenAnyVal::ToNativePtr(Value* native_ptr, MemPool* pool) {
+  Value* v = ToNativeValue(pool);
   if (native_ptr == NULL) {
     native_ptr = codegen_->CreateEntryBlockAlloca(*builder_, v->getType());
   }
   builder_->CreateStore(v, native_ptr);
   return native_ptr;
+}
+
+// Example output for materializing an int slot:
+//
+//   ; [insert point starts here]
+//   %is_null = trunc i64 %src to i1
+//   br i1 %is_null, label %null, label %non_null ;
+//
+// non_null:                                         ; preds = %entry
+//   %slot = getelementptr inbounds { i8, i32, %"struct.impala::StringValue" }* %tuple,
+//       i32 0, i32 1
+//   %2 = ashr i64 %src, 32
+//   %3 = trunc i64 %2 to i32
+//   store i32 %3, i32* %slot
+//   br label %end_write
+//
+// null:                                             ; preds = %entry
+//   call void @SetNull6({ i8, i32, %"struct.impala::StringValue" }* %tuple)
+//   br label %end_write
+//
+// end_write:                                        ; preds = %null, %non_null
+//   ; [insert point ends here]
+void CodegenAnyVal::WriteToSlot(const SlotDescriptor& slot_desc, Value* tuple,
+    MemPool* pool, BasicBlock* insert_before) {
+  DCHECK(tuple->getType()->isPointerTy());
+  DCHECK(tuple->getType()->getPointerElementType()->isStructTy());
+  LLVMContext& context = codegen_->context();
+  Function* fn = builder_->GetInsertBlock()->getParent();
+
+  // Create new block that will come after conditional blocks if necessary
+  if (insert_before == NULL) insert_before = BasicBlock::Create(context, "end_write", fn);
+
+  // Create new basic blocks and br instruction
+  BasicBlock* non_null_block = BasicBlock::Create(context, "non_null", fn, insert_before);
+  BasicBlock* null_block = BasicBlock::Create(context, "null", fn, insert_before);
+  builder_->CreateCondBr(GetIsNull(), null_block, non_null_block);
+
+  // Non-null block: write slot
+  builder_->SetInsertPoint(non_null_block);
+  Value* slot = builder_->CreateStructGEP(NULL, tuple, slot_desc.llvm_field_idx(),
+      "slot");
+  ToNativePtr(slot, pool);
+  builder_->CreateBr(insert_before);
+
+  // Null block: set null bit
+  builder_->SetInsertPoint(null_block);
+  Function* set_null_fn = slot_desc.GetUpdateNullFn(codegen_, true);
+  DCHECK(set_null_fn != NULL);
+  builder_->CreateCall(set_null_fn, tuple);
+  builder_->CreateBr(insert_before);
+
+  // Leave builder_ after conditional blocks
+  builder_->SetInsertPoint(insert_before);
 }
 
 Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {

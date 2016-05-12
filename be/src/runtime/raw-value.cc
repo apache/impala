@@ -151,6 +151,9 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
       dest->len = src->len;
       if (type.type == TYPE_VARCHAR) DCHECK_LE(dest->len, type.len);
       if (pool != NULL) {
+        // Note: if this changes to TryAllocate(), CodegenAnyVal::WriteToSlot() will need
+        // to reflect this change as well (the codegen'd Allocate() call is actually
+        // generated in CodegenAnyVal::ToNativeValue()).
         dest->ptr = reinterpret_cast<char*>(pool->Allocate(dest->len));
         memcpy(dest->ptr, src->ptr, dest->len);
       } else {

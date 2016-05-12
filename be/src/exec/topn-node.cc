@@ -16,6 +16,7 @@
 
 #include <sstream>
 
+#include "codegen/llvm-codegen.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
@@ -33,6 +34,7 @@
 
 using std::priority_queue;
 using namespace impala;
+using namespace llvm;
 
 TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
@@ -41,6 +43,7 @@ TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     tuple_row_less_than_(NULL),
     tmp_tuple_(NULL),
     tuple_pool_(NULL),
+    codegend_insert_batch_fn_(NULL),
     num_rows_skipped_(0),
     priority_queue_(NULL) {
 }
@@ -57,10 +60,44 @@ Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+Status TopNNode::Codegen(RuntimeState* state) {
+  DCHECK(materialized_tuple_desc_ != NULL);
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
+  Function* insert_batch_fn =
+      codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
+
+  // Generate two MaterializeExprs() functions, one using tuple_pool_ and one with no
+  // pool.
+  Function* materialize_exprs_tuple_pool_fn;
+  RETURN_IF_ERROR(Tuple::CodegenMaterializeExprs(state, false, *materialized_tuple_desc_,
+      sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), tuple_pool_.get(),
+      &materialize_exprs_tuple_pool_fn));
+
+  Function* materialize_exprs_no_pool_fn;
+  RETURN_IF_ERROR(Tuple::CodegenMaterializeExprs(state, false, *materialized_tuple_desc_,
+      sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), NULL, &materialize_exprs_no_pool_fn));
+
+  int replaced = codegen->ReplaceCallSites(insert_batch_fn,
+      materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
+  DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+
+  replaced = codegen->ReplaceCallSites(insert_batch_fn, materialize_exprs_no_pool_fn,
+      Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
+  DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+
+  insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
+  DCHECK(insert_batch_fn != NULL);
+  codegen->AddFunctionToJit(insert_batch_fn,
+      reinterpret_cast<void**>(&codegend_insert_batch_fn_));
+  return Status::OK();
+}
+
 Status TopNNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_pool_.reset(new MemPool(mem_tracker()));
+  materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
       state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
   AddExprCtxsToFree(sort_exec_exprs_);
@@ -69,13 +106,16 @@ Status TopNNode::Prepare(RuntimeState* state) {
   bool codegen_enabled = false;
   Status codegen_status;
   if (state->codegen_enabled()) {
+    // TODO: inline tuple_row_less_than_->Compare()
     codegen_status = tuple_row_less_than_->Codegen(state);
+    codegen_status.MergeStatus(Codegen(state));
     codegen_enabled = codegen_status.ok();
   }
   AddCodegenExecOption(codegen_enabled, codegen_status);
   priority_queue_.reset(new priority_queue<Tuple*, vector<Tuple*>,
       ComparatorWrapper<TupleRowComparator> >(*tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
+  insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
   return Status::OK();
 }
 
@@ -99,8 +139,13 @@ Status TopNNode::Open(RuntimeState* state) {
     do {
       batch.Reset();
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
-      for (int i = 0; i < batch.num_rows(); ++i) {
-        InsertTupleRow(batch.GetRow(i));
+      {
+        SCOPED_TIMER(insert_batch_timer_);
+        if (codegend_insert_batch_fn_ != NULL) {
+          codegend_insert_batch_fn_(this, &batch);
+        } else {
+          InsertBatch(&batch);
+        }
       }
       RETURN_IF_CANCELLED(state);
       RETURN_IF_ERROR(QueryMaintenance(state));
@@ -159,32 +204,6 @@ void TopNNode::Close(RuntimeState* state) {
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   sort_exec_exprs_.Close(state);
   ExecNode::Close(state);
-}
-
-// Insert if either not at the limit or it's a new TopN tuple_row
-void TopNNode::InsertTupleRow(TupleRow* input_row) {
-  Tuple* insert_tuple = NULL;
-
-  if (priority_queue_->size() < limit_ + offset_) {
-    insert_tuple = reinterpret_cast<Tuple*>(
-        tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));
-    insert_tuple->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
-        sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), tuple_pool_.get());
-  } else {
-    DCHECK(!priority_queue_->empty());
-    Tuple* top_tuple = priority_queue_->top();
-    tmp_tuple_->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
-            sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), NULL);
-    if (tuple_row_less_than_->Less(tmp_tuple_, top_tuple)) {
-      // TODO: DeepCopy() will allocate new buffers for the string data. This needs
-      // to be fixed to use a freelist
-      tmp_tuple_->DeepCopy(top_tuple, *materialized_tuple_desc_, tuple_pool_.get());
-      insert_tuple = top_tuple;
-      priority_queue_->pop();
-    }
-  }
-
-  if (insert_tuple != NULL) priority_queue_->push(insert_tuple);
 }
 
 // Reverse the order of the tuples in the priority queue

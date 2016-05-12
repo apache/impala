@@ -17,10 +17,15 @@
 #define IMPALA_RUNTIME_TUPLE_H
 
 #include <cstring>
+#include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "gutil/macros.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+
+namespace llvm {
+class Function;
+}
 
 namespace impala {
 
@@ -103,19 +108,63 @@ class Tuple {
   /// regardless of this tuple's offset in 'tuple_data'.
   void ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple_data);
 
-  /// Materialize this by evaluating the expressions in materialize_exprs
-  /// over the specified 'row'. 'pool' is used to allocate var-length data.
-  /// (Memory for this tuple itself must already be allocated.)
-  /// If collect_string_vals is true, the materialized non-NULL string value
-  /// slots and the total length of the string slots are returned in var_values
-  /// and total_string.
+  /// Materialize 'this' by evaluating the expressions in 'materialize_exprs_ctxs' over
+  /// the specified 'row'.
+  ///
+  /// If non-NULL, 'pool' is used to allocate var-length data, otherwise var-length data
+  /// isn't copied. (Memory for this tuple itself must already be allocated.) 'NULL_POOL'
+  /// should be true if 'pool' is NULL and false otherwise. The template parameter serves
+  /// only to differentiate the NULL vs. non-NULL pool cases when we replace the function
+  /// calls during codegen; the parameter means there are two different function symbols.
+  ///
+  /// If 'COLLECT_STRING_VALS' is true, the materialized non-NULL string value slots and
+  /// the total length of the string slots are returned in 'non_null_string_values' and
+  /// 'total_string_lengths'. 'non_null_string_values' and 'total_string_lengths' must be
+  /// non-NULL in this case. 'non_null_string_values' does not need to be empty; its
+  /// original contents will be overwritten.
+
   /// TODO: this function does not collect other var-len types such as collections.
-  template <bool collect_string_vals>
-  void MaterializeExprs(
-      TupleRow* row, const TupleDescriptor& desc,
-      const std::vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
-      std::vector<StringValue*>* non_null_string_values = NULL,
-      int* total_string = NULL);
+  template <bool COLLECT_STRING_VALS, bool NULL_POOL>
+  inline void IR_ALWAYS_INLINE MaterializeExprs(TupleRow* row,
+      const TupleDescriptor& desc, const std::vector<ExprContext*>& materialize_expr_ctxs,
+      MemPool* pool, std::vector<StringValue*>* non_null_string_values = NULL,
+      int* total_string_lengths = NULL) {
+    DCHECK_EQ(NULL_POOL, pool == NULL);
+    DCHECK_EQ(materialize_expr_ctxs.size(), desc.slots().size());
+    StringValue** non_null_string_values_array = NULL;
+    int num_non_null_string_values = 0;
+    if (COLLECT_STRING_VALS) {
+      DCHECK(non_null_string_values != NULL);
+      DCHECK(total_string_lengths != NULL);
+      // string::resize() will zero-initialize any new values, so we resize to the largest
+      // possible size here, then truncate the vector below once we know the actual size
+      // (which preserves already-written values).
+      non_null_string_values->resize(desc.string_slots().size());
+      non_null_string_values_array = non_null_string_values->data();
+      *total_string_lengths = 0;
+    }
+    MaterializeExprs<COLLECT_STRING_VALS, NULL_POOL>(row, desc,
+        materialize_expr_ctxs.data(), pool, non_null_string_values_array,
+        total_string_lengths, &num_non_null_string_values);
+    if (COLLECT_STRING_VALS) non_null_string_values->resize(num_non_null_string_values);
+  }
+
+  /// Symbols (or substrings of the symbols) of MaterializeExprs(). These can be passed to
+  /// LlvmCodeGen::ReplaceCallSites().
+  static const char* MATERIALIZE_EXPRS_SYMBOL;
+  static const char* MATERIALIZE_EXPRS_NULL_POOL_SYMBOL;
+
+  /// Generates an IR version of MaterializeExprs(), returned in 'fn'. Currently only
+  /// 'collect_string_vals' = false is implemented.
+  ///
+  /// 'pool' may be NULL, in which case no pool-related code is generated. Otherwise
+  /// 'pool's address is used directly in the IR. Note that this requires generating
+  /// separate functions for the non-NULL and NULL cases, i.e., the 'pool' argument of the
+  /// generated function is ignored. There are two different MaterializeExprs symbols to
+  /// differentiate these cases when we replace the function calls during codegen.
+  static Status CodegenMaterializeExprs(RuntimeState* state, bool collect_string_vals,
+      const TupleDescriptor& desc, const vector<ExprContext*>& materialize_expr_ctxs,
+      MemPool* pool, llvm::Function** fn);
 
   /// Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
   /// this is a no-op (but we don't have to branch to check is slots are nulalble).
@@ -183,6 +232,14 @@ class Tuple {
   /// and referenced collection and string data.
   void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
+
+  /// Implementation of MaterializedExprs(). This function is replaced during
+  /// codegen. 'num_non_null_string_values' must be initialized by the caller.
+  template <bool COLLECT_STRING_VALS, bool NULL_POOL>
+  void IR_NO_INLINE MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
+      ExprContext* const* materialize_expr_ctxs, MemPool* pool,
+      StringValue** non_null_string_values, int* total_string_lengths,
+      int* num_non_null_string_values);
 };
 
 }

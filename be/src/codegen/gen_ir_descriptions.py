@@ -114,6 +114,9 @@ ir_functions = [
   ["IS_NULL_STRING", "IrIsNullString"],
   ["GENERIC_IS_NULL_STRING", "IrGenericIsNullString"],
   ["RAW_VALUE_COMPARE", "8RawValue7Compare"],
+  ["TOPN_NODE_INSERT_BATCH", "TopNNode11InsertBatch"],
+  ["MEMPOOL_ALLOCATE", "MemPool8AllocateILb0"],
+  ["MEMPOOL_CHECKED_ALLOCATE", "MemPool8AllocateILb1"],
 ]
 
 enums_preamble = '\

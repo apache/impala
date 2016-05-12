@@ -60,6 +60,8 @@ namespace impala {
 
 const int RowDescriptor::INVALID_IDX;
 
+const char* TupleDescriptor::LLVM_CLASS_NAME = "class.impala::TupleDescriptor";
+
 string NullIndicatorOffset::DebugString() const {
   stringstream out;
   out << "(offset=" << byte_offset

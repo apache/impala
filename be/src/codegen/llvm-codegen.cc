@@ -954,26 +954,39 @@ Status LlvmCodeGen::LoadIntrinsics() {
 void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, int size) {
   DCHECK_GE(size, 0);
   if (size == 0) return;
+  Value* size_val = GetIntConstant(TYPE_BIGINT, size);
+  CodegenMemcpy(builder, dst, src, size_val);
+}
 
-  // Cast src/dst to int8_t*.  If they already are, this will get optimized away
-  DCHECK(PointerType::classof(dst->getType()));
-  DCHECK(PointerType::classof(src->getType()));
-  dst = builder->CreateBitCast(dst, ptr_type());
-  src = builder->CreateBitCast(src, ptr_type());
+void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src,
+    Value* size) {
+  DCHECK(dst->getType()->isPointerTy()) << Print(dst);
+  DCHECK(src->getType()->isPointerTy()) << Print(src);
+  builder->CreateMemCpy(dst, src, size, /* no alignment */ 0);
+}
 
-  // Get intrinsic function.
-  Function* memcpy_fn = llvm_intrinsics_[Intrinsic::memcpy];
-  DCHECK(memcpy_fn != NULL);
+void LlvmCodeGen::CodegenMemset(LlvmBuilder* builder, Value* dst, int value, int size) {
+  DCHECK(dst->getType()->isPointerTy()) << Print(dst);
+  DCHECK_GE(size, 0);
+  if (size == 0) return;
+  Value* value_const = GetIntConstant(TYPE_TINYINT, value);
+  builder->CreateMemSet(dst, value_const, size, /* no alignment */ 0);
+}
 
-  // The fourth argument is the alignment.  For non-zero values, the caller
-  // must guarantee that the src and dst values are aligned to that byte boundary.
-  // TODO: We should try to take advantage of this since our tuples are well aligned.
-  Value* args[] = {
-    dst, src, GetIntConstant(TYPE_INT, size),
-    GetIntConstant(TYPE_INT, 0),
-    false_value()                       // is_volatile.
-  };
-  builder->CreateCall(memcpy_fn, args);
+Value* LlvmCodeGen::CodegenAllocate(LlvmBuilder* builder, MemPool* pool, Value* size,
+    const char* name) {
+  DCHECK(pool != NULL);
+  DCHECK(size->getType()->isIntegerTy());
+  DCHECK_LE(size->getType()->getIntegerBitWidth(), 64);
+  // Extend 'size' to i64 if necessary
+  if (size->getType()->getIntegerBitWidth() < 64) {
+    size = builder->CreateSExt(size, bigint_type());
+  }
+  Function* allocate_fn = GetFunction(IRFunction::MEMPOOL_ALLOCATE, false);
+  PointerType* pool_type = GetPtrType(MemPool::LLVM_CLASS_NAME);
+  Value* pool_val = CastPtrToLlvmPtr(pool_type, pool);
+  Value* fn_args[] = { pool_val, size };
+  return builder->CreateCall(allocate_fn, fn_args, name);
 }
 
 Value* LlvmCodeGen::CodegenArrayAt(LlvmBuilder* builder, Value* array, int idx,

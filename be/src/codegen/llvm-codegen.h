@@ -249,8 +249,8 @@ class LlvmCodeGen {
   /// false, the module will not be optimized before compilation.
   Status FinalizeModule();
 
-  /// Replaces all instructions in 'caller' that call 'target_name' with a call instruction
-  /// to 'new_fn'.  Returns the number of call sites updated.
+  /// Replaces all instructions in 'caller' that call 'target_name' with a call
+  /// instruction to 'new_fn'. Returns the number of call sites updated.
   ///
   /// 'target_name' must be a substring of the mangled symbol of the function to be
   /// replaced. This usually means that the unmangled function name is sufficient.
@@ -386,7 +386,17 @@ class LlvmCodeGen {
   /// Codegen to call llvm memcpy intrinsic at the current builder location
   /// dst & src must be pointer types. size is the number of bytes to copy.
   /// No-op if size is zero.
-  void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, int size);
+  void CodegenMemcpy(LlvmBuilder* builder, llvm::Value* dst, llvm::Value* src, int size);
+  void CodegenMemcpy(LlvmBuilder* builder, llvm::Value* dst, llvm::Value* src,
+      llvm::Value* size);
+
+  /// Codegen to call llvm memset intrinsic at the current builder location. 'dst' should
+  /// be a pointer. No-op if size is zero.
+  void CodegenMemset(LlvmBuilder* builder, llvm::Value* dst, int value, int size);
+
+  /// Codegen to call pool->Allocate(size).
+  llvm::Value* CodegenAllocate(LlvmBuilder* builder, MemPool* pool, llvm::Value* size,
+      const char* name = "");
 
   /// Codegens IR to load array[idx] and returns the loaded value. 'array' should be a
   /// C-style array (e.g. i32*) or an IR array (e.g. [10 x i32]). This function does not

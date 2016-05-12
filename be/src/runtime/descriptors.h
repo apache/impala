@@ -395,6 +395,8 @@ class TupleDescriptor {
   /// The resulting struct definition is cached.
   llvm::StructType* GetLlvmStruct(LlvmCodeGen* codegen) const;
 
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   friend class DescriptorTbl;
 

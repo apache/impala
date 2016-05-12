@@ -19,6 +19,7 @@
 #include <queue>
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/impala-ir.h"
 #include "exec/exec-node.h"
 #include "exec/sort-exec-exprs.h"
 #include "runtime/descriptors.h"  // for TupleId
@@ -53,9 +54,15 @@ class TopNNode : public ExecNode {
 
   friend class TupleLessThan;
 
+  /// Creates a codegen'd version of InsertBatch() that is used in Open().
+  Status Codegen(RuntimeState* state);
+
+  /// Inserts all the rows in 'batch' into the queue.
+  void InsertBatch(RowBatch* batch);
+
   /// Inserts a tuple row into the priority queue if it's in the TopN.  Creates a deep
   /// copy of tuple_row, which it stores in tuple_pool_.
-  void InsertTupleRow(TupleRow* tuple_row);
+  void IR_ALWAYS_INLINE InsertTupleRow(TupleRow* tuple_row);
 
   /// Flatten and reverse the priority queue.
   void PrepareForOutput();
@@ -86,8 +93,14 @@ class TopNNode : public ExecNode {
   /// Stores everything referenced in priority_queue_.
   boost::scoped_ptr<MemPool> tuple_pool_;
 
-  // Iterator over elements in sorted_top_n_.
+  /// Iterator over elements in sorted_top_n_.
   std::vector<Tuple*>::iterator get_next_iter_;
+
+  typedef void (*InsertBatchFn)(TopNNode*, RowBatch*);
+  InsertBatchFn codegend_insert_batch_fn_;
+
+  /// Timer for time spent in InsertBatch() function (or codegen'd version)
+  RuntimeProfile::Counter* insert_batch_timer_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
