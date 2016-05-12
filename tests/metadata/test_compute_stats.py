@@ -48,7 +48,7 @@ class TestComputeStats(ImpalaTestSuite):
   def test_compute_stats_many_partitions(self, vector):
     # To cut down on test execution time, only run the compute stats test against many
     # partitions if performing an exhaustive test run.
-    if self.exploration_strategy() != 'exhaustive': return
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
     self.run_test_case('QueryTest/compute-stats-many-partitions', vector)
 
   @pytest.mark.execute_serially
@@ -111,16 +111,40 @@ class TestComputeStats(ImpalaTestSuite):
     assert(len(show_result.data) == 2)
     assert("1\tpval\t8" in show_result.data[0])
 
+# Tests compute stats on HBase tables. This test is separate from TestComputeStats,
+# because we want to use the existing machanism to disable running tests on hbase/none
+# based on the filesystem type (S3, Isilon, etc.).
+class TestHbaseComputeStats(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
 
-@SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
-class TestCorruptTableStats(TestComputeStats):
   @classmethod
   def add_test_dimensions(cls):
-    super(TestComputeStats, cls).add_test_dimensions()
+    super(TestHbaseComputeStats, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.TestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'hbase')
+
+  def test_hbase_compute_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/hbase-compute-stats', vector, unique_database)
+
+  def test_hbase_compute_stats_incremental(self, vector, unique_database):
+    self.run_test_case('QueryTest/hbase-compute-stats-incremental', vector,
+      unique_database)
+
+
+@SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
+class TestCorruptTableStats(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCorruptTableStats, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(create_exec_option_dimension(
       disable_codegen_options=[False], exec_single_node_option=[100]))
-    # Do not run these tests using all dimensions because the expected results
-    # are different for different file formats.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_corrupt_stats(self, vector, unique_database):
@@ -130,7 +154,11 @@ class TestCorruptTableStats(TestComputeStats):
     self.run_test_case('QueryTest/corrupt-stats', vector, unique_database)
 
 
-class TestIncompatibleColStats(TestComputeStats):
+class TestIncompatibleColStats(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestIncompatibleColStats, cls).add_test_dimensions()

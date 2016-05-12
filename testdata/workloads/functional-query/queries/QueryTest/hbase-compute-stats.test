@@ -1,18 +1,17 @@
 ====
 ---- QUERY
 # test computing stats on an HBase table
-create table compute_stats_db_hbase.alltypessmall_hbase
-like alltypessmall;
+create table alltypessmall_hbase like functional_hbase.alltypessmall
 ====
 ---- QUERY
-compute stats compute_stats_db_hbase.alltypessmall_hbase
+compute stats alltypessmall_hbase
 ---- RESULTS
 'Updated 1 partition(s) and 13 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db_hbase.alltypessmall_hbase
+show table stats alltypessmall_hbase
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS: VERIFY_IS_EQUAL
@@ -27,7 +26,7 @@ regex:.+,'9',regex:.+,regex:.+B
 STRING, STRING, BIGINT, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db_hbase.alltypessmall_hbase
+show column stats alltypessmall_hbase
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -49,18 +48,17 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test computing stats on an binary HBase table
-create table compute_stats_db_hbase.alltypessmall_hbase_bin
-like alltypessmallbinary;
+create table alltypessmall_hbase_bin like functional_hbase.alltypessmallbinary
 ====
 ---- QUERY
-compute stats compute_stats_db_hbase.alltypessmall_hbase_bin
+compute stats alltypessmall_hbase_bin
 ---- RESULTS
 'Updated 1 partition(s) and 13 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY: VERIFY_IS_EQUAL
-show table stats compute_stats_db_hbase.alltypessmall_hbase_bin
+show table stats alltypessmall_hbase_bin
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS
@@ -69,7 +67,7 @@ regex:.+,'',regex:.+,regex:.+
 STRING, STRING, BIGINT, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db_hbase.alltypessmall_hbase_bin
+show column stats alltypessmall_hbase_bin
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -92,18 +90,17 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ---- QUERY
 # IMP-1227: Test computing stats on an HBase table that has a
 # complex-typed column that Impala does not yet support.
-create table compute_stats_db_hbase.allcomplextypes
-like allcomplextypes
+create table allcomplextypes_hbase like functional_hbase.allcomplextypes
 ====
 ---- QUERY
-compute stats compute_stats_db_hbase.allcomplextypes
+compute stats allcomplextypes_hbase
 ---- RESULTS
 'Updated 1 partition(s) and 3 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY: VERIFY_IS_EQUAL
-show table stats compute_stats_db_hbase.allcomplextypes
+show table stats allcomplextypes_hbase
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS
@@ -112,7 +109,7 @@ regex:.+,'',regex:.+,regex:.+
 STRING, STRING, BIGINT, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db_hbase.allcomplextypes
+show column stats allcomplextypes_hbase
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -134,9 +131,3 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
----- QUERY
-compute incremental stats alltypes;
----- RESULTS
-'Updated 1 partition(s) and 13 column(s).'
----- TYPES
-STRING
