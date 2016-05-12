@@ -183,30 +183,36 @@ class TestDdlStatements(ImpalaTestSuite):
     # Verify the table directory exists
     assert self.filesystem_client.exists("test-warehouse/truncate_table_test_db.db/t1/")
 
-    # Should have created one file in the table's dir
-    self.client.execute("insert into %s.t1 values (1)" % TRUNCATE_DB)
-    assert len(self.filesystem_client.ls("test-warehouse/%s.db/t1/" % TRUNCATE_DB)) == 2
+    try:
+      # If we're testing S3, we want the staging directory to be created.
+      self.client.execute("set s3_skip_insert_staging=false")
+      # Should have created one file in the table's dir
+      self.client.execute("insert into %s.t1 values (1)" % TRUNCATE_DB)
+      assert len(self.filesystem_client.ls("test-warehouse/%s.db/t1/" % TRUNCATE_DB)) == 2
 
-    # Truncating the table removes the data files and preserves the table's directory
-    self.client.execute("truncate table %s.t1" % TRUNCATE_DB)
-    assert len(self.filesystem_client.ls("test-warehouse/%s.db/t1/" % TRUNCATE_DB)) == 1
+      # Truncating the table removes the data files and preserves the table's directory
+      self.client.execute("truncate table %s.t1" % TRUNCATE_DB)
+      assert len(self.filesystem_client.ls("test-warehouse/%s.db/t1/" % TRUNCATE_DB)) == 1
 
-    self.client.execute(
-        "create table %s.t2(i int) partitioned by (p int)" % TRUNCATE_DB)
-    # Verify the table directory exists
-    assert self.filesystem_client.exists("test-warehouse/%s.db/t2/" % TRUNCATE_DB)
+      self.client.execute(
+          "create table %s.t2(i int) partitioned by (p int)" % TRUNCATE_DB)
+      # Verify the table directory exists
+      assert self.filesystem_client.exists("test-warehouse/%s.db/t2/" % TRUNCATE_DB)
 
-    # Should have created the partition dir, which should contain exactly one file
-    self.client.execute(
-        "insert into %s.t2 partition(p=1) values (1)" % TRUNCATE_DB)
-    assert len(self.filesystem_client.ls(
-        "test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)) == 1
+      # Should have created the partition dir, which should contain exactly one file
+      self.client.execute(
+          "insert into %s.t2 partition(p=1) values (1)" % TRUNCATE_DB)
+      assert len(self.filesystem_client.ls(
+          "test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)) == 1
 
-    # Truncating the table removes the data files and preserves the partition's directory
-    self.client.execute("truncate table %s.t2" % TRUNCATE_DB)
-    assert self.filesystem_client.exists("test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)
-    assert len(self.filesystem_client.ls(
-        "test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)) == 0
+      # Truncating the table removes the data files and preserves the partition's directory
+      self.client.execute("truncate table %s.t2" % TRUNCATE_DB)
+      assert self.filesystem_client.exists("test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)
+      assert len(self.filesystem_client.ls(
+          "test-warehouse/%s.db/t2/p=1" % TRUNCATE_DB)) == 0
+    finally:
+      # Reset to its default value.
+      self.client.execute("set s3_skip_insert_staging=true")
 
   @pytest.mark.execute_serially
   def test_truncate_table(self, vector):
