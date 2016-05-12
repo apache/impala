@@ -1156,10 +1156,12 @@ void HdfsParquetScanner::Close() {
   }
   if (batch_ != NULL) {
     AttachPool(dictionary_pool_.get(), false);
+    AttachPool(scratch_batch_->mem_pool(), false);
     AddFinalRowBatch();
   }
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(dictionary_pool_.get()->total_allocated_bytes(), 0);
+  DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
   // If this was a metadata only read (i.e. count(*)), there are no columns.
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
