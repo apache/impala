@@ -24,7 +24,13 @@ set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION})
 set(LLVM_ASAN_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_ASAN_VERSION})
 
 set(CMAKE_C_COMPILER ${LLVM_ASAN_ROOT}/bin/clang)
-set(CMAKE_CXX_COMPILER ${LLVM_ASAN_ROOT}/bin/clang++)
+
+# Use clang to build unless overridden by environment.
+if($ENV{IMPALA_CXX_COMPILER} STREQUAL "default")
+  set(CMAKE_CXX_COMPILER ${LLVM_ASAN_ROOT}/bin/clang++)
+else()
+  set(CMAKE_CXX_COMPILER $ENV{IMPALA_CXX_COMPILER})
+endif()
 
 # Add the GCC root location to the compiler flags
 set(CXX_COMMON_FLAGS "--gcc-toolchain=${GCC_ROOT}")
