@@ -68,7 +68,6 @@ class TestDdlStatements(ImpalaTestSuite):
     for dir_ in ['part_data', 't1_tmp1', 't_part_tmp']:
       self.filesystem_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
 
-  @SkipIfS3.hdfs_purge
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_table_with_purge(self):
@@ -80,41 +79,48 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("create table {0}.t1(i int)".format(DDL_PURGE_DB))
     self.client.execute("create table {0}.t2(i int)".format(DDL_PURGE_DB))
     # Create sample test data files under the table directories
-    self.hdfs_client.create_file("test-warehouse/{0}.db/t1/t1.txt".format(DDL_PURGE_DB),\
-        file_data='t1')
-    self.hdfs_client.create_file("test-warehouse/{0}.db/t2/t2.txt".format(DDL_PURGE_DB),\
-        file_data='t2')
+    self.filesystem_client.create_file("test-warehouse/{0}.db/t1/t1.txt".\
+        format(DDL_PURGE_DB), file_data='t1')
+    self.filesystem_client.create_file("test-warehouse/{0}.db/t2/t2.txt".\
+        format(DDL_PURGE_DB), file_data='t2')
     # Drop the table (without purge) and make sure it exists in trash
     self.client.execute("drop table {0}.t1".format(DDL_PURGE_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/t1.txt".\
+    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/t1.txt".\
         format(DDL_PURGE_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/".format(DDL_PURGE_DB))
-    assert self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/t1.txt".\
+    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/".\
+        format(DDL_PURGE_DB))
+    assert self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/t1.txt".\
         format(getpass.getuser(), DDL_PURGE_DB))
-    assert self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1".\
+    assert self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1".\
         format(getpass.getuser(), DDL_PURGE_DB))
     # Drop the table (with purge) and make sure it doesn't exist in trash
     self.client.execute("drop table {0}.t2 purge".format(DDL_PURGE_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t2/".format(DDL_PURGE_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t2/t2.txt".\
-        format(DDL_PURGE_DB))
-    assert not self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t2/t2.txt".\
+    if not IS_S3:
+      # In S3, deletes are eventual. So even though we dropped the table, the files
+      # belonging to this table will still be visible for some unbounded time. This
+      # happens only with PURGE. A regular DROP TABLE is just a copy of files which is
+      # consistent.
+      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t2/".\
+          format(DDL_PURGE_DB))
+      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t2/t2.txt".\
+          format(DDL_PURGE_DB))
+    assert not self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t2/t2.txt".\
         format(getpass.getuser(), DDL_PURGE_DB))
-    assert not self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t2".\
+    assert not self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t2".\
         format(getpass.getuser(), DDL_PURGE_DB))
     # Create an external table t3 and run the same test as above. Make
     # sure the data is not deleted
-    self.hdfs_client.make_dir("test-warehouse/data_t3/", permission=777)
-    self.hdfs_client.create_file("test-warehouse/data_t3/data.txt", file_data='100')
+    self.filesystem_client.make_dir("test-warehouse/data_t3/", permission=777)
+    self.filesystem_client.create_file("test-warehouse/data_t3/data.txt", file_data='100')
     self.client.execute("create external table {0}.t3(i int) stored as \
       textfile location \'/test-warehouse/data_t3\'" .format(DDL_PURGE_DB))
     self.client.execute("drop table {0}.t3 purge".format(DDL_PURGE_DB))
-    assert self.hdfs_client.exists("test-warehouse/data_t3/data.txt")
-    self.hdfs_client.delete_file_dir("test-warehouse/data_t3", recursive=True)
+    assert self.filesystem_client.exists("test-warehouse/data_t3/data.txt")
+    self.filesystem_client.delete_file_dir("test-warehouse/data_t3", recursive=True)
 
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
@@ -306,7 +312,6 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/alter-table', vector, use_db='alter_table_test_db',
         multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIfS3.hdfs_purge # S3: missing coverage: alter table drop partition
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_partition_with_purge(self, vector):
@@ -315,38 +320,43 @@ class TestDdlStatements(ImpalaTestSuite):
     # Create a sample database alter_purge_db and table t1 in it
     self._create_db(ALTER_PURGE_DB)
     self.client.execute("create table {0}.t1(i int) partitioned\
-      by (j int)".format(ALTER_PURGE_DB))
+        by (j int)".format(ALTER_PURGE_DB))
     # Add two partitions (j=1) and (j=2) to table t1
     self.client.execute("alter table {0}.t1 add partition(j=1)".format(ALTER_PURGE_DB))
     self.client.execute("alter table {0}.t1 add partition(j=2)".format(ALTER_PURGE_DB))
-    self.hdfs_client.create_file(\
-            "test-warehouse/{0}.db/t1/j=1/j1.txt".format(ALTER_PURGE_DB), file_data='j1')
-    self.hdfs_client.create_file(\
-            "test-warehouse/{0}.db/t1/j=2/j2.txt".format(ALTER_PURGE_DB), file_data='j2')
+    self.filesystem_client.create_file(\
+        "test-warehouse/{0}.db/t1/j=1/j1.txt".format(ALTER_PURGE_DB), file_data='j1')
+    self.filesystem_client.create_file(\
+        "test-warehouse/{0}.db/t1/j=2/j2.txt".format(ALTER_PURGE_DB), file_data='j2')
     # Drop the partition (j=1) without purge and make sure it exists in trash
     self.client.execute("alter table {0}.t1 drop partition(j=1)".format(ALTER_PURGE_DB));
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".\
+    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".\
         format(ALTER_PURGE_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1".\
+    assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=1".\
         format(ALTER_PURGE_DB))
-    assert self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1/j1.txt".\
+    assert self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1/j1.txt".\
         format(getpass.getuser(), ALTER_PURGE_DB))
-    assert self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1".\
+    assert self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1".\
         format(getpass.getuser(), ALTER_PURGE_DB))
     # Drop the partition (with purge) and make sure it doesn't exist in trash
     self.client.execute("alter table {0}.t1 drop partition(j=2) purge".\
         format(ALTER_PURGE_DB));
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2/j2.txt".\
-        format(ALTER_PURGE_DB))
-    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2".\
-        format(ALTER_PURGE_DB))
-    assert not self.hdfs_client.exists(\
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2".\
+    if not IS_S3:
+      # In S3, deletes are eventual. So even though we dropped the partition, the files
+      # belonging to this partition will still be visible for some unbounded time. This
+      # happens only with PURGE. A regular DROP TABLE is just a copy of files which is
+      # consistent.
+      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=2/j2.txt".\
+          format(ALTER_PURGE_DB))
+      assert not self.filesystem_client.exists("test-warehouse/{0}.db/t1/j=2".\
+          format(ALTER_PURGE_DB))
+    assert not self.filesystem_client.exists(\
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2".\
         format(getpass.getuser(), ALTER_PURGE_DB))
-    assert not self.hdfs_client.exists(
-        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2/j2.txt".\
+    assert not self.filesystem_client.exists(
+        "user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=2/j2.txt".\
         format(getpass.getuser(), ALTER_PURGE_DB))
 
   @pytest.mark.execute_serially
