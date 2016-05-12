@@ -9,6 +9,7 @@
 import logging
 import pytest
 import random
+import tempfile
 from copy import deepcopy
 from subprocess import call, check_call
 
@@ -417,6 +418,82 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
       result = self.client.execute("select count(*) from " + t)
       assert result.data == expected_result.data
 
+# Tests behavior of split "\r\n" delimiters.
+class TestTextSplitDelimiters(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTextSplitDelimiters, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'text' and\
+        v.get_value('table_format').compression_codec == 'none')
+
+  def test_text_split_delimiters(self, vector, unique_database):
+    """Creates and queries a datafile that exercises interesting edge cases around split
+    "\r\n" delimiters. The data file contains the following 4-byte scan ranges:
+
+    abc\r   First scan range, ends with split \r\n
+            - materializes (abc)
+    \nde\r  Initial delimiter found, scan range ends with split \r\n
+            - materializes (de)
+    \nfg\r  Initial delimiter found, scan range ends with \r
+            - materializes (fg),(hij)
+    hij\r   Initial delimiter is \r at end
+            - materializes (klm)
+    klm\r   Initial delimiter is split \r\n
+            - materializes nothing
+    \nno\r  Final scan range, initial delimiter found, ends with \r
+            - materializes (no)
+    """
+    DATA = "abc\r\nde\r\nfg\rhij\rklm\r\nno\r"
+    max_scan_range_length = 4
+    expected_result = ['abc', 'de', 'fg', 'hij', 'klm', 'no']
+
+    self._create_and_query_test_table(
+      vector, unique_database, DATA, max_scan_range_length, expected_result)
+
+  def test_text_split_across_buffers_delimiter(self, vector, unique_database):
+    """Creates and queries a datafile that exercises a split "\r\n" across io buffers (but
+    within a single scan range). We use a 32MB file and 16MB scan ranges, so there are two
+    scan ranges of two io buffers each. The first scan range exercises a split delimiter
+    in the main text parsing algorithm. The second scan range exercises correctly
+    identifying a split delimiter as the first in a scan range."""
+    DEFAULT_IO_BUFFER_SIZE = 8 * 1024 * 1024
+    data = ('a' * (DEFAULT_IO_BUFFER_SIZE - 1) + "\r\n" + # first scan range
+            'b' * (DEFAULT_IO_BUFFER_SIZE - 3) + "\r\n" +
+            'a' * (DEFAULT_IO_BUFFER_SIZE - 1) + "\r\n" +     # second scan range
+            'b' * (DEFAULT_IO_BUFFER_SIZE - 1))
+    assert len(data) == DEFAULT_IO_BUFFER_SIZE * 4
+
+    max_scan_range_length = DEFAULT_IO_BUFFER_SIZE * 2
+    expected_result = data.split("\r\n")
+
+    self._create_and_query_test_table(
+      vector, unique_database, data, max_scan_range_length, expected_result)
+
+  def _create_and_query_test_table(self, vector, unique_database, data,
+        max_scan_range_length, expected_result):
+    TABLE_NAME = "test_text_split_delimiters"
+    qualified_table_name = "%s.%s" % (unique_database, TABLE_NAME)
+    location = get_fs_path("/test-warehouse/%s_%s" % (unique_database, TABLE_NAME))
+    query = "create table %s (s string) location '%s'" % (qualified_table_name, location)
+    self.client.execute(query)
+
+    with tempfile.NamedTemporaryFile() as f:
+      f.write(data)
+      f.flush()
+      check_call(['hadoop', 'fs', '-copyFromLocal', f.name, location])
+    self.client.execute("refresh %s" % qualified_table_name);
+
+    vector.get_value('exec_option')['max_scan_range_length'] = max_scan_range_length
+    query = "select * from %s" % qualified_table_name
+    result = self.execute_query_expect_success(
+      self.client, query, vector.get_value('exec_option'))
+
+    assert sorted(result.data) == sorted(expected_result)
 
 # Test for IMPALA-1740: Support for skip.header.line.count
 class TestTextScanRangeLengths(ImpalaTestSuite):

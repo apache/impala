@@ -284,11 +284,6 @@ restart:
     if (num_escape_chars % 2 != 0) goto restart;
   }
 
-  if (tuple_start == len - 1 && buffer_start[tuple_start] == '\r') {
-    // If \r is the last char we need to wait to see if the next one is \n or not.
-    last_row_delim_offset_ = 0;
-    return -1;
-  }
   if (tuple_start < len && buffer_start[tuple_start] == '\n' &&
       buffer_start[tuple_start - 1] == '\r') {
     // We have \r\n, move to the next character.

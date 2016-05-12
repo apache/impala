@@ -249,6 +249,20 @@ Status HdfsTextScanner::ResetScanner() {
 Status HdfsTextScanner::FinishScanRange() {
   if (scan_node_->ReachedLimit()) return Status::OK();
 
+  DCHECK_EQ(byte_buffer_ptr_, byte_buffer_end_);
+  bool split_delimiter;
+  RETURN_IF_ERROR(CheckForSplitDelimiter(&split_delimiter));
+  if (split_delimiter) {
+    // If the scan range ends on the '\r' of a "\r\n", the next tuple is considered part
+    // of the next scan range. Nothing to do since we already fully parsed the previous
+    // tuple.
+    DCHECK(!delimited_text_parser_->HasUnfinishedTuple());
+    DCHECK(partial_tuple_empty_);
+    DCHECK(boundary_column_.Empty());
+    DCHECK(boundary_row_.Empty());
+    return Status::OK();
+  }
+
   // For text we always need to scan past the scan range to find the next delimiter
   while (true) {
     bool eosr = true;
@@ -576,29 +590,47 @@ Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
   if (num_rows_to_skip > 0) {
     int num_skipped_rows = 0;
     *tuple_found = false;
-    while (true) {
-      bool eosr = false;
-      RETURN_IF_ERROR(FillByteBuffer(&eosr));  // updates byte_buffer_read_size_
+    bool eosr = false;
+    // Offset maybe not point to a tuple boundary, skip ahead to the first tuple start in
+    // this scan range (if one exists).
+    do {
+      RETURN_IF_ERROR(FillByteBuffer(&eosr));
 
       delimited_text_parser_->ParserReset();
       SCOPED_TIMER(parse_delimiter_timer_);
       int next_tuple_offset = 0;
+      int bytes_left = byte_buffer_read_size_;
       while (num_skipped_rows < num_rows_to_skip) {
         next_tuple_offset = delimited_text_parser_->FindFirstInstance(byte_buffer_ptr_,
-          byte_buffer_read_size_);
+          bytes_left);
         if (next_tuple_offset == -1) break;
         byte_buffer_ptr_ += next_tuple_offset;
-        byte_buffer_read_size_ -= next_tuple_offset;
+        bytes_left -= next_tuple_offset;
         ++num_skipped_rows;
       }
 
-      if (next_tuple_offset == -1) {
-        // Didn't find enough new tuples in this buffer, continue with the next one.
-        if (!eosr) continue;
-      } else {
-        *tuple_found = true;
+      if (next_tuple_offset != -1) *tuple_found = true;
+    } while (!*tuple_found && !eosr);
+
+    // Special case: if the first delimiter is at the end of the current buffer, it's
+    // possible it's a split "\r\n" delimiter.
+    if (*tuple_found && byte_buffer_ptr_ == byte_buffer_end_) {
+      bool split_delimiter;
+      RETURN_IF_ERROR(CheckForSplitDelimiter(&split_delimiter));
+      if (split_delimiter) {
+        if (eosr) {
+          // Split delimiter at the end of the scan range. The next tuple is considered
+          // part of the next scan range, so we report no tuple found.
+          *tuple_found = false;
+        } else {
+          // Split delimiter at the end of the current buffer, but not eosr. Advance to
+          // the correct position in the next buffer.
+          RETURN_IF_ERROR(FillByteBuffer(&eosr));
+          DCHECK_GT(byte_buffer_read_size_, 0);
+          DCHECK_EQ(*byte_buffer_ptr_, '\n');
+          byte_buffer_ptr_ += 1;
+        }
       }
-      break;
     }
     if (num_rows_to_skip > 1 && num_skipped_rows != num_rows_to_skip) {
       DCHECK(!*tuple_found);
@@ -610,6 +642,36 @@ Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
     }
   }
   DCHECK(delimited_text_parser_->AtTupleStart());
+  return Status::OK();
+}
+
+Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
+  DCHECK_EQ(byte_buffer_ptr_, byte_buffer_end_);
+  *split_delimiter = false;
+
+  // Nothing in buffer
+  if (byte_buffer_read_size_ == 0) return Status::OK();
+
+  // If the line delimiter is "\n" (meaning we also accept "\r" and "\r\n" as delimiters)
+  // and the current buffer ends with '\r', this could be a "\r\n" delimiter.
+  bool split_delimiter_possible = context_->partition_descriptor()->line_delim() == '\n'
+      && *(byte_buffer_end_ - 1) == '\r';
+  if (!split_delimiter_possible) return Status::OK();
+
+  // The '\r' may be escaped. If it's not the text parser will report a complete tuple.
+  if (delimited_text_parser_->HasUnfinishedTuple()) return Status::OK();
+
+  // Peek ahead one byte to see if the '\r' is followed by '\n'.
+  Status status;
+  uint8_t* next_byte;
+  int64_t out_len;
+  stream_->GetBytes(1, &next_byte, &out_len, &status, /*peek*/ true);
+  RETURN_IF_ERROR(status);
+
+  // No more bytes after current buffer
+  if (out_len == 0) return Status::OK();
+
+  *split_delimiter = *next_byte == '\n';
   return Status::OK();
 }
 

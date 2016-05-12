@@ -27,6 +27,20 @@ struct HdfsFileDesc;
 
 /// HdfsScanner implementation that understands text-formatted records.
 /// Uses SSE instructions, if available, for performance.
+///
+/// Splitting text files:
+/// This scanner handles text files split across multiple blocks/scan ranges. Note that
+/// the split can occur anywhere in the file, e.g. in the middle of a row. Each scanner
+/// starts materializing tuples right after the first row delimiter found in the scan
+/// range, and stops at the first row delimiter occuring past the end of the scan
+/// range. If no delimiter is found in the scan range, the scanner doesn't materialize
+/// anything. This scheme ensures that every row is materialized by exactly one scanner.
+///
+/// A special case is a "\r\n" row delimiter split across two scan ranges. (When the row
+/// delimiter is '\n', we also consider '\r' and "\r\n" row delimiters.) In this case, the
+/// delimiter is considered part of the second scan range, i.e., the first scan range's
+/// scanner is responsible for the tuple directly before it, and the second scan range's
+/// scanner for the tuple directly after it.
 class HdfsTextScanner : public HdfsScanner {
  public:
   HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state);
@@ -114,6 +128,13 @@ class HdfsTextScanner : public HdfsScanner {
   /// If bytes_to_read = -1, will call GetBuffer().
   Status DecompressBufferStream(int64_t bytes_to_read, uint8_t** decompressed_buffer,
       int64_t* decompressed_len, bool *eosr);
+
+  /// Checks if the current buffer ends with a row delimiter spanning this and the next
+  /// buffer (i.e. a "\r\n" delimiter). Does not modify byte_buffer_ptr_, etc. Always
+  /// returns false if the table's row delimiter is not '\n'. This can only be called
+  /// after the buffer has been fully parsed, i.e. when byte_buffer_ptr_ ==
+  /// byte_buffer_end_.
+  Status CheckForSplitDelimiter(bool* split_delimiter);
 
   /// Prepends field data that was from the previous file buffer (This field straddled two
   /// file buffers). 'data' already contains the pointer/len from the current file buffer,
