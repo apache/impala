@@ -123,8 +123,8 @@ class HashTableCtx {
   ///       space by not storing some rows we know will never match.
   HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
       const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
-      const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
-      MemTracker* tracker);
+      const std::vector<bool>& finds_nulls, int32_t initial_seed,
+      int max_levels, MemTracker* tracker);
 
   /// Create a hash table context with the specified parameters, invoke Init() to
   /// initialize the new hash table context and return it in 'ht_ctx'. Please see header
@@ -189,6 +189,22 @@ class HashTableCtx {
   /// If 'use_murmur' is true, murmur hash is used, otherwise CRC is used if the hardware
   /// supports it (see hash-util.h).
   Status CodegenHashCurrentRow(RuntimeState* state, bool use_murmur, llvm::Function** fn);
+
+  /// Struct that returns the number of constants replaced by ReplaceConstants().
+  struct HashTableReplacedConstants {
+    int stores_nulls;
+    int finds_some_nulls;
+    int stores_tuples;
+    int stores_duplicates;
+    int quadratic_probing;
+  };
+
+  /// Replace hash table parameters with constants in 'fn'. Updates 'replacement_counts'
+  /// with the number of replacements made. 'num_build_tuples' and 'stores_duplicates'
+  /// correspond to HashTable parameters with the same name.
+  Status ReplaceHashTableConstants(RuntimeState* state, bool stores_duplicates,
+      int num_build_tuples, llvm::Function* fn,
+      HashTableReplacedConstants* replacement_counts);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -417,13 +433,15 @@ class HashTableCtx {
   /// Cross-compiled function to access member variables used in CodegenHashCurrentRow().
   uint32_t GetHashSeed() const;
 
+  /// Functions to be replaced by codegen to specialize the hash table.
+  bool IR_NO_INLINE stores_nulls() const { return stores_nulls_; }
+  bool IR_NO_INLINE finds_some_nulls() const { return finds_some_nulls_; }
+
   const std::vector<ExprContext*>& build_expr_ctxs_;
   const std::vector<ExprContext*>& probe_expr_ctxs_;
 
   /// Constants on how the hash table should behave. Joins and aggs have slightly
   /// different behavior.
-  /// TODO: these constants are an ideal candidate to be removed with codegen.
-  /// TODO: ..or with template-ization
   const bool stores_nulls_;
   const std::vector<bool> finds_nulls_;
 
@@ -512,6 +530,8 @@ class HashTable {
   /// Returns a newly allocated HashTable. The probing algorithm is set by the
   /// FLAG_enable_quadratic_probing.
   ///  - client: block mgr client to allocate data pages from.
+  ///  - stores_duplicates: true if rows with duplicate keys may be inserted into the
+  ///    hash table.
   ///  - num_build_tuples: number of Tuples in the build tuple row.
   ///  - tuple_stream: the tuple stream which contains the tuple rows index by the
   ///    hash table. Can be NULL if the rows contain only a single tuple, in which
@@ -522,8 +542,8 @@ class HashTable {
   ///  - initial_num_buckets: number of buckets that the hash table should be initialized
   ///    with.
   static HashTable* Create(RuntimeState* state, BufferedBlockMgr::Client* client,
-      int num_build_tuples, BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
-      int64_t initial_num_buckets);
+      bool stores_duplicates, int num_build_tuples, BufferedTupleStream* tuple_stream,
+      int64_t max_num_buckets, int64_t initial_num_buckets);
 
   /// Allocates the initial bucket structure. Returns false if OOM.
   bool Init();
@@ -730,7 +750,7 @@ class HashTable {
   ///  - quadratic_probing: set to true when the probing algorithm is quadratic, as
   ///    opposed to linear.
   HashTable(bool quadratic_probing, RuntimeState* state, BufferedBlockMgr::Client* client,
-      int num_build_tuples, BufferedTupleStream* tuple_stream,
+      bool stores_duplicates, int num_build_tuples, BufferedTupleStream* tuple_stream,
       int64_t max_num_buckets, int64_t initial_num_buckets);
 
   /// Performs the probing operation according to the probing algorithm (linear or
@@ -802,6 +822,11 @@ class HashTable {
   /// Grow the node array. Returns false on OOM.
   bool GrowNodeArray();
 
+  /// Functions to be replaced by codegen to specialize the hash table.
+  bool IR_NO_INLINE stores_tuples() const { return stores_tuples_; }
+  bool IR_NO_INLINE stores_duplicates() const { return stores_duplicates_; }
+  bool IR_NO_INLINE quadratic_probing() const { return quadratic_probing_; }
+
   /// Load factor that will trigger growing the hash table on insert.  This is
   /// defined as the number of non-empty buckets / total_buckets
   static const double MAX_FILL_FACTOR;
@@ -818,9 +843,10 @@ class HashTable {
 
   /// Constants on how the hash table should behave. Joins and aggs have slightly
   /// different behavior.
-  /// TODO: these constants are an ideal candidate to be removed with codegen.
-  /// TODO: ..or with template-ization
   const bool stores_tuples_;
+
+  /// True if duplicates may be inserted into hash table.
+  const bool stores_duplicates_;
 
   /// Quadratic probing enabled (as opposed to linear).
   const bool quadratic_probing_;
@@ -857,7 +883,6 @@ class HashTable {
   int64_t num_buckets_with_duplicates_;
 
   /// Number of build tuples, used for constructing temp row* for probes.
-  /// TODO: We should remove it.
   const int num_build_tuples_;
 
   /// Flag used to disable spilling hash tables that already had matches in case of

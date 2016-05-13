@@ -622,27 +622,61 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
 }
 
 int LlvmCodeGen::ReplaceCallSites(Function* caller, Function* new_fn,
-    const string& replacee_name) {
+    const string& target_name) {
   DCHECK(!is_compiled_);
   DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
   DCHECK(new_fn != NULL);
+
+  vector<CallInst*> call_sites;
+  FindCallSites(caller, target_name, &call_sites);
   int replaced = 0;
+  for (CallInst* call_instr: call_sites) {
+    // Replace the called function
+    call_instr->setCalledFunction(new_fn);
+    ++replaced;
+  }
+  return replaced;
+}
+
+int LlvmCodeGen::ReplaceCallSitesWithValue(Function* caller, Value* replacement,
+    const string& target_name) {
+  DCHECK(!is_compiled_);
+  DCHECK(caller->getParent() == module_);
+  DCHECK(caller != NULL);
+  DCHECK(replacement != NULL);
+
+  vector<CallInst*> call_sites;
+  FindCallSites(caller, target_name, &call_sites);
+  int replaced = 0;
+  for (CallInst* call_instr: call_sites) {
+    call_instr->replaceAllUsesWith(replacement);
+    ++replaced;
+  }
+  return replaced;
+}
+
+int LlvmCodeGen::ReplaceCallSitesWithBoolConst(llvm::Function* caller, bool constant,
+    const string& target_name) {
+  Value* replacement = ConstantInt::get(Type::getInt1Ty(context()), constant);
+  return ReplaceCallSitesWithValue(caller, replacement, target_name);
+}
+
+void LlvmCodeGen::FindCallSites(Function* caller, const string& target_name,
+      vector<CallInst*>* results) {
   for (inst_iterator iter = inst_begin(caller); iter != inst_end(caller); ++iter) {
     Instruction* instr = &*iter;
-    // look for call instructions
+    // Look for call instructions. Note that we'll ignore invoke and other related
+    // instructions that are not a plain function call.
     if (CallInst::classof(instr)) {
       CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
-      Function* old_fn = call_instr->getCalledFunction();
-      // look for call instruction that matches the name
-      if (old_fn != NULL && old_fn->getName().find(replacee_name) != string::npos) {
-        // Replace the called function
-        call_instr->setCalledFunction(new_fn);
-        ++replaced;
+      Function* callee = call_instr->getCalledFunction();
+      // Check for substring match.
+      if (callee != NULL && callee->getName().find(target_name) != string::npos) {
+        results->push_back(call_instr);
       }
     }
   }
-  return replaced;
 }
 
 Function* LlvmCodeGen::CloneFunction(Function* fn) {

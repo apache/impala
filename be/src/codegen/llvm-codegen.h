@@ -261,6 +261,11 @@ class LlvmCodeGen {
   int ReplaceCallSites(llvm::Function* caller, llvm::Function* new_fn,
       const std::string& target_name);
 
+  /// Same as ReplaceCallSites(), except replaces the function call instructions with the
+  /// boolean value 'constant'.
+  int ReplaceCallSitesWithBoolConst(llvm::Function* caller, bool constant,
+      const std::string& target_name);
+
   /// Returns a copy of fn. The copy is added to the module.
   llvm::Function* CloneFunction(llvm::Function* fn);
 
@@ -463,6 +468,17 @@ class LlvmCodeGen {
 
   /// Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
+
+  /// Replace calls to functions in 'caller' where the callee's name has 'target_name'
+  /// as a substring. Calls to functions are replaced with the value 'replacement'. The
+  /// return value is the number of calls replaced.
+  int ReplaceCallSitesWithValue(llvm::Function* caller, llvm::Value* replacement,
+      const std::string& target_name);
+
+  /// Finds call instructions in 'caller' where 'target_name' is a substring of the
+  /// callee's name. Found instructions are appended to the 'results' vector.
+  static void FindCallSites(llvm::Function* caller, const std::string& target_name,
+      std::vector<llvm::CallInst*>* results);
 
   /// Whether InitializeLlvm() has been called.
   static bool llvm_initialized_;

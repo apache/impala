@@ -455,6 +455,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
   int64_t estimated_num_buckets = build_rows()->RowConsumesMemory() ?
       HashTable::EstimateNumBuckets(build_rows()->num_rows()) : state->batch_size() * 2;
   hash_tbl_.reset(HashTable::Create(state, parent_->block_mgr_client_,
+      true /* store_duplicates */,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
       1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
@@ -1660,6 +1661,18 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
       "EvalBuildRow");
   DCHECK_EQ(replaced, 1);
 
+  // Replace some hash table parameters with constants.
+  HashTableCtx::HashTableReplacedConstants replaced_constants;
+  const bool stores_duplicates = true;
+  const int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state, stores_duplicates,
+      num_build_tuples, process_build_batch_fn, &replaced_constants));
+  DCHECK_GE(replaced_constants.stores_nulls, 1);
+  DCHECK_EQ(replaced_constants.finds_some_nulls, 0);
+  DCHECK_EQ(replaced_constants.stores_duplicates, 0);
+  DCHECK_EQ(replaced_constants.stores_tuples, 0);
+  DCHECK_EQ(replaced_constants.quadratic_probing, 0);
+
   Function* process_build_batch_fn_level0 =
       codegen->CloneFunction(process_build_batch_fn);
 
@@ -1836,6 +1849,18 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // TODO: switch statement
   DCHECK(replaced == 1 || replaced == 2 || replaced == 3 || replaced == 4) << replaced;
 
+  // Replace hash-table parameters with constants.
+  HashTableCtx::HashTableReplacedConstants replaced_constants;
+  const bool stores_duplicates = true;
+  const int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state, stores_duplicates,
+      num_build_tuples, process_probe_batch_fn, &replaced_constants));
+  DCHECK_GE(replaced_constants.stores_nulls, 1);
+  DCHECK_GE(replaced_constants.finds_some_nulls, 1);
+  DCHECK_GE(replaced_constants.stores_duplicates, 1);
+  DCHECK_GE(replaced_constants.stores_tuples, 1);
+  DCHECK_GE(replaced_constants.quadratic_probing, 1);
+
   Function* process_probe_batch_fn_level0 =
       codegen->CloneFunction(process_probe_batch_fn);
 
@@ -1894,6 +1919,18 @@ Status PartitionedHashJoinNode::CodegenInsertBatch(RuntimeState* state,
   // Use codegen'd Equals() function
   replaced = codegen->ReplaceCallSites(insert_batch_fn, build_equals_fn, "Equals");
   DCHECK_EQ(replaced, 1);
+
+  // Replace hash-table parameters with constants.
+  HashTableCtx::HashTableReplacedConstants replaced_constants;
+  const bool stores_duplicates = true;
+  const int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state, stores_duplicates,
+      num_build_tuples, insert_batch_fn, &replaced_constants));
+  DCHECK_GE(replaced_constants.stores_nulls, 1);
+  DCHECK_EQ(replaced_constants.finds_some_nulls, 0);
+  DCHECK_GE(replaced_constants.stores_duplicates, 1);
+  DCHECK_GE(replaced_constants.stores_tuples, 1);
+  DCHECK_GE(replaced_constants.quadratic_probing, 1);
 
   Function* insert_batch_fn_level0 = codegen->CloneFunction(insert_batch_fn);
 

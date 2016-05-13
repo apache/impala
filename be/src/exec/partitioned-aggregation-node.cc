@@ -763,9 +763,9 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   // though. Always start with small buffers.
   // TODO: How many buckets? We currently use a default value, 1024.
   static const int64_t PAGG_DEFAULT_HASH_TABLE_SZ = 1024;
-
-  hash_tbl.reset(HashTable::Create(parent->state_, parent->block_mgr_client_, 1,
-      NULL, 1L << (32 - NUM_PARTITIONING_BITS), PAGG_DEFAULT_HASH_TABLE_SZ));
+  hash_tbl.reset(HashTable::Create(parent->state_, parent->block_mgr_client_,
+      false, 1, NULL, 1L << (32 - NUM_PARTITIONING_BITS),
+      PAGG_DEFAULT_HASH_TABLE_SZ));
   return hash_tbl->Init();
 }
 
@@ -1841,6 +1841,16 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
 
     replaced = codegen->ReplaceCallSites(process_batch_fn, build_equals_fn, "Equals");
     DCHECK_EQ(replaced, 1);
+
+    HashTableCtx::HashTableReplacedConstants replaced_constants;
+    const bool stores_duplicates = false;
+    RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state_, stores_duplicates, 1,
+        process_batch_fn, &replaced_constants));
+    DCHECK_GE(replaced_constants.stores_nulls, 1);
+    DCHECK_GE(replaced_constants.finds_some_nulls, 1);
+    DCHECK_GE(replaced_constants.stores_duplicates, 1);
+    DCHECK_GE(replaced_constants.stores_tuples, 1);
+    DCHECK_GE(replaced_constants.quadratic_probing, 1);
   }
 
   replaced = codegen->ReplaceCallSites(process_batch_fn, update_tuple_fn, "UpdateTuple");
@@ -1909,6 +1919,16 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
 
   replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, equals_fn, "Equals");
   DCHECK_EQ(replaced, 1);
+
+  HashTableCtx::HashTableReplacedConstants replaced_constants;
+  const bool stores_duplicates = false;
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state_, stores_duplicates, 1,
+      process_batch_streaming_fn, &replaced_constants));
+  DCHECK_GE(replaced_constants.stores_nulls, 1);
+  DCHECK_GE(replaced_constants.finds_some_nulls, 1);
+  DCHECK_GE(replaced_constants.stores_duplicates, 1);
+  DCHECK_GE(replaced_constants.stores_tuples, 1);
+  DCHECK_GE(replaced_constants.quadratic_probing, 1);
 
   DCHECK(process_batch_streaming_fn != NULL);
   process_batch_streaming_fn = codegen->FinalizeFunction(process_batch_streaming_fn);

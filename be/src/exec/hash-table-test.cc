@@ -189,7 +189,7 @@ class HashTableTest : public testing::Test {
     // Initial_num_buckets must be a power of two.
     EXPECT_EQ(initial_num_buckets, BitUtil::RoundUpToPowerOfTwo(initial_num_buckets));
     int64_t max_num_buckets = 1L << 31;
-    table->reset(new HashTable(quadratic, runtime_state_, client, 1, NULL,
+    table->reset(new HashTable(quadratic, runtime_state_, client, true, 1, NULL,
           max_num_buckets, initial_num_buckets));
     return (*table)->Init();
   }
@@ -239,6 +239,7 @@ class HashTableTest : public testing::Test {
         probe_expr_ctxs_, true /* stores_nulls_ */,
         vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1, &tracker_, &ht_ctx);
     EXPECT_OK(status);
+
     for (int i = 0; i < 2; ++i) {
       if (!ht_ctx->EvalAndHashBuild(build_rows[i])) continue;
       BufferedTupleStream::RowIdx dummy_row_idx;

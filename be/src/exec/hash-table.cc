@@ -84,8 +84,8 @@ static const int NUM_SMALL_DATA_PAGES = sizeof(INITIAL_DATA_PAGE_SIZES) / sizeof
 
 HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
     const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
-    const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
-    MemTracker* tracker)
+    const std::vector<bool>& finds_nulls, int32_t initial_seed,
+    int max_levels, MemTracker* tracker)
     : build_expr_ctxs_(build_expr_ctxs),
       probe_expr_ctxs_(probe_expr_ctxs),
       stores_nulls_(stores_nulls),
@@ -341,20 +341,21 @@ void HashTableCtx::ExprValuesCache::ResetForRead() {
 const double HashTable::MAX_FILL_FACTOR = 0.75f;
 
 HashTable* HashTable::Create(RuntimeState* state,
-    BufferedBlockMgr::Client* client, int num_build_tuples,
+    BufferedBlockMgr::Client* client, bool stores_duplicates, int num_build_tuples,
     BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
     int64_t initial_num_buckets) {
-  return new HashTable(FLAGS_enable_quadratic_probing, state, client,
+  return new HashTable(FLAGS_enable_quadratic_probing, state, client, stores_duplicates,
       num_build_tuples, tuple_stream, max_num_buckets, initial_num_buckets);
 }
 
 HashTable::HashTable(bool quadratic_probing, RuntimeState* state,
-    BufferedBlockMgr::Client* client, int num_build_tuples, BufferedTupleStream* stream,
-    int64_t max_num_buckets, int64_t num_buckets)
+    BufferedBlockMgr::Client* client, bool stores_duplicates, int num_build_tuples,
+    BufferedTupleStream* stream, int64_t max_num_buckets, int64_t num_buckets)
   : state_(state),
     block_mgr_client_(client),
     tuple_stream_(stream),
     stores_tuples_(num_build_tuples == 1),
+    stores_duplicates_(stores_duplicates),
     quadratic_probing_(quadratic_probing),
     total_data_page_size_(0),
     next_node_(NULL),
@@ -1152,5 +1153,24 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
     return Status("Codegen'd HashTableCtx::Equals() function failed verification, "
         "see log");
   }
+  return Status::OK();
+}
+
+Status HashTableCtx::ReplaceHashTableConstants(RuntimeState* state,
+    bool stores_duplicates, int num_build_tuples, Function* fn,
+    HashTableReplacedConstants* replacement_counts) {
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
+
+  replacement_counts->stores_nulls = codegen->ReplaceCallSitesWithBoolConst(
+      fn, stores_nulls(), "stores_nulls");
+  replacement_counts->finds_some_nulls = codegen->ReplaceCallSitesWithBoolConst(
+      fn, finds_some_nulls(), "finds_some_nulls");
+  replacement_counts->stores_tuples = codegen->ReplaceCallSitesWithBoolConst(
+      fn, num_build_tuples == 1, "stores_tuples");
+  replacement_counts->stores_duplicates = codegen->ReplaceCallSitesWithBoolConst(
+      fn, stores_duplicates, "stores_duplicates");
+  replacement_counts->quadratic_probing = codegen->ReplaceCallSitesWithBoolConst(
+      fn, FLAGS_enable_quadratic_probing, "quadratic_probing");
   return Status::OK();
 }

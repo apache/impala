@@ -25,14 +25,14 @@ namespace impala {
 
 inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row) {
   bool has_null = EvalBuildRow(row);
-  if (!stores_nulls_ && has_null) return false;
+  if (!stores_nulls() && has_null) return false;
   expr_values_cache_.SetExprValuesHash(HashCurrentRow());
   return true;
 }
 
 inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row) {
   bool has_null = EvalProbeRow(row);
-  if (has_null && !(stores_nulls_ && finds_some_nulls_)) return false;
+  if (has_null && !(stores_nulls() && finds_some_nulls())) return false;
   expr_values_cache_.SetExprValuesHash(HashCurrentRow());
   return true;
 }
@@ -72,7 +72,7 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     // Move to the next bucket.
     ++step;
     ++travel_length_;
-    if (quadratic_probing_) {
+    if (quadratic_probing()) {
       // The i-th probe location is idx = (hash + (step * (step + 1)) / 2) mod num_buckets.
       // This gives num_buckets unique idxs (between 0 and N-1) when num_buckets is a power
       // of 2.
@@ -82,7 +82,7 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     }
   } while (LIKELY(step < num_buckets));
   DCHECK_EQ(num_filled_buckets_, num_buckets) << "Probing of a non-full table "
-      << "failed: " << quadratic_probing_ << " " << hash;
+      << "failed: " << quadratic_probing() << " " << hash;
   return Iterator::BUCKET_NOT_FOUND;
 }
 
@@ -108,7 +108,7 @@ inline bool HashTable::Insert(HashTableCtx* ht_ctx,
   HtData* htdata = InsertInternal(ht_ctx);
   // If successful insert, update the contents of the newly inserted entry with 'idx'.
   if (LIKELY(htdata != NULL)) {
-    if (stores_tuples_) {
+    if (stores_tuples()) {
       htdata->tuple = row->GetTuple(0);
     } else {
       htdata->idx = idx;
@@ -136,7 +136,7 @@ inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx) {
   int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
   if (found) {
     return Iterator(this, ht_ctx->scratch_row(), bucket_idx,
-        buckets_[bucket_idx].bucketData.duplicates);
+        stores_duplicates() ? buckets_[bucket_idx].bucketData.duplicates : NULL);
   }
   return End();
 }
@@ -147,8 +147,10 @@ inline HashTable::Iterator HashTable::FindBuildRowBucket(
   ++num_probes_;
   uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
   int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
-  DuplicateNode* duplicates = LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND) ?
-      buckets_[bucket_idx].bucketData.duplicates : NULL;
+  DuplicateNode* duplicates = NULL;
+  if (stores_duplicates() && LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND)) {
+    duplicates = buckets_[bucket_idx].bucketData.duplicates;
+  }
   return Iterator(this, ht_ctx->scratch_row(), bucket_idx, duplicates);
 }
 
@@ -167,8 +169,8 @@ inline HashTable::Iterator HashTable::FirstUnmatched(HashTableCtx* ctx) {
   // Check whether the bucket, or its first duplicate node, is matched. If it is not
   // matched, then return. Otherwise, move to the first unmatched entry (node or bucket).
   Bucket* bucket = &buckets_[bucket_idx];
-  if ((!bucket->hasDuplicates && bucket->matched) ||
-      (bucket->hasDuplicates && node->matched)) {
+  bool has_duplicates = stores_duplicates() && bucket->hasDuplicates;
+  if ((!has_duplicates && bucket->matched) || (has_duplicates && node->matched)) {
     it.NextUnmatched();
   }
   return it;
@@ -178,7 +180,7 @@ inline void HashTable::NextFilledBucket(int64_t* bucket_idx, DuplicateNode** nod
   ++*bucket_idx;
   for (; *bucket_idx < num_buckets_; ++*bucket_idx) {
     if (buckets_[*bucket_idx].filled) {
-      *node = buckets_[*bucket_idx].bucketData.duplicates;
+      *node = stores_duplicates() ? buckets_[*bucket_idx].bucketData.duplicates : NULL;
       return;
     }
   }
@@ -212,6 +214,7 @@ inline HashTable::DuplicateNode* HashTable::InsertDuplicateNode(int64_t bucket_i
   DCHECK_LT(bucket_idx, num_buckets_);
   Bucket* bucket = &buckets_[bucket_idx];
   DCHECK(bucket->filled);
+  DCHECK(stores_duplicates());
   // Allocate one duplicate node for the new data and one for the preexisting data,
   // if needed.
   while (node_remaining_current_page_ < 1 + !bucket->hasDuplicates) {
@@ -234,18 +237,19 @@ inline HashTable::DuplicateNode* HashTable::InsertDuplicateNode(int64_t bucket_i
   return AppendNextNode(bucket);
 }
 
-inline TupleRow* HashTable::GetRow(HtData& htdata, TupleRow* row) const {
-  if (stores_tuples_) {
+inline TupleRow* IR_ALWAYS_INLINE HashTable::GetRow(HtData& htdata, TupleRow* row) const {
+  if (stores_tuples()) {
     return reinterpret_cast<TupleRow*>(&htdata.tuple);
   } else {
+    // TODO: GetTupleRow() has interpreted code that iterates over the row's descriptor.
     tuple_stream_->GetTupleRow(htdata.idx, row);
     return row;
   }
 }
 
-inline TupleRow* HashTable::GetRow(Bucket* bucket, TupleRow* row) const {
+inline TupleRow* IR_ALWAYS_INLINE HashTable::GetRow(Bucket* bucket, TupleRow* row) const {
   DCHECK(bucket != NULL);
-  if (UNLIKELY(bucket->hasDuplicates)) {
+  if (UNLIKELY(stores_duplicates() && bucket->hasDuplicates)) {
     DuplicateNode* duplicate = bucket->bucketData.duplicates;
     DCHECK(duplicate != NULL);
     return GetRow(duplicate->htdata, row);
@@ -254,12 +258,12 @@ inline TupleRow* HashTable::GetRow(Bucket* bucket, TupleRow* row) const {
   }
 }
 
-inline TupleRow* HashTable::Iterator::GetRow() const {
+inline TupleRow* IR_ALWAYS_INLINE HashTable::Iterator::GetRow() const {
   DCHECK(!AtEnd());
   DCHECK(table_ != NULL);
   DCHECK(scratch_row_ != NULL);
   Bucket* bucket = &table_->buckets_[bucket_idx_];
-  if (UNLIKELY(bucket->hasDuplicates)) {
+  if (UNLIKELY(table_->stores_duplicates() && bucket->hasDuplicates)) {
     DCHECK(node_ != NULL);
     return table_->GetRow(node_->htdata, scratch_row_);
   } else {
@@ -267,12 +271,12 @@ inline TupleRow* HashTable::Iterator::GetRow() const {
   }
 }
 
-inline Tuple* HashTable::Iterator::GetTuple() const {
+inline Tuple* IR_ALWAYS_INLINE HashTable::Iterator::GetTuple() const {
   DCHECK(!AtEnd());
-  DCHECK(table_->stores_tuples_);
+  DCHECK(table_->stores_tuples());
   Bucket* bucket = &table_->buckets_[bucket_idx_];
   // TODO: To avoid the hasDuplicates check, store the HtData* in the Iterator.
-  if (UNLIKELY(bucket->hasDuplicates)) {
+  if (UNLIKELY(table_->stores_duplicates() && bucket->hasDuplicates)) {
     DCHECK(node_ != NULL);
     return node_->htdata.tuple;
   } else {
@@ -282,7 +286,7 @@ inline Tuple* HashTable::Iterator::GetTuple() const {
 
 inline void HashTable::Iterator::SetTuple(Tuple* tuple, uint32_t hash) {
   DCHECK(!AtEnd());
-  DCHECK(table_->stores_tuples_);
+  DCHECK(table_->stores_tuples());
   table_->PrepareBucketForInsert(bucket_idx_, hash);
   table_->buckets_[bucket_idx_].bucketData.htdata.tuple = tuple;
 }
@@ -290,7 +294,7 @@ inline void HashTable::Iterator::SetTuple(Tuple* tuple, uint32_t hash) {
 inline void HashTable::Iterator::SetMatched() {
   DCHECK(!AtEnd());
   Bucket* bucket = &table_->buckets_[bucket_idx_];
-  if (bucket->hasDuplicates) {
+  if (table_->stores_duplicates() && bucket->hasDuplicates) {
     node_->matched = true;
   } else {
     bucket->matched = true;
@@ -303,7 +307,7 @@ inline void HashTable::Iterator::SetMatched() {
 inline bool HashTable::Iterator::IsMatched() const {
   DCHECK(!AtEnd());
   Bucket* bucket = &table_->buckets_[bucket_idx_];
-  if (bucket->hasDuplicates) {
+  if (table_->stores_duplicates() && bucket->hasDuplicates) {
     return node_->matched;
   }
   return bucket->matched;
@@ -326,7 +330,8 @@ inline void HashTable::Iterator::PrefetchBucket() {
 
 inline void HashTable::Iterator::Next() {
   DCHECK(!AtEnd());
-  if (table_->buckets_[bucket_idx_].hasDuplicates && node_->next != NULL) {
+  if (table_->stores_duplicates() && table_->buckets_[bucket_idx_].hasDuplicates &&
+      node_->next != NULL) {
     node_ = node_->next;
   } else {
     table_->NextFilledBucket(&bucket_idx_, &node_);
@@ -335,7 +340,8 @@ inline void HashTable::Iterator::Next() {
 
 inline void HashTable::Iterator::NextDuplicate() {
   DCHECK(!AtEnd());
-  if (table_->buckets_[bucket_idx_].hasDuplicates && node_->next != NULL) {
+  if (table_->stores_duplicates() && table_->buckets_[bucket_idx_].hasDuplicates &&
+      node_->next != NULL) {
     node_ = node_->next;
   } else {
     bucket_idx_ = BUCKET_NOT_FOUND;
@@ -347,7 +353,7 @@ inline void HashTable::Iterator::NextUnmatched() {
   DCHECK(!AtEnd());
   Bucket* bucket = &table_->buckets_[bucket_idx_];
   // Check if there is any remaining unmatched duplicate node in the current bucket.
-  if (bucket->hasDuplicates) {
+  if (table_->stores_duplicates() && bucket->hasDuplicates) {
     while (node_->next != NULL) {
       node_ = node_->next;
       if (!node_->matched) return;
@@ -358,7 +364,7 @@ inline void HashTable::Iterator::NextUnmatched() {
   table_->NextFilledBucket(&bucket_idx_, &node_);
   while (bucket_idx_ != Iterator::BUCKET_NOT_FOUND) {
     bucket = &table_->buckets_[bucket_idx_];
-    if (!bucket->hasDuplicates) {
+    if (!table_->stores_duplicates() || !bucket->hasDuplicates) {
       if (!bucket->matched) return;
     } else {
       while (node_->matched && node_->next != NULL) {
