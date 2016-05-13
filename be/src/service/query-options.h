@@ -111,7 +111,8 @@ Status SetQueryOption(const std::string& key, const std::string& value,
 /// Parse a "," separated key=value pair of query options and set it in 'query_options'.
 /// If the same query option is specified more than once, the last one wins. The
 /// set_query_options_mask bitmask is updated to reflect the query options which were
-/// set. Return an error if the input is invalid (bad format or invalid query option).
+/// set. Returns an error status containing an error detail for any invalid options (e.g.
+/// bad format or invalid query option), but all valid query options are still handled.
 Status ParseQueryOptions(const std::string& options, TQueryOptions* query_options,
     QueryOptionsMask* set_query_options_mask);
 

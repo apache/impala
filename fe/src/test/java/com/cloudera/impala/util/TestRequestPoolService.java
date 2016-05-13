@@ -250,8 +250,10 @@ public class TestRequestPoolService {
 
     // Test pool limit changes
     checkPoolConfigResult("root", 15, 100, -1, 30000L, "");
+    // not_a_valid_option=foo.bar gets filtered out when parsing the query options on
+    // the backend, but it should be observed coming from the test file here.
     checkPoolConfigResult("root.queueA", 1, 30, 100000 * ByteUnits.MEGABYTE,
-        50L, "mem_limit=128m,query_timeout_s=5");
+        50L, "mem_limit=128m,query_timeout_s=5,not_a_valid_option=foo.bar");
     checkPoolConfigResult("root.queueB", 5, 10, -1, 60000L, "");
     checkPoolConfigResult("root.queueC", 10, 30, 128 * ByteUnits.MEGABYTE,
         30000L, "mem_limit=2048m,query_timeout_s=60");

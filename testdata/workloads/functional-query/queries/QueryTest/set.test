@@ -135,7 +135,7 @@ The PARQUET_FILE_SIZE query option must be less than 2GB.
 ---- QUERY
 set foo=bar
 ---- CATCH
-Ignoring invalid configuration option: foo
+Invalid query option: foo
 ====
 ---- QUERY
 set parquet_compression_codec=bar

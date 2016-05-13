@@ -107,7 +107,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask) {
   int option = GetQueryOptionForKey(key);
   if (option < 0) {
-    return Status(Substitute("Ignoring invalid configuration option: $0", key));
+    return Status(Substitute("Invalid query option: $0", key));
   } else {
     switch (option) {
       case TImpalaQueryOptions::ABORT_ON_ERROR:
@@ -421,17 +421,22 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
   if (options.length() == 0) return Status::OK();
   vector<string> kv_pairs;
   split(kv_pairs, options, is_any_of(","), token_compress_on);
+  // Construct an error status which is used to aggregate errors encountered during
+  // parsing. It is only returned if the number of error details is greater than 0.
+  Status errorStatus = Status::Expected("Errors parsing query options");
   for (string& kv_string: kv_pairs) {
     trim(kv_string);
     if (kv_string.length() == 0) continue;
     vector<string> key_value;
     split(key_value, kv_string, is_any_of("="), token_compress_on);
     if (key_value.size() != 2) {
-      return Status(Substitute("Ignoring invalid configuration option $0: bad format "
-          "(expected 'key=value')", kv_string));
+      errorStatus.MergeStatus(
+          Status(Substitute("Invalid configuration option '$0'.", kv_string)));
+      continue;
     }
-    RETURN_IF_ERROR(SetQueryOption(key_value[0], key_value[1], query_options,
+    errorStatus.MergeStatus(SetQueryOption(key_value[0], key_value[1], query_options,
         set_query_options_mask));
   }
+  if (errorStatus.msg().details().size() > 0) return errorStatus;
   return Status::OK();
 }

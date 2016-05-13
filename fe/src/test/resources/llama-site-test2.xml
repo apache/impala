@@ -41,7 +41,7 @@
   </property>
   <property>
     <name>impala.admission-control.pool-default-query-options.root.queueA</name>
-    <value>mem_limit=128m,query_timeout_s=5</value>
+    <value>mem_limit=128m,query_timeout_s=5,not_a_valid_option=foo.bar</value>
   </property>
   <property>
     <name>llama.am.throttling.maximum.placed.reservations.root.queueC</name>

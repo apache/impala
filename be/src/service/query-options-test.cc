@@ -80,6 +80,33 @@ TEST(QueryOptions, SetFilterWait) {
   EXPECT_EQ(numeric_limits<int32_t>::max(), options.runtime_filter_wait_time_ms);
 }
 
+TEST(QueryOptions, ParseQueryOptions) {
+  QueryOptionsMask expectedMask;
+  expectedMask.set(TImpalaQueryOptions::NUM_NODES);
+  expectedMask.set(TImpalaQueryOptions::MEM_LIMIT);
+
+  {
+    TQueryOptions options;
+    QueryOptionsMask mask;
+    EXPECT_OK(ParseQueryOptions("num_nodes=1,mem_limit=42", &options, &mask));
+    EXPECT_EQ(options.num_nodes, 1);
+    EXPECT_EQ(options.mem_limit, 42);
+    EXPECT_EQ(mask, expectedMask);
+  }
+
+  {
+    TQueryOptions options;
+    QueryOptionsMask mask;
+    Status status = ParseQueryOptions("num_nodes=1,mem_limit:42,foo=bar,mem_limit=42",
+        &options, &mask);
+    EXPECT_EQ(options.num_nodes, 1);
+    EXPECT_EQ(options.mem_limit, 42);
+    EXPECT_EQ(mask, expectedMask);
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.msg().details().size(), 2);
+  }
+}
+
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   MemInfo::Init();
