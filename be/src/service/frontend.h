@@ -35,10 +35,10 @@ class Frontend {
   /// or if there is any further exception, the constructor will terminate the process.
   Frontend();
 
-  /// Request to update the Impalad catalog cache. The TUpdateCatalogCacheRequest contains
-  /// a list of objects that should be added/removed from the Catalog. Returns a response
-  /// that contains details such as the new max catalog version.
-  Status UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
+  /// Request to update the Impalad catalog cache. The req argument contains a vector of
+  /// updates that each contain objects that should be added/removed from the Catalog.
+  /// Returns a response that contains details such as the new max catalog version.
+  Status UpdateCatalogCache(const vector<TUpdateCatalogCacheRequest>& req,
       TUpdateCatalogCacheResponse *resp);
 
   /// Request to update the Impalad frontend cluster membership snapshot.  The
@@ -175,7 +175,7 @@ class Frontend {
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig(byte[])
   jmethodID get_hadoop_configs_id_;  // JniFrontend.getAllHadoopConfigs()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
-  jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache()
+  jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
   jmethodID update_membership_id_; // JniFrontend.updateMembership()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_db_id_; // JniFrontend.describeDb

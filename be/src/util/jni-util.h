@@ -265,6 +265,30 @@ class JniUtil {
     return Status::OK();
   }
 
+  template <typename T, typename R>
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method,
+      const vector<T>& args, R* response) {
+    JNIEnv* jni_env = getJNIEnv();
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(jni_env));
+    jclass jByteArray_class = jni_env->FindClass("[B");
+    jobjectArray array_of_jByteArray =
+        jni_env->NewObjectArray(args.size(), jByteArray_class, NULL);
+    RETURN_ERROR_IF_EXC(jni_env);
+    jbyteArray request_bytes;
+    for (int i = 0; i < args.size(); i++) {
+      RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &args[i], &request_bytes));
+      jni_env->SetObjectArrayElement(array_of_jByteArray, i, request_bytes);
+      RETURN_ERROR_IF_EXC(jni_env);
+      jni_env->DeleteLocalRef(request_bytes);
+    }
+    jbyteArray result_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(obj, method, array_of_jByteArray));
+    RETURN_ERROR_IF_EXC(jni_env);
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
+    return Status::OK();
+  }
+
   template <typename T>
   static Status CallJniMethod(const jobject& obj, const jmethodID& method,
       const T& arg, std::string* response) {

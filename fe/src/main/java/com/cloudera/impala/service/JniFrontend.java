@@ -16,6 +16,7 @@ package com.cloudera.impala.service;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -80,6 +81,7 @@ import com.cloudera.impala.thrift.TShowRolesParams;
 import com.cloudera.impala.thrift.TShowRolesResult;
 import com.cloudera.impala.thrift.TShowStatsParams;
 import com.cloudera.impala.thrift.TTableName;
+import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateMembershipRequest;
 import com.cloudera.impala.util.GlogAppender;
@@ -153,12 +155,28 @@ public class JniFrontend {
     }
   }
 
-  public byte[] updateCatalogCache(byte[] thriftCatalogUpdate) throws ImpalaException {
-    TUpdateCatalogCacheRequest req = new TUpdateCatalogCacheRequest();
-    JniUtil.deserializeThrift(protocolFactory_, req, thriftCatalogUpdate);
+  // Deserialize and merge each thrift catalog update into a single merged update
+  public byte[] updateCatalogCache(byte[][] thriftCatalogUpdates) throws ImpalaException {
+    TUniqueId defaultCatalogServiceId = new TUniqueId(0L, 0L);
+    TUpdateCatalogCacheRequest mergedUpdateRequest = new TUpdateCatalogCacheRequest(
+        false, defaultCatalogServiceId, new ArrayList<TCatalogObject>(),
+        new ArrayList<TCatalogObject>());
+    for (byte[] catalogUpdate: thriftCatalogUpdates) {
+      TUpdateCatalogCacheRequest incrementalRequest = new TUpdateCatalogCacheRequest();
+      JniUtil.deserializeThrift(protocolFactory_, incrementalRequest, catalogUpdate);
+      mergedUpdateRequest.is_delta |= incrementalRequest.is_delta;
+      if (!incrementalRequest.getCatalog_service_id().equals(defaultCatalogServiceId)) {
+        mergedUpdateRequest.setCatalog_service_id(
+            incrementalRequest.getCatalog_service_id());
+      }
+      mergedUpdateRequest.getUpdated_objects().addAll(
+          incrementalRequest.getUpdated_objects());
+      mergedUpdateRequest.getRemoved_objects().addAll(
+          incrementalRequest.getRemoved_objects());
+    }
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
-      return serializer.serialize(frontend_.updateCatalogCache(req));
+      return serializer.serialize(frontend_.updateCatalogCache(mergedUpdateRequest));
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }

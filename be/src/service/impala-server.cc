@@ -194,6 +194,9 @@ const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
 const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
+// Max size for multiple update in a single split. JNI is not able to write java byte
+// array more than 2GB. A single topic update is not restricted by this.
+const uint64_t MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES = 500 * 1024 * 1024;
 
 const string BEESWAX_SERVER_NAME = "beeswax-frontend";
 const string HS2_SERVER_NAME = "hiveserver2-frontend";
@@ -1240,14 +1243,17 @@ void ImpalaServer::CatalogUpdateCallback(
   if (topic == incoming_topic_deltas.end()) return;
   const TTopicDelta& delta = topic->second;
 
-
-  // Process any updates
+  // Update catalog cache in frontend. An update is split into batches of size
+  // MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES each for multiple updates. IMPALA-3499
   if (delta.topic_entries.size() != 0 || delta.topic_deletions.size() != 0)  {
-    TUpdateCatalogCacheRequest update_req;
-    update_req.__set_is_delta(delta.is_delta);
+    vector<TUpdateCatalogCacheRequest> update_reqs;
+    update_reqs.push_back(TUpdateCatalogCacheRequest());
+    TUpdateCatalogCacheRequest* incremental_request = &update_reqs.back();
+    incremental_request->__set_is_delta(delta.is_delta);
     // Process all Catalog updates (new and modified objects) and determine what the
     // new catalog version will be.
     int64_t new_catalog_version = catalog_update_info_.catalog_version;
+    uint64_t batch_size_bytes = 0;
     for (const TTopicItem& item: delta.topic_entries) {
       uint32_t len = item.value.size();
       TCatalogObject catalog_object;
@@ -1257,12 +1263,20 @@ void ImpalaServer::CatalogUpdateCallback(
         LOG(ERROR) << "Error deserializing item: " << status.GetDetail();
         continue;
       }
+      if (len > 100 * 1024 * 1024 /* 100MB */) {
+        LOG(INFO) << "Received large catalog update(>100mb): "
+                     << item.key << " is "
+                     << PrettyPrinter::Print(len, TUnit::BYTES);
+      }
       if (catalog_object.type == TCatalogObjectType::CATALOG) {
-        update_req.__set_catalog_service_id(catalog_object.catalog.catalog_service_id);
+        incremental_request->__set_catalog_service_id(
+            catalog_object.catalog.catalog_service_id);
         new_catalog_version = catalog_object.catalog_version;
       }
 
       // Refresh the lib cache entries of any added functions and data sources
+      // TODO: if frontend returns the list of functions and data sources, we do not
+      // need to deserialize these in backend.
       if (catalog_object.type == TCatalogObjectType::FUNCTION) {
         DCHECK(catalog_object.__isset.fn);
         LibCache::instance()->SetNeedsRefresh(catalog_object.fn.hdfs_location);
@@ -1272,8 +1286,16 @@ void ImpalaServer::CatalogUpdateCallback(
         LibCache::instance()->SetNeedsRefresh(catalog_object.data_source.hdfs_location);
       }
 
-      update_req.updated_objects.push_back(catalog_object);
+      if (batch_size_bytes + len > MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES) {
+        update_reqs.push_back(TUpdateCatalogCacheRequest());
+        incremental_request = &update_reqs.back();
+        batch_size_bytes = 0;
+      }
+      incremental_request->updated_objects.push_back(catalog_object);
+      batch_size_bytes += len;
     }
+    update_reqs.push_back(TUpdateCatalogCacheRequest());
+    TUpdateCatalogCacheRequest* deletion_request = &update_reqs.back();
 
     // We need to look up the dropped functions and data sources and remove them
     // from the library cache. The data sent from the catalog service does not
@@ -1292,7 +1314,7 @@ void ImpalaServer::CatalogUpdateCallback(
                    << "Error: " << status.GetDetail();
         continue;
       }
-      update_req.removed_objects.push_back(catalog_object);
+      deletion_request->removed_objects.push_back(catalog_object);
       if (catalog_object.type == TCatalogObjectType::FUNCTION ||
           catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
         TCatalogObject dropped_object;
@@ -1314,7 +1336,7 @@ void ImpalaServer::CatalogUpdateCallback(
 
     // Call the FE to apply the changes to the Impalad Catalog.
     TUpdateCatalogCacheResponse resp;
-    Status s = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
+    Status s = exec_env_->frontend()->UpdateCatalogCache(update_reqs, &resp);
     if (!s.ok()) {
       LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
                  << " a full topic update to recover: " << s.GetDetail();
@@ -1409,7 +1431,8 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
 
      // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;
-    Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
+    Status status = exec_env_->frontend()->UpdateCatalogCache(
+        vector<TUpdateCatalogCacheRequest>{update_req}, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     RETURN_IF_ERROR(status);
     if (!wait_for_all_subscribers) return Status::OK();
