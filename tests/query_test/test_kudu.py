@@ -70,6 +70,7 @@ class TestKuduOperations(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db("kududb_test")
 
+  @pytest.mark.execute_serially
   def test_kudu_scan_node(self, vector):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db="functional_kudu",
         wait_secs_between_stmts=1)
@@ -87,6 +88,7 @@ class TestKuduOperations(ImpalaTestSuite):
   def test_kudu_alter_table(self, vector):
     self.run_test_case('QueryTest/kudu_alter', vector, use_db="kududb_test")
 
+  @pytest.mark.execute_serially
   def test_kudu_stats(self, vector):
     self.run_test_case('QueryTest/kudu_stats', vector, use_db="kududb_test")
 
