@@ -134,7 +134,7 @@ class KuduTestHelper {
     for (int i = first_row; i < num_rows + first_row; i++) {
       KUDU_ASSERT_OK(session->Apply(BuildTestRow(table, i, num_cols).release()));
       if (i % 1000 == 0) {
-        session->Flush();
+        KUDU_ASSERT_OK(session->Flush());
       }
     }
     KUDU_ASSERT_OK(session->Flush());
@@ -155,7 +155,7 @@ class KuduTestHelper {
   vector<const KuduPartialRow*> DefaultSplitRows() {
     vector<const KuduPartialRow*> keys;
     KuduPartialRow* key = test_schema_.NewRow();
-    key->SetInt32(0, 5);
+    KUDU_CHECK_OK(key->SetInt32(0, 5));
     keys.push_back(key);
     return keys;
   }

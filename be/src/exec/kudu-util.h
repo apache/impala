@@ -25,8 +25,8 @@ namespace impala {
 class TExpr;
 class KuduTableDescriptor;
 class Status;
-class ColumnType;
 class TupleDescriptor;
+struct ColumnType;
 
 /// Returns false when running on an operating system that Kudu doesn't support. If this
 /// check fails, there is no way Kudu should be expected to work. Exposed for testing.

@@ -224,7 +224,7 @@ class KuduScanNodeTest : public testing::Test {
     string encoded_start_key;
     if (start_key != -1) {
       scoped_ptr<KuduPartialRow> start_key_row(kudu_test_helper_.test_schema().NewRow());
-      start_key_row->SetInt32(0, start_key);
+      KUDU_ASSERT_OK(start_key_row->SetInt32(0, start_key));
       start_key_row->EncodeRowKey(&encoded_start_key);
     } else {
       encoded_start_key = "";
@@ -233,7 +233,7 @@ class KuduScanNodeTest : public testing::Test {
     string encoded_stop_key;
     if (stop_key != -1) {
       gscoped_ptr<KuduPartialRow> stop_key_row(kudu_test_helper_.test_schema().NewRow());
-      stop_key_row->SetInt32(0, stop_key);
+      KUDU_ASSERT_OK(stop_key_row->SetInt32(0, stop_key));
       stop_key_row->EncodeRowKey(&encoded_stop_key);
     } else {
       encoded_stop_key = "";
@@ -476,7 +476,7 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
   gscoped_ptr<KuduInsert> insert(kudu_test_helper_.table()->NewInsert());
   KUDU_ASSERT_OK(insert->mutable_row()->SetInt32(0, 10));
   KUDU_ASSERT_OK(insert->mutable_row()->SetString(2, ""));
-  session->Apply(insert.release());
+  KUDU_ASSERT_OK(session->Apply(insert.release()));
   KUDU_ASSERT_OK(session->Flush());
   ASSERT_FALSE(session->HasPendingOperations());
 
@@ -557,7 +557,7 @@ TEST_F(KuduScanNodeTest, BenchmarkScanNode) {
     for (int i = 1; i < NUM_SPLITS; ++i) {
        int split_key = (NUM_ROWS / NUM_SPLITS) * i;
        KuduPartialRow* row = kudu_test_helper_.test_schema().NewRow();
-       row->SetInt32(0, split_key);
+       KUDU_ASSERT_OK(row->SetInt32(0, split_key));
        split_rows.push_back(row);
     }
     kudu_test_helper_.CreateTable(BASE_TABLE_NAME, &split_rows);
