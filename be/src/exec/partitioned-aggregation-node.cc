@@ -360,6 +360,61 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
 
 Status PartitionedAggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch,
     bool* eos) {
+  int first_row_idx = row_batch->num_rows();
+  RETURN_IF_ERROR(GetNextInternal(state, row_batch, eos));
+  RETURN_IF_ERROR(HandleOutputStrings(row_batch, first_row_idx));
+  return Status::OK();
+}
+
+Status PartitionedAggregationNode::HandleOutputStrings(RowBatch* row_batch,
+    int first_row_idx) {
+  if (!needs_finalize_ && !needs_serialize_) return Status::OK();
+  // String data returned by Serialize() or Finalize() is from local expr allocations in
+  // the agg function contexts, and will be freed on the next GetNext() call by
+  // FreeLocalAllocations(). The data either needs to be copied out or sent up the plan
+  // tree via MarkNeedToReturn(). (See IMPALA-3311)
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+    const SlotDescriptor* slot_desc = aggregate_evaluators_[i]->output_slot_desc();
+    DCHECK(!slot_desc->type().IsCollectionType()) << "producing collections NYI";
+    if (!slot_desc->type().IsVarLenStringType()) continue;
+    if (IsInSubplan()) {
+      // Copy string data to the row batch's pool. This is more efficient than
+      // MarkNeedToReturn() in a subplan since we are likely producing many small batches.
+      RETURN_IF_ERROR(CopyStringData(slot_desc, row_batch, first_row_idx,
+              row_batch->tuple_data_pool()));
+    } else {
+      row_batch->MarkNeedToReturn();
+      break;
+    }
+  }
+  return Status::OK();
+}
+
+Status PartitionedAggregationNode::CopyStringData(const SlotDescriptor* slot_desc,
+    RowBatch* row_batch, int first_row_idx, MemPool* pool) {
+  DCHECK(slot_desc->type().IsVarLenStringType());
+  DCHECK_EQ(row_batch->row_desc().tuple_descriptors().size(), 1);
+  FOREACH_ROW(row_batch, first_row_idx, batch_iter) {
+    Tuple* tuple = batch_iter.Get()->GetTuple(0);
+    StringValue* sv = reinterpret_cast<StringValue*>(
+        tuple->GetSlot(slot_desc->tuple_offset()));
+    if (sv == NULL || sv->len == 0) continue;
+    char* new_ptr = reinterpret_cast<char*>(pool->TryAllocate(sv->len));
+    if (new_ptr == NULL) {
+      Status s = Status::MemLimitExceeded();
+      s.AddDetail(Substitute("Cannot perform aggregation at node with id $0."
+              " Failed to allocate $1 output bytes.", id_, sv->len));
+      state_->SetMemLimitExceeded();
+      return s;
+    }
+    memcpy(new_ptr, sv->ptr, sv->len);
+    sv->ptr = new_ptr;
+  }
+  return Status::OK();
+}
+
+Status PartitionedAggregationNode::GetNextInternal(RuntimeState* state,
+    RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);

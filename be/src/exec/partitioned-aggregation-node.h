@@ -390,6 +390,20 @@ class PartitionedAggregationNode : public ExecNode {
   /// a temporary buffer.
   boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
 
+  /// Materializes 'row_batch' in either grouping or non-grouping case.
+  Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
+
+  /// Helper function called by GetNextInternal() to ensure that string data referenced in
+  /// 'row_batch' will live as long as 'row_batch's tuples. 'first_row_idx' indexes the
+  /// first row that should be processed in 'row_batch'.
+  Status HandleOutputStrings(RowBatch* row_batch, int first_row_idx);
+
+  /// Copies string data from the specified slot into 'pool', and sets the StringValues'
+  /// ptrs to the copied data. Copies data from all tuples in 'row_batch' from
+  /// 'first_row_idx' onwards. 'slot_desc' must have a var-len string type.
+  Status CopyStringData(const SlotDescriptor* slot_desc, RowBatch* row_batch,
+      int first_row_idx, MemPool* pool);
+
   /// Constructs singleton output tuple, allocating memory from pool.
   Tuple* ConstructSingletonOutputTuple(
       const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs, MemPool* pool);

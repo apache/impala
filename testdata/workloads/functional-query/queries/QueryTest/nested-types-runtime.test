@@ -450,3 +450,19 @@ inner join t2.int_array a
 ---- TYPES
 bigint
 ====
+---- QUERY
+# IMPALA-3311: test string data coming out of an agg in a subplan
+select id, m from complextypestbl t,
+(select min(cast(item as string)) m from t.int_array) v
+---- RESULTS
+1,'1'
+2,'1'
+3,'NULL'
+4,'NULL'
+5,'NULL'
+6,'NULL'
+7,'NULL'
+8,'-1'
+---- TYPES
+BIGINT,STRING
+====

@@ -1,0 +1,11 @@
+====
+---- QUERY: subplan_aggregation
+-- Description: Agg in subplan produces string output that's fed to non-trivial parent
+-- plan
+-- Target test case: Regression test for IMPALA-3311
+select c_custkey, max(m) from customer c,
+(select max(o_orderstatus) m from c.c_orders) v
+group by c_custkey order by 1 limit 1
+---- RESULTS
+---- TYPES
+====

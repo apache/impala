@@ -118,6 +118,7 @@ class AggFnEvaluator {
   const std::string& fn_name() const { return fn_.name.function_name; }
   const std::string& update_symbol() const { return fn_.aggregate_fn.update_fn_symbol; }
   const std::string& merge_symbol() const { return fn_.aggregate_fn.merge_fn_symbol; }
+  const SlotDescriptor* output_slot_desc() const { return output_slot_desc_; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;
