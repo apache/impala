@@ -102,9 +102,11 @@ class ImpalaServer::QueryExecState {
   /// The caller must hold fetch_rows_lock_ and lock_.
   Status RestartFetch();
 
-  /// Update query state if the requested state isn't already obsolete.
+  /// Update query state if the requested state isn't already obsolete. This is only for
+  /// non-error states - if the query encounters an error the query status needs to be set
+  /// with information about the error so UpdateQueryStatus must be used instead.
   /// Takes lock_.
-  void UpdateQueryState(beeswax::QueryState::type query_state);
+  void UpdateNonErrorQueryState(beeswax::QueryState::type query_state);
 
   /// Update the query status and the "Query Status" summary profile string.
   /// If current status is already != ok, no update is made (we preserve the first error)
@@ -163,7 +165,6 @@ class ImpalaServer::QueryExecState {
   boost::mutex* lock() { return &lock_; }
   boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
   const beeswax::QueryState::type query_state() const { return query_state_; }
-  void set_query_state(beeswax::QueryState::type state) { query_state_ = state; }
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
   const RuntimeProfile& profile() const { return profile_; }
@@ -281,6 +282,8 @@ class ImpalaServer::QueryExecState {
   RuntimeProfile::EventSequence* query_events_;
   std::vector<ExprContext*> output_expr_ctxs_;
   bool eos_;  // if true, there are no more rows to return
+  // We enforce the invariant that query_status_ is not OK iff query_state_
+  // is EXCEPTION, given that lock_ is held.
   beeswax::QueryState::type query_state_;
   Status query_status_;
   TExecRequest exec_request_;

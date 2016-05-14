@@ -185,7 +185,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   RAISE_IF_ERROR(Execute(&query_ctx, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  exec_state->UpdateQueryState(QueryState::RUNNING);
+  exec_state->UpdateNonErrorQueryState(QueryState::RUNNING);
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
   exec_state->WaitAsync();
@@ -226,7 +226,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(Execute(&query_ctx, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  exec_state->UpdateQueryState(QueryState::RUNNING);
+  exec_state->UpdateNonErrorQueryState(QueryState::RUNNING);
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   Status status = SetQueryInflight(session, exec_state);
@@ -242,7 +242,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 
-  exec_state->UpdateQueryState(QueryState::FINISHED);
+  exec_state->UpdateNonErrorQueryState(QueryState::FINISHED);
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
 
   // If the input log context id is an empty string, then create a new number and

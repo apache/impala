@@ -605,7 +605,7 @@ void ImpalaServer::QueryExecState::Wait() {
     UpdateQueryStatus(status);
   }
   if (status.ok()) {
-    UpdateQueryState(QueryState::FINISHED);
+    UpdateNonErrorQueryState(QueryState::FINISHED);
   }
 }
 
@@ -674,8 +674,9 @@ Status ImpalaServer::QueryExecState::RestartFetch() {
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::UpdateQueryState(QueryState::type query_state) {
+void ImpalaServer::QueryExecState::UpdateNonErrorQueryState(QueryState::type query_state) {
   lock_guard<mutex> l(lock_);
+  DCHECK(query_state != QueryState::EXCEPTION);
   if (query_state_ < query_state) query_state_ = query_state;
 }
 
@@ -845,9 +846,10 @@ void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
   if (eos_ || query_state_ == QueryState::EXCEPTION) return;
 
   if (cause != NULL) {
+    DCHECK(!cause->ok());
     UpdateQueryStatus(*cause);
     query_events_->MarkEvent("Cancelled");
-    query_state_ = QueryState::EXCEPTION;
+    DCHECK_EQ(query_state_, QueryState::EXCEPTION);
   }
   if (coord_.get() != NULL) coord_->Cancel(cause);
 }

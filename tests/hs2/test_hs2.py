@@ -24,6 +24,7 @@ from ImpalaService import ImpalaHiveServer2Service
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
 from TCLIService import TCLIService
 
+SQLSTATE_GENERAL_ERROR = "HY000"
 
 class TestHS2(HS2TestSuite):
   def test_open_session(self):
@@ -164,17 +165,32 @@ class TestHS2(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp)
 
-    get_operation_status_req = TCLIService.TGetOperationStatusReq()
-    get_operation_status_req.operationHandle = execute_statement_resp.operationHandle
-
     get_operation_status_resp = \
-        self.hs2_client.GetOperationStatus(get_operation_status_req)
+        self.get_operation_status(execute_statement_resp.operationHandle)
     TestHS2.check_response(get_operation_status_resp)
 
     assert get_operation_status_resp.operationState in \
         [TCLIService.TOperationState.INITIALIZED_STATE,
          TCLIService.TOperationState.RUNNING_STATE,
          TCLIService.TOperationState.FINISHED_STATE]
+
+  @needs_session(conf_overlay={"abort_on_error": "1"})
+  def test_get_operation_status_error(self):
+    """Tests that GetOperationStatus returns a valid result for a query that encountered
+    an error"""
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "SELECT * FROM functional.alltypeserror"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    get_operation_status_resp = self.wait_for_operation_state( \
+        execute_statement_resp.operationHandle, TCLIService.TOperationState.ERROR_STATE)
+
+    # Check that an error message and sql state have been set.
+    assert get_operation_status_resp.errorMessage is not None and \
+        get_operation_status_resp.errorMessage is not ""
+    assert get_operation_status_resp.sqlState == SQLSTATE_GENERAL_ERROR
 
   @needs_session()
   def test_malformed_get_operation_status(self):
@@ -189,13 +205,10 @@ class TestHS2(HS2TestSuite):
     operation_handle.operationType = TCLIService.TOperationType.EXECUTE_STATEMENT
     operation_handle.hasResultSet = False
 
-    get_operation_status_req = TCLIService.TGetOperationStatusReq()
-    get_operation_status_req.operationHandle = operation_handle
+    get_operation_status_resp = self.get_operation_status(operation_handle)
+    TestHS2.check_response(get_operation_status_resp, \
+        TCLIService.TStatusCode.ERROR_STATUS)
 
-    get_operation_status_resp = \
-        self.hs2_client.GetOperationStatus(get_operation_status_req)
-    TestHS2.check_response(get_operation_status_resp,
-                           TCLIService.TStatusCode.ERROR_STATUS)
     err_msg = "(guid size: %d, expected 16, secret size: %d, expected 16)" \
         % (len(operation_handle.operationId.guid),
            len(operation_handle.operationId.secret))

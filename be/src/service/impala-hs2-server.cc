@@ -462,7 +462,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  exec_state->UpdateQueryState(QueryState::FINISHED);
+  exec_state->UpdateNonErrorQueryState(QueryState::FINISHED);
 
   Status inflight_status = SetQueryInflight(session, exec_state);
   if (!inflight_status.ok()) {
@@ -767,7 +767,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
       HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
     }
   }
-  exec_state->UpdateQueryState(QueryState::RUNNING);
+  exec_state->UpdateNonErrorQueryState(QueryState::RUNNING);
   // Start thread to wait for results to become available.
   exec_state->WaitAsync();
   // Once the query is running do a final check for session closure and add it to the
@@ -937,9 +937,18 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
   lock_guard<mutex> l(query_exec_state_map_lock_);
   QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
   if (entry != query_exec_state_map_.end()) {
-    QueryState::type query_state = entry->second->query_state();
-    TOperationState::type operation_state = QueryStateToTOperationState(query_state);
+    QueryExecState *exec_state = entry->second.get();
+    lock_guard<mutex> l(*exec_state->lock());
+    TOperationState::type operation_state = QueryStateToTOperationState(
+        exec_state->query_state());
     return_val.__set_operationState(operation_state);
+    if (operation_state == TOperationState::ERROR_STATE) {
+      DCHECK(!exec_state->query_status().ok());
+      return_val.__set_errorMessage(exec_state->query_status().GetDetail());
+      return_val.__set_sqlState(SQLSTATE_GENERAL_ERROR);
+    } else {
+      DCHECK(exec_state->query_status().ok());
+    }
     return;
   }
 

@@ -21,6 +21,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
+from time import sleep, time
 
 def needs_session(protocol_version=
                   TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
@@ -200,3 +201,27 @@ class HS2TestSuite(ImpalaTestSuite):
             break
       formatted += (", ".join(row) + "\n")
     return (num_rows, formatted)
+
+  def get_operation_status(self, operation_handle):
+    """Executes GetOperationStatus with the given operation handle and returns the
+    TGetOperationStatusResp"""
+    get_operation_status_req = TCLIService.TGetOperationStatusReq()
+    get_operation_status_req.operationHandle = operation_handle
+    get_operation_status_resp = \
+        self.hs2_client.GetOperationStatus(get_operation_status_req)
+    return get_operation_status_resp
+
+  def wait_for_operation_state(self, operation_handle, expected_state, \
+                               timeout = 10, interval = 1):
+    """Waits for the operation to reach expected_state by polling GetOperationStatus every
+    interval seconds, returning the TGetOperationStatusResp, or raising an assertion after
+    timeout seconds."""
+    start_time = time()
+    while (time() - start_time < timeout):
+      get_operation_status_resp = self.get_operation_status(operation_handle)
+      HS2TestSuite.check_response(get_operation_status_resp)
+      if get_operation_status_resp.operationState is expected_state:
+        return get_operation_status_resp
+      sleep(interval)
+    assert False, 'Did not reach expected operation state %s in time, actual state was ' \
+        '%s' % (expected_state, get_operation_status_resp.operationState)
