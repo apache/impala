@@ -1,11 +1,6 @@
 ====
 ---- QUERY
-use functional
-====
----- QUERY
 # Stats on a partitioned Hdfs table stored as text
-drop stats alltypes;
-compute stats alltypes;
 show table stats alltypes
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION

@@ -1,30 +1,6 @@
 ====
 ---- QUERY
-# Simple describe (note Hive does not support this)
 describe functional.alltypes
----- RESULTS
-'id','int','Add a comment'
-'bool_col','boolean',''
-'tinyint_col','tinyint',''
-'smallint_col','smallint',''
-'int_col','int',''
-'bigint_col','bigint',''
-'float_col','float',''
-'double_col','double',''
-'date_string_col','string',''
-'string_col','string',''
-'timestamp_col','timestamp',''
-'year','int',''
-'month','int',''
----- TYPES
-string, string, string
-====
----- QUERY
-USE functional
-====
----- QUERY
-# Default database
-describe alltypes
 ---- RESULTS
 'id','int','Add a comment'
 'bool_col','boolean',''
@@ -98,15 +74,54 @@ describe functional_parquet.allcomplextypes.complex_struct_col.f2
 string,string,string
 ====
 ---- QUERY
-use functional_parquet
-====
----- QUERY
-describe functional_parquet.allcomplextypes.complex_struct_col.f2
+describe functional_parquet.allcomplextypes.nested_struct_col
 ---- RESULTS
-'item','int',''
-'pos','bigint',''
+'f1','int',''
+'f2','struct<\n  f11:bigint,\n  f12:struct<\n    f21:bigint\n  >\n>',''
 ---- TYPES
 string,string,string
+====
+---- QUERY
+# Test describing structs within collections.
+create table if not exists nested_structs (
+  map_array_struct_col map<string, array<struct<f1:int, f2:string>>>,
+  struct_array_struct_col
+  struct<f1:int, f2:array<struct<f11:bigint, f12:string>>>,
+  map_array_map_struct_col
+  map<string, array<map<string, struct<f1:string, f2:int>>>>)
+---- RESULTS
+====
+---- QUERY
+describe nested_structs
+---- RESULTS
+'map_array_struct_col','map<string,array<struct<\n  f1:int,\n  f2:string\n>>>',''
+'struct_array_struct_col','struct<\n  f1:int,\n  f2:array<struct<\n    f11:bigint,\n    f12:string\n  >>\n>',''
+'map_array_map_struct_col','map<string,array<map<string,struct<\n  f1:string,\n  f2:int\n>>>>',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+use functional
+====
+---- QUERY
+# Check that paths relative to current database work ok.
+describe alltypes
+---- RESULTS
+'id','int','Add a comment'
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+string, string, string
 ====
 ---- QUERY
 use functional_parquet
@@ -117,24 +132,6 @@ describe allcomplextypes.int_array_col
 ---- RESULTS
 'item','int',''
 'pos','bigint',''
----- TYPES
-string,string,string
-====
----- QUERY
-# Pretty-printing should work for fields too.
-describe allcomplextypes.nested_struct_col
----- RESULTS
-'f1','int',''
-'f2','struct<\n  f11:bigint,\n  f12:struct<\n    f21:bigint\n  >\n>',''
----- TYPES
-string,string,string
-====
----- QUERY
-describe impala_test_desc_db1.complex_types_tbl
----- RESULTS
-'map_array_struct_col','map<string,array<struct<\n  f1:int,\n  f2:string\n>>>',''
-'struct_array_struct_col','struct<\n  f1:int,\n  f2:array<struct<\n    f11:bigint,\n    f12:string\n  >>\n>',''
-'map_array_map_struct_col','map<string,array<map<string,struct<\n  f1:string,\n  f2:int\n>>>>',''
 ---- TYPES
 string,string,string
 ====
