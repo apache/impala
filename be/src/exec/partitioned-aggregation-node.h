@@ -228,13 +228,17 @@ class PartitionedAggregationNode : public ExecNode {
   Partition* output_partition_;
   HashTable::Iterator output_iterator_;
 
-  typedef Status (*ProcessRowBatchFn)(
-      PartitionedAggregationNode*, RowBatch*, HashTableCtx*);
-  /// Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
-  ProcessRowBatchFn process_row_batch_fn_;
+  typedef Status (*ProcessBatchNoGroupingFn)(PartitionedAggregationNode*, RowBatch*);
+  /// Jitted ProcessBatchNoGrouping function pointer. Null if codegen is disabled.
+  ProcessBatchNoGroupingFn process_batch_no_grouping_fn_;
 
-  typedef Status (*ProcessBatchStreamingFn)(PartitionedAggregationNode*, bool, RowBatch*,
-      RowBatch*, HashTableCtx*, int[PARTITION_FANOUT]);
+  typedef Status (*ProcessBatchFn)(
+      PartitionedAggregationNode*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
+  /// Jitted ProcessBatch function pointer. Null if codegen is disabled.
+  ProcessBatchFn process_batch_fn_;
+
+  typedef Status (*ProcessBatchStreamingFn)(PartitionedAggregationNode*, bool,
+      TPrefetchMode::type, RowBatch*, RowBatch*, HashTableCtx*, int[PARTITION_FANOUT]);
   /// Jitted ProcessBatchStreaming function pointer.  Null if codegen is disabled.
   ProcessBatchStreamingFn process_batch_streaming_fn_;
 
@@ -311,6 +315,9 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Current partitions we are partitioning into.
   std::vector<Partition*> hash_partitions_;
+
+  /// Cache for hash tables in 'hash_partitions_'.
+  HashTable* hash_tbls_[PARTITION_FANOUT];
 
   /// All partitions that have been spilled and need further processing.
   std::list<Partition*> spilled_partitions_;
@@ -390,6 +397,13 @@ class PartitionedAggregationNode : public ExecNode {
   /// a temporary buffer.
   boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
 
+  /// Accessor for 'hash_tbls_' that verifies consistency with the partitions.
+  HashTable* ALWAYS_INLINE GetHashTable(int partition_idx) {
+    HashTable* ht = hash_tbls_[partition_idx];
+    DCHECK_EQ(ht, hash_partitions_[partition_idx]->hash_tbl.get());
+    return ht;
+  }
+
   /// Materializes 'row_batch' in either grouping or non-grouping case.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
@@ -465,19 +479,31 @@ class PartitionedAggregationNode : public ExecNode {
                         Tuple* tuple, MemPool* pool);
 
   /// Do the aggregation for all tuple rows in the batch when there is no grouping.
-  /// The HashTableCtx argument is unused, but included so the signature matches that of
-  /// ProcessBatch() for codegen. This function is replaced by codegen.
-  Status ProcessBatchNoGrouping(RowBatch* batch, const HashTableCtx* ht_ctx = NULL);
+  /// This function is replaced by codegen.
+  Status ProcessBatchNoGrouping(RowBatch* batch);
 
   /// Processes a batch of rows. This is the core function of the algorithm. We partition
   /// the rows into hash_partitions_, spilling as necessary.
   /// If AGGREGATED_ROWS is true, it means that the rows in the batch are already
   /// pre-aggregated.
+  /// 'prefetch_mode' specifies the prefetching mode in use. If it's not PREFETCH_NONE,
+  ///     hash table buckets will be prefetched based on the hash values computed. Note
+  ///     that 'prefetch_mode' will be substituted with constants during codegen time.
   //
-  /// This function is replaced by codegen. It's inlined into ProcessBatch_true/false in
-  /// the IR module. We pass in ht_ctx_.get() as an argument for performance.
+  /// This function is replaced by codegen. We pass in ht_ctx_.get() as an argument for
+  /// performance.
   template<bool AGGREGATED_ROWS>
-  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx);
+  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch,
+      TPrefetchMode::type prefetch_mode, HashTableCtx* ht_ctx);
+
+  /// Evaluates the rows in 'batch' starting at 'start_row_idx' and stores the results in
+  /// the expression values cache in 'ht_ctx'. The number of rows evaluated depends on
+  /// the capacity of the cache. 'prefetch_mode' specifies the prefetching mode in use.
+  /// If it's not PREFETCH_NONE, hash table buckets for the computed hashes will be
+  /// prefetched. Note that codegen replaces 'prefetch_mode' with a constant.
+  template<bool AGGREGATED_ROWS>
+  void EvalAndHashPrefetchGroup(RowBatch* batch, int start_row_idx,
+      TPrefetchMode::type prefetch_mode, HashTableCtx* ht_ctx);
 
   /// This function processes each individual row in ProcessBatch(). Must be inlined into
   /// ProcessBatch for codegen to substitute function calls with codegen'd versions.
@@ -532,25 +558,28 @@ class PartitionedAggregationNode : public ExecNode {
   /// store all of the rows in 'in_batch'.
   /// 'needs_serialize' is an argument so that codegen can replace it with a constant,
   ///     rather than using the member variable 'needs_serialize_'.
+  /// 'prefetch_mode' specifies the prefetching mode in use. If it's not PREFETCH_NONE,
+  ///     hash table buckets will be prefetched based on the hash values computed. Note
+  ///     that 'prefetch_mode' will be substituted with constants during codegen time.
   /// 'remaining_capacity' is an array with PARTITION_FANOUT entries with the number of
   ///     additional rows that can be added to the hash table per partition. It is updated
   ///     by ProcessBatchStreaming() when it inserts new rows.
   /// 'ht_ctx' is passed in as a way to avoid aliasing of 'this' confusing the optimiser.
-  Status ProcessBatchStreaming(bool needs_serialize, RowBatch* in_batch,
-      RowBatch* out_batch, HashTableCtx* ht_ctx,
+  Status ProcessBatchStreaming(bool needs_serialize, TPrefetchMode::type prefetch_mode,
+      RowBatch* in_batch, RowBatch* out_batch, HashTableCtx* ht_ctx,
       int remaining_capacity[PARTITION_FANOUT]);
 
-  /// Tries to add intermediate to the hash table of 'partition' for streaming aggregation.
-  /// The input row must have been evaluated with 'ht_ctx', with 'hash' set to the
-  /// corresponding hash. If the tuple already exists in the hash table, update the tuple
-  /// and return true. Otherwise try to create a new entry in the hash table, returning
-  /// true if successful or false if the table is full. 'remaining_capacity' keeps track
-  /// of how many more entries can be added to the hash table so we can avoid retrying
-  /// inserts. It is decremented if an insert succeeds and set to zero if an insert
-  /// fails. If an error occurs, returns false and sets 'status'.
+  /// Tries to add intermediate to the hash table 'hash_tbl' of 'partition' for streaming
+  /// aggregation. The input row must have been evaluated with 'ht_ctx', with 'hash' set
+  /// to the corresponding hash. If the tuple already exists in the hash table, update
+  /// the tuple and return true. Otherwise try to create a new entry in the hash table,
+  /// returning true if successful or false if the table is full. 'remaining_capacity'
+  /// keeps track of how many more entries can be added to the hash table so we can avoid
+  /// retrying inserts. It is decremented if an insert succeeds and set to zero if an
+  /// insert fails. If an error occurs, returns false and sets 'status'.
   bool IR_ALWAYS_INLINE TryAddToHashTable(HashTableCtx* ht_ctx,
-      Partition* partition, TupleRow* in_row, uint32_t hash, int* remaining_capacity,
-      Status* status);
+      Partition* partition, HashTable* hash_tbl, TupleRow* in_row, uint32_t hash,
+      int* remaining_capacity, Status* status);
 
   /// Initializes hash_partitions_. 'level' is the level for the partitions to create.
   /// Also sets ht_ctx_'s level to 'level'.
@@ -601,18 +630,15 @@ class PartitionedAggregationNode : public ExecNode {
   /// Codegen the non-streaming process row batch loop. The loop has already been
   /// compiled to IR and loaded into the codegen object. UpdateAggTuple has also been
   /// codegen'd to IR. This function will modify the loop subsituting the statically
-  /// compiled functions with codegen'd ones.
+  /// compiled functions with codegen'd ones. 'process_batch_fn_' or
+  /// 'process_batch_no_grouping_fn_' will be updated with the codegened function
+  /// depending on whether this is a grouping or non-grouping aggregation.
   /// Assumes AGGREGATED_ROWS = false.
-  Status CodegenProcessBatch(llvm::Function** fn);
+  Status CodegenProcessBatch();
 
   /// Codegen the materialization loop for streaming preaggregations.
-  Status CodegenProcessBatchStreaming(llvm::Function** fn);
-
-  /// Functions to instantiate templated versions of ProcessBatch().
-  /// The xcompiled versions of these functions are used in CodegenProcessBatch().
-  /// TODO: is there a better way to do this?
-  Status ProcessBatch_false(RowBatch* batch, HashTableCtx* ht_ctx);
-  Status ProcessBatch_true(RowBatch* batch, HashTableCtx* ht_ctx);
+  /// 'process_batch_streaming_fn_' will be updated with the codegened function.
+  Status CodegenProcessBatchStreaming();
 
   /// We need two buffers per partition, one for the aggregated stream and one
   /// for the unaggregated stream. We need an additional buffer to read the stream

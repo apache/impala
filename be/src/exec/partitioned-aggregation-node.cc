@@ -109,7 +109,8 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     needs_serialize_(false),
     block_mgr_client_(NULL),
     output_partition_(NULL),
-    process_row_batch_fn_(NULL),
+    process_batch_no_grouping_fn_(NULL),
+    process_batch_fn_(NULL),
     process_batch_streaming_fn_(NULL),
     build_timer_(NULL),
     ht_resize_timer_(NULL),
@@ -274,25 +275,9 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   bool codegen_enabled = false;
   Status codegen_status;
   if (state->codegen_enabled()) {
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
-    if (is_streaming_preagg_) {
-      Function* codegen_process_batch_streaming_fn;
-      codegen_status = CodegenProcessBatchStreaming(&codegen_process_batch_streaming_fn);
-      if (codegen_status.ok()) {
-        codegen->AddFunctionToJit(codegen_process_batch_streaming_fn,
-            reinterpret_cast<void**>(&process_batch_streaming_fn_));
-        codegen_enabled = true;
-      }
-    } else {
-      Function* codegen_process_row_batch_fn;
-      codegen_status = CodegenProcessBatch(&codegen_process_row_batch_fn);
-      if (codegen_status.ok()) {
-        codegen->AddFunctionToJit(codegen_process_row_batch_fn,
-            reinterpret_cast<void**>(&process_row_batch_fn_));
-        codegen_enabled = true;
-      }
-    }
+    codegen_status = is_streaming_preagg_ ? CodegenProcessBatchStreaming()
+                                          : CodegenProcessBatch();
+    codegen_enabled = codegen_status.ok();
   }
   AddCodegenExecOption(codegen_enabled, codegen_status);
   return Status::OK();
@@ -330,14 +315,21 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
       }
     }
 
+    TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
     SCOPED_TIMER(build_timer_);
-    if (process_row_batch_fn_ != NULL) {
-      RETURN_IF_ERROR(process_row_batch_fn_(this, &batch, ht_ctx_.get()));
-    } else if (grouping_expr_ctxs_.empty()) {
-      RETURN_IF_ERROR(ProcessBatchNoGrouping(&batch));
+    if (grouping_expr_ctxs_.empty()) {
+      if (process_batch_no_grouping_fn_ != NULL) {
+        RETURN_IF_ERROR(process_batch_no_grouping_fn_(this, &batch));
+      } else {
+        RETURN_IF_ERROR(ProcessBatchNoGrouping(&batch));
+      }
     } else {
       // There is grouping, so we will do partitioned aggregation.
-      RETURN_IF_ERROR(ProcessBatch<false>(&batch, ht_ctx_.get()));
+      if (process_batch_fn_ != NULL) {
+        RETURN_IF_ERROR(process_batch_fn_(this, &batch, prefetch_mode, ht_ctx_.get()));
+      } else {
+        RETURN_IF_ERROR(ProcessBatch<false>(&batch, prefetch_mode, ht_ctx_.get()));
+      }
     }
     batch.Reset();
   } while (!eos);
@@ -542,8 +534,9 @@ Status PartitionedAggregationNode::GetRowsStreaming(RuntimeState* state,
     int remaining_capacity[PARTITION_FANOUT];
     bool ht_needs_expansion = false;
     for (int i = 0; i < PARTITION_FANOUT; ++i) {
-      DCHECK(hash_partitions_[i]->hash_tbl != NULL);
-      remaining_capacity[i] = hash_partitions_[i]->hash_tbl->NumInsertsBeforeResize();
+      HashTable* hash_tbl = GetHashTable(i);
+      DCHECK(hash_tbl != NULL);
+      remaining_capacity[i] = hash_tbl->NumInsertsBeforeResize();
       ht_needs_expansion |= remaining_capacity[i] < child_batch_->num_rows();
     }
 
@@ -554,7 +547,7 @@ Status PartitionedAggregationNode::GetRowsStreaming(RuntimeState* state,
     // should always use the remaining space in the hash table to avoid wasting memory.
     if (ht_needs_expansion && ShouldExpandPreaggHashTables()) {
       for (int i = 0; i < PARTITION_FANOUT; ++i) {
-        HashTable* ht = hash_partitions_[i]->hash_tbl.get();
+        HashTable* ht = GetHashTable(i);
         if (remaining_capacity[i] < child_batch_->num_rows()) {
           SCOPED_TIMER(ht_resize_timer_);
           if (ht->CheckAndResize(child_batch_->num_rows(), ht_ctx_.get())) {
@@ -564,12 +557,13 @@ Status PartitionedAggregationNode::GetRowsStreaming(RuntimeState* state,
       }
     }
 
+    TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
     if (process_batch_streaming_fn_ != NULL) {
-      RETURN_IF_ERROR(process_batch_streaming_fn_(this, needs_serialize_,
+      RETURN_IF_ERROR(process_batch_streaming_fn_(this, needs_serialize_, prefetch_mode,
           child_batch_.get(), out_batch, ht_ctx_.get(), remaining_capacity));
     } else {
-      RETURN_IF_ERROR(ProcessBatchStreaming(needs_serialize_, child_batch_.get(),
-            out_batch, ht_ctx_.get(), remaining_capacity ));
+      RETURN_IF_ERROR(ProcessBatchStreaming(needs_serialize_, prefetch_mode,
+          child_batch_.get(), out_batch, ht_ctx_.get(), remaining_capacity ));
     }
 
     child_batch_->Reset(); // All rows from child_batch_ were processed.
@@ -1145,6 +1139,7 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
     DCHECK(new_partition != NULL);
     hash_partitions_.push_back(partition_pool_->Add(new_partition));
     RETURN_IF_ERROR(new_partition->InitStreams());
+    hash_tbls_[i] = NULL;
   }
   if (!is_streaming_preagg_) {
     DCHECK_GT(state_->block_mgr()->num_reserved_buffers_remaining(block_mgr_client_), 0);
@@ -1166,6 +1161,7 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
       }
       RETURN_IF_ERROR(hash_partitions_[i]->Spill());
     }
+    hash_tbls_[i] = hash_partitions_[i]->hash_tbl.get();
   }
 
   COUNTER_ADD(partitions_created_, hash_partitions_.size());
@@ -1293,12 +1289,14 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
       RETURN_IF_ERROR(SpillPartition());
     }
 
+    TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
     bool eos = false;
     RowBatch batch(AGGREGATED_ROWS ? *intermediate_row_desc_ : children_[0]->row_desc(),
                    state_->batch_size(), mem_tracker());
     do {
       RETURN_IF_ERROR(input_stream->GetNext(&batch, &eos));
-      RETURN_IF_ERROR(ProcessBatch<AGGREGATED_ROWS>(&batch, ht_ctx_.get()));
+      RETURN_IF_ERROR(
+          ProcessBatch<AGGREGATED_ROWS>(&batch, prefetch_mode, ht_ctx_.get()));
       RETURN_IF_ERROR(state_->GetQueryStatus());
       FreeLocalAllocations();
       batch.Reset();
@@ -1331,6 +1329,7 @@ Status PartitionedAggregationNode::SpillPartition() {
     return state_->block_mgr()->MemLimitTooLowError(block_mgr_client_, id());
   }
 
+  hash_tbls_[partition_idx] = NULL;
   return hash_partitions_[partition_idx]->Spill();
 }
 
@@ -1398,6 +1397,7 @@ void PartitionedAggregationNode::ClosePartitions() {
   aggregated_partitions_.clear();
   spilled_partitions_.clear();
   hash_partitions_.clear();
+  memset(hash_tbls_, 0, sizeof(hash_tbls_));
   partition_pool_->Clear();
 }
 
@@ -1792,7 +1792,7 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
+Status PartitionedAggregationNode::CodegenProcessBatch() {
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state_->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
@@ -1802,7 +1802,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
 
   // Get the cross compiled update row batch function
   IRFunction::Type ir_fn = (!grouping_expr_ctxs_.empty() ?
-      IRFunction::PART_AGG_NODE_PROCESS_BATCH_FALSE :
+      IRFunction::PART_AGG_NODE_PROCESS_BATCH_UNAGGREGATED :
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_NO_GROUPING);
   Function* process_batch_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_batch_fn != NULL);
@@ -1810,6 +1810,13 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
   int replaced;
   if (!grouping_expr_ctxs_.empty()) {
     // Codegen for grouping using hash table
+
+    // Replace prefetch_mode with constant so branches can be optimised out.
+    TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
+    Value* prefetch_mode_arg = codegen->GetArgument(process_batch_fn, 3);
+    prefetch_mode_arg->replaceAllUsesWith(
+        ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
     Function* hash_fn;
@@ -1838,15 +1845,20 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
 
   replaced = codegen->ReplaceCallSites(process_batch_fn, update_tuple_fn, "UpdateTuple");
   DCHECK_GE(replaced, 1);
-  *fn = codegen->FinalizeFunction(process_batch_fn);
-  if (*fn == NULL) {
+  process_batch_fn = codegen->FinalizeFunction(process_batch_fn);
+  if (process_batch_fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenProcessBatch(): codegen'd "
         "ProcessBatch() function failed verification, see log");
   }
+
+  void **codegened_fn_ptr = grouping_expr_ctxs_.empty() ?
+      reinterpret_cast<void**>(&process_batch_no_grouping_fn_) :
+      reinterpret_cast<void**>(&process_batch_fn_);
+  codegen->AddFunctionToJit(process_batch_fn, codegened_fn_ptr);
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
+Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
   DCHECK(is_streaming_preagg_);
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state_->GetCodegen(&codegen));
@@ -1860,6 +1872,12 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
   Value* needs_serialize_arg = codegen->GetArgument(process_batch_streaming_fn, 2);
   needs_serialize_arg->replaceAllUsesWith(
       ConstantInt::get(Type::getInt1Ty(codegen->context()), needs_serialize_));
+
+  // Replace prefetch_mode with constant so branches can be optimised out.
+  TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
+  Value* prefetch_mode_arg = codegen->GetArgument(process_batch_streaming_fn, 3);
+  prefetch_mode_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
 
   Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(&update_tuple_fn));
@@ -1893,11 +1911,14 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
   DCHECK_EQ(replaced, 1);
 
   DCHECK(process_batch_streaming_fn != NULL);
-  *fn = codegen->FinalizeFunction(process_batch_streaming_fn);
-  if (*fn == NULL) {
+  process_batch_streaming_fn = codegen->FinalizeFunction(process_batch_streaming_fn);
+  if (process_batch_streaming_fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenProcessBatchStreaming(): codegen'd "
         "ProcessBatchStreaming() function failed verification, see log");
   }
+
+  codegen->AddFunctionToJit(process_batch_streaming_fn,
+      reinterpret_cast<void**>(&process_batch_streaming_fn_));
   return Status::OK();
 }
 

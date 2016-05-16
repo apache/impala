@@ -854,9 +854,12 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
   Value* cur_expr_values = builder.CreateLoad(cur_expr_values_ptr);
 
   // Load cur_expr_values_null_ into a LLVM pointer.
-  Value* cur_expr_values_null_ptr =
-      codegen->CastPtrToLlvmPtr(buffer_ptr_type, &expr_values_cache_.cur_expr_values_null_);
-  Value* cur_expr_values_null = builder.CreateLoad(cur_expr_values_null_ptr);
+  Value* cur_expr_values_null = NULL;
+  if (stores_nulls_) {
+    Value* cur_expr_values_null_ptr = codegen->CastPtrToLlvmPtr(
+        buffer_ptr_type, &expr_values_cache_.cur_expr_values_null_);
+    cur_expr_values_null = builder.CreateLoad(cur_expr_values_null_ptr);
+  }
 
   // Call GetHashSeed() to get seeds_[level_]
   Function* get_hash_seed_fn =
