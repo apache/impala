@@ -47,8 +47,6 @@ namespace impala {
 bool CpuInfo::initialized_ = false;
 int64_t CpuInfo::hardware_flags_ = 0;
 int64_t CpuInfo::original_hardware_flags_;
-long CpuInfo::cache_sizes_[L3_CACHE + 1];
-long CpuInfo::cache_line_sizes_[L3_CACHE + 1];
 int64_t CpuInfo::cycles_per_ms_;
 int CpuInfo::num_cores_ = 1;
 string CpuInfo::model_name_ = "unknown";
@@ -87,8 +85,6 @@ void CpuInfo::Init() {
   float max_mhz = 0;
   int num_cores = 0;
 
-  memset(&cache_sizes_, 0, sizeof(cache_sizes_));
-
   // Read from /proc/cpuinfo
   ifstream cpuinfo("/proc/cpuinfo", ios::in);
   while (cpuinfo) {
@@ -117,40 +113,12 @@ void CpuInfo::Init() {
   }
   if (cpuinfo.is_open()) cpuinfo.close();
 
-#ifdef __APPLE__
-  // On Mac OS X use sysctl() to get the cache sizes
-  size_t len = 0;
-  sysctlbyname("hw.cachesize", NULL, &len, NULL, 0);
-  uint64_t* data = static_cast<uint64_t*>(malloc(len));
-  sysctlbyname("hw.cachesize", data, &len, NULL, 0);
-  DCHECK(len / sizeof(uint64_t) >= 3);
-  for (size_t i = 0; i < 3; ++i) {
-    cache_sizes_[i] = data[i];
-  }
-  size_t linesize;
-  size_t sizeof_linesize = sizeof(linesize);
-  sysctlbyname("hw.cachelinesize", &linesize, &sizeof_linesize, NULL, 0);
-  for (size_t i = 0; i < 3; ++i) cache_line_sizes_[i] = linesize;
-#else
-  // Call sysconf to query for the cache sizes
-  cache_sizes_[0] = sysconf(_SC_LEVEL1_DCACHE_SIZE);
-  cache_sizes_[1] = sysconf(_SC_LEVEL2_CACHE_SIZE);
-  cache_sizes_[2] = sysconf(_SC_LEVEL3_CACHE_SIZE);
-
-  cache_line_sizes_[0] = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
-  // See bloom-filter.cc for one dependency.
-  DCHECK_EQ(cache_line_sizes_[0], 64) << "Impala expects 64-byte L1 cache lines";
-  cache_line_sizes_[1] = sysconf(_SC_LEVEL2_CACHE_LINESIZE);
-  cache_line_sizes_[2] = sysconf(_SC_LEVEL3_CACHE_LINESIZE);
-#endif
-
   if (max_mhz != 0) {
     cycles_per_ms_ = max_mhz * 1000;
   } else {
     cycles_per_ms_ = 1000000;
   }
   original_hardware_flags_ = hardware_flags_;
-
 
   if (num_cores > 0) {
     num_cores_ = num_cores;
@@ -181,18 +149,52 @@ void CpuInfo::EnableFeature(long flag, bool enable) {
   }
 }
 
+void CpuInfo::GetCacheInfo(long cache_sizes[NUM_CACHE_LEVELS],
+      long cache_line_sizes[NUM_CACHE_LEVELS]) {
+#ifdef __APPLE__
+  // On Mac OS X use sysctl() to get the cache sizes
+  size_t len = 0;
+  sysctlbyname("hw.cachesize", NULL, &len, NULL, 0);
+  uint64_t* data = static_cast<uint64_t*>(malloc(len));
+  sysctlbyname("hw.cachesize", data, &len, NULL, 0);
+  DCHECK(len / sizeof(uint64_t) >= 3);
+  for (size_t i = 0; i < NUM_CACHE_LEVELS; ++i) {
+    cache_sizes[i] = data[i];
+  }
+  size_t linesize;
+  size_t sizeof_linesize = sizeof(linesize);
+  sysctlbyname("hw.cachelinesize", &linesize, &sizeof_linesize, NULL, 0);
+  for (size_t i = 0; i < NUM_CACHE_LEVELS; ++i) cache_line_sizes[i] = linesize;
+#else
+  // Call sysconf to query for the cache sizes
+  // Note: on some systems (e.g. RHEL 5 on AWS EC2), this returns 0 instead of the
+  // actual cache line size.
+  cache_sizes[L1_CACHE] = sysconf(_SC_LEVEL1_DCACHE_SIZE);
+  cache_sizes[L2_CACHE] = sysconf(_SC_LEVEL2_CACHE_SIZE);
+  cache_sizes[L3_CACHE] = sysconf(_SC_LEVEL3_CACHE_SIZE);
+
+  cache_line_sizes[L1_CACHE] = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+  cache_line_sizes[L2_CACHE] = sysconf(_SC_LEVEL2_CACHE_LINESIZE);
+  cache_line_sizes[L3_CACHE] = sysconf(_SC_LEVEL3_CACHE_LINESIZE);
+#endif
+}
+
 string CpuInfo::DebugString() {
   DCHECK(initialized_);
   stringstream stream;
+  long cache_sizes[NUM_CACHE_LEVELS];
+  long cache_line_sizes[NUM_CACHE_LEVELS];
+  GetCacheInfo(cache_sizes, cache_line_sizes);
+
   string L1 = Substitute("L1 Cache: $0 (Line: $1)",
-      PrettyPrinter::Print(CacheSize(L1_CACHE), TUnit::BYTES),
-      PrettyPrinter::Print(CacheLineSize(L1_CACHE), TUnit::BYTES));
+      PrettyPrinter::Print(cache_sizes[L1_CACHE], TUnit::BYTES),
+      PrettyPrinter::Print(cache_line_sizes[L1_CACHE], TUnit::BYTES));
   string L2 = Substitute("L1 Cache: $0 (Line: $1)",
-      PrettyPrinter::Print(CacheSize(L2_CACHE), TUnit::BYTES),
-      PrettyPrinter::Print(CacheLineSize(L2_CACHE), TUnit::BYTES));
+      PrettyPrinter::Print(cache_sizes[L2_CACHE], TUnit::BYTES),
+      PrettyPrinter::Print(cache_line_sizes[L2_CACHE], TUnit::BYTES));
   string L3 = Substitute("L1 Cache: $0 (Line: $1)",
-      PrettyPrinter::Print(CacheSize(L3_CACHE), TUnit::BYTES),
-      PrettyPrinter::Print(CacheLineSize(L3_CACHE), TUnit::BYTES));
+      PrettyPrinter::Print(cache_sizes[L3_CACHE], TUnit::BYTES),
+      PrettyPrinter::Print(cache_line_sizes[L3_CACHE], TUnit::BYTES));
   stream << "Cpu Info:" << endl
          << "  Model: " << model_name_ << endl
          << "  Cores: " << num_cores_ << endl

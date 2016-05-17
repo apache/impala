@@ -40,6 +40,7 @@ class CpuInfo {
     L2_CACHE = 1,
     L3_CACHE = 2,
   };
+  static const int NUM_CACHE_LEVELS = L3_CACHE + 1;
 
   /// Initialize CpuInfo.
   static void Init();
@@ -64,18 +65,6 @@ class CpuInfo {
   /// that the underlying hardware cannot support. This is useful for testing.
   static void EnableFeature(long flag, bool enable);
 
-  /// Returns the size of the cache in KB at this cache level
-  static long CacheSize(CacheLevel level) {
-    DCHECK(initialized_);
-    return cache_sizes_[level];
-  }
-
-  /// Returns the size of a line in the cache at this level.
-  static long CacheLineSize(CacheLevel level) {
-    DCHECK(initialized_);
-    return cache_line_sizes_[level];
-  }
-
   /// Returns the number of cpu cycles per millisecond
   static int64_t cycles_per_ms() {
     DCHECK(initialized_);
@@ -97,11 +86,15 @@ class CpuInfo {
   static std::string DebugString();
 
  private:
+  /// Populates the arguments with information about this machine's caches.
+  /// The values returned are not reliable in some environments, e.g. RHEL5 on EC2, so
+  /// so we will keep this as a private method.
+  static void GetCacheInfo(long cache_sizes[NUM_CACHE_LEVELS],
+      long cache_line_sizes[NUM_CACHE_LEVELS]);
+
   static bool initialized_;
   static int64_t hardware_flags_;
   static int64_t original_hardware_flags_;
-  static long cache_sizes_[L3_CACHE + 1];
-  static long cache_line_sizes_[L3_CACHE + 1];
   static int64_t cycles_per_ms_;
   static int num_cores_;
   static std::string model_name_;
