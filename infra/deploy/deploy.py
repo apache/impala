@@ -101,20 +101,17 @@ def parse_args():
     return parser.parse_args()
 
 def find_cluster(api, cluster_name):
-    all_clusters = api.get_all_clusters()
-    if not cluster_name and len(all_clusters) > 1:
-        raise Exception("Cannot use implicit cluster; there is more than one available")
-
-    for cluster in all_clusters:
-        if (cluster_name and cluster.name == cluster_name) or not cluster_name:
-            print "Found cluster: %s" % (cluster.name,)
-            return cluster
-
     if cluster_name:
-        message = "Cannot find cluster: %s" % (cluster_name,)
+        cluster = api.get_cluster(cluster_name)
     else:
-        message = "Cannot find implicit cluster"
-    raise Exception(message)
+        all_clusters = api.get_all_clusters()
+        if len(all_clusters) == 0:
+            raise Exception("No clusters found; create one before calling this script")
+        if len(all_clusters) > 1:
+            raise Exception("Cannot use implicit cluster; there is more than one available")
+        cluster = all_clusters[0]
+    print("Found cluster: %s" % (cluster.displayName, ))
+    return cluster
 
 def find_dependencies(args, cluster):
     deps = []
