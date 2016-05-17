@@ -36,12 +36,6 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
     for x in range(len(result.data)):
       assert comparison.data[x] == result.data[x]
 
-  def test_avro_codegen_decoder(self, vector):
-    """Test for IMPALA-2798, verify if Impala returns correct result if table schema
-    doesn't match file schema.
-    """
-    self.run_test_case('QueryTest/avro-schema-resolution', vector)
-
   def test_avro_schema_changes(self, vector, unique_database):
     """Test for IMPALA-3314 and IMPALA-3513: Impalad shouldn't crash with stale avro
     metadata. Instead, should provide a meaningful error message.
