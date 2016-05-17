@@ -4,7 +4,7 @@
 # fields terminated by ','
 # escaped by '\\'
 # lines terminated by '\n'
-select * from text_comma_backslash_newline
+select * from functional.text_comma_backslash_newline
 ---- RESULTS
 'one','two',3,4
 'one,one','two',3,4
@@ -19,7 +19,7 @@ STRING,STRING,INT,INT
 # fields terminated by '$'
 # escaped by '#'
 # lines terminated by '|'
-select * from text_dollar_hash_pipe
+select * from functional.text_dollar_hash_pipe
 ---- RESULTS
 'one','two',3,4
 'one$one','two',3,4
@@ -31,13 +31,13 @@ STRING,STRING,INT,INT
 ====
 ---- QUERY
 # create new tables like the ones above to test inserting
-create table delim_text_test_db.cbn like text_comma_backslash_newline;
-create table delim_text_test_db.dhp like text_dollar_hash_pipe;
+create table cbn like functional.text_comma_backslash_newline;
+create table dhp like functional.text_dollar_hash_pipe;
 ---- RESULTS
 ====
 ---- QUERY
 # insert data into cbn table and check results
-insert into delim_text_test_db.cbn values
+insert into cbn values
 ('abc , abc', 'xyz \\ xyz', 1, 2),
 ('abc ,,, abc', 'xyz \\\\\\ xyz', 3, 4),
 ('abc \\,\\, abc', 'xyz ,\\,\\ xyz', 5, 6)
@@ -45,7 +45,7 @@ insert into delim_text_test_db.cbn values
 : 3
 ====
 ---- QUERY
-select * from delim_text_test_db.cbn
+select * from cbn
 ---- RESULTS
 'abc , abc','xyz \\ xyz',1,2
 'abc ,,, abc','xyz \\\\\\ xyz',3,4
@@ -55,7 +55,7 @@ STRING,STRING,INT,INT
 ====
 ---- QUERY
 # insert data into dhp table and check results
-insert into delim_text_test_db.dhp values
+insert into dhp values
 ('abc $ abc', 'xyz # xyz', 1, 2),
 ('abc $$$ abc', 'xyz ### xyz', 3, 4),
 ('abc #$#$ abc', 'xyz $#$# xyz', 5, 6)
@@ -63,7 +63,7 @@ insert into delim_text_test_db.dhp values
 : 3
 ====
 ---- QUERY
-select * from delim_text_test_db.dhp
+select * from dhp
 ---- RESULTS
 'abc $ abc','xyz # xyz',1,2
 'abc $$$ abc','xyz ### xyz',3,4

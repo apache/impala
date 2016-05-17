@@ -4,7 +4,7 @@
 # fields terminated by '-2' -- thorn character
 # escaped by '-22' -- lowercase e with circumflex
 # lines terminated by '\n'
-select * from text_thorn_ecirc_newline
+select * from functional.text_thorn_ecirc_newline
 ---- RESULTS
 'one','two',3,4
 'one\xfeone','two',3,4
@@ -16,7 +16,7 @@ STRING,STRING,INT,INT
 ====
 ---- QUERY
 # create new tables like the ones above to test inserting
-create table delim_text_test_db.tecn like text_thorn_ecirc_newline;
+create table tecn like functional.text_thorn_ecirc_newline;
 ---- RESULTS
 ====
 ---- QUERY
@@ -24,12 +24,12 @@ create table delim_text_test_db.tecn like text_thorn_ecirc_newline;
 # TODO: Expand verification to cover inserting a field terminator and escape character.
 # Some additional work needs to be done in the test framework to properly encode/decode
 # the values going into the INSERT query before this will work.
-insert overwrite delim_text_test_db.tecn values
+insert overwrite tecn values
 ('abc', 'xyz', 1, 2),
 ('efg', 'xyz', 3, 4)
 ====
 ---- QUERY
-select * from delim_text_test_db.tecn
+select * from tecn
 ---- RESULTS
 'abc','xyz',1,2
 'efg','xyz',3,4
