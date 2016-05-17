@@ -225,6 +225,20 @@ void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
   ClearErrorMap(error_log_);
 }
 
+Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
+  DCHECK_NE(message.error(), TErrorCode::OK);
+  // If either abort_on_error=true or the error necessitates execution stops
+  // immediately, return an error status.
+  if (abort_on_error() ||
+      message.error() == TErrorCode::MEM_LIMIT_EXCEEDED ||
+      message.error() == TErrorCode::CANCELLED) {
+    return Status(message);
+  }
+  // Otherwise, add the error to the error log and continue.
+  LogError(message);
+  return Status::OK();
+}
+
 void RuntimeState::LogMemLimitExceeded(const MemTracker* tracker,
     int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);

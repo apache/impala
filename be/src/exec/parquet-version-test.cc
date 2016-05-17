@@ -17,7 +17,8 @@
 #include <iostream>
 #include <limits.h>
 #include <gtest/gtest.h>
-#include "exec/hdfs-parquet-scanner.h"
+#include "exec/parquet-metadata-utils.h"
+#include "util/cpu-info.h"
 
 #include "common/names.h"
 
@@ -26,7 +27,7 @@ namespace impala {
 void CheckVersionParse(const string& s, const string& expected_application,
     int expected_major, int expected_minor, int expected_patch,
     bool expected_is_internal) {
-  HdfsParquetScanner::FileVersion v(s);
+  ParquetFileVersion v(s);
   EXPECT_EQ(v.application, expected_application) << "String: " << s;
   EXPECT_EQ(v.version.major, expected_major) << "String: " << s;
   EXPECT_EQ(v.version.minor, expected_minor) << "String: " << s;
@@ -62,7 +63,7 @@ TEST(ParquetVersionTest, Parsing) {
 }
 
 TEST(ParquetVersionTest, Comparisons) {
-  HdfsParquetScanner::FileVersion v("foo version 1.2.3");
+  ParquetFileVersion v("foo version 1.2.3");
   EXPECT_TRUE(v.VersionEq(1, 2, 3));
   EXPECT_FALSE(v.VersionEq(1, 2, 4));
   EXPECT_TRUE(v.VersionLt(3, 2, 1));

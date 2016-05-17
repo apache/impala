@@ -124,7 +124,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     header_ = state_->obj_pool()->Add(AllocateFileHeader());
     Status status = ReadFileHeader();
     if (!status.ok()) {
-      RETURN_IF_ERROR(LogOrReturnError(status.msg()));
+      RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
       // We need to complete the ranges for this file.
       CloseFileRanges(stream_->filename());
       return Status::OK();

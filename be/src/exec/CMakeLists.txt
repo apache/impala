@@ -62,6 +62,8 @@ add_library(Exec
   hbase-table-scanner.cc
   incr-stats-util.cc
   nested-loop-join-node.cc
+  parquet-column-readers.cc
+  parquet-metadata-utils.cc
   partitioned-aggregation-node.cc
   partitioned-aggregation-node-ir.cc
   partitioned-hash-join-node.cc

@@ -269,6 +269,14 @@ string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path) {
   return ss.str();
 }
 
+string PrintSubPath(const TableDescriptor& tbl_desc, const SchemaPath& path,
+    int end_path_idx) {
+  DCHECK_GE(end_path_idx, 0);
+  SchemaPath::const_iterator subpath_end = path.begin() + end_path_idx + 1;
+  SchemaPath subpath(path.begin(), subpath_end);
+  return PrintPath(tbl_desc, subpath);
+}
+
 string PrintNumericPath(const SchemaPath& path) {
   stringstream ss;
   ss << "[";

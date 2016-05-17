@@ -209,6 +209,12 @@ class RuntimeState {
   /// be sent back to the coordinator
   void GetUnreportedErrors(ErrorLogMap* new_errors);
 
+  /// Given an error message, determine whether execution should be aborted and, if so,
+  /// return the corresponding error status. Otherwise, log the error and return
+  /// Status::OK(). Execution is aborted if the ABORT_ON_ERROR query option is set to
+  /// true or the error is not recoverable and should be handled upstream.
+  Status LogOrReturnError(const ErrorMsg& message);
+
   bool is_cancelled() const { return is_cancelled_; }
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
 

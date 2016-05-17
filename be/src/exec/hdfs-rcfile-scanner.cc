@@ -525,7 +525,7 @@ Status HdfsRCFileScanner::ProcessRange() {
         if (error_in_row) {
           error_in_row = false;
           ErrorMsg msg(TErrorCode::GENERAL, Substitute("file: $0", stream_->filename()));
-          RETURN_IF_ERROR(LogOrReturnError(msg));
+          RETURN_IF_ERROR(state_->LogOrReturnError(msg));
         }
 
         current_row->SetTuple(scan_node_->tuple_idx(), tuple);

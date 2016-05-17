@@ -17,7 +17,7 @@
 
 #include "runtime/collection-value.h"
 #include "runtime/decimal-value.h"
-#include "runtime/string-value.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "util/decimal-util.h"
 

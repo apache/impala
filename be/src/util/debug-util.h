@@ -70,8 +70,12 @@ std::string PrintAsHex(const char* bytes, int64_t len);
 std::string PrintTMetricKind(const TMetricKind::type& type);
 std::string PrintTUnit(const TUnit::type& type);
 std::string PrintTImpalaQueryOptions(const TImpalaQueryOptions::type& type);
+
 /// Returns the fully qualified path, e.g. "database.table.array_col.item.field"
 std::string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path);
+/// Same as PrintPath(), but truncates the path after the given 'end_path_idx'.
+std::string PrintSubPath(const TableDescriptor& tbl_desc, const SchemaPath& path,
+    int end_path_idx);
 /// Returns the numeric path without column/field names, e.g. "[0,1,2]"
 std::string PrintNumericPath(const SchemaPath& path);
 
@@ -97,6 +101,20 @@ std::string GetVersionString(bool compact = false);
 /// Note: there is a libc bug that causes this not to work on 64 bit machines
 /// for recursive calls.
 std::string GetStackTrace();
+
+// FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
+// input file. They differentiate these cases from DCHECKs, which indicate conditions that
+// are true unless there's a bug in Impala. We would ideally always return a bad Status
+// instead of failing a FILE_CHECK, but in many cases we use FILE_CHECK instead because
+// there's a performance cost to doing the check in a release build, or just due to legacy
+// code.
+#define FILE_CHECK(a) DCHECK(a)
+#define FILE_CHECK_EQ(a, b) DCHECK_EQ(a, b)
+#define FILE_CHECK_NE(a, b) DCHECK_NE(a, b)
+#define FILE_CHECK_GT(a, b) DCHECK_GT(a, b)
+#define FILE_CHECK_LT(a, b) DCHECK_LT(a, b)
+#define FILE_CHECK_GE(a, b) DCHECK_GE(a, b)
+#define FILE_CHECK_LE(a, b) DCHECK_LE(a, b)
 
 }
 
