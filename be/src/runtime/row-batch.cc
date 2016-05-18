@@ -26,6 +26,7 @@
 #include "runtime/tuple-row.h"
 #include "util/compress.h"
 #include "util/decompress.h"
+#include "util/debug-util.h"
 #include "util/fixed-size-hash-table.h"
 #include "gen-cpp/Results_types.h"
 
@@ -452,6 +453,14 @@ Status RowBatch::ResizeAndAllocateTupleBuffer(RuntimeState* state,
         *tuple_buffer_size);
   }
   return Status::OK();
+}
+
+void RowBatch::VLogRows(const string& context) {
+  if (!VLOG_ROW_IS_ON) return;
+  VLOG_ROW << context << ": #rows=" << num_rows_;
+  for (int i = 0; i < num_rows_; ++i) {
+    VLOG_ROW << PrintRow(GetRow(i), row_desc_);
+  }
 }
 
 }

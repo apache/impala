@@ -37,6 +37,11 @@
 
 namespace impala {
 
+DataSink::DataSink(const RowDescriptor& row_desc) :
+    closed_(false), row_desc_(row_desc), mem_tracker_(NULL) {}
+
+DataSink::~DataSink() {}
+
 Status DataSink::CreateDataSink(ObjectPool* pool,
     const TDataSink& thrift_sink, const vector<TExpr>& output_exprs,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx,
@@ -144,14 +149,16 @@ string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
   return ss.str();
 }
 
-Status DataSink::Prepare(RuntimeState* state) {
-  expr_mem_tracker_.reset(
-      new MemTracker(-1, -1, "Data sink expr", state->instance_mem_tracker(), false));
+Status DataSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
+  DCHECK(mem_tracker != NULL);
+  profile_ = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(), GetName()));
+  mem_tracker_ = mem_tracker;
+  expr_mem_tracker_.reset(new MemTracker(-1, -1, "Exprs", mem_tracker, false));
   return Status::OK();
 }
 
 void DataSink::Close(RuntimeState* state) {
-  if (expr_mem_tracker_.get() != NULL) {
+  if (expr_mem_tracker_ != NULL) {
     expr_mem_tracker_->UnregisterFromParent();
     expr_mem_tracker_.reset();
   }

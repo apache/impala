@@ -19,6 +19,7 @@
 #ifndef IMPALA_EXEC_ROW_BATCH_CACHE_H
 #define IMPALA_EXEC_ROW_BATCH_CACHE_H
 
+#include <memory>
 #include <vector>
 
 #include "runtime/row-batch.h"
@@ -40,16 +41,21 @@ class RowBatchCache {
       next_row_batch_idx_(0) {
   }
 
+  ~RowBatchCache() {
+    DCHECK_EQ(0, row_batches_.size());
+  }
+
   /// Returns the next batch from the cache. Expands the cache if necessary.
   RowBatch* GetNextBatch() {
     if (next_row_batch_idx_ >= row_batches_.size()) {
       // Expand the cache with a new row batch.
-      row_batches_.push_back(new RowBatch(row_desc_, batch_size_, mem_tracker_));
+      row_batches_.push_back(
+          std::make_unique<RowBatch>(row_desc_, batch_size_, mem_tracker_));
     } else {
       // Reset batch from the cache before returning it.
       row_batches_[next_row_batch_idx_]->Reset();
     }
-    return row_batches_[next_row_batch_idx_++];
+    return row_batches_[next_row_batch_idx_++].get();
   }
 
   /// Resets the cache such that subsequent calls to GetNextBatch() return batches from
@@ -57,10 +63,16 @@ class RowBatchCache {
   /// are invalid.
   void Reset() { next_row_batch_idx_ = 0; }
 
-  ~RowBatchCache() {
-    std::vector<RowBatch*>::iterator it;
-    for (it = row_batches_.begin(); it != row_batches_.end(); ++it) delete *it;
-    row_batches_.clear();
+  /// Delete and free resources associated with all cached batch objects. Must be called
+  /// before the RowBatchCache is destroyed.
+  void Clear() {
+    row_batches_.clear(); // unique_ptr automatically calls all destructors.
+  }
+
+  /// Return the last batch returned from GetNextBatch() since Reset(), or NULL if
+  /// GetNextBatch() has not yet been called.
+  RowBatch* GetLastBatchReturned() {
+    return next_row_batch_idx_ == 0 ? NULL : row_batches_[next_row_batch_idx_ - 1].get();
   }
 
  private:
@@ -70,7 +82,7 @@ class RowBatchCache {
   MemTracker* mem_tracker_; // not owned
 
   /// List of cached row-batch objects. The row-batch objects are owned by this cache.
-  std::vector<RowBatch*> row_batches_;
+  std::vector<std::unique_ptr<RowBatch>> row_batches_;
 
   /// Index of next row batch to return in GetRowBatch().
   int next_row_batch_idx_;

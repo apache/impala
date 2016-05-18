@@ -58,7 +58,7 @@ const static string& ROOT_PARTITION_KEY =
 HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
     const vector<TExpr>& select_list_texprs,
     const TDataSink& tsink)
-    :  row_desc_(row_desc),
+    :  DataSink(row_desc),
        table_id_(tsink.table_sink.target_table_id),
        skip_header_line_count_(
            tsink.table_sink.hdfs_table_sink.__isset.skip_header_line_count
@@ -108,12 +108,10 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HdfsTableSink::Prepare(RuntimeState* state) {
-  RETURN_IF_ERROR(DataSink::Prepare(state));
+Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
   unique_id_str_ = PrintId(state->fragment_instance_id(), "-");
-  runtime_profile_ = state->obj_pool()->Add(
-      new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(profile()->total_time_counter());
 
   // TODO: Consider a system-wide random number generator, initialised in a single place.
   ptime now = microsec_clock::local_time();
@@ -141,8 +139,6 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       PrintId(state->query_id(), "_"));
 
   RETURN_IF_ERROR(PrepareExprs(state));
-  mem_tracker_.reset(new MemTracker(profile(), -1, -1, profile()->name(),
-      state->instance_mem_tracker()));
 
   partitions_created_counter_ =
       ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
@@ -534,39 +530,33 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
   return Status::OK();
 }
 
-Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
   ExprContext::FreeLocalAllocations(partition_key_expr_ctxs_);
   RETURN_IF_ERROR(state->CheckQueryState());
-  bool empty_input_batch = batch->num_rows() == 0;
-  // We don't do any work for an empty batch aside from end of stream finalization.
-  if (empty_input_batch && !eos) return Status::OK();
+  // We don't do any work for an empty batch.
+  if (batch->num_rows() == 0) return Status::OK();
 
   // If there are no partition keys then just pass the whole batch to one partition.
   if (dynamic_partition_key_expr_ctxs_.empty()) {
     // If there are no dynamic keys just use an empty key.
     PartitionPair* partition_pair;
-    // Populate the partition_pair even if the input is empty because we need it to
-    // delete the existing data for 'insert overwrite'. We need to handle empty input
-    // batches carefully so that empty partitions are correctly created at eos.
-    RETURN_IF_ERROR(GetOutputPartition(state, ROOT_PARTITION_KEY, &partition_pair,
-        empty_input_batch));
-    if (!empty_input_batch) {
-      // Pass the row batch to the writer. If new_file is returned true then the current
-      // file is finalized and a new file is opened.
-      // The writer tracks where it is in the batch when it returns with new_file set.
-      OutputPartition* output_partition = partition_pair->first;
-      bool new_file;
-      do {
-        RETURN_IF_ERROR(output_partition->writer->AppendRowBatch(
-            batch, partition_pair->second, &new_file));
-        if (new_file) {
-          RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
-          RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
-        }
-      } while (new_file);
-    }
+    RETURN_IF_ERROR(
+        GetOutputPartition(state, ROOT_PARTITION_KEY, &partition_pair, false));
+    // Pass the row batch to the writer. If new_file is returned true then the current
+    // file is finalized and a new file is opened.
+    // The writer tracks where it is in the batch when it returns with new_file set.
+    OutputPartition* output_partition = partition_pair->first;
+    bool new_file;
+    do {
+      RETURN_IF_ERROR(output_partition->writer->AppendRowBatch(
+          batch, partition_pair->second, &new_file));
+      if (new_file) {
+        RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
+        RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
+      }
+    } while (new_file);
   } else {
     for (int i = 0; i < batch->num_rows(); ++i) {
       current_row_ = batch->GetRow(i);
@@ -592,16 +582,6 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
         }
       } while (new_file);
       partition->second.second.clear();
-    }
-  }
-
-  if (eos) {
-    // Close Hdfs files, and update stats in runtime state.
-    for (PartitionMap::iterator cur_partition =
-            partition_keys_to_output_partitions_.begin();
-        cur_partition != partition_keys_to_output_partitions_.end();
-        ++cur_partition) {
-      RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
     }
   }
   return Status::OK();
@@ -646,7 +626,23 @@ void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* par
 }
 
 Status HdfsTableSink::FlushFinal(RuntimeState* state) {
-  // Currently a no-op function.
+  SCOPED_TIMER(profile()->total_time_counter());
+
+  if (dynamic_partition_key_expr_ctxs_.empty()) {
+    // Make sure we create an output partition even if the input is empty because we need
+    // it to delete the existing data for 'insert overwrite'.
+    PartitionPair* dummy;
+    RETURN_IF_ERROR(GetOutputPartition(state, ROOT_PARTITION_KEY, &dummy, true));
+  }
+
+  // Close Hdfs files, and update stats in runtime state.
+  for (PartitionMap::iterator cur_partition =
+          partition_keys_to_output_partitions_.begin();
+      cur_partition != partition_keys_to_output_partitions_.end();
+      ++cur_partition) {
+    RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
+  }
+
   // TODO: Move call to ClosePartitionFile() here so that the error status can be
   // propagated. If closing the file fails, the query should fail.
   return Status::OK();
@@ -654,7 +650,7 @@ Status HdfsTableSink::FlushFinal(RuntimeState* state) {
 
 void HdfsTableSink::Close(RuntimeState* state) {
   if (closed_) return;
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(profile()->total_time_counter());
   for (PartitionMap::iterator cur_partition =
           partition_keys_to_output_partitions_.begin();
       cur_partition != partition_keys_to_output_partitions_.end();
@@ -674,10 +670,6 @@ void HdfsTableSink::Close(RuntimeState* state) {
   }
   Expr::Close(output_expr_ctxs_, state);
   Expr::Close(partition_key_expr_ctxs_, state);
-  if (mem_tracker_.get() != NULL) {
-    mem_tracker_->UnregisterFromParent();
-    mem_tracker_.reset();
-  }
   DataSink::Close(state);
   closed_ = true;
 }

@@ -32,6 +32,10 @@ namespace impala {
   ScopedStopWatch<MonotonicStopWatch> \
   MACRO_CONCAT(STOP_WATCH, __COUNTER__)(c)
 
+#define CONDITIONAL_SCOPED_STOP_WATCH(c, enabled) \
+  ScopedStopWatch<MonotonicStopWatch> \
+  MACRO_CONCAT(STOP_WATCH, __COUNTER__)(c, enabled)
+
 #define SCOPED_CONCURRENT_STOP_WATCH(c) \
   ScopedStopWatch<ConcurrentStopWatch> \
   MACRO_CONCAT(CONCURRENT_STOP_WATCH, __COUNTER__)(c)
@@ -231,23 +235,25 @@ class ConcurrentStopWatch {
 };
 
 /// Utility class that starts the stop watch in the constructor and stops the watch when
-/// the object goes out of scope.
+/// the object goes out of scope. If the optional argument 'enabled' is false, the
+/// stopwatch is not updated.
 /// 'T' must implement the StopWatch interface "Start", "Stop".
 template<class T>
 class ScopedStopWatch {
  public:
-  ScopedStopWatch(T* sw) :
-    sw_(sw) {
+  ScopedStopWatch(T* sw, bool enabled = true) :
+    sw_(sw), enabled_(enabled) {
     DCHECK(sw != NULL);
-    sw_->Start();
+    if (enabled_) sw_->Start();
   }
 
   ~ScopedStopWatch() {
-    sw_->Stop();
+    if (enabled_) sw_->Stop();
   }
 
  private:
   T* sw_;
+  bool enabled_;
 };
 
 }

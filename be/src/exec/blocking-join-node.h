@@ -31,6 +31,7 @@
 namespace impala {
 
 class MemPool;
+class MemTracker;
 class RowBatch;
 class TupleRow;
 
@@ -52,9 +53,7 @@ class BlockingJoinNode : public ExecNode {
   /// Prepare() work, e.g. codegen.
   virtual Status Prepare(RuntimeState* state);
 
-  /// Open prepares the build side structures (subclasses should implement
-  /// ConstructBuildSide()) and then prepares for GetNext with the first left child row
-  /// (subclasses should implement InitGetNext()).
+  /// Calls ExecNode::Open() and initializes 'eos_' and 'probe_side_eos_'.
   virtual Status Open(RuntimeState* state);
 
   /// Subclasses should close any other structures and then call
@@ -67,7 +66,8 @@ class BlockingJoinNode : public ExecNode {
   const std::string node_name_;
   TJoinOp::type join_op_;
 
-  boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced from build side
+  /// Store in node to avoid reallocating. Cleared after build completes.
+  boost::scoped_ptr<RowBatch> build_batch_;
 
   /// probe_batch_ must be cleared before calling GetNext().  The child node
   /// does not initialize all tuple ptrs in the row, only the ones that it
@@ -77,8 +77,6 @@ class BlockingJoinNode : public ExecNode {
   bool eos_;  // if true, nothing left to return in GetNext()
   bool probe_side_eos_;  // if true, left child has no more rows to process
 
-  /// TODO: These variables should move to a join control block struct, which is local to
-  /// each probing thread.
   int probe_batch_pos_;  // current scan pos in probe_batch_
   TupleRow* current_probe_row_;  // The row currently being probed
   bool matched_probe_;  // if true, the current probe row is matched
@@ -103,15 +101,36 @@ class BlockingJoinNode : public ExecNode {
   /// with the probe child Open().
   MonotonicStopWatch built_probe_overlap_stop_watch_;
 
-  /// Init the build-side state for a new left child row (e.g. hash table iterator or list
-  /// iterator) given the first row. Used in Open() to prepare for GetNext().
-  /// A NULL ptr for first_left_child_row indicates the left child eos.
-  virtual Status InitGetNext(TupleRow* first_left_child_row) = 0;
+  /// Processes the build-side input.
+  /// Called from ConstructBuildAndOpenProbe() if the subclass does not provide a
+  /// DataSink to consume the build input.
+  /// Note that this can be called concurrently with Open'ing the left child to
+  /// increase parallelism. If, for example, the left child is another join node,
+  /// it can start its own build at the same time.
+  /// TODO: move all subclasses to use the DataSink interface and remove this method.
+  virtual Status ProcessBuildInput(RuntimeState* state) = 0;
 
-  /// We parallelize building the build-side with Open'ing the left child. If, for example,
-  /// the left child is another join node, it can start to build its own build-side at the
-  /// same time.
-  virtual Status ConstructBuildSide(RuntimeState* state) = 0;
+  /// Processes the build-side input and opens the probe side. Will do both concurrently
+  /// if the plan shape and thread token availability permit it.
+  /// If 'build_sink' is non-NULL, sends the build-side input to 'build_sink'. Otherwise
+  /// calls ProcessBuildInput on the subclass.
+  Status ConstructBuildAndOpenProbe(RuntimeState* state, DataSink* build_sink);
+
+  /// Helper function to process the build input by sending it to a DataSink.
+  /// ASYNC_BUILD enables timers that impose some overhead but are required if the build
+  /// is processed concurrently with the Open() of the left child.
+  template <bool ASYNC_BUILD>
+  Status SendBuildInputToSink(RuntimeState* state, DataSink* build_sink);
+
+  /// Set up 'current_probe_row_' to point to the first input row from the left child
+  /// (probe side). Fills 'probe_batch_' with rows from the left child and updates
+  /// 'probe_batch_pos_' to the index of the row in 'probe_batch_' after
+  /// 'current_probe_row_'. 'probe_side_eos_' is set to true if 'probe_batch_' is the
+  /// last batch to be returned from the child.
+  /// If eos of the left child is reached and no rows are returned, 'current_probe_row_'
+  /// is set to NULL and 'eos_' is set to true for join modes where unmatched rows from
+  /// the build side do not need to be returned.
+  Status GetFirstProbeRow(RuntimeState* state);
 
   /// Gives subclasses an opportunity to add debug output to the debug string printed by
   /// DebugString().
@@ -180,9 +199,11 @@ class BlockingJoinNode : public ExecNode {
       const MonotonicStopWatch* child_overlap_timer);
 
  private:
-  /// Supervises ConstructBuildSide in a separate thread, and returns its status in the
-  /// promise parameter.
-  void BuildSideThread(RuntimeState* state, Promise<Status>* status);
+  /// The main function for the thread that processes the build input asynchronously.
+  /// Its status is returned in the 'status' promise. If 'build_sink' is non-NULL, it
+  /// is used for the build. Otherwise, ProcessBuildInput() is called on the subclass.
+  void ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink,
+      Promise<Status>* status);
 };
 
 }

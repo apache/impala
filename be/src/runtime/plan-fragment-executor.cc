@@ -265,7 +265,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
         obj_pool(), request.fragment_ctx.fragment.output_sink,
         request.fragment_ctx.fragment.output_exprs,
         fragment_instance_ctx, row_desc(), &sink_));
-    RETURN_IF_ERROR(sink_->Prepare(runtime_state()));
+    sink_mem_tracker_.reset(new MemTracker(-1, -1, sink_->GetName(),
+        runtime_state_->instance_mem_tracker(), true));
+    RETURN_IF_ERROR(sink_->Prepare(runtime_state(), sink_mem_tracker_.get()));
 
     RuntimeProfile* sink_profile = sink_->profile();
     if (sink_profile != NULL) {
@@ -364,35 +366,24 @@ Status PlanFragmentExecutor::Open() {
 }
 
 Status PlanFragmentExecutor::OpenInternal() {
-  {
-    SCOPED_TIMER(profile()->total_time_counter());
-    RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
-  }
+  SCOPED_TIMER(profile()->total_time_counter());
+  RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
   if (sink_.get() == NULL) return Status::OK();
 
-  RETURN_IF_ERROR(sink_->Open(runtime_state_.get()));
   // If there is a sink, do all the work of driving it here, so that
   // when this returns the query has actually finished
+  RETURN_IF_ERROR(sink_->Open(runtime_state_.get()));
   while (!done_) {
-    RowBatch* batch;
-    RETURN_IF_ERROR(GetNextInternal(&batch));
-    if (batch == NULL) break;
-
-    if (VLOG_ROW_IS_ON) {
-      VLOG_ROW << "OpenInternal: #rows=" << batch->num_rows();
-      for (int i = 0; i < batch->num_rows(); ++i) {
-        VLOG_ROW << PrintRow(batch->GetRow(i), row_desc());
-      }
-    }
-    SCOPED_TIMER(profile()->total_time_counter());
-    RETURN_IF_ERROR(sink_->Send(runtime_state(), batch, done_));
+    row_batch_->Reset();
+    RETURN_IF_ERROR(plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
+    if (VLOG_ROW_IS_ON) row_batch_->VLogRows("PlanFragmentExecutor::OpenInternal()");
+    COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
+    RETURN_IF_ERROR(sink_->Send(runtime_state(), row_batch_.get()));
   }
 
   // Flush the sink *before* stopping the report thread. Flush may need to add some
   // important information to the last report that gets sent. (e.g. table sinks record the
   // files they have written to in this method)
-  //
-  SCOPED_TIMER(profile()->total_time_counter());
   RETURN_IF_ERROR(sink_->FlushFinal(runtime_state()));
   return Status::OK();
 }
@@ -473,45 +464,34 @@ void PlanFragmentExecutor::StopReportThread() {
   report_thread_->Join();
 }
 
-// TODO: why can't we just put the total_time_counter() at the
-// beginning of Open() and GetNext(). This seems to really mess
-// the timer here, presumably because the data stream sender is
-// multithreaded and the timer we use gets confused.
 Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
-  VLOG_FILE << "GetNext(): instance_id="
-      << runtime_state_->fragment_instance_id();
-  Status status = GetNextInternal(batch);
+  SCOPED_TIMER(profile()->total_time_counter());
+  VLOG_FILE << "GetNext(): instance_id=" << runtime_state_->fragment_instance_id();
+
+  Status status = Status::OK();
+  row_batch_->Reset();
+  // Loop until we've got a non-empty batch, hit an error or exhausted the input.
+  while (!done_) {
+    status = plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_);
+    if (VLOG_ROW_IS_ON) row_batch_->VLogRows("PlanFragmentExecutor::GetNext()");
+    if (!status.ok()) break;
+    if (row_batch_->num_rows() > 0) break;
+    row_batch_->Reset();
+  }
   UpdateStatus(status);
+
   if (done_) {
     VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
         << " instance_id=" << PrintId(runtime_state_->fragment_instance_id());
     FragmentComplete();
-    // GetNext() uses *batch = NULL to signal the end.
-    if (*batch != NULL && (*batch)->num_rows() == 0) *batch = NULL;
+    // Once all rows are returned, signal that we're done with an empty batch.
+    *batch = row_batch_->num_rows() == 0 ? NULL : row_batch_.get();
+    return status;
   }
 
+  *batch = row_batch_.get();
+  COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
   return status;
-}
-
-Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
-  if (done_) {
-    *batch = NULL;
-    return Status::OK();
-  }
-
-  while (!done_) {
-    row_batch_->Reset();
-    SCOPED_TIMER(profile()->total_time_counter());
-    RETURN_IF_ERROR(
-        plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
-    *batch = row_batch_.get();
-    if (row_batch_->num_rows() > 0) {
-      COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
-      break;
-    }
-  }
-
-  return Status::OK();
 }
 
 void PlanFragmentExecutor::FragmentComplete() {
@@ -596,6 +576,10 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
 void PlanFragmentExecutor::Close() {
   if (closed_) return;
   row_batch_.reset();
+  if (sink_mem_tracker_ != NULL) {
+    sink_mem_tracker_->UnregisterFromParent();
+    sink_mem_tracker_.reset();
+  }
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
     if (runtime_state_->query_resource_mgr() != NULL) {

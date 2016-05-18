@@ -145,7 +145,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
     AddExprCtxToFree(ctx.expr);
   }
 
-  // Although ConstructBuildSide() maybe be run in a separate thread, it is safe to free
+  // Although ProcessBuildInput() may be run in a separate thread, it is safe to free
   // local allocations in QueryMaintenance() since the build thread is not run
   // concurrently with other expr evaluation in this join node.
   // Probe side expr is not included in QueryMaintenance(). We cache the probe expression
@@ -242,22 +242,39 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status PartitionedHashJoinNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(BlockingJoinNode::Open(state));
+  RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
+  RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
+  RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
+  for (const FilterContext& filter: filters_) RETURN_IF_ERROR(filter.expr->Open(state));
+  AllocateRuntimeFilters(state);
+
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_aware_partition_ = partition_pool_->Add(new Partition(state, this, 0));
     RETURN_IF_ERROR(
         null_aware_partition_->build_rows()->Init(id(), runtime_profile(), false));
     RETURN_IF_ERROR(
         null_aware_partition_->probe_rows()->Init(id(), runtime_profile(), false));
-
     null_probe_rows_ = new BufferedTupleStream(
         state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
         true /* use_initial_small_buffers */, false /* read_write */ );
     RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
   }
-  RETURN_IF_ERROR(BlockingJoinNode::Open(state));
 
+  // Check for errors and free local allocations before opening children.
+  RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(QueryMaintenance(state));
+  // The prepare functions of probe expressions may have done local allocations implicitly
+  // (e.g. calling UdfBuiltins::Lower()). The probe expressions' local allocations need to
+  // be freed now as they don't get freed again till probing. Other exprs' local allocations
+  // are freed in ExecNode::FreeLocalAllocations() in ProcessBuildInput().
+  ExprContext::FreeLocalAllocations(probe_expr_ctxs_);
+
+  RETURN_IF_ERROR(BlockingJoinNode::ConstructBuildAndOpenProbe(state, NULL));
+  RETURN_IF_ERROR(BlockingJoinNode::GetFirstProbeRow(state));
+  ResetForProbe();
   DCHECK(null_aware_partition_ == NULL || join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN);
-
   return Status::OK();
 }
 
@@ -509,7 +526,7 @@ not_built:
   return Status::OK();
 }
 
-bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
+void PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
   DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN || filters_.size() == 0)
       << "Runtime filters not supported with NULL_AWARE_LEFT_ANTI_JOIN";
   DCHECK(ht_ctx_.get() != NULL);
@@ -517,7 +534,6 @@ bool PartitionedHashJoinNode::AllocateRuntimeFilters(RuntimeState* state) {
     filters_[i].local_bloom_filter =
         state->filter_bank()->AllocateScratchBloomFilter(filters_[i].filter->id());
   }
-  return true;
 }
 
 void PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state,
@@ -617,21 +633,7 @@ Status PartitionedHashJoinNode::SpillPartition(Partition** spilled_partition) {
   return Status::OK();
 }
 
-Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
-  for (const FilterContext& filter: filters_) {
-    RETURN_IF_ERROR(filter.expr->Open(state));
-  }
-  AllocateRuntimeFilters(state);
-
-  // The prepare functions of probe expressions may have done local allocations implicitly
-  // (e.g. calling UdfBuiltins::Lower()). The probe expressions' local allocations need to
-  // be freed now as they don't get freed again till probing. Other exprs' local allocations
-  // are freed in ExecNode::FreeLocalAllocations() in ProcessBuildInput().
-  ExprContext::FreeLocalAllocations(probe_expr_ctxs_);
-
+Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state) {
   // Do a full scan of child(1) and partition the rows.
   {
     SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
@@ -680,7 +682,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
 
-  RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
+  DCHECK_EQ(build_batch_->num_rows(), 0);
   bool eos = false;
   int64_t total_build_rows = 0;
   while (!eos) {
@@ -693,30 +695,30 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
       // If we are still consuming batches from the build side.
       {
         SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
-        RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
+        RETURN_IF_ERROR(child(1)->GetNext(state, build_batch_.get(), &eos));
       }
-      COUNTER_ADD(build_row_counter_, build_batch.num_rows());
+      COUNTER_ADD(build_row_counter_, build_batch_->num_rows());
     } else {
       // If we are consuming batches that have already been partitioned.
-      RETURN_IF_ERROR(input_partition_->build_rows()->GetNext(&build_batch, &eos));
+      RETURN_IF_ERROR(input_partition_->build_rows()->GetNext(build_batch_.get(), &eos));
     }
-    total_build_rows += build_batch.num_rows();
+    total_build_rows += build_batch_->num_rows();
 
     SCOPED_TIMER(partition_build_timer_);
     if (process_build_batch_fn_ == NULL) {
       bool build_filters = ht_ctx_->level() == 0;
-      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch, build_filters));
+      RETURN_IF_ERROR(ProcessBuildBatch(build_batch_.get(), build_filters));
     } else {
       DCHECK(process_build_batch_fn_level0_ != NULL);
       if (ht_ctx_->level() == 0) {
         RETURN_IF_ERROR(
-            process_build_batch_fn_level0_(this, &build_batch, true));
+            process_build_batch_fn_level0_(this, build_batch_.get(), true));
       } else {
-        RETURN_IF_ERROR(process_build_batch_fn_(this, &build_batch, false));
+        RETURN_IF_ERROR(process_build_batch_fn_(this, build_batch_.get(), false));
       }
     }
-    build_batch.Reset();
-    DCHECK(!build_batch.AtCapacity());
+    build_batch_->Reset();
+    DCHECK(!build_batch_->AtCapacity());
   }
 
   if (ht_ctx_->level() == 0) PublishRuntimeFilters(state, total_build_rows);
@@ -744,12 +746,6 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   COUNTER_ADD(num_build_rows_partitioned_, total_build_rows);
   non_empty_build_ |= (total_build_rows > 0);
   RETURN_IF_ERROR(BuildHashTables(state));
-  return Status::OK();
-}
-
-Status PartitionedHashJoinNode::InitGetNext(TupleRow* first_probe_row) {
-  // TODO: Move this reset to blocking-join. Not yet though because of hash-join.
-  ResetForProbe();
   return Status::OK();
 }
 

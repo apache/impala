@@ -25,6 +25,7 @@
 #include "exec/old-hash-table.inline.h"
 #include "exprs/expr.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.h"
 #include "runtime/runtime-filter-bank.h"
@@ -142,6 +143,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
           filter_expr_ctxs_,
           child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
           is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
+  build_pool_.reset(new MemPool(mem_tracker()));
 
   bool build_codegen_enabled = false;
   bool probe_codegen_enabled = false;
@@ -184,6 +186,7 @@ Status HashJoinNode::Reset(RuntimeState* state) {
 void HashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  if (build_pool_.get() != NULL) build_pool_->FreeAll();
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(filter_expr_ctxs_, state);
@@ -191,12 +194,25 @@ void HashJoinNode::Close(RuntimeState* state) {
   BlockingJoinNode::Close(state);
 }
 
-Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
+Status HashJoinNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(BlockingJoinNode::Open(state));
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(filter_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
 
+  // Check for errors and free local allocations before opening children.
+  RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(QueryMaintenance(state));
+
+  RETURN_IF_ERROR(BlockingJoinNode::ConstructBuildAndOpenProbe(state, NULL));
+  RETURN_IF_ERROR(BlockingJoinNode::GetFirstProbeRow(state));
+  InitGetNext();
+  return Status::OK();
+}
+
+Status HashJoinNode::ProcessBuildInput(RuntimeState* state) {
   // Do a full scan of child(1) and store everything in hash_tbl_
   // The hash join node needs to keep in memory all build tuples, including the tuple
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they
@@ -251,14 +267,13 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HashJoinNode::InitGetNext(TupleRow* first_probe_row) {
-  if (first_probe_row == NULL) {
+void HashJoinNode::InitGetNext() {
+  if (current_probe_row_ == NULL) {
     hash_tbl_iterator_ = hash_tbl_->Begin();
   } else {
     matched_probe_ = false;
-    hash_tbl_iterator_ = hash_tbl_->Find(first_probe_row);
+    hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
   }
-  return Status::OK();
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {

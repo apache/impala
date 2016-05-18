@@ -36,10 +36,10 @@ const static string& ROOT_PARTITION_KEY =
 HBaseTableSink::HBaseTableSink(const RowDescriptor& row_desc,
                                const vector<TExpr>& select_list_texprs,
                                const TDataSink& tsink)
-    : table_id_(tsink.table_sink.target_table_id),
+    : DataSink(row_desc),
+      table_id_(tsink.table_sink.target_table_id),
       table_desc_(NULL),
       hbase_table_writer_(NULL),
-      row_desc_(row_desc),
       select_list_texprs_(select_list_texprs) {
 }
 
@@ -53,11 +53,9 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HBaseTableSink::Prepare(RuntimeState* state) {
-  RETURN_IF_ERROR(DataSink::Prepare(state));
-  runtime_profile_ = state->obj_pool()->Add(
-      new RuntimeProfile(state->obj_pool(), "HbaseTableSink"));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+Status HBaseTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+  SCOPED_TIMER(profile()->total_time_counter());
 
   // Get the hbase table descriptor.  The table name will be used.
   table_desc_ = static_cast<HBaseTableDescriptor*>(
@@ -66,7 +64,7 @@ Status HBaseTableSink::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(PrepareExprs(state));
   // Now that expressions are ready to materialize tuples, create the writer.
   hbase_table_writer_.reset(
-      new HBaseTableWriter(table_desc_, output_expr_ctxs_, runtime_profile_));
+      new HBaseTableWriter(table_desc_, output_expr_ctxs_, profile()));
 
   // Try and init the table writer.  This can create connections to HBase and
   // to zookeeper.
@@ -86,8 +84,8 @@ Status HBaseTableSink::Open(RuntimeState* state) {
   return Expr::Open(output_expr_ctxs_, state);
 }
 
-Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
   RETURN_IF_ERROR(state->CheckQueryState());
   // Since everything is set up just forward everything to the writer.
@@ -104,7 +102,7 @@ Status HBaseTableSink::FlushFinal(RuntimeState* state) {
 
 void HBaseTableSink::Close(RuntimeState* state) {
   if (closed_) return;
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(profile()->total_time_counter());
 
   if (hbase_table_writer_.get() != NULL) {
     hbase_table_writer_->Close(state);

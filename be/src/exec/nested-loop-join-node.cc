@@ -20,7 +20,6 @@
 #include <sstream>
 #include <gutil/strings/substitute.h>
 
-#include "exec/row-batch-cache.h"
 #include "exprs/expr.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
@@ -51,9 +50,8 @@ NestedLoopJoinNode::~NestedLoopJoinNode() {
 Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
   DCHECK(tnode.__isset.nested_loop_join_node);
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.nested_loop_join_node.join_conjuncts,
-                            &join_conjunct_ctxs_));
+  RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, tnode.nested_loop_join_node.join_conjuncts,
+      &join_conjunct_ctxs_));
 
   DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN ||
       join_conjunct_ctxs_.size() == 0) << "Join conjuncts in a cross join";
@@ -61,8 +59,36 @@ Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 }
 
 Status NestedLoopJoinNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(join_conjunct_ctxs_, state));
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
+  RETURN_IF_ERROR(Expr::Open(join_conjunct_ctxs_, state));
+
+  // Check for errors and free local allocations before opening children.
+  RETURN_IF_CANCELLED(state);
+  RETURN_IF_ERROR(QueryMaintenance(state));
+
+  if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
+    DCHECK(IsInSubplan());
+    // When inside a subplan, open the first child before doing the build such that
+    // UnnestNodes on the probe side are opened and project their unnested collection
+    // slots. Otherwise, the build might unnecessarily deep-copy those collection slots,
+    // and this node would return them in GetNext().
+    // TODO: Remove this special-case behavior for subplans once we have proper
+    // projection. See UnnestNode for details on the current projection implementation.
+    RETURN_IF_ERROR(child(0)->Open(state));
+    RETURN_IF_ERROR(ConstructSingularBuildSide(state));
+    DCHECK_EQ(builder_->copied_build_batches()->total_num_rows(), 0);
+    build_batches_ = builder_->input_build_batches();
+  } else {
+    RETURN_IF_ERROR(
+        BlockingJoinNode::ConstructBuildAndOpenProbe(state, builder_.get()));
+    build_batches_ = builder_->GetFinalBuildBatches();
+    if (matching_build_rows_ != NULL) {
+      RETURN_IF_ERROR(ResetMatchingBuildRows(state, build_batches_->total_num_rows()));
+    }
+  }
+  RETURN_IF_ERROR(BlockingJoinNode::GetFirstProbeRow(state));
+  ResetForProbe();
   return Status::OK();
 }
 
@@ -75,8 +101,10 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
   RETURN_IF_ERROR(Expr::Prepare(
       join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
-  build_batch_cache_.reset(new RowBatchCache(
-      child(1)->row_desc(), state->batch_size(), mem_tracker()));
+
+  builder_.reset(
+      new NljBuilder(child(1)->row_desc(), state, mem_tracker()));
+  RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
 
   // For some join modes we need to record the build rows with matches in a bitmap.
   if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
@@ -99,135 +127,76 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status NestedLoopJoinNode::Reset(RuntimeState* state) {
-  raw_build_batches_.Reset();
-  copied_build_batches_.Reset();
+  builder_->Reset();
   build_batches_ = NULL;
   matched_probe_ = false;
   current_probe_row_ = NULL;
   probe_batch_pos_ = 0;
   process_unmatched_build_rows_ = false;
-  build_batch_cache_->Reset();
   return BlockingJoinNode::Reset(state);
 }
 
 void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  raw_build_batches_.Reset();
-  copied_build_batches_.Reset();
-  build_batches_ = NULL;
   Expr::Close(join_conjunct_ctxs_, state);
+  if (builder_ != NULL) {
+    builder_->Close(state);
+    builder_.reset();
+  }
+  build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
     mem_tracker()->Release(matching_build_rows_->MemUsage());
     matching_build_rows_.reset();
   }
-  build_batch_cache_.reset();
   BlockingJoinNode::Close(state);
 }
 
-Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
-  if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
-    // Optimized path for a common subplan shape with a singular row src
-    // node on the build side. This specialized build construction is
-    // faster mostly because it avoids the expensive timers below.
-    DCHECK(IsInSubplan());
-    RowBatch* batch = build_batch_cache_->GetNextBatch();
-    bool eos;
-    RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
-    DCHECK_EQ(batch->num_rows(), 1);
-    DCHECK(eos);
-    DCHECK(!batch->need_to_return());
-    raw_build_batches_.AddRowBatch(batch);
-    build_batches_ = &raw_build_batches_;
-    if (matching_build_rows_ != NULL) {
-      DCHECK_EQ(matching_build_rows_->num_bits(), 1);
-      matching_build_rows_->SetAllBits(false);
-    }
-    return Status::OK();
-  }
-
-  {
-    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
-    RETURN_IF_ERROR(child(1)->Open(state));
-  }
-  bool eos = false;
-  do {
-    RowBatch* batch = build_batch_cache_->GetNextBatch();
-    {
-      SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
-      RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
-    }
-    SCOPED_TIMER(build_timer_);
-    raw_build_batches_.AddRowBatch(batch);
-    if (batch->need_to_return()) {
-      // This batch and earlier batches may refer to resources passed from the child
-      // that aren't owned by the row batch itself. Deep copying ensures that the row
-      // batches are backed by memory owned by this node that is safe to hold on to.
-      RETURN_IF_ERROR(DeepCopyBuildBatches(state));
-    }
-
-    VLOG_ROW << Substitute("raw_build_batches_: BuildList($0)",
-        raw_build_batches_.DebugString(child(1)->row_desc()));
-    VLOG_ROW << Substitute("copied_build_batches_: BuildList($0)",
-        copied_build_batches_.DebugString(child(1)->row_desc()));
-    COUNTER_SET(build_row_counter_, raw_build_batches_.total_num_rows() +
-        copied_build_batches_.total_num_rows());
-  } while (!eos);
-
-  SCOPED_TIMER(build_timer_);
-  if (copied_build_batches_.total_num_rows() > 0) {
-    // To simplify things, we only want to process one list, so we need to copy
-    // the remaining raw batches.
-    DeepCopyBuildBatches(state);
-    build_batches_ = &copied_build_batches_;
-  } else {
-    // We didn't need to copy anything so we can just use raw batches.
-    build_batches_ = &raw_build_batches_;
-  }
-
+Status NestedLoopJoinNode::ConstructSingularBuildSide(RuntimeState* state) {
+  // Optimized path for a common subplan shape with a singular row src node on the build
+  // side that avoids expensive timers, virtual function calls, and other overhead.
+  DCHECK_EQ(child(1)->type(), TPlanNodeType::type::SINGULAR_ROW_SRC_NODE);
+  DCHECK(IsInSubplan());
+  RowBatch* batch = builder_->GetNextEmptyBatch();
+  bool eos;
+  RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
+  DCHECK_EQ(batch->num_rows(), 1);
+  DCHECK(eos);
+  DCHECK(!batch->need_to_return());
+  builder_->AddBuildBatch(batch);
   if (matching_build_rows_ != NULL) {
-    int64_t num_bits = build_batches_->total_num_rows();
-    // Reuse existing bitmap, expanding it if needed.
-    if (matching_build_rows_->num_bits() >= num_bits) {
-      matching_build_rows_->SetAllBits(false);
-    } else {
-      // Account for the additional memory used by the bitmap.
-      int64_t bitmap_size_increase =
-          Bitmap::MemUsage(num_bits) - matching_build_rows_->MemUsage();
-      if (!mem_tracker()->TryConsume(bitmap_size_increase)) {
-        return mem_tracker()->MemLimitExceeded(state,
-            "Could not expand bitmap in nested loop join", bitmap_size_increase);
-      }
-      matching_build_rows_->Reset(num_bits);
+    DCHECK_EQ(matching_build_rows_->num_bits(), 1);
+    matching_build_rows_->SetAllBits(false);
+  }
+  return Status::OK();
+}
+
+Status NestedLoopJoinNode::ResetMatchingBuildRows(RuntimeState* state, int64_t num_bits) {
+  // Reuse existing bitmap, expanding it if needed.
+  if (matching_build_rows_->num_bits() >= num_bits) {
+    matching_build_rows_->SetAllBits(false);
+  } else {
+    // Account for the additional memory used by the bitmap.
+    int64_t bitmap_size_increase =
+        Bitmap::MemUsage(num_bits) - matching_build_rows_->MemUsage();
+    if (!mem_tracker()->TryConsume(bitmap_size_increase)) {
+      return mem_tracker()->MemLimitExceeded(state,
+          "Could not expand bitmap in nested loop join", bitmap_size_increase);
     }
+    matching_build_rows_->Reset(num_bits);
   }
   return Status::OK();
 }
 
-Status NestedLoopJoinNode::DeepCopyBuildBatches(RuntimeState* state) {
-  for (RowBatchList::BatchIterator it = raw_build_batches_.BatchesBegin();
-    it != raw_build_batches_.BatchesEnd(); ++it) {
-    RowBatch* raw_batch = *it;
-    // TODO: it would be more efficient to do the deep copy within the same batch, rather
-    // than to a new batch.
-    RowBatch* copied_batch = build_batch_cache_->GetNextBatch();
-    raw_batch->DeepCopyTo(copied_batch);
-    copied_build_batches_.AddRowBatch(copied_batch);
-    // Reset raw batches as we go to free up memory if possible.
-    raw_batch->Reset();
-
-    RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(QueryMaintenance(state));
-  }
-  raw_build_batches_.Reset();
+Status NestedLoopJoinNode::ProcessBuildInput(RuntimeState* state) {
+  DCHECK(false) << "Should not be called, NLJ uses the BuildSink API";
   return Status::OK();
 }
 
-Status NestedLoopJoinNode::InitGetNext(TupleRow* first_left_row) {
+void NestedLoopJoinNode::ResetForProbe() {
   DCHECK(build_batches_ != NULL);
   build_row_iterator_ = build_batches_->Iterator();
   current_build_row_idx_ = 0;
   matched_probe_ = false;
-  return Status::OK();
 }
 
 Status NestedLoopJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch,

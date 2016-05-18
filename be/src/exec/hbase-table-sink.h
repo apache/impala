@@ -38,12 +38,12 @@ class HBaseTableSink : public DataSink {
   HBaseTableSink(const RowDescriptor& row_desc,
                  const std::vector<TExpr>& select_list_texprs,
                  const TDataSink& tsink);
-  virtual Status Prepare(RuntimeState* state);
+  virtual std::string GetName() { return "HBaseTableSink"; }
+  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
   virtual Status Open(RuntimeState* state);
-  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
+  virtual Status Send(RuntimeState* state, RowBatch* batch);
   virtual Status FlushFinal(RuntimeState* state);
   virtual void Close(RuntimeState* state);
-  virtual RuntimeProfile* profile() { return runtime_profile_; }
 
  private:
   /// Turn thrift TExpr into Expr and prepare them to run
@@ -61,14 +61,8 @@ class HBaseTableSink : public DataSink {
   boost::scoped_ptr<HBaseTableWriter> hbase_table_writer_;
 
   /// Owned by the RuntimeState.
-  const RowDescriptor& row_desc_;
-
-  /// Owned by the RuntimeState.
   const std::vector<TExpr>& select_list_texprs_;
   std::vector<ExprContext*> output_expr_ctxs_;
-
-  /// Allocated from runtime state's pool.
-  RuntimeProfile* runtime_profile_;
 };
 
 }  // namespace impala

@@ -43,8 +43,6 @@ using kudu::client::KuduInsert;
 using kudu::client::KuduUpdate;
 using kudu::client::KuduError;
 
-static const char* KUDU_SINK_NAME = "KuduTableSink";
-
 namespace impala {
 
 const static string& ROOT_PARTITION_KEY =
@@ -53,8 +51,8 @@ const static string& ROOT_PARTITION_KEY =
 KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
     const vector<TExpr>& select_list_texprs,
     const TDataSink& tsink)
-    : table_id_(tsink.table_sink.target_table_id),
-      row_desc_(row_desc),
+    : DataSink(row_desc),
+      table_id_(tsink.table_sink.target_table_id),
       select_list_texprs_(select_list_texprs),
       sink_action_(tsink.table_sink.action),
       kudu_table_sink_(tsink.table_sink.kudu_table_sink),
@@ -76,11 +74,9 @@ Status KuduTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status KuduTableSink::Prepare(RuntimeState* state) {
-  RETURN_IF_ERROR(DataSink::Prepare(state));
-  runtime_profile_ = state->obj_pool()->Add(
-      new RuntimeProfile(state->obj_pool(), KUDU_SINK_NAME));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+  SCOPED_TIMER(profile()->total_time_counter());
   RETURN_IF_ERROR(PrepareExprs(state));
 
   // Get the kudu table descriptor.
@@ -101,17 +97,14 @@ Status KuduTableSink::Prepare(RuntimeState* state) {
   state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
 
   // Add counters
-  kudu_flush_counter_ =
-      ADD_COUNTER(runtime_profile_, "TotalKuduFlushOperations", TUnit::UNIT);
-  kudu_error_counter_ =
-      ADD_COUNTER(runtime_profile_, "TotalKuduFlushErrors", TUnit::UNIT);
-  kudu_flush_timer_ = ADD_TIMER(runtime_profile_, "KuduFlushTimer");
-  rows_written_ =
-      ADD_COUNTER(runtime_profile_, "RowsWritten", TUnit::UNIT);
-  rows_written_rate_ = runtime_profile_->AddDerivedCounter(
+  kudu_flush_counter_ = ADD_COUNTER(profile(), "TotalKuduFlushOperations", TUnit::UNIT);
+  kudu_error_counter_ = ADD_COUNTER(profile(), "TotalKuduFlushErrors", TUnit::UNIT);
+  kudu_flush_timer_ = ADD_TIMER(profile(), "KuduFlushTimer");
+  rows_written_ = ADD_COUNTER(profile(), "RowsWritten", TUnit::UNIT);
+  rows_written_rate_ = profile()->AddDerivedCounter(
       "RowsWrittenRate", TUnit::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_written_,
-        runtime_profile_->total_time_counter()));
+      profile()->total_time_counter()));
 
   return Status::OK();
 }
@@ -147,8 +140,8 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
   }
 }
 
-Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
   RETURN_IF_ERROR(state->CheckQueryState());
 
@@ -294,8 +287,9 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
 
 void KuduTableSink::Close(RuntimeState* state) {
   if (closed_) return;
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(profile()->total_time_counter());
   Expr::Close(output_expr_ctxs_, state);
+  DataSink::Close(state);
   closed_ = true;
 }
 

@@ -75,8 +75,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
  protected:
   virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
-  virtual Status InitGetNext(TupleRow* first_probe_row);
-  virtual Status ConstructBuildSide(RuntimeState* state);
+  virtual Status ProcessBuildInput(RuntimeState* state);
 
  private:
   class Partition;
@@ -354,8 +353,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// For each filter in filters_, allocate a bloom_filter from the fragment-local
   /// RuntimeFilterBank and store it in runtime_filters_ to populate during the build
-  /// phase. Returns false if filter construction is disabled.
-  bool AllocateRuntimeFilters(RuntimeState* state);
+  /// phase.
+  void AllocateRuntimeFilters(RuntimeState* state);
 
   /// Publish the runtime filters to the fragment-local
   /// RuntimeFilterBank. 'total_build_rows' is used to determine whether the computed

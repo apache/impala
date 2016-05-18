@@ -224,14 +224,15 @@ class KuduTableSinkTest : public testing::Test {
     vector<TExpr> exprs;
     CreateTExpr(schema_cols, &exprs);
     KuduTableSink sink(*row_desc_, exprs, data_sink_);
-    ASSERT_OK(sink.Prepare(&runtime_state_));
+    ASSERT_OK(sink.Prepare(&runtime_state_, &mem_tracker_));
     ASSERT_OK(sink.Open(&runtime_state_));
     vector<RowBatch*> row_batches;
     row_batches.push_back(CreateRowBatch(0, kNumRowsPerBatch, factor, val, skip_val));
-    ASSERT_OK(sink.Send(&runtime_state_, row_batches.front(), false));
+    ASSERT_OK(sink.Send(&runtime_state_, row_batches.front()));
     row_batches.push_back(CreateRowBatch(kNumRowsPerBatch, kNumRowsPerBatch, factor, val,
                                          skip_val));
-    ASSERT_OK(sink.Send(&runtime_state_,row_batches.back(), true));
+    ASSERT_OK(sink.Send(&runtime_state_,row_batches.back()));
+    ASSERT_OK(sink.FlushFinal(&runtime_state_));
     STLDeleteElements(&row_batches);
     sink.Close(&runtime_state_);
     Verify(num_columns, 2 * kNumRowsPerBatch, factor, val, skip_val);

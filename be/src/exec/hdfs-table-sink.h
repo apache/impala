@@ -27,7 +27,6 @@
 #include "common/object-pool.h"
 #include "exec/data-sink.h"
 #include "runtime/descriptors.h"
-#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -131,18 +130,20 @@ class HdfsTableSink : public DataSink {
   HdfsTableSink(const RowDescriptor& row_desc,
       const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
 
+  virtual std::string GetName() { return "HdfsTableSink"; }
+
   /// Prepares output_exprs and partition_key_exprs, and connects to HDFS.
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
 
   /// Opens output_exprs and partition_key_exprs, prepares the single output partition for
   /// static inserts, and populates partition_descriptor_map_.
   virtual Status Open(RuntimeState* state);
 
   /// Append all rows in batch to the temporary Hdfs files corresponding to partitions.
-  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
+  virtual Status Send(RuntimeState* state, RowBatch* batch);
 
-  /// Currently a no-op function.
-  /// TODO: Move calls to functions that can fail in Close() to FlushFinal()
+  /// Finalize any open files.
+  /// TODO: IMPALA-2988: Move calls to functions that can fail in Close() to FlushFinal()
   virtual Status FlushFinal(RuntimeState* state);
 
   /// Move temporary Hdfs files to final locations.
@@ -152,9 +153,7 @@ class HdfsTableSink : public DataSink {
 
   int skip_header_line_count() const { return skip_header_line_count_; }
 
-  virtual RuntimeProfile* profile() { return runtime_profile_; }
   const HdfsTableDescriptor& TableDesc() { return *table_desc_; }
-  MemTracker* mem_tracker() { return mem_tracker_.get(); }
 
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
   RuntimeProfile::Counter* bytes_written_counter() { return bytes_written_counter_; }
@@ -195,7 +194,7 @@ class HdfsTableSink : public DataSink {
   /// the partition_keys_to_output_partitions_.
   /// no_more_rows indicates that no more rows will be added to the partition.
   Status GetOutputPartition(RuntimeState* state, const std::string& key,
-                  PartitionPair** partition_pair, bool no_more_rows);
+      PartitionPair** partition_pair, bool no_more_rows);
 
   /// Initialise and prepare select and partition key expressions
   Status PrepareExprs(RuntimeState* state);
@@ -233,9 +232,6 @@ class HdfsTableSink : public DataSink {
 
   /// Current row from the current RowBatch to output
   TupleRow* current_row_;
-
-  /// Row descriptor of row batches passed in Send(). Set in c'tor.
-  const RowDescriptor& row_desc_;
 
   /// Table id resolved in Prepare() to set tuple_desc_;
   TableId table_id_;
@@ -286,10 +282,6 @@ class HdfsTableSink : public DataSink {
       PartitionDescriptorMap;
   PartitionDescriptorMap partition_descriptor_map_;
 
-  boost::scoped_ptr<MemTracker> mem_tracker_;
-
-  /// Allocated from runtime state's pool.
-  RuntimeProfile* runtime_profile_;
   RuntimeProfile::Counter* partitions_created_counter_;
   RuntimeProfile::Counter* files_created_counter_;
   RuntimeProfile::Counter* rows_inserted_counter_;

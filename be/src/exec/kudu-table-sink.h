@@ -46,24 +46,24 @@ class KuduTableSink : public DataSink {
   KuduTableSink(const RowDescriptor& row_desc,
       const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
 
+  virtual std::string GetName() { return "KuduTableSink"; }
+
   /// Prepares the expressions to be applied and creates a KuduSchema based on the
   /// expressions and KuduTableDescriptor.
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
 
   /// Connects to Kudu and creates the KuduSession to be used for the writes.
   virtual Status Open(RuntimeState* state);
 
   /// Transforms 'batch' into Kudu writes and sends them to Kudu.
   /// The KuduSession is flushed on each row batch.
-  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
+  virtual Status Send(RuntimeState* state, RowBatch* batch);
 
   /// Does nothing. We currently flush on each Send() call.
   virtual Status FlushFinal(RuntimeState* state);
 
   /// Closes the KuduSession and the expressions.
   virtual void Close(RuntimeState* state);
-
-  virtual RuntimeProfile* profile() { return runtime_profile_; }
 
  private:
   /// Turn thrift TExpr into Expr and prepare them to run
@@ -82,8 +82,6 @@ class KuduTableSink : public DataSink {
   /// Used to get the KuduTableDescriptor from the RuntimeState
   TableId table_id_;
 
-  /// Row descriptor of row batches passed in Send(). Set in c'tor.
-  const RowDescriptor& row_desc_;
   /// The descriptor of the KuduTable being written to. Set on Prepare().
   const KuduTableDescriptor* table_desc_;
 
@@ -97,9 +95,6 @@ class KuduTableSink : public DataSink {
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;
   std::tr1::shared_ptr<kudu::client::KuduTable> table_;
   std::tr1::shared_ptr<kudu::client::KuduSession> session_;
-
-  /// Allocated from runtime state's pool.
-  RuntimeProfile* runtime_profile_;
 
   /// Used to specify the type of write operation (INSERT/UPDATE/DELETE).
   TSinkAction::type sink_action_;

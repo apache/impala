@@ -489,7 +489,7 @@ class DataStreamTest : public testing::Test {
     const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
         &obj_pool_, sender_num, *row_desc_, sink, dest_, channel_buffer_size);
-    EXPECT_OK(sender.Prepare(&state));
+    EXPECT_OK(sender.Prepare(&state, &tracker_));
     EXPECT_OK(sender.Open(&state));
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];
@@ -497,7 +497,7 @@ class DataStreamTest : public testing::Test {
     for (int i = 0; i < NUM_BATCHES; ++i) {
       GetNextBatch(batch.get(), &next_val);
       VLOG_QUERY << "sender " << sender_num << ": #rows=" << batch->num_rows();
-      info.status = sender.Send(&state, batch.get(), false);
+      info.status = sender.Send(&state, batch.get());
       if (!info.status.ok()) break;
     }
     VLOG_QUERY << "closing sender" << sender_num;

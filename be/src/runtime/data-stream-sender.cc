@@ -23,6 +23,7 @@
 #include "common/logging.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
@@ -47,6 +48,7 @@ using boost::condition_variable;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
+using strings::Substitute;
 
 namespace impala {
 
@@ -158,7 +160,7 @@ Status DataStreamSender::Channel::Init(RuntimeState* state) {
   runtime_state_ = state;
   // TODO: figure out how to size batch_
   int capacity = max(1, buffer_size_ / max(row_desc_.GetRowSize(), 1));
-  batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker_.get()));
+  batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker()));
   return Status::OK();
 }
 
@@ -309,9 +311,9 @@ Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
   VLOG_RPC << "calling TransmitData(eos=true) to terminate channel.";
   rpc_status_ = DoTransmitDataRpc(&client, params, &res);
   if (!rpc_status_.ok()) {
-    stringstream msg;
-    msg << "TransmitData(eos=true) to " << address_ << " failed:\n" << rpc_status_.msg().msg();
-    return Status(rpc_status_.code(), msg.str());
+    return Status(rpc_status_.code(),
+       Substitute("TransmitData(eos=true) to $0 failed:\n $1",
+        TNetworkAddressToString(address_), rpc_status_.msg().msg()));
   }
   return Status(res.status);
 }
@@ -327,14 +329,13 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
-  : sender_id_(sender_id),
+  : DataSink(row_desc),
+    sender_id_(sender_id),
     pool_(pool),
-    row_desc_(row_desc),
     current_channel_idx_(0),
     flushed_(false),
     closed_(false),
     current_thrift_batch_(&thrift_batch1_),
-    profile_(NULL),
     serialize_batch_timer_(NULL),
     thrift_transmit_timer_(NULL),
     bytes_sent_counter_(NULL),
@@ -369,6 +370,10 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
   }
 }
 
+string DataStreamSender::GetName() {
+  return Substitute("DataStreamSender (dst_id=$0)", dest_node_id_);
+}
+
 DataStreamSender::~DataStreamSender() {
   // TODO: check that sender was either already closed() or there was an error
   // on some channel
@@ -377,18 +382,12 @@ DataStreamSender::~DataStreamSender() {
   }
 }
 
-Status DataStreamSender::Prepare(RuntimeState* state) {
-  DCHECK(state != NULL);
+Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
   state_ = state;
-  stringstream title;
-  title << "DataStreamSender (dst_id=" << dest_node_id_ << ")";
-  profile_ = pool_->Add(new RuntimeProfile(pool_, title.str()));
   SCOPED_TIMER(profile_->total_time_counter());
 
-  mem_tracker_.reset(new MemTracker(profile(), -1, -1, "DataStreamSender",
-      state->instance_mem_tracker()));
-  RETURN_IF_ERROR(
-      Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker_.get()));
+  RETURN_IF_ERROR(Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker));
 
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
@@ -418,7 +417,7 @@ Status DataStreamSender::Open(RuntimeState* state) {
   return Expr::Open(partition_expr_ctxs_, state);
 }
 
-Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
+Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   DCHECK(!closed_);
   DCHECK(!flushed_);
 
@@ -486,10 +485,7 @@ void DataStreamSender::Close(RuntimeState* state) {
     channels_[i]->Teardown(state);
   }
   Expr::Close(partition_expr_ctxs_, state);
-  if (mem_tracker_.get() != NULL) {
-    mem_tracker_->UnregisterFromParent();
-    mem_tracker_.reset();
-  }
+  DataSink::Close(state);
   closed_ = true;
 }
 

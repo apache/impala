@@ -299,6 +299,10 @@ class RowBatch {
   Status ResizeAndAllocateTupleBuffer(RuntimeState* state, int64_t* buffer_size,
        uint8_t** buffer);
 
+  /// Helper function to log the batch's rows if VLOG_ROW is enabled. 'context' is a
+  /// string to prepend to the log message.
+  void VLogRows(const std::string& context);
+
  private:
   friend class RowBatchSerializeBaseline;
   friend class RowBatchSerializeBenchmark;

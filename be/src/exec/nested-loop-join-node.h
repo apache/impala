@@ -23,9 +23,7 @@
 
 #include "exec/exec-node.h"
 #include "exec/blocking-join-node.h"
-#include "exec/row-batch-list.h"
-#include "runtime/descriptors.h"  // for TupleDescriptor
-#include "runtime/mem-pool.h"
+#include "exec/nested-loop-join-builder.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -34,16 +32,10 @@ namespace impala {
 class Bitmap;
 class RowBatch;
 class TupleRow;
-class RowBatchCache;
 
-/// Operator to perform nested-loop join.
+/// Operator to perform nested-loop join. The build side is implemented by NljBuilder.
 /// This operator does not support spill to disk. Supports all join modes except
 /// null-aware left anti-join.
-/// This operator will operate in one of two modes depending on the memory ownership of
-/// row batches pulled from the child node on the build side. If the row batches own all
-/// tuple memory, the non-copying mode is used and row batches are simply accumulated in
-/// this node. If the batches reference tuple data they do not own, the copying mode is
-/// used and all data is deep copied into memory owned by this node.
 ///
 /// TODO: Add support for null-aware left-anti join.
 class NestedLoopJoinNode : public BlockingJoinNode {
@@ -60,27 +52,17 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   virtual void Close(RuntimeState* state);
 
  protected:
-  virtual Status InitGetNext(TupleRow* first_left_row);
-  virtual Status ConstructBuildSide(RuntimeState* state);
+  virtual Status ProcessBuildInput(RuntimeState* state);
 
  private:
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// Creates and caches RowBatches for the build side. The RowBatch objects are owned by
-  /// this cache, but the tuple data is always transferred to the output batch in
-  /// GetNext() when eos_ is set to true. The cache helps to avoid creating new
-  /// RowBatches after a Reset().
-  boost::scoped_ptr<RowBatchCache> build_batch_cache_;
+  /// The build side rows of the join.
+  boost::scoped_ptr<NljBuilder> builder_;
 
-  /// List of build batches from child.
-  RowBatchList raw_build_batches_;
-
-  /// List of build batches that were deep copied and are backed by each row batch's pool.
-  RowBatchList copied_build_batches_;
-
-  /// Pointer to either raw_build_batches_ or copied_build_batches_ that contains the
-  /// batches to use during the probe phase.
+  /// Pointer to the RowBatchList (owned by 'builder_') that contains the batches to
+  /// use during the probe phase.
   RowBatchList* build_batches_;
 
   RowBatchList::TupleRowIterator build_row_iterator_;
@@ -102,6 +84,16 @@ class NestedLoopJoinNode : public BlockingJoinNode {
 
   /// Join conjuncts
   std::vector<ExprContext*> join_conjunct_ctxs_;
+
+  /// Optimized build for the case where the right child is a SingularRowSrcNode.
+  Status ConstructSingularBuildSide(RuntimeState* state);
+
+  /// Expand 'matching_build_rows_' to hold at least 'num_bits' bits and set
+  /// all its bits to zero.
+  Status ResetMatchingBuildRows(RuntimeState* state, int64_t num_bits);
+
+  /// Prepares for probing the first batch.
+  void ResetForProbe();
 
   Status GetNextInnerJoin(RuntimeState* state, RowBatch* output_batch);
   Status GetNextLeftOuterJoin(RuntimeState* state, RowBatch* output_batch);
@@ -149,12 +141,6 @@ class NestedLoopJoinNode : public BlockingJoinNode {
     return current_probe_row_ != NULL;
   }
 
-  /// Deep copy all build batches in raw_build_batches_ to copied_build_batches_.
-  /// Resets all the source batches and clears raw_build_batches_.
-  /// If the memory limit is exceeded while copying batches, returns a MEM_LIMIT_EXCEEDED
-  /// status, sets the query status to MEM_LIMIT_EXCEEDED and leave the row batches to
-  /// be cleaned up later when the node is closed.
-  Status DeepCopyBuildBatches(RuntimeState* state);
 };
 
 }

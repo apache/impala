@@ -194,6 +194,8 @@ class PlanFragmentExecutor {
   /// returned via GetNext's row batch
   /// Created in Prepare (if required), owned by this object.
   boost::scoped_ptr<DataSink> sink_;
+  boost::scoped_ptr<MemTracker> sink_mem_tracker_;
+
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_batch_;
 
@@ -279,10 +281,6 @@ class PlanFragmentExecutor {
   /// have been closed, a final report will have been sent and the report thread will
   /// have been stopped. sink_ will be set to NULL after successful execution.
   Status OpenInternal();
-
-  /// Executes GetNext() logic and returns resulting status.
-  /// sets done_ to true if the last row batch was returned.
-  Status GetNextInternal(RowBatch** batch);
 
   /// Stops report thread, if one is running. Blocks until report thread terminates.
   /// Idempotent.

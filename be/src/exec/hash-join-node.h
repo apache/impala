@@ -54,7 +54,7 @@ class HashJoinNode : public BlockingJoinNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
-  // Open() implemented in BlockingJoinNode
+  virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
@@ -63,12 +63,15 @@ class HashJoinNode : public BlockingJoinNode {
 
  protected:
   virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
-  virtual Status InitGetNext(TupleRow* first_probe_row);
-  virtual Status ConstructBuildSide(RuntimeState* state);
+
+  virtual Status ProcessBuildInput(RuntimeState* state);
 
  private:
   boost::scoped_ptr<OldHashTable> hash_tbl_;
   OldHashTable::Iterator hash_tbl_iterator_;
+
+  /// holds everything referenced from build side
+  boost::scoped_ptr<MemPool> build_pool_;
 
   /// our equi-join predicates "<lhs> = <rhs>" are separated into
   /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
@@ -115,6 +118,9 @@ class HashJoinNode : public BlockingJoinNode {
 
   RuntimeProfile::Counter* build_buckets_counter_;   // num buckets in hash table
   RuntimeProfile::Counter* hash_tbl_load_factor_counter_;
+
+  /// Prepares for the first call to GetNext(). Must be called after GetFirstProbeRow().
+  void InitGetNext();
 
   /// GetNext helper function for the common join cases: Inner join, left semi and left
   /// outer

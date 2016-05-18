@@ -63,9 +63,11 @@ class DataStreamSender : public DataSink {
     int per_channel_buffer_size);
   virtual ~DataStreamSender();
 
+  virtual std::string GetName();
+
   /// Must be called before other API calls, and before the codegen'd IR module is
   /// compiled (i.e. in an ExecNode's Prepare() function).
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
 
   /// Must be called before Send() or Close(), and after the codegen'd IR module is
   /// compiled (i.e. in an ExecNode's Open() function).
@@ -81,7 +83,7 @@ class DataStreamSender : public DataSink {
   /// Blocks until all rows in batch are placed in their appropriate outgoing
   /// buffers (ie, blocks if there are still in-flight rpcs from the last
   /// Send() call).
-  virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
+  virtual Status Send(RuntimeState* state, RowBatch* batch);
 
   /// Shutdown all existing channels to destination hosts. Further FlushFinal() calls are
   /// illegal after calling Close().
@@ -96,8 +98,6 @@ class DataStreamSender : public DataSink {
   /// broadcast to multiple receivers, they are counted once per receiver.
   int64_t GetNumDataBytesSent() const;
 
-  virtual RuntimeProfile* profile() { return profile_; }
-
  private:
   class Channel;
 
@@ -105,7 +105,6 @@ class DataStreamSender : public DataSink {
   int sender_id_;
   RuntimeState* state_;
   ObjectPool* pool_;
-  const RowDescriptor& row_desc_;
   bool broadcast_;  // if true, send all rows on all channels
   bool random_; // if true, round-robins row batches among channels
   int current_channel_idx_; // index of current channel to send to if random_ == true
@@ -126,14 +125,12 @@ class DataStreamSender : public DataSink {
   std::vector<ExprContext*> partition_expr_ctxs_;  // compute per-row partition values
   std::vector<Channel*> channels_;
 
-  RuntimeProfile* profile_; // Allocated from pool_
   RuntimeProfile::Counter* serialize_batch_timer_;
   /// The concurrent wall time spent sending data over the network.
   RuntimeProfile::ConcurrentTimerCounter* thrift_transmit_timer_;
   RuntimeProfile::Counter* bytes_sent_counter_;
   RuntimeProfile::Counter* uncompressed_bytes_counter_;
   RuntimeProfile::Counter* total_sent_rows_counter_;
-  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   /// Throughput per time spent in TransmitData
   RuntimeProfile::Counter* network_throughput_;

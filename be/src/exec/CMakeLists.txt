@@ -64,6 +64,7 @@ add_library(Exec
   hbase-scan-node.cc
   hbase-table-scanner.cc
   incr-stats-util.cc
+  nested-loop-join-builder.cc
   nested-loop-join-node.cc
   parquet-column-readers.cc
   parquet-metadata-utils.cc
