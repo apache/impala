@@ -196,6 +196,7 @@ public class AggregationNode extends PlanNode {
         cardinality_ = Math.min(getChild(0).getCardinality(), cardinality_);
       }
     }
+    cardinality_ = capAtLimit(cardinality_);
     LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality_));
   }
 

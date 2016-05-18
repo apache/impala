@@ -398,6 +398,7 @@ public class PlannerTestBase {
         testPlan(testCase, Section.PLAN, queryCtx, errorLog, actualOutput);
     checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
+    checkLimitCardinality(query, singleNodeExecRequest, errorLog);
     // Test distributed plan.
     testPlan(testCase, Section.DISTRIBUTEDPLAN, queryCtx, errorLog, actualOutput);
     // test parallel plans
@@ -547,6 +548,38 @@ public class PlannerTestBase {
       }
 
       // TODO: check that scan range locations are identical in both cases
+    }
+  }
+
+  /** Checks that limits are accounted for in the cardinality of plan nodes.
+   */
+  private void checkLimitCardinality(
+      String query, TExecRequest execRequest, StringBuilder errorLog) {
+    if (execRequest == null) return;
+    if (!execRequest.isSetQuery_exec_request()
+        || execRequest.query_exec_request == null) {
+      return;
+    }
+    for (TPlanFragment planFragment : execRequest.query_exec_request.fragments) {
+      if (!planFragment.isSetPlan() || planFragment.plan == null) continue;
+      for (TPlanNode node : planFragment.plan.nodes) {
+        if (!node.isSetLimit() || -1 == node.limit) continue;
+        if (!node.isSetEstimated_stats() || node.estimated_stats == null) continue;
+        if (node.limit < node.estimated_stats.cardinality) {
+          StringBuilder limitCardinalityError = new StringBuilder();
+          limitCardinalityError.append("Query: " + query + "\n");
+          limitCardinalityError.append(
+              "Expected cardinality estimate less than or equal to LIMIT: "
+              + node.limit + "\n");
+          limitCardinalityError.append(
+              "Actual cardinality estimate: "
+              + node.estimated_stats.cardinality + "\n");
+          limitCardinalityError.append(
+              "In node id "
+              + node.node_id + "\n");
+          errorLog.append(limitCardinalityError.toString());
+        }
+      }
     }
   }
 

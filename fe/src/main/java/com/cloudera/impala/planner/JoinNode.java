@@ -445,7 +445,7 @@ public abstract class JoinNode extends PlanNode {
         break;
       }
     }
-
+    cardinality_ = capAtLimit(cardinality_);
     Preconditions.checkState(hasValidStats());
     LOG.debug("stats Join: cardinality=" + Long.toString(cardinality_));
   }

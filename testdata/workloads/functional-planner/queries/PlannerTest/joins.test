@@ -2199,3 +2199,114 @@ and t3.a != t2.g
 00:SCAN HDFS [functional.nulltable t1]
    partitions=1/1 files=1 size=18B
 ====
+# IMPALA-3450: limits on join nodes are reflected in cardinality estimates. The test for
+# this is embedded in PlannerTestBase.java and is not visible in these plans, as they only
+# have explain_level=1
+select a.c_custkey as c_custkey from tpch.customer a, tpch.customer b limit 1
+---- PLAN
+02:NESTED LOOP JOIN [CROSS JOIN]
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+====
+select a.c_custkey as c_custkey from tpch.customer a left semi join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  runtime filters: RF000 <- b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF000 -> a.c_custkey
+====
+select b.c_custkey as c_custkey from tpch.customer a right semi join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  runtime filters: RF000 <- b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF000 -> a.c_custkey
+====
+select a.c_custkey as c_custkey from tpch.customer a left outer join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+====
+select b.c_custkey as c_custkey from tpch.customer a right outer join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  runtime filters: RF000 <- b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF000 -> a.c_custkey
+====
+select a.c_custkey as c_custkey from tpch.customer a full outer join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+====
+select a.c_custkey as c_custkey from tpch.customer a left anti join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+====
+select b.c_custkey as c_custkey from tpch.customer a right anti join tpch.customer b
+using (c_custkey) limit 1
+---- PLAN
+02:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: a.c_custkey = b.c_custkey
+|  limit: 1
+|
+|--01:SCAN HDFS [tpch.customer b]
+|     partitions=1/1 files=1 size=23.08MB
+|
+00:SCAN HDFS [tpch.customer a]
+   partitions=1/1 files=1 size=23.08MB
+====

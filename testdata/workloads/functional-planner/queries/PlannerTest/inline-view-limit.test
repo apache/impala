@@ -613,3 +613,16 @@ where a.id > 10 and b.id > 20
    predicates: id != 1, functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20
    runtime filters: RF000 -> id
 ====
+# IMPALA-3450: limits on select nodes are reflected in cardinality estimates. The test for
+# this is embedded in PlannerTestBase.java and is not visible in these plans, as they only
+# have explain_level=1
+select * from (select * from functional.alltypes limit 100) v where id < 10 limit 1
+---- PLAN
+01:SELECT
+|  predicates: functional.alltypes.id < 10
+|  limit: 1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   limit: 100
+====

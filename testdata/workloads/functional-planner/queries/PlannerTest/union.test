@@ -2661,3 +2661,31 @@ select 1000, 2000
 06:SCAN HDFS [functional.alltypes]
    partitions=1/24 files=1 size=18.12KB
 ====
+# IMPALA-3450: limits on union nodes are reflected in cardinality estimates. The test for
+# this is embedded in PlannerTestBase.java and is not visible in these plans, as they only
+# have explain_level=1
+select * from tpch.lineitem UNION ALL (select * from tpch.lineitem) LIMIT 1
+---- PLAN
+00:UNION
+|  limit: 1
+|
+|--02:SCAN HDFS [tpch.lineitem]
+|     partitions=1/1 files=1 size=718.94MB
+|
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+====
+select l_orderkey from tpch.lineitem UNION DISTINCT (select l_orderkey from tpch.lineitem) LIMIT 1
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  group by: l_orderkey
+|  limit: 1
+|
+00:UNION
+|
+|--02:SCAN HDFS [tpch.lineitem]
+|     partitions=1/1 files=1 size=718.94MB
+|
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+====

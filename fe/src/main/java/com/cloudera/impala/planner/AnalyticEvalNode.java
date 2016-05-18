@@ -126,6 +126,7 @@ public class AnalyticEvalNode extends PlanNode {
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = getChild(0).cardinality_;
+    cardinality_ = capAtLimit(cardinality_);
   }
 
   @Override

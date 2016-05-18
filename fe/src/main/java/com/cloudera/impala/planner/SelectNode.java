@@ -63,6 +63,7 @@ public class SelectNode extends PlanNode {
           Math.round(((double) getChild(0).cardinality_) * computeSelectivity());
       Preconditions.checkState(cardinality_ >= 0);
     }
+    cardinality_ = capAtLimit(cardinality_);
     LOG.debug("stats Select: cardinality=" + Long.toString(cardinality_));
   }
 
