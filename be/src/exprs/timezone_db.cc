@@ -14,11 +14,14 @@
 
 #include "timestamp-functions.h"
 
+#include "gutil/strings/substitute.h"
+
 #include "common/names.h"
 
 using boost::local_time::tz_database;
 using boost::local_time::time_zone_ptr;
 using boost::local_time::posix_time_zone;
+using strings::Substitute;
 
 namespace impala {
 
@@ -653,5 +656,34 @@ const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD
 \"WET\",\"WET\",\"Western European Time\",\"WEST\",\"Western European Summer Time\",\"+00:00:00\",\"+01:00:00\",\"-1;0;3\",\"+01:00:00\",\"-1;0;10\",\"+01:00:00\"\n\
 \"Zulu\",\"UTC\",\"Coordinated Universal Time\",\"\",\"\",\"+00:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"";
 
+Status TimezoneDatabase::Initialize() {
+  // Create a temporary file and write the timezone information.  The boost
+  // interface only loads this format from a file.  We don't want to raise
+  // an error here since this is done when the backend is created and this
+  // information might not actually get used by any queries.
+  char filestr[] = "/tmp/impala.tzdb.XXXXXXX";
+  FILE* file;
+  int fd;
+  if ((fd = mkstemp(filestr)) == -1) {
+    return Status(Substitute("Could not create temporary timezone file: $0", filestr));
+  }
+  if ((file = fopen(filestr, "w")) == NULL) {
+    unlink(filestr);
+    close(fd);
+    return Status(Substitute("Could not open temporary timezone file: $0", filestr));
+  }
+  if (fputs(TIMEZONE_DATABASE_STR, file) == EOF) {
+    unlink(filestr);
+    close(fd);
+    fclose(file);
+    return Status(Substitute("Could not load temporary timezone file: $0", filestr));
+  }
+  fclose(file);
+  tz_database_.load_from_file(string(filestr));
+  tz_region_list_ = tz_database_.region_list();
+  unlink(filestr);
+  close(fd);
+  return Status::OK();
+}
 
 }

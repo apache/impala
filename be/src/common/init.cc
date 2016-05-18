@@ -21,6 +21,7 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
+#include "exprs/timestamp-functions.h"
 #include "gutil/atomicops.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -187,6 +188,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   AtomicOps_x86CPUFeaturesInit();
   impala::InitThreading();
   impala::TimestampParser::Init();
+  ABORT_IF_ERROR(impala::TimezoneDatabase::Initialize());
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize maintenance_thread after InitGoogleLoggingSafe and InitThreading.

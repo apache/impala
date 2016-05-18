@@ -17,8 +17,8 @@
 #define IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 
 #include <boost/date_time/local_time/local_time.hpp>
-#include <string>
 
+#include "common/status.h"
 #include "udf/udf.h"
 
 using namespace impala_udf;
@@ -186,8 +186,8 @@ class TimestampFunctions {
 /// Functions to load and access the timestamp database.
 class TimezoneDatabase {
  public:
-   TimezoneDatabase();
-   ~TimezoneDatabase();
+  /// Set up the static timezone database.
+  static Status Initialize();
 
   /// Converts the name of a timezone to a boost timezone object.
   /// Some countries change their timezones, the tiemstamp is required to correctly

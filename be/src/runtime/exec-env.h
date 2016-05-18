@@ -21,7 +21,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "common/status.h"
-#include "exprs/timestamp-functions.h"
 #include "runtime/backend-client.h"
 #include "util/cgroups-mgr.h"
 #include "util/hdfs-bulk-ops.h" // For declaration of HdfsOpThreadPool
@@ -154,7 +153,6 @@ class ExecEnv {
 
  private:
   static ExecEnv* exec_env_;
-  TimezoneDatabase tz_database_;
   bool is_fe_tests_;
 
   /// Address of the Impala backend server instance
