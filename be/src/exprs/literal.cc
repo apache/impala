@@ -260,49 +260,49 @@ Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
   }
 }
 
-BooleanVal Literal::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal Literal::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
   return BooleanVal(value_.bool_val);
 }
 
-TinyIntVal Literal::GetTinyIntVal(ExprContext* context, TupleRow* row) {
+TinyIntVal Literal::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TINYINT) << type_;
   return TinyIntVal(value_.tinyint_val);
 }
 
-SmallIntVal Literal::GetSmallIntVal(ExprContext* context, TupleRow* row) {
+SmallIntVal Literal::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_SMALLINT) << type_;
   return SmallIntVal(value_.smallint_val);
 }
 
-IntVal Literal::GetIntVal(ExprContext* context, TupleRow* row) {
+IntVal Literal::GetIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_INT) << type_;
   return IntVal(value_.int_val);
 }
 
-BigIntVal Literal::GetBigIntVal(ExprContext* context, TupleRow* row) {
+BigIntVal Literal::GetBigIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BIGINT) << type_;
   return BigIntVal(value_.bigint_val);
 }
 
-FloatVal Literal::GetFloatVal(ExprContext* context, TupleRow* row) {
+FloatVal Literal::GetFloatVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_FLOAT) << type_;
   return FloatVal(value_.float_val);
 }
 
-DoubleVal Literal::GetDoubleVal(ExprContext* context, TupleRow* row) {
+DoubleVal Literal::GetDoubleVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DOUBLE) << type_;
   return DoubleVal(value_.double_val);
 }
 
-StringVal Literal::GetStringVal(ExprContext* context, TupleRow* row) {
+StringVal Literal::GetStringVal(ExprContext* context, const TupleRow* row) {
   DCHECK(type_.IsStringType()) << type_;
   StringVal result;
   value_.string_val.ToStringVal(&result);
   return result;
 }
 
-DecimalVal Literal::GetDecimalVal(ExprContext* context, TupleRow* row) {
+DecimalVal Literal::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DECIMAL) << type_;
   switch (type().GetByteSize()) {
     case 4:

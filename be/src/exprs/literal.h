@@ -44,15 +44,15 @@ class Literal: public Expr {
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
 
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, TupleRow*);
-  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext*, TupleRow*);
-  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext*, TupleRow*);
-  virtual impala_udf::IntVal GetIntVal(ExprContext*, TupleRow*);
-  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext*, TupleRow*);
-  virtual impala_udf::FloatVal GetFloatVal(ExprContext*, TupleRow*);
-  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext*, TupleRow*);
-  virtual impala_udf::StringVal GetStringVal(ExprContext*, TupleRow*);
-  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, TupleRow*);
+  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::IntVal GetIntVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::FloatVal GetFloatVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::StringVal GetStringVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, const TupleRow*);
 
  protected:
   friend class Expr;

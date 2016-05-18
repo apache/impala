@@ -27,57 +27,57 @@ using namespace llvm;
 
 namespace impala {
 
-BooleanVal NullLiteral::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal NullLiteral::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
   return BooleanVal::null();
 }
 
-TinyIntVal NullLiteral::GetTinyIntVal(ExprContext* context, TupleRow* row) {
+TinyIntVal NullLiteral::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TINYINT) << type_;
   return TinyIntVal::null();
 }
 
-SmallIntVal NullLiteral::GetSmallIntVal(ExprContext* context, TupleRow* row) {
+SmallIntVal NullLiteral::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_SMALLINT) << type_;
   return SmallIntVal::null();
 }
 
-IntVal NullLiteral::GetIntVal(ExprContext* context, TupleRow* row) {
+IntVal NullLiteral::GetIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_INT) << type_;
   return IntVal::null();
 }
 
-BigIntVal NullLiteral::GetBigIntVal(ExprContext* context, TupleRow* row) {
+BigIntVal NullLiteral::GetBigIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BIGINT) << type_;
   return BigIntVal::null();
 }
 
-FloatVal NullLiteral::GetFloatVal(ExprContext* context, TupleRow* row) {
+FloatVal NullLiteral::GetFloatVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_FLOAT) << type_;
   return FloatVal::null();
 }
 
-DoubleVal NullLiteral::GetDoubleVal(ExprContext* context, TupleRow* row) {
+DoubleVal NullLiteral::GetDoubleVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DOUBLE) << type_;
   return DoubleVal::null();
 }
 
-StringVal NullLiteral::GetStringVal(ExprContext* context, TupleRow* row) {
+StringVal NullLiteral::GetStringVal(ExprContext* context, const TupleRow* row) {
   DCHECK(type_.IsStringType()) << type_;
   return StringVal::null();
 }
 
-TimestampVal NullLiteral::GetTimestampVal(ExprContext* context, TupleRow* row) {
+TimestampVal NullLiteral::GetTimestampVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP) << type_;
   return TimestampVal::null();
 }
 
-DecimalVal NullLiteral::GetDecimalVal(ExprContext* context, TupleRow* row) {
+DecimalVal NullLiteral::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DECIMAL) << type_;
   return DecimalVal::null();
 }
 
-CollectionVal NullLiteral::GetCollectionVal(ExprContext* context, TupleRow* row) {
+CollectionVal NullLiteral::GetCollectionVal(ExprContext* context, const TupleRow* row) {
   DCHECK(type_.IsCollectionType());
   return CollectionVal::null();
 }

@@ -258,7 +258,7 @@ void DataStreamRecvr::SenderQueue::Close() {
 
 Status DataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
   DCHECK(is_merging_);
-  vector<SortedRunMerger::RunBatchSupplier> input_batch_suppliers;
+  vector<SortedRunMerger::RunBatchSupplierFn> input_batch_suppliers;
   input_batch_suppliers.reserve(sender_queues_.size());
 
   // Create the merger that will a single stream of sorted rows.

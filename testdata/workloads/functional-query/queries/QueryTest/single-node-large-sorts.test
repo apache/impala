@@ -30,4 +30,5 @@ STRING,STRING,STRING
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
 ---- RUNTIME_PROFILE
 row_regex: .* TotalMergesPerformed: [^0] .*
+row_regex: .* SpilledRuns: [^0] .*
 ====

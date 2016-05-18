@@ -4107,3 +4107,37 @@ select 1 from functional.alltypestiny order by 1
 ---- TYPES
 TINYINT
 ====
+---- QUERY
+# Test for corner case: fixed length data but only NULL var-len slots.
+select id, cast(NULL as string) str
+from functional.alltypestiny
+order by 2, 1
+---- RESULTS
+0,'NULL'
+1,'NULL'
+2,'NULL'
+3,'NULL'
+4,'NULL'
+5,'NULL'
+6,'NULL'
+7,'NULL'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Test for corner case: fixed length data but only zero-length var len data.
+select id, ''
+from functional.alltypestiny
+order by 2 desc, 1 desc
+---- RESULTS
+7,''
+6,''
+5,''
+4,''
+3,''
+2,''
+1,''
+0,''
+---- TYPES
+INT, STRING
+====

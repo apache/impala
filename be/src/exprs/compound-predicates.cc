@@ -25,7 +25,7 @@ using namespace impala;
 using namespace llvm;
 
 // (<> && false) is false, (true && NULL) is NULL
-BooleanVal AndPredicate::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal AndPredicate::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(children_.size(), 2);
   BooleanVal val1 = children_[0]->GetBooleanVal(context, row);
   if (!val1.is_null && !val1.val) return BooleanVal(false); // short-circuit
@@ -44,7 +44,7 @@ string AndPredicate::DebugString() const {
 }
 
 // (<> || true) is true, (false || NULL) is NULL
-BooleanVal OrPredicate::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal OrPredicate::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(children_.size(), 2);
   BooleanVal val1 = children_[0]->GetBooleanVal(context, row);
   if (!val1.is_null && val1.val) return BooleanVal(true); // short-circuit

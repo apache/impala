@@ -40,7 +40,7 @@ class TupleIsNullPredicate: public Predicate {
 
   virtual bool IsConstant() const { return false; }
 
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow* row);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
 
  private:
   /// Tuple ids to check for NULL. May contain ids of nullable and non-nullable tuples.

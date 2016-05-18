@@ -20,7 +20,7 @@ using namespace impala;
 using namespace impala_udf;
 
 #define IS_NULL_COMPUTE_FUNCTION(type) \
-  type IsNullExpr::Get##type(ExprContext* context, TupleRow* row) { \
+  type IsNullExpr::Get##type(ExprContext* context, const TupleRow* row) { \
     DCHECK_EQ(children_.size(), 2); \
     type val = children_[0]->Get##type(context, row); \
     if (!val.is_null) return val; /* short-circuit */ \
@@ -39,7 +39,7 @@ IS_NULL_COMPUTE_FUNCTION(TimestampVal);
 IS_NULL_COMPUTE_FUNCTION(DecimalVal);
 
 #define NULL_IF_COMPUTE_FUNCTION(AnyValType) \
-  AnyValType NullIfExpr::Get##AnyValType(ExprContext* ctx, TupleRow* row) { \
+  AnyValType NullIfExpr::Get##AnyValType(ExprContext* ctx, const TupleRow* row) { \
     DCHECK_EQ(children_.size(), 2); \
     AnyValType lhs_val = children_[0]->Get##AnyValType(ctx, row); \
     /* Short-circuit in case lhs_val is NULL. Can never be equal to RHS. */ \
@@ -112,7 +112,7 @@ ZERO_IF_NULL_COMPUTE_FUNCTION(DoubleVal);
 ZERO_IF_NULL_COMPUTE_FUNCTION(DecimalVal);
 
 #define IF_COMPUTE_FUNCTION(type) \
-  type IfExpr::Get##type(ExprContext* context, TupleRow* row) { \
+  type IfExpr::Get##type(ExprContext* context, const TupleRow* row) { \
     DCHECK_EQ(children_.size(), 3); \
     BooleanVal cond = children_[0]->GetBooleanVal(context, row); \
     if (cond.is_null || !cond.val) { \
@@ -133,7 +133,7 @@ IF_COMPUTE_FUNCTION(TimestampVal);
 IF_COMPUTE_FUNCTION(DecimalVal);
 
 #define COALESCE_COMPUTE_FUNCTION(type) \
-  type CoalesceExpr::Get##type(ExprContext* context, TupleRow* row) { \
+  type CoalesceExpr::Get##type(ExprContext* context, const TupleRow* row) { \
     DCHECK_GE(children_.size(), 1); \
     for (int i = 0; i < children_.size(); ++i) {                  \
       type val = children_[i]->Get##type(context, row); \

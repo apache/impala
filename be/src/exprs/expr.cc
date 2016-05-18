@@ -678,47 +678,47 @@ Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, Function** fn) {
 }
 
 // At least one of these should always be subclassed.
-BooleanVal Expr::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal Expr::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return BooleanVal::null();
 }
-TinyIntVal Expr::GetTinyIntVal(ExprContext* context, TupleRow* row) {
+TinyIntVal Expr::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return TinyIntVal::null();
 }
-SmallIntVal Expr::GetSmallIntVal(ExprContext* context, TupleRow* row) {
+SmallIntVal Expr::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return SmallIntVal::null();
 }
-IntVal Expr::GetIntVal(ExprContext* context, TupleRow* row) {
+IntVal Expr::GetIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return IntVal::null();
 }
-BigIntVal Expr::GetBigIntVal(ExprContext* context, TupleRow* row) {
+BigIntVal Expr::GetBigIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return BigIntVal::null();
 }
-FloatVal Expr::GetFloatVal(ExprContext* context, TupleRow* row) {
+FloatVal Expr::GetFloatVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return FloatVal::null();
 }
-DoubleVal Expr::GetDoubleVal(ExprContext* context, TupleRow* row) {
+DoubleVal Expr::GetDoubleVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return DoubleVal::null();
 }
-StringVal Expr::GetStringVal(ExprContext* context, TupleRow* row) {
+StringVal Expr::GetStringVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return StringVal::null();
 }
-CollectionVal Expr::GetCollectionVal(ExprContext* context, TupleRow* row) {
+CollectionVal Expr::GetCollectionVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return CollectionVal::null();
 }
-TimestampVal Expr::GetTimestampVal(ExprContext* context, TupleRow* row) {
+TimestampVal Expr::GetTimestampVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return TimestampVal::null();
 }
-DecimalVal Expr::GetDecimalVal(ExprContext* context, TupleRow* row) {
+DecimalVal Expr::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   DCHECK(false) << DebugString();
   return DecimalVal::null();
 }

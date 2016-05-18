@@ -66,7 +66,7 @@ class ExprContext {
 
   /// Calls the appropriate Get*Val() function on this context's expr tree and stores the
   /// result in result_.
-  void* GetValue(TupleRow* row);
+  void* GetValue(const TupleRow* row);
 
   /// Convenience function: extract value into col_val and sets the
   /// appropriate __isset flag.
@@ -83,13 +83,13 @@ class ExprContext {
   /// TYPE_TIMESTAMP: stringVal
   /// Note: timestamp is converted to string via RawValue::PrintValue because HiveServer2
   /// requires timestamp in a string format.
-  void GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val);
+  void GetValue(const TupleRow* row, bool as_ascii, TColumnValue* col_val);
 
   /// Convenience functions: print value into 'str' or 'stream'.  NULL turns into "NULL".
-  void PrintValue(TupleRow* row, std::string* str);
+  void PrintValue(const TupleRow* row, std::string* str);
   void PrintValue(void* value, std::string* str);
   void PrintValue(void* value, std::stringstream* stream);
-  void PrintValue(TupleRow* row, std::stringstream* stream);
+  void PrintValue(const TupleRow* row, std::stringstream* stream);
 
   /// Creates a FunctionContext, and returns the index that's passed to fn_context() to
   /// retrieve the created context. Exprs that need a FunctionContext should call this in
@@ -172,7 +172,7 @@ class ExprContext {
 
   /// Calls the appropriate Get*Val() function on 'e' and stores the result in result_.
   /// This is used by Exprs to call GetValue() on a child expr, rather than root_.
-  void* GetValue(Expr* e, TupleRow* row);
+  void* GetValue(Expr* e, const TupleRow* row);
 };
 
 }

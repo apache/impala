@@ -29,16 +29,16 @@ class CaseExpr: public Expr {
  public:
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
 
-  virtual BooleanVal GetBooleanVal(ExprContext* ctx, TupleRow* row);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* ctx, TupleRow* row);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* ctx, TupleRow* row);
-  virtual IntVal GetIntVal(ExprContext* ctx, TupleRow* row);
-  virtual BigIntVal GetBigIntVal(ExprContext* ctx, TupleRow* row);
-  virtual FloatVal GetFloatVal(ExprContext* ctx, TupleRow* row);
-  virtual DoubleVal GetDoubleVal(ExprContext* ctx, TupleRow* row);
-  virtual StringVal GetStringVal(ExprContext* ctx, TupleRow* row);
-  virtual TimestampVal GetTimestampVal(ExprContext* ctx, TupleRow* row);
-  virtual DecimalVal GetDecimalVal(ExprContext* ctx, TupleRow* row);
+  virtual BooleanVal GetBooleanVal(ExprContext* ctx, const TupleRow* row);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* ctx, const TupleRow* row);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* ctx, const TupleRow* row);
+  virtual IntVal GetIntVal(ExprContext* ctx, const TupleRow* row);
+  virtual BigIntVal GetBigIntVal(ExprContext* ctx, const TupleRow* row);
+  virtual FloatVal GetFloatVal(ExprContext* ctx, const TupleRow* row);
+  virtual DoubleVal GetDoubleVal(ExprContext* ctx, const TupleRow* row);
+  virtual StringVal GetStringVal(ExprContext* ctx, const TupleRow* row);
+  virtual TimestampVal GetTimestampVal(ExprContext* ctx, const TupleRow* row);
+  virtual DecimalVal GetDecimalVal(ExprContext* ctx, const TupleRow* row);
 
  protected:
   friend class Expr;
@@ -65,7 +65,7 @@ class CaseExpr: public Expr {
 
   /// Populates 'dst' with the result of calling the appropriate Get*Val() function on the
   /// specified child expr.
-  void GetChildVal(int child_idx, ExprContext* ctx, TupleRow* row, AnyVal* dst);
+  void GetChildVal(int child_idx, ExprContext* ctx, const TupleRow* row, AnyVal* dst);
 
   /// Return true iff *v1 == *v2. v1 and v2 should both be of the specified type.
   bool AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* v2);

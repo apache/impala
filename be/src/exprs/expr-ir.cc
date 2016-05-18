@@ -39,33 +39,33 @@ using namespace impala_udf;
 // Static wrappers around Get*Val() functions. We'd like to be able to call these from
 // directly from native code as well as from generated IR functions.
 
-BooleanVal Expr::GetBooleanVal(Expr* expr, ExprContext* context, TupleRow* row) {
+BooleanVal Expr::GetBooleanVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetBooleanVal(context, row);
 }
-TinyIntVal Expr::GetTinyIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+TinyIntVal Expr::GetTinyIntVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetTinyIntVal(context, row);
 }
-SmallIntVal Expr::GetSmallIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+SmallIntVal Expr::GetSmallIntVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetSmallIntVal(context, row);
 }
-IntVal Expr::GetIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+IntVal Expr::GetIntVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetIntVal(context, row);
 }
-BigIntVal Expr::GetBigIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+BigIntVal Expr::GetBigIntVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetBigIntVal(context, row);
 }
-FloatVal Expr::GetFloatVal(Expr* expr, ExprContext* context, TupleRow* row) {
+FloatVal Expr::GetFloatVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetFloatVal(context, row);
 }
-DoubleVal Expr::GetDoubleVal(Expr* expr, ExprContext* context, TupleRow* row) {
+DoubleVal Expr::GetDoubleVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetDoubleVal(context, row);
 }
-StringVal Expr::GetStringVal(Expr* expr, ExprContext* context, TupleRow* row) {
+StringVal Expr::GetStringVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetStringVal(context, row);
 }
-TimestampVal Expr::GetTimestampVal(Expr* expr, ExprContext* context, TupleRow* row) {
+TimestampVal Expr::GetTimestampVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetTimestampVal(context, row);
 }
-DecimalVal Expr::GetDecimalVal(Expr* expr, ExprContext* context, TupleRow* row) {
+DecimalVal Expr::GetDecimalVal(Expr* expr, ExprContext* context, const TupleRow* row) {
   return expr->GetDecimalVal(context, row);
 }

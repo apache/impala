@@ -290,7 +290,7 @@ Status CaseExpr::GetCodegendComputeFn(RuntimeState* state, Function** fn) {
   return Status::OK();
 }
 
-void CaseExpr::GetChildVal(int child_idx, ExprContext* ctx, TupleRow* row, AnyVal* dst) {
+void CaseExpr::GetChildVal(int child_idx, ExprContext* ctx, const TupleRow* row, AnyVal* dst) {
   switch (children()[child_idx]->type().type) {
     case TYPE_BOOLEAN:
       *reinterpret_cast<BooleanVal*>(dst) = children()[child_idx]->GetBooleanVal(ctx, row);
@@ -368,7 +368,7 @@ bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* 
 }
 
 #define CASE_COMPUTE_FN(THEN_TYPE) \
-  THEN_TYPE CaseExpr::Get##THEN_TYPE(ExprContext* ctx, TupleRow* row) { \
+  THEN_TYPE CaseExpr::Get##THEN_TYPE(ExprContext* ctx, const TupleRow* row) { \
     FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_); \
     CaseExprState* state = reinterpret_cast<CaseExprState*>( \
         fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL)); \

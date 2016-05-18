@@ -26,7 +26,7 @@ IsNotEmptyPredicate::IsNotEmptyPredicate(const TExprNode& node)
   : Predicate(node) {
 }
 
-BooleanVal IsNotEmptyPredicate::GetBooleanVal(ExprContext* ctx, TupleRow* row) {
+BooleanVal IsNotEmptyPredicate::GetBooleanVal(ExprContext* ctx, const TupleRow* row) {
   CollectionVal coll = children_[0]->GetCollectionVal(ctx, row);
   if (coll.is_null) return BooleanVal::null();
   return BooleanVal(coll.num_tuples != 0);

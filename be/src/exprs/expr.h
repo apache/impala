@@ -19,7 +19,7 @@
 /// and produces a scalar result. This function evaluates the necessary child arguments by
 /// calling their compute functions, then performs whatever computation is necessary on
 /// the arguments (e.g. calling a UDF with the child arguments). All compute functions
-/// take arguments (ExprContext*, TupleRow*). The return type is a *Val (i.e. a subclass
+/// take arguments (ExprContext*, const TupleRow*). The return type is a *Val (i.e. a subclass
 /// of AnyVal). Thus, a single expression will implement a compute function for every
 /// return type it supports.
 ///
@@ -130,17 +130,17 @@ class Expr {
   /// the functions for the return type(s) it supports. For example, a boolean function
   /// will only implement GetBooleanVal(). Some Exprs, like Literal, have many possible
   /// return types and will implement multiple Get*Val() functions.
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow*);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow*);
-  virtual IntVal GetIntVal(ExprContext* context, TupleRow*);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, TupleRow*);
-  virtual FloatVal GetFloatVal(ExprContext* context, TupleRow*);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow*);
-  virtual StringVal GetStringVal(ExprContext* context, TupleRow*);
-  virtual CollectionVal GetCollectionVal(ExprContext* context, TupleRow*);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow*);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow*);
+  virtual IntVal GetIntVal(ExprContext* context, const TupleRow*);
+  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow*);
+  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow*);
+  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow*);
+  virtual StringVal GetStringVal(ExprContext* context, const TupleRow*);
+  virtual CollectionVal GetCollectionVal(ExprContext* context, const TupleRow*);
+  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow*);
+  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow*);
 
   /// Get the number of digits after the decimal that should be displayed for this value.
   /// Returns -1 if no scale has been specified (currently the scale is only set for
@@ -227,7 +227,7 @@ class Expr {
       std::vector<int>* offsets, int* var_result_begin);
 
   /// Returns an llvm::Function* with signature:
-  /// <subclass of AnyVal> ComputeFn(ExprContext* context, TupleRow* row)
+  /// <subclass of AnyVal> ComputeFn(ExprContext* context, const TupleRow* row)
   //
   /// The function should evaluate this expr over 'row' and return the result as the
   /// appropriate type of AnyVal.
@@ -431,16 +431,16 @@ class Expr {
   /// These are used to call Get*Val() functions from generated functions, since I don't
   /// know how to call virtual functions directly. GetStaticGetValWrapper() returns the
   /// IR function of the appropriate wrapper function.
-  static BooleanVal GetBooleanVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static TinyIntVal GetTinyIntVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static SmallIntVal GetSmallIntVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static IntVal GetIntVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static BigIntVal GetBigIntVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static FloatVal GetFloatVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static DoubleVal GetDoubleVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static StringVal GetStringVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static TimestampVal GetTimestampVal(Expr* expr, ExprContext* context, TupleRow* row);
-  static DecimalVal GetDecimalVal(Expr* expr, ExprContext* context, TupleRow* row);
+  static BooleanVal GetBooleanVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static TinyIntVal GetTinyIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static SmallIntVal GetSmallIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static IntVal GetIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static BigIntVal GetBigIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static FloatVal GetFloatVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static DoubleVal GetDoubleVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static StringVal GetStringVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static TimestampVal GetTimestampVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static DecimalVal GetDecimalVal(Expr* expr, ExprContext* context, const TupleRow* row);
 
 
   // Helper function for GetConstantInt() and InlineConstants(): return the constant value

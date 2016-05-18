@@ -68,16 +68,16 @@ class HiveUdfCall : public Expr {
   virtual void Close(RuntimeState* state, ExprContext* context,
       FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
 
-  virtual BooleanVal GetBooleanVal(ExprContext* ctx, TupleRow*);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* ctx, TupleRow*);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* ctx, TupleRow*);
-  virtual IntVal GetIntVal(ExprContext* ctx, TupleRow*);
-  virtual BigIntVal GetBigIntVal(ExprContext* ctx, TupleRow*);
-  virtual FloatVal GetFloatVal(ExprContext* ctx, TupleRow*);
-  virtual DoubleVal GetDoubleVal(ExprContext* ctx, TupleRow*);
-  virtual StringVal GetStringVal(ExprContext* ctx, TupleRow*);
-  virtual TimestampVal GetTimestampVal(ExprContext* ctx, TupleRow*);
-  virtual DecimalVal GetDecimalVal(ExprContext* ctx, TupleRow*);
+  virtual BooleanVal GetBooleanVal(ExprContext* ctx, const TupleRow*);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* ctx, const TupleRow*);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* ctx, const TupleRow*);
+  virtual IntVal GetIntVal(ExprContext* ctx, const TupleRow*);
+  virtual BigIntVal GetBigIntVal(ExprContext* ctx, const TupleRow*);
+  virtual FloatVal GetFloatVal(ExprContext* ctx, const TupleRow*);
+  virtual DoubleVal GetDoubleVal(ExprContext* ctx, const TupleRow*);
+  virtual StringVal GetStringVal(ExprContext* ctx, const TupleRow*);
+  virtual TimestampVal GetTimestampVal(ExprContext* ctx, const TupleRow*);
+  virtual DecimalVal GetDecimalVal(ExprContext* ctx, const TupleRow*);
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
 
@@ -92,7 +92,7 @@ class HiveUdfCall : public Expr {
   /// Evalutes the UDF over row. Returns the result as an AnyVal. This function
   /// never returns NULL but rather an AnyVal object with is_null set to true on
   /// error.
-  AnyVal* Evaluate(ExprContext* ctx, TupleRow* row);
+  AnyVal* Evaluate(ExprContext* ctx, const TupleRow* row);
 
   /// The path on the local FS to the UDF's jar
   std::string local_location_;

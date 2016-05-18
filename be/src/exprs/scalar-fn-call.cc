@@ -527,7 +527,7 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
   }
 }
 
-void ScalarFnCall::EvaluateChildren(ExprContext* context, TupleRow* row,
+void ScalarFnCall::EvaluateChildren(ExprContext* context, const TupleRow* row,
                                     vector<AnyVal*>* input_vals) {
   DCHECK_EQ(input_vals->size(), NumFixedArgs());
   FunctionContext* fn_ctx = context->fn_context(fn_context_index_);
@@ -546,7 +546,7 @@ void ScalarFnCall::EvaluateChildren(ExprContext* context, TupleRow* row,
 }
 
 template<typename RETURN_TYPE>
-RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, TupleRow* row) {
+RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, const TupleRow* row) {
   DCHECK(scalar_fn_ != NULL) << DebugString();
   FunctionContext* fn_ctx = context->fn_context(fn_context_index_);
   vector<AnyVal*>* input_vals = fn_ctx->impl()->staging_input_vals();
@@ -675,19 +675,19 @@ RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, TupleRow* row) {
   return RETURN_TYPE::null();
 }
 
-typedef BooleanVal (*BooleanWrapper)(ExprContext*, TupleRow*);
-typedef TinyIntVal (*TinyIntWrapper)(ExprContext*, TupleRow*);
-typedef SmallIntVal (*SmallIntWrapper)(ExprContext*, TupleRow*);
-typedef IntVal (*IntWrapper)(ExprContext*, TupleRow*);
-typedef BigIntVal (*BigIntWrapper)(ExprContext*, TupleRow*);
-typedef FloatVal (*FloatWrapper)(ExprContext*, TupleRow*);
-typedef DoubleVal (*DoubleWrapper)(ExprContext*, TupleRow*);
-typedef StringVal (*StringWrapper)(ExprContext*, TupleRow*);
-typedef TimestampVal (*TimestampWrapper)(ExprContext*, TupleRow*);
-typedef DecimalVal (*DecimalWrapper)(ExprContext*, TupleRow*);
+typedef BooleanVal (*BooleanWrapper)(ExprContext*, const TupleRow*);
+typedef TinyIntVal (*TinyIntWrapper)(ExprContext*, const TupleRow*);
+typedef SmallIntVal (*SmallIntWrapper)(ExprContext*, const TupleRow*);
+typedef IntVal (*IntWrapper)(ExprContext*, const TupleRow*);
+typedef BigIntVal (*BigIntWrapper)(ExprContext*, const TupleRow*);
+typedef FloatVal (*FloatWrapper)(ExprContext*, const TupleRow*);
+typedef DoubleVal (*DoubleWrapper)(ExprContext*, const TupleRow*);
+typedef StringVal (*StringWrapper)(ExprContext*, const TupleRow*);
+typedef TimestampVal (*TimestampWrapper)(ExprContext*, const TupleRow*);
+typedef DecimalVal (*DecimalWrapper)(ExprContext*, const TupleRow*);
 
 // TODO: macroify this?
-BooleanVal ScalarFnCall::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal ScalarFnCall::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<BooleanVal>(context, row);
@@ -695,7 +695,7 @@ BooleanVal ScalarFnCall::GetBooleanVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-TinyIntVal ScalarFnCall::GetTinyIntVal(ExprContext* context, TupleRow* row) {
+TinyIntVal ScalarFnCall::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TINYINT);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<TinyIntVal>(context, row);
@@ -703,7 +703,7 @@ TinyIntVal ScalarFnCall::GetTinyIntVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-SmallIntVal ScalarFnCall::GetSmallIntVal(ExprContext* context, TupleRow* row) {
+SmallIntVal ScalarFnCall::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_SMALLINT);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<SmallIntVal>(context, row);
@@ -711,7 +711,7 @@ SmallIntVal ScalarFnCall::GetSmallIntVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-IntVal ScalarFnCall::GetIntVal(ExprContext* context, TupleRow* row) {
+IntVal ScalarFnCall::GetIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_INT);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<IntVal>(context, row);
@@ -719,7 +719,7 @@ IntVal ScalarFnCall::GetIntVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-BigIntVal ScalarFnCall::GetBigIntVal(ExprContext* context, TupleRow* row) {
+BigIntVal ScalarFnCall::GetBigIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BIGINT);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<BigIntVal>(context, row);
@@ -727,7 +727,7 @@ BigIntVal ScalarFnCall::GetBigIntVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-FloatVal ScalarFnCall::GetFloatVal(ExprContext* context, TupleRow* row) {
+FloatVal ScalarFnCall::GetFloatVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_FLOAT);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<FloatVal>(context, row);
@@ -735,7 +735,7 @@ FloatVal ScalarFnCall::GetFloatVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-DoubleVal ScalarFnCall::GetDoubleVal(ExprContext* context, TupleRow* row) {
+DoubleVal ScalarFnCall::GetDoubleVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DOUBLE);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<DoubleVal>(context, row);
@@ -743,7 +743,7 @@ DoubleVal ScalarFnCall::GetDoubleVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-StringVal ScalarFnCall::GetStringVal(ExprContext* context, TupleRow* row) {
+StringVal ScalarFnCall::GetStringVal(ExprContext* context, const TupleRow* row) {
   DCHECK(type_.IsStringType());
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<StringVal>(context, row);
@@ -751,7 +751,7 @@ StringVal ScalarFnCall::GetStringVal(ExprContext* context, TupleRow* row) {
   return fn(context, row);
 }
 
-TimestampVal ScalarFnCall::GetTimestampVal(ExprContext* context, TupleRow* row) {
+TimestampVal ScalarFnCall::GetTimestampVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<TimestampVal>(context, row);
@@ -759,7 +759,7 @@ TimestampVal ScalarFnCall::GetTimestampVal(ExprContext* context, TupleRow* row) 
   return fn(context, row);
 }
 
-DecimalVal ScalarFnCall::GetDecimalVal(ExprContext* context, TupleRow* row) {
+DecimalVal ScalarFnCall::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<DecimalVal>(context, row);

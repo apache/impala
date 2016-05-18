@@ -42,17 +42,17 @@ class SlotRef : public Expr {
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
 
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::IntVal GetIntVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::FloatVal GetFloatVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::StringVal GetStringVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
-  virtual impala_udf::CollectionVal GetCollectionVal(ExprContext* context, TupleRow*);
+  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::IntVal GetIntVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::FloatVal GetFloatVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::StringVal GetStringVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext* context, const TupleRow*);
+  virtual impala_udf::CollectionVal GetCollectionVal(ExprContext* context, const TupleRow*);
 
  protected:
   int tuple_idx_;  // within row

@@ -24,7 +24,7 @@
 
 namespace impala {
 
-BooleanVal TupleIsNullPredicate::GetBooleanVal(ExprContext* ctx, TupleRow* row) {
+BooleanVal TupleIsNullPredicate::GetBooleanVal(ExprContext* ctx, const TupleRow* row) {
   int count = 0;
   for (int i = 0; i < tuple_idxs_.size(); ++i) {
     count += row->GetTuple(tuple_idxs_[i]) == NULL;

@@ -28,7 +28,7 @@ namespace impala {
 /// together make up a row.
 class TupleRow {
  public:
-  Tuple* ALWAYS_INLINE GetTuple(int tuple_idx) {
+  Tuple* ALWAYS_INLINE GetTuple(int tuple_idx) const {
     return tuples_[tuple_idx];
   }
 
@@ -37,7 +37,7 @@ class TupleRow {
   }
 
   /// Create a deep copy of this TupleRow.  DeepCopy will allocate from  the pool.
-  TupleRow* DeepCopy(const std::vector<TupleDescriptor*>& descs, MemPool* pool) {
+  TupleRow* DeepCopy(const std::vector<TupleDescriptor*>& descs, MemPool* pool) const {
     int size = descs.size() * sizeof(Tuple*);
     TupleRow* result = reinterpret_cast<TupleRow*>(pool->Allocate(size));
     DeepCopy(result, descs, pool, false);
@@ -51,7 +51,7 @@ class TupleRow {
   /// tuple memory and that memory will be reused.  Otherwise, new tuples will be allocated
   /// and stored in 'dst'.
   void DeepCopy(TupleRow* dst, const std::vector<TupleDescriptor*>& descs, MemPool* pool,
-      bool reuse_tuple_mem) {
+      bool reuse_tuple_mem) const {
     for (int i = 0; i < descs.size(); ++i) {
       if (this->GetTuple(i) != NULL) {
         if (reuse_tuple_mem && dst->GetTuple(i) != NULL) {

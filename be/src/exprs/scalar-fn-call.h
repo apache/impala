@@ -63,16 +63,16 @@ class ScalarFnCall: public Expr {
 
   virtual bool IsConstant() const;
 
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow*);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow*);
-  virtual IntVal GetIntVal(ExprContext* context, TupleRow*);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, TupleRow*);
-  virtual FloatVal GetFloatVal(ExprContext* context, TupleRow*);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow*);
-  virtual StringVal GetStringVal(ExprContext* context, TupleRow*);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow*);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow*);
+  virtual IntVal GetIntVal(ExprContext* context, const TupleRow*);
+  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow*);
+  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow*);
+  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow*);
+  virtual StringVal GetStringVal(ExprContext* context, const TupleRow*);
+  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow*);
+  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow*);
 
  private:
   /// If this function has var args, children()[vararg_start_idx_] is the first vararg
@@ -81,7 +81,7 @@ class ScalarFnCall: public Expr {
   int vararg_start_idx_;
 
   /// Function pointer to the JIT'd function produced by GetCodegendComputeFn().
-  /// Has signature *Val (ExprContext*, TupleRow*), and calls the scalar
+  /// Has signature *Val (ExprContext*, const TupleRow*), and calls the scalar
   /// function with signature like *Val (FunctionContext*, const *Val& arg1, ...)
   void* scalar_fn_wrapper_;
 
@@ -113,12 +113,12 @@ class ScalarFnCall: public Expr {
 
   /// Evaluates the children exprs and stores the results in input_vals. Used in the
   /// interpreted path.
-  void EvaluateChildren(ExprContext* context, TupleRow* row,
+  void EvaluateChildren(ExprContext* context, const TupleRow* row,
                         std::vector<impala_udf::AnyVal*>* input_vals);
 
   /// Function to call scalar_fn_. Used in the interpreted path.
   template<typename RETURN_TYPE>
-  RETURN_TYPE InterpretEval(ExprContext* context, TupleRow* row);
+  RETURN_TYPE InterpretEval(ExprContext* context, const TupleRow* row);
 };
 
 }

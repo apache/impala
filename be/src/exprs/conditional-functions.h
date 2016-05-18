@@ -59,16 +59,16 @@ class ConditionalFunctions {
 
 class IsNullExpr : public Expr {
  public:
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow* row);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow* row);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow* row);
-  virtual IntVal GetIntVal(ExprContext* context, TupleRow* row);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, TupleRow* row);
-  virtual FloatVal GetFloatVal(ExprContext* context, TupleRow* row);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow* row);
-  virtual StringVal GetStringVal(ExprContext* context, TupleRow* row);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow* row);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow* row);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow* row);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow* row);
+  virtual IntVal GetIntVal(ExprContext* context, const TupleRow* row);
+  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow* row);
+  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow* row);
+  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow* row);
+  virtual StringVal GetStringVal(ExprContext* context, const TupleRow* row);
+  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
+  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
   virtual std::string DebugString() const { return Expr::DebugString("IsNullExpr"); }
@@ -80,16 +80,16 @@ class IsNullExpr : public Expr {
 
 class NullIfExpr : public Expr {
  public:
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow* row);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow* row);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow* row);
-  virtual IntVal GetIntVal(ExprContext* context, TupleRow* row);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, TupleRow* row);
-  virtual FloatVal GetFloatVal(ExprContext* context, TupleRow* row);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow* row);
-  virtual StringVal GetStringVal(ExprContext* context, TupleRow* row);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow* row);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow* row);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow* row);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow* row);
+  virtual IntVal GetIntVal(ExprContext* context, const TupleRow* row);
+  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow* row);
+  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow* row);
+  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow* row);
+  virtual StringVal GetStringVal(ExprContext* context, const TupleRow* row);
+  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
+  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
   virtual std::string DebugString() const { return Expr::DebugString("NullIfExpr"); }
@@ -101,16 +101,16 @@ class NullIfExpr : public Expr {
 
 class IfExpr : public Expr {
  public:
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow* row);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow* row);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow* row);
-  virtual IntVal GetIntVal(ExprContext* context, TupleRow* row);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, TupleRow* row);
-  virtual FloatVal GetFloatVal(ExprContext* context, TupleRow* row);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow* row);
-  virtual StringVal GetStringVal(ExprContext* context, TupleRow* row);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow* row);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow* row);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow* row);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow* row);
+  virtual IntVal GetIntVal(ExprContext* context, const TupleRow* row);
+  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow* row);
+  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow* row);
+  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow* row);
+  virtual StringVal GetStringVal(ExprContext* context, const TupleRow* row);
+  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
+  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
   virtual std::string DebugString() const { return Expr::DebugString("IfExpr"); }
@@ -122,16 +122,16 @@ class IfExpr : public Expr {
 
 class CoalesceExpr : public Expr {
  public:
-  virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow* row);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow* row);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow* row);
-  virtual IntVal GetIntVal(ExprContext* context, TupleRow* row);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, TupleRow* row);
-  virtual FloatVal GetFloatVal(ExprContext* context, TupleRow* row);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow* row);
-  virtual StringVal GetStringVal(ExprContext* context, TupleRow* row);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow* row);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow* row);
+  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow* row);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow* row);
+  virtual IntVal GetIntVal(ExprContext* context, const TupleRow* row);
+  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow* row);
+  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow* row);
+  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow* row);
+  virtual StringVal GetStringVal(ExprContext* context, const TupleRow* row);
+  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
+  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
   virtual std::string DebugString() const { return Expr::DebugString("CoalesceExpr"); }
 

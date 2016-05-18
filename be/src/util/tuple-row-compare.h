@@ -16,6 +16,7 @@
 #ifndef IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 #define IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 
+#include "common/compiler-util.h"
 #include "exec/sort-exec-exprs.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
@@ -91,7 +92,7 @@ class TupleRowComparator {
   /// than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_) must
   /// have been prepared and opened before calling this, i.e. 'sort_key_exprs' in the
   /// constructor must have been opened.
-  int Compare(TupleRow* lhs, TupleRow* rhs) const {
+  int Compare(const TupleRow* lhs, const TupleRow* rhs) const {
     DCHECK_EQ(key_expr_ctxs_lhs_.size(), key_expr_ctxs_rhs_.size());
     for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
       void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
@@ -114,14 +115,16 @@ class TupleRowComparator {
   /// Returns true if lhs is strictly less than rhs.
   /// All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
   /// before calling this.
-  bool Less(TupleRow* lhs, TupleRow* rhs) const {
+  /// Force inlining because it tends not to be always inlined at callsites, even in
+  /// hot loops.
+  bool ALWAYS_INLINE Less(const TupleRow* lhs, const TupleRow* rhs) const {
     int result = codegend_compare_fn_ == NULL ? Compare(lhs, rhs) :
         (*codegend_compare_fn_)(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
     if (result < 0) return true;
     return false;
   }
 
-  bool Less(Tuple* lhs, Tuple* rhs) const {
+  bool ALWAYS_INLINE Less(const Tuple* lhs, const Tuple* rhs) const {
     TupleRow* lhs_row = reinterpret_cast<TupleRow*>(&lhs);
     TupleRow* rhs_row = reinterpret_cast<TupleRow*>(&rhs);
     return Less(lhs_row, rhs_row);
@@ -150,8 +153,8 @@ class TupleRowComparator {
   /// TupleRowComparator is copied before the module is compiled, the copy will still have
   /// its function pointer set to NULL. The function pointer is allocated from the runtime
   /// state's object pool so that its lifetime will be >= that of any copies.
-  typedef int (*CompareFn)(ExprContext* const*, ExprContext* const*, TupleRow*,
-      TupleRow*);
+  typedef int (*CompareFn)(ExprContext* const*, ExprContext* const*, const TupleRow*,
+      const TupleRow*);
   CompareFn* codegend_compare_fn_;
 };
 
@@ -200,7 +203,7 @@ struct RowEqualityChecker {
     }
   }
 
-  bool Equal(TupleRow* x, TupleRow* y) {
+  bool Equal(const TupleRow* x, const TupleRow* y) {
     for (int i = 0; i < tuple_checkers_.size(); ++i) {
       Tuple* x_tuple = x->GetTuple(i);
       Tuple* y_tuple = y->GetTuple(i);

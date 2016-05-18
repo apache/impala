@@ -147,7 +147,7 @@ void ExprContext::FreeLocalAllocations(const vector<FunctionContext*>& fn_ctxs) 
   }
 }
 
-void ExprContext::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
+void ExprContext::GetValue(const TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
   if (as_ascii) {
     RawValue::PrintValue(value, root_->type_, root_->output_scale_, &col_val->string_val);
@@ -221,11 +221,11 @@ void ExprContext::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) 
   }
 }
 
-void* ExprContext::GetValue(TupleRow* row) {
+void* ExprContext::GetValue(const TupleRow* row) {
   return GetValue(root_, row);
 }
 
-void* ExprContext::GetValue(Expr* e, TupleRow* row) {
+void* ExprContext::GetValue(Expr* e, const TupleRow* row) {
   switch (e->type_.type) {
     case TYPE_BOOLEAN: {
       impala_udf::BooleanVal v = e->GetBooleanVal(this, row);
@@ -326,7 +326,7 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
   }
 }
 
-void ExprContext::PrintValue(TupleRow* row, string* str) {
+void ExprContext::PrintValue(const TupleRow* row, string* str) {
   RawValue::PrintValue(GetValue(row), root_->type(), root_->output_scale_, str);
 }
 void ExprContext::PrintValue(void* value, string* str) {
@@ -335,7 +335,7 @@ void ExprContext::PrintValue(void* value, string* str) {
 void ExprContext::PrintValue(void* value, stringstream* stream) {
   RawValue::PrintValue(value, root_->type(), root_->output_scale_, stream);
 }
-void ExprContext::PrintValue(TupleRow* row, stringstream* stream) {
+void ExprContext::PrintValue(const TupleRow* row, stringstream* stream) {
   RawValue::PrintValue(GetValue(row), root_->type(), root_->output_scale_, stream);
 }
 

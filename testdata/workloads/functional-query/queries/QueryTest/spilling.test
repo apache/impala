@@ -427,6 +427,7 @@ limit 20;
 CHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
+row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
@@ -465,6 +466,7 @@ limit 20;
 CHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
+row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
@@ -504,6 +506,7 @@ limit 20;
 CHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
+row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
@@ -543,6 +546,7 @@ limit 20;
 STRING
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
+row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
@@ -582,5 +586,6 @@ limit 20;
 STRING
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
+row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====

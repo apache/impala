@@ -77,7 +77,6 @@ class TestQueryFullSort(ImpalaTestSuite):
     assert(result[0] == sorted(result[0]))
 
   def test_sort_union(self, vector):
-    pytest.xfail(reason="IMPALA-1346")
     query = """select o_orderdate, o_custkey, o_comment from (select * from orders union
     select * from orders union all select * from orders) as i
     order by o_orderdate limit 100000"""
@@ -116,3 +115,27 @@ class TestQueryFullSort(ImpalaTestSuite):
       query, exec_option, table_format=table_format).data)
     numeric_results = [int(val) for val in result[0]]
     assert(numeric_results == sorted(numeric_results))
+
+  def test_spill_empty_strings(self, vector):
+    """Test corner case of spilling sort with only empty strings. Spilling with var len
+    slots typically means the sort must reorder blocks and convert pointers, but this case
+    has to be handled differently because there are no var len blocks to point into."""
+
+    query = """
+    select empty, l_orderkey, l_partkey, l_suppkey,
+        l_linenumber, l_quantity, l_extendedprice, l_discount, l_tax
+    from (select substr(l_comment, 1000, 0) empty, * from lineitem) t
+    order by empty, l_orderkey, l_partkey, l_suppkey, l_linenumber
+    limit 100000
+    """
+
+    exec_option = vector.get_value('exec_option')
+    exec_option['disable_outermost_topn'] = 1
+    exec_option['max_block_mgr_memory'] = "256m"
+    exec_option['num_nodes'] = "1"
+    table_format = vector.get_value('table_format')
+
+    result = transpose_results(self.execute_query(
+      query, exec_option, table_format=table_format).data)
+    assert(result[0] == sorted(result[0]))
+

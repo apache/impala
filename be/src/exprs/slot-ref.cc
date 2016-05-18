@@ -368,56 +368,56 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   return Status::OK();
 }
 
-BooleanVal SlotRef::GetBooleanVal(ExprContext* context, TupleRow* row) {
+BooleanVal SlotRef::GetBooleanVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return BooleanVal::null();
   return BooleanVal(*reinterpret_cast<bool*>(t->GetSlot(slot_offset_)));
 }
 
-TinyIntVal SlotRef::GetTinyIntVal(ExprContext* context, TupleRow* row) {
+TinyIntVal SlotRef::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TINYINT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return TinyIntVal::null();
   return TinyIntVal(*reinterpret_cast<int8_t*>(t->GetSlot(slot_offset_)));
 }
 
-SmallIntVal SlotRef::GetSmallIntVal(ExprContext* context, TupleRow* row) {
+SmallIntVal SlotRef::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_SMALLINT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return SmallIntVal::null();
   return SmallIntVal(*reinterpret_cast<int16_t*>(t->GetSlot(slot_offset_)));
 }
 
-IntVal SlotRef::GetIntVal(ExprContext* context, TupleRow* row) {
+IntVal SlotRef::GetIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_INT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return IntVal::null();
   return IntVal(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
 }
 
-BigIntVal SlotRef::GetBigIntVal(ExprContext* context, TupleRow* row) {
+BigIntVal SlotRef::GetBigIntVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_BIGINT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return BigIntVal::null();
   return BigIntVal(*reinterpret_cast<int64_t*>(t->GetSlot(slot_offset_)));
 }
 
-FloatVal SlotRef::GetFloatVal(ExprContext* context, TupleRow* row) {
+FloatVal SlotRef::GetFloatVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_FLOAT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return FloatVal::null();
   return FloatVal(*reinterpret_cast<float*>(t->GetSlot(slot_offset_)));
 }
 
-DoubleVal SlotRef::GetDoubleVal(ExprContext* context, TupleRow* row) {
+DoubleVal SlotRef::GetDoubleVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DOUBLE);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return DoubleVal::null();
   return DoubleVal(*reinterpret_cast<double*>(t->GetSlot(slot_offset_)));
 }
 
-StringVal SlotRef::GetStringVal(ExprContext* context, TupleRow* row) {
+StringVal SlotRef::GetStringVal(ExprContext* context, const TupleRow* row) {
   DCHECK(type_.IsStringType());
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
@@ -433,7 +433,7 @@ StringVal SlotRef::GetStringVal(ExprContext* context, TupleRow* row) {
   return result;
 }
 
-TimestampVal SlotRef::GetTimestampVal(ExprContext* context, TupleRow* row) {
+TimestampVal SlotRef::GetTimestampVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return TimestampVal::null();
@@ -443,7 +443,7 @@ TimestampVal SlotRef::GetTimestampVal(ExprContext* context, TupleRow* row) {
   return result;
 }
 
-DecimalVal SlotRef::GetDecimalVal(ExprContext* context, TupleRow* row) {
+DecimalVal SlotRef::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return DecimalVal::null();
@@ -460,7 +460,7 @@ DecimalVal SlotRef::GetDecimalVal(ExprContext* context, TupleRow* row) {
   }
 }
 
-CollectionVal SlotRef::GetCollectionVal(ExprContext* context, TupleRow* row) {
+CollectionVal SlotRef::GetCollectionVal(ExprContext* context, const TupleRow* row) {
   DCHECK(type_.IsCollectionType());
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return CollectionVal::null();

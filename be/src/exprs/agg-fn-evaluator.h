@@ -129,11 +129,11 @@ class AggFnEvaluator {
   /// Updates the intermediate state dst based on adding the input src row. This can be
   /// called either to drive the UDA's Update() or Merge() function depending on
   /// is_merge_. That is, from the caller, it doesn't mater.
-  void Add(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
+  void Add(FunctionContext* agg_fn_ctx, const TupleRow* src, Tuple* dst);
 
   /// Updates the intermediate state dst to remove the input src row, i.e. undoes
   /// Add(src, dst). Only used internally for analytic fn builtins.
-  void Remove(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
+  void Remove(FunctionContext* agg_fn_ctx, const TupleRow* src, Tuple* dst);
 
   /// Explicitly does a merge, even if this evalutor is not marked as merging.
   /// This is used by the partitioned agg node when it needs to merge spill results.
@@ -153,9 +153,9 @@ class AggFnEvaluator {
   static void Init(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
   static void Add(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
+      const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst);
   static void Remove(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
+      const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst);
   static void Serialize(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
   static void GetValue(const std::vector<AggFnEvaluator*>& evaluators,
@@ -222,7 +222,7 @@ class AggFnEvaluator {
   /// taking TupleRow to the UDA signature taking AnvVals by populating the staging
   /// AnyVals.
   /// fn must be a function that implement's the UDA Update() signature.
-  void Update(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst, void* fn);
+  void Update(FunctionContext* agg_fn_ctx, const TupleRow* row, Tuple* dst, void* fn);
 
   /// Sets up the arguments to call fn. This converts from the agg-expr signature,
   /// taking TupleRow to the UDA signature taking AnvVals. Writes the serialize/finalize
@@ -237,12 +237,12 @@ class AggFnEvaluator {
 };
 
 inline void AggFnEvaluator::Add(
-    FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+    FunctionContext* agg_fn_ctx, const TupleRow* row, Tuple* dst) {
   agg_fn_ctx->impl()->IncrementNumUpdates();
   Update(agg_fn_ctx, row, dst, is_merge() ? merge_fn_ : update_fn_);
 }
 inline void AggFnEvaluator::Remove(
-    FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+    FunctionContext* agg_fn_ctx, const TupleRow* row, Tuple* dst) {
   agg_fn_ctx->impl()->IncrementNumRemoves();
   Update(agg_fn_ctx, row, dst, remove_fn_);
 }
@@ -267,14 +267,14 @@ inline void AggFnEvaluator::Init(const std::vector<AggFnEvaluator*>& evaluators,
   }
 }
 inline void AggFnEvaluator::Add(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
+      const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Add(fn_ctxs[i], src, dst);
   }
 }
 inline void AggFnEvaluator::Remove(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
+      const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Remove(fn_ctxs[i], src, dst);

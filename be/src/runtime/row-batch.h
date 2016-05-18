@@ -198,6 +198,7 @@ class RowBatch {
   int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_io_buffers() const { return io_buffers_.size(); }
+  int num_blocks() const { return blocks_.size(); }
   int num_tuple_streams() const { return tuple_streams_.size(); }
 
   /// Resets the row batch, returning all resources it has accumulated.

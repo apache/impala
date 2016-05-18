@@ -339,7 +339,7 @@ static void SetAnyVal(const SlotDescriptor* desc, Tuple* tuple, AnyVal* dst) {
 }
 
 void AggFnEvaluator::Update(
-    FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst, void* fn) {
+    FunctionContext* agg_fn_ctx, const TupleRow* row, Tuple* dst, void* fn) {
   if (fn == NULL) return;
 
   SetAnyVal(intermediate_slot_desc_, dst, staging_intermediate_val_);
