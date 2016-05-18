@@ -1201,7 +1201,7 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
 Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_user) {
   if (user.empty()) {
     return Status("Unable to delegate using empty proxy username.");
-  } else if (user.empty()) {
+  } else if (do_as_user.empty()) {
     return Status("Unable to delegate using empty doAs username.");
   }
 

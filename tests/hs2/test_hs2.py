@@ -55,6 +55,22 @@ class TestHS2(HS2TestSuite):
     assert open_session_resp.serverProtocolVersion == \
         TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
+  def test_open_session_empty_user(self):
+    """Test that we get the expected errors back if either impala.doas.user is set but
+    username is empty, or username is set but impala.doas.user is empty."""
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req.username = ""
+    open_session_req.configuration = {"impala.doas.user": "do_as_user"}
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(open_session_resp, TCLIService.TStatusCode.ERROR_STATUS, \
+        "Unable to delegate using empty proxy username.")
+
+    open_session_req.username = "user"
+    open_session_req.configuration = {"impala.doas.user": ""}
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(open_session_resp, TCLIService.TStatusCode.ERROR_STATUS, \
+        "Unable to delegate using empty doAs username.")
+
   def test_close_session(self):
     """Test that an open session can be closed"""
     open_session_req = TCLIService.TOpenSessionReq()
