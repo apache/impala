@@ -393,11 +393,10 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ---- QUERY
 # Test sort with inlined char column materialized by exprs.
 # Set low memory limit to force spilling.
+# IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
 set num_nodes=0;
 set max_block_mgr_memory=4m;
-# IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
-# When IMPALA-3332 is fixed, can reenable this memory limit.
-#set mem_limit=200m;
+set mem_limit=200m;
 set disable_outermost_topn=1;
 select cast(l_comment as char(50))
 from lineitem
@@ -513,8 +512,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 set num_nodes=0;
 set max_block_mgr_memory=4m;
 # IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
-# When IMPALA-3332 is fixed, can reenable this memory limit.
-#set mem_limit=200m;
+set mem_limit=200m;
 set disable_outermost_topn=1;
 select cast(l_comment as varchar(50))
 from lineitem

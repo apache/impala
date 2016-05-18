@@ -102,7 +102,7 @@ class TupleRowComparator {
       if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
 
       int result = RawValue::Compare(lhs_value, rhs_value,
-                                     key_expr_ctxs_lhs_[i]->root()->type());
+          key_expr_ctxs_lhs_[i]->root()->type());
       if (!is_asc_[i]) result = -result;
       if (result != 0) return result;
       // Otherwise, try the next Expr
@@ -126,7 +126,17 @@ class TupleRowComparator {
     return Less(lhs_row, rhs_row);
   }
 
+  /// Free any local allocations made during expression evaluations in Compare().
+  void FreeLocalAllocations() const {
+    ExprContext::FreeLocalAllocations(key_expr_ctxs_lhs_);
+    ExprContext::FreeLocalAllocations(key_expr_ctxs_rhs_);
+  }
+
  private:
+  /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
+  /// TODO: have codegen'd users inline this instead of calling through the () operator
+  Status CodegenCompare(RuntimeState* state, llvm::Function** fn);
+
   const std::vector<ExprContext*>& key_expr_ctxs_lhs_;
   const std::vector<ExprContext*>& key_expr_ctxs_rhs_;
   std::vector<bool> is_asc_;
@@ -142,10 +152,6 @@ class TupleRowComparator {
   typedef int (*CompareFn)(ExprContext* const*, ExprContext* const*, TupleRow*,
       TupleRow*);
   CompareFn* codegend_compare_fn_;
-
-  /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
-  /// TODO: have codegen'd users inline this instead of calling through the () operator
-  Status CodegenCompare(RuntimeState* state, llvm::Function** fn);
 };
 
 /// Compares the equality of two Tuples, going slot by slot.

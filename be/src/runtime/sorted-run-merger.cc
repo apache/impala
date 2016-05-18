@@ -180,6 +180,8 @@ Status SortedRunMerger::GetNext(RowBatch* output_batch, bool* eos) {
 
     Heapify(0);
   }
+  // Free local allocations made by comparator_.Less();
+  comparator_.FreeLocalAllocations();
 
   *eos = min_heap_.empty();
   return Status::OK();
