@@ -57,9 +57,11 @@ if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
 else
   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} --cluster_size=3"
 fi
+# Indicates whether code coverage reports should be generated.
+: ${CODE_COVERAGE:=false}
 
 # parse command line options
-while getopts "e:n:" OPTION
+while getopts "e:n:c" OPTION
 do
   case "$OPTION" in
     e)
@@ -68,10 +70,14 @@ do
     n)
       NUM_TEST_ITERATIONS=$OPTARG
       ;;
+    c)
+      CODE_COVERAGE=true
+      ;;
     ?)
       echo "run-all-tests.sh [-e <exploration_strategy>] [-n <num_iters>]"
       echo "[-e] The exploration strategy to use. Default exploration is 'core'."
       echo "[-n] The number of times to run the tests. Default is 1."
+      echo "[-c] Set this option to generate code coverage reports."
       exit 1;
       ;;
   esac
@@ -127,7 +133,10 @@ do
     MVN_ARGS=""
     if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
       # When running against S3, only run the S3 frontend tests.
-      MVN_ARGS="-Dtest=S3*"
+      MVN_ARGS="-Dtest=S3* "
+    fi
+    if [[ "$CODE_COVERAGE" == true ]]; then
+      MVN_ARGS+="-DcodeCoverage"
     fi
     if ! ${IMPALA_HOME}/bin/mvn-quiet.sh -fae test ${MVN_ARGS}; then
       TEST_RET_CODE=1

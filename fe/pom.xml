@@ -27,6 +27,9 @@
 
   <properties>
     <surefire.reports.dir>${env.IMPALA_LOGS_DIR}/fe_tests</surefire.reports.dir>
+    <jacoco.skip>true</jacoco.skip>
+    <jacoco.data.file>${env.IMPALA_FE_TEST_COVERAGE_DIR}/jacoco.exec</jacoco.data.file>
+    <jacoco.report.dir>${env.IMPALA_FE_TEST_COVERAGE_DIR}</jacoco.report.dir>
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
     <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
     <beeswax_port>21000</beeswax_port>
@@ -356,6 +359,7 @@
       <artifactId>javax.json</artifactId>
       <version>1.0.2</version>
     </dependency>
+
   </dependencies>
 
   <reporting>
@@ -460,7 +464,7 @@
         <configuration>
           <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
-          <argLine>-Djava.library.path=${java.library.path}:${backend.library.path}</argLine>
+          <argLine>-Djava.library.path=${java.library.path}:${backend.library.path} ${surefireJacocoArg}</argLine>
           <systemProperties>
             <property>
               <name>testExecutionMode</name>
@@ -475,19 +479,6 @@
               <value>${use_external_impalad}</value>
             </property>
           </systemProperties>
-        </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>com.atlassian.maven.plugins</groupId>
-        <artifactId>maven-clover2-plugin</artifactId>
-        <version>3.0.2</version>
-        <configuration>
-          <generateHtml>true</generateHtml>
-          <generateXml>true</generateXml>
-          <excludes>
-            <exclude>**/jdbc/*.java</exclude>
-          </excludes>
         </configuration>
       </plugin>
 
@@ -541,6 +532,41 @@
             </systemProperties>
           </configuration>
       </plugin>
+
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.7.6.201602180812</version>
+        <executions>
+          <execution>
+            <id>prepare-jacoco-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <configuration>
+              <destFile>${jacoco.data.file}</destFile>
+              <propertyName>surefireJacocoArg</propertyName>
+            </configuration>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <phase>test</phase>
+            <goals>
+             <goal>report</goal>
+            </goals>
+            <configuration>
+              <dataFile>${jacoco.data.file}</dataFile>
+              <outputDirectory>${jacoco.report.dir}</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+        <configuration>
+          <!-- Code coverage reporting is disabled by default and must be enabled
+               when running tests like this: mvn test -DcodeCoverage -->
+          <skip>${jacoco.skip}</skip>
+        </configuration>
+      </plugin>
+
   </plugins>
     <pluginManagement>
       <plugins>
@@ -712,6 +738,23 @@
       </activation>
       <properties>
         <thrift.executable>${env.THRIFT_HOME}/bin/thrift</thrift.executable>
+      </properties>
+    </profile>
+    <profile>
+      <id>jacoco-code-coverage</id>
+      <activation>
+        <property>
+          <!-- Enable code coverage if the 'codeCoverage' property is set.
+               Usage: mvn test -DcodeCoverage -->
+          <name>codeCoverage</name>
+        </property>
+      </activation>
+      <properties>
+        <jacoco.skip>false</jacoco.skip>
+        <!-- Due to Jacoco's runtime instrumentation some tests could fail.
+             In order to still produce a coverage report it is recommended
+             to ignore test failures. -->
+        <maven.test.failure.ignore>true</maven.test.failure.ignore>
       </properties>
     </profile>
   </profiles>

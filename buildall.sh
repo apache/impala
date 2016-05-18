@@ -46,7 +46,7 @@ IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
 METASTORE_SNAPSHOT_FILE=
 MAKE_IMPALA_ARGS=""
-BUILD_COVERAGE=0
+CODE_COVERAGE=0
 BUILD_ASAN=0
 BUILD_FE_ONLY=0
 MAKE_CMD=make
@@ -98,7 +98,7 @@ do
       CMAKE_BUILD_TYPE=Release
       ;;
     -codecoverage)
-      BUILD_COVERAGE=1
+      CODE_COVERAGE=1
       ;;
     -asan)
       BUILD_ASAN=1
@@ -207,7 +207,7 @@ Examples of common tasks:
 done
 
 # Adjust CMAKE_BUILD_TYPE for ASAN and code coverage, if necessary.
-if [[ ${BUILD_COVERAGE} -eq 1 ]]; then
+if [[ ${CODE_COVERAGE} -eq 1 ]]; then
   case ${CMAKE_BUILD_TYPE} in
     Debug)
       CMAKE_BUILD_TYPE=CODE_COVERAGE_DEBUG
@@ -218,7 +218,7 @@ if [[ ${BUILD_COVERAGE} -eq 1 ]]; then
   esac
 fi
 if [[ ${BUILD_ASAN} -eq 1 ]]; then
-  # The next check also catches cases where BUILD_COVERAGE=1, which is not supported
+  # The next check also catches cases where CODE_COVERAGE=1, which is not supported
   # together with BUILD_ASAN=1.
   if [[ "${CMAKE_BUILD_TYPE}" != "Debug" ]]; then
     echo "Address sanitizer build not supported for build type: ${CMAKE_BUILD_TYPE}"
@@ -399,7 +399,11 @@ if [ $TESTDATA_ACTION -eq 1 ]; then
 fi
 
 if [ $TESTS_ACTION -eq 1 ]; then
-  ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY
+  if [ $CODE_COVERAGE -eq 0 ]; then
+    ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY
+  else
+    ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY -c
+  fi
 fi
 
 # Generate list of files for Cscope to index
