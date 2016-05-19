@@ -241,12 +241,10 @@ class RuntimeState {
   /// This value and tracker are only used for error reporting.
   /// If 'msg' is non-NULL, it will be appended to query_status_ in addition to the
   /// generic "Memory limit exceeded" error.
+  /// Note that this interface is deprecated and MemTracker::LimitExceeded() should be
+  /// used and the error status should be returned.
   Status SetMemLimitExceeded(MemTracker* tracker = NULL,
       int64_t failed_allocation_size = 0, const ErrorMsg* msg = NULL);
-
-  Status SetMemLimitExceeded(const ErrorMsg& msg) {
-    return SetMemLimitExceeded(NULL, 0, &msg);
-  }
 
   /// Returns a non-OK status if query execution should stop (e.g., the query was cancelled
   /// or a mem limit was exceeded). Exec nodes should check this periodically so execution

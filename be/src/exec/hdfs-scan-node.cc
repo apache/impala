@@ -266,7 +266,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   Status status = GetNextInternal(state, row_batch, eos);
-  if (status.IsMemLimitExceeded()) state->SetMemLimitExceeded();
   if (!status.ok() || *eos) StopAndFinalizeCounters();
   return status;
 }
@@ -1093,7 +1092,6 @@ void HdfsScanNode::ScannerThread() {
         status_ = status;
       }
 
-      if (status.IsMemLimitExceeded()) runtime_state_->SetMemLimitExceeded();
       SetDone();
       break;
     }
@@ -1198,7 +1196,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   }
 
   status = scanner->ProcessSplit();
-  if (VLOG_QUERY_IS_ON && !status.ok()) {
+  if (VLOG_QUERY_IS_ON && !status.ok() && !status.IsCancelled()) {
     // This thread hit an error, record it and bail
     stringstream ss;
     ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "

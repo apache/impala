@@ -30,7 +30,7 @@ RIGHT OUTER JOIN lineitem l ON o.o_orderkey =  if(l.l_orderkey % 2 = 0, 0, l.l_o
 ORDER BY l_receiptdate, l_orderkey, l_shipdate
 limit 10
 ---- CATCH
-Memory limit exceeded
+Repartitioning did not reduce the size of a spilled partition
 ====
 ---- QUERY
 # Regression test for IMPALA-2612. The following query will cause CastToChar

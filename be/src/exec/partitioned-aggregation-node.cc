@@ -392,12 +392,10 @@ Status PartitionedAggregationNode::CopyStringData(const SlotDescriptor* slot_des
         tuple->GetSlot(slot_desc->tuple_offset()));
     if (sv == NULL || sv->len == 0) continue;
     char* new_ptr = reinterpret_cast<char*>(pool->TryAllocate(sv->len));
-    if (new_ptr == NULL) {
-      Status s = Status::MemLimitExceeded();
-      s.AddDetail(Substitute("Cannot perform aggregation at node with id $0."
-              " Failed to allocate $1 output bytes.", id_, sv->len));
-      state_->SetMemLimitExceeded();
-      return s;
+    if (UNLIKELY(new_ptr == NULL)) {
+      string details = Substitute("Cannot perform aggregation at node with id $0."
+          " Failed to allocate $1 output bytes.", id_, sv->len);
+      return pool->mem_tracker()->MemLimitExceeded(state_, details, sv->len);
     }
     memcpy(new_ptr, sv->ptr, sv->len);
     sv->ptr = new_ptr;
@@ -761,11 +759,11 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   // TODO: we could switch to 64 bit hashes and then we don't need a max size.
   // It might be reasonable to limit individual hash table size for other reasons
   // though. Always start with small buffers.
-  // TODO: How many buckets? We currently use a default value, 1024.
-  static const int64_t PAGG_DEFAULT_HASH_TABLE_SZ = 1024;
   hash_tbl.reset(HashTable::Create(parent->state_, parent->block_mgr_client_,
       false, 1, NULL, 1L << (32 - NUM_PARTITIONING_BITS),
       PAGG_DEFAULT_HASH_TABLE_SZ));
+  // Please update the error message in CreateHashPartitions() if initial size of
+  // hash table changes.
   return hash_tbl->Init();
 }
 
@@ -927,13 +925,12 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
     const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool, Status* status) {
   const int fixed_size = intermediate_tuple_desc_->byte_size();
   const int varlen_size = GroupingExprsVarlenSize();
-  uint8_t* tuple_data = pool->TryAllocate(fixed_size + varlen_size);
-  if (tuple_data == NULL) {
-    *status = Status::MemLimitExceeded();
-    status->AddDetail(Substitute("Cannot perform aggregation at node with id $0."
-        " Failed to allocate $1 bytes for intermediate tuple.", id_,
-        fixed_size + varlen_size));
-    state_->SetMemLimitExceeded();
+  const int tuple_data_size = fixed_size + varlen_size;
+  uint8_t* tuple_data = pool->TryAllocate(tuple_data_size);
+  if (UNLIKELY(tuple_data == NULL)) {
+    string details = Substitute("Cannot perform aggregation at node with id $0. Failed "
+        "to allocate $1 bytes for intermediate tuple.", id_, tuple_data_size);
+    *status = pool->mem_tracker()->MemLimitExceeded(state_, details, tuple_data_size);
     return NULL;
   }
   memset(tuple_data, 0, fixed_size);
@@ -1127,9 +1124,8 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
 
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   if (is_streaming_preagg_) DCHECK_EQ(level, 0);
-  if (level >= MAX_PARTITION_DEPTH) {
-    return state_->SetMemLimitExceeded(ErrorMsg(
-        TErrorCode::PARTITIONED_AGG_MAX_PARTITION_DEPTH, id_, MAX_PARTITION_DEPTH));
+  if (UNLIKELY(level >= MAX_PARTITION_DEPTH)) {
+    return Status(TErrorCode::PARTITIONED_AGG_MAX_PARTITION_DEPTH, id_, MAX_PARTITION_DEPTH);
   }
   ht_ctx_->set_level(level);
 
@@ -1148,16 +1144,15 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   // Now that all the streams are reserved (meaning we have enough memory to execute
   // the algorithm), allocate the hash tables. These can fail and we can still continue.
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    if (!hash_partitions_[i]->InitHashTable()) {
+    if (UNLIKELY(!hash_partitions_[i]->InitHashTable())) {
       // We don't spill on preaggregations. If we have so little memory that we can't
       // allocate small hash tables, the mem limit is just too low.
       if (is_streaming_preagg_) {
-        Status status = Status::MemLimitExceeded();
-        status.AddDetail(Substitute("Cannot perform aggregation at node with id $0."
-              " Failed to initialize hash table in preaggregation. The memory limit"
-              " is too low to execute the query.", id_));
-        state_->SetMemLimitExceeded();
-        return status;
+        int64_t alloc_size = PAGG_DEFAULT_HASH_TABLE_SZ * HashTable::BucketSize();
+        string details = Substitute("Cannot perform aggregation at node with id $0."
+            " Failed to initialize hash table in preaggregation. The memory limit"
+            " is too low to execute the query.", id_);
+        return mem_tracker()->MemLimitExceeded(state_, details, alloc_size);
       }
       RETURN_IF_ERROR(hash_partitions_[i]->Spill());
     }
@@ -1255,14 +1250,9 @@ Status PartitionedAggregationNode::NextPartition() {
       int64_t largest_partition = LargestSpilledPartition();
       DCHECK_GE(num_input_rows, largest_partition) << "Cannot have a partition with "
           "more rows than the input";
-      if (num_input_rows == largest_partition) {
-        Status status = Status::MemLimitExceeded();
-        status.AddDetail(Substitute("Cannot perform aggregation at node with id $0. "
-            "Repartitioning did not reduce the size of a spilled partition. "
-            "Repartitioning level $1. Number of rows $2.",
-            id_, partition->level + 1, num_input_rows));
-        state_->SetMemLimitExceeded();
-        return status;
+      if (UNLIKELY(num_input_rows == largest_partition)) {
+        return Status(TErrorCode::PARTITIONED_AGG_REPARTITION_FAILS, id_,
+            partition->level + 1, num_input_rows);
       }
       RETURN_IF_ERROR(MoveHashPartitions(num_input_rows));
     }

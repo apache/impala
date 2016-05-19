@@ -236,8 +236,15 @@ error_codes = (
   ("KUDU_NOT_SUPPORTED_ON_OS", 75, "Kudu is not supported on this operating system."),
 
   ("KUDU_NOT_ENABLED", 76, "Kudu features are disabled by the startup flag "
-   "--disable_kudu.")
+   "--disable_kudu."),
 
+  ("PARTITIONED_HASH_JOIN_REPARTITION_FAILS", 77, "Cannot perform hash join at node with "
+   "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
+   "level $1. Number of rows $2."),
+
+  ("PARTITIONED_AGG_REPARTITION_FAILS", 78,  "Cannot perform aggregation at node with "
+   "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
+   "level $1. Number of rows $2."),
 )
 
 import sys

@@ -791,9 +791,10 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
         fetched_rows->ByteSize(num_rows_fetched_from_cache, fetched_rows->size());
     MemTracker* query_mem_tracker = coord_->query_mem_tracker();
     // Count the cached rows towards the mem limit.
-    if (!query_mem_tracker->TryConsume(delta_bytes)) {
-      return coord_->runtime_state()->SetMemLimitExceeded(
-          query_mem_tracker, delta_bytes);
+    if (UNLIKELY(!query_mem_tracker->TryConsume(delta_bytes))) {
+      string details("Failed to allocate memory for result cache.");
+      return query_mem_tracker->MemLimitExceeded(coord_->runtime_state(), details,
+          delta_bytes);
     }
     // Append all rows fetched from the coordinator into the cache.
     int num_rows_added = result_cache_->AddRows(

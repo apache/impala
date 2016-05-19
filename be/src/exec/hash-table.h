@@ -612,6 +612,9 @@ class HashTable {
     return num_buckets * sizeof(Bucket);
   }
 
+  /// Return the size of a hash table bucket in bytes.
+  static int64_t BucketSize() { return sizeof(Bucket); }
+
   /// Returns the memory occupied by the hash table, takes into account the number of
   /// duplicates.
   int64_t CurrentMemSize() const;

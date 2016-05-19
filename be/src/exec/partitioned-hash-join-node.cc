@@ -633,9 +633,9 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
 }
 
 Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level) {
-  if (level >= MAX_PARTITION_DEPTH) {
-    return state->SetMemLimitExceeded(ErrorMsg(
-        TErrorCode::PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH, id_, MAX_PARTITION_DEPTH));
+  if (UNLIKELY(level >= MAX_PARTITION_DEPTH)) {
+    return Status(TErrorCode::PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH, id_,
+        MAX_PARTITION_DEPTH);
   }
 
   DCHECK(hash_partitions_.empty());
@@ -854,14 +854,9 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
     int64_t largest_partition = LargestSpilledPartition();
     DCHECK_GE(num_input_rows, largest_partition) << "Cannot have a partition with "
         "more rows than the input";
-    if (num_input_rows == largest_partition) {
-      Status status = Status::MemLimitExceeded();
-      status.AddDetail(Substitute("Cannot perform hash join at node with id $0. "
-          "Repartitioning did not reduce the size of a spilled partition. "
-          "Repartitioning level $1. Number of rows $2.",
-          id_, input_partition_->level_ + 1, num_input_rows));
-      state->SetMemLimitExceeded();
-      return status;
+    if (UNLIKELY(num_input_rows == largest_partition)) {
+      return Status(TErrorCode::PARTITIONED_HASH_JOIN_REPARTITION_FAILS, id_,
+          input_partition_->level_ + 1, num_input_rows);
     }
   } else {
     DCHECK(hash_partitions_.empty());

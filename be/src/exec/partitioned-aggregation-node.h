@@ -158,6 +158,10 @@ class PartitionedAggregationNode : public ExecNode {
   /// TODO: we can revisit and try harder to explicitly detect skew.
   static const int MAX_PARTITION_DEPTH = 16;
 
+  /// Default initial number of buckets in a hash table.
+  /// TODO: rethink this ?
+  static const int64_t PAGG_DEFAULT_HASH_TABLE_SZ = 1024;
+
   /// Codegen doesn't allow for automatic Status variables because then exception
   /// handling code is needed to destruct the Status, and our function call substitution
   /// doesn't know how to deal with the LLVM IR 'invoke' instruction. Workaround that by

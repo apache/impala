@@ -263,9 +263,10 @@ Status HdfsRCFileScanner::ReadRowGroup() {
       // The row group length depends on the user data and can be very big. This
       // can cause us to go way over the mem limit so use TryAllocate instead.
       row_group_buffer_ = data_buffer_pool_->TryAllocate(row_group_length_);
-      if (row_group_length_ > 0 && row_group_buffer_ == NULL) {
-        return state_->SetMemLimitExceeded(
-            scan_node_->mem_tracker(), row_group_length_);
+      if (UNLIKELY(row_group_buffer_ == NULL)) {
+        string details("RC file scanner failed to allocate row group buffer.");
+        return scan_node_->mem_tracker()->MemLimitExceeded(state_, details,
+            row_group_length_);
       }
       row_group_buffer_size_ = row_group_length_;
     }
