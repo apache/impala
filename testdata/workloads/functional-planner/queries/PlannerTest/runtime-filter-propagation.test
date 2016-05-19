@@ -1085,3 +1085,36 @@ select straight_join 1 from functional.alltypestiny a1
    partitions=4/4 files=4 size=460B
    runtime filters: RF001 -> a1.int_col
 ====
+# IMPALA-3574: Runtime filter generated from a targer expr that contains a TupleIsNull
+# predicate.
+select distinct t1.int_col
+from functional.alltypestiny t1 left join
+  (select coalesce(t3.int_col, 384) as int_col
+   from (select int_col from functional.alltypes) t1
+   right semi join (select int_col from functional.alltypesagg) t3
+     on t1.int_col = t3.int_col) t2
+  on t2.int_col = t1.month
+where t1.month is not null
+---- PLAN
+05:AGGREGATE [FINALIZE]
+|  group by: t1.int_col
+|
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: if(TupleIsNull(), NULL, coalesce(int_col, 384)) = t1.month
+|  runtime filters: RF000 <- t1.month
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 files=4 size=460B
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF001 <- int_col
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> coalesce(functional.alltypes.int_col, 384)
+|
+02:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> coalesce(int_col, 384), RF001 -> int_col
+====

@@ -31,6 +31,7 @@ import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.analysis.TupleIsNullPredicate;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.planner.PlanNode;
@@ -238,6 +239,9 @@ public final class RuntimeFilterGenerator {
       Preconditions.checkNotNull(targetSlots);
       if (targetSlots.isEmpty()) return null;
 
+      // Ensure that the targer expr does not contain TupleIsNull predicates as these
+      // can't be evaluated at a scan node.
+      targetExpr = TupleIsNullPredicate.unwrapExpr(targetExpr.clone());
       LOG.trace("Generating runtime filter from predicate " + joinPredicate);
       return new RuntimeFilter(idGen.getNextId(), filterSrcNode,
           srcExpr, targetExpr, targetSlots);

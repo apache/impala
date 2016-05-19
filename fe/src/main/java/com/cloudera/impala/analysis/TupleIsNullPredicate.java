@@ -157,6 +157,26 @@ public class TupleIsNullPredicate extends Predicate {
     return analyzer.isTrueWithNullSlots(isNotNullLiteralPred);
   }
 
+  /**
+   * Recursive function that replaces all 'IF(TupleIsNull(), NULL, e)' exprs in
+   * 'expr' with e and returns the modified expr.
+   */
+  public static Expr unwrapExpr(Expr expr)  {
+    if (expr instanceof FunctionCallExpr) {
+      FunctionCallExpr fnCallExpr = (FunctionCallExpr) expr;
+      List<Expr> params = fnCallExpr.getParams().exprs();
+      if (fnCallExpr.getFnName().getFunction().equals("if") &&
+          params.get(0) instanceof TupleIsNullPredicate &&
+          params.get(1) instanceof NullLiteral) {
+        return unwrapExpr(params.get(2));
+      }
+    }
+    for (int i = 0; i < expr.getChildren().size(); ++i) {
+      expr.setChild(i, unwrapExpr(expr.getChild(i)));
+    }
+    return expr;
+  }
+
   @Override
   public Expr clone() { return new TupleIsNullPredicate(this); }
 }
