@@ -167,10 +167,12 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       break;
   }
 
-  // TODO: add warning for overflow case
-  if (parse_result == StringParser::PARSE_FAILURE) {
-    tuple->SetNull(slot_desc->null_indicator_offset());
-    return false;
+  if (UNLIKELY(parse_result != StringParser::PARSE_SUCCESS)) {
+    if (parse_result == StringParser::PARSE_FAILURE ||
+        (strict_mode_ && parse_result == StringParser::PARSE_OVERFLOW)) {
+      tuple->SetNull(slot_desc->null_indicator_offset());
+      return false;
+    }
   }
 
   return true;

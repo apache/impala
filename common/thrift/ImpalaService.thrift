@@ -222,7 +222,10 @@ enum TImpalaQueryOptions {
   RUNTIME_FILTER_MIN_SIZE,
 
   // Prefetching behavior during hash tables' building and probing.
-  PREFETCH_MODE
+  PREFETCH_MODE,
+
+  // Additional strict handling of invalid data parsing and type conversions.
+  STRICT_MODE
 }
 
 // The summary of an insert.

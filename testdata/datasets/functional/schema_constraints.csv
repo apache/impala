@@ -102,9 +102,10 @@ table_name:tblwithraggedcolumns, constraint:exclude, table_format:hbase/none/non
 table_name:greptiny, constraint:exclude, table_format:hbase/none/none
 table_name:tinyinttable, constraint:exclude, table_format:hbase/none/none
 
-# overflow has a bigint that's too big. hbase may lose precision, hence this
-# table cannot be loaded.
-table_name:overflow, constraint:exclude, table_format:hbase/none/none
+# overflow uses a manually constructed text file which doesn't make sense to write to
+# other table formats since the values that would be written are different (e.g. already
+# truncated.)
+table_name:overflow, constraint:restrict_to, table_format:text/none/none
 
 # widerow has a single column with a single row containing a 10MB string. hbase doesn't
 # seem to like this.

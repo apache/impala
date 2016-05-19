@@ -134,6 +134,14 @@ class TestQueriesTextTables(ImpalaTestSuite):
   def test_overflow(self, vector):
     self.run_test_case('QueryTest/overflow', vector)
 
+  def test_strict_mode(self, vector):
+    vector.get_value('exec_option')['strict_mode'] = 1
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/strict-mode', vector)
+
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/strict-mode-abort', vector)
+
   def test_data_source_tables(self, vector):
     self.run_test_case('QueryTest/data-source-tables', vector)
 

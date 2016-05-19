@@ -354,7 +354,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
     Function* fn = TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc,
         node->hdfs_table()->null_column_value().data(),
-        node->hdfs_table()->null_column_value().size(), true);
+        node->hdfs_table()->null_column_value().size(), true, state->strict_mode());
     if (fn == NULL) return NULL;
     slot_fns.push_back(fn);
   }

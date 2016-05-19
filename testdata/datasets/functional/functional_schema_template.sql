@@ -927,8 +927,6 @@ float_col float
 double_col double
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/overflow.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====

@@ -196,6 +196,9 @@ struct TQueryOptions {
 
   // Prefetching behavior during hash tables' building and probing.
   48: optional Types.TPrefetchMode prefetch_mode = Types.TPrefetchMode.HT_BUCKET
+
+  // Additional strict handling of invalid data parsing and type conversions.
+  49: optional bool strict_mode = false
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

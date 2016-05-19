@@ -30,10 +30,11 @@ using namespace impala;
 using namespace llvm;
 
 TextConverter::TextConverter(char escape_char, const string& null_col_val,
-    bool check_null)
+    bool check_null, bool strict_mode)
   : escape_char_(escape_char),
     null_col_val_(null_col_val),
-    check_null_(check_null) {
+    check_null_(check_null),
+    strict_mode_(strict_mode) {
 }
 
 void TextConverter::UnescapeString(const char* src, char* dest, int* len,
@@ -90,9 +91,19 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len,
 //   call void @SetNull({ i8, i32 }* %tuple_arg)
 //   ret i1 false
 // }
+//
+// If strict_mode = true, then 'parse_slot' also treats overflows errors, e.g.:
+// parse_slot:                                       ; preds = %check_zero
+//   %slot = getelementptr inbounds { i8, i32 }* %tuple_arg, i32 0, i32 1
+//   %1 = call i32 @IrStringToInt32(i8* %data, i32 %len, i32* %parse_result)
+//   %parse_result1 = load i32, i32* %parse_result
+//   %failed = icmp eq i32 %parse_result1, 1
+//   %overflowed = icmp eq i32 %parse_result1, 2
+//   %failed_or = or i1 %failed, %overflowed
+//   br i1 %failed_or, label %parse_fail, label %parse_success
 Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
-    const char* null_col_val, int len, bool check_null) {
+    const char* null_col_val, int len, bool check_null, bool strict_mode) {
   if (slot_desc->type().type == TYPE_CHAR) {
     LOG(INFO) << "Char isn't supported for CodegenWriteSlot";
     return NULL;
@@ -226,15 +237,23 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
         &parse_success_block, &parse_failed_block);
     LlvmCodeGen::NamedVariable parse_result("parse_result", codegen->GetType(TYPE_INT));
     Value* parse_result_ptr = codegen->CreateEntryBlockAlloca(fn, parse_result);
-    Value* failed_value = codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_FAILURE);
 
     // Call Impala's StringTo* function
     Value* result = builder.CreateCall(parse_fn,
         ArrayRef<Value*>({args[1], args[2], parse_result_ptr}));
     Value* parse_result_val = builder.CreateLoad(parse_result_ptr, "parse_result");
+    Value* failed_value = codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_FAILURE);
 
-    // Check for parse error.  TODO: handle overflow
+    // Check for parse error.
     Value* parse_failed = builder.CreateICmpEQ(parse_result_val, failed_value, "failed");
+    if (strict_mode) {
+      // In strict_mode, also check if parse_result is PARSE_OVERFLOW.
+      Value* overflow_value = codegen->GetIntConstant(TYPE_INT,
+          StringParser::PARSE_OVERFLOW);
+      Value* parse_overflow = builder.CreateICmpEQ(parse_result_val, overflow_value,
+          "overflowed");
+      parse_failed = builder.CreateOr(parse_failed, parse_overflow, "failed_or");
+    }
     builder.CreateCondBr(parse_failed, parse_failed_block, parse_success_block);
 
     // Parse succeeded

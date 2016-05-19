@@ -100,6 +100,9 @@ class RuntimeState {
   bool abort_on_error() const {
     return query_ctx().request.query_options.abort_on_error;
   }
+  bool strict_mode() const {
+    return query_ctx().request.query_options.strict_mode;
+  }
   bool abort_on_default_limit_exceeded() const {
     return query_ctx().request.query_options.abort_on_default_limit_exceeded;
   }
