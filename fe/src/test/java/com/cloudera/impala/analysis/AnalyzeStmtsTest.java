@@ -1063,6 +1063,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(select int_col * 10, int_col as back, int_col + 2 from " +
         "functional.alltypestiny) y) x",
         createAnalyzerUsingHiveColLabels());
+    // IMPALA-3537: Test that auto-generated column labels are only applied in
+    // the appropriate child query blocks.
+    SelectStmt colLabelsStmt =
+        (SelectStmt) AnalyzesOk("select avg(int_col) from functional.alltypes_view");
+    assertEquals("avg(int_col)", colLabelsStmt.getColLabels().get(0));
+    AnalyzesOk("select `max(int_col)` from " +
+        "(select max(int_col) from functional.alltypes_view) v");
 
     // ambiguous reference to an auto-generated column
     AnalysisError("select _c0 from " +

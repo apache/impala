@@ -118,7 +118,10 @@ public class Analyzer {
 
   private final User user_;
 
-  // true if the corresponding select block has a limit and/or offset clause
+  // Whether to use Hive's auto-generated column labels.
+  private boolean useHiveColLabels_ = false;
+
+  // True if the corresponding select block has a limit and/or offset clause.
   private boolean hasLimitOffsetClause_ = false;
 
   // Current depth of nested analyze() calls. Used for enforcing a
@@ -180,9 +183,6 @@ public class Analyzer {
 
     // True if at least one of the analyzers belongs to a subquery.
     public boolean containsSubquery = false;
-
-    // whether to use Hive's auto-generated column labels
-    public boolean useHiveColLabels = false;
 
     // all registered conjuncts (map from expr id to conjunct)
     public final Map<ExprId, Expr> conjuncts = Maps.newHashMap();
@@ -368,6 +368,7 @@ public class Analyzer {
     globalState_ = globalState;
     missingTbls_ = parentAnalyzer.missingTbls_;
     user_ = parentAnalyzer.getUser();
+    useHiveColLabels_ = parentAnalyzer.useHiveColLabels_;
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
     isWithClause_ = parentAnalyzer.isWithClause_;
@@ -2419,9 +2420,9 @@ public class Analyzer {
   public void setIsExplain() { globalState_.isExplain = true; }
   public boolean isExplain() { return globalState_.isExplain; }
   public void setUseHiveColLabels(boolean useHiveColLabels) {
-    globalState_.useHiveColLabels = useHiveColLabels;
+    useHiveColLabels_ = useHiveColLabels;
   }
-  public boolean useHiveColLabels() { return globalState_.useHiveColLabels; }
+  public boolean useHiveColLabels() { return useHiveColLabels_; }
 
   public void setHasLimitOffsetClause(boolean hasLimitOffset) {
     this.hasLimitOffsetClause_ = hasLimitOffset;
@@ -2512,7 +2513,7 @@ public class Analyzer {
 
     // Number of slots registered at the time when the value transfer graph was
     // computed.
-    private int numSlots_ = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+    private final int numSlots_ = globalState_.descTbl.getMaxSlotId().asInt() + 1;
 
     public int getNumSlots() { return numSlots_; }
 
