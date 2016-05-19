@@ -16,8 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -410,10 +408,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Returns a clone of child with all NumericLiterals in it explicitly
+   * Returns a clone of child with all decimal-typed NumericLiterals in it explicitly
    * cast to targetType.
    */
-  private Expr convertNumericLiteralsToFloat(Analyzer analyzer, Expr child,
+  private Expr convertDecimalLiteralsToFloat(Analyzer analyzer, Expr child,
       Type targetType) throws AnalysisException {
     if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return child;
     if (targetType.isIntegerType()) targetType = Type.DOUBLE;
@@ -421,6 +419,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     child.collectAll(Predicates.instanceOf(NumericLiteral.class), literals);
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     for (NumericLiteral l: literals) {
+      if (!l.getType().isDecimal()) continue;
       NumericLiteral castLiteral = (NumericLiteral) l.clone();
       castLiteral.explicitlyCastToFloat(targetType);
       smap.put(l, castLiteral);
@@ -463,11 +462,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     // Only child(0) or child(1) is a const decimal. See if we can cast it to
     // the type of the other child.
     if (c0IsConstantDecimal && !isExplicitCastToDecimal(getChild(0))) {
-      Expr c0 = convertNumericLiteralsToFloat(analyzer, getChild(0), t1);
+      Expr c0 = convertDecimalLiteralsToFloat(analyzer, getChild(0), t1);
       setChild(0, c0);
     }
     if (c1IsConstantDecimal && !isExplicitCastToDecimal(getChild(1))) {
-      Expr c1 = convertNumericLiteralsToFloat(analyzer, getChild(1), t0);
+      Expr c1 = convertDecimalLiteralsToFloat(analyzer, getChild(1), t0);
       setChild(1, c1);
     }
   }

@@ -1280,6 +1280,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     checkReturnType("select int_col + 1.1 from functional.alltypestiny",
         Type.DOUBLE);
 
+    // IMPALA-3439: Non-trivial constant expression with decimal + double = double.
+    // Tests that only the decimal literals in the constant decimal expr are cast
+    // to double. The second argument of round() must be an integer.
+    checkReturnType("select round(1.2345, 2) * pow(10, 10)", Type.DOUBLE);
+
     // Explicitly casting the literal to a decimal will override the behavior
     checkReturnType("select int_col + cast(1.1 as decimal(2,1)) from "
         + " functional.alltypestiny", ScalarType.createDecimalType(12,1));
