@@ -21,9 +21,9 @@ import re
 import os
 import pytest
 from functools import partial
-
 from tests.common.environ import IMPALAD_BUILD, USING_OLD_AGGS_JOINS
-from tests.util.filesystem_utils import IS_DEFAULT_FS, IS_S3, IS_ISILON, IS_LOCAL
+from tests.util.filesystem_utils import IS_DEFAULT_FS, IS_S3, IS_ISILON, IS_LOCAL,\
+    SECONDARY_FILESYSTEM
 
 
 class SkipIfS3:
@@ -45,8 +45,6 @@ class SkipIfS3:
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
 
 class SkipIf:
-  # Some tests require a non-default filesystem to be present.
-  default_fs = pytest.mark.skipif(IS_DEFAULT_FS, reason="Non-default filesystem needed")
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
       reason="--skip_hbase argument specified")
   not_default_fs = pytest.mark.skipif(not IS_DEFAULT_FS,
@@ -54,6 +52,8 @@ class SkipIf:
   kudu_not_supported = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
       reason="Kudu is not supported")
   not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")
+  no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
+      reason="Secondary filesystem needed")
 
 class SkipIfIsilon:
   caching = pytest.mark.skipif(IS_ISILON, reason="SET CACHED not implemented for Isilon")

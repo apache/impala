@@ -231,9 +231,6 @@ class HdfsTableSink : public DataSink {
   /// Current row from the current RowBatch to output
   TupleRow* current_row_;
 
-  /// Connection to hdfs, established in Open() and closed in Close().
-  hdfsFS hdfs_connection_;
-
   /// Row descriptor of row batches passed in Send(). Set in c'tor.
   const RowDescriptor& row_desc_;
 

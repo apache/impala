@@ -42,7 +42,7 @@ from tests.performance.query_executor import JdbcQueryExecConfig
 from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 from tests.util.s3_util import S3Client
-from tests.util.filesystem_utils import IS_S3, S3_BUCKET_NAME
+from tests.util.filesystem_utils import IS_S3, IS_HDFS, S3_BUCKET_NAME
 
 # Imports required for Hive Metastore Client
 from hive_metastore import ThriftHiveMetastore
@@ -118,7 +118,8 @@ class ImpalaTestSuite(BaseTestSuite):
 
     cls.impalad_test_service = cls.create_impala_service()
     cls.hdfs_client = cls.create_hdfs_client()
-    cls.filesystem_client = S3Client(S3_BUCKET_NAME) if IS_S3 else cls.hdfs_client
+    cls.s3_client = S3Client(S3_BUCKET_NAME)
+    cls.filesystem_client = cls.s3_client if IS_S3 else cls.hdfs_client
 
   @classmethod
   def teardown_class(cls):
@@ -266,7 +267,9 @@ class ImpalaTestSuite(BaseTestSuite):
       query = QueryTestSectionReader.build_query(test_section['QUERY']
           .replace('$GROUP_NAME', group_name)
           .replace('$IMPALA_HOME', IMPALA_HOME)
-          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX))
+          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)
+          .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str()))
+      if use_db: query = query.replace('$DATABASE', use_db)
 
       if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])

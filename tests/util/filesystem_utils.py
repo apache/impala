@@ -16,10 +16,12 @@
 import os
 
 FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX") or str()
+SECONDARY_FILESYSTEM = os.getenv("SECONDARY_FILESYSTEM") or str()
 FILESYSTEM = os.getenv("TARGET_FILESYSTEM")
 IS_S3 = FILESYSTEM == "s3"
 IS_ISILON = FILESYSTEM == "isilon"
 IS_LOCAL = FILESYSTEM == "local"
+IS_HDFS = FILESYSTEM == "hdfs"
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
 #   - Tne environment variables is unset ( None )
@@ -27,6 +29,7 @@ IS_LOCAL = FILESYSTEM == "local"
 IS_DEFAULT_FS = not FILESYSTEM_PREFIX or IS_LOCAL
 
 # Isilon specific values.
+ISILON_NAMENODE = os.getenv("ISILON_NAMENODE") or str()
 ISILON_WEBHDFS_PORT = 8082
 
 # S3 specific values
@@ -34,5 +37,8 @@ S3_BUCKET_NAME = os.getenv("S3_BUCKET")
 
 def get_fs_path(path):
   return "%s%s" % (FILESYSTEM_PREFIX, path)
+
+def get_secondary_fs_path(path):
+  return "%s%s" % (SECONDARY_FILESYSTEM, path)
 
 WAREHOUSE = get_fs_path('/test-warehouse')

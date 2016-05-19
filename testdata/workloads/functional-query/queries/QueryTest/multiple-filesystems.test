@@ -3,7 +3,7 @@
 # Verify various CREATE TABLE for unpartitioned tables on non-default
 # filesystem (e.g. S3A).
 create external table tinytable_like like functional.tinytable
-location '$FILESYSTEM_PREFIX/test-warehouse/tinytable'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/tinytable'
 ---- RESULTS
 ====
 ---- QUERY
@@ -32,7 +32,7 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 create external table tinytable_copy (a string, b string)
 row format delimited fields terminated by ','
-location '$FILESYSTEM_PREFIX/test-warehouse/tinytable'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/tinytable'
 ---- RESULTS
 ====
 ---- QUERY
@@ -58,22 +58,22 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 ---- QUERY
 # Verify ADD PARTITION for non-default filesystem.
 alter table alltypes add partition(year=2009, month=1)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=1'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/year=2009/month=1'
 ---- RESULTS
 ====
 ---- QUERY
 alter table alltypes add partition(year=2009, month=2)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=2'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/year=2009/month=2'
 ---- RESULTS
 ====
 ---- QUERY
 alter table alltypes add partition(year=2010, month=1)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=1'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/year=2010/month=1'
 ---- RESULTS
 ====
 ---- QUERY
 alter table alltypes add partition(year=2010, month=2)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=2'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/year=2010/month=2'
 ---- RESULTS
 ====
 ---- QUERY
@@ -117,17 +117,17 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 ====
 ---- QUERY
 # Verify tables with partitions that span multiple filesystems.
-# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2010, month=3)
-location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2010/month=3'
+location '/test-warehouse/alltypes_parquet/year=2010/month=3'
 ---- RESULTS
 ====
 ---- QUERY
-# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2010, month=4)
-location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2010/month=4'
+location '/test-warehouse/alltypes_parquet/year=2010/month=4'
 ---- RESULTS
 ====
 ---- QUERY
@@ -173,7 +173,7 @@ drop table alltypes
 ---- QUERY
 # Verify CREATE TABLE for partitioned table on non-default filesystem.
 create external table alltypes like functional_parquet.alltypes
-location '$FILESYSTEM_PREFIX/test-warehouse/multi_fs_db.db/alltypes'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes'
 ---- RESULTS
 ====
 ---- QUERY
@@ -184,29 +184,29 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 ====
 ---- QUERY
 # Verify tables with partitions that span multiple filesystems, split on the other partition.
-# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2009, month=5)
-location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2009/month=5'
+location '/test-warehouse/alltypes_parquet/year=2009/month=5'
 ---- RESULTS
 ====
 ---- QUERY
 alter table alltypes add partition(year=2009, month=6)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=6'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/year=2009/month=6'
 ---- RESULTS
 ====
 ---- QUERY
-# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# Note: intentionally not using $SECONDARY_FILESYSTEM so that the partition points
 # to the default filesystem.
 alter table alltypes add partition(year=2010, month=5)
-location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2010/month=5'
+location '/test-warehouse/alltypes_parquet/year=2010/month=5'
 ---- RESULTS
 ====
 ---- QUERY
 # This partition directory was dropped earlier, so this also verifies the partition
 # directory was not deleted.
 alter table alltypes add partition(year=2010, month=2)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=2'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_parquet/year=2010/month=2'
 ---- RESULTS
 ====
 ---- QUERY
@@ -291,7 +291,7 @@ create table alltypes_multipart_insert like functional_parquet.alltypes
 ---- QUERY
 # ADD PARTITION on a non-default filesystem.
 alter table alltypes_multipart_insert add partition(year=2009, month=1)
-location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_multipart_insert/year=2009/month=1'
+location '$SECONDARY_FILESYSTEM/multi_fs_tests/$DATABASE.db/alltypes_multipart_insert/year=2009/month=1'
 ---- RESULTS
 ====
 ---- QUERY
@@ -304,8 +304,9 @@ year=2009/month=1/: 310
 ====
 ---- QUERY
 # ADD PARTITION on the default filesystem.
+# Point to unique database so we don't overwrite someone else's data.
 alter table alltypes_multipart_insert add partition(year=2009, month=2)
-location '/test-warehouse/alltypes_multipart_insert/year=2009/month=2'
+location '/test-warehouse/$DATABASE.db/alltypes_multipart_insert/year=2009/month=2'
 ---- RESULTS
 ====
 ---- QUERY

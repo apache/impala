@@ -138,8 +138,6 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       PrintId(state->query_id(), "_"));
 
   RETURN_IF_ERROR(PrepareExprs(state));
-  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-      staging_dir_, &hdfs_connection_));
   mem_tracker_.reset(new MemTracker(profile(), -1, -1, profile()->name(),
       state->instance_mem_tracker()));
 
@@ -296,15 +294,22 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   // Check if tmp_hdfs_file_name exists.
   const char* tmp_hdfs_file_name_cstr =
       output_partition->current_file_name.c_str();
-  if (hdfsExists(hdfs_connection_, tmp_hdfs_file_name_cstr) == 0) {
+
+  if (hdfsExists(output_partition->hdfs_connection, tmp_hdfs_file_name_cstr) == 0) {
     return Status(GetHdfsErrorMsg("Temporary HDFS file already exists: ",
         output_partition->current_file_name));
   }
   uint64_t block_size = output_partition->partition_descriptor->block_size();
   if (block_size == 0) block_size = output_partition->writer->default_block_size();
 
-  output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
+  output_partition->tmp_hdfs_file = hdfsOpenFile(output_partition->hdfs_connection,
       tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, block_size);
+
+  VLOG_FILE << "hdfsOpenFile() file=" << tmp_hdfs_file_name_cstr;
+  if (output_partition->tmp_hdfs_file == NULL) {
+    return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
+        output_partition->current_file_name));
+  }
 
   if (IsS3APath(output_partition->current_file_name.c_str())) {
     // On S3A, the file cannot be stat'ed until after it's closed, and even so, the block
@@ -324,12 +329,6 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     hdfsFreeFileInfo(info, 1);
   }
 
-  VLOG_FILE << "hdfsOpenFile() file=" << tmp_hdfs_file_name_cstr;
-  if (output_partition->tmp_hdfs_file == NULL) {
-    return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
-        output_partition->current_file_name));
-  }
-
   ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(1);
   COUNTER_ADD(files_created_counter_, 1);
 
@@ -343,7 +342,8 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   Status status = output_partition->writer->InitNewFile();
   if (!status.ok()) {
     ClosePartitionFile(state, output_partition);
-    hdfsDelete(hdfs_connection_, output_partition->current_file_name.c_str(), 0);
+    hdfsDelete(output_partition->hdfs_connection,
+        output_partition->current_file_name.c_str(), 0);
   }
   return status;
 }
@@ -384,7 +384,18 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   output_partition->partition_name = partition_name_ss.str();
   BuildHdfsFileNames(partition_descriptor, output_partition);
 
-  output_partition->hdfs_connection = hdfs_connection_;
+  if (ShouldSkipStaging(state, output_partition)) {
+    // We will be writing to the final file if we're skipping staging, so get a connection
+    // to its filesystem.
+    RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+        output_partition->final_hdfs_file_name_prefix,
+        &output_partition->hdfs_connection));
+  } else {
+    // Else get a connection to the filesystem of the tmp file.
+    RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+        output_partition->tmp_hdfs_file_name_prefix, &output_partition->hdfs_connection));
+  }
+
   output_partition->partition_descriptor = &partition_descriptor;
 
   bool allow_unsupported_formats =
@@ -620,7 +631,7 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
 
 void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* partition) {
   if (partition->tmp_hdfs_file == NULL) return;
-  int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
+  int hdfs_ret = hdfsCloseFile(partition->hdfs_connection, partition->tmp_hdfs_file);
   VLOG_FILE << "hdfsCloseFile() file=" << partition->current_file_name;
   if (hdfs_ret != 0) {
     state->LogError(ErrorMsg(TErrorCode::GENERAL,
