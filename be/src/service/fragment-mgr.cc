@@ -42,14 +42,14 @@ Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params)
   // Preparing and opening the fragment creates a thread and consumes a non-trivial
   // amount of memory. If we are already starved for memory, cancel the fragment as
   // early as possible to avoid digging the hole deeper.
-  if (ExecEnv::GetInstance()->process_mem_tracker()->LimitExceeded()) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute("Instance $0 of plan fragment $1 of query $2 could not "
-            "start because the backend Impala daemon is over its memory limit",
-            PrintId(exec_params.fragment_instance_ctx.fragment_instance_id),
-            exec_params.fragment.display_name,
-            PrintId(exec_params.fragment_instance_ctx.query_ctx.query_id)));
-    return status;
+  MemTracker* process_mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
+  if (process_mem_tracker->LimitExceeded()) {
+    string msg = Substitute("Instance $0 of plan fragment $1 of query $2 could not "
+        "start because the backend Impala daemon is over its memory limit",
+        PrintId(exec_params.fragment_instance_ctx.fragment_instance_id),
+        exec_params.fragment.display_name,
+        PrintId(exec_params.fragment_instance_ctx.query_ctx.query_id));
+    return process_mem_tracker->MemLimitExceeded(NULL, msg, 0);
   }
 
   // Remote fragments must always have a sink. Remove when IMPALA-2905 is resolved.

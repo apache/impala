@@ -16,6 +16,7 @@
 #define IMPALA_RUNTIME_COLLECTION_VALUE_BUILDER_H
 
 #include "runtime/collection-value.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/tuple.h"
 #include "util/debug-util.h"
 
@@ -30,10 +31,12 @@ class CollectionValueBuilder {
   static const int DEFAULT_INITIAL_TUPLE_CAPACITY = 4;
 
   CollectionValueBuilder(CollectionValue* coll_value, const TupleDescriptor& tuple_desc,
-      MemPool* pool, int initial_tuple_capacity = DEFAULT_INITIAL_TUPLE_CAPACITY)
+      MemPool* pool, RuntimeState* state,
+      int initial_tuple_capacity = DEFAULT_INITIAL_TUPLE_CAPACITY)
     : coll_value_(coll_value),
       tuple_desc_(tuple_desc),
-      pool_(pool) {
+      pool_(pool),
+      state_(state) {
     buffer_size_ = initial_tuple_capacity * tuple_desc_.byte_size();
     coll_value_->ptr = pool_->TryAllocate(buffer_size_);
     if (coll_value_->ptr == NULL) buffer_size_ = 0;
@@ -61,10 +64,9 @@ class CollectionValueBuilder {
           *num_tuples = 0;
           string path = tuple_desc_.table_desc() == NULL ? "" :
               PrintPath(*tuple_desc_.table_desc(), tuple_desc_.tuple_path());
-          Status status = Status::MemLimitExceeded();
-          status.AddDetail(ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED, new_buffer_size,
-              path, buffer_size_, coll_value_->num_tuples).msg());
-          return status;
+          return pool_->mem_tracker()->MemLimitExceeded(state_,
+              ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED, new_buffer_size,
+              path, buffer_size_, coll_value_->num_tuples).msg(), new_buffer_size);
         }
         memcpy(new_buf, coll_value_->ptr, bytes_written);
         coll_value_->ptr = new_buf;
@@ -96,6 +98,9 @@ class CollectionValueBuilder {
 
   /// The pool backing coll_value_'s buffer
   MemPool* pool_;
+
+  /// May be NULL. If non-NULL, used to log memory limit errors.
+  RuntimeState* state_;
 
   /// The current size of coll_value_'s buffer in bytes, including any unused space
   /// (i.e. buffer_size_ is equal to or larger than coll_value_->ByteSize()).

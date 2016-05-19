@@ -41,7 +41,7 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
   MemTracker tracker(mem_limit, mem_limit);
   MemPool pool(&tracker);
   CollectionValueBuilder coll_value_builder(
-      &coll_value, tuple_desc, &pool, initial_capacity);
+      &coll_value, tuple_desc, &pool, NULL, initial_capacity);
   EXPECT_EQ(tracker.consumption(), initial_capacity * 4);
 
   // Attempt to double the buffer so it goes over 32-bit INT_MAX.

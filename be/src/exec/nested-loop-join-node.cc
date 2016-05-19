@@ -80,8 +80,10 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
     if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
       // Allocate a fixed-size bitmap with a single element if we have a singular
       // row source node as our build child.
-      if (!mem_tracker()->TryConsume(Bitmap::MemUsage(1))) {
-        return Status::MemLimitExceeded();
+      int64_t bitmap_mem_usage = Bitmap::MemUsage(1);
+      if (!mem_tracker()->TryConsume(bitmap_mem_usage)) {
+        return mem_tracker()->MemLimitExceeded(state,
+            "Could not allocate bitmap in nested loop join", bitmap_mem_usage);
       }
       matching_build_rows_.reset(new Bitmap(1));
     } else {
@@ -185,9 +187,11 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
       matching_build_rows_->SetAllBits(false);
     } else {
       // Account for the additional memory used by the bitmap.
-      if (!mem_tracker()->TryConsume(Bitmap::MemUsage(num_bits) -
-          matching_build_rows_->MemUsage())) {
-        return Status::MemLimitExceeded();
+      int64_t bitmap_size_increase =
+          Bitmap::MemUsage(num_bits) - matching_build_rows_->MemUsage();
+      if (!mem_tracker()->TryConsume(bitmap_size_increase)) {
+        return mem_tracker()->MemLimitExceeded(state,
+            "Could not expand bitmap in nested loop join", bitmap_size_increase);
       }
       matching_build_rows_->Reset(num_bits);
     }

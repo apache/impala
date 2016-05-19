@@ -1715,7 +1715,7 @@ bool HdfsParquetScanner::CollectionColumnReader::ReadSlot(void* slot, MemPool* p
   CollectionValue* coll_slot = reinterpret_cast<CollectionValue*>(slot);
   *coll_slot = CollectionValue();
   CollectionValueBuilder builder(
-      coll_slot, *slot_desc_->collection_item_descriptor(), pool);
+      coll_slot, *slot_desc_->collection_item_descriptor(), pool, parent_->state_);
   bool continue_execution = parent_->AssembleCollection(
       children_, new_collection_rep_level(), &builder);
   if (!continue_execution) return false;

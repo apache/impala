@@ -158,7 +158,7 @@ class RowBatchSerializeTest : public testing::Test {
         const TupleDescriptor* item_desc = slot_desc.collection_item_descriptor();
         int array_len = rand() % (MAX_ARRAY_LEN + 1);
         CollectionValue cv;
-        CollectionValueBuilder builder(&cv, *item_desc, pool, array_len);
+        CollectionValueBuilder builder(&cv, *item_desc, pool, NULL, array_len);
         Tuple* tuple_mem;
         int n;
         EXPECT_OK(builder.GetFreeMemory(&tuple_mem, &n));

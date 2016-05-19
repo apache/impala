@@ -1006,7 +1006,8 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     CollectionValue* cv = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
     cv->ptr = NULL;
     cv->num_tuples = 0;
-    CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), array_len);
+    CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), runtime_state_,
+        array_len);
     Tuple* array_data;
     int num_rows;
     builder.GetFreeMemory(&array_data, &num_rows);
@@ -1108,7 +1109,8 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   const TupleDescriptor* item_desc = array_slot->collection_item_descriptor();
   int array_len = 128;
   CollectionValue* cv = tuple0->GetCollectionSlot(array_slot->tuple_offset());
-  CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), array_len);
+  CollectionValueBuilder builder(cv, *item_desc, mem_pool_.get(), runtime_state_,
+      array_len);
   Tuple* array_data;
   int num_rows;
   builder.GetFreeMemory(&array_data, &num_rows);

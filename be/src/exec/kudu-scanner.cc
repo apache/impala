@@ -290,9 +290,8 @@ Status KuduScanner::RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool) {
     if (LIKELY(val->len > 0)) {
       // The allocator returns a NULL ptr when out of memory.
       if (UNLIKELY(val->ptr == NULL)) {
-        Status s = Status::MemLimitExceeded();
-        s.AddDetail("Could not allocate memory for string.");
-        return s;
+        return mem_pool->mem_tracker()->MemLimitExceeded(state_,
+            "Kudu scanner could not allocate memory for string", val->len);
       }
       memcpy(val->ptr, old_buf, val->len);
     }
