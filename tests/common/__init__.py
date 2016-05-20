@@ -1,1 +1,2 @@
-# This file is needed to make the files in this directory a python module
+KUDU_MASTER_HOST = "127.0.0.1"
+KUDU_MASTER_PORT = 7051

@@ -26,6 +26,7 @@ import optparse
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import textwrap
@@ -62,17 +63,28 @@ def create_virtualenv():
   shutil.rmtree(build_dir)
 
 
-def exec_cmd(args):
+def exec_cmd(args, **kwargs):
   '''Executes a command and waits for it to finish, raises an exception if the return
-     status is not zero.
+     status is not zero. The command output is returned.
 
-     'args' uses the same format as subprocess.Popen().
+     'args' and 'kwargs' use the same format as subprocess.Popen().
   '''
-  process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+      **kwargs)
   output = process.communicate()[0]
   if process.returncode != 0:
     raise Exception("Command returned non-zero status\nCommand: %s\nOutput: %s"
         % (args, output))
+  return output
+
+
+def exec_pip_install(args, **popen_kwargs):
+  # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
+  # virtualenv using an absolute path. If the path to the virtualenv is very long, the
+  # hashbang won't work.
+  exec_cmd([os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
+    "install", "--no-index", "--find-links",
+    "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR))] + args, **popen_kwargs)
 
 
 def find_file(*paths):
@@ -108,17 +120,117 @@ def detect_python_cmd():
 
 
 def install_deps():
-  LOG.info("Installing packages into virtualenv")
-  # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
-  # virtualenv using an absolute path. If the path to the virtualenv is very long, the
-  # hashbang won't work.
-  # --no-cache-dir is used because the dev version of Impyla may be the same even though
-  # the contents are different. Since the version doesn't change, pip may use its cached
-  # build.
-  exec_cmd([os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
-    "install", "--no-cache-dir", "--no-index", "--find-links",
-    "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR)), "-r", REQS_PATH])
+  LOG.info("Installing packages into the virtualenv")
+  exec_pip_install(["-r", REQS_PATH])
   shutil.copyfile(REQS_PATH, INSTALLED_REQS_PATH)
+
+
+def install_kudu_client_if_possible():
+  """Installs the Kudu python module if possible. The Kudu module is the only one that
+     requires the toolchain. If the toolchain isn't in use or hasn't been populated
+     yet, nothing will be done. Also nothing will be done if the Kudu client lib required
+     by the module isn't available (as determined by KUDU_IS_SUPPORTED).
+  """
+  if os.environ["KUDU_IS_SUPPORTED"] != "true":
+    LOG.debug("Skipping Kudu: Kudu is not supported")
+    return
+  impala_toolchain_dir = os.environ.get("IMPALA_TOOLCHAIN")
+  if not impala_toolchain_dir:
+    LOG.debug("Skipping Kudu: IMPALA_TOOLCHAIN not set")
+    return
+  toolchain_kudu_dir = os.path.join(
+      impala_toolchain_dir, "kudu-" + os.environ["IMPALA_KUDU_VERSION"])
+  if not os.path.exists(toolchain_kudu_dir):
+    LOG.debug("Skipping Kudu: %s doesn't exist" % toolchain_kudu_dir)
+    return
+
+  # The "pip" command could be used to provide the version of Kudu installed (if any)
+  # but it's a little too slow. Running the virtualenv python to detect the installed
+  # version is faster.
+  actual_version_string = exec_cmd([os.path.join(ENV_DIR, "bin", "python"), "-c",
+      textwrap.dedent("""
+      try:
+        import kudu
+        print kudu.__version__
+      except ImportError:
+        pass""")]).strip()
+  actual_version = [int(v) for v in actual_version_string.split(".") if v]
+
+  reqs_file = open(REQS_PATH)
+  try:
+    for line in reqs_file:
+      if not line.startswith("# kudu-python=="):
+        continue
+      expected_version_string = line.split()[1].split("==")[1]
+      break
+    else:
+      raise Exception("Unable to find kudu-python version in requirements file")
+  finally:
+    reqs_file.close()
+  expected_version = [int(v) for v in expected_version_string.split(".")]
+
+  if actual_version and actual_version == expected_version:
+    LOG.debug("Skipping Kudu: Installed %s == required %s"
+        % (actual_version_string, expected_version_string))
+    return
+  LOG.debug("Kudu installation required. Actual version %s. Required version %s.",
+      actual_version, expected_version)
+
+  LOG.info("Installing Kudu into the virtualenv")
+  # The installation requires that KUDU_HOME/build/latest exists. An empty directory
+  # structure will be made to satisfy that. The Kudu client headers and lib will be made
+  # available through GCC environment variables.
+  fake_kudu_build_dir = os.path.join(tempfile.gettempdir(), "virtualenv-kudu")
+  try:
+    artifact_dir = os.path.join(fake_kudu_build_dir, "build", "latest")
+    if not os.path.exists(artifact_dir):
+      os.makedirs(artifact_dir)
+    env = dict(os.environ)
+    env["KUDU_HOME"] = fake_kudu_build_dir
+    kudu_client_dir = find_kudu_client_install_dir()
+    env["CPLUS_INCLUDE_PATH"] = os.path.join(kudu_client_dir, "include")
+    env["LIBRARY_PATH"] = os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
+                                                os.path.join(kudu_client_dir, 'lib64')])
+
+    exec_pip_install(["kudu-python==" + expected_version_string], env=env)
+  finally:
+    try:
+      shutil.rmtree(fake_kudu_build_dir)
+    except Exception:
+      LOG.debug("Error removing temp Kudu build dir", exc_info=True)
+
+
+def find_kudu_client_install_dir():
+  custom_client_dir = os.environ["KUDU_CLIENT_DIR"]
+  if custom_client_dir:
+    install_dir = os.path.join(custom_client_dir, "usr", "local")
+    error_if_kudu_client_not_found(install_dir)
+  else:
+    # If the toolchain appears to have been setup already, then the Kudu client is
+    # required to exist. It's possible that the toolchain won't be setup yet though
+    # since the toolchain bootstrap script depends on the virtualenv.
+    kudu_base_dir = os.path.join(os.environ["IMPALA_TOOLCHAIN"],
+        "kudu-%s" % os.environ["IMPALA_KUDU_VERSION"])
+    install_dir = os.path.join(kudu_base_dir, "debug")
+    if os.path.exists(kudu_base_dir):
+      error_if_kudu_client_not_found(install_dir)
+  return install_dir
+
+
+def error_if_kudu_client_not_found(install_dir):
+  header_path = os.path.join(install_dir, "include", "kudu", "client", "client.h")
+  if not os.path.exists(header_path):
+    raise Exception("Kudu client header not found at %s" % header_path)
+
+  kudu_client_lib = "libkudu_client.so"
+  lib_dir = os.path.join(install_dir, "lib64")
+  if not os.path.exists(lib_dir):
+    lib_dir = os.path.join(install_dir, "lib")
+  for _, _, files in os.walk(lib_dir):
+    for file in files:
+      if file == kudu_client_lib:
+        return
+  raise Exception("%s not found at %s" % (kudu_client_lib, lib_dir))
 
 
 def deps_are_installed():
@@ -148,11 +260,23 @@ def setup_virtualenv_if_not_exists():
 
 
 if __name__ == "__main__":
-  logging.basicConfig(level=logging.INFO)
   parser = optparse.OptionParser()
+  parser.add_option("-l", "--log-level", default="INFO",
+      choices=("DEBUG", "INFO", "WARN", "ERROR"))
   parser.add_option("-r", "--rebuild", action="store_true", help="Force a rebuild of"
       " the virtualenv even if it exists and appears to be completely up-to-date.")
+  parser.add_option("--print-ld-library-path", action="store_true", help="Print the"
+      " LD_LIBRARY_PATH that should be used when running python from the virtualenv.")
   options, args = parser.parse_args()
+
+  if options.print_ld_library_path:
+    kudu_client_dir = find_kudu_client_install_dir()
+    print os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
+                                os.path.join(kudu_client_dir, 'lib64')])
+    sys.exit()
+
+  logging.basicConfig(level=getattr(logging, options.log_level))
   if options.rebuild:
     delete_virtualenv_if_exist()
   setup_virtualenv_if_not_exists()
+  install_kudu_client_if_possible()
