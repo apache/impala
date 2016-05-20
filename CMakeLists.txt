@@ -141,7 +141,7 @@ if (CMAKE_DEBUG)
 endif()
 
 
-find_package(Boost $ENV{IMPALA_MIN_BOOST_VERSION} REQUIRED
+find_package(Boost $ENV{IMPALA_BOOST_VERSION} REQUIRED
   COMPONENTS thread regex system filesystem date_time)
 include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
@@ -296,13 +296,6 @@ message(STATUS "Re2 library: " ${RE2_STATIC_LIB})
 find_package(RapidJson REQUIRED)
 include_directories(${RAPIDJSON_INCLUDE_DIR})
 message(STATUS "RapidJson include dir: " ${RAPIDJSON_INCLUDE_DIR})
-
-# find boost multi precision headers
-if (Boost_VERSION LESS 105300)
-  find_package(BoostMultiPrecision REQUIRED)
-  include_directories(${BOOST_MULTI_PRECISION_INCLUDE_DIR})
-  message(STATUS "BoostMultiPrecision include dir: " ${BOOST_MULTI_PRECISION_INCLUDE_DIR})
-endif ()
 
 # find Avro headers and libs
 find_package(Avro REQUIRED)
