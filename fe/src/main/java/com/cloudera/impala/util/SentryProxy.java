@@ -36,6 +36,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TPrivilege;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -65,14 +66,21 @@ public class SentryProxy {
   // The interface to access the Sentry Policy Service to read policy metadata.
   private final SentryPolicyService sentryPolicyService_;
 
-  // This is user that the Catalog Service is running as. This user should always be a
+  // This is the user that the Catalog Service is running as. For kerberized clusters,
+  // this is set to the Kerberos principal of Catalog. This user should always be a
   // Sentry Service admin => have full rights to read/update the Sentry Service.
-  private final User processUser_ = new User(System.getProperty("user.name"));
+  private final User processUser_;
 
-  public SentryProxy(SentryConfig sentryConfig, CatalogServiceCatalog catalog) {
+  public SentryProxy(SentryConfig sentryConfig, CatalogServiceCatalog catalog,
+      String kerberosPrincipal) {
     Preconditions.checkNotNull(catalog);
     Preconditions.checkNotNull(sentryConfig);
     catalog_ = catalog;
+    if (Strings.isNullOrEmpty(kerberosPrincipal)) {
+      processUser_ = new User(System.getProperty("user.name"));
+    } else {
+      processUser_ = new User(kerberosPrincipal);
+    }
     sentryPolicyService_ = new SentryPolicyService(sentryConfig);
     // Sentry Service is enabled.
     // TODO: Make this configurable

@@ -77,7 +77,7 @@ public class JniCatalog {
 
   public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
       String sentryServiceConfig, int impalaLogLevel, int otherLogLevel,
-      boolean allowAuthToLocal) throws InternalException {
+      boolean allowAuthToLocal, String kerberosPrincipal) throws InternalException {
     BackendConfig.setAuthToLocal(allowAuthToLocal);
     Preconditions.checkArgument(numMetadataLoadingThreads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
@@ -94,7 +94,7 @@ public class JniCatalog {
     LOG.info(JniUtil.getJavaVersion());
 
     catalog_ = new CatalogServiceCatalog(loadInBackground,
-        numMetadataLoadingThreads, sentryConfig, getServiceId());
+        numMetadataLoadingThreads, sentryConfig, getServiceId(), kerberosPrincipal);
     try {
       catalog_.reset();
     } catch (CatalogException e) {

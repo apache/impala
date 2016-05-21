@@ -155,14 +155,14 @@ public class CatalogServiceCatalog extends Catalog {
    * will be loaded in the background
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId) {
+      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal) {
     super(true);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
     cachePoolReader_.scheduleAtFixedRate(new CachePoolReader(), 0, 1, TimeUnit.MINUTES);
     if (sentryConfig != null) {
-      sentryProxy_ = new SentryProxy(sentryConfig, this);
+      sentryProxy_ = new SentryProxy(sentryConfig, this, kerberosPrincipal);
     } else {
       sentryProxy_ = null;
     }

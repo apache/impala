@@ -41,7 +41,7 @@ DECLARE_int32(non_impala_java_vlog);
 
 Catalog::Catalog() {
   JniMethodDescriptor methods[] = {
-    {"<init>", "(ZILjava/lang/String;IIZ)V", &catalog_ctor_},
+    {"<init>", "(ZILjava/lang/String;IIZLjava/lang/String;)V", &catalog_ctor_},
     {"updateCatalog", "([B)[B", &update_metastore_id_},
     {"execDdl", "([B)[B", &exec_ddl_id_},
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
@@ -70,10 +70,11 @@ Catalog::Catalog() {
   // auth_to_local rules are read if --load_auth_to_local_rules is set to true
   // and impala is kerberized.
   jboolean auth_to_local = FLAGS_load_auth_to_local_rules && !FLAGS_principal.empty();
+  jstring principal = jni_env->NewStringUTF(FLAGS_principal.c_str());
   jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_,
       load_in_background, num_metadata_loading_threads, sentry_config,
       FlagToTLogLevel(FLAGS_v), FlagToTLogLevel(FLAGS_non_impala_java_vlog),
-      auth_to_local);
+      auth_to_local, principal);
   EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }
