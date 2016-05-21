@@ -24,9 +24,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryType;
-import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.FileStatus;
@@ -36,7 +36,8 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdfs.protocol.AclException;
-import org.apache.hadoop.ipc.RemoteException;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -50,10 +51,13 @@ import com.google.common.collect.Lists;
 public class FsPermissionChecker {
   private final static Logger LOG = LoggerFactory.getLogger(FsPermissionChecker.class);
   private final static FsPermissionChecker instance_;
+  private final static Configuration CONF;
   protected final String user_;
   private final Set<String> groups_ = new HashSet<String>();
+  private final String supergroup_;
 
   static {
+    CONF = new Configuration();
     try {
       instance_ = new FsPermissionChecker();
     } catch (IOException e) {
@@ -65,10 +69,12 @@ public class FsPermissionChecker {
   private FsPermissionChecker() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     groups_.addAll(Arrays.asList(ugi.getGroupNames()));
-    // Todo: should add HDFS supergroup as well
+    supergroup_ = CONF.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
+        DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
     user_ = ugi.getShortUserName();
   }
 
+  private boolean isSuperUser() { return groups_.contains(supergroup_); }
 
   private static List<AclEntryType> ACL_TYPE_PRIORITY =
       ImmutableList.of(AclEntryType.USER, AclEntryType.GROUP, AclEntryType.OTHER);
@@ -198,6 +204,7 @@ public class FsPermissionChecker {
      * permissions.
      */
     public boolean checkPermissions(FsAction action) {
+      if (FsPermissionChecker.this.isSuperUser()) return true;
       Boolean aclPerms = checkAcls(action);
       if (aclPerms != null) return aclPerms;
 
