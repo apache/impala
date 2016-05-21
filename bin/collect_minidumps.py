@@ -17,7 +17,7 @@
 # We try to fit as many files as possible into the tarball until a size limit is reached.
 # Example invokation by CM to:
 #     ./collect_minidumps.py --conf_dir=/var/run/.../5555-impala-STATESTORE/impala-conf \
-#       --role_name=statestored --max_output_size=50000000 --end_time=1463033495 \
+#       --role_name=statestored --max_output_size=50000000 --end_time=1463033495000 \
 #       --output_file_path=/tmp/minidump_package.tar.gz
 
 import os
@@ -33,8 +33,8 @@ class FileArchiver(object):
   gzip and placed into output_file_path. If a file with that name already exists, it will
   be deleted and re-created. Max_result_size is the maximum allowed size of the resulting
   tarball. If all files in the source_dir can't fit into the allowed size, most recent
-  files will be preferred. start_time and end_time paramenters allow us to specify an
-  interval of time for which to consider the files.
+  files will be preferred. start_time and end_time paramenters (in milliseconds UTC) allow
+  us to specify an interval of time for which to consider the files.
   '''
 
   def __init__(self,
@@ -84,7 +84,8 @@ class FileArchiver(object):
       full_path = os.path.join(self.source_dir, f)
       if not os.path.isfile(full_path):
         continue
-      time_modified = os.stat(full_path).st_mtime
+      # st_mtime is in seconds UTC, so we need to multiply by 1000 to get milliseconds.
+      time_modified = os.stat(full_path).st_mtime * 1000
       if self.start_time and self.start_time > time_modified:
         continue
       if self.end_time and self.end_time < time_modified:
@@ -177,10 +178,10 @@ def main():
       help='The maximum file size of the result tarball to be written given in bytes. '
            'If the total size exceeds this value, most recent files will be preferred')
   parser.add_option('--start_time', default=None, type='int',
-      help='Interval start time (in epoch seconds UTC).')
+      help='Interval start time (in epoch milliseconds UTC).')
   parser.add_option('--end_time', default=None, type='int',
       help='Interval end time, until when to collect the minidump files '
-           '(in epoch seconds UTC).')
+           '(in epoch milliseconds UTC).')
   parser.add_option('--output_file_path', help='The full path of the output file.')
   options, args = parser.parse_args()
   if not options.conf_dir:
