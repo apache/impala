@@ -19,6 +19,7 @@
 
 #include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
+#include "common/init.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-stress.h"
 #include "runtime/mem-tracker.h"
@@ -39,6 +40,14 @@ namespace impala {
 
 class DiskIoMgrTest : public testing::Test {
  public:
+
+  virtual void SetUp() {
+    pool_.reset(new ObjectPool);
+  }
+
+  virtual void TearDown() {
+    pool_.reset();
+  }
   void WriteValidateCallback(int num_writes, DiskIoMgr::WriteRange** written_range,
       DiskIoMgr* io_mgr, DiskIoRequestContext* reader, int32_t* data,
       Status expected_status, const Status& status) {
@@ -220,6 +229,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
   read_io_mgr->UnregisterContext(reader);
   read_io_mgr.reset();
 }
+
 // Perform invalid writes (e.g. non-existent file, negative offset) and validate
 // that an error status is returned via the write callback.
 TEST_F(DiskIoMgrTest, InvalidWrite) {
@@ -230,7 +240,6 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   ASSERT_OK(io_mgr.Init(&mem_tracker));
   DiskIoRequestContext* writer;
   ASSERT_OK(io_mgr.RegisterContext(&writer));
-  pool_.reset(new ObjectPool);
   int32_t* data = pool_->Add(new int32_t);
   *data = rand();
 
@@ -619,11 +628,11 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     pool_.reset(new ObjectPool);
     if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
-    MemTracker mem_tracker(mem_limit_num_buffers * MAX_BUFFER_SIZE);
+    MemTracker root_mem_tracker(mem_limit_num_buffers * MAX_BUFFER_SIZE);
     DiskIoMgr io_mgr(1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
-    ASSERT_OK(io_mgr.Init(&mem_tracker));
-    MemTracker reader_mem_tracker;
+    ASSERT_OK(io_mgr.Init(&root_mem_tracker));
+    MemTracker reader_mem_tracker(-1, -1, "Reader", &root_mem_tracker);
     DiskIoRequestContext* reader;
     ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
@@ -932,54 +941,66 @@ TEST_F(DiskIoMgrTest, Buffers) {
   // Test default min/max buffer size
   int min_buffer_size = 1024;
   int max_buffer_size = 8 * 1024 * 1024; // 8 MB
-  MemTracker mem_tracker(max_buffer_size * 2);
+  MemTracker root_mem_tracker(max_buffer_size * 2);
 
   DiskIoMgr io_mgr(1, 1, min_buffer_size, max_buffer_size);
-  ASSERT_OK(io_mgr.Init(&mem_tracker));
-  ASSERT_EQ(mem_tracker.consumption(), 0);
+  ASSERT_OK(io_mgr.Init(&root_mem_tracker));
+  ASSERT_EQ(root_mem_tracker.consumption(), 0);
+
+  MemTracker reader_mem_tracker(-1, -1, "Reader", &root_mem_tracker);
+  DiskIoRequestContext* reader;
+  ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+
+  DiskIoMgr::ScanRange* dummy_range = InitRange(1, "dummy", 0, 0, 0, 0);
 
   // buffer length should be rounded up to min buffer size
   int64_t buffer_len = 1;
-  char* buf = io_mgr.GetFreeBuffer(&buffer_len);
-  EXPECT_EQ(buffer_len, min_buffer_size);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 1);
-  io_mgr.ReturnFreeBuffer(buf, buffer_len);
-  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size);
+  DiskIoMgr::BufferDescriptor* buffer_desc;
+  buffer_desc = io_mgr.GetFreeBuffer(reader, dummy_range, buffer_len);
+  EXPECT_TRUE(buffer_desc->buffer() != NULL);
+  EXPECT_EQ(min_buffer_size, buffer_desc->buffer_len());
+  EXPECT_EQ(1, io_mgr.num_allocated_buffers_.Load());
+  io_mgr.FreeBufferMemory(buffer_desc);
+  EXPECT_EQ(min_buffer_size, root_mem_tracker.consumption());
 
   // reuse buffer
   buffer_len = min_buffer_size;
-  buf = io_mgr.GetFreeBuffer(&buffer_len);
-  EXPECT_EQ(buffer_len, min_buffer_size);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 1);
-  io_mgr.ReturnFreeBuffer(buf, buffer_len);
-  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size);
+  buffer_desc = io_mgr.GetFreeBuffer(reader, dummy_range, buffer_len);
+  EXPECT_TRUE(buffer_desc->buffer() != NULL);
+  EXPECT_EQ(min_buffer_size, buffer_desc->buffer_len());
+  EXPECT_EQ(1, io_mgr.num_allocated_buffers_.Load());
+  io_mgr.FreeBufferMemory(buffer_desc);
+  EXPECT_EQ(min_buffer_size, root_mem_tracker.consumption());
 
   // bump up to next buffer size
   buffer_len = min_buffer_size + 1;
-  buf = io_mgr.GetFreeBuffer(&buffer_len);
-  EXPECT_EQ(buffer_len, min_buffer_size * 2);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 2);
-  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 3);
+  buffer_desc = io_mgr.GetFreeBuffer(reader, dummy_range, buffer_len);
+  EXPECT_TRUE(buffer_desc->buffer() != NULL);
+  EXPECT_EQ(min_buffer_size * 2, buffer_desc->buffer_len());
+  EXPECT_EQ(2, io_mgr.num_allocated_buffers_.Load());
+  EXPECT_EQ(min_buffer_size * 3, root_mem_tracker.consumption());
 
   // gc unused buffer
   io_mgr.GcIoBuffers();
-  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 1);
-  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 2);
+  EXPECT_EQ(1, io_mgr.num_allocated_buffers_.Load());
+  EXPECT_EQ(min_buffer_size * 2, root_mem_tracker.consumption());
 
-  io_mgr.ReturnFreeBuffer(buf, buffer_len);
+  io_mgr.FreeBufferMemory(buffer_desc);
 
   // max buffer size
   buffer_len = max_buffer_size;
-  buf = io_mgr.GetFreeBuffer(&buffer_len);
-  EXPECT_EQ(buffer_len, max_buffer_size);
-  EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 2);
-  io_mgr.ReturnFreeBuffer(buf, buffer_len);
-  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 2 + max_buffer_size);
+  buffer_desc = io_mgr.GetFreeBuffer(reader, dummy_range, buffer_len);
+  EXPECT_TRUE(buffer_desc->buffer() != NULL);
+  EXPECT_EQ(max_buffer_size, buffer_desc->buffer_len());
+  EXPECT_EQ(2, io_mgr.num_allocated_buffers_.Load());
+  io_mgr.FreeBufferMemory(buffer_desc);
+  EXPECT_EQ(min_buffer_size * 2 + max_buffer_size, root_mem_tracker.consumption());
 
   // gc buffers
   io_mgr.GcIoBuffers();
   EXPECT_EQ(io_mgr.num_allocated_buffers_.Load(), 0);
-  EXPECT_EQ(mem_tracker.consumption(), 0);
+  EXPECT_EQ(root_mem_tracker.consumption(), 0);
+  io_mgr.UnregisterContext(reader);
 }
 
 // IMPALA-2366: handle partial read where range goes past end of file.
@@ -995,7 +1016,6 @@ TEST_F(DiskIoMgrTest, PartialRead) {
   struct stat stat_val;
   stat(tmp_file, &stat_val);
 
-  pool_.reset(new ObjectPool);
   scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, read_len, read_len));
 
   ASSERT_OK(io_mgr->Init(&mem_tracker));
@@ -1022,11 +1042,7 @@ TEST_F(DiskIoMgrTest, PartialRead) {
 }
 
 int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  impala::DiskInfo::Init();
-  impala::OsInfo::Init();
-  impala::InitThreading();
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

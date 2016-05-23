@@ -442,8 +442,10 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   DCHECK_EQ(bytes_read, len());
 
   // Create a single buffer desc for the entire scan range and enqueue that.
+  // 'mem_tracker' is NULL because the memory is owned by the HDFS java client,
+  // not the Impala backend.
   BufferDescriptor* desc = io_mgr_->GetBufferDesc(
-      reader_, this, reinterpret_cast<char*>(buffer), 0);
+      reader_, NULL, this, reinterpret_cast<char*>(buffer), 0);
   desc->len_ = bytes_read;
   desc->scan_range_offset_ = 0;
   desc->eosr_ = true;

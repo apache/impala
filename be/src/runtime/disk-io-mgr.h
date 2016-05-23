@@ -237,9 +237,12 @@ class DiskIoMgr {
     /// Returns the offset within the scan range that this buffer starts at
     int64_t scan_range_offset() const { return scan_range_offset_; }
 
-    /// Updates this buffer buffer to be owned by the new tracker. Consumption is
-    /// release from the current tracker and added to the new one.
-    void SetMemTracker(MemTracker* tracker);
+    /// Transfer ownership of buffer memory from 'mem_tracker_' to 'dst' and
+    /// set 'mem_tracker_' to 'dst'.  'mem_tracker_' and 'dst' must be non-NULL.
+    /// Does not check memory limits on 'dst': the caller should check the memory limit
+    /// if a different memory limit may apply to 'dst'.
+    /// TODO: IMPALA-3209: revisit this as part of scanner memory usage revamp.
+    void TransferOwnership(MemTracker* dst);
 
     /// Returns the buffer to the IoMgr. This must be called for every buffer
     /// returned by GetNext()/Read() that did not return an error. This is non-blocking.
@@ -251,19 +254,26 @@ class DiskIoMgr {
     friend class DiskIoRequestContext;
     BufferDescriptor(DiskIoMgr* io_mgr);
 
+    bool is_cached() { return scan_range_->cached_buffer_ != NULL; }
+
+    /// Reset the buffer descriptor to an uninitialized state.
+    void Reset();
+
     /// Resets the buffer descriptor state for a new reader, range and data buffer.
+    /// The buffer memory should already be accounted against MemTracker
     void Reset(DiskIoRequestContext* reader, ScanRange* range, char* buffer,
-        int64_t buffer_len);
+        int64_t buffer_len, MemTracker* mem_tracker);
 
-    DiskIoMgr* io_mgr_;
+    DiskIoMgr* const io_mgr_;
 
-    /// Reader that this buffer is for
+    /// Reader that this buffer is for.
     DiskIoRequestContext* reader_;
 
-    /// The current tracker this buffer is associated with.
+    /// The current tracker this buffer is associated with. After initialisation,
+    /// NULL for cached buffers and non-NULL for all other buffers.
     MemTracker* mem_tracker_;
 
-    /// Scan range that this buffer is for.
+    /// Scan range that this buffer is for. Non-NULL when initialised.
     ScanRange* scan_range_;
 
     /// buffer with the read contents
@@ -684,8 +694,13 @@ class DiskIoMgr {
   /// Pool to allocate BufferDescriptors.
   ObjectPool pool_;
 
-  /// Process memory tracker; needed to account for io buffers.
-  MemTracker* process_mem_tracker_;
+  /// Memory tracker for unused I/O buffers owned by DiskIoMgr.
+  boost::scoped_ptr<MemTracker> free_buffer_mem_tracker_;
+
+  /// Memory tracker for I/O buffers where the DiskIoRequestContext has no MemTracker.
+  /// TODO: once IMPALA-3200 is fixed, there should be no more cases where readers don't
+  /// provide a MemTracker.
+  boost::scoped_ptr<MemTracker> unowned_buffer_mem_tracker_;
 
   /// Number of worker(read) threads per disk. Also the max depth of queued
   /// work to the disk.
@@ -757,25 +772,27 @@ class DiskIoMgr {
   /// Returns the index into free_buffers_ for a given buffer size
   int free_buffers_idx(int64_t buffer_size);
 
-  /// Gets a buffer description object, initialized for this reader, allocating one as
-  /// necessary. buffer_size / min_buffer_size_ should be a power of 2, and buffer_size
-  /// should be <= max_buffer_size_. These constraints will be met if buffer was acquired
-  /// via GetFreeBuffer() (which it should have been).
-  BufferDescriptor* GetBufferDesc(
-      DiskIoRequestContext* reader, ScanRange* range, char* buffer, int64_t buffer_size);
+  /// Returns a buffer to read into with size between 'buffer_size' and
+  /// 'max_buffer_size_', If there is an appropriately-sized free buffer in the
+  /// 'free_buffers_', that is returned, otherwise a new one is allocated.
+  /// The returned *buffer_size must be between 0 and 'max_buffer_size_'.
+  /// The buffer memory is tracked against reader's mem tracker, or
+  /// 'unowned_buffer_mem_tracker_' if the reader does not have one.
+  BufferDescriptor* GetFreeBuffer(DiskIoRequestContext* reader, ScanRange* range,
+      int64_t buffer_size);
 
-  /// Returns a buffer desc object which can now be used for another reader.
-  void ReturnBufferDesc(BufferDescriptor* desc);
+  /// Gets a BufferDescriptor initialized with the provided parameters. The object may be
+  /// recycled or newly allocated. Does not do anything aside from initialize the
+  /// descriptor's fields.
+  BufferDescriptor* GetBufferDesc(DiskIoRequestContext* reader,
+      MemTracker* mem_tracker, ScanRange* range, char* buffer, int64_t buffer_size);
 
   /// Returns the buffer desc and underlying buffer to the disk IoMgr. This also updates
   /// the reader and disk queue state.
   void ReturnBuffer(BufferDescriptor* buffer);
 
-  /// Returns a buffer to read into with size between *buffer_size and max_buffer_size_,
-  /// and *buffer_size is set to the size of the buffer. If there is an
-  /// appropriately-sized free buffer in the 'free_buffers_', that is returned, otherwise
-  /// a new one is allocated. *buffer_size must be between 0 and max_buffer_size_.
-  char* GetFreeBuffer(int64_t* buffer_size);
+  /// Returns a buffer desc object which can now be used for another reader.
+  void ReturnBufferDesc(BufferDescriptor* desc);
 
   /// Garbage collect all unused io buffers. This is currently only triggered when the
   /// process wide limit is hit. This is not good enough. While it is sufficient for
@@ -783,14 +800,10 @@ class DiskIoMgr {
   /// TODO: make this run periodically?
   void GcIoBuffers();
 
-  /// Returns a buffer to the free list. buffer_size / min_buffer_size_ should be a power
-  /// of 2, and buffer_size should be <= max_buffer_size_. These constraints will be met
-  /// if buffer was acquired via GetFreeBuffer() (which it should have been).
-  void ReturnFreeBuffer(char* buffer, int64_t buffer_size);
-
-  /// Returns the buffer in desc (cannot be NULL), sets buffer to NULL and clears the
-  /// mem tracker.
-  void ReturnFreeBuffer(BufferDescriptor* desc);
+  /// Disassociates the desc->buffer_ memory from 'desc' (which cannot be NULL), either
+  /// freeing it or returning it to 'free_buffers_'. Memory tracking is updated to
+  /// reflect the transfer of ownership from desc->mem_tracker_ to the disk I/O mgr.
+  void FreeBufferMemory(BufferDescriptor* desc);
 
   /// Disk worker thread loop. This function retrieves the next range to process on
   /// the disk queue and invokes ReadRange() or Write() depending on the type of Range().

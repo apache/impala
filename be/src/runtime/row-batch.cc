@@ -290,7 +290,7 @@ void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   DCHECK(buffer != NULL);
   io_buffers_.push_back(buffer);
   auxiliary_mem_usage_ += buffer->buffer_len();
-  buffer->SetMemTracker(mem_tracker_);
+  buffer->TransferOwnership(mem_tracker_);
 }
 
 void RowBatch::AddTupleStream(BufferedTupleStream* stream) {
