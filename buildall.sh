@@ -71,9 +71,7 @@ do
     -skiptests)
       TESTS_ACTION=0
       ;;
-    -build_shared_libs)
-      ;;
-    -so)
+    -build_shared_libs|-so)
       MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_shared_libs"
       ;;
     -notests)
