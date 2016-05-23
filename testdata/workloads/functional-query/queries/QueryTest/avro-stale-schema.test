@@ -13,7 +13,7 @@ CREATE EXTERNAL TABLE alltypesagg_staleschema (
   string_col STRING,
   timestamp_col STRING
 )
-LOCATION 'hdfs://localhost:20500//test-warehouse/alltypesaggmultifilesnopart_avro_snap'
+LOCATION '/test-warehouse/alltypesaggmultifilesnopart_avro_snap'
 TBLPROPERTIES ('avro.schema.url'= '/test-warehouse/avro_schemas/functional/alltypesaggmultifilesnopart.json')
 ====
 ---- QUERY
