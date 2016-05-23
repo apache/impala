@@ -140,30 +140,41 @@ class FileArchiver(object):
         msg = 'Success. Archived {0} out of {1} files in "{2}".'
         return status, msg.format(max_num_files, len(self.file_list), self.source_dir)
 
-def get_minidump_dir(conf_dir, role_name):
-  '''Extracts the minidump directory path for a given role from the configuration file.'''
+def get_config_parameter_value(conf_dir, role_name, config_parameter_name):
+  '''Extract a single config parameter from the configuration file of a particular
+  daemon.
+  '''
   ROLE_FLAGFILE_MAP = {
       'impalad': 'impalad_flags',
       'statestored': 'state_store_flags',
       'catalogd': 'catalogserver_flags'}
-  result = None
+  config_parameter_value = None
   try:
     file_path = os.path.join(conf_dir, ROLE_FLAGFILE_MAP[role_name])
     with open(file_path, 'r') as f:
       for line in f:
-        m = re.match('-minidump_path=(.*)', line)
+        m = re.match('-{0}=(.*)'.format(config_parameter_name), line)
         if m:
-          result = m.group(1)
+          config_parameter_value = m.group(1)
   except IOError as e:
     print >> sys.stderr, 'Error: Unable to open "{0}".'.format(file_path)
     sys.exit(1)
-  if result:
-    result = os.path.join(result, role_name)
-    if not os.path.isdir(result):
-      sys.exit(0)
-  else:
-    msg = 'Error: "{0}" does not contain a "-minidump_path" flag.'
-    print >> sys.stderr, msg.format(file_path)
+  return config_parameter_value
+
+def get_minidump_dir(conf_dir, role_name):
+  '''Extracts the minidump directory path for a given role from the configuration file.
+  The directory defaults to 'minidumps', relative paths are prepended with log_dir, which
+  defaults to '/tmp'.
+  '''
+  minidump_path = get_config_parameter_value(
+    conf_dir, role_name, 'minidump_path') or 'minidumps'
+  if not os.path.isabs(minidump_path):
+    log_dir = get_config_parameter_value(conf_dir, role_name, 'log_dir') or '/tmp'
+    minidump_path = os.path.join(log_dir, minidump_path)
+  result = os.path.join(minidump_path, role_name)
+  if not os.path.isdir(result):
+    msg = 'Error: minidump directory does not exist.'
+    print >> sys.stderr, msg
     sys.exit(1)
   return result
 

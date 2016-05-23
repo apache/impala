@@ -39,6 +39,7 @@ using boost::filesystem::path;
 using boost::filesystem::remove;
 using boost::system::error_code;
 
+DECLARE_string(log_dir);
 DECLARE_string(minidump_path);
 DECLARE_int32(max_minidumps);
 DECLARE_int32(minidump_size_limit_hint_kb);
@@ -163,6 +164,11 @@ Status RegisterMinidump(const char* cmd_line_path) {
   registered = true;
 
   if (FLAGS_minidump_path.empty()) return Status::OK();
+
+  if (path(FLAGS_minidump_path).is_relative()) {
+    path log_dir(FLAGS_log_dir);
+    FLAGS_minidump_path = (log_dir / FLAGS_minidump_path).string();
+  }
 
   // Add the daemon name to the path where minidumps will be written. This makes
   // identification easier and prevents name collisions between the files.

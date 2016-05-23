@@ -67,11 +67,13 @@ DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redacti
     "Web UI and audit records. Query results will not be affected. Refer to the "
     "documentation for the rule file format.");
 
-DEFINE_string(minidump_path, "/tmp/impala-minidumps", "Directory to write minidump files "
-    "to. Minidump files contain crash-related information in a compressed format and "
-    "will only be written when a daemon exits unexpectedly, for example on an unhandled "
-    "exception or signal. Each daemon will create its own subdirectory under this "
-    "directory. Set to empty to disable writing minidump files.");
+DEFINE_string(minidump_path, "minidumps", "Directory to write minidump files to. This "
+    "can be either an absolute path or a path relative to log_dir. Each daemon will "
+    "create an additional sub-directory to prevent naming conflicts and to make it "
+    "easier to identify a crashing daemon. Minidump files contain crash-related "
+    "information in a compressed format and will only be written when a daemon exits "
+    "unexpectedly, for example on an unhandled exception or signal. Set to empty to "
+    "disable writing minidump files.");
 
 DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
     "Older files are removed first. Set to 0 to keep all minidump files.");

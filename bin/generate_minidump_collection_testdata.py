@@ -33,7 +33,8 @@ from optparse import OptionParser
 
 parser = OptionParser()
 parser.add_option('--conf_dir', default='/tmp/impala-conf')
-parser.add_option('--minidump_dir', default='/tmp/minidumps')
+parser.add_option('--log_dir', default='/tmp/impala-logs')
+parser.add_option('--minidump_dir', default='minidumps')
 parser.add_option('--start_time', default=None, type='int')
 parser.add_option('--end_time', default=None, type='int')
 parser.add_option('--duration', default=3600, type='int',
@@ -61,7 +62,8 @@ CONFIG_FILE = '''-beeswax_port=21000
 -max_audit_event_log_file_size=5000
 -abort_on_failed_audit_event=false
 -lineage_event_log_dir=/var/log/impalad/lineage
--minidump_path={0}
+-log_dir={0}
+-minidump_path={1}
 -max_lineage_log_file_size=5000
 -hostname=vb0204.halxg.cloudera.com
 -state_store_host=vb0202.halxg.cloudera.com
@@ -88,7 +90,7 @@ def generate_conf_files():
       raise e
   for role_name in ROLE_NAMES:
     with open(os.path.join(options.conf_dir, ROLE_NAMES[role_name]), 'w') as f:
-      f.write(CONFIG_FILE.format(options.minidump_dir))
+      f.write(CONFIG_FILE.format(options.log_dir, options.minidump_dir))
 
 def random_bytes(num):
   return ''.join(chr(random.randint(0, 255)) for _ in range(num))
@@ -112,10 +114,13 @@ def generate_minidumps():
   else:
     start_timestamp = options.start_time
     end_timestamp = options.end_time
-  if os.path.exists(options.minidump_dir):
-    shutil.rmtree(options.minidump_dir)
+  minidump_dir = options.minidump_dir
+  if not os.path.isabs(minidump_dir):
+    minidump_dir = os.path.join(options.log_dir, minidump_dir)
+  if os.path.exists(minidump_dir):
+    shutil.rmtree(minidump_dir)
   for role_name in ROLE_NAMES:
-    os.makedirs(os.path.join(options.minidump_dir, role_name))
+    os.makedirs(os.path.join(minidump_dir, role_name))
     # We want the files to have a high compression ratio and be several megabytes in size.
     # The parameters below should accomplish this.
     repeated_token = random_bytes(256)
@@ -127,7 +132,7 @@ def generate_minidumps():
     for i in xrange(options.num_minidumps):
       write_minidump(common_data,
           start_timestamp + interval * i,
-          os.path.join(options.minidump_dir, role_name))
+          os.path.join(minidump_dir, role_name))
 
 def main():
   generate_conf_files()

@@ -86,12 +86,13 @@ class TestBreakpad(CustomClusterTestSuite):
     assert not self.cluster.statestored
     assert not self.cluster.catalogd
 
-  def count_minidumps(self, daemon):
-    path = os.path.join(self.tmp_dir, daemon)
+  def count_minidumps(self, daemon, base_dir=None):
+    base_dir = base_dir or self.tmp_dir
+    path = os.path.join(base_dir, daemon)
     return len(glob.glob("%s/*.dmp" % path))
 
-  def count_all_minidumps(self):
-    return sum((self.count_minidumps(daemon) for daemon in DAEMONS))
+  def count_all_minidumps(self, base_dir=None):
+    return sum((self.count_minidumps(daemon, base_dir) for daemon in DAEMONS))
 
   def assert_num_logfile_entries(self, expected_count):
     self.assert_impalad_log_contains('INFO', 'Wrote minidump to ',
@@ -111,6 +112,25 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_minidumps('impalad') == cluster_size
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
+
+  @pytest.mark.execute_serially
+  def test_minidump_relative_path(self):
+    """Check that setting 'minidump_path' to a relative value results in minidump files
+    written to 'log_dir'.
+    """
+    minidump_base_dir = os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'minidumps')
+    shutil.rmtree(minidump_base_dir)
+    # Omitting minidump_path as a parameter to the cluster will choose the default
+    # configuration, which is a FLAGS_log_dir/minidumps.
+    self.start_cluster_with_args()
+    assert self.count_all_minidumps(minidump_base_dir) == 0
+    cluster_size = len(self.cluster.impalads)
+    self.kill_cluster(SIGSEGV)
+    self.assert_num_logfile_entries(1)
+    assert self.count_minidumps('impalad', minidump_base_dir) == cluster_size
+    assert self.count_minidumps('statestored', minidump_base_dir) == 1
+    assert self.count_minidumps('catalogd', minidump_base_dir) == 1
+    shutil.rmtree(minidump_base_dir)
 
   @pytest.mark.execute_serially
   def test_minidump_cleanup(self):
