@@ -11,3 +11,9 @@ SELECT 1+
 1;
 SELECT /* This comment block
 is OK */ 2;
+/* Trailing comment -1 */
+-- Trailing comment -2
+/*
+-- query inside a comment
+select 2;
+/* nested comments end */

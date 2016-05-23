@@ -1167,7 +1167,23 @@ def print_to_stderr(message):
 
 def parse_query_text(query_text, utf8_encode_policy='strict'):
   """Parse query file text to extract queries and encode into utf-8"""
-  return [q.encode('utf-8', utf8_encode_policy) for q in sqlparse.split(query_text)]
+  query_list = [q.encode('utf-8', utf8_encode_policy) for q in sqlparse.split(query_text)]
+  # Remove trailing comments in the input, if any. We do this because sqlparse splits the
+  # input at query boundaries and associates the query only with preceding comments
+  # (following comments are associated with the next query). This is a problem with
+  # trailing comments. For example, consider the following input:
+  # -------------
+  # -- comment1
+  # select 1;
+  # -- comment2
+  # -------------
+  # When sqlparse splits the query, "comment1" is associated with the query "select 1" and
+  # "--comment2" is sent as is. Impala's parser however doesn't consider it a valid SQL
+  # and throws an exception. We identify such trailing comments and ignore them (do not
+  # send them to Impala).
+  if query_list and not sqlparse.format(query_list[-1], strip_comments=True).strip("\n"):
+    query_list.pop()
+  return query_list
 
 def parse_variables(keyvals):
   """Parse variable assignments passed as arguments in the command line"""
