@@ -2097,6 +2097,18 @@ public class ParserTest {
       }
     }
 
+    // Test SET COLUMN STATS.
+    ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('numDVs'='10')");
+    ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('numDVs'='10','maxSize'='20')");
+    ParsesOk("ALTER TABLE TestDb.Foo SET COLUMN STATS col ('avgSize'='20')");
+    ParserError("ALTER TABLE SET COLUMN STATS col ('numDVs'='10'");
+    ParserError("ALTER TABLE Foo SET COLUMN STATS ('numDVs'='10'");
+    ParserError("ALTER TABLE Foo SET COLUMN STATS col");
+    ParserError("ALTER TABLE Foo SET COLUMN STATS col ()");
+    ParserError("ALTER TABLE Foo SET COLUMN STATS col (numDVs='10')");
+    ParserError("ALTER TABLE Foo SET COLUMN STATS col ('numDVs'=10)");
+    ParserError("ALTER TABLE Foo PARTITION (p=1) SET COLUMN STATS col ('avgSize'='20')");
+
     for (String cacheClause: Lists.newArrayList("UNCACHED", "CACHED in 'pool'",
         "CACHED in 'pool' with replication = 4")) {
       ParsesOk("ALTER TABLE Foo SET " + cacheClause);

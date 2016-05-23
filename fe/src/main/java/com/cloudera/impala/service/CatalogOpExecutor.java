@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.cloudera.impala.thrift.TDistributeParam;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -80,10 +79,10 @@ import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.catalog.delegates.DdlDelegate;
 import com.cloudera.impala.catalog.delegates.KuduDdlDelegate;
 import com.cloudera.impala.catalog.delegates.UnsupportedOpDelegate;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.InternalException;
@@ -119,6 +118,7 @@ import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlExecResponse;
+import com.cloudera.impala.thrift.TDistributeParam;
 import com.cloudera.impala.thrift.TDropDataSourceParams;
 import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
@@ -543,13 +543,20 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Alters an existing table's table and column statistics. Partitions are updated
+   * Alters an existing table's table and/or column statistics. Partitions are updated
    * in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'.
    */
   private void alterTableUpdateStats(Table table, TAlterTableUpdateStatsParams params,
       TDdlExecResponse resp) throws ImpalaException {
     Preconditions.checkState(Thread.holdsLock(table));
-    Preconditions.checkState(params.isSetPartition_stats() && params.isSetTable_stats());
+    if (params.isSetTable_stats()) {
+      // Updating table and column stats via COMPUTE STATS.
+      Preconditions.checkState(
+          params.isSetPartition_stats() && params.isSetTable_stats());
+    } else {
+      // Only changing column stats via ALTER TABLE SET COLUMN STATS.
+      Preconditions.checkState(params.isSetColumn_stats());
+    }
 
     TableName tableName = table.getTableName();
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
@@ -569,13 +576,15 @@ public class CatalogOpExecutor {
     }
 
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    int numTargetedPartitions;
+    int numTargetedPartitions = 0;
     int numUpdatedColumns = 0;
     try {
       // Update the table and partition row counts based on the query results.
       List<HdfsPartition> modifiedParts = Lists.newArrayList();
-      numTargetedPartitions = updateTableStats(table, params, msTbl, partitions,
-          modifiedParts);
+      if (params.isSetTable_stats()) {
+        numTargetedPartitions = updateTableStats(table, params, msTbl, partitions,
+            modifiedParts);
+      }
 
       ColumnStatistics colStats = null;
       if (params.isSetColumn_stats()) {

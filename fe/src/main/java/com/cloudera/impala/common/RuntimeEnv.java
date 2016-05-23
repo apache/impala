@@ -14,13 +14,11 @@
 
 package com.cloudera.impala.common;
 
-import java.lang.System;
-
-import com.cloudera.impala.thrift.TStartupOptions;
-import com.cloudera.impala.service.FeSupport;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.cloudera.impala.service.FeSupport;
+import com.cloudera.impala.thrift.TStartupOptions;
 
 /**
  * Contains runtime-specific parameters such as the number of CPU cores. Currently only
@@ -63,5 +61,8 @@ public class RuntimeEnv {
   public void setTestEnv(boolean v) { isTestEnv_ = v; }
   public boolean isTestEnv() { return isTestEnv_; }
   public boolean computeLineage() { return computeLineage_; }
+  public boolean isKuduSupported() {
+    return "true".equals(System.getenv("KUDU_IS_SUPPORTED"));
+  }
 
 }

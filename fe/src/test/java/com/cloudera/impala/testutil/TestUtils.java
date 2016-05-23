@@ -1,27 +1,28 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.testutil;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Scanner;
 import java.util.Map;
-import java.io.StringWriter;
-import java.io.StringReader;
+import java.util.Scanner;
 
 import javax.json.Json;
-import javax.json.stream.JsonGenerator;
-import javax.json.JsonReader;
 import javax.json.JsonObject;
+import javax.json.JsonReader;
 import javax.json.JsonWriter;
 import javax.json.JsonWriterFactory;
+import javax.json.stream.JsonGenerator;
 
+import org.junit.Assume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.junit.Assume;
 
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TQueryCtx;
@@ -29,7 +30,6 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TSessionType;
 import com.cloudera.impala.thrift.TUniqueId;
-
 import com.google.common.collect.Maps;
 
 public class TestUtils {
@@ -52,7 +52,7 @@ public class TestUtils {
   static class PathFilter implements ResultFilter {
     private final static String PATH_FILTER = "-*\\d+--\\d+_\\d+.*$";
     private final static String PORT_FILTER = "//\\w+(\\.\\w+)?(\\.\\w+)?:\\d+";
-    private String filterKey_;
+    private final String filterKey_;
 
     public PathFilter(String prefix) { filterKey_ = prefix; }
 
@@ -270,6 +270,6 @@ public class TestUtils {
   }
 
   public static void assumeKuduIsSupported() {
-    Assume.assumeTrue("true".equals(System.getenv("KUDU_IS_SUPPORTED")));
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
   }
 }

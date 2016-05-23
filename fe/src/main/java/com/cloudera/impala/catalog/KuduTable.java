@@ -18,11 +18,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import javax.xml.bind.DatatypeConverter;
 
-import com.cloudera.impala.analysis.AlterTableOrViewRenameStmt;
-import com.cloudera.impala.analysis.AlterTableSetTblProperties;
-import com.cloudera.impala.analysis.AlterTableStmt;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.log4j.Logger;
+import org.kududb.client.KuduClient;
+import org.kududb.client.LocatedTablet;
+
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumn;
@@ -32,21 +37,14 @@ import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
-import com.cloudera.impala.util.TResultRowBuilder;
 import com.cloudera.impala.util.KuduUtil;
+import com.cloudera.impala.util.TResultRowBuilder;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.log4j.Logger;
-import org.kududb.client.KuduClient;
-import org.kududb.client.LocatedTablet;
 
 /**
  * Impala representation of a Kudu table.
@@ -91,11 +89,6 @@ public class KuduTable extends Table {
 
   // The set of columns that are key columns in Kudu.
   private ImmutableList<String> kuduKeyColumnNames_;
-
-  public static boolean alterTableAllowed(AlterTableStmt stmt) {
-    return stmt instanceof AlterTableSetTblProperties ||
-        stmt instanceof AlterTableOrViewRenameStmt;
-  }
 
   protected KuduTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {

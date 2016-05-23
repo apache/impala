@@ -891,12 +891,19 @@ alter_tbl_stmt ::=
     table_property_type:target LPAREN properties_map:properties RPAREN
   {: RESULT = new AlterTableSetTblProperties(table, partition, target, properties); :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
+    KW_COLUMN KW_STATS IDENT:col LPAREN properties_map:map RPAREN
+  {:
+    // The opt_partition_spec is used to avoid conflicts even though
+    // a partition clause does not make sense for this stmt. If a partition
+    // is given, manually throw a parse error.
+    if (partition != null) parser.parseError("set", SqlParserSymbols.KW_SET);
+    RESULT = new AlterTableSetColumnStats(table, col, map);
+  :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
     cache_op_val:cache_op
   {:
     // Ensure a parser error is thrown for ALTER statements if no cache op is specified.
-    if (cache_op == null) {
-      parser.parseError("set", SqlParserSymbols.KW_SET);
-    }
+    if (cache_op == null) parser.parseError("set", SqlParserSymbols.KW_SET);
     RESULT = new AlterTableSetCachedStmt(table, partition, cache_op);
   :}
   | KW_ALTER KW_TABLE table_name:table KW_RECOVER KW_PARTITIONS

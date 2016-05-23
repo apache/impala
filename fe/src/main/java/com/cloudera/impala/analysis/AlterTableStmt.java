@@ -67,7 +67,10 @@ public abstract class AlterTableStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     table_ = analyzer.getTable(tableName_, Privilege.ALTER);
-    if (table_ instanceof KuduTable && !KuduTable.alterTableAllowed(this)) {
+    if (table_ instanceof KuduTable
+        && !(this instanceof AlterTableSetTblProperties)
+        && !(this instanceof AlterTableSetColumnStats)
+        && !(this instanceof AlterTableOrViewRenameStmt)) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on Kudu table: %s", table_.getFullName()));
     }
@@ -75,7 +78,8 @@ public abstract class AlterTableStmt extends StatementBase {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a view: %s", table_.getFullName()));
     }
-    if (table_ instanceof DataSourceTable) {
+    if (table_ instanceof DataSourceTable
+        && !(this instanceof AlterTableSetColumnStats)) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a table produced by a data source: %s",
           table_.getFullName()));

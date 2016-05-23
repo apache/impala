@@ -318,6 +318,14 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/alter-table', vector, use_db='alter_table_test_db',
         multiple_impalad=self._use_multiple_impalad(vector))
 
+  @pytest.mark.execute_serially
+  @SkipIf.not_default_fs
+  def test_alter_set_column_stats(self, vector):
+    self._create_db('alter_table_test_db', sync=True)
+    self.run_test_case('QueryTest/alter-table-set-column-stats',
+        vector, use_db='alter_table_test_db',
+        multiple_impalad=self._use_multiple_impalad(vector))
+
   @SkipIfLocal.hdfs_client
   @pytest.mark.execute_serially
   def test_drop_partition_with_purge(self, vector):

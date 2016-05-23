@@ -1,0 +1,151 @@
+====
+---- QUERY
+create external table alltypes_clone like functional_parquet.alltypes
+location '/test-warehouse/alltypes_parquet';
+alter table alltypes_clone recover partitions;
+====
+---- QUERY
+# Set various column stats.
+alter table alltypes_clone set column stats double_col ('numDVs'='2');
+alter table alltypes_clone set column stats timestamp_col ('numNulls'='9');
+alter table alltypes_clone set column stats int_col ('numDVs'='100','numNulls'='20');
+alter table alltypes_clone set column stats string_col ('maxSize'='555','avgSize'='60');
+====
+---- QUERY
+show column stats alltypes_clone
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',100,20,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',2,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,555,60
+'timestamp_col','TIMESTAMP',-1,9,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Make sure compute stats still works.
+compute stats alltypes_clone
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Reset the column stats to an unknown state by setting the values to -1
+alter table alltypes_clone set column stats double_col ('numDVs'='-1');
+alter table alltypes_clone set column stats timestamp_col ('numNulls'='-1');
+alter table alltypes_clone set column stats int_col ('numDVs'='-1','numNulls'='-1');
+alter table alltypes_clone set column stats string_col ('maxSize'='-1','avgSize'='-1');
+====
+---- QUERY
+show column stats alltypes_clone
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',7505,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',736,-1,8,8
+'string_col','STRING',10,-1,-1,-1
+'timestamp_col','TIMESTAMP',7554,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Also alter a few 'numRows' parameters to make sure manually setting all stats works.
+alter table alltypes_clone partition(year=2009,month=2) set tblproperties('numRows'='280');
+alter table alltypes_clone set tblproperties('numRows'='7300');
+====
+---- QUERY
+# Check that we can query the table.
+select id, int_col, double_col, string_col, timestamp_col from alltypes_clone
+where year = 2009 and month between 2 and 3 and int_col = 9 and id between 300 and 400
+---- RESULTS
+319,9,90.89999999999999,'9',2009-02-01 00:09:00.360000000
+329,9,90.89999999999999,'9',2009-02-02 00:19:00.810000000
+339,9,90.89999999999999,'9',2009-02-03 00:29:01.260000000
+349,9,90.89999999999999,'9',2009-02-04 00:39:01.710000000
+359,9,90.89999999999999,'9',2009-02-05 00:49:02.160000000
+369,9,90.89999999999999,'9',2009-02-06 00:59:02.610000000
+379,9,90.89999999999999,'9',2009-02-07 01:09:03.600000000
+389,9,90.89999999999999,'9',2009-02-08 01:19:03.510000000
+399,9,90.89999999999999,'9',2009-02-09 01:29:03.960000000
+---- TYPES
+INT, INT, DOUBLE, STRING, TIMESTAMP
+====
+---- QUERY
+# Similar test on an HBase table.
+create external table alltypes_hbase_clone like functional_hbase.alltypes
+====
+---- QUERY
+alter table alltypes_hbase_clone set column stats double_col ('numDVs'='2');
+alter table alltypes_hbase_clone set column stats timestamp_col ('numNulls'='9');
+alter table alltypes_hbase_clone set column stats int_col ('numDVs'='100','numNulls'='20');
+alter table alltypes_hbase_clone set column stats string_col ('maxSize'='555','avgSize'='60');
+====
+---- QUERY
+show column stats alltypes_hbase_clone
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',100,20,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',2,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,555,60
+'timestamp_col','TIMESTAMP',-1,9,16,16
+'year','INT',-1,-1,4,4
+'month','INT',-1,-1,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Reset the column stats to an unknown state by setting the values to -1
+alter table alltypes_hbase_clone set column stats double_col ('numDVs'='-1');
+alter table alltypes_hbase_clone set column stats timestamp_col ('numNulls'='-1');
+alter table alltypes_hbase_clone set column stats int_col ('numDVs'='-1','numNulls'='-1');
+alter table alltypes_hbase_clone set column stats string_col ('maxSize'='-1','avgSize'='-1');
+====
+---- QUERY
+show column stats alltypes_hbase_clone
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',-1,-1,4,4
+'month','INT',-1,-1,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====

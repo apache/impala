@@ -47,6 +47,31 @@ public class ColumnStats {
       PrimitiveType.STRING, PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT,
       PrimitiveType.DECIMAL);
 
+  public enum StatsKey {
+    NUM_DISTINCT_VALUES("numDVs"),
+    NUM_NULLS("numNulls"),
+    AVG_SIZE("avgSize"),
+    MAX_SIZE("maxSize");
+
+    private final String name_;
+
+    private StatsKey(String name) { name_ = name; }
+
+    /**
+     * Returns the StatsKey whose name matches 'key'. The comparison is
+     * case insensitive. Returns null if there is no matching StatsKey.
+     */
+    public static StatsKey fromString(String key) {
+      for (StatsKey k: values()) {
+        if (key.equalsIgnoreCase(k.name_)) return k;
+      }
+      return null;
+    }
+
+    @Override
+    public String toString() { return name_; }
+  }
+
   // in bytes: excludes serialization overhead
   private double avgSize_;
   // in bytes; includes serialization overhead.
@@ -57,6 +82,17 @@ public class ColumnStats {
 
   public ColumnStats(Type colType) {
     initColStats(colType);
+  }
+
+  /**
+   * C'tor for clone().
+   */
+  private ColumnStats(ColumnStats other) {
+    avgSize_ = other.avgSize_;
+    avgSerializedSize_ = other.avgSerializedSize_;
+    maxSize_ = other.maxSize_;
+    numDistinctValues_ = other.numDistinctValues_;
+    numNulls_ = other.numNulls_;
   }
 
   /**
@@ -118,13 +154,14 @@ public class ColumnStats {
     return this;
   }
 
-  public void setAvgSerializedSize(float avgSize) { this.avgSerializedSize_ = avgSize; }
-  public void setMaxSize(long maxSize) { this.maxSize_ = maxSize; }
+  public void setAvgSize(float avgSize) { avgSize_ = avgSize; }
+  public void setAvgSerializedSize(float avgSize) { avgSerializedSize_ = avgSize; }
+  public void setMaxSize(long maxSize) { maxSize_ = maxSize; }
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setNumDistinctValues(long numDistinctValues) {
     this.numDistinctValues_ = numDistinctValues;
   }
-  public void setNumNulls(long numNulls) { this.numNulls_ = numNulls; }
+  public void setNumNulls(long numNulls) { numNulls_ = numNulls; }
   public double getAvgSerializedSize() { return avgSerializedSize_; }
   public double getAvgSize() { return avgSize_; }
   public long getMaxSize() { return maxSize_; }
@@ -216,6 +253,40 @@ public class ColumnStats {
   }
 
   /**
+   * Sets the member corresponding to the given stats key to 'value'.
+   * Requires that the given value is of a type appropriate for the
+   * member being set. Throws if that is not the case.
+   */
+  public void update(StatsKey key, Number value) {
+    Preconditions.checkNotNull(key);
+    Preconditions.checkNotNull(value);
+    if (key == StatsKey.AVG_SIZE) {
+      Preconditions.checkArgument(value instanceof Float);
+    } else {
+      Preconditions.checkArgument(value instanceof Long);
+    }
+    switch (key) {
+      case NUM_DISTINCT_VALUES: {
+        numDistinctValues_ = (Long) value;
+        break;
+      }
+      case NUM_NULLS: {
+        numNulls_ = (Long) value;
+        break;
+      }
+      case AVG_SIZE: {
+        avgSize_ = (Float) value;
+        break;
+      }
+      case MAX_SIZE: {
+        maxSize_ = (Long) value;
+        break;
+      }
+      default: Preconditions.checkState(false);
+    }
+  }
+
+  /**
    * Returns true if the given PrimitiveType supports column stats updates.
    */
   public static boolean isSupportedColType(Type colType) {
@@ -254,4 +325,7 @@ public class ColumnStats {
         .add("numNulls_", numNulls_)
         .toString();
   }
+
+  @Override
+  public ColumnStats clone() { return new ColumnStats(this); }
 }

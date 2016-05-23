@@ -63,7 +63,7 @@ enum TAlterTableType {
   SET_FILE_FORMAT,
   SET_LOCATION,
   SET_TBL_PROPERTIES,
-  // Used internally by the COMPUTE STATS DDL command.
+  // Used internally by COMPUTE STATS and by ALTER TABLE SET COLUMN STATS.
   UPDATE_STATS,
   SET_CACHED,
   RECOVER_PARTITIONS,
@@ -282,7 +282,8 @@ struct TAlterTableSetLocationParams {
 }
 
 // Parameters for updating the table and/or column statistics
-// of a table. Used internally by a COMPUTE STATS command.
+// of a table. Used by ALTER TABLE SET COLUMN STATS, and internally by
+// a COMPUTE STATS command.
 struct TAlterTableUpdateStatsParams {
   // Fully qualified name of the table to be updated.
   1: required CatalogObjects.TTableName table_name

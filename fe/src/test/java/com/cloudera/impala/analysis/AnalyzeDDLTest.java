@@ -19,6 +19,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
@@ -32,7 +33,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.ArrayType;
 import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.analysis.CreateTableStmt;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -42,8 +43,10 @@ import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.util.MetaStoreUtil;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -563,6 +566,146 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Partition spec does not exist: (year=9999, month=1).");
   }
 
+  @Test
+  public void TestAlterTableSetColumnStats() {
+    // Contains entries of the form 'statsKey'='statsValue' for every
+    // stats key. A dummy value is used for 'statsValue'.
+    List<String> testKeyValues = Lists.newArrayList();
+    for (ColumnStats.StatsKey statsKey: ColumnStats.StatsKey.values()) {
+      testKeyValues.add(String.format("'%s'='10'", statsKey));
+    }
+    // Test updating all stats keys individually.
+    for (String kv: testKeyValues) {
+      AnalyzesOk(String.format(
+          "alter table functional.alltypes set column stats string_col (%s)", kv));
+      // Stats key is case-insensitive.
+      AnalyzesOk(String.format(
+          "alter table functional.alltypes set column stats string_col (%s)",
+          kv.toLowerCase()));
+      AnalyzesOk(String.format(
+          "alter table functional.alltypes set column stats string_col (%s)",
+          kv.toUpperCase()));
+    }
+    // Test updating all stats keys at once in a single statement.
+    AnalyzesOk(String.format(
+        "alter table functional.alltypes set column stats string_col (%s)",
+        Joiner.on(",").join(testKeyValues)));
+    // Test setting all stats keys to -1 (unknown).
+    for (ColumnStats.StatsKey statsKey:  ColumnStats.StatsKey.values()) {
+      AnalyzesOk(String.format(
+          "alter table functional.alltypes set column stats string_col ('%s'='-1')",
+          statsKey));
+    }
+    // Duplicate stats keys are valid. The last entry is used.
+    AnalyzesOk("alter table functional.alltypes set column stats " +
+        "int_col ('numDVs'='2','numDVs'='3')");
+
+    // Test updating stats on all scalar types.
+    for (Type t: Type.getSupportedTypes()) {
+      if (t.isNull()) continue;
+      Preconditions.checkState(t.isScalarType());
+      String typeStr = t.getPrimitiveType().toString();
+      if (t.getPrimitiveType() == PrimitiveType.CHAR ||
+          t.getPrimitiveType() == PrimitiveType.VARCHAR) {
+        typeStr += "(60)";
+      }
+      String tblName = "t_" + t.getPrimitiveType();
+      addTestTable(String.format("create table %s (c %s)", tblName, typeStr));
+      AnalyzesOk(String.format(
+          "alter table %s set column stats c ('%s'='100','%s'='10')",
+          tblName, ColumnStats.StatsKey.NUM_DISTINCT_VALUES,
+          ColumnStats.StatsKey.NUM_NULLS));
+      // Test setting stats values to -1 (unknown).
+      AnalyzesOk(String.format(
+          "alter table %s set column stats c ('%s'='-1','%s'='-1')",
+          tblName, ColumnStats.StatsKey.NUM_DISTINCT_VALUES,
+          ColumnStats.StatsKey.NUM_NULLS));
+    }
+
+    // Setting stats works on all table types.
+    AnalyzesOk("alter table functional_hbase.alltypes set column stats " +
+        "int_col ('numNulls'='2')");
+    AnalyzesOk("alter table functional.alltypes_datasource set column stats " +
+        "int_col ('numDVs'='2')");
+    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
+      AnalyzesOk("alter table functional_kudu.testtbl set column stats " +
+          "name ('numNulls'='2')");
+    }
+
+    // Table does not exist.
+    AnalysisError("alter table bad_tbl set column stats int_col ('numNulls'='2')",
+        "Table does not exist: default.bad_tbl");
+    // Column does not exist.
+    AnalysisError(
+        "alter table functional.alltypes set column stats bad_col ('numNulls'='2')",
+        "Column 'bad_col' does not exist in table: functional.alltypes");
+
+    // Cannot set column stats of a view.
+    AnalysisError(
+        "alter table functional.alltypes_view set column stats int_col ('numNulls'='2')",
+        "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot set column stats of partition columns.
+    AnalysisError(
+        "alter table functional.alltypes set column stats month ('numDVs'='10')",
+        "Updating the stats of a partition column is not allowed: month");
+    // Cannot set the size of a fixed-length column.
+    AnalysisError(
+        "alter table functional.alltypes set column stats int_col ('maxSize'='10')",
+        "Cannot update the 'maxSize' stats of column 'int_col' with type 'INT'.\n" +
+        "Changing 'maxSize' is only allowed for variable-length columns.");
+    AnalysisError(
+        "alter table functional.alltypes set column stats int_col ('avgSize'='10')",
+        "Cannot update the 'avgSize' stats of column 'int_col' with type 'INT'.\n" +
+        "Changing 'avgSize' is only allowed for variable-length columns.");
+    // Cannot set column stats of complex-typed columns.
+    AnalysisError(
+        "alter table functional.allcomplextypes set column stats int_array_col " +
+        "('numNulls'='10')",
+        "Statistics for column 'int_array_col' are not supported because " +
+        "it has type 'ARRAY<INT>'.");
+    AnalysisError(
+        "alter table functional.allcomplextypes set column stats int_map_col " +
+        "('numDVs'='10')",
+        "Statistics for column 'int_map_col' are not supported because " +
+        "it has type 'MAP<STRING,INT>'.");
+    AnalysisError(
+        "alter table functional.allcomplextypes set column stats int_struct_col " +
+        "('numDVs'='10')",
+        "Statistics for column 'int_struct_col' are not supported because " +
+        "it has type 'STRUCT<f1:INT,f2:INT>'.");
+
+    // Invalid stats key.
+    AnalysisError(
+        "alter table functional.alltypes set column stats int_col ('badKey'='10')",
+        "Invalid column stats key: badKey");
+    AnalysisError(
+        "alter table functional.alltypes set column stats " +
+        "int_col ('numDVs'='10',''='10')",
+        "Invalid column stats key: ");
+    // Invalid long stats values.
+    AnalysisError(
+        "alter table functional.alltypes set column stats int_col ('numDVs'='bad')",
+        "Invalid stats value 'bad' for column stats key: numDVs");
+    AnalysisError(
+        "alter table functional.alltypes set column stats int_col ('numDVs'='-10')",
+        "Invalid stats value '-10' for column stats key: numDVs");
+    // Invalid float stats values.
+    AnalysisError(
+        "alter table functional.alltypes set column stats string_col ('avgSize'='bad')",
+        "Invalid stats value 'bad' for column stats key: avgSize");
+    AnalysisError(
+        "alter table functional.alltypes set column stats string_col ('avgSize'='-1.5')",
+        "Invalid stats value '-1.5' for column stats key: avgSize");
+    AnalysisError(
+        "alter table functional.alltypes set column stats string_col ('avgSize'='-0.5')",
+        "Invalid stats value '-0.5' for column stats key: avgSize");
+    AnalysisError(
+        "alter table functional.alltypes set column stats string_col ('avgSize'='NaN')",
+        "Invalid stats value 'NaN' for column stats key: avgSize");
+    AnalysisError(
+        "alter table functional.alltypes set column stats string_col ('avgSize'='inf')",
+        "Invalid stats value 'inf' for column stats key: avgSize");
+  }
 
   @Test
   public void TestAlterTableSetAvroProperties() {
