@@ -174,6 +174,9 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       if(len(subsection_info) == 2):
         subsection_name, subsection_comment = subsection_info
 
+      lines_content = lines[1:-1]
+      subsection_str = '\n'.join([line for line in lines_content])
+
       if subsection_name not in valid_section_names:
         if skip_unknown_sections or not subsection_name:
           print sub_section
@@ -194,7 +197,17 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
           else:
             raise RuntimeError, 'Unknown subsection comment: %s' % comment
 
-      parsed_sections[subsection_name] = '\n'.join([line for line in lines[1:-1]])
+      if subsection_name == 'CATCH':
+        parsed_sections['CATCH'] = list()
+        if subsection_comment == None:
+          parsed_sections['CATCH'].append(subsection_str)
+        elif subsection_comment == 'ANY_OF':
+          parsed_sections['CATCH'].extend(lines_content)
+        else:
+          raise RuntimeError, 'Unknown subsection comment: %s' % subsection_comment
+        continue
+
+      parsed_sections[subsection_name] = subsection_str
 
     if parsed_sections:
       sections.append(parsed_sections)

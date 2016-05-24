@@ -163,8 +163,7 @@ class ImpalaTestSuite(BaseTestSuite):
     self.client.set_configuration({'sync_ddl': sync_ddl})
     self.client.execute("drop database if exists `" + db_name + "` cascade")
 
-  @classmethod
-  def restore_query_options(self, query_options_changed):
+  def __restore_query_options(self, query_options_changed):
     """
     Restore the list of modified query options to their default values.
     """
@@ -188,6 +187,25 @@ class ImpalaTestSuite(BaseTestSuite):
         self.client.execute(query_str)
       except Exception as e:
         LOG.info('Unexpected exception when executing ' + query_str + ' : ' + str(e))
+
+  def __verify_exceptions(self, expected_strs, actual_str, use_db):
+    """
+    Verifies that at least one of the strings in 'expected_str' is a substring of the
+    actual exception string 'actual_str'.
+    """
+    actual_str = actual_str.replace('\n', '')
+    for expected_str in expected_strs:
+      # In error messages, some paths are always qualified and some are not.
+      # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.
+      expected_str = expected_str.strip() \
+          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
+          .replace('$NAMENODE', NAMENODE) \
+          .replace('$IMPALA_HOME', IMPALA_HOME)
+      if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
+      # Strip newlines so we can split error message into multiple lines
+      expected_str = expected_str.replace('\n', '')
+      if expected_str in actual_str: return
+    assert False, 'Unexpected exception string: %s' % actual_str
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
       encoding=None, wait_secs_between_stmts=None):
@@ -275,22 +293,12 @@ class ImpalaTestSuite(BaseTestSuite):
             time.sleep(wait_secs_between_stmts)
       except Exception as e:
         if 'CATCH' in test_section:
-          # In error messages, some paths are always qualified and some are not.
-          # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.
-          expected_str = test_section['CATCH'].strip() \
-              .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
-              .replace('$NAMENODE', NAMENODE) \
-              .replace('$IMPALA_HOME', IMPALA_HOME)
-          if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
-          # Strip newlines so we can split error message into multiple lines
-          expected_str = expected_str.replace('\n', '')
-          actual_str = str(e).replace('\n', '')
-          assert expected_str in actual_str
+          self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
           continue
         raise
       finally:
         if len(query_options_changed) > 0:
-          self.restore_query_options(query_options_changed)
+          self.__restore_query_options(query_options_changed)
 
       if 'CATCH' in test_section:
         assert test_section['CATCH'].strip() == ''

@@ -29,8 +29,9 @@ SELECT straight_join * FROM orders o
 RIGHT OUTER JOIN lineitem l ON o.o_orderkey =  if(l.l_orderkey % 2 = 0, 0, l.l_orderkey)
 ORDER BY l_receiptdate, l_orderkey, l_shipdate
 limit 10
----- CATCH
+---- CATCH: ANY_OF
 Repartitioning did not reduce the size of a spilled partition
+Memory limit exceeded
 ====
 ---- QUERY
 # Regression test for IMPALA-2612. The following query will cause CastToChar
