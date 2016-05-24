@@ -88,20 +88,23 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   is_prepared_ = true;
   // TODO: Break this method up.
   fragment_sw_.Start();
-  const TPlanFragmentExecParams& params = request.params;
-  query_id_ = request.fragment_instance_ctx.query_ctx.query_id;
+  const TPlanFragmentInstanceCtx& fragment_instance_ctx = request.fragment_instance_ctx;
+  query_id_ = request.query_ctx.query_id;
 
   VLOG_QUERY << "Prepare(): query_id=" << PrintId(query_id_) << " instance_id="
              << PrintId(request.fragment_instance_ctx.fragment_instance_id);
-  VLOG(2) << "params:\n" << ThriftDebugString(params);
+  VLOG(2) << "fragment_instance_ctx:\n" << ThriftDebugString(fragment_instance_ctx);
 
-  if (request.__isset.reserved_resource) {
+  DCHECK(request.__isset.fragment_ctx);
+  bool request_has_reserved_resource =
+      request.fragment_instance_ctx.__isset.reserved_resource;
+  if (request_has_reserved_resource) {
     VLOG_QUERY << "Executing fragment in reserved resource:\n"
-               << request.reserved_resource;
+               << request.fragment_instance_ctx.reserved_resource;
   }
 
   string cgroup = "";
-  if (FLAGS_enable_rm && request.__isset.reserved_resource) {
+  if (FLAGS_enable_rm && request_has_reserved_resource) {
     cgroup = exec_env_->cgroups_mgr()->UniqueIdToCgroup(PrintId(query_id_, "_"));
   }
 
@@ -114,34 +117,34 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   SCOPED_TIMER(profile()->total_time_counter());
 
   // Register after setting runtime_state_ to ensure proper cleanup.
-  if (FLAGS_enable_rm && !cgroup.empty() && request.__isset.reserved_resource) {
+  if (FLAGS_enable_rm && !cgroup.empty() && request_has_reserved_resource) {
     bool is_first;
     RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
         request.fragment_instance_ctx.fragment_instance_id, cgroup, &is_first));
     // The first fragment using cgroup sets the cgroup's CPU shares based on the reserved
     // resource.
     if (is_first) {
-      DCHECK(request.__isset.reserved_resource);
+      DCHECK(request_has_reserved_resource);
       int32_t cpu_shares = exec_env_->cgroups_mgr()->VirtualCoresToCpuShares(
-          request.reserved_resource.v_cpu_cores);
+          request.fragment_instance_ctx.reserved_resource.v_cpu_cores);
       RETURN_IF_ERROR(exec_env_->cgroups_mgr()->SetCpuShares(cgroup, cpu_shares));
     }
   }
 
   // TODO: Find the reservation id when the resource request is not set
-  if (FLAGS_enable_rm && request.__isset.reserved_resource) {
+  if (FLAGS_enable_rm && request_has_reserved_resource) {
     TUniqueId reservation_id;
-    reservation_id << request.reserved_resource.reservation_id;
+    reservation_id << request.fragment_instance_ctx.reserved_resource.reservation_id;
 
     // TODO: Combine this with RegisterFragment() etc.
     QueryResourceMgr* res_mgr;
     bool is_first = exec_env_->resource_broker()->GetQueryResourceMgr(query_id_,
-        reservation_id, request.local_resource_address, &res_mgr);
+        reservation_id, request.fragment_instance_ctx.local_resource_address, &res_mgr);
     DCHECK(res_mgr != NULL);
     runtime_state_->SetQueryResourceMgr(res_mgr);
     if (is_first) {
       runtime_state_->query_resource_mgr()->InitVcoreAcquisition(
-          request.reserved_resource.v_cpu_cores);
+          request.fragment_instance_ctx.reserved_resource.v_cpu_cores);
     }
   }
 
@@ -155,9 +158,11 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   int64_t rm_reservation_size_bytes = -1;
-  if (request.__isset.reserved_resource && request.reserved_resource.memory_mb > 0) {
-    rm_reservation_size_bytes =
-        static_cast<int64_t>(request.reserved_resource.memory_mb) * 1024L * 1024L;
+  if (request_has_reserved_resource &&
+      request.fragment_instance_ctx.reserved_resource.memory_mb > 0) {
+    int64_t rm_reservation_size_mb =
+      static_cast<int64_t>(request.fragment_instance_ctx.reserved_resource.memory_mb);
+    rm_reservation_size_bytes = rm_reservation_size_mb * 1024L * 1024L;
     // Queries that use more than the hard limit will be killed, so it's not useful to
     // have a reservation larger than the hard limit. Clamp reservation bytes limit to the
     // hard limit (if it exists).
@@ -171,8 +176,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
                << PrettyPrinter::Print(rm_reservation_size_bytes, TUnit::BYTES);
   }
 
-  DCHECK(!params.request_pool.empty());
-  runtime_state_->InitMemTrackers(query_id_, &params.request_pool,
+  DCHECK(!fragment_instance_ctx.request_pool.empty());
+  runtime_state_->InitMemTrackers(query_id_, &fragment_instance_ctx.request_pool,
       bytes_limit, rm_reservation_size_bytes);
   RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
 
@@ -197,25 +202,26 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;
-  DCHECK(request.__isset.desc_tbl);
+  DCHECK(request.__isset.query_ctx);
+  DCHECK(request.query_ctx.__isset.desc_tbl);
   RETURN_IF_ERROR(
-      DescriptorTbl::Create(obj_pool(), request.desc_tbl, &desc_tbl));
+      DescriptorTbl::Create(obj_pool(), request.query_ctx.desc_tbl, &desc_tbl));
   runtime_state_->set_desc_tbl(desc_tbl);
   VLOG_QUERY << "descriptor table for fragment="
              << request.fragment_instance_ctx.fragment_instance_id
              << "\n" << desc_tbl->DebugString();
 
   // set up plan
-  DCHECK(request.__isset.fragment);
-  RETURN_IF_ERROR(ExecNode::CreateTree(runtime_state_.get(), request.fragment.plan,
-      *desc_tbl, &plan_));
+  DCHECK(request.__isset.fragment_ctx);
+  RETURN_IF_ERROR(ExecNode::CreateTree(runtime_state_.get(),
+      request.fragment_ctx.fragment.plan, *desc_tbl, &plan_));
   runtime_state_->set_fragment_root_id(plan_->id());
 
-  if (request.params.__isset.debug_node_id) {
-    DCHECK(request.params.__isset.debug_action);
-    DCHECK(request.params.__isset.debug_phase);
-    ExecNode::SetDebugOptions(request.params.debug_node_id,
-        request.params.debug_phase, request.params.debug_action, plan_);
+  if (fragment_instance_ctx.__isset.debug_node_id) {
+    DCHECK(fragment_instance_ctx.__isset.debug_action);
+    DCHECK(fragment_instance_ctx.__isset.debug_phase);
+    ExecNode::SetDebugOptions(fragment_instance_ctx.debug_node_id,
+        fragment_instance_ctx.debug_phase, fragment_instance_ctx.debug_action, plan_);
   }
 
   // set #senders of exchange nodes before calling Prepare()
@@ -224,7 +230,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   for (ExecNode* exch_node: exch_nodes)
   {
     DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
-    int num_senders = FindWithDefault(params.per_exch_num_senders,
+    int num_senders = FindWithDefault(fragment_instance_ctx.per_exch_num_senders,
         exch_node->id(), 0);
     DCHECK_GT(num_senders, 0);
     static_cast<ExchangeNode*>(exch_node)->set_num_senders(num_senders);
@@ -237,7 +243,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   for (int i = 0; i < scan_nodes.size(); ++i) {
     ScanNode* scan_node = static_cast<ScanNode*>(scan_nodes[i]);
     const vector<TScanRangeParams>& scan_ranges = FindWithDefault(
-        params.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
+        fragment_instance_ctx.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
     scan_node->SetScanRanges(scan_ranges);
   }
 
@@ -247,13 +253,14 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   }
 
-  PrintVolumeIds(params.per_node_scan_ranges);
+  PrintVolumeIds(fragment_instance_ctx.per_node_scan_ranges);
 
   // set up sink, if required
-  if (request.fragment.__isset.output_sink) {
+  if (request.fragment_ctx.fragment.__isset.output_sink) {
     RETURN_IF_ERROR(DataSink::CreateDataSink(
-        obj_pool(), request.fragment.output_sink, request.fragment.output_exprs,
-        params, row_desc(), &sink_));
+        obj_pool(), request.fragment_ctx.fragment.output_sink,
+        request.fragment_ctx.fragment.output_exprs,
+        fragment_instance_ctx, row_desc(), &sink_));
     RETURN_IF_ERROR(sink_->Prepare(runtime_state()));
 
     RuntimeProfile* sink_profile = sink_->profile();

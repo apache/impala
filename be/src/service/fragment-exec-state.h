@@ -29,7 +29,7 @@ namespace impala {
 class FragmentMgr::FragmentExecState {
  public:
   FragmentExecState(const TExecPlanFragmentParams& params, ExecEnv* exec_env)
-    : fragment_instance_ctx_(params.fragment_instance_ctx),
+    : query_ctx_(params.query_ctx), fragment_instance_ctx_(params.fragment_instance_ctx),
       executor_(exec_env, boost::bind<void>(
           boost::mem_fn(&FragmentMgr::FragmentExecState::ReportStatusCb),
               this, _1, _2, _3)),
@@ -50,17 +50,13 @@ class FragmentMgr::FragmentExecState {
   /// Main loop of plan fragment execution. Blocks until execution finishes.
   void Exec();
 
-  const TUniqueId& query_id() const {
-    return fragment_instance_ctx_.query_ctx.query_id;
-  }
+  const TUniqueId& query_id() const { return query_ctx_.query_id; }
 
   const TUniqueId& fragment_instance_id() const {
     return fragment_instance_ctx_.fragment_instance_id;
   }
 
-  const TNetworkAddress& coord_address() const {
-    return fragment_instance_ctx_.query_ctx.coord_address;
-  }
+  const TNetworkAddress& coord_address() const { return query_ctx_.coord_address; }
 
   /// Set the execution thread, taking ownership of the object.
   void set_exec_thread(Thread* exec_thread) { exec_thread_.reset(exec_thread); }
@@ -69,6 +65,7 @@ class FragmentMgr::FragmentExecState {
   void PublishFilter(int32_t filter_id, const TBloomFilter& thrift_bloom_filter);
 
  private:
+  TQueryCtx query_ctx_;
   TPlanFragmentInstanceCtx fragment_instance_ctx_;
   PlanFragmentExecutor executor_;
   ImpalaBackendClientCache* client_cache_;

@@ -284,25 +284,19 @@ struct TQueryCtx {
   // results returned from multiple scan nodes are consistent.
   // This defaults to -1 when no timestamp is specified.
   11: optional i64 snapshot_timestamp = -1;
+
+  // Contains only the union of those descriptors referenced by list of fragments destined
+  // for a single host. Optional for frontend tests.
+  12: optional Descriptors.TDescriptorTable desc_tbl
 }
 
-// Context of a fragment instance, including its unique id, the total number
-// of fragment instances, the query context, the coordinator address, etc.
-struct TPlanFragmentInstanceCtx {
-  // context of the query this fragment instance belongs to
-  1: required TQueryCtx query_ctx
-
-  // the globally unique fragment instance id
-  2: required Types.TUniqueId fragment_instance_id
-
-  // ordinal of this fragment instance, range [0, num_fragment_instances)
-  3: required i32 per_fragment_instance_idx
+// Context to collect information, which is shared among all instances of that plan
+// fragment.
+struct TPlanFragmentCtx {
+  1: required Planner.TPlanFragment fragment
 
   // total number of instances of this fragment
-  4: required i32 num_fragment_instances
-
-  // Index of this fragment instance across all combined instances in this query.
-  5: required i32 fragment_instance_idx
+  2: required i32 num_fragment_instances
 }
 
 // A scan range plus the parameters needed to execute that scan.
@@ -322,34 +316,52 @@ struct TPlanFragmentDestination {
   2: required Types.TNetworkAddress server
 }
 
-// Parameters for a single execution instance of a particular TPlanFragment
+// Execution parameters of a fragment instance, including its unique id, the total number
+// of fragment instances, the query context, the coordinator address, etc.
 // TODO: for range partitioning, we also need to specify the range boundaries
-struct TPlanFragmentExecParams {
-  // initial scan ranges for each scan node in TPlanFragment.plan_tree
-  1: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+struct TPlanFragmentInstanceCtx {
+  // the globally unique fragment instance id
+  1: required Types.TUniqueId fragment_instance_id
 
-  // number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
+  // Index of this fragment instance accross all instances of its parent fragment,
+  // range [0, TPlanFragmentCtx.num_fragment_instances).
+  2: required i32 fragment_instance_idx
+
+  // Index of this fragment instance in Coordinator::fragment_instance_states_.
+  3: required i32 instance_state_idx
+
+  // Initial scan ranges for each scan node in TPlanFragment.plan_tree
+  4: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+
+  // Number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
   // needed to create a DataStreamRecvr
-  2: required map<Types.TPlanNodeId, i32> per_exch_num_senders
+  5: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
   // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
-  3: list<TPlanFragmentDestination> destinations
+  6: list<TPlanFragmentDestination> destinations
 
   // Debug options: perform some action in a particular phase of a particular node
-  4: optional Types.TPlanNodeId debug_node_id
-  5: optional PlanNodes.TExecNodePhase debug_phase
-  6: optional PlanNodes.TDebugAction debug_action
+  7: optional Types.TPlanNodeId debug_node_id
+  8: optional PlanNodes.TExecNodePhase debug_phase
+  9: optional PlanNodes.TDebugAction debug_action
 
   // The pool to which this request has been submitted. Used to update pool statistics
   // for admission control.
-  7: optional string request_pool
+  10: optional string request_pool
 
   // Id of this fragment in its role as a sender.
-  8: optional i32 sender_id
+  11: optional i32 sender_id
+
+  // Resource reservation to run this plan fragment in.
+  12: optional Llama.TAllocatedResource reserved_resource
+
+  // Address of local node manager (used for expanding resource allocations)
+  13: optional Types.TNetworkAddress local_resource_address
 }
+
 
 // Service Protocol Details
 
@@ -363,25 +375,15 @@ enum ImpalaInternalServiceVersion {
 struct TExecPlanFragmentParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
-  // required in V1
-  2: optional Planner.TPlanFragment fragment
+  // Context of the query, which this fragment is part of.
+  2: optional TQueryCtx query_ctx
 
-  // required in V1
-  // Contains only those descriptors referenced by fragment's scan nodes and data sink
-  3: optional Descriptors.TDescriptorTable desc_tbl
+  // Context of this fragment.
+  3: optional TPlanFragmentCtx fragment_ctx
 
-  // required in V1
-  4: optional TPlanFragmentExecParams params
-
-  // Context of this fragment, including its instance id, the total number fragment
-  // instances, the query context, etc.
-  5: optional TPlanFragmentInstanceCtx fragment_instance_ctx
-
-  // Resource reservation to run this plan fragment in.
-  6: optional Llama.TAllocatedResource reserved_resource
-
-  // Address of local node manager (used for expanding resource allocations)
-  7: optional Types.TNetworkAddress local_resource_address
+  // Context of this fragment instance, including its instance id, the total number
+  // fragment instances, the query context, etc.
+  4: optional TPlanFragmentInstanceCtx fragment_instance_ctx
 }
 
 struct TExecPlanFragmentResult {
@@ -450,9 +452,10 @@ struct TReportExecStatusParams {
   // required in V1
   2: optional Types.TUniqueId query_id
 
-  // passed into ExecPlanFragment() as TPlanFragmentInstanceCtx.backend_num
   // required in V1
-  3: optional i32 fragment_instance_idx
+  // Used to look up the fragment instance state in the coordinator, same value as
+  // TExecPlanFragmentParams.instance_state_idx.
+  3: optional i32 instance_state_idx
 
   // required in V1
   4: optional Types.TUniqueId fragment_instance_id

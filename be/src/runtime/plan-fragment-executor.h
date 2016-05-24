@@ -40,7 +40,6 @@ class RuntimeState;
 class TRowBatch;
 class TPlanExecRequest;
 class TPlanFragment;
-class TPlanFragmentExecParams;
 class TPlanExecParams;
 
 /// PlanFragmentExecutor handles all aspects of the execution of a single plan fragment,
@@ -242,7 +241,7 @@ class PlanFragmentExecutor {
 
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 
-  /// typedef for TPlanFragmentExecParams.per_node_scan_ranges
+  /// typedef for TPlanFragmentInstanceCtx.per_node_scan_ranges
   typedef std::map<TPlanNodeId, std::vector<TScanRangeParams> > PerNodeScanRanges;
 
   /// Main loop of profile reporting thread.

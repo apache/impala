@@ -42,7 +42,7 @@ typedef boost::unordered_map<TNetworkAddress, PerNodeScanRanges>
     FragmentScanRangeAssignment;
 
 /// execution parameters for a single fragment; used to assemble the
-/// per-fragment instance TPlanFragmentExecParams;
+/// TPlanFragmentInstanceCtx;
 /// hosts.size() == instance_ids.size()
 struct FragmentExecParams {
   std::vector<TNetworkAddress> hosts; // execution backends

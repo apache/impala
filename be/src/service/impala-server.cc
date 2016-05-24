@@ -1087,7 +1087,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
 void ImpalaServer::ReportExecStatus(
     TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {
   VLOG_FILE << "ReportExecStatus() query_id=" << params.query_id
-            << " fragment instance#=" << params.fragment_instance_idx
+            << " fragment instance#=" << params.instance_state_idx
             << " instance_id=" << params.fragment_instance_id
             << " done=" << (params.done ? "true" : "false");
   // TODO: implement something more efficient here, we're currently
@@ -1104,7 +1104,7 @@ void ImpalaServer::ReportExecStatus(
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
         "query ID (probably closed or cancelled). (query_id: $0, backend: $1, instance:"
         " $2 done: $3)", PrintId(params.query_id),
-        params.fragment_instance_idx, PrintId(params.fragment_instance_id),
+        params.instance_state_idx, PrintId(params.fragment_instance_id),
         params.done);
     return_val.status.error_msgs.push_back(err);
     // TODO: Re-enable logging when this only happens once per fragment.

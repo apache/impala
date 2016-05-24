@@ -425,14 +425,15 @@ class Coordinator {
   void MarkFilterRoutingTableComplete();
 
   /// Fill in rpc_params based on parameters.
-  /// 'fragment_instance_idx' is the 0-based query-wide ordinal of the fragment instance.
+  /// 'instance_state_idx' is the index of the fragment instance state in
+  /// fragment_instance_states_.
   /// 'fragment_idx' is the 0-based query-wide ordinal of the fragment of which it is an
   /// instance.
-  /// 'per_fragment_instance_idx' is the 0-based ordinal of this particular fragment
+  /// 'fragment_instance_idx' is the 0-based ordinal of this particular fragment
   /// instance within its fragment.
   void SetExecPlanFragmentParams(QuerySchedule& schedule, const TPlanFragment& fragment,
-      const FragmentExecParams& params, int fragment_instance_idx, int fragment_idx,
-      int per_fragment_instance_idx, const TNetworkAddress& coord,
+      const FragmentExecParams& params, int instance_state_idx, int fragment_idx,
+      int fragment_instance_idx, const TNetworkAddress& coord,
       TExecPlanFragmentParams* rpc_params);
 
   /// Wrapper for ExecPlanFragment() RPC. This function will be called in parallel from
@@ -440,8 +441,8 @@ class Coordinator {
   /// fragment_instance_states_, then calls RPC to issue fragment on remote impalad.
   void ExecRemoteFragment(const FragmentExecParams* fragment_exec_params,
       const TPlanFragment* plan_fragment, DebugOptions* debug_options,
-      QuerySchedule* schedule, int fragment_instance_idx, int fragment_idx,
-      int per_fragment_instance_idx);
+      QuerySchedule* schedule, int instance_state_idx, int fragment_idx,
+      int fragment_instance_idx);
 
   /// Determine fragment number, given fragment id.
   int GetFragmentNum(const TUniqueId& fragment_id);

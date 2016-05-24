@@ -95,24 +95,24 @@ namespace impala {
 // Maximum number of fragment instances that can publish each broadcast filter.
 static const int MAX_BROADCAST_FILTER_PRODUCERS = 3;
 
-// container for debug options in TPlanFragmentExecParams (debug_node, debug_action,
+// container for debug options in TPlanFragmentInstanceCtx (debug_node, debug_action,
 // debug_phase)
 struct DebugOptions {
-  int fragment_instance_idx;
+  int instance_state_idx;
   int node_id;
   TDebugAction::type action;
   TExecNodePhase::type phase;  // INVALID: debug options invalid
 
   DebugOptions()
-    : fragment_instance_idx(-1), node_id(-1), action(TDebugAction::WAIT),
+    : instance_state_idx(-1), node_id(-1), action(TDebugAction::WAIT),
       phase(TExecNodePhase::INVALID) {}
 
   // If these debug options apply to the candidate fragment instance, returns true
   // otherwise returns false.
   bool IsApplicable(int candidate_fragment_instance_idx) {
     if (phase == TExecNodePhase::INVALID) return false;
-    return (fragment_instance_idx == -1 ||
-        fragment_instance_idx == candidate_fragment_instance_idx);
+    return (instance_state_idx == -1 ||
+        instance_state_idx == candidate_fragment_instance_idx);
   }
 };
 
@@ -360,12 +360,12 @@ static void ProcessQueryOptions(
   split(components, query_options.debug_action, is_any_of(":"), token_compress_on);
   if (components.size() < 3 || components.size() > 4) return;
   if (components.size() == 3) {
-    debug_options->fragment_instance_idx = -1;
+    debug_options->instance_state_idx = -1;
     debug_options->node_id = atoi(components[0].c_str());
     debug_options->phase = GetExecNodePhase(components[1]);
     debug_options->action = GetDebugAction(components[2]);
   } else {
-    debug_options->fragment_instance_idx = atoi(components[0].c_str());
+    debug_options->instance_state_idx = atoi(components[0].c_str());
     debug_options->node_id = atoi(components[1].c_str());
     debug_options->phase = GetExecNodePhase(components[2]);
     debug_options->action = GetDebugAction(components[3]);
@@ -552,7 +552,7 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
   query_events_->MarkEvent(
       Substitute("Ready to start $0 remote fragments", num_fragment_instances));
 
-  int fragment_instance_idx = 0;
+  int instance_state_idx = 0;
   bool has_coordinator_fragment =
       request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
   int first_remote_fragment_idx = has_coordinator_fragment ? 1 : 0;
@@ -565,13 +565,13 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
       int num_hosts = params->hosts.size();
       DCHECK_GT(num_hosts, 0);
       UpdateFilterRoutingTable(request.fragments[fragment_idx].plan.nodes, num_hosts,
-          fragment_instance_idx);
-      fragment_instance_idx += num_hosts;
+          instance_state_idx);
+      instance_state_idx += num_hosts;
     }
     MarkFilterRoutingTableComplete();
   }
 
-  fragment_instance_idx = 0;
+  instance_state_idx = 0;
   // Start one fragment instance per fragment per host (number of hosts running each
   // fragment may not be constant).
   for (int fragment_idx = first_remote_fragment_idx;
@@ -584,24 +584,24 @@ Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
     // schedule. Each fragment instance is assigned a unique ID, numbered from 0, with
     // instances for fragment ID 0 being assigned IDs [0 .. num_hosts(fragment_id_0)] and
     // so on.
-    for (int per_fragment_instance_idx = 0; per_fragment_instance_idx < num_hosts;
-         ++per_fragment_instance_idx) {
+    for (int fragment_instance_idx = 0; fragment_instance_idx < num_hosts;
+         ++fragment_instance_idx) {
       DebugOptions* fragment_instance_debug_options =
-          debug_options.IsApplicable(fragment_instance_idx) ? &debug_options : NULL;
+          debug_options.IsApplicable(instance_state_idx) ? &debug_options : NULL;
       exec_env_->fragment_exec_thread_pool()->Offer(
           bind<void>(mem_fn(&Coordinator::ExecRemoteFragment), this,
               params, // fragment_exec_params
               &request.fragments[fragment_idx], // plan_fragment,
               fragment_instance_debug_options,
               schedule,
-              fragment_instance_idx++,
+              instance_state_idx++,
               fragment_idx,
-              per_fragment_instance_idx));
+              fragment_instance_idx));
     }
   }
   exec_complete_barrier_->Wait();
   query_events_->MarkEvent(
-      Substitute("All $0 remote fragments started", fragment_instance_idx));
+      Substitute("All $0 remote fragments started", instance_state_idx));
 
   Status status = Status::OK();
   const TMetricDef& def =
@@ -1360,23 +1360,24 @@ int64_t Coordinator::ComputeTotalScanRangesComplete(int node_id) {
 
 void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_params,
     const TPlanFragment* plan_fragment, DebugOptions* debug_options,
-    QuerySchedule* schedule, int fragment_instance_idx, int fragment_idx,
-    int per_fragment_instance_idx) {
+    QuerySchedule* schedule, int instance_state_idx, int fragment_idx,
+    int fragment_instance_idx) {
   NotifyBarrierOnExit notifier(exec_complete_barrier_.get());
   TExecPlanFragmentParams rpc_params;
   SetExecPlanFragmentParams(*schedule, *plan_fragment, *fragment_exec_params,
-      fragment_instance_idx, fragment_idx, per_fragment_instance_idx,
+      instance_state_idx, fragment_idx, fragment_instance_idx,
       MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port), &rpc_params);
   if (debug_options != NULL) {
-    rpc_params.params.__set_debug_node_id(debug_options->node_id);
-    rpc_params.params.__set_debug_action(debug_options->action);
-    rpc_params.params.__set_debug_phase(debug_options->phase);
+    rpc_params.fragment_instance_ctx.__set_debug_node_id(debug_options->node_id);
+    rpc_params.fragment_instance_ctx.__set_debug_action(debug_options->action);
+    rpc_params.fragment_instance_ctx.__set_debug_phase(debug_options->phase);
   }
   FragmentInstanceState* exec_state = obj_pool()->Add(
-      new FragmentInstanceState(fragment_idx, fragment_exec_params,
-          per_fragment_instance_idx, obj_pool()));
-  exec_state->ComputeTotalSplitSize(rpc_params.params.per_node_scan_ranges);
-  fragment_instance_states_[fragment_instance_idx] = exec_state;
+      new FragmentInstanceState(fragment_idx, fragment_exec_params, fragment_instance_idx,
+          obj_pool()));
+  exec_state->ComputeTotalSplitSize(
+      rpc_params.fragment_instance_ctx.per_node_scan_ranges);
+  fragment_instance_states_[instance_state_idx] = exec_state;
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
             << " instance_id=" << exec_state->fragment_instance_id()
             << " host=" << exec_state->impalad_address();
@@ -1510,13 +1511,13 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   VLOG_FILE << "UpdateFragmentExecStatus() query_id=" << query_id_
             << " status=" << params.status.status_code
             << " done=" << (params.done ? "true" : "false");
-  uint32_t fragment_instance_idx = params.fragment_instance_idx;
-  if (fragment_instance_idx >= fragment_instance_states_.size()) {
+  uint32_t instance_state_idx = params.instance_state_idx;
+  if (instance_state_idx >= fragment_instance_states_.size()) {
     return Status(TErrorCode::INTERNAL_ERROR,
         Substitute("Unknown fragment instance index $0 (max known: $1)",
-            fragment_instance_idx, fragment_instance_states_.size() - 1));
+            instance_state_idx, fragment_instance_states_.size() - 1));
   }
-  FragmentInstanceState* exec_state = fragment_instance_states_[fragment_instance_idx];
+  FragmentInstanceState* exec_state = fragment_instance_states_[instance_state_idx];
 
   const TRuntimeProfileTree& cumulative_profile = params.profile;
   Status status(params.status);
@@ -1611,7 +1612,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     exec_state->stopwatch()->Stop();
     DCHECK_GT(num_remaining_fragment_instances_, 0);
-    VLOG_QUERY << "Fragment instance " << params.fragment_instance_idx << "("
+    VLOG_QUERY << "Fragment instance " << params.instance_state_idx << "("
                << exec_state->fragment_instance_id() << ") on host "
                << exec_state->impalad_address() << " completed, "
                << num_remaining_fragment_instances_ - 1 << " remaining: query_id="
@@ -1857,13 +1858,18 @@ string Coordinator::GetErrorLog() {
 
 void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
     const TPlanFragment& fragment, const FragmentExecParams& params,
-    int fragment_instance_idx, int fragment_idx, int per_fragment_instance_idx,
+    int instance_state_idx, int fragment_idx, int fragment_instance_idx,
     const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params) {
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
-  rpc_params->__set_fragment(fragment);
+  rpc_params->__set_query_ctx(query_ctx_);
+
+  TPlanFragmentCtx fragment_ctx;
+  TPlanFragmentInstanceCtx fragment_instance_ctx;
+
+  fragment_ctx.__set_fragment(fragment);
   // Remove filters that weren't selected during filter routing table construction.
   if (filter_mode_ != TRuntimeFilterMode::OFF) {
-    for (TPlanNode& plan_node: rpc_params->fragment.plan.nodes) {
+    for (TPlanNode& plan_node: rpc_params->fragment_ctx.fragment.plan.nodes) {
       if (plan_node.__isset.runtime_filters) {
         vector<TRuntimeFilterDesc> required_filters;
         for (const TRuntimeFilterDesc& desc: plan_node.runtime_filters) {
@@ -1872,7 +1878,7 @@ void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
           if (filter_it == filter_routing_table_.end()) continue;
           FilterState* f = &filter_it->second;
           if (plan_node.__isset.hash_join_node) {
-            if (f->src_fragment_instance_idxs.find(fragment_instance_idx) ==
+            if (f->src_fragment_instance_idxs.find(instance_state_idx) ==
                 f->src_fragment_instance_idxs.end()) {
               DCHECK(desc.is_broadcast_join);
               continue;
@@ -1889,7 +1895,7 @@ void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
   }
   SetExecPlanDescriptorTable(fragment, rpc_params);
 
-  TNetworkAddress exec_host = params.hosts[per_fragment_instance_idx];
+  TNetworkAddress exec_host = params.hosts[fragment_instance_idx];
   if (schedule.HasReservation()) {
     // The reservation has already have been validated at this point.
     TNetworkAddress resource_hostport;
@@ -1900,33 +1906,32 @@ void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
     // fragment. Otherwise, don't set it (usually this the coordinator fragment), and it
     // won't participate in dynamic RM controls.
     if (it != schedule.reservation()->allocated_resources.end()) {
-      rpc_params->__set_reserved_resource(it->second);
-      rpc_params->__set_local_resource_address(resource_hostport);
+      fragment_instance_ctx.__set_reserved_resource(it->second);
+      fragment_instance_ctx.__set_local_resource_address(resource_hostport);
     }
   }
-  rpc_params->params.__set_request_pool(schedule.request_pool());
   FragmentScanRangeAssignment::const_iterator it =
       params.scan_range_assignment.find(exec_host);
   // Scan ranges may not always be set, so use an empty structure if so.
   const PerNodeScanRanges& scan_ranges =
       (it != params.scan_range_assignment.end()) ? it->second : PerNodeScanRanges();
 
-  rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
-  rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);
-  rpc_params->params.__set_destinations(params.destinations);
-  rpc_params->params.__set_sender_id(params.sender_id_base + per_fragment_instance_idx);
-  rpc_params->__isset.params = true;
-  rpc_params->fragment_instance_ctx.__set_query_ctx(query_ctx_);
-  rpc_params->fragment_instance_ctx.fragment_instance_id =
-      params.instance_ids[per_fragment_instance_idx];
-  rpc_params->fragment_instance_ctx.per_fragment_instance_idx = per_fragment_instance_idx;
-  rpc_params->fragment_instance_ctx.num_fragment_instances = params.instance_ids.size();
-  rpc_params->fragment_instance_ctx.fragment_instance_idx = fragment_instance_idx;
-  rpc_params->__isset.fragment_instance_ctx = true;
+  fragment_ctx.num_fragment_instances = params.instance_ids.size();
+  fragment_instance_ctx.__set_request_pool(schedule.request_pool());
+  fragment_instance_ctx.__set_per_node_scan_ranges(scan_ranges);
+  fragment_instance_ctx.__set_per_exch_num_senders(params.per_exch_num_senders);
+  fragment_instance_ctx.__set_destinations(params.destinations);
+  fragment_instance_ctx.__set_sender_id(params.sender_id_base + fragment_instance_idx);
+  fragment_instance_ctx.fragment_instance_id = params.instance_ids[fragment_instance_idx];
+  fragment_instance_ctx.fragment_instance_idx = fragment_instance_idx;
+  fragment_instance_ctx.instance_state_idx = instance_state_idx;
+  rpc_params->__set_fragment_ctx(fragment_ctx);
+  rpc_params->__set_fragment_instance_ctx(fragment_instance_ctx);
 }
 
 void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
     TExecPlanFragmentParams* rpc_params) {
+  DCHECK(rpc_params->__isset.query_ctx);
   TDescriptorTable thrift_desc_tbl;
 
   // Always add the Tuple and Slot descriptors.
@@ -1991,7 +1996,7 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
     thrift_desc_tbl.__isset.tableDescriptors = true;
   }
 
-  rpc_params->__set_desc_tbl(thrift_desc_tbl);
+  rpc_params->query_ctx.__set_desc_tbl(thrift_desc_tbl);
 }
 namespace {
 

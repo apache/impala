@@ -100,7 +100,7 @@ class RuntimeState {
   bool abort_on_default_limit_exceeded() const {
     return query_ctx().request.query_options.abort_on_default_limit_exceeded;
   }
-  const TQueryCtx& query_ctx() const { return fragment_ctx().query_ctx; }
+  const TQueryCtx& query_ctx() const { return fragment_params_.query_ctx; }
   const TPlanFragmentInstanceCtx& fragment_ctx() const {
     return fragment_params_.fragment_instance_ctx;
   }
@@ -243,9 +243,9 @@ class RuntimeState {
   Status SetMemLimitExceeded(MemTracker* tracker = NULL,
       int64_t failed_allocation_size = 0, const ErrorMsg* msg = NULL);
 
-  /// Returns a non-OK status if query execution should stop (e.g., the query was cancelled
-  /// or a mem limit was exceeded). Exec nodes should check this periodically so execution
-  /// doesn't continue if the query terminates abnormally.
+  /// Returns a non-OK status if query execution should stop (e.g., the query was
+  /// cancelled or a mem limit was exceeded). Exec nodes should check this periodically so
+  /// execution doesn't continue if the query terminates abnormally.
   Status CheckQueryState();
 
   QueryResourceMgr* query_resource_mgr() const { return query_resource_mgr_; }
@@ -337,8 +337,8 @@ class RuntimeState {
   SpinLock query_status_lock_;
   Status query_status_;
 
-  /// Query-wide resource manager for resource expansion etc. Not owned by us; owned by the
-  /// ResourceBroker instead.
+  /// Query-wide resource manager for resource expansion etc. Not owned by us; owned by
+  /// the ResourceBroker instead.
   QueryResourceMgr* query_resource_mgr_;
 
   /// Reader contexts that need to be closed when the fragment is closed.

@@ -32,7 +32,7 @@ class RuntimeProfile;
 class RuntimeState;
 class TPlanExecRequest;
 class TPlanExecParams;
-class TPlanFragmentExecParams;
+class TPlanFragmentInstanceCtx;
 class RowDescriptor;
 
 /// Superclass of all data sinks.
@@ -66,7 +66,7 @@ class DataSink {
   /// new sink is written to *sink, and is owned by the caller.
   static Status CreateDataSink(ObjectPool* pool,
     const TDataSink& thrift_sink, const std::vector<TExpr>& output_exprs,
-    const TPlanFragmentExecParams& params,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx,
     const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
 
   /// Returns the runtime profile for the sink.
@@ -77,7 +77,8 @@ class DataSink {
   static void MergeInsertStats(const TInsertStats& src_stats,
       TInsertStats* dst_stats);
 
-  /// Outputs the insert stats contained in the map of insert partition updates to a string
+  /// Outputs the insert stats contained in the map of insert partition updates to a
+  /// string
   static std::string OutputInsertStats(const PartitionStatusMap& stats,
       const std::string& prefix = "");
 

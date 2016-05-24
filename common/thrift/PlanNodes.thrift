@@ -16,7 +16,7 @@
 // This file contains all structs, enums, etc., that together make up
 // a plan tree. All information recorded in struct TPlan and below is independent
 // of the execution parameters of any one of the backends on which it is running
-// (those are recorded in TPlanFragmentExecParams).
+// (those are recorded in TPlanFragmentInstanceCtx).
 
 namespace cpp impala
 namespace java com.cloudera.impala.thrift

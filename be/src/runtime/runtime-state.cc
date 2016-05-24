@@ -68,8 +68,8 @@ RuntimeState::RuntimeState(const TExecPlanFragmentParams& fragment_params,
     const string& cgroup, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     fragment_params_(fragment_params),
-    now_(new TimestampValue(fragment_ctx().query_ctx.now_string.c_str(),
-        fragment_ctx().query_ctx.now_string.size())),
+    now_(new TimestampValue(query_ctx().now_string.c_str(),
+        query_ctx().now_string.size())),
     cgroup_(cgroup),
     codegen_expr_(false),
     profile_(obj_pool_.get(),
@@ -77,7 +77,7 @@ RuntimeState::RuntimeState(const TExecPlanFragmentParams& fragment_params,
     is_cancelled_(false),
     query_resource_mgr_(NULL),
     root_node_id_(-1),
-    filter_bank_(new RuntimeFilterBank(fragment_ctx().query_ctx, this)) {
+    filter_bank_(new RuntimeFilterBank(query_ctx(), this)) {
   Status status = Init(exec_env);
   DCHECK(status.ok()) << status.GetDetail();
 }
@@ -93,8 +93,8 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     query_resource_mgr_(NULL),
     root_node_id_(-1),
     filter_bank_(new RuntimeFilterBank(query_ctx, this)) {
-  fragment_params_.fragment_instance_ctx.__set_query_ctx(query_ctx);
-  fragment_params_.fragment_instance_ctx.query_ctx.request.query_options
+  fragment_params_.__set_query_ctx(query_ctx);
+  fragment_params_.query_ctx.request.query_options
       .__set_batch_size(DEFAULT_BATCH_SIZE);
 }
 
@@ -119,7 +119,7 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
   SCOPED_TIMER(profile_.total_time_counter());
   exec_env_ = exec_env;
   TQueryOptions& query_options =
-      fragment_params_.fragment_instance_ctx.query_ctx.request.query_options;
+      fragment_params_.query_ctx.request.query_options;
 
   // max_errors does not indicate how many errors in total have been recorded, but rather
   // how many are distinct. It is defined as the sum of the number of generic errors and

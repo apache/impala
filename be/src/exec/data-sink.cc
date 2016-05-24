@@ -36,7 +36,7 @@ namespace impala {
 
 Status DataSink::CreateDataSink(ObjectPool* pool,
     const TDataSink& thrift_sink, const vector<TExpr>& output_exprs,
-    const TPlanFragmentExecParams& params,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx,
     const RowDescriptor& row_desc, scoped_ptr<DataSink>* sink) {
   DataSink* tmp_sink = NULL;
   switch (thrift_sink.type) {
@@ -47,8 +47,8 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
 
       // TODO: figure out good buffer size based on size of output row
       tmp_sink = new DataStreamSender(pool,
-          params.sender_id, row_desc, thrift_sink.stream_sink,
-          params.destinations, 16 * 1024);
+          fragment_instance_ctx.sender_id, row_desc, thrift_sink.stream_sink,
+          fragment_instance_ctx.destinations, 16 * 1024);
       sink->reset(tmp_sink);
       break;
 
