@@ -1,6 +1,7 @@
 # Copyright (c) 2014 Cloudera, Inc. All rights reserved.
 # Tests admission control
 
+import sys
 import pytest
 import threading
 import re
@@ -245,6 +246,29 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Check HS2 query in queueB gets the process-wide default query options
     self.__check_hs2_query_opts("root.queueB", None,\
         ['MEM_LIMIT=200000000', 'REQUEST_POOL=root.queueB', batch_size])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args("-require_username"),
+      statestored_args=_STATESTORED_ARGS)
+  def test_require_user(self):
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req.username = ""
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestAdmissionController.check_response(open_session_resp)
+
+    try:
+      execute_statement_req = TCLIService.TExecuteStatementReq()
+      execute_statement_req.sessionHandle = open_session_resp.sessionHandle
+      execute_statement_req.statement = "select count(1) from functional.alltypes"
+      execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+      TestAdmissionController.check_response(execute_statement_resp,
+          TCLIService.TStatusCode.ERROR_STATUS, "User must be specified")
+    finally:
+      close_req = TCLIService.TCloseSessionReq()
+      close_req.sessionHandle = open_session_resp.sessionHandle
+      TestAdmissionController.check_response(self.hs2_client.CloseSession(close_req))
+
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -502,7 +526,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           LOG.debug("Submitting query %s", self.query_num)
           self.query_handle = client.execute_async(query)
         except ImpalaBeeswaxException as e:
-          if "Rejected" in str(e):
+          if re.search("Rejected.*queue full", str(e)):
             LOG.debug("Rejected query %s", self.query_num)
             self.query_state = 'REJECTED'
             return
@@ -642,7 +666,11 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_flags(self, vector):
     self.pool_name = 'default-pool'
-    self.run_admission_test(vector, {'request_pool': self.pool_name})
+    # The pool has no mem resources set, so submitting queries with huge mem_limits
+    # should be fine. This exercises the code that does the per-pool memory
+    # accounting (see MemTracker::GetPoolMemReserved()) without actually being throttled.
+    self.run_admission_test(vector, {'request_pool': self.pool_name,
+      'mem_limit': sys.maxint})
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
