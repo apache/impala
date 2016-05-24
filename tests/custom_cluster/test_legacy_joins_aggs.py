@@ -24,26 +24,10 @@ class TestLegacyJoinsAggs(CustomClusterTestSuite):
   def get_workload(self):
     return 'functional-query'
 
-  @classmethod
-  def setup_class(cls):
-    #start impala with args
-    cls._start_impala_cluster(['--impalad_args="--enable_partitioned_hash_join=false '
-        '--enable_partitioned_aggregation=false"',
-        'catalogd_args="--load_catalog_in_background=false"'])
-    super(CustomClusterTestSuite, cls).setup_class()
-
-  @classmethod
-  def teardown_class(cls):
-    pass
-
-  @classmethod
-  def setup_method(self, method):
-    pass
-
-  @classmethod
-  def teardown_method(self, method):
-    pass
-
+  @CustomClusterTestSuite.with_args(
+      impalad_args=('--enable_partitioned_hash_join=false '
+                    '--enable_partitioned_aggregation=false'),
+      catalogd_args='--load_catalog_in_background=false')
   def test_nested_types(self, vector):
     self.run_test_case('QueryTest/legacy-joins-aggs', vector,
       use_db='functional_parquet')

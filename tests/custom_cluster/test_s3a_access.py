@@ -30,6 +30,7 @@ class TestS3AAccess(CustomClusterTestSuite):
   cmd_filename = ""
   @classmethod
   def setup_class(cls):
+    super(TestS3AAccess, cls).setup_class()
     try:
       tmp.write('echo badkey')
     finally:
@@ -42,8 +43,8 @@ class TestS3AAccess(CustomClusterTestSuite):
   def teardown_class(cls):
     os.remove(BAD_KEY_FILE)
 
-  def teardown_method(cls, method):
-    cls._drop_test_tbl()
+  def teardown_method(self, method):
+    self._drop_test_tbl()
 
   def _drop_test_tbl(self):
     client = self._get_impala_client()

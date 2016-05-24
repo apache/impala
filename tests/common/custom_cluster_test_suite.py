@@ -17,11 +17,13 @@
 
 import os
 import os.path
+import pytest
 import re
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfLocal
+from tests.util.filesystem_utils import IS_LOCAL
 from time import sleep
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
@@ -33,7 +35,6 @@ IMPALAD_ARGS = 'impalad_args'
 STATESTORED_ARGS = 'state_store_args'
 CATALOGD_ARGS = 'catalogd_args'
 
-@SkipIfLocal.multiple_impalad
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Every test in a test suite deriving from this class gets its own Impala cluster.
   Custom arguments may be passed to the cluster by using the @with_args decorator."""
@@ -52,12 +53,20 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         v.get_value('exec_option')['disable_codegen'] == False and
         v.get_value('exec_option')['num_nodes'] == 0)
 
+  @classmethod
   def setup_class(cls):
-    # No-op, but needed to override base class setup which is not wanted in this
-    # case (it is done on a per-method basis).
-    pass
+    # Explicit override of ImpalaTestSuite.setup_class(). For custom cluster, the
+    # ImpalaTestSuite.setup_class() procedure needs to happen on a per-method basis.
+    # IMPALA-3614: @SkipIfLocal.multiple_impalad workaround
+    # IMPALA-2943 TODO: When pytest is upgraded, see if this explicit skip can be
+    # removed in favor of the class-level SkipifLocal.multiple_impalad decorator.
+    if IS_LOCAL:
+      pytest.skip("multiple impalads needed")
 
+  @classmethod
   def teardown_class(cls):
+    # Explicit override of ImpalaTestSuite.teardown_class(). For custom cluster, the
+    # ImpalaTestSuite.teardown_class() procedure needs to happen on a per-method basis.
     pass
 
   @staticmethod

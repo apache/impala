@@ -26,6 +26,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
+    super(TestInsertBehaviourCustomCluster, cls).setup_class()
     if pytest.config.option.namenode_http_address is None:
       hdfs_conf = HdfsConfig(pytest.config.option.minicluster_xml_conf)
       cls.hdfs_client = get_hdfs_client_from_conf(hdfs_conf)

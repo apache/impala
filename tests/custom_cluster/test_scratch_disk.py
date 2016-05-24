@@ -54,6 +54,7 @@ class TestScratchDir(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
+    super(TestScratchDir, cls).setup_class()
     cls.normal_dirs = cls.generate_dirs(5)
     cls.non_writable_dirs = cls.generate_dirs(5, writable=False)
     cls.non_existing_dirs = cls.generate_dirs(5, non_existing=True)

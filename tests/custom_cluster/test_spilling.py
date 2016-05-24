@@ -27,20 +27,23 @@ class TestSpillStress(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
-    # Start with 256KB buffers, to reduce data size required to force spilling.
+    super(TestSpillStress, cls).setup_class()
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    # Since test_spill_stress below runs TEST_IDS * NUM_ITERATIONS times, but we only
+    # need Impala to start once, it's inefficient to use
+    # @CustomClusterTestSuite.with_args() to restart Impala every time. Instead, start
+    # Impala here, once.
+    #
+    # Start with 256KB buffers to reduce data size required to force spilling.
     cls._start_impala_cluster(['--impalad_args=--"read_size=262144"',
         'catalogd_args="--load_catalog_in_background=false"'])
-    super(CustomClusterTestSuite, cls).setup_class()
 
-  @classmethod
-  def teardown_class(cls):
-    pass
-
-  @classmethod
   def setup_method(self, method):
+    # We don't need CustomClusterTestSuite.setup_method() or teardown_method() here
+    # since we're not doing per-test method restart of Impala.
     pass
 
-  @classmethod
   def teardown_method(self, method):
     pass
 
@@ -49,16 +52,11 @@ class TestSpillStress(CustomClusterTestSuite):
     super(TestSpillStress, cls).add_test_dimensions()
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
-
     # Each client will get a different test id.
     # TODO: this test takes extremely long so only run on exhaustive. It would
     # be good to configure it so we can run some version on core.
     TEST_IDS = xrange(0, 3)
-    NUM_ITERATIONS = [0]
-    if cls.exploration_strategy() == 'exhaustive':
-      TEST_IDS = xrange(0, 3)
-      NUM_ITERATIONS = [1]
-
+    NUM_ITERATIONS = [1]
     cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
     cls.TestMatrix.add_dimension(TestDimension('iterations', *NUM_ITERATIONS))
 
