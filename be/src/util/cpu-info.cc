@@ -189,10 +189,10 @@ string CpuInfo::DebugString() {
   string L1 = Substitute("L1 Cache: $0 (Line: $1)",
       PrettyPrinter::Print(cache_sizes[L1_CACHE], TUnit::BYTES),
       PrettyPrinter::Print(cache_line_sizes[L1_CACHE], TUnit::BYTES));
-  string L2 = Substitute("L1 Cache: $0 (Line: $1)",
+  string L2 = Substitute("L2 Cache: $0 (Line: $1)",
       PrettyPrinter::Print(cache_sizes[L2_CACHE], TUnit::BYTES),
       PrettyPrinter::Print(cache_line_sizes[L2_CACHE], TUnit::BYTES));
-  string L3 = Substitute("L1 Cache: $0 (Line: $1)",
+  string L3 = Substitute("L3 Cache: $0 (Line: $1)",
       PrettyPrinter::Print(cache_sizes[L3_CACHE], TUnit::BYTES),
       PrettyPrinter::Print(cache_line_sizes[L3_CACHE], TUnit::BYTES));
   stream << "Cpu Info:" << endl
