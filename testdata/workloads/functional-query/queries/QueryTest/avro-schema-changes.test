@@ -1,0 +1,69 @@
+====
+---- QUERY
+# Create a table with default fileformat and later change it to avro using
+# alter sql. The query runs with stale metadata and a warning should be raised.
+# Invalidating metadata should cause the Avro schema to be properly set upon the
+# next metadata load.
+CREATE EXTERNAL TABLE alltypesagg_staleschema (
+  id INT,
+  bool_col BOOLEAN,
+  tinyint_col INT,
+  smallint_col INT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING
+)
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/alltypesaggmultifilesnopart_avro_snap'
+TBLPROPERTIES ('avro.schema.url'= '$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypesaggmultifilesnopart.json')
+====
+---- QUERY
+alter table alltypesagg_staleschema set fileformat avro
+====
+---- QUERY
+select count(*) from alltypesagg_staleschema
+---- CATCH
+Missing Avro schema in scan node. This could be due to stale metadata.
+====
+---- QUERY
+invalidate metadata alltypesagg_staleschema
+====
+---- QUERY
+select count(*) from alltypesagg_staleschema
+---- RESULTS
+11000
+---- TYPES
+bigint
+====
+---- QUERY
+# IMPALA-3092. Create an Avro table without column definitions and add columns via ALTER
+# TABLE. Querying the table should work.
+CREATE EXTERNAL TABLE avro_alter_table_add_new_column (
+a string,
+b string)
+STORED AS AVRO
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/tinytable_avro';
+
+ALTER TABLE avro_alter_table_add_new_column ADD COLUMNS (
+bool_col boolean,
+int_col int,
+bigint_col bigint,
+float_col float,
+double_col double,
+timestamp_col timestamp,
+decimal_col decimal(2,0),
+string_col string)
+====
+---- QUERY
+# Every new column just added should have NULL filled
+select * from avro_alter_table_add_new_column
+---- RESULTS
+'aaaaaaa','bbbbbbb',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL'
+'ccccc','dddd',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL'
+'eeeeeeee','f',NULL,NULL,NULL,NULL,NULL,'NULL',NULL,'NULL'
+---- TYPES
+string, string, boolean, int, bigint, float, double, string, decimal, string
+====

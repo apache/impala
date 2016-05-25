@@ -18,7 +18,9 @@ import java.util.List;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.node.IntNode;
+import org.codehaus.jackson.node.JsonNodeFactory;
 
 import com.cloudera.impala.analysis.ColumnDef;
 import com.cloudera.impala.catalog.ArrayType;
@@ -99,6 +101,7 @@ public class AvroSchemaConverter {
   private Schema convertFieldSchemasImpl(
       List<FieldSchema> fieldSchemas, String schemaName) {
     List<Schema.Field> avroFields = Lists.newArrayList();
+    JsonNode nullDefault = JsonNodeFactory.instance.nullNode();
     for (FieldSchema fs: fieldSchemas) {
       Type impalaType = Type.parseColumnType(fs.getType());
       if (impalaType == null) {
@@ -106,7 +109,7 @@ public class AvroSchemaConverter {
             fs.getType() + " is not a suppported Impala type");
       }
       final Schema.Field avroField = new Schema.Field(fs.getName(),
-          createAvroSchema(impalaType), fs.getComment(), null);
+          createAvroSchema(impalaType), fs.getComment(), nullDefault);
       avroFields.add(avroField);
     }
     return createAvroRecord(avroFields, schemaName);
@@ -136,7 +139,7 @@ public class AvroSchemaConverter {
     }
     // Make the Avro schema nullable.
     Schema nullSchema = Schema.create(Schema.Type.NULL);
-    return Schema.createUnion(Arrays.asList(schema, nullSchema));
+    return Schema.createUnion(Arrays.asList(nullSchema, schema));
   }
 
   private Schema createScalarSchema(ScalarType impalaScalarType) {
