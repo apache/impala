@@ -19,12 +19,14 @@
 #include "runtime/types.h"
 #include "util/runtime-profile.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/unordered_map.hpp>
 
 namespace impala {
 
 class BloomFilter;
+class MemTracker;
 class RuntimeFilter;
 class RuntimeState;
 class TBloomFilter;
@@ -126,6 +128,9 @@ class RuntimeFilterBank {
 
   /// Object pool to track allocated Bloom filters.
   ObjectPool obj_pool_;
+
+  /// MemTracker to track Bloom filter memory.
+  boost::scoped_ptr<MemTracker> filter_mem_tracker_;
 
   /// True iff Close() has been called. Used to prevent races between
   /// AllocateScratchBloomFilter() and Close().

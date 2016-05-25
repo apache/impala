@@ -76,8 +76,7 @@ RuntimeState::RuntimeState(const TExecPlanFragmentParams& fragment_params,
         "Fragment " + PrintId(fragment_ctx().fragment_instance_id)),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
-    root_node_id_(-1),
-    filter_bank_(new RuntimeFilterBank(query_ctx(), this)) {
+    root_node_id_(-1) {
   Status status = Init(exec_env);
   DCHECK(status.ok()) << status.GetDetail();
 }
@@ -91,11 +90,9 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
-    root_node_id_(-1),
-    filter_bank_(new RuntimeFilterBank(query_ctx, this)) {
+    root_node_id_(-1) {
   fragment_params_.__set_query_ctx(query_ctx);
-  fragment_params_.query_ctx.request.query_options
-      .__set_batch_size(DEFAULT_BATCH_SIZE);
+  fragment_params_.query_ctx.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
 }
 
 RuntimeState::~RuntimeState() {
@@ -159,6 +156,10 @@ void RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* pool
           query_rm_reservation_limit_bytes, query_parent_tracker, query_resource_mgr());
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
+}
+
+void RuntimeState::InitFilterBank() {
+  filter_bank_.reset(new RuntimeFilterBank(query_ctx(), this));
 }
 
 Status RuntimeState::CreateBlockMgr() {

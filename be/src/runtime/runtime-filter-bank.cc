@@ -62,6 +62,9 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
   default_filter_size_ = max<int64_t>(default_filter_size_, min_filter_size_);
   default_filter_size_ =
       BitUtil::RoundUpToPowerOfTwo(min<int64_t>(default_filter_size_, max_filter_size_));
+
+  filter_mem_tracker_.reset(new MemTracker(-1, -1, "Runtime Filter Bank",
+      state->instance_mem_tracker(), false));
 }
 
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,
@@ -166,7 +169,7 @@ void RuntimeFilterBank::PublishGlobalFilter(int32_t filter_id,
         BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space);
     // Silently fail to publish the filter (replacing it with a 0-byte complete one) if
     // there's not enough memory for it.
-    if (!state_->query_mem_tracker()->TryConsume(required_space)) {
+    if (!filter_mem_tracker_->TryConsume(required_space)) {
       VLOG_QUERY << "No memory for global filter: " << filter_id
                  << " (fragment instance: " << state_->fragment_instance_id() << ")";
       it->second->SetBloomFilter(BloomFilter::ALWAYS_TRUE_FILTER);
@@ -191,7 +194,7 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
   // Track required space
   int64_t log_filter_size = Bits::Log2Ceiling64(it->second->filter_size());
   int64_t required_space = BloomFilter::GetExpectedHeapSpaceUsed(log_filter_size);
-  if (!state_->query_mem_tracker()->TryConsume(required_space)) return NULL;
+  if (!filter_mem_tracker_->TryConsume(required_space)) return NULL;
   BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(log_filter_size));
   DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
   memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
@@ -217,6 +220,7 @@ void RuntimeFilterBank::Close() {
   lock_guard<mutex> l(runtime_filter_lock_);
   closed_ = true;
   obj_pool_.Clear();
-  state_->query_mem_tracker()->Release(memory_allocated_->value());
+  filter_mem_tracker_->Release(memory_allocated_->value());
+  filter_mem_tracker_->UnregisterFromParent();
 }
 

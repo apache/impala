@@ -81,6 +81,9 @@ class RuntimeState {
   void InitMemTrackers(const TUniqueId& query_id, const std::string* request_pool,
       int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes = -1);
 
+  /// Initializes the runtime filter bank. Must be called after InitMemTrackers().
+  void InitFilterBank();
+
   /// Gets/Creates the query wide block mgr.
   Status CreateBlockMgr();
 
