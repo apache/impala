@@ -53,11 +53,15 @@ fi
 # also set IMPALA_BUILD_THREADS to increase parallelism.
 : ${IMPALA_CXX_COMPILER=default}
 
+# If enabled, debug symbols are added to cross-compiled IR.
+: ${ENABLE_IMPALA_IR_DEBUG_INFO=false}
+
 export DISABLE_IMPALA_TOOLCHAIN
 export IMPALA_TOOLCHAIN
 export USE_SYSTEM_GCC
 export USE_GOLD_LINKER
 export IMPALA_CXX_COMPILER
+export ENABLE_IMPALA_IR_DEBUG_INFO
 export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
 
 # To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
