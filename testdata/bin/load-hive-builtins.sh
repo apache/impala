@@ -42,5 +42,5 @@ ${HADOOP_HOME}/bin/hadoop fs -put ${SENTRY_HOME}/lib/*.jar ${FILESYSTEM_PREFIX}$
 
 ${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/
 ${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/
-${HADOOP_HOME}/bin/hadoop fs -put ${IMPALA_HOME}/thirdparty/postgresql-jdbc/*.jar \
+${HADOOP_HOME}/bin/hadoop fs -put ${POSTGRES_JDBC_DRIVER} \
     ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/

@@ -240,6 +240,7 @@ export IMPALA_LLVM_ASAN_VERSION=3.8.0
 export IMPALA_LZ4_VERSION=svn
 export IMPALA_OPENLDAP_VERSION=2.4.25
 export IMPALA_OPENSSL_VERSION=0.9.8zf
+export IMPALA_POSTGRES_JDBC_DRIVER_VERSION=9.0-801
 export IMPALA_RAPIDJSON_VERSION=0.11
 export IMPALA_RE2_VERSION=20130115
 export IMPALA_SNAPPY_VERSION=1.1.3
@@ -331,20 +332,15 @@ export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
-# any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.) Find the
-# Postgresql jdbc driver required for starting the Hive Metastore.
-JDBC_DRIVER=$(find $IMPALA_HOME/thirdparty/postgresql-jdbc -name '*postgres*jdbc*jar' | head -n 1)
-if [[ -z "$JDBC_DRIVER" ]]; then
-  echo Could not find Postgres JDBC driver in >&2
-  return
-fi
-export HIVE_AUX_JARS_PATH="$JDBC_DRIVER"
+# any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
+# The Postgres JDBC driver is downloaded by maven when building the frontend.
+# Export the location of Postgres JDBC driver so Sentry can pick it up.
+export POSTGRES_JDBC_DRIVER=${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jdbc4.jar
+
+export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
 export AUX_CLASSPATH="${LZO_JAR_PATH}"
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
-
-# Export the location of Postgres JDBC driver so Sentry can pick it up.
-export POSTGRES_JDBC_DRIVER="$JDBC_DRIVER"
 
 export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
 export PATH=$HBASE_HOME/bin:$PATH
@@ -460,6 +456,7 @@ echo "PYTHONPATH             = $PYTHONPATH"
 echo "JAVA_HOME              = $JAVA_HOME"
 echo "LD_LIBRARY_PATH        = $LD_LIBRARY_PATH"
 echo "LD_PRELOAD             = $LD_PRELOAD"
+echo "POSTGRES_JDBC_DRIVER   = $POSTGRES_JDBC_DRIVER"
 echo "IMPALA_TOOLCHAIN       = $IMPALA_TOOLCHAIN"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
