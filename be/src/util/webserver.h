@@ -16,14 +16,14 @@
 #ifndef IMPALA_UTIL_WEBSERVER_H
 #define IMPALA_UTIL_WEBSERVER_H
 
-#include <squeasel/squeasel.h>
-#include <string>
-#include <map>
 #include <boost/function.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <map>
 #include <rapidjson/document.h>
+#include <string>
 
 #include "common/status.h"
+#include "thirdparty/squeasel/squeasel.h"
 #include "util/network-util.h"
 
 namespace impala {

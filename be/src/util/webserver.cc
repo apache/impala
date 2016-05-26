@@ -20,18 +20,19 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/thread/locks.hpp>
+#include <fstream>
 #include <gutil/strings/substitute.h>
 #include <map>
-#include <fstream>
 #include <stdio.h>
 #include <signal.h>
 #include <string>
-#include <mustache/mustache.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 
-#include "util/asan.h"
 #include "common/logging.h"
+#include "rpc/thrift-util.h"
+#include "thirdparty/mustache/mustache.h"
+#include "util/asan.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/mem-info.h"
@@ -42,7 +43,6 @@
 #include "util/debug-util.h"
 #include "util/pretty-printer.h"
 #include "util/stopwatch.h"
-#include "rpc/thrift-util.h"
 
 #include "common/names.h"
 
