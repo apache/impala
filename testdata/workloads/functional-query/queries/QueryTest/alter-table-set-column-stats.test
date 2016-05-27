@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 create external table alltypes_clone like functional_parquet.alltypes
-location '/test-warehouse/alltypes_parquet';
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet';
 alter table alltypes_clone recover partitions;
 ====
 ---- QUERY
