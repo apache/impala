@@ -331,4 +331,13 @@ add_custom_target(benchmark_run
   COMMAND ${CMAKE_SOURCE_DIR}/be/bin/run_hive_benchmark.py
 )
 
+# Dump include paths to a file
+if (DUMP_INCLUDE_PATHS)
+  file(REMOVE "${DUMP_INCLUDE_PATHS}")
+  get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+  foreach(dir ${dirs})
+    file(APPEND "${DUMP_INCLUDE_PATHS}" "${dir}\n")
+  endforeach()
+endif(DUMP_INCLUDE_PATHS)
+
 SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
