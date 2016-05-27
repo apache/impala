@@ -1095,19 +1095,16 @@ void ImpalaServer::ReportExecStatus(
   // every report (assign each query a local int32_t id and use that to index into a
   // vector of QueryExecStates, w/o lookup or locking?)
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(params.query_id, false);
-  // TODO: This is expected occasionally (since a report RPC might be in flight while
-  // cancellation is happening), but repeated instances for the same query are a bug
-  // (which we have occasionally seen). Consider keeping query exec states around for a
-  // little longer (until all reports have been received).
   if (exec_state.get() == NULL) {
-    return_val.status.__set_status_code(TErrorCode::INTERNAL_ERROR);
+    // This is expected occasionally (since a report RPC might be in flight while
+    // cancellation is happening). Return an error to the caller to get it to stop.
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
         "query ID (probably closed or cancelled). (query_id: $0, backend: $1, instance:"
         " $2 done: $3)", PrintId(params.query_id),
         params.instance_state_idx, PrintId(params.fragment_instance_id),
         params.done);
-    return_val.status.error_msgs.push_back(err);
-    // TODO: Re-enable logging when this only happens once per fragment.
+    Status(TErrorCode::INTERNAL_ERROR, err).SetTStatus(&return_val);
+    VLOG_QUERY << err;
     return;
   }
   exec_state->coord()->UpdateFragmentExecStatus(params).SetTStatus(&return_val);
