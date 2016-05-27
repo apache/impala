@@ -83,6 +83,16 @@ do
   esac
 done
 
+# The EXPLORATION_STRATEGY parameter should only apply to the
+# functional-query workload because the larger datasets (ex. tpch) are
+# not generated in all table formats.
+COMMON_PYTEST_ARGS="--maxfail=${MAX_PYTEST_FAILURES} --exploration_strategy=core"`
+    `" --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY"
+if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
+  # Only one impalad is supported when running against local filesystem.
+  COMMON_PYTEST_ARGS+=" --impalad=localhost:21000"
+fi
+
 # For logging when using run-step.
 LOG_DIR=${IMPALA_EE_TEST_LOGS_DIR}
 
@@ -145,20 +155,10 @@ do
   fi
 
   if [[ "$EE_TEST" == true ]]; then
-    # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
-    # functional-query workload because the larger datasets (ex. tpch) are not generated
-    # in all table formats.
+    # Run end-to-end tests.
     # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-    LOCAL_FS_ARGS=""
-    if [[ "$TARGET_FILESYSTEM" == "local" ]]; then
-      # Only one impalad is supported when running against local filesystem.
-      LOCAL_FS_ARGS="--impalad=localhost:21000"
-    fi
-    if ! ${IMPALA_HOME}/tests/run-tests.py --maxfail=${MAX_PYTEST_FAILURES} \
-         --exploration_strategy=core \
-         --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY \
-         ${LOCAL_FS_ARGS} \
-         ${EE_TEST_FILES}; then #${KERB_ARGS};
+    if ! ${IMPALA_HOME}/tests/run-tests.py ${COMMON_PYTEST_ARGS} ${EE_TEST_FILES}; then
+      #${KERB_ARGS};
       TEST_RET_CODE=1
     fi
   fi
@@ -189,8 +189,7 @@ do
     # Run the custom-cluster tests after all other tests, since they will restart the
     # cluster repeatedly and lose state.
     # TODO: Consider moving in to run-tests.py.
-    if ! ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh \
-         --maxfail=${MAX_PYTEST_FAILURES}; then
+    if ! ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh ${COMMON_PYTEST_ARGS}; then
       TEST_RET_CODE=1
     fi
     export IMPALA_MAX_LOG_FILES=${IMPALA_MAX_LOG_FILES_SAVE}
