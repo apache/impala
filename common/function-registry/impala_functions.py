@@ -106,6 +106,7 @@ visible_functions = [
     '_ZN6impala11UdfBuiltins9VectorGetEPN10impala_udf15FunctionContextERKNS1_9BigIntValERKNS1_9StringValE'],
 
   # Timestamp functions
+  [['next_day'], 'TIMESTAMP', ['TIMESTAMP', 'STRING'], '_ZN6impala18TimestampFunctions7NextDayEPN10impala_udf15FunctionContextERKNS1_12TimestampValERKNS1_9StringValE'],
   [['unix_timestamp'], 'BIGINT', ['STRING'], '_ZN6impala18TimestampFunctions14UnixFromStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['year'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions4YearEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['month'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions5MonthEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],

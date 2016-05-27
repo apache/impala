@@ -141,6 +141,17 @@ class TimestampFunctions {
   static DoubleVal MonthsBetween(FunctionContext* context,
       const TimestampVal& ts_val1, const TimestampVal& ts_val2);
 
+  /// Return the date of the weekday that follows a particular date.
+  /// The 'weekday' argument is a string literal indicating the day of the week.
+  /// Also this argument is case-insensitive. Available values are:
+  /// "Sunday"/"SUN", "Monday"/"MON", "Tuesday"/"TUE",
+  /// "Wednesday"/"WED", "Thursday"/"THU", "Friday"/"FRI", "Saturday"/"SAT".
+  /// For example, the first Saturday after Wednesday, 25 December 2013
+  /// is on 28 December 2013.
+  /// select next_day('2013-12-25','Saturday') returns '2013-12-28'
+  static TimestampVal NextDay(FunctionContext* context, const TimestampVal& date,
+      const StringVal& weekday);
+
   /// Add/sub functions on the timestamp. This handles three forms of adding/subtracting
   /// intervals to/from timestamps:
   ///   1) ADD/SUB_<INTERVAL>(<TIMESTAMP>, <NUMBER>),

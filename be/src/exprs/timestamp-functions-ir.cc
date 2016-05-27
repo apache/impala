@@ -573,6 +573,38 @@ DoubleVal TimestampFunctions::MonthsBetween(FunctionContext* context,
   return DoubleVal(months_between);
 }
 
+TimestampVal TimestampFunctions::NextDay(FunctionContext* context,
+    const TimestampVal& date, const StringVal& weekday) {
+  string weekday_str = string(reinterpret_cast<const char*>(weekday.ptr), weekday.len);
+  transform(weekday_str.begin(), weekday_str.end(), weekday_str.begin(), tolower);
+  int day_idx = 0;
+  if (weekday_str == "sunday" || weekday_str == "sun") {
+    day_idx = 1;
+  } else if (weekday_str == "monday" || weekday_str == "mon") {
+    day_idx = 2;
+  } else if (weekday_str == "tuesday" || weekday_str == "tue") {
+    day_idx = 3;
+  } else if (weekday_str == "wednesday" || weekday_str == "wed") {
+    day_idx = 4;
+  } else if (weekday_str == "thursday" || weekday_str == "thu") {
+    day_idx = 5;
+  } else if (weekday_str == "friday" || weekday_str == "fri") {
+    day_idx = 6;
+  } else if (weekday_str == "saturday" || weekday_str == "sat") {
+    day_idx = 7;
+  }
+  DCHECK_GE(day_idx, 1);
+  DCHECK_LE(day_idx, 7);
+
+  int delta_days = day_idx - DayOfWeek(context, date).val;
+  delta_days = delta_days <= 0 ? delta_days + 7 : delta_days;
+  DCHECK_GE(delta_days, 1);
+  DCHECK_LE(delta_days, 7);
+
+  IntVal delta(delta_days);
+  return AddSub<true, IntVal, Days, false>(context, date, delta);
+}
+
 IntVal TimestampFunctions::IntMonthsBetween(FunctionContext* context,
     const TimestampVal& ts1, const TimestampVal& ts2) {
   if (ts1.is_null || ts2.is_null) return IntVal::null();

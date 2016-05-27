@@ -267,6 +267,80 @@ class ExprTest : public testing::Test {
     return results;
   }
 
+  void TestNextDayFunction(){
+    // Sequential test cases
+    TestTimestampValue("next_day('2016-05-01','Sunday')",
+      TimestampValue("2016-05-08 00:00:00", 19));
+    TestTimestampValue("next_day('2016-05-01','Monday')",
+      TimestampValue("2016-05-02 00:00:00", 19));
+    TestTimestampValue("next_day('2016-05-01','Tuesday')",
+      TimestampValue("2016-05-03 00:00:00", 19));
+    TestTimestampValue("next_day('2016-05-01','Wednesday')",
+      TimestampValue("2016-05-04 00:00:00", 19));
+    TestTimestampValue("next_day('2016-05-01','Thursday')",
+      TimestampValue("2016-05-05 00:00:00", 19));
+    TestTimestampValue("next_day('2016-05-01','Friday')",
+      TimestampValue("2016-05-06 00:00:00", 19));
+    TestTimestampValue("next_day('2016-05-01','Saturday')",
+      TimestampValue("2016-05-07 00:00:00", 19));
+
+    // Random test cases
+    TestTimestampValue("next_day('1910-01-18','SunDay')",
+      TimestampValue("1910-01-23 00:00:00", 19));
+    TestTimestampValue("next_day('1916-06-05', 'SUN')",
+      TimestampValue("1916-06-11 00:00:00", 19));
+    TestTimestampValue("next_day('1932-11-08','monday')",
+      TimestampValue("1932-11-14 00:00:00", 19));
+    TestTimestampValue("next_day('1933-09-11','Mon')",
+      TimestampValue("1933-09-18 00:00:00", 19));
+    TestTimestampValue("next_day('1934-03-21','TUeSday')",
+      TimestampValue("1934-03-27 00:00:00", 19));
+    TestTimestampValue("next_day('1954-02-25','tuE')",
+      TimestampValue("1954-03-02 00:00:00", 19));
+    TestTimestampValue("next_day('1965-04-18','WeDneSdaY')",
+      TimestampValue("1965-04-21 00:00:00", 19));
+    TestTimestampValue("next_day('1966-08-29','wed')",
+      TimestampValue("1966-08-31 00:00:00", 19));
+    TestTimestampValue("next_day('1968-07-23','tHurSday')",
+      TimestampValue("1968-07-25 00:00:00", 19));
+    TestTimestampValue("next_day('1969-05-28','thu')",
+      TimestampValue("1969-05-29 00:00:00", 19));
+    TestTimestampValue("next_day('1989-10-12','fRIDay')",
+      TimestampValue("1989-10-13 00:00:00", 19));
+    TestTimestampValue("next_day('1973-10-02','frI')",
+      TimestampValue("1973-10-05 00:00:00", 19));
+    TestTimestampValue("next_day('2000-02-29','saTUrDaY')",
+      TimestampValue("2000-03-04 00:00:00", 19));
+    TestTimestampValue("next_day('2013-04-12','sat')",
+      TimestampValue("2013-04-13 00:00:00", 19));
+    TestTimestampValue("next_day('2013-12-25','Saturday')",
+      TimestampValue("2013-12-28 00:00:00", 19));
+
+    // Explicit timestamp conversion tests
+    TestTimestampValue("next_day(to_timestamp('12-27-2008', 'MM-dd-yyyy'), 'moN')",
+      TimestampValue("2008-12-29 00:00:00", 19));
+    TestTimestampValue("next_day(to_timestamp('2007-20-10 11:22', 'yyyy-dd-MM HH:mm'),\
+      'TUeSdaY')", TimestampValue("2007-10-23 11:22:00", 19));
+    TestTimestampValue("next_day(to_timestamp('18-11-2070 09:12', 'dd-MM-yyyy HH:mm'),\
+      'WeDneSdaY')", TimestampValue("2070-11-19 09:12:00", 19));
+    TestTimestampValue("next_day(to_timestamp('12-1900-05', 'dd-yyyy-MM'), 'tHurSday')",
+      TimestampValue("1900-05-17 00:00:00", 19));
+    TestTimestampValue("next_day(to_timestamp('08-1987-21', 'MM-yyyy-dd'), 'FRIDAY')",
+      TimestampValue("1987-08-28 00:00:00", 19));
+    TestTimestampValue("next_day(to_timestamp('02-04-2001', 'dd-MM-yyyy'), 'SAT')",
+      TimestampValue("2001-04-07 00:00:00", 19));
+    TestTimestampValue("next_day(to_timestamp('1970-01-31 00:00:00',\
+      'yyyy-MM-dd HH:mm:ss'), 'SunDay')", TimestampValue("1970-02-01 00:00:00", 19));
+
+    // Invalid input: unacceptable date parameter
+    TestIsNull("next_day('12202010','Saturday')", TYPE_TIMESTAMP);
+    TestIsNull("next_day('2011 02 11','thu')", TYPE_TIMESTAMP);
+    TestIsNull("next_day('09-19-2012xyz','monDay')", TYPE_TIMESTAMP);
+    TestIsNull("next_day('000000000000000','wed')", TYPE_TIMESTAMP);
+    TestIsNull("next_day('hell world!','fRiDaY')", TYPE_TIMESTAMP);
+    TestIsNull("next_day('t1c7t0c9','sunDAY')", TYPE_TIMESTAMP);
+  }
+
 // This macro adds a scoped trace to provide the line number of the caller upon failure.
 #define EXPECT_BETWEEN(start, value, end) { \
     SCOPED_TRACE(""); \
@@ -4346,7 +4420,12 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("unix_timestamp('12/2/2015', 'MM/dd/yyyy')", TYPE_BIGINT);
   TestValue("unix_timestamp('12/31/2015', 'MM/d/yyyy')", TYPE_BIGINT, 1451520000);
   TestValue("unix_timestamp('12/31/2015', 'MM/dd/yyyy')", TYPE_BIGINT, 1451520000);
+
+  // next_day udf test for IMPALA-2459
+  TestNextDayFunction();
 }
+
+
 
 TEST_F(ExprTest, ConditionalFunctions) {
   // If first param evaluates to true, should return second parameter,
