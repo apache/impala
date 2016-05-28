@@ -7,7 +7,7 @@ DIR=$(dirname $0)
 
 HADOOP_LOG_DIR="$LOG_DIR/llama"
 HADOOP_CLASSPATH="$NODE_DIR/etc/llama/conf:$HADOOP_CLASSPATH"
-for JAR in $(find "$IMPALA_HOME"/thirdparty/llama* -name "*jar"); do
+for JAR in $(find "$LLAMA_HOME" -name "*jar"); do
   HADOOP_CLASSPATH="$JAR:$HADOOP_CLASSPATH"
 done
 export HADOOP_CLASSPATH

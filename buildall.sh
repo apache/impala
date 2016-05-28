@@ -244,6 +244,15 @@ if [ $CLEAN_ACTION -eq 1 ]; then
     $IMPALA_HOME/bin/clean.sh
 fi
 
+# Populate necessary thirdparty components unless it's set to be skipped.
+if [ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]; then
+  echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
+else
+  echo "Downloading and extracting dependencies."
+  $IMPALA_HOME/bin/bootstrap_toolchain.py
+  echo "Toolchain bootstrap complete."
+fi
+
 MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
 
 if [ $BUILD_FE_ONLY -eq 1 ]; then
@@ -254,8 +263,7 @@ fi
 
 if [ -e $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.so ]
 then
-  cp $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.* \
-    $IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/lib/native/
+  cp $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.* $HADOOP_HOME/lib/native
 else
   echo "No hadoop-lzo found"
 fi

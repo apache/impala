@@ -14,21 +14,6 @@
 
 cmake_minimum_required(VERSION 2.6)
 
-if ("$ENV{SKIP_TOOLCHAIN_BOOTSTRAP}" STREQUAL "true")
-  message(STATUS "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap.")
-else()
-  # Download any missing toolchain dependencies. If this fails, fail the build.
-  set(BOOTSTRAP_CMD "$ENV{IMPALA_HOME}/bin/bootstrap_toolchain.py")
-  # Download and unpack the dependencies
-  message(STATUS "Downloading and extracting dependencies.")
-  execute_process(COMMAND ${BOOTSTRAP_CMD} RESULT_VARIABLE BOOTSTRAP_RESULT)
-  if (${BOOTSTRAP_RESULT} EQUAL 0)
-    message(STATUS "Toolchain bootstrap complete.")
-  else()
-    message(FATAL_ERROR "Toolchain bootstrap failed.")
-  endif()
-endif()
-
 # Explicitly define project() to allow modifying the compiler before the project is
 # initialized.
 project(Impala)

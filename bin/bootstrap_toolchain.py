@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Bootstrapping the native toolchain with prebuilt binaries
 #
-# The purpose of this script is to download prebuilt artifacts of the native toolchain to
-# satisfy the third-party dependencies for Impala. The script checks for the presence of
-# IMPALA_HOME and IMPALA_TOOLCHAIN. IMPALA_HOME indicates that the environment is
-# correctly setup and that we can deduce the version settings of the dependencies from the
-# environment. IMPALA_TOOLCHAIN indicates the location where the prebuilt artifacts should
-# be extracted to.
+# The purpose of this script is to download prebuilt binaries and jar files to satisfy the
+# third-party dependencies for Impala. The script checks for the presence of IMPALA_HOME
+# and IMPALA_TOOLCHAIN. IMPALA_HOME indicates that the environment is correctly setup and
+# that we can deduce the version settings of the dependencies from the environment.
+# IMPALA_TOOLCHAIN indicates the location where the prebuilt artifacts should be extracted
+# to. If DOWNLOAD_CDH_COMPONENTS is set to true, this script will also download and extract
+# the CDH components (i.e. Hadoop, Hive, HBase, Llama, Llama-minikdc and Sentry) into
+# CDH_COMPONENTS_HOME.
 #
 # The script is called as follows without any additional parameters:
 #
@@ -29,6 +29,7 @@ import re
 import sh
 import shutil
 import subprocess
+import sys
 import tempfile
 
 HOST = "https://native-toolchain.s3.amazonaws.com/build"
@@ -67,6 +68,16 @@ def get_platform_release_label(release=None):
 
   raise Exception("Could not find package label for OS version: {0}.".format(release))
 
+
+def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobber):
+  print "URL {0}".format(download_path)
+  print "Downloading {0} to {1}".format(file_name, destination)
+  # --no-clobber avoids downloading the file if a file with the name already exists
+  sh.wget(download_path, directory_prefix=destination, no_clobber=wget_no_clobber)
+  print "Extracting {0}".format(file_name)
+  sh.tar(z=True, x=True, f=os.path.join(destination, file_name), directory=destination)
+  sh.rm(os.path.join(destination, file_name))
+
 def download_package(destination, product, version, compiler, platform_release=None):
   remove_existing_package(destination, product, version)
 
@@ -75,37 +86,12 @@ def download_package(destination, product, version, compiler, platform_release=N
   url_path="/{0}/{1}-{2}/{0}-{1}-{2}-{3}.tar.gz".format(product, version, compiler, label)
   download_path = HOST + url_path
 
-  print "URL {0}".format(download_path)
-  print "Downloading {0} to {1}".format(file_name, destination)
-  # --no-clobber avoids downloading the file if a file with the name already exists
-  sh.wget(download_path, directory_prefix=destination, no_clobber=True)
-  print "Extracting {0}".format(file_name)
-  sh.tar(z=True, x=True, f=os.path.join(destination, file_name), directory=destination)
-  sh.rm(os.path.join(destination, file_name))
+  wget_and_unpack_package(download_path, file_name, destination, True)
 
-def bootstrap(packages):
-  """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment. By
-  checking $IMPALA_HOME is present, we assume that IMPALA_{LIB}_VERSION will be present as
-  well. Will create the directory specified by $IMPALA_TOOLCHAIN if it does not yet
-  exist. Each of the packages specified in `packages` is downloaded and extracted into
-  $IMPALA_TOOLCHAIN.
-
+def bootstrap(toolchain_root, packages):
+  """Downloads and unpacks each package in the list `packages` into `toolchain_root` if it
+  doesn't exist already.
   """
-  if not os.getenv("IMPALA_HOME"):
-    print("Impala environment not set up correctly, make sure "
-          "impala-config.sh is sourced.")
-    sys.exit(1)
-
-  # Create the destination directory if necessary
-  toolchain_root = os.getenv("IMPALA_TOOLCHAIN")
-  if not toolchain_root:
-    print("Impala environment not set up correctly, make sure "
-          "$IMPALA_TOOLCHAIN is present.")
-    sys.exit(1)
-
-  if not os.path.exists(toolchain_root):
-    os.makedirs(toolchain_root)
-
   if not try_get_platform_release_label():
     check_custom_toolchain(toolchain_root, packages)
     return
@@ -303,8 +289,62 @@ extern "C" void %s() {
   finally:
     shutil.rmtree(stub_build_dir)
 
+def download_cdh_components(toolchain_root, cdh_components):
+  """Downloads and unpacks the CDH components into $CDH_COMPONENTS_HOME if not found."""
+  cdh_components_home = os.getenv("CDH_COMPONENTS_HOME")
+  if not cdh_components_home:
+    print("Impala environment not set up correctly, make sure "
+          "$CDH_COMPONENTS_HOME is present.")
+    return
+
+  # Create the directory where CDH components live if necessary.
+  if not os.path.exists(cdh_components_home):
+    os.makedirs(cdh_components_home)
+
+  # The URL prefix of where CDH components live in S3.
+  download_path_prefix = HOST + "/cdh_components/"
+
+  for component in cdh_components:
+    pkg_name, pkg_version = unpack_name_and_version(component)
+    pkg_directory = package_directory(cdh_components_home, pkg_name, pkg_version)
+    if os.path.isdir(pkg_directory):
+      continue
+
+    # Download the package if it doesn't exist
+    file_name = "{0}-{1}.tar.gz".format(pkg_name, pkg_version)
+    download_path = download_path_prefix + file_name
+    wget_and_unpack_package(download_path, file_name, cdh_components_home, False)
+
 if __name__ == "__main__":
+  """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment.-
+  By checking $IMPALA_HOME is present, we assume that IMPALA_{LIB}_VERSION will be present
+  as well. Will create the directory specified by $IMPALA_TOOLCHAIN if it doesn't exist
+  yet. Each of the packages specified in `packages` is downloaded and extracted into
+  $IMPALA_TOOLCHAIN. If $DOWNLOAD_CDH_COMPONENTS is true, this function will also download
+  the CDH components (i.e. hadoop, hbase, hive, llama, llama-minikidc and sentry) into the
+  directory specified by $CDH_COMPONENTS_HOME.
+  """
+  if not os.getenv("IMPALA_HOME"):
+    print("Impala environment not set up correctly, make sure "
+          "impala-config.sh is sourced.")
+    sys.exit(1)
+
+  # Create the destination directory if necessary
+  toolchain_root = os.getenv("IMPALA_TOOLCHAIN")
+  if not toolchain_root:
+    print("Impala environment not set up correctly, make sure "
+          "$IMPALA_TOOLCHAIN is present.")
+    sys.exit(1)
+
+  if not os.path.exists(toolchain_root):
+    os.makedirs(toolchain_root)
+
   packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "gcc", "gflags", "glog",
       "gperftools", "gtest", "kudu", "llvm", ("llvm", "3.8.0-asserts-p1"), "lz4",
       "openldap", "rapidjson", "re2", "snappy", "thrift", "zlib"]
-  bootstrap(packages)
+  bootstrap(toolchain_root, packages)
+
+  # Download the CDH components if necessary.
+  if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
+    cdh_components = ["hadoop", "hbase", "hive", "llama", "llama-minikdc", "sentry"]
+    download_cdh_components(toolchain_root, cdh_components)

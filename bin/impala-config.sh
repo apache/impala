@@ -46,6 +46,9 @@ if [ -z $IMPALA_TOOLCHAIN ]; then
   return 1
 fi
 
+# If true, will not call $IMPALA_HOME/bin/bootstrap_toolchain.py.
+: ${SKIP_TOOLCHAIN_BOOTSTRAP=false}
+
 # This flag is used in $IMPALA_HOME/cmake_modules/toolchain.cmake.
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
 : ${USE_SYSTEM_GCC=0}
@@ -63,11 +66,17 @@ fi
 # If enabled, debug symbols are added to cross-compiled IR.
 : ${ENABLE_IMPALA_IR_DEBUG_INFO=false}
 
+# If true, download and use the CDH components from S3 instead of the ones
+# in $IMPALA_HOME/thirdparty.
+: ${DOWNLOAD_CDH_COMPONENTS=false}
+
 export IMPALA_TOOLCHAIN
+export SKIP_TOOLCHAIN_BOOTSTRAP
 export USE_SYSTEM_GCC
 export USE_GOLD_LINKER
 export IMPALA_CXX_COMPILER
 export ENABLE_IMPALA_IR_DEBUG_INFO
+export DOWNLOAD_CDH_COMPONENTS
 export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
 
 # To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
@@ -280,7 +289,7 @@ export IMPALA_HIVE_VERSION=1.1.0-cdh5.9.0-SNAPSHOT
 export IMPALA_SENTRY_VERSION=1.5.1-cdh5.9.0-SNAPSHOT
 export IMPALA_LLAMA_VERSION=1.0.0-cdh5.9.0-SNAPSHOT
 export IMPALA_PARQUET_VERSION=1.5.0-cdh5.9.0-SNAPSHOT
-export IMPALA_MINIKDC_VERSION=1.0.0
+export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
@@ -292,7 +301,11 @@ export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
 # The directory in which all the thirdparty CDH components live.
-CDH_COMPONENTS_HOME=$IMPALA_HOME/thirdparty
+if [ "${DOWNLOAD_CDH_COMPONENTS}" = true ]; then
+  export CDH_COMPONENTS_HOME=$IMPALA_TOOLCHAIN/cdh_components
+else
+  export CDH_COMPONENTS_HOME=$IMPALA_HOME/thirdparty
+fi
 
 # Hadoop dependencies are snapshots in the Impala tree
 export HADOOP_HOME=$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/
@@ -308,7 +321,7 @@ export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
 export LLAMA_HOME=$CDH_COMPONENTS_HOME/llama-${IMPALA_LLAMA_VERSION}/
-export MINIKDC_HOME=$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_MINIKDC_VERSION}
+export MINIKDC_HOME=$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_VERSION}
 export SENTRY_HOME=$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}
 export SENTRY_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
 
@@ -382,10 +395,10 @@ export JAVA_LIBRARY_PATH=${IMPALA_SNAPPY_PATH}
 LIB_JAVA=`find ${JAVA_HOME}/   -name libjava.so | head -1`
 LIB_JSIG=`find ${JAVA_HOME}/   -name libjsig.so | head -1`
 LIB_JVM=` find ${JAVA_HOME}/   -name libjvm.so  | head -1`
-LIB_HDFS=`find ${HADOOP_HOME}/ -name libhdfs.so | head -1`
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`:`dirname ${LIB_HDFS}`"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${HADOOP_HOME}/lib/native"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
