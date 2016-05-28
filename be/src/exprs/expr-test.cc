@@ -183,9 +183,6 @@ class ExprTest : public testing::Test {
   string default_string_val_;
   TimestampValue default_timestamp_val_;
 
-  // This is used to hold the return values from the query executor.
-  ExprValue expr_value_;
-
   virtual void SetUp() {
     min_int_values_[TYPE_TINYINT] = 1;
     min_int_values_[TYPE_SMALLINT] =
@@ -230,124 +227,44 @@ class ExprTest : public testing::Test {
     default_type_strs_[TYPE_DECIMAL] = default_decimal_str_;
   }
 
-  void GetValue(const string& expr, const ColumnType& expr_type,
-      void** interpreted_value, bool expect_error = false) {
+  string GetValue(const string& expr, const ColumnType& expr_type,
+      bool expect_error = false) {
     string stmt = "select " + expr;
     vector<FieldSchema> result_types;
     Status status = executor_->Exec(stmt, &result_types);
     if (!status.ok()) {
-      ASSERT_TRUE(expect_error) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
-      return;
+      EXPECT_TRUE(expect_error) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
+      return "";
     }
     string result_row;
     status = executor_->FetchResult(&result_row);
     if (expect_error) {
-      ASSERT_FALSE(status.ok()) << "Expected error\nstmt: " << stmt;
-      return;
+      EXPECT_FALSE(status.ok()) << "Expected error\nstmt: " << stmt;
+      return "";
     }
-    ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
+    EXPECT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
     EXPECT_EQ(TypeToOdbcString(expr_type.type), result_types[0].type) << expr;
-    *interpreted_value = ConvertValue(expr_type, result_row);
+    return result_row;
   }
 
-  void* ConvertValue(const ColumnType& type, const string& value) {
-    StringParser::ParseResult result;
-    if (value.compare("NULL") == 0) return NULL;
-    switch (type.type) {
-      case TYPE_STRING:
-      case TYPE_CHAR:
-        // Float and double get conversion errors so leave them as strings.
-        // We convert the expected result to string.
-      case TYPE_FLOAT:
-      case TYPE_DOUBLE:
-        // Construct a StringValue from 'value'. 'value' must be valid for as long as
-        // this object is valid.
-        expr_value_.string_val = StringValue(value);
-        return &expr_value_.string_val;
-      case TYPE_TINYINT:
-        expr_value_.tinyint_val =
-            StringParser::StringToInt<int8_t>(&value[0], value.size(), &result);
-        return &expr_value_.tinyint_val;
-      case TYPE_SMALLINT:
-        expr_value_.smallint_val =
-            StringParser::StringToInt<int16_t>(&value[0], value.size(), &result);
-        return &expr_value_.smallint_val;
-      case TYPE_INT:
-        expr_value_.int_val =
-            StringParser::StringToInt<int32_t>(&value[0], value.size(), &result);
-        return &expr_value_.int_val;
-      case TYPE_BIGINT:
-        expr_value_.bigint_val =
-            StringParser::StringToInt<int64_t>(&value[0], value.size(), &result);
-        return &expr_value_.bigint_val;
-      case TYPE_BOOLEAN:
-        expr_value_.bool_val = value.compare("false");
-        return &expr_value_.bool_val;
-      case TYPE_TIMESTAMP:
-        expr_value_.timestamp_val = TimestampValue(&value[0], value.size());
-        return &expr_value_.timestamp_val;
-      case TYPE_DECIMAL:
-        switch (type.GetByteSize()) {
-          case 4:
-            expr_value_.decimal4_val = StringParser::StringToDecimal<int32_t>(
-                &value[0], value.size(), type, &result);
-            return &expr_value_.decimal4_val;
-          case 8:
-            expr_value_.decimal8_val = StringParser::StringToDecimal<int64_t>(
-                &value[0], value.size(), type, &result);
-            return &expr_value_.decimal8_val;
-          case 16:
-            expr_value_.decimal16_val = StringParser::StringToDecimal<int128_t>(
-                &value[0], value.size(), type, &result);
-            return &expr_value_.decimal16_val;
-          default:
-            EXPECT_TRUE(false) << type;
-        }
-      default:
-        EXPECT_TRUE(false) << type;
-    }
-    return NULL;
-  }
+  template <typename T>
+  T ConvertValue(const string& value);
 
   void TestStringValue(const string& expr, const string& expected_result) {
-    StringValue* result;
-    GetValue(expr, TYPE_STRING, reinterpret_cast<void**>(&result));
-    string tmp(result->ptr, result->len);
-    EXPECT_EQ(expected_result, tmp) << expr;
+    EXPECT_EQ(expected_result, GetValue(expr, TYPE_STRING)) << expr;
   }
 
   void TestCharValue(const string& expr, const string& expected_result,
                      const ColumnType& type) {
-    StringValue* result;
-    GetValue(expr, type, reinterpret_cast<void**>(&result));
-    string tmp(result->ptr, result->len);
-    EXPECT_EQ(expected_result, tmp) << expr;
+    EXPECT_EQ(expected_result, GetValue(expr, type)) << expr;
   }
 
   string TestStringValueRegex(const string& expr, const string& regex) {
-    StringValue* result;
-    GetValue(expr, TYPE_STRING, reinterpret_cast<void **>(&result));
+    const string results = GetValue(expr, TYPE_STRING);
     static const boost::regex e(regex);
-    string result_cxxstr(result->ptr, result->len);
-    const bool is_regex_match = regex_match(result_cxxstr, e);
+    const bool is_regex_match = regex_match(results, e);
     EXPECT_TRUE(is_regex_match);
-    return result_cxxstr;
-  }
-
-  // We can't put this into TestValue() because GTest can't resolve
-  // the ambiguity in TimestampValue::operator==, even with the appropriate casts.
-  void TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
-    TimestampValue* result;
-    GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
-    EXPECT_EQ(expected_result, *result);
-  }
-
-  // Tests whether the returned TimestampValue is valid.
-  // We use this function for tests where the expected value is unknown, e.g., now().
-  void TestValidTimestampValue(const string& expr) {
-    TimestampValue* result;
-    GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
-    EXPECT_TRUE(result->HasDateOrTime());
+    return results;
   }
 
 // This macro adds a scoped trace to provide the line number of the caller upon failure.
@@ -409,70 +326,83 @@ class ExprTest : public testing::Test {
   template <typename T>
   void TestDecimalValue(const string& expr, const T& expected_result,
       const ColumnType& expected_type) {
-    T* result = NULL;
-    GetValue(expr, expected_type, reinterpret_cast<void**>(&result));
-    EXPECT_EQ(expected_result.value(), result->value());
+    const string value = GetValue(expr, expected_type);
+
+    StringParser::ParseResult result;
+    switch (expected_type.GetByteSize()) {
+      case 4:
+        EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int32_t>(
+            &value[0], value.size(), expected_type, &result).value());
+        break;
+      case 8:
+        EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int64_t>(
+            &value[0], value.size(), expected_type, &result).value());
+        break;
+      case 16:
+        EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int128_t>(
+            &value[0], value.size(), expected_type, &result).value());
+        break;
+      default:
+        EXPECT_TRUE(false) << expected_type << " " << expected_type.GetByteSize();
+    }
   }
 
   template <class T> void TestValue(const string& expr, const ColumnType& expr_type,
                                     const T& expected_result) {
-    void* result;
-    GetValue(expr, expr_type, &result);
+    const string result = GetValue(expr, expr_type);
 
-    string expected_str;
-    float expected_float;
-    double expected_double;
     switch (expr_type.type) {
       case TYPE_BOOLEAN:
-        EXPECT_EQ(expected_result, *reinterpret_cast<bool*>(result)) << expr;
+        EXPECT_EQ(expected_result, ConvertValue<bool>(result)) << expr;
         break;
       case TYPE_TINYINT:
-        EXPECT_EQ(expected_result, *reinterpret_cast<int8_t*>(result)) << expr;
+        EXPECT_EQ(expected_result, ConvertValue<int8_t>(result)) << expr;
         break;
       case TYPE_SMALLINT:
-        EXPECT_EQ(expected_result, *reinterpret_cast<int16_t*>(result)) << expr;
+        EXPECT_EQ(expected_result, ConvertValue<int16_t>(result)) << expr;
         break;
       case TYPE_INT:
-        EXPECT_EQ(expected_result, *reinterpret_cast<int32_t*>(result)) << expr;
+        EXPECT_EQ(expected_result, ConvertValue<int32_t>(result)) << expr;
         break;
       case TYPE_BIGINT:
-        EXPECT_EQ(expected_result, *reinterpret_cast<int64_t*>(result)) << expr;
+        EXPECT_EQ(expected_result, ConvertValue<int64_t>(result)) << expr;
         break;
-      case TYPE_FLOAT:
+      case TYPE_FLOAT: {
         // Converting the float back from a string is inaccurate so convert
         // the expected result to a string.
         // In case the expected_result was passed in as an int or double, convert it.
+        string expected_str;
+        float expected_float;
         expected_float = static_cast<float>(expected_result);
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_float),
                              TYPE_FLOAT, -1, &expected_str);
-        EXPECT_EQ(expected_str, *reinterpret_cast<string*>(result)) << expr;
+        EXPECT_EQ(expected_str, result) << expr;
         break;
-      case TYPE_DOUBLE:
+      }
+      case TYPE_DOUBLE: {
+        string expected_str;
+        double expected_double;
         expected_double = static_cast<double>(expected_result);
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_double),
                              TYPE_DOUBLE, -1, &expected_str);
-        EXPECT_EQ(expected_str, *reinterpret_cast<string*>(result)) << expr;
+        EXPECT_EQ(expected_str, result) << expr;
         break;
+      }
       default:
         ASSERT_TRUE(false) << "invalid TestValue() type: " << expr_type;
     }
   }
 
   void TestIsNull(const string& expr, const ColumnType& expr_type) {
-    void* result;
-    GetValue(expr, expr_type, &result);
-    EXPECT_TRUE(result == NULL) << expr;
+    EXPECT_TRUE(GetValue(expr, expr_type) == "NULL") << expr;
   }
 
   void TestIsNotNull(const string& expr, const ColumnType& expr_type) {
-    void* result;
-    GetValue(expr, expr_type, &result);
-    EXPECT_TRUE(result != NULL) << expr;
+    EXPECT_TRUE(GetValue(expr, expr_type) != "NULL") << expr;
   }
 
   void TestError(const string& expr) {
-    void* dummy_result;
-    GetValue(expr, INVALID_TYPE, &dummy_result, /* expect_error */ true);
+    GetValue(expr, INVALID_TYPE, /* expect_error */ true);
   }
 
   void TestNonOkStatus(const string& expr) {
@@ -620,6 +550,9 @@ class ExprTest : public testing::Test {
     TestIsNull("NULL <= " + op, TYPE_BOOLEAN);
     TestIsNull("NULL >= " + op, TYPE_BOOLEAN);
   }
+
+  void TestTimestampValue(const string& expr, const TimestampValue& expected_result);
+  void TestValidTimestampValue(const string& expr);
 
   // Test IS DISTINCT FROM operator and its variants
   void TestDistinctFrom() {
@@ -956,6 +889,59 @@ void ExprTest::TestCast(const string& stmt, const char* val,
   } catch (bad_lexical_cast& e) {
     EXPECT_TRUE(false) << e.what();
   }
+}
+
+template <>
+bool ExprTest::ConvertValue<bool>(const string& value) {
+  if (value.compare("false") == 0) {
+    return false;
+  } else {
+    DCHECK(value.compare("true") == 0);
+    return true;
+  }
+}
+
+template <>
+int8_t ExprTest::ConvertValue<int8_t>(const string& value) {
+  StringParser::ParseResult result;
+  return StringParser::StringToInt<int8_t>(&value[0], value.size(), &result);
+}
+
+template <>
+int16_t ExprTest::ConvertValue<int16_t>(const string& value) {
+  StringParser::ParseResult result;
+  return StringParser::StringToInt<int16_t>(&value[0], value.size(), &result);
+}
+
+template <>
+int32_t ExprTest::ConvertValue<int32_t>(const string& value) {
+  StringParser::ParseResult result;
+  return StringParser::StringToInt<int32_t>(&value[0], value.size(), &result);
+}
+
+template <>
+int64_t ExprTest::ConvertValue<int64_t>(const string& value) {
+  StringParser::ParseResult result;
+  return StringParser::StringToInt<int64_t>(&value[0], value.size(), &result);
+}
+
+template <>
+TimestampValue ExprTest::ConvertValue<TimestampValue>(const string& value) {
+  return TimestampValue(&value[0], value.size());
+}
+
+// We can't put this into TestValue() because GTest can't resolve
+// the ambiguity in TimestampValue::operator==, even with the appropriate casts.
+void ExprTest::TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
+  EXPECT_EQ(expected_result,
+      ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)));
+}
+
+// Tests whether the returned TimestampValue is valid.
+// We use this function for tests where the expected value is unknown, e.g., now().
+void ExprTest::TestValidTimestampValue(const string& expr) {
+  EXPECT_TRUE(ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP))
+      .HasDateOrTime());
 }
 
 template <typename T> void TestSingleLiteralConstruction(
@@ -3676,8 +3662,7 @@ TEST_F(ExprTest, TimestampFunctions) {
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
 
   // Check that timeofday() does not crash or return incorrect results
-  StringValue* tod;
-  GetValue("timeofday()", TYPE_STRING, reinterpret_cast<void**>(&tod));
+  GetValue("timeofday()", TYPE_STRING);
 
   TestValue("timestamp_cmp('1964-05-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, -1);
   TestValue("timestamp_cmp('1966-09-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, 1);
@@ -3845,10 +3830,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   // the correct behavior. The first test below checks the default/incorrect behavior.
   time_t unix_start_time =
       (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
-  int64_t* unix_timestamp_result;
-  GetValue("unix_timestamp()", TYPE_BIGINT,
-      reinterpret_cast<void**>(&unix_timestamp_result));
-  EXPECT_BETWEEN(unix_start_time, *unix_timestamp_result, static_cast<int64_t>(
+  int64_t unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
+      TYPE_BIGINT));
+  EXPECT_BETWEEN(unix_start_time, unix_timestamp_result, static_cast<int64_t>(
       (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds()));
 
   // Check again with the flag enabled.
@@ -3856,28 +3840,28 @@ TEST_F(ExprTest, TimestampFunctions) {
     ScopedLocalUnixTimestampConversionOverride use_local;
     tm before = to_tm(posix_time::microsec_clock::local_time());
     unix_start_time = mktime(&before);
-    GetValue("unix_timestamp()", TYPE_BIGINT,
-        reinterpret_cast<void**>(&unix_timestamp_result));
+    unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
+        TYPE_BIGINT));
     tm after = to_tm(posix_time::microsec_clock::local_time());
-    EXPECT_BETWEEN(unix_start_time, *unix_timestamp_result,
+    EXPECT_BETWEEN(unix_start_time, unix_timestamp_result,
         static_cast<int64_t>(mktime(&after)));
   }
 
   // Test that the other current time functions are also reasonable.
-  TimestampValue* timestamp_result;
+  TimestampValue timestamp_result;
   TimestampValue start_time = TimestampValue::LocalTime();
-  GetValue("now()", TYPE_TIMESTAMP, reinterpret_cast<void**>(&timestamp_result));
-  EXPECT_BETWEEN(start_time, *timestamp_result, TimestampValue::LocalTime());
-  GetValue("current_timestamp()", TYPE_TIMESTAMP,
-      reinterpret_cast<void**>(&timestamp_result));
-  EXPECT_BETWEEN(start_time, *timestamp_result, TimestampValue::LocalTime());
+  timestamp_result = ConvertValue<TimestampValue>(GetValue("now()", TYPE_TIMESTAMP));
+  EXPECT_BETWEEN(start_time, timestamp_result, TimestampValue::LocalTime());
+  timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
+      TYPE_TIMESTAMP));
+  EXPECT_BETWEEN(start_time, timestamp_result, TimestampValue::LocalTime());
   // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
   // a second to ensure an earlier value.
   unix_start_time =
       (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
-  GetValue("cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP,
-      reinterpret_cast<void**>(&timestamp_result));
-  EXPECT_BETWEEN(TimestampValue(unix_start_time - 1), *timestamp_result,
+  timestamp_result = ConvertValue<TimestampValue>(GetValue(
+      "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
+  EXPECT_BETWEEN(TimestampValue(unix_start_time - 1), timestamp_result,
       TimestampValue::LocalTime());
 
   // Test alias
