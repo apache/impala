@@ -140,7 +140,7 @@ class FunctionContext {
   /// The UDF/UDA is responsible for calling Free() on all buffers returned by Allocate().
   /// If Allocate() fails or causes the memory limit to be exceeded, the error will be
   /// set in this object causing the query to fail.
-  uint8_t* Allocate(int byte_size);
+  uint8_t* Allocate(int byte_size) noexcept;
 
   /// Wrapper around Allocate() to allocate a buffer of the given type "T".
   template<typename T>
@@ -155,10 +155,10 @@ class FunctionContext {
   /// memory limit to be exceeded, the error will be set in this object.
   ///
   /// This should be used for buffers that constantly get appended to.
-  uint8_t* Reallocate(uint8_t* ptr, int byte_size);
+  uint8_t* Reallocate(uint8_t* ptr, int byte_size) noexcept;
 
   /// Frees a buffer returned from Allocate() or Reallocate()
-  void Free(uint8_t* buffer);
+  void Free(uint8_t* buffer) noexcept;
 
   /// For allocations that cannot use the Allocate() API provided by this
   /// object, TrackAllocation()/Free() can be used to just keep count of the
@@ -573,7 +573,7 @@ struct StringVal : public AnyVal {
   /// If the memory allocation fails, e.g. because the intermediate value would be too
   /// large, the constructor will construct a NULL string and set an error on the function
   /// context.
-  StringVal(FunctionContext* context, int len);
+  StringVal(FunctionContext* context, int len) noexcept;
 
   /// Will create a new StringVal with the given dimension and copy the data from the
   /// parameters. In case of an error will return a NULL string and set an error on the
@@ -582,7 +582,7 @@ struct StringVal : public AnyVal {
   /// Note that the memory for the buffer of the new StringVal is managed by Impala.
   /// Impala will handle freeing it. Callers should not call Free() on the 'ptr' of
   /// the StringVal returned.
-  static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len);
+  static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) noexcept;
 
   static StringVal null() {
     StringVal sv;

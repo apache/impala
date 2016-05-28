@@ -97,7 +97,7 @@ void MemPool::FreeAll() {
   }
 }
 
-bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
+bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
   // Try to allocate from a free chunk. The first free chunk, if any, will be immediately
   // after the current chunk.
   int first_free_idx = current_chunk_idx_ + 1;

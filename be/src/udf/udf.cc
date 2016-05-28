@@ -284,7 +284,7 @@ inline bool FunctionContextImpl::CheckAllocResult(const char* fn_name,
   return true;
 }
 
-uint8_t* FunctionContext::Allocate(int byte_size) {
+uint8_t* FunctionContext::Allocate(int byte_size) noexcept {
   assert(!impl_->closed_);
   if (byte_size == 0) return NULL;
   uint8_t* buffer = impl_->pool_->Allocate(byte_size);
@@ -302,7 +302,7 @@ uint8_t* FunctionContext::Allocate(int byte_size) {
   return buffer;
 }
 
-uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) {
+uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) noexcept {
   assert(!impl_->closed_);
   VLOG_ROW << "Reallocate: FunctionContext=" << this
            << " size=" << byte_size
@@ -321,7 +321,7 @@ uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) {
   return new_ptr;
 }
 
-void FunctionContext::Free(uint8_t* buffer) {
+void FunctionContext::Free(uint8_t* buffer) noexcept {
   assert(!impl_->closed_);
   if (buffer == NULL) return;
   VLOG_ROW << "Free: FunctionContext=" << this << " "
@@ -416,7 +416,7 @@ void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
   }
 }
 
-uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
+uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) noexcept {
   assert(!closed_);
   if (byte_size == 0) return NULL;
   uint8_t* buffer = pool_->Allocate(byte_size);
@@ -431,7 +431,7 @@ uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
   return buffer;
 }
 
-void FunctionContextImpl::FreeLocalAllocations() {
+void FunctionContextImpl::FreeLocalAllocations() noexcept {
   assert(!closed_);
   if (VLOG_ROW_IS_ON) {
     stringstream ss;
@@ -454,7 +454,7 @@ void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) 
 
 // Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
 // expr-ir.cc. This could probably use further investigation.
-StringVal::StringVal(FunctionContext* context, int len)
+StringVal::StringVal(FunctionContext* context, int len) noexcept
   : len(len), ptr(NULL) {
   if (UNLIKELY(len > StringVal::MAX_LENGTH)) {
     std::cout << "MAX_LENGTH, Trying to allocate " << len;
@@ -474,7 +474,7 @@ StringVal::StringVal(FunctionContext* context, int len)
   }
 }
 
-StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) {
+StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) noexcept {
   StringVal result(ctx, len);
   if (LIKELY(!result.is_null)) {
     memcpy(result.ptr, buf, len);

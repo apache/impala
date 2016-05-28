@@ -79,10 +79,10 @@ class FunctionContextImpl {
   /// FreeLocalAllocations(). This is used where the lifetime of the allocation is clear.
   /// For UDFs, the allocations can be freed at the row level.
   /// TODO: free them at the batch level and save some copies?
-  uint8_t* AllocateLocal(int byte_size);
+  uint8_t* AllocateLocal(int byte_size) noexcept;
 
   /// Frees all allocations returned by AllocateLocal().
-  void FreeLocalAllocations();
+  void FreeLocalAllocations() noexcept;
 
   /// Returns true if there are any allocations returned by AllocateLocal().
   bool HasLocalAllocations() const { return !local_allocations_.empty(); }

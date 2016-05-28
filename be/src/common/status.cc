@@ -204,11 +204,11 @@ void Status::ToThrift(TStatus* status) const {
   }
 }
 
-void Status::FreeMessage() {
+void Status::FreeMessage() noexcept {
   delete msg_;
 }
 
-void Status::CopyMessageFrom(const Status& status) {
+void Status::CopyMessageFrom(const Status& status) noexcept {
   delete msg_;
   msg_ = status.msg_ == NULL ? NULL : new ErrorMsg(*status.msg_);
 }

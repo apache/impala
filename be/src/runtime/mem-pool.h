@@ -86,7 +86,7 @@ class MemPool {
   /// Allocates 8-byte aligned section of memory of 'size' bytes at the end
   /// of the the current chunk. Creates a new chunk if there aren't any chunks
   /// with enough capacity.
-  uint8_t* Allocate(int64_t size) {
+  uint8_t* Allocate(int64_t size) noexcept {
     return Allocate<false>(size);
   }
 
@@ -94,7 +94,7 @@ class MemPool {
   /// this call will fail (returns NULL) if it does.
   /// The caller must handle the NULL case. This should be used for allocations
   /// where the size can be very big to bound the amount by which we exceed mem limits.
-  uint8_t* TryAllocate(int64_t size) {
+  uint8_t* TryAllocate(int64_t size) noexcept {
     return Allocate<true>(size);
   }
 
@@ -193,7 +193,7 @@ class MemPool {
   /// if a new chunk needs to be created.
   /// If check_limits is true, this call can fail (returns false) if adding a
   /// new chunk exceeds the mem limits.
-  bool FindChunk(int64_t min_size, bool check_limits);
+  bool FindChunk(int64_t min_size, bool check_limits) noexcept;
 
   /// Check integrity of the supporting data structures; always returns true but DCHECKs
   /// all invariants.
@@ -207,7 +207,7 @@ class MemPool {
   }
 
   template <bool CHECK_LIMIT_FIRST>
-  uint8_t* Allocate(int64_t size) {
+  uint8_t* Allocate(int64_t size) noexcept {
     if (UNLIKELY(size == 0)) return reinterpret_cast<uint8_t *>(&zero_length_region_);
 
     int64_t num_bytes = BitUtil::RoundUp(size, 8);
@@ -229,8 +229,8 @@ class MemPool {
 };
 
 // Stamp out templated implementations here so they're included in IR module
-template uint8_t* MemPool::Allocate<false>(int64_t size);
-template uint8_t* MemPool::Allocate<true>(int64_t size);
+template uint8_t* MemPool::Allocate<false>(int64_t size) noexcept;
+template uint8_t* MemPool::Allocate<true>(int64_t size) noexcept;
 
 }
 

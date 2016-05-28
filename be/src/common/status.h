@@ -239,10 +239,10 @@ class Status {
   Status(const std::string& error_msg, bool silent);
 
   // A non-inline function for copying status' message.
-  void CopyMessageFrom(const Status& status);
+  void CopyMessageFrom(const Status& status) noexcept;
 
   // A non-inline function for freeing status' message.
-  void FreeMessage();
+  void FreeMessage() noexcept;
 
   /// Status uses a naked pointer to ensure the size of an instance on the stack is only
   /// the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.

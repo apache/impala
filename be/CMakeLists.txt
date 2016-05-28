@@ -138,7 +138,6 @@ add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 # Empirically, the runtime JIT produces slightly better code when starting with IR that
 # was optimized at -O1. Higher optimization levels tend to bloat the code.
 #  -Wno-deprecated: gutil contains deprecated headers
-#  -Wno-c++11-extensions: c++11 extensions are ok as long as clang supports them
 #  -Wno-return-type-c-linkage: UDFs return C++ classes but use C linkage to prevent
 #       mangling
 #  -DBOOST_NO_EXCEPTIONS: call a custom error handler for exceptions in codegen'd code.
