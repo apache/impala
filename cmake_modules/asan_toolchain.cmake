@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(IMPALA_TOOLCHAIN ON)
-
 # Set the root directory for the toolchain
 set(TOOLCHAIN_ROOT $ENV{IMPALA_TOOLCHAIN})
 

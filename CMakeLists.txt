@@ -14,28 +14,19 @@
 
 cmake_minimum_required(VERSION 2.6)
 
-if (NOT $ENV{DISABLE_IMPALA_TOOLCHAIN})
-  # Enable toolchain variable if the environment is setup
-  set(IMPALA_TOOLCHAIN ON)
-  message(STATUS "Toolchain build.")
-  if ("$ENV{SKIP_TOOLCHAIN_BOOTSTRAP}" STREQUAL "true")
-    message(STATUS "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap.")
-  else()
-    # Download any missing toolchain dependencies. If this fails, fail the build.
-    set(BOOTSTRAP_CMD "$ENV{IMPALA_HOME}/bin/bootstrap_toolchain.py")
-    # Download and unpack the dependencies
-    message(STATUS "Downloading and extracting dependencies.")
-    execute_process(COMMAND ${BOOTSTRAP_CMD} RESULT_VARIABLE BOOTSTRAP_RESULT)
-    if (${BOOTSTRAP_RESULT} EQUAL 0)
-      message(STATUS "Toolchain bootstrap complete.")
-    else()
-      message(FATAL_ERROR "Toolchain bootstrap failed.")
-    endif()
-  endif()
+if ("$ENV{SKIP_TOOLCHAIN_BOOTSTRAP}" STREQUAL "true")
+  message(STATUS "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap.")
 else()
-  set(IMPALA_TOOLCHAIN OFF)
-  message(STATUS "Impala toolchain was explicitly disabled using DISABLE_IMPALA_TOOLCHAIN.")
-  message(STATUS "Assuming system search path for dependencies.")
+  # Download any missing toolchain dependencies. If this fails, fail the build.
+  set(BOOTSTRAP_CMD "$ENV{IMPALA_HOME}/bin/bootstrap_toolchain.py")
+  # Download and unpack the dependencies
+  message(STATUS "Downloading and extracting dependencies.")
+  execute_process(COMMAND ${BOOTSTRAP_CMD} RESULT_VARIABLE BOOTSTRAP_RESULT)
+  if (${BOOTSTRAP_RESULT} EQUAL 0)
+    message(STATUS "Toolchain bootstrap complete.")
+  else()
+    message(FATAL_ERROR "Toolchain bootstrap failed.")
+  endif()
 endif()
 
 # Explicitly define project() to allow modifying the compiler before the project is
@@ -84,62 +75,50 @@ function(set_dep_root NAME)
   set(${NAME}_ROOT $ENV{IMPALA_TOOLCHAIN}/${NAME_LOWER}-$ENV{${VAL_NAME}} PARENT_SCOPE)
 endfunction()
 
-set(Boost_USE_MULTITHREADED ON)
+# Define root path for all dependencies, this is in the form of
+# set_dep_root(PACKAGE) ->
+#   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
+set_dep_root(AVRO)
+set_dep_root(BOOST)
+set_dep_root(BREAKPAD)
+set_dep_root(BZIP2)
+set_dep_root(GCC)
+set_dep_root(GFLAGS)
+set_dep_root(GLOG)
+set_dep_root(GPERFTOOLS)
+set_dep_root(GTEST)
+set_dep_root(LLVM)
+set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
+set_dep_root(LZ4)
+set_dep_root(OPENLDAP)
+set_dep_root(RE2)
+set_dep_root(RAPIDJSON)
+set_dep_root(SNAPPY)
+set_dep_root(THRIFT)
+set_dep_root(ZLIB)
+if (APPLE)
+  set_dep_root(OPENSSL)
+endif()
 
-if (IMPALA_TOOLCHAIN)
-  message(STATUS "Found Impala Toolchain, enabling toolchain boost")
-  set(ENV{BOOST_ROOT} "$ENV{IMPALA_TOOLCHAIN}/boost-$ENV{IMPALA_BOOST_VERSION}")
-  set(Boost_USE_STATIC_LIBS NOT ${BUILD_SHARED_LIBS})
-  set(Boost_USE_STATIC_RUNTIME ON)
+set(Boost_USE_STATIC_LIBS NOT ${BUILD_SHARED_LIBS})
+set(Boost_USE_STATIC_RUNTIME ON)
 
-  # Newer versions of boost (including the version in toolchain) don't build separate
-  # multithreaded versions (they always are). Make sure to pick those up.
-  set(Boost_USE_MULTITHREADED OFF)
+# Newer versions of boost (including the version in toolchain) don't build separate
+# multithreaded versions (they always are). Make sure to pick those up.
+# TODO: understand the consequence of leaving this ON (the default value).
+set(Boost_USE_MULTITHREADED OFF)
 
-  # Define root path for all dependencies, this is in the form of
-  # set_dep_root(PACKAGE) ->
-  #   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
-  set_dep_root(GCC)
-  set_dep_root(AVRO)
-  set_dep_root(BREAKPAD)
-  set_dep_root(BZIP2)
-  set_dep_root(GFLAGS)
-  set_dep_root(GLOG)
-  set_dep_root(GPERFTOOLS)
-  set_dep_root(GTEST)
-  set_dep_root(LLVM)
-  set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
-  set_dep_root(LZ4)
-  set_dep_root(OPENLDAP)
-  set_dep_root(RE2)
-  set_dep_root(RAPIDJSON)
-  set_dep_root(SNAPPY)
-  set_dep_root(THRIFT)
-  set_dep_root(ZLIB)
-  if (APPLE)
-    set_dep_root(OPENSSL)
-  endif()
-endif ()
-
-# find libraries that will be statically linked if they were compiled with -fPIC
-find_package(PICLibs REQUIRED)
-
-# find boost headers and libs
-IF (DEFINED ENV{BOOST_ROOT})
-    # The casing and underscoring expected for these properties varies between
-    # versions of CMake. Multiple inconsistent versions may be present here
-    # intentionally to provide what a wide range of versions expects.
-    set(Boost_NO_SYSTEM_PATHS true)
-    set(BOOST_ROOT $ENV{BOOST_ROOT})
-    set(BOOST_LIBRARYDIR $ENV{BOOST_ROOT}/lib)
-    set(BOOST_INCLUDEDIR $ENV{BOOST_ROOT}/include)
-    set(Boost_INCLUDE_DIR ${BOOST_INCLUDEDIR})
-ENDIF (DEFINED ENV{BOOST_ROOT})
+# The casing and underscoring expected for these properties varies between
+# versions of CMake. Multiple inconsistent versions may be present here
+# intentionally to provide what a wide range of versions expects.
+set(Boost_NO_SYSTEM_PATHS true)
+set(BOOST_LIBRARYDIR ${BOOST_ROOT}/lib)
+set(BOOST_INCLUDEDIR ${BOOST_ROOT}/include)
+set(Boost_INCLUDE_DIR ${BOOST_INCLUDEDIR})
 
 if (CMAKE_DEBUG)
   set(Boost_DEBUG TRUE)
 endif()
-
 
 find_package(Boost $ENV{IMPALA_BOOST_VERSION} REQUIRED
   COMPONENTS thread regex system filesystem date_time)
@@ -160,20 +139,17 @@ find_package(Zlib REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIR})
 
 if(NOT BUILD_SHARED_LIBS)
-  # It might be the case that bzip2 and zlib are not available as static libs in the non
-  # toolchain case
-  # TODO remove this when moving to toolchain only
+  # Panic if we cannot find the static libraries as they are supposed to be
+  # in the toolchain.
   if (NOT BZIP2_STATIC_FOUND)
-    set(LIBBZ2 ${BZIP2_LIBRARIES})
-  else()
-    set(LIBBZ2 BZIP2_STATIC)
+    message(FATAL_ERROR "bzip2 static library libbz2.a not found in $ENV{IMPALA_TOOLCHAIN}")
+  endif()
+  if (NOT ZLIB_STATIC_FOUND)
+    message(FATAL_ERROR "zlib static library libz.a not found in $ENV{IMPALA_TOOLCHAIN}")
   endif()
 
-  if (NOT ZLIB_STATIC_FOUND)
-    set(LIBZ ${ZLIB_LIBRARIES})
-  else()
-    set(LIBZ ZLIB_STATIC)
-  endif()
+  set(LIBBZ2 BZIP2_STATIC)
+  set(LIBZ ZLIB_STATIC)
 else()
   set(LIBBZ2 ${BZIP2_LIBRARIES})
   set(LIBZ ${ZLIB_LIBRARIES})
@@ -226,8 +202,8 @@ set(LLVM_BINARIES_ROOT ${LLVM_ROOT})
 find_package(LlvmBinaries REQUIRED)
 
 # Find LLVM libraries to link against.
-if (IMPALA_TOOLCHAIN AND ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG"
-      OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"))
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG"
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   # Use the LLVM libaries with assertions for debug builds.
   set(LLVM_ROOT ${LLVM_DEBUG_ROOT})
 endif()
@@ -253,6 +229,12 @@ set(LDAP_LIBRARY ldapstatic)
 set(LBER_LIBRARY lberstatic)
 message(STATUS "LDAP: ${LDAP_INCLUDE_DIR}")
 
+# The environment variable $THRIFT_HOME is set in impala-config.sh
+# Make sure it's consistent with $THRIFT_ROOT.
+if (NOT ($ENV{THRIFT_HOME} STREQUAL ${THRIFT_ROOT}))
+  message(FATAL_ERROR "THRIFT_ROOT (${THRIFT_ROOT}) differs from environment "
+      "variable THRIFT_HOME ($ENV{THRIFT_HOME}).")
+endif()
 # find thrift headers and libs
 find_package(Thrift REQUIRED)
 include_directories(${THRIFT_INCLUDE_DIR})

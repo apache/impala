@@ -244,16 +244,6 @@ if [ $CLEAN_ACTION -eq 1 ]; then
     $IMPALA_HOME/bin/clean.sh
 fi
 
-# Only build thirdparty if no toolchain is set
-if [[ -z $IMPALA_TOOLCHAIN ]]; then
-  # Sanity check that thirdparty is built.
-  if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
-  then
-    echo "Couldn't find thirdparty build files.  Building thirdparty."
-    $IMPALA_HOME/bin/build_thirdparty.sh $([ ${CLEAN_ACTION} -eq 0 ] && echo '-noclean')
-  fi
-fi
-
 MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
 
 if [ $BUILD_FE_ONLY -eq 1 ]; then
@@ -308,9 +298,7 @@ $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 if [ -e $IMPALA_LZO ]
 then
   pushd $IMPALA_LZO
-  if [[ ! -z $IMPALA_TOOLCHAIN ]]; then
-    LZO_CMAKE_ARGS+=" -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake"
-  fi
+  LZO_CMAKE_ARGS+=" -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake"
   rm -f CMakeCache.txt
   cmake ${LZO_CMAKE_ARGS}
   ${MAKE_CMD}

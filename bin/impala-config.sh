@@ -21,7 +21,7 @@
 # this script because scripts outside this repository may need to be updated and that
 # is not practical at this time.
 export JAVA_HOME="${JAVA_HOME:-/usr/java/default}"
-if [ ! -d "$JAVA_HOME" ] ; then
+if [ ! -d "$JAVA_HOME" ]; then
   echo "JAVA_HOME must be set to the location of your JDK!"
   return 1
 fi
@@ -39,8 +39,15 @@ if [ -z $IMPALA_HOME ]; then
   fi
 fi
 
-: ${DISABLE_IMPALA_TOOLCHAIN=0}
 : ${IMPALA_TOOLCHAIN=$IMPALA_HOME/toolchain}
+if [ -z $IMPALA_TOOLCHAIN ]; then
+  echo "IMPALA_TOOLCHAIN must be specified. Please set it to a valid directory or"\
+       "leave it unset."
+  return 1
+fi
+
+# This flag is used in $IMPALA_HOME/cmake_modules/toolchain.cmake.
+# If it's 0, Impala will be built with the compiler in the toolchain directory.
 : ${USE_SYSTEM_GCC=0}
 
 # Gold is available on newer systems and a full build with static linking is ~1.5 mins
@@ -48,15 +55,14 @@ fi
 : ${USE_GOLD_LINKER=false}
 
 # Override the default compiler by setting a path to the new compiler. The default
-# compiler depends on USE_SYSTEM_GCC, DISABLE_IMPALA_TOOLCHAIN, and IMPALA_GCC_VERSION.
-# The intended use case is to set the compiler to distcc, in that case the user would
-# also set IMPALA_BUILD_THREADS to increase parallelism.
+# compiler depends on USE_SYSTEM_GCC and IMPALA_GCC_VERSION. The intended use case
+# is to set the compiler to distcc, in that case the user would also set
+# IMPALA_BUILD_THREADS to increase parallelism.
 : ${IMPALA_CXX_COMPILER=default}
 
 # If enabled, debug symbols are added to cross-compiled IR.
 : ${ENABLE_IMPALA_IR_DEBUG_INFO=false}
 
-export DISABLE_IMPALA_TOOLCHAIN
 export IMPALA_TOOLCHAIN
 export USE_SYSTEM_GCC
 export USE_GOLD_LINKER
@@ -95,9 +101,7 @@ export USE_KUDU_DEBUG_BUILD
 if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
   KUDU_IS_SUPPORTED=true
   if [[ -z $KUDU_BUILD_DIR ]]; then
-    if [[ $DISABLE_IMPALA_TOOLCHAIN -eq 1 ]]; then
-      KUDU_IS_SUPPORTED=false
-    elif ! $IS_OSX; then
+    if ! $IS_OSX; then
       if ! which lsb_release &>/dev/null; then
         echo Unable to find the 'lsb_release' command. \
             Please ensure it is available in your PATH. 1>&2
@@ -226,46 +230,34 @@ export NUM_CONCURRENT_TESTS=${NUM_CONCURRENT_TESTS-${CORES}}
 
 # Versions of toolchain dependencies (or if toolchain is not used of dependencies in
 # thirdparty)
-export IMPALA_AVRO_VERSION=1.7.4
+export IMPALA_AVRO_VERSION=1.7.4-p4
 export IMPALA_BINUTILS_VERSION=2.26
 export IMPALA_BOOST_VERSION=1.57.0
 export IMPALA_BREAKPAD_VERSION=20150612-p1
-export IMPALA_BZIP2_VERSION=1.0.6
+export IMPALA_BZIP2_VERSION=1.0.6-p1
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 export IMPALA_GCC_VERSION=4.9.2
 export IMPALA_GFLAGS_VERSION=2.0
-export IMPALA_GLOG_VERSION=0.3.2
+export IMPALA_GLOG_VERSION=0.3.2-p1
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
 export IMPALA_KUDU_VERSION=0.8.0-RC1
-export IMPALA_LLVM_VERSION=3.8.0
-export IMPALA_LLVM_DEBUG_VERSION=3.8.0
-export IMPALA_LLVM_ASAN_VERSION=3.8.0
+export IMPALA_LLVM_VERSION=3.8.0-p1
+export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
+# Debug builds should use the release+asserts build to get additional coverage.
+# Don't use the LLVM debug build because the binaries are too large to distribute.
+export IMPALA_LLVM_DEBUG_VERSION=3.8.0-asserts-p1
 export IMPALA_LZ4_VERSION=svn
 export IMPALA_OPENLDAP_VERSION=2.4.25
 export IMPALA_OPENSSL_VERSION=0.9.8zf
 export IMPALA_POSTGRES_JDBC_DRIVER_VERSION=9.0-801
 export IMPALA_RAPIDJSON_VERSION=0.11
-export IMPALA_RE2_VERSION=20130115
+export IMPALA_RE2_VERSION=20130115-p1
 export IMPALA_SNAPPY_VERSION=1.1.3
 export IMPALA_SQUEASEL_VERSION=3.3
-export IMPALA_THRIFT_VERSION=0.9.0
+export IMPALA_THRIFT_VERSION=0.9.0-p8
 export IMPALA_THRIFT_JAVA_VERSION=0.9.0
 export IMPALA_ZLIB_VERSION=1.2.8
-
-# Some of the variables need to be overwritten to explicitly mark the patch level
-if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
-  IMPALA_AVRO_VERSION+=-p4
-  IMPALA_BZIP2_VERSION+=-p1
-  IMPALA_GLOG_VERSION+=-p1
-  IMPALA_THRIFT_VERSION+=-p8
-  IMPALA_RE2_VERSION+=-p1
-  IMPALA_LLVM_VERSION+=-p1
-  IMPALA_LLVM_ASAN_VERSION+=-p1
-  # Debug builds should use the release+asserts build to get additional coverage.
-  # Don't use the LLVM debug build because the binaries are too large to distribute.
-  IMPALA_LLVM_DEBUG_VERSION+=-asserts-p1
-fi
 
 export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
 export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
@@ -280,20 +272,6 @@ if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_OPENSSL_VERSION=1.0.1p
   IMPALA_THRIFT_VERSION=0.9.2
   IMPALA_THRIFT_JAVA_VERSION=0.9.2
-fi
-
-
-if [[ ! -z "${IMPALA_CYRUS_SASL_INSTALL_DIR:-}" ]]
-then
-  export IMPALA_CYRUS_SASL_INSTALL_DIR # Ensure it's exported
-elif [[ "${IMPALA_HOME}" =~ "~" ]]
-then
-  # Sasl has problems with 'make install' if the path contains a ~, e.g.
-  # /some~directory/impala. In our packaging jobs, the path contains ~ so we'll
-  # just install somewhere else as a workaround.
-  export IMPALA_CYRUS_SASL_INSTALL_DIR=/tmp/impala-build/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build
-else
-  export IMPALA_CYRUS_SASL_INSTALL_DIR=${IMPALA_HOME}/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build
 fi
 
 export IMPALA_HADOOP_VERSION=2.6.0-cdh5.8.0-SNAPSHOT
@@ -313,8 +291,11 @@ export IMPALA_AUX_DATASET_DIR=$IMPALA_AUX_TEST_HOME/testdata/datasets
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
+# The directory in which all the thirdparty CDH components live.
+CDH_COMPONENTS_HOME=$IMPALA_HOME/thirdparty
+
 # Hadoop dependencies are snapshots in the Impala tree
-export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
+export HADOOP_HOME=$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
 : ${HADOOP_CLASSPATH=}
@@ -326,12 +307,12 @@ HADOOP_CLASSPATH+=":$LZO_JAR_PATH"
 export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
-export LLAMA_HOME=$IMPALA_HOME/thirdparty/llama-${IMPALA_LLAMA_VERSION}/
-export MINIKDC_HOME=$IMPALA_HOME/thirdparty/llama-minikdc-${IMPALA_MINIKDC_VERSION}
-export SENTRY_HOME=$IMPALA_HOME/thirdparty/sentry-${IMPALA_SENTRY_VERSION}
+export LLAMA_HOME=$CDH_COMPONENTS_HOME/llama-${IMPALA_LLAMA_VERSION}/
+export MINIKDC_HOME=$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_MINIKDC_VERSION}
+export SENTRY_HOME=$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}
 export SENTRY_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
 
-export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
+export HIVE_HOME=$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
@@ -346,7 +327,7 @@ export AUX_CLASSPATH="${LZO_JAR_PATH}"
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
-export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
+export HBASE_HOME=$CDH_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/
 export PATH=$HBASE_HOME/bin:$PATH
 
 # Add the jars so hive can create hbase tables.
@@ -358,18 +339,11 @@ export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA
 
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
-# Optionally set the Thrift home to the toolchain
-if [[ -z $IMPALA_TOOLCHAIN ]]; then
-  THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}
-  export THRIFT_HOME=${THRIFT_SRC_DIR}/build
-else
-  export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}
-fi
+# Set $THRIFT_HOME to the Thrift directory in toolchain.
+export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}
 
 # ASAN needs a matching version of llvm-symbolizer to symbolize stack traces.
-if [[ -n $IMPALA_TOOLCHAIN ]]; then
-  export ASAN_SYMBOLIZER_PATH=${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer
-fi
+export ASAN_SYMBOLIZER_PATH=${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer
 
 export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
@@ -399,11 +373,7 @@ export LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
 
 export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 
-if [[ -z "${IMPALA_TOOLCHAIN}" ]]; then
-  IMPALA_SNAPPY_PATH=${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib
-else
-  IMPALA_SNAPPY_PATH=${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib
-fi
+export IMPALA_SNAPPY_PATH=${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib
 
 export JAVA_LIBRARY_PATH=${IMPALA_SNAPPY_PATH}
 
@@ -418,10 +388,11 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`:`dirname ${LIB_HDFS}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$IMPALA_LZO/build"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
 
-if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
-  LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64"
+if [ $USE_SYSTEM_GCC -eq 0 ]; then
+  IMPALA_TOOLCHAIN_GCC_LIB=${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64
+  LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_TOOLCHAIN_GCC_LIB}"
 fi
 
 export LD_LIBRARY_PATH

@@ -43,9 +43,7 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 IF($ENV{USE_GOLD_LINKER} STREQUAL "true")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wl,-fuse-ld=gold")
-  if (IMPALA_TOOLCHAIN)
-    SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN}/binutils-$ENV{IMPALA_BINUTILS_VERSION}/bin/")
-  endif()
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -B $ENV{IMPALA_TOOLCHAIN}/binutils-$ENV{IMPALA_BINUTILS_VERSION}/bin/")
 ENDIF()
 
 # On Apple we build with clang and need libstdc++ instead of libc++
@@ -78,11 +76,9 @@ SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
 #
 # Debug information is stored as dwarf2 to be as compatible as possible
 SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb -gdwarf-2")
-if (IMPALA_TOOLCHAIN)
-  # -Werror: compile warnings should be errors when using the toolchain compiler.
-  #   Only enable for debug builds because this is what we test in pre-commit tests.
-  SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG} -Werror")
-endif()
+# -Werror: compile warnings should be errors when using the toolchain compiler.
+#   Only enable for debug builds because this is what we test in pre-commit tests.
+SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG} -Werror")
 SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
@@ -93,9 +89,6 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_RELEASE})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
-  if (NOT IMPALA_TOOLCHAIN)
-    SET(CMAKE_CXX_COMPILER ${LLVM_CLANG_EXECUTABLE})
-  endif()
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_ADDRESS_SANITIZER}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
@@ -145,10 +138,9 @@ set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++14" "-DIR_COMPILE" "-DNDEBUG"
   "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG"
   "-DBOOST_NO_EXCEPTIONS" "-fcolor-diagnostics" "-Wno-deprecated"
   "-Wno-return-type-c-linkage" "-O1")
-if (IMPALA_TOOLCHAIN)
-  # -Werror: compile warnings should be errors when using the toolchain compiler.
-  SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
-endif()
+# -Werror: compile warnings should be errors when using the toolchain compiler.
+set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
+
 IF($ENV{ENABLE_IMPALA_IR_DEBUG_INFO} STREQUAL "true")
   # -g: emit debug symbols in IR. These increase IR size and memory overhead of LLVM, but
   #     are useful for debugging codegened code and interpreting codegen disassembly
@@ -159,7 +151,6 @@ endif()
 # Flags to pass to LLVM's opt to further optimize cross-compiled IR.
 #  -inline: inline with low threshold to get rid of trivial accessor functions.
 set(LLVM_OPT_IR_FLAGS "-inline" "-inlinehint-threshold=10" "-inline-threshold=10")
-
 
 # setup doc generation with Doxygen
 find_package(Doxygen)
@@ -203,11 +194,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 
 set(CLANG_INCLUDE_FLAGS)
 
-if (IMPALA_TOOLCHAIN)
-  # Ensure that clang uses the gcc toolchain headers.
-  set(CLANG_BASE_FLAGS --gcc-toolchain=${GCC_ROOT})
-  set(CLANG_INCLUDE_FLAGS ${CLANG_BASE_FLAGS})
-endif()
+# Ensure that clang uses the gcc toolchain headers.
+set(CLANG_BASE_FLAGS --gcc-toolchain=${GCC_ROOT})
+set(CLANG_INCLUDE_FLAGS ${CLANG_BASE_FLAGS})
 
 set(CLANG_INCLUDE_FLAGS
   ${CLANG_INCLUDE_FLAGS}
@@ -355,13 +344,6 @@ endif()
 set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
 list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS HDFS_STATIC)
 set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${HDFS_LIBRARIES})
-# Replace static libz bzib with dynamic
-if (NOT IMPALA_TOOLCHAIN AND NOT BUILD_SHARED_LIBS)
-  list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS BZIP2_STATIC)
-  list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS ZLIB_STATIC)
-  set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS
-    ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES})
-endif()
 
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.
