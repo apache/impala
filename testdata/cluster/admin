@@ -317,13 +317,15 @@ function start_cluster {
     echo "Starting Kerberized cluster."
   fi
 
-  for SERVICE in ${SUPPORTED_SERVICES[@]}; do
-    start $SERVICE
-  done
+  if [ ${#SUPPORTED_SERVICES[@]} -gt 0 ]; then
+    for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
+      start $SERVICE
+    done
 
-  # Check if the cluster is still alive...
-  sleep 10
-  check_cluster_status
+    # If there any services to start, check that the cluster is still alive...
+    sleep 10
+    check_cluster_status
+  fi
   return $?
 }
 
@@ -408,7 +410,7 @@ function check_cluster_status {
   ROLE_COUNT=0
   NOT_RUNNING=()
   for NODE_DIR in "$NODES_DIR/$NODE_PREFIX"*; do
-    for SERVICE in ${SUPPORTED_SERVICES[@]}; do
+    for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
       for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/$SERVICE*" $FIND_EXECUTABLE_FILTER \
           -type f); do
         ROLE_COUNT=$((ROLE_COUNT + 1))
