@@ -390,11 +390,6 @@ FUNCTION(ADD_UDF_TEST TEST_NAME)
   ADD_DEPENDENCIES(be-test ${TEST_NAME})
 ENDFUNCTION()
 
-FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
-  ADD_EXECUTABLE(${BENCHMARK_NAME} ${BENCHMARK_NAME}.cc)
-  TARGET_LINK_LIBRARIES(${BENCHMARK_NAME} ${IMPALA_LINK_LIBS})
-ENDFUNCTION()
-
 # Function to generate rule to cross compile a source file to an IR module.
 # This should be called with the .cc src file and it will generate a
 # src-file-ir target that can be built.

@@ -56,9 +56,6 @@ add_library(Exprs
 )
 add_dependencies(Exprs thrift-deps gen_ir_descriptions)
 
-add_executable(expr-benchmark expr-benchmark.cc)
-target_link_libraries(expr-benchmark ${IMPALA_TEST_LINK_LIBS})
-
 ADD_BE_TEST(expr-test)
 ADD_BE_TEST(expr-codegen-test)
 
@@ -67,5 +64,3 @@ COMPILE_TO_IR(expr-codegen-test.cc)
 add_dependencies(expr-codegen-test-ir thrift-deps)
 
 ADD_UDF_TEST(aggregate-functions-test)
-
-ADD_BE_BENCHMARK(in-predicate-benchmark)

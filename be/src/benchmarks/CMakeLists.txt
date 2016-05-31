@@ -19,6 +19,11 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/benchmarks")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/benchmarks")
 
+FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
+  ADD_EXECUTABLE(${BENCHMARK_NAME} ${BENCHMARK_NAME}.cc)
+  TARGET_LINK_LIBRARIES(${BENCHMARK_NAME} ${IMPALA_LINK_LIBS})
+ENDFUNCTION()
+
 ADD_BE_BENCHMARK(parse-timestamp-benchmark)
 ADD_BE_BENCHMARK(string-search-benchmark)
 ADD_BE_BENCHMARK(atod-benchmark)
@@ -37,6 +42,9 @@ ADD_BE_BENCHMARK(overflow-benchmark)
 ADD_BE_BENCHMARK(bloom-filter-benchmark)
 ADD_BE_BENCHMARK(int-hash-benchmark)
 ADD_BE_BENCHMARK(bitmap-benchmark)
+ADD_BE_BENCHMARK(expr-benchmark)
+ADD_BE_BENCHMARK(hash-benchmark)
+ADD_BE_BENCHMARK(in-predicate-benchmark)
+ADD_BE_BENCHMARK(network-perf-benchmark)
 
-add_executable(hash-benchmark hash-benchmark.cc)
-target_link_libraries(hash-benchmark Experiments ${IMPALA_LINK_LIBS})
+target_link_libraries(hash-benchmark Experiments)
