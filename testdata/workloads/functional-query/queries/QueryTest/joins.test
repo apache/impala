@@ -710,3 +710,13 @@ NULL,1,NULL,1
 ---- TYPES
 TINYINT,TINYINT,TINYINT,TINYINT
 ====
+---- QUERY
+# Regression test for IMPALA-3645. Certain UDFs may do local allocations in Expr::Open().
+# Make sure the DCHECK in PartitionedHashJoinNode::ProcessBuildInput() doesn't fire.
+select count(*) from functional.alltypesagg t1 join functional.alltypesagg t2
+on extract(minute from t1.timestamp_col) = extract(hour from t2.timestamp_col);
+---- RESULTS
+2042200
+---- TYPES
+BIGINT
+====

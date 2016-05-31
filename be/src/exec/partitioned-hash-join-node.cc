@@ -623,6 +623,12 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   }
   AllocateRuntimeFilters(state);
 
+  // The prepare functions of probe expressions may have done local allocations implicitly
+  // (e.g. calling UdfBuiltins::Lower()). The probe expressions' local allocations need to
+  // be freed now as they don't get freed again till probing. Other exprs' local allocations
+  // are freed in ExecNode::FreeLocalAllocations() in ProcessBuildInput().
+  ExprContext::FreeLocalAllocations(probe_expr_ctxs_);
+
   // Do a full scan of child(1) and partition the rows.
   {
     SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
@@ -678,7 +684,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
     // 'probe_expr_ctxs_' should have made no local allocations in this function.
-    DCHECK(!ExprContext::HasLocalAllocations(probe_expr_ctxs_));
+    DCHECK(!ExprContext::HasLocalAllocations(probe_expr_ctxs_))
+        << Expr::DebugString(probe_expr_ctxs_);
     if (input_partition_ == NULL) {
       // If we are still consuming batches from the build side.
       {
