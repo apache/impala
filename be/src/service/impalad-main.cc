@@ -77,6 +77,8 @@ int ImpaladMain(int argc, char** argv) {
 
   ABORT_IF_ERROR(be_server->Start());
 
+  ABORT_IF_ERROR(beeswax_server->Start());
+  ABORT_IF_ERROR(hs2_server->Start());
   Status status = exec_env.StartServices();
   if (!status.ok()) {
     LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: "
@@ -84,12 +86,9 @@ int ImpaladMain(int argc, char** argv) {
     ShutdownLogging();
     exit(1);
   }
-
-  // this blocks until the beeswax and hs2 servers terminate
-  ABORT_IF_ERROR(beeswax_server->Start());
-  ABORT_IF_ERROR(hs2_server->Start());
   ImpaladMetrics::IMPALA_SERVER_READY->set_value(true);
   LOG(INFO) << "Impala has started.";
+  // this blocks until the beeswax and hs2 servers terminate
   beeswax_server->Join();
   hs2_server->Join();
 
