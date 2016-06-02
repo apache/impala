@@ -224,6 +224,30 @@ class TestParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-abort-on-error', vector)
 
+  def test_corrupt_rle_counts(self, vector, unique_database):
+    """IMPALA-3646: Tests that a certain type of file corruption for plain
+    dictionary encoded values is gracefully handled. Cases tested:
+    - incorrect literal count of 0 for the RLE encoded dictionary indexes
+    - incorrect repeat count of 0 for the RLE encoded dictionary indexes
+    """
+    # Create test table and copy the corrupt files into it.
+    self.client.execute(
+        "create table %s.bad_rle_counts (c bigint) stored as parquet" % unique_database)
+    bad_rle_counts_tbl_loc =\
+        get_fs_path("/test-warehouse/%s.db/%s" % (unique_database, "bad_rle_counts"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/bad_rle_literal_count.parquet",
+        bad_rle_counts_tbl_loc])
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/bad_rle_repeat_count.parquet",
+        bad_rle_counts_tbl_loc])
+    # Querying the corrupted files should not DCHECK or crash.
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/parquet-corrupt-rle-counts', vector, unique_database)
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/parquet-corrupt-rle-counts-abort',
+                       vector, unique_database)
+
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad

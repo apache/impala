@@ -419,6 +419,29 @@ TEST(BitRle, Overflow) {
   }
 }
 
+// Tests handling of a specific data corruption scenario where
+// the literal or repeat count is decoded as 0 (which is invalid).
+TEST(Rle, ZeroLiteralOrRepeatCount) {
+  const int len = 1024;
+  uint8_t buffer[len];
+  RleDecoder decoder(buffer, len, 0);
+  uint64_t val;
+
+  // Test the RLE repeated values path.
+  memset(buffer, 0, len);
+  for (int i = 0; i < 10; ++i) {
+    bool result = decoder.Get(&val);
+    EXPECT_FALSE(result);
+  }
+
+  // Test the RLE literal values path
+  memset(buffer, 1, len);
+  for (int i = 0; i < 10; ++i) {
+    bool result = decoder.Get(&val);
+    EXPECT_FALSE(result);
+  }
+}
+
 }
 
 int main(int argc, char **argv) {

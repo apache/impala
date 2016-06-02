@@ -1,0 +1,8 @@
+====
+---- QUERY
+select * from bad_rle_counts
+---- TYPES
+bigint
+---- CATCH
+Failed to decode dictionary-encoded value.
+====

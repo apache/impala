@@ -1,0 +1,9 @@
+====
+---- QUERY
+select * from bad_rle_counts
+---- TYPES
+bigint
+---- RESULTS
+---- ERRORS
+Failed to decode dictionary-encoded value. file: hdfs://regex:.$
+====

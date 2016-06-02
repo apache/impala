@@ -866,7 +866,7 @@ class HdfsParquetScanner::ScalarColumnReader :
         if (def_level >= max_def_level()) {
           bool continue_execution =
               ReadSlot<IS_DICT_ENCODED>(tuple->GetSlot(tuple_offset_), pool);
-          if (UNLIKELY(!continue_execution)) break;
+          if (UNLIKELY(!continue_execution)) return false;
         } else {
           tuple->SetNull(null_indicator_offset_);
         }
@@ -1622,7 +1622,8 @@ bool HdfsParquetScanner::LevelDecoder::FillCache(int batch_size,
       }
       literal_count_ -= num_literals_to_set;
 
-      if (num_values == batch_size || !NextCounts<int16_t>()) break;
+      if (num_values == batch_size) break;
+      if (UNLIKELY(!NextCounts<int16_t>())) return false;
       if (repeat_count_ > 0 && current_value_ > max_level_) return false;
     }
   } else {
