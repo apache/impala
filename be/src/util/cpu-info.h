@@ -33,6 +33,7 @@ class CpuInfo {
   static const int64_t SSE4_1  = (1 << 2);
   static const int64_t SSE4_2  = (1 << 3);
   static const int64_t POPCNT  = (1 << 4);
+  static const int64_t AVX2    = (1 << 5);
 
   /// Cache enums for L1 (data), L2 and L3
   enum CacheLevel {
@@ -84,6 +85,35 @@ class CpuInfo {
   }
 
   static std::string DebugString();
+
+  /// A utility class for temporarily disabling CPU features. Usage:
+  ///
+  /// {
+  ///   CpuInfo::TempDisable disabler(CpuInfo::AVX2);
+  ///   // On the previous line, the constructor disables AVX2 instructions. On the next
+  ///   // line, CpuInfo::IsSupported(CpuInfo::AVX2) will return false.
+  ///   SomeOperation();
+  ///   // On the next line, the block closes, 'disabler's destructor runs, and AVX2
+  ///   // instructions are re-enabled.
+  /// }
+  ///
+  /// TempDisable's destructor never re-enables features that were not enabled when then
+  /// constructor ran.
+  struct TempDisable {
+    TempDisable(int64_t feature)
+      : feature_(feature), reenable_(CpuInfo::IsSupported(feature)) {
+      CpuInfo::EnableFeature(feature_, false);
+    }
+    ~TempDisable() {
+      if (reenable_) {
+        CpuInfo::EnableFeature(feature_, true);
+      }
+    }
+
+   private:
+    int64_t feature_;
+    bool reenable_;
+  };
 
  private:
   /// Populates the arguments with information about this machine's caches.

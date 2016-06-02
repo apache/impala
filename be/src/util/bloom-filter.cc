@@ -26,21 +26,22 @@ using namespace std;
 
 namespace impala {
 
-BloomFilter* BloomFilter::ALWAYS_TRUE_FILTER = NULL;
+BloomFilter* const BloomFilter::ALWAYS_TRUE_FILTER = NULL;
+
+constexpr uint32_t BloomFilter::REHASH[8] __attribute__((aligned(32)));
 
 BloomFilter::BloomFilter(const int log_heap_space)
-    : // Since log_heap_space is in bytes, we need to convert it to cache lines. There
-      // are 64 = 2^6 bytes in a cache line.
-      log_num_buckets_(std::max(1, log_heap_space - LOG_BUCKET_WORD_BITS)),
-      // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
-      // that is too large.
-      directory_mask_((1ull << std::min(63, log_num_buckets_)) - 1),
-      directory_(NULL) {
+  : // Since log_heap_space is in bytes, we need to convert it to the number of tiny Bloom
+    // filters we will use.
+    log_num_buckets_(std::max(1, log_heap_space - LOG_BUCKET_BYTE_SIZE)),
+    // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
+    // that is too large.
+    directory_mask_((1ull << std::min(63, log_num_buckets_)) - 1),
+    directory_(NULL) {
   // Since we use 32 bits in the arguments of Insert() and Find(), log_num_buckets_
   // must be limited.
   DCHECK(log_num_buckets_ <= 32)
       << "Bloom filter too large. log_heap_space: " << log_heap_space;
-  // Each bucket has 64 = 2^6 bytes:
   const size_t alloc_size = directory_size();
   const int malloc_failed =
       posix_memalign(reinterpret_cast<void**>(&directory_), 64, alloc_size);
@@ -84,6 +85,7 @@ void BloomFilter::Or(const BloomFilter& other) {
   BucketWord* dir_ptr = reinterpret_cast<BucketWord*>(directory_);
   const BucketWord* other_dir_ptr = reinterpret_cast<const BucketWord*>(other.directory_);
   int directory_size_in_words = directory_size() / sizeof(BucketWord);
+  // TODO: use SIMD here:
   for (int i = 0; i < directory_size_in_words; ++i) dir_ptr[i] |= other_dir_ptr[i];
 }
 

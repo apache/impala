@@ -38,51 +38,103 @@ using namespace impala;
 // As in bloom-filter.h, ndv refers to the number of unique items inserted into a filter
 // and fpp is the probability of false positives.
 //
+//
 // Machine Info: Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+//
+// With AVX2:
+//
 // initialize:           Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//       ndv      10k fpp   10.0%                6628                  1X
-//       ndv      10k fpp    1.0%                3655             0.5515X
-//       ndv      10k fpp    0.1%                1293              0.195X
-//       ndv    1000k fpp   10.0%               28.92           0.004363X
-//       ndv    1000k fpp    1.0%                14.5           0.002188X
-//       ndv    1000k fpp    0.1%               14.51            0.00219X
-//       ndv  100000k fpp   10.0%             0.05863          8.846e-06X
-//       ndv  100000k fpp    1.0%             0.05776          8.714e-06X
-//       ndv  100000k fpp    0.1%             0.02849          4.298e-06X
+//       ndv      10k fpp   10.0%                6607                  1X
+//       ndv      10k fpp    1.0%                3427             0.5187X
+//       ndv      10k fpp    0.1%                1203              0.182X
+//       ndv    1000k fpp   10.0%               5.273          0.0007982X
+//       ndv    1000k fpp    1.0%               3.297           0.000499X
+//       ndv    1000k fpp    0.1%                3.31           0.000501X
+//       ndv  100000k fpp   10.0%             0.08597          1.301e-05X
+//       ndv  100000k fpp    1.0%              0.0846           1.28e-05X
+//       ndv  100000k fpp    0.1%             0.04349          6.582e-06X
 //
 // insert:               Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//       ndv      10k fpp   10.0%           1.109e+05                  1X
-//       ndv      10k fpp    1.0%           1.083e+05             0.9771X
-//       ndv      10k fpp    0.1%           1.088e+05             0.9808X
-//       ndv    1000k fpp   10.0%           8.975e+04             0.8094X
-//       ndv    1000k fpp    1.0%             8.8e+04             0.7937X
-//       ndv    1000k fpp    0.1%           9.353e+04             0.8435X
-//       ndv  100000k fpp   10.0%           2.322e+04             0.2094X
-//       ndv  100000k fpp    1.0%           2.314e+04             0.2087X
-//       ndv  100000k fpp    0.1%           1.953e+04             0.1762X
+//       ndv      10k fpp   10.0%           1.858e+05                  1X
+//       ndv      10k fpp    1.0%           1.801e+05             0.9693X
+//       ndv      10k fpp    0.1%           1.869e+05              1.006X
+//       ndv    1000k fpp   10.0%           1.686e+05             0.9076X
+//       ndv    1000k fpp    1.0%           1.627e+05             0.8756X
+//       ndv    1000k fpp    0.1%            1.53e+05             0.8234X
+//       ndv  100000k fpp   10.0%           4.262e+04             0.2294X
+//       ndv  100000k fpp    1.0%           4.326e+04             0.2329X
+//       ndv  100000k fpp    0.1%           4.185e+04             0.2253X
 //
 // find:                 Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-// present ndv      10k fpp   10.0%           2.044e+05                  1X
-// absent  ndv      10k fpp   10.0%           1.019e+05             0.4984X
-// present ndv      10k fpp    1.0%           2.039e+05             0.9976X
-// absent  ndv      10k fpp    1.0%           1.234e+05             0.6037X
-// present ndv      10k fpp    0.1%           1.928e+05             0.9431X
-// absent  ndv      10k fpp    0.1%           1.998e+05             0.9774X
-// present ndv    1000k fpp   10.0%           1.367e+05             0.6686X
-// absent  ndv    1000k fpp   10.0%           7.115e+04              0.348X
-// present ndv    1000k fpp    1.0%           1.164e+05             0.5694X
-// absent  ndv    1000k fpp    1.0%           9.859e+04             0.4822X
-// present ndv    1000k fpp    0.1%           1.153e+05             0.5638X
-// absent  ndv    1000k fpp    0.1%           9.787e+04             0.4787X
-// present ndv  100000k fpp   10.0%           2.869e+04             0.1403X
-// absent  ndv  100000k fpp   10.0%           3.222e+04             0.1576X
-// present ndv  100000k fpp    1.0%           2.868e+04             0.1403X
-// absent  ndv  100000k fpp    1.0%           3.212e+04             0.1571X
-// present ndv  100000k fpp    0.1%           2.793e+04             0.1366X
-// absent  ndv  100000k fpp    0.1%           3.948e+04             0.1931X
+// present ndv      10k fpp   10.0%           2.277e+05                  1X
+// absent  ndv      10k fpp   10.0%           2.258e+05             0.9914X
+// present ndv      10k fpp    1.0%           2.277e+05                  1X
+// absent  ndv      10k fpp    1.0%           2.295e+05              1.008X
+// present ndv      10k fpp    0.1%           2.258e+05             0.9916X
+// absent  ndv      10k fpp    0.1%           2.283e+05              1.003X
+// present ndv    1000k fpp   10.0%           1.799e+05             0.7901X
+// absent  ndv    1000k fpp   10.0%           1.777e+05             0.7803X
+// present ndv    1000k fpp    1.0%            1.52e+05             0.6674X
+// absent  ndv    1000k fpp    1.0%           1.625e+05             0.7134X
+// present ndv    1000k fpp    0.1%           1.825e+05             0.8013X
+// absent  ndv    1000k fpp    0.1%           1.836e+05              0.806X
+// present ndv  100000k fpp   10.0%           4.125e+04             0.1811X
+// absent  ndv  100000k fpp   10.0%           4.147e+04             0.1821X
+// present ndv  100000k fpp    1.0%           4.203e+04             0.1845X
+// absent  ndv  100000k fpp    1.0%           4.189e+04             0.1839X
+// present ndv  100000k fpp    0.1%           3.506e+04             0.1539X
+// absent  ndv  100000k fpp    0.1%           3.507e+04              0.154X
+//
+//
+// Without AVX2:
+//
+// initialize:           Function     Rate (iters/ms)          Comparison
+// ----------------------------------------------------------------------
+//       ndv      10k fpp   10.0%                6453                  1X
+//       ndv      10k fpp    1.0%                3271             0.5068X
+//       ndv      10k fpp    0.1%                1280             0.1984X
+//       ndv    1000k fpp   10.0%               5.213          0.0008078X
+//       ndv    1000k fpp    1.0%               2.574          0.0003989X
+//       ndv    1000k fpp    0.1%               2.584          0.0004005X
+//       ndv  100000k fpp   10.0%             0.03276          5.076e-06X
+//       ndv  100000k fpp    1.0%             0.03224          4.996e-06X
+//       ndv  100000k fpp    0.1%              0.0161          2.494e-06X
+//
+// insert:               Function     Rate (iters/ms)          Comparison
+// ----------------------------------------------------------------------
+//       ndv      10k fpp   10.0%           1.128e+05                  1X
+//       ndv      10k fpp    1.0%           1.162e+05               1.03X
+//       ndv      10k fpp    0.1%           1.145e+05              1.015X
+//       ndv    1000k fpp   10.0%           1.086e+05             0.9626X
+//       ndv    1000k fpp    1.0%           8.377e+04             0.7427X
+//       ndv    1000k fpp    0.1%           8.902e+04             0.7892X
+//       ndv  100000k fpp   10.0%           2.548e+04             0.2259X
+//       ndv  100000k fpp    1.0%            2.37e+04             0.2101X
+//       ndv  100000k fpp    0.1%           2.256e+04                0.2X
+//
+// find:                 Function     Rate (iters/ms)          Comparison
+// ----------------------------------------------------------------------
+// present ndv      10k fpp   10.0%           1.676e+05                  1X
+// absent  ndv      10k fpp   10.0%           1.067e+05             0.6366X
+// present ndv      10k fpp    1.0%           1.683e+05              1.004X
+// absent  ndv      10k fpp    1.0%           1.291e+05             0.7705X
+// present ndv      10k fpp    0.1%           1.662e+05             0.9917X
+// absent  ndv      10k fpp    0.1%           2.238e+05              1.336X
+// present ndv    1000k fpp   10.0%           1.231e+05             0.7344X
+// absent  ndv    1000k fpp   10.0%           6.903e+04             0.4119X
+// present ndv    1000k fpp    1.0%           1.215e+05              0.725X
+// absent  ndv    1000k fpp    1.0%           1.124e+05             0.6707X
+// present ndv    1000k fpp    0.1%           1.095e+05             0.6532X
+// absent  ndv    1000k fpp    0.1%           1.034e+05             0.6171X
+// present ndv  100000k fpp   10.0%           2.733e+04             0.1631X
+// absent  ndv  100000k fpp   10.0%           3.447e+04             0.2057X
+// present ndv  100000k fpp    1.0%           2.779e+04             0.1658X
+// absent  ndv  100000k fpp    1.0%            3.36e+04             0.2005X
+// present ndv  100000k fpp    0.1%           2.725e+04             0.1626X
+// absent  ndv  100000k fpp    0.1%           4.342e+04             0.2591X
 
 // Make a random uint32_t, avoiding the absent high bit and the low-entropy low bits
 // produced by rand().
@@ -174,9 +226,7 @@ void Absent(int batch_size, void* data) {
 
 }  // namespace find
 
-int main(int argc, char **argv) {
-  CpuInfo::Init();
-  cout << endl << Benchmark::GetMachineInfo() << endl;
+void RunBenchmarks() {
 
   char name[120];
 
@@ -220,6 +270,14 @@ int main(int argc, char **argv) {
     }
     cout << suite.Measure() << endl;
   }
+}
 
-  return 0;
+int main(int argc, char **argv) {
+  CpuInfo::Init();
+  cout << endl << Benchmark::GetMachineInfo() << endl << endl
+       << "With AVX2:" << endl << endl;
+  RunBenchmarks();
+  cout << endl << "Without AVX2:" << endl << endl;
+  CpuInfo::TempDisable t(CpuInfo::AVX2);
+  RunBenchmarks();
 }
