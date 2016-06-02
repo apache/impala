@@ -402,6 +402,12 @@ class ImpalaShell(cmd.Cmd):
       completed_cmd = sqlparse.format(cmd)
     return completed_cmd
 
+  def _new_impala_client(self):
+    return ImpalaClient(self.impalad, self.use_kerberos,
+                        self.kerberos_service_name, self.use_ssl,
+                        self.ca_cert, self.user, self.ldap_password,
+                        self.use_ldap)
+
   def _signal_handler(self, signal, frame):
     """Handles query cancellation on a Ctrl+C event"""
     if self.last_query_handle is None or self.query_handle_closed:
@@ -411,7 +417,7 @@ class ImpalaShell(cmd.Cmd):
       try:
         self.query_handle_closed = True
         print_to_stderr(ImpalaShell.CANCELLATION_MESSAGE)
-        new_imp_client = ImpalaClient(self.impalad)
+        new_imp_client = self._new_impala_client()
         new_imp_client.connect()
         new_imp_client.cancel_query(self.last_query_handle, False)
         self.imp_client.close_query(self.last_query_handle)
@@ -627,10 +633,7 @@ class ImpalaShell(cmd.Cmd):
       host_port.append('21000')
     self.impalad = tuple(host_port)
     if self.imp_client: self.imp_client.close_connection()
-    self.imp_client = ImpalaClient(self.impalad, self.use_kerberos,
-                                   self.kerberos_service_name, self.use_ssl,
-                                   self.ca_cert, self.user, self.ldap_password,
-                                   self.use_ldap)
+    self.imp_client = self._new_impala_client()
     self._connect()
     # If the connection fails and the Kerberos has not been enabled,
     # check for a valid kerberos ticket and retry the connection
@@ -638,11 +641,12 @@ class ImpalaShell(cmd.Cmd):
     if not self.imp_client.connected and not self.use_kerberos:
       try:
         if call(["klist", "-s"]) == 0:
-          print_to_stderr(("Kerberos ticket found in the credentials cache, retrying "
-                           "the connection with a secure transport."))
-          self.imp_client.use_kerberos = True
-          self.imp_client.use_ldap = False
-          self.imp_client.ldap_password = None
+          print_to_stderr("Kerberos ticket found in the credentials cache, retrying "
+                          "the connection with a secure transport.")
+          self.use_kerberos = True
+          self.use_ldap = False
+          self.ldap_password = None
+          self.imp_client = self._new_impala_client()
           self._connect()
       except OSError, e:
         pass
@@ -1365,5 +1369,8 @@ if __name__ == "__main__":
       except RPCException, e:
         # could not complete the rpc successfully
         print_to_stderr(e)
+      except IOError, e:
+        # Interrupted system calls (e.g. because of cancellation) should be ignored.
+        if e.errno != errno.EINTR: raise
     finally:
       intro = ''

@@ -14,7 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import pytest
 import re
+import shlex
+from subprocess import Popen, PIPE
+
+IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
+assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
+IMPALAD = IMPALAD_HOST_PORT_LIST[0]
+SHELL_CMD = "%s/bin/impala-shell.sh -i %s" % (os.environ['IMPALA_HOME'], IMPALAD)
 
 def assert_var_substitution(result):
   assert_pattern(r'\bfoo_number=.*$', 'foo_number= 123123', result.stdout, \
@@ -70,3 +79,61 @@ def assert_pattern(pattern, result, text, message):
   m = re.search(pattern, text, re.MULTILINE)
   assert m and m.group(0) == result, message
 
+def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
+  """Runs the Impala shell on the commandline.
+
+  'shell_args' is a string which represents the commandline options.
+  Returns a ImpalaShellResult.
+  """
+  p = ImpalaShell(shell_args)
+  result = p.get_result(stdin_input)
+  cmd = "%s %s" % (SHELL_CMD, shell_args)
+  if expect_success:
+    assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (cmd, result.stderr)
+  else:
+    assert result.rc != 0, "Cmd %s was expected to fail" % cmd
+  return result
+
+class ImpalaShellResult(object):
+  def __init__(self):
+    self.rc = 0
+    self.stdout = str()
+    self.stderr = str()
+
+class ImpalaShell(object):
+  """A single instance of the Impala shell. The proces is started when this object is
+     constructed, and then users should repeatedly call send_cmd(), followed eventually by
+     get_result() to retrieve the process output."""
+  def __init__(self, args=None, env=None):
+    self.shell_process = self._start_new_shell_process(args, env=env)
+
+  def pid(self):
+    return self.shell_process.pid
+
+  def send_cmd(self, cmd):
+    """Send a single command to the shell. This method adds the end-of-query
+       terminator (';'). """
+    self.shell_process.stdin.write("%s;\n" % cmd)
+    self.shell_process.stdin.flush()
+    # Allow fluent-style chaining of commands
+    return self
+
+  def get_result(self, stdin_input=None):
+    """Returns an ImpalaShellResult produced by the shell process on exit. After this
+       method returns, send_cmd() no longer has any effect."""
+    result = ImpalaShellResult()
+    result.stdout, result.stderr = self.shell_process.communicate(input=stdin_input)
+    # We need to close STDIN if we gave it an input, in order to send an EOF that will
+    # allow the subprocess to exit.
+    if stdin_input is not None: self.shell_process.stdin.close()
+    result.rc = self.shell_process.returncode
+    return result
+
+  def _start_new_shell_process(self, args=None, env=None):
+    """Starts a shell process and returns the process handle"""
+    shell_args = SHELL_CMD
+    if args is not None: shell_args = "%s %s" % (SHELL_CMD, args)
+    lex = shlex.split(shell_args)
+    if not env: env = os.environ
+    return Popen(lex, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
+                 env=env)

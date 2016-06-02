@@ -24,12 +24,11 @@ import socket
 import signal
 import sys
 
-from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE
 from tests.common.impala_service import ImpaladService
 from tests.common.skip import SkipIfLocal
 from time import sleep
-from test_shell_common import assert_var_substitution
+from util import assert_var_substitution, ImpalaShell
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
@@ -38,19 +37,6 @@ QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 class TestImpalaShellInteractive(object):
   """Test the impala shell interactively"""
-
-  def _send_cmd_to_shell(self, p, cmd):
-    """Given an open shell process, write a cmd to stdin
-
-    This method takes care of adding the delimiter and EOL, callers should send the raw
-    command.
-    """
-    p.stdin.write("%s;\n" % cmd)
-    p.stdin.flush()
-
-  def _start_new_shell_process(self):
-    """Starts a shell process and returns the process handle"""
-    return Popen([SHELL_CMD], stdout=PIPE, stdin=PIPE, stderr=PIPE)
 
   @classmethod
   def setup_class(cls):
@@ -85,15 +71,15 @@ class TestImpalaShellInteractive(object):
   def test_compute_stats_with_live_progress_options(self):
     """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
     impalad = ImpaladService(socket.getfqdn())
-    p = self._start_new_shell_process()
-    self._send_cmd_to_shell(p, "set live_progress=True")
-    self._send_cmd_to_shell(p, "set live_summary=True")
-    self._send_cmd_to_shell(p, 'create table test_live_progress_option(col int);')
+    p = ImpalaShell()
+    p.send_cmd("set live_progress=True")
+    p.send_cmd("set live_summary=True")
+    p.send_cmd('create table test_live_progress_option(col int);')
     try:
-      self._send_cmd_to_shell(p, 'compute stats test_live_progress_option;')
+      p.send_cmd('compute stats test_live_progress_option;')
     finally:
-      self._send_cmd_to_shell(p, 'drop table if exists test_live_progress_option;')
-    result = get_shell_cmd_result(p)
+      p.send_cmd('drop table if exists test_live_progress_option;')
+    result = p.get_result()
     assert "Updated 1 partition(s) and 1 column(s)" in result.stdout
 
   @pytest.mark.execute_serially
@@ -115,11 +101,11 @@ class TestImpalaShellInteractive(object):
     impalad = ImpaladService(socket.getfqdn())
     impalad.wait_for_num_in_flight_queries(0)
     command = "select sleep(10000);"
-    p = self._start_new_shell_process()
-    self._send_cmd_to_shell(p, command)
+    p = ImpalaShell()
+    p.send_cmd(command)
     sleep(3)
-    os.kill(p.pid, signal.SIGINT)
-    result = get_shell_cmd_result(p)
+    os.kill(p.pid(), signal.SIGINT)
+    result = p.get_result()
     assert "Cancelled" not in result.stderr
     assert impalad.wait_for_num_in_flight_queries(0)
 
@@ -170,12 +156,12 @@ class TestImpalaShellInteractive(object):
     num_sessions_initial = get_num_open_sessions(initial_impala_service)
     num_sessions_target = get_num_open_sessions(target_impala_service)
     # Connect to localhost:21000 (default)
-    p = self._start_new_shell_process()
+    p = ImpalaShell()
     sleep(2)
     # Make sure we're connected <hostname>:21000
     assert get_num_open_sessions(initial_impala_service) == num_sessions_initial + 1, \
         "Not connected to %s:21000" % hostname
-    self._send_cmd_to_shell(p, "connect %s:21001" % hostname)
+    p.send_cmd("connect %s:21001" % hostname)
     # Wait for a little while
     sleep(2)
     # The number of sessions on the target impalad should have been incremented.
@@ -201,18 +187,18 @@ class TestImpalaShellInteractive(object):
     NUM_QUERIES = 'impala-server.num-queries'
 
     impalad = ImpaladService(socket.getfqdn())
-    p = self._start_new_shell_process()
+    p = ImpalaShell()
     try:
       start_num_queries = impalad.get_metric_value(NUM_QUERIES)
-      self._send_cmd_to_shell(p, 'create database if not exists %s' % TMP_DB)
-      self._send_cmd_to_shell(p, 'use %s' % TMP_DB)
+      p.send_cmd('create database if not exists %s' % TMP_DB)
+      p.send_cmd('use %s' % TMP_DB)
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 2)
       assert impalad.wait_for_num_in_flight_queries(0), MSG % 'use'
-      self._send_cmd_to_shell(p, 'create table %s(i int)' % TMP_TBL)
-      self._send_cmd_to_shell(p, 'alter table %s add columns (j int)' % TMP_TBL)
+      p.send_cmd('create table %s(i int)' % TMP_TBL)
+      p.send_cmd('alter table %s add columns (j int)' % TMP_TBL)
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 4)
       assert impalad.wait_for_num_in_flight_queries(0), MSG % 'alter'
-      self._send_cmd_to_shell(p, 'drop table %s' % TMP_TBL)
+      p.send_cmd('drop table %s' % TMP_TBL)
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 5)
       assert impalad.wait_for_num_in_flight_queries(0), MSG % 'drop'
     finally:
@@ -238,9 +224,9 @@ class TestImpalaShellInteractive(object):
       child_proc.sendline(query)
     child_proc.expect(prompt_regex)
     child_proc.sendline('quit;')
-    p = self._start_new_shell_process()
-    self._send_cmd_to_shell(p, 'history')
-    result = get_shell_cmd_result(p)
+    p = ImpalaShell()
+    p.send_cmd('history')
+    result = p.get_result()
     for query in queries:
       assert query in result.stderr, "'%s' not in '%s'" % (query, result.stderr)
 
@@ -260,9 +246,8 @@ class TestImpalaShellInteractive(object):
 
   @pytest.mark.execute_serially
   def test_var_substitution(self):
-    cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read().\
-      split('\n')
-    args = '--var=foo=123 --var=BAR=456 --delimited --output_delimiter=" "'
+    cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read()
+    args = '''--var=foo=123 --var=BAR=456 --delimited "--output_delimiter= " '''
     result = run_impala_shell_interactive(cmds, shell_args=args)
     assert_var_substitution(result)
 
@@ -302,9 +287,8 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive("source %s;" % full_path)
     assert "No such file or directory" in result.stderr
 
-def run_impala_shell_interactive(input_lines, shell_args=''):
+def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
-  cmd = "%s %s" % (SHELL_CMD, shell_args)
   # if argument "input_lines" is a string, makes it into a list
   if type(input_lines) is str:
     input_lines = [input_lines]
@@ -312,9 +296,7 @@ def run_impala_shell_interactive(input_lines, shell_args=''):
   # since piping defaults to ascii
   my_env = os.environ
   my_env['PYTHONIOENCODING'] = 'utf-8'
-  p = Popen(cmd, shell=True, stdout=PIPE,
-            stdin=PIPE, stderr=PIPE, env=my_env)
+  p = ImpalaShell(shell_args, env=my_env)
   for line in input_lines:
-    p.stdin.write(line + "\n")
-    p.stdin.flush()
-  return get_shell_cmd_result(p)
+    p.send_cmd(line)
+  return p.get_result()

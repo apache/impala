@@ -19,18 +19,14 @@ import re
 import shlex
 import signal
 
-from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE, call
 from tests.common.impala_service import ImpaladService
 from time import sleep
-from test_shell_common import assert_var_substitution
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.patterns import is_valid_impala_identifier
+from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
+from util import IMPALAD, SHELL_CMD
 
-IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
-assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
-IMPALAD = IMPALAD_HOST_PORT_LIST[0]
-SHELL_CMD = "%s/bin/impala-shell.sh -i %s" % (os.environ['IMPALA_HOME'], IMPALAD)
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
@@ -304,25 +300,23 @@ class TestImpalaShell(ImpalaTestSuite):
     args = '-f %s/test_close_queries.sql --quiet -B' % QUERY_FILE_PATH
     cmd = "%s %s" % (SHELL_CMD, args)
     # Execute the shell command async
-    p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
+    p = ImpalaShell(args)
 
     impalad_service = ImpaladService(IMPALAD.split(':')[0])
     # The last query in the test SQL script will sleep for 10 seconds, so sleep
     # here for 5 seconds and verify the number of in-flight queries is 1.
     sleep(5)
     assert 1 == impalad_service.get_num_in_flight_queries()
-    assert get_shell_cmd_result(p).rc == 0
+    assert p.get_result().rc == 0
     assert 0 == impalad_service.get_num_in_flight_queries()
 
   def test_cancellation(self):
     """Test cancellation (Ctrl+C event)."""
     args = '-q "select sleep(10000)"'
-    cmd = "%s %s" % (SHELL_CMD, args)
-
-    p = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE)
+    p = ImpalaShell(args)
     sleep(3)
-    os.kill(p.pid, signal.SIGINT)
-    result = get_shell_cmd_result(p)
+    os.kill(p.pid(), signal.SIGINT)
+    result = p.get_result()
 
     assert "Cancelling Query" in result.stderr, result.stderr
 
@@ -423,19 +417,3 @@ class TestImpalaShell(ImpalaTestSuite):
            % (os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql'))
     result = run_impala_shell_cmd(args, expect_success=True)
     assert_var_substitution(result)
-
-
-def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
-  """Run the Impala shell on the commandline.
-
-  'shell_args' is a string which represents the commandline options.
-  Returns a ImpalaShellResult.
-  """
-  cmd = "%s %s" % (SHELL_CMD, shell_args)
-  p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE, stdin=PIPE)
-  result = get_shell_cmd_result(p, stdin_input)
-  if expect_success:
-    assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (cmd, result.stderr)
-  else:
-    assert result.rc != 0, "Cmd %s was expected to fail" % cmd
-  return result
