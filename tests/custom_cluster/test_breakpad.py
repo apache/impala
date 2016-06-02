@@ -22,6 +22,8 @@ import time
 
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
 from signal import SIGSEGV, SIGKILL
+from tests.common.skip import SkipIfBuildType
+from subprocess import CalledProcessError
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
@@ -212,3 +214,16 @@ class TestBreakpad(CustomClusterTestSuite):
     # Check that the minidump file size has been reduced.
     assert reduced_minidump_size < full_minidump_size
 
+  @SkipIfBuildType.not_dev_build
+  @pytest.mark.execute_serially
+  def test_dcheck_writes_minidump(self):
+    """Check that hitting a DCHECK macro writes a minidump."""
+    assert self.count_all_minidumps() == 0
+    failed_to_start = False
+    try:
+      self.start_cluster_with_args(minidump_path=self.tmp_dir,
+          beeswax_port=1)
+    except CalledProcessError:
+      failed_to_start = True
+    assert failed_to_start
+    assert self.count_minidumps('impalad') > 0
