@@ -285,6 +285,11 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
         state->block_mgr(), block_mgr_client_, false /* use_initial_small_buffers */,
         false /* read_write */));
     RETURN_IF_ERROR(serialize_stream_->Init(id(), runtime_profile(), false));
+    bool got_buffer;
+    RETURN_IF_ERROR(serialize_stream_->PrepareForWrite(&got_buffer));
+    if (!got_buffer) {
+      return state_->block_mgr()->MemLimitTooLowError(block_mgr_client_, id());
+    }
     DCHECK(serialize_stream_->has_write_block());
   }
 
@@ -755,6 +760,12 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
       false /* read_write */, external_varlen_slots));
   RETURN_IF_ERROR(
       aggregated_row_stream->Init(parent->id(), parent->runtime_profile(), true));
+  bool got_buffer;
+  RETURN_IF_ERROR(aggregated_row_stream->PrepareForWrite(&got_buffer));
+  if (!got_buffer) {
+    return parent->state_->block_mgr()->MemLimitTooLowError(
+        parent->block_mgr_client_, parent->id());
+  }
 
   if (!parent->is_streaming_preagg_) {
     unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
@@ -764,6 +775,12 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
     // This stream is only used to spill, no need to ever have this pinned.
     RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id(), parent->runtime_profile(),
         false));
+    // TODO: allocate this buffer later only if we spill the partition.
+    RETURN_IF_ERROR(unaggregated_row_stream->PrepareForWrite(&got_buffer));
+    if (!got_buffer) {
+      return parent->state_->block_mgr()->MemLimitTooLowError(
+          parent->block_mgr_client_, parent->id());
+    }
     DCHECK(unaggregated_row_stream->has_write_block());
   }
   return Status::OK();
@@ -844,6 +861,14 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
         false /* read_write */));
     status = parent->serialize_stream_->Init(parent->id(), parent->runtime_profile(),
         false);
+    if (status.ok()) {
+      bool got_buffer;
+      status = parent->serialize_stream_->PrepareForWrite(&got_buffer);
+      if (status.ok() && !got_buffer) {
+        status = parent->state_->block_mgr()->MemLimitTooLowError(
+            parent->block_mgr_client_, parent->id());
+      }
+    }
     if (!status.ok()) {
       hash_tbl->Close();
       hash_tbl.reset();
@@ -887,7 +912,8 @@ Status PartitionedAggregationNode::Partition::Spill() {
   // TODO: when not repartitioning, don't leave the write block pinned.
   DCHECK(!got_buffer || aggregated_row_stream->has_write_block())
       << aggregated_row_stream->DebugString();
-  RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(false));
+  RETURN_IF_ERROR(
+      aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
 
   if (got_buffer && unaggregated_row_stream->using_small_buffers()) {
     RETURN_IF_ERROR(unaggregated_row_stream->SwitchToIoBuffers(&got_buffer));
@@ -1372,8 +1398,10 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
       // TODO: we only need to do this when we have memory pressure. This might be
       // okay though since the block mgr should only write these to disk if there
       // is memory pressure.
-      RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream(true));
-      RETURN_IF_ERROR(partition->unaggregated_row_stream->UnpinStream(true));
+      RETURN_IF_ERROR(
+          partition->aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL));
+      RETURN_IF_ERROR(partition->unaggregated_row_stream->UnpinStream(
+          BufferedTupleStream::UNPIN_ALL));
 
       // Push new created partitions at the front. This means a depth first walk
       // (more finely partitioned partitions are processed first). This allows us

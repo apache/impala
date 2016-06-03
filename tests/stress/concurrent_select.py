@@ -692,7 +692,7 @@ class Query(object):
 class QueryRunner(object):
   """Encapsulates functionality to run a query and provide a runtime report."""
 
-  SPILLED_PATTERN = re.compile("ExecOption:.*Spilled")
+  SPILLED_PATTERNS= [re.compile("ExecOption:.*Spilled"), re.compile("SpilledRuns: [^0]")]
   BATCH_SIZE = 1024
 
   def __init__(self):
@@ -765,8 +765,8 @@ class QueryRunner(object):
           # Producing a query profile can be somewhat expensive. A v-tune profile of
           # impalad showed 10% of cpu time spent generating query profiles.
           report.profile = cursor.get_profile()
-          report.mem_was_spilled = \
-              QueryRunner.SPILLED_PATTERN.search(report.profile) is not None
+          report.mem_was_spilled = any([pattern.search(report.profile) is not None
+              for pattern in  QueryRunner.SPILLED_PATTERNS])
     except Exception as error:
       # A mem limit error would have been caught above, no need to check for that here.
       report.non_mem_limit_error = error

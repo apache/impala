@@ -32,8 +32,7 @@ NljBuilder::NljBuilder(const RowDescriptor& row_desc, RuntimeState* state,
     : DataSink(row_desc), build_batch_cache_(row_desc, state->batch_size(),
       mem_tracker) {}
 
-Status NljBuilder::Prepare(RuntimeState* state,
-    MemTracker* mem_tracker) {
+Status NljBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
   return Status::OK();
 }

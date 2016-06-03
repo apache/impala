@@ -22,25 +22,30 @@
 
 #include "common/logging.h"
 #include "exec/exec-node.h"
-#include "exec/hdfs-table-sink.h"
 #include "exec/hbase-table-sink.h"
+#include "exec/hdfs-table-sink.h"
 #include "exec/kudu-table-sink.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/data-stream-sender.h"
 #include "runtime/mem-tracker.h"
 #include "util/container-util.h"
 
 #include "common/names.h"
 
+using strings::Substitute;
+
 namespace impala {
 
 DataSink::DataSink(const RowDescriptor& row_desc) :
     closed_(false), row_desc_(row_desc), mem_tracker_(NULL) {}
 
-DataSink::~DataSink() {}
+DataSink::~DataSink() {
+  DCHECK(closed_);
+}
 
 Status DataSink::CreateDataSink(ObjectPool* pool,
     const TDataSink& thrift_sink, const vector<TExpr>& output_exprs,
@@ -153,15 +158,18 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   DCHECK(mem_tracker != NULL);
   profile_ = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(), GetName()));
   mem_tracker_ = mem_tracker;
-  expr_mem_tracker_.reset(new MemTracker(-1, "Exprs", mem_tracker, false));
+  expr_mem_tracker_.reset(
+      new MemTracker(-1, Substitute("$0 Exprs", GetName()), mem_tracker, false));
   return Status::OK();
 }
 
 void DataSink::Close(RuntimeState* state) {
+  if (closed_) return;
   if (expr_mem_tracker_ != NULL) {
     expr_mem_tracker_->UnregisterFromParent();
     expr_mem_tracker_.reset();
   }
+  closed_ = true;
 }
 
 }  // namespace impala

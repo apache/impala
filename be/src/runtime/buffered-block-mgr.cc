@@ -15,15 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/runtime-state.h"
-#include "runtime/mem-tracker.h"
-#include "runtime/mem-pool.h"
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/runtime-state.h"
 #include "runtime/tmp-file-mgr.h"
-#include "util/runtime-profile-counters.h"
+#include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
 #include "util/impalad-metrics.h"
+#include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
 
 #include <openssl/rand.h>

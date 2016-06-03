@@ -205,7 +205,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  RETURN_IF_ERROR(BlockingJoinNode::ConstructBuildAndOpenProbe(state, NULL));
+  RETURN_IF_ERROR(BlockingJoinNode::ProcessBuildInputAndOpenProbe(state, NULL));
   RETURN_IF_ERROR(BlockingJoinNode::GetFirstProbeRow(state));
   InitGetNext();
   return Status::OK();

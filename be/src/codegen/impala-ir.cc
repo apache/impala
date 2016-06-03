@@ -29,6 +29,7 @@
 #include "exec/hdfs-parquet-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
 #include "exec/partitioned-aggregation-node-ir.cc"
+#include "exec/partitioned-hash-join-builder-ir.cc"
 #include "exec/partitioned-hash-join-node-ir.cc"
 #include "exec/topn-node-ir.cc"
 #include "exprs/aggregate-functions-ir.cc"

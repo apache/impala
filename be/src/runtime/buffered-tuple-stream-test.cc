@@ -290,8 +290,13 @@ class SimpleTupleStreamTest : public testing::Test {
     BufferedTupleStream stream(runtime_state_, *desc, runtime_state_->block_mgr(),
         client_, use_small_buffers, false);
     ASSERT_OK(stream.Init(-1, NULL, true));
+    bool got_write_buffer;
+    ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+    ASSERT_TRUE(got_write_buffer);
 
-    if (unpin_stream) ASSERT_OK(stream.UnpinStream());
+    if (unpin_stream) {
+      ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    }
     // Add rows to the stream
     int offset = 0;
     for (int i = 0; i < num_batches; ++i) {
@@ -339,10 +344,15 @@ class SimpleTupleStreamTest : public testing::Test {
           client_, small_buffers == 0,  // initial small buffers
           true); // read_write
       ASSERT_OK(stream.Init(-1, NULL, true));
+      bool got_write_buffer;
+      ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+      ASSERT_TRUE(got_write_buffer);
       bool got_read_buffer;
       ASSERT_OK(stream.PrepareForRead(true, &got_read_buffer));
       ASSERT_TRUE(got_read_buffer);
-      if (unpin_stream) ASSERT_OK(stream.UnpinStream());
+      if (unpin_stream) {
+        ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+      }
 
       vector<int> results;
 
@@ -555,6 +565,9 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
   BufferedTupleStream stream(runtime_state_, *row_desc, runtime_state_->block_mgr(),
       client_, true, false);
   ASSERT_OK(stream.Init(-1, NULL, true));
+  bool got_write_buffer;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+  ASSERT_TRUE(got_write_buffer);
 
   int offset = 0;
   bool full = false;
@@ -571,7 +584,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
     offset += j;
   }
 
-  ASSERT_OK(stream.UnpinStream());
+  ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
 
   bool pinned = false;
   ASSERT_OK(stream.PinStream(false, &pinned));
@@ -624,6 +637,9 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
       client_, true, false);
   ASSERT_OK(stream.Init(-1, NULL, false));
+  bool got_write_buffer;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+  ASSERT_TRUE(got_write_buffer);
 
   // Initial buffer should be small.
   EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
@@ -849,6 +865,9 @@ TEST_F(MultiTupleStreamTest, MultiTupleAllocateRow) {
   BufferedTupleStream stream(runtime_state_, *string_desc_, runtime_state_->block_mgr(),
       client_, false, false);
   ASSERT_OK(stream.Init(-1, NULL, false));
+  bool got_write_buffer;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+  ASSERT_TRUE(got_write_buffer);
 
   for (int i = 0; i < num_batches; ++i) {
     RowBatch* batch = CreateStringBatch(rows_added, 1, false);
@@ -1005,6 +1024,10 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   int num_array_lens = sizeof(array_lens) / sizeof(array_lens[0]);
   int array_len_index = 0;
   ASSERT_OK(stream.Init(-1, NULL, false));
+  bool got_write_buffer;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+  ASSERT_TRUE(got_write_buffer);
+
   for (int i = 0; i < NUM_ROWS; ++i) {
     int expected_row_size = tuple_descs[0]->byte_size() + tuple_descs[1]->byte_size();
     gscoped_ptr<TupleRow, FreeDeleter> row(reinterpret_cast<TupleRow*>(

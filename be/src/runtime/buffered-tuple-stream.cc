@@ -120,9 +120,8 @@ BufferedTupleStream::~BufferedTupleStream() {
 // num_pinned_.
 int NumPinned(const list<BufferedBlockMgr::Block*>& blocks) {
   int num_pinned = 0;
-  for (list<BufferedBlockMgr::Block*>::const_iterator it = blocks.begin();
-      it != blocks.end(); ++it) {
-    if ((*it)->is_pinned() && (*it)->is_max_size()) ++num_pinned;
+  for (BufferedBlockMgr::Block* block : blocks) {
+    if (block->is_pinned() && block->is_max_size()) ++num_pinned;
   }
   return num_pinned;
 }
@@ -141,10 +140,9 @@ string BufferedTupleStream::DebugString() const {
     ss << *read_block_;
   }
   ss << " blocks=[\n";
-  for (list<BufferedBlockMgr::Block*>::const_iterator it = blocks_.begin();
-      it != blocks_.end(); ++it) {
-    ss << "{" << (*it)->DebugString() << "}";
-    if (*it != blocks_.back()) ss << ",\n";
+  for (BufferedBlockMgr::Block* block : blocks_) {
+    ss << "{" << block->DebugString() << "}";
+    if (block != blocks_.back()) ss << ",\n";
   }
   ss << "]";
   return ss.str();
@@ -169,13 +167,13 @@ Status BufferedTupleStream::Init(int node_id, RuntimeProfile* profile, bool pinn
   if (block_mgr_->max_block_size() < INITIAL_BLOCK_SIZES[0]) {
     use_small_buffers_ = false;
   }
-
-  bool got_block;
-  RETURN_IF_ERROR(NewWriteBlockForRow(fixed_tuple_row_size_, &got_block));
-  if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_, node_id);
-  DCHECK(write_block_ != NULL);
-  if (!pinned) RETURN_IF_ERROR(UnpinStream());
+  if (!pinned) RETURN_IF_ERROR(UnpinStream(UNPIN_ALL_EXCEPT_CURRENT));
   return Status::OK();
+}
+
+Status BufferedTupleStream::PrepareForWrite(bool* got_buffer) {
+  DCHECK(write_block_ == NULL);
+  return NewWriteBlockForRow(fixed_tuple_row_size_, got_buffer);
 }
 
 Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
@@ -194,9 +192,8 @@ Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
 }
 
 void BufferedTupleStream::Close() {
-  for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
-      it != blocks_.end(); ++it) {
-    (*it)->Delete();
+  for (BufferedBlockMgr::Block* block : blocks_) {
+    block->Delete();
   }
   blocks_.clear();
   num_pinned_ = 0;
@@ -206,12 +203,11 @@ void BufferedTupleStream::Close() {
 
 int64_t BufferedTupleStream::bytes_in_mem(bool ignore_current) const {
   int64_t result = 0;
-  for (list<BufferedBlockMgr::Block*>::const_iterator it = blocks_.begin();
-      it != blocks_.end(); ++it) {
-    if (!(*it)->is_pinned()) continue;
-    if (!(*it)->is_max_size()) continue;
-    if (*it == write_block_ && ignore_current) continue;
-    result += (*it)->buffer_len();
+  for (BufferedBlockMgr::Block* block : blocks_) {
+    if (!block->is_pinned()) continue;
+    if (!block->is_max_size()) continue;
+    if (block == write_block_ && ignore_current) continue;
+    result += block->buffer_len();
   }
   return result;
 }
@@ -394,13 +390,12 @@ Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_buffer
     write_block_ = NULL;
   }
 
-  // Walk the blocks and pin the first non-io sized block.
-  for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
-      it != blocks_.end(); ++it) {
-    if (!(*it)->is_pinned()) {
+  // Walk the blocks and pin the first IO-sized block.
+  for (BufferedBlockMgr::Block* block : blocks_) {
+    if (!block->is_pinned()) {
       SCOPED_TIMER(pin_timer_);
       bool current_pinned;
-      RETURN_IF_ERROR((*it)->Pin(&current_pinned));
+      RETURN_IF_ERROR(block->Pin(&current_pinned));
       if (!current_pinned) {
         *got_buffer = false;
         return Status::OK();
@@ -408,7 +403,7 @@ Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_buffer
       ++num_pinned_;
       DCHECK_EQ(num_pinned_, NumPinned(blocks_));
     }
-    if ((*it)->is_max_size()) break;
+    if (block->is_max_size()) break;
   }
 
   read_block_ = blocks_.begin();
@@ -437,12 +432,11 @@ Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
     }
   }
 
-  for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
-      it != blocks_.end(); ++it) {
-    if ((*it)->is_pinned()) continue;
+  for (BufferedBlockMgr::Block* block : blocks_) {
+    if (block->is_pinned()) continue;
     {
       SCOPED_TIMER(pin_timer_);
-      RETURN_IF_ERROR((*it)->Pin(pinned));
+      RETURN_IF_ERROR(block->Pin(pinned));
     }
     if (!*pinned) {
       VLOG_QUERY << "Should have been reserved." << endl
@@ -457,9 +451,8 @@ Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
     // Populate block_start_idx_ on pin.
     DCHECK_EQ(block_start_idx_.size(), blocks_.size());
     block_start_idx_.clear();
-    for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
-        it != blocks_.end(); ++it) {
-      block_start_idx_.push_back((*it)->buffer());
+    for (BufferedBlockMgr::Block* block : blocks_) {
+      block_start_idx_.push_back(block->buffer());
     }
   }
   *pinned = true;
@@ -467,18 +460,20 @@ Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
   return Status::OK();
 }
 
-Status BufferedTupleStream::UnpinStream(bool all) {
+Status BufferedTupleStream::UnpinStream(UnpinMode mode) {
   DCHECK(!closed_);
+  DCHECK(mode == UNPIN_ALL || mode == UNPIN_ALL_EXCEPT_CURRENT);
   SCOPED_TIMER(unpin_timer_);
 
   for (BufferedBlockMgr::Block* block: blocks_) {
     if (!block->is_pinned()) continue;
-    if (!all && (block == write_block_ || (read_write_ && block == *read_block_))) {
+    if (mode == UNPIN_ALL_EXCEPT_CURRENT
+        && (block == write_block_ || (read_write_ && block == *read_block_))) {
       continue;
     }
     RETURN_IF_ERROR(UnpinBlock(block));
   }
-  if (all) {
+  if (mode == UNPIN_ALL) {
     read_block_ = blocks_.end();
     write_block_ = NULL;
   }

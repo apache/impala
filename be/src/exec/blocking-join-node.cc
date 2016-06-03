@@ -174,8 +174,8 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status BlockingJoinNode::ConstructBuildAndOpenProbe(RuntimeState* state,
-    DataSink* build_sink) {
+Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
+    RuntimeState* state, DataSink* build_sink) {
   // If this node is not inside a subplan and can get a thread token, initiate the
   // construction of the build-side table in a separate thread, so that the left child
   // can do any initialisation in parallel. Otherwise, do this in the main thread.

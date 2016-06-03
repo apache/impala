@@ -32,11 +32,6 @@
 
 static const int MAX_TUPLE_POOL_SIZE = 8 * 1024 * 1024; // 8MB
 
-const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
-    "Failed to acquire initial read buffer for analytic function evaluation. Reducing "
-    "query concurrency or increasing the memory limit may help this query to complete "
-    "successfully.";
-
 using namespace strings;
 
 namespace impala {
@@ -200,10 +195,15 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
       state->block_mgr(), client_, false /* use_initial_small_buffers */,
       true /* read_write */);
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
+  bool got_write_buffer;
+  RETURN_IF_ERROR(input_stream_->PrepareForWrite(&got_write_buffer));
+  if (!got_write_buffer) {
+    return state->block_mgr()->MemLimitTooLowError(client_, id());
+  }
   bool got_read_buffer;
   RETURN_IF_ERROR(input_stream_->PrepareForRead(true, &got_read_buffer));
   if (!got_read_buffer) {
-    return mem_tracker()->MemLimitExceeded(state, PREPARE_FOR_READ_FAILED_ERROR_MSG);
+    return state->block_mgr()->MemLimitTooLowError(client_, id());
   }
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
@@ -367,7 +367,8 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     // the stream and continue writing/reading in unpinned mode.
     // TODO: Consider re-pinning later if the output stream is fully consumed.
     RETURN_IF_ERROR(status);
-    RETURN_IF_ERROR(input_stream_->UnpinStream());
+    RETURN_IF_ERROR(
+        input_stream_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
     VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
     if (!input_stream_->AddRow(row, &status)) {
       // Rows should be added in unpinned mode unless an error occurs.

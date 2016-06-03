@@ -374,25 +374,40 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
 }
 
 void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile* loc) {
-  DCHECK(child != NULL);
   lock_guard<SpinLock> l(children_lock_);
+  ChildVector::iterator insert_pos;
+  if (loc == NULL) {
+    insert_pos = children_.end();
+  } else {
+    bool found = false;
+    for (ChildVector::iterator it = children_.begin(); it != children_.end(); ++it) {
+      if (it->first == loc) {
+        insert_pos = it + 1;
+        found = true;
+        break;
+      }
+    }
+    DCHECK(found) << "Invalid loc";
+  }
+  AddChildLocked(child, indent, insert_pos);
+}
+
+void RuntimeProfile::AddChildLocked(
+    RuntimeProfile* child, bool indent, ChildVector::iterator insert_pos) {
+  children_lock_.DCheckLocked();
+  DCHECK(child != NULL);
   if (child_map_.count(child->name_) > 0) {
     // This child has already been added, so do nothing.
     // Otherwise, the map and vector will be out of sync.
     return;
   }
   child_map_[child->name_] = child;
-  if (loc == NULL) {
-    children_.push_back(make_pair(child, indent));
-  } else {
-    for (ChildVector::iterator it = children_.begin(); it != children_.end(); ++it) {
-      if (it->first == loc) {
-        children_.insert(++it, make_pair(child, indent));
-        return;
-      }
-    }
-    DCHECK(false) << "Invalid loc";
-  }
+  children_.insert(insert_pos, make_pair(child, indent));
+}
+
+void RuntimeProfile::PrependChild(RuntimeProfile* child, bool indent) {
+  lock_guard<SpinLock> l(children_lock_);
+  AddChildLocked(child, indent, children_.begin());
 }
 
 void RuntimeProfile::GetChildren(vector<RuntimeProfile*>* children) {

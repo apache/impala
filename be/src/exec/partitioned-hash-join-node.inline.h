@@ -32,12 +32,6 @@ inline void PartitionedHashJoinNode::ResetForProbe() {
   ht_ctx_->expr_values_cache()->Reset();
 }
 
-inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
-    TupleRow* row, Status* status) {
-  if (LIKELY(stream->AddRow(row, status))) return true;
-  return AppendRowStreamFull(stream, row, status);
-}
-
 }
 
 #endif

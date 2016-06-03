@@ -73,6 +73,8 @@ add_library(Exec
   parquet-metadata-utils.cc
   partitioned-aggregation-node.cc
   partitioned-aggregation-node-ir.cc
+  partitioned-hash-join-builder.cc
+  partitioned-hash-join-builder-ir.cc
   partitioned-hash-join-node.cc
   partitioned-hash-join-node-ir.cc
   kudu-scanner.cc

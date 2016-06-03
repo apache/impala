@@ -39,13 +39,13 @@ class NljBuilder : public DataSink {
  public:
   NljBuilder(const RowDescriptor& row_desc, RuntimeState* state, MemTracker* mem_tracker);
 
-  /// Implementations of DataSink methods.
-  virtual std::string GetName() { return "Nested Loop Join Build"; }
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
-  virtual Status Open(RuntimeState* state);
-  virtual Status Send(RuntimeState* state, RowBatch* batch);
-  virtual Status FlushFinal(RuntimeState* state);
-  virtual void Close(RuntimeState* state);
+  /// Implementations of DataSink interface methods.
+  virtual std::string GetName() override { return "Nested Loop Join Builder"; }
+  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker) override;
+  virtual Status Open(RuntimeState* state) override;
+  virtual Status Send(RuntimeState* state, RowBatch* batch) override;
+  virtual Status FlushFinal(RuntimeState* state) override;
+  virtual void Close(RuntimeState* state) override;
 
   /// Reset the builder to the same state as it was in after calling Open().
   void Reset();

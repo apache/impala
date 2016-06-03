@@ -1,6 +1,7 @@
 BasedOnStyle: Google
 AlignAfterOpenBracket: 'false'
 AlignOperands: 'false'
+AllowShortCaseLabelsOnASingleLine: 'true'
 AllowShortFunctionsOnASingleLine: 'Inline'
 AllowShortIfStatementsOnASingleLine: 'true'
 BreakBeforeBinaryOperators: 'NonAssignment'

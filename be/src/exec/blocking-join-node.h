@@ -104,7 +104,7 @@ class BlockingJoinNode : public ExecNode {
   MonotonicStopWatch built_probe_overlap_stop_watch_;
 
   /// Processes the build-side input.
-  /// Called from ConstructBuildAndOpenProbe() if the subclass does not provide a
+  /// Called from ProcessBuildInputAndOpenProbe() if the subclass does not provide a
   /// DataSink to consume the build input.
   /// Note that this can be called concurrently with Open'ing the left child to
   /// increase parallelism. If, for example, the left child is another join node,
@@ -116,7 +116,7 @@ class BlockingJoinNode : public ExecNode {
   /// if the plan shape and thread token availability permit it.
   /// If 'build_sink' is non-NULL, sends the build-side input to 'build_sink'. Otherwise
   /// calls ProcessBuildInput on the subclass.
-  Status ConstructBuildAndOpenProbe(RuntimeState* state, DataSink* build_sink);
+  Status ProcessBuildInputAndOpenProbe(RuntimeState* state, DataSink* build_sink);
 
   /// Helper function to process the build input by sending it to a DataSink.
   /// ASYNC_BUILD enables timers that impose some overhead but are required if the build

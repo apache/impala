@@ -124,6 +124,10 @@ class RuntimeProfile {
   void AddChild(RuntimeProfile* child,
       bool indent = true, RuntimeProfile* location = NULL);
 
+  /// Adds a child profile, similarly to AddChild(). The child profile is put before any
+  /// existing profiles.
+  void PrependChild(RuntimeProfile* child, bool indent = true);
+
   /// Sorts all children according to a custom comparator. Does not
   /// invalidate pointers to profiles.
   template <class Compare>
@@ -428,8 +432,13 @@ class RuntimeProfile {
 
   /// Create a subtree of runtime profiles from nodes, starting at *node_idx.
   /// On return, *node_idx is the index one past the end of this subtree
-  static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
-      const std::vector<TRuntimeProfileNode>& nodes, int* node_idx);
+  static RuntimeProfile* CreateFromThrift(
+      ObjectPool* pool, const std::vector<TRuntimeProfileNode>& nodes, int* node_idx);
+
+  ///  Inserts 'child' before the iterator 'insert_pos' in 'children_'.
+  /// 'children_lock_' must be held by the caller.
+  void AddChildLocked(
+      RuntimeProfile* child, bool indent, ChildVector::iterator insert_pos);
 
   /// Print the child counters of the given counter name
   static void PrintChildCounters(const std::string& prefix,

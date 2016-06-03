@@ -228,6 +228,13 @@ class BufferedTupleStream {
   /// 'node_id' is only used for error reporting.
   Status Init(int node_id, RuntimeProfile* profile, bool pinned);
 
+  /// Prepares the stream for writing by attempting to allocate a write block.
+  /// Called after Init() and before the first AddRow() call.
+  /// 'got_buffer': set to true if the first write block was successfully pinned, or
+  ///     false if the block could not be pinned and no error was encountered. Undefined
+  ///     if an error status is returned.
+  Status PrepareForWrite(bool* got_buffer);
+
   /// Must be called for streams using small buffers to switch to IO-sized buffers.
   /// If it fails to get a buffer (i.e. the switch fails) it resets the use_small_buffers_
   /// back to false.
@@ -269,9 +276,20 @@ class BufferedTupleStream {
   /// block_mgr_client_ to pin the stream.
   Status PinStream(bool already_reserved, bool* pinned);
 
-  /// Unpins stream. If all is true, all blocks are unpinned, otherwise all blocks
-  /// except the write_block_ and read_block_ are unpinned.
-  Status UnpinStream(bool all = false);
+  /// Modes for UnpinStream().
+  enum UnpinMode {
+    /// All blocks in the stream are unpinned and the read/write positions in the stream
+    /// are reset. No more rows can be written to the stream after this. The stream can
+    /// be re-read from the beginning by calling PrepareForRead().
+    UNPIN_ALL,
+    /// All blocks are unpinned aside from the current read and write blocks (if any),
+    /// which is left in the same state. The unpinned stream can continue being read
+    /// or written from the current read or write positions.
+    UNPIN_ALL_EXCEPT_CURRENT,
+  };
+
+  /// Unpins stream with the given 'mode' as described above.
+  Status UnpinStream(UnpinMode mode);
 
   /// Get the next batch of output rows. Memory is still owned by the BufferedTupleStream
   /// and must be copied out by the caller.

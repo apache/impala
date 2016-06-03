@@ -81,7 +81,7 @@ Status NestedLoopJoinNode::Open(RuntimeState* state) {
     build_batches_ = builder_->input_build_batches();
   } else {
     RETURN_IF_ERROR(
-        BlockingJoinNode::ConstructBuildAndOpenProbe(state, builder_.get()));
+        BlockingJoinNode::ProcessBuildInputAndOpenProbe(state, builder_.get()));
     build_batches_ = builder_->GetFinalBuildBatches();
     if (matching_build_rows_ != NULL) {
       RETURN_IF_ERROR(ResetMatchingBuildRows(state, build_batches_->total_num_rows()));
@@ -102,9 +102,9 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Prepare(
       join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
 
-  builder_.reset(
-      new NljBuilder(child(1)->row_desc(), state, mem_tracker()));
+  builder_.reset(new NljBuilder(child(1)->row_desc(), state, mem_tracker()));
   RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
+  runtime_profile()->PrependChild(builder_->profile());
 
   // For some join modes we need to record the build rows with matches in a bitmap.
   if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
