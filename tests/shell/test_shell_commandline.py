@@ -24,18 +24,61 @@ from subprocess import Popen, PIPE, call
 from tests.common.impala_service import ImpaladService
 from time import sleep
 from test_shell_common import assert_var_substitution
-from tests.common.skip import SkipIfS3
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.patterns import is_valid_impala_identifier
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
 IMPALAD = IMPALAD_HOST_PORT_LIST[0]
 SHELL_CMD = "%s/bin/impala-shell.sh -i %s" % (os.environ['IMPALA_HOME'], IMPALAD)
 DEFAULT_QUERY = 'select 1'
-TEST_DB = "tmp_shell"
-TEST_TBL = "tbl1"
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
-class TestImpalaShell(object):
+
+@pytest.fixture
+def empty_table(unique_database, request):
+  """Create an empty table within the test database before executing test.
+
+  The table will have the same name as the test_function itself. Setup and teardown
+  of the database is handled by the unique_database fixture.
+
+  Args:
+    unique_database: pytest fixture defined in conftest.py
+    request: standard pytest request fixture
+
+  Returns:
+    fq_table_name (str): the fully qualified name of the table: : dbname.table_name
+  """
+  table_name = request.node.name
+  fq_table_name = '.'.join([unique_database, table_name])
+  stmt = "CREATE TABLE %s (i integer, s string)" % fq_table_name
+  request.instance.execute_query_expect_success(request.instance.client, stmt,
+                                                query_options={'sync_ddl': 1})
+  return fq_table_name
+
+
+@pytest.fixture
+def populated_table(empty_table, request):
+  """
+  Populate a table within the test database before executing test.
+
+  The table will have the same name as the test_function itself. Setup and teardown
+  of the database is handled by the unique_database fixture.
+
+  Args:
+    empty_table: pytest fixture that creates an empty table
+    request: standard pytest request fixture
+
+  Returns:
+    fq_table_name (str): the fully qualified name of the table: : dbname.table_name
+  """
+  fq_table_name = empty_table
+  stmt = "insert into %s values (1, 'a'),(1, 'b'),(3, 'b')" % fq_table_name
+  request.instance.execute_query_expect_success(request.instance.client, stmt)
+  return fq_table_name
+
+
+class TestImpalaShell(ImpalaTestSuite):
   """A set of sanity tests for the Impala shell commandline parameters.
 
   The tests need to maintain Python 2.4 compatibility as a sub-goal of having
@@ -47,48 +90,27 @@ class TestImpalaShell(object):
      * Add a test for a kerberized impala.
   """
 
-  @classmethod
-  def setup_class(cls):
-    cls.__create_shell_data()
-
-  @classmethod
-  def teardown_class(cls):
-    run_impala_shell_cmd('-q "drop table if exists %s.%s"' % (TEST_DB, TEST_TBL))
-    run_impala_shell_cmd('-q "drop database if exists %s"' % TEST_DB)
-
-  @classmethod
-  def __create_shell_data(cls):
-    # Create a temporary table and populate it with test data.
-    stmts = ['create database if not exists %s' % TEST_DB,
-             'create table if not exists %s.%s (i integer, s string)' % (TEST_DB,
-                                                                         TEST_TBL),
-             "insert into %s.%s values (1, 'a'),(1, 'b'),(3, 'b')" % (TEST_DB, TEST_TBL)
-            ]
-    args = '-q "%s"' % (';'.join(stmts))
-    run_impala_shell_cmd(args)
-
-  @pytest.mark.execute_serially
   def test_no_args(self):
     args = '-q "%s"' % DEFAULT_QUERY
     run_impala_shell_cmd(args)
 
-  @pytest.mark.execute_serially
   def test_multiple_queries(self):
     queries = ';'.join([DEFAULT_QUERY] * 3)
     args = '-q "%s" -B' % queries
     run_impala_shell_cmd(args)
 
-  @pytest.mark.execute_serially
   def test_multiple_queries_with_escaped_backslash(self):
-    # Regression test for string containing an escaped backslash. This relies on the
-    # patch at thirdparty/patches/sqlparse/0001-....patch.
+    """Regression test for string containing an escaped backslash.
+
+    This relies on the patch at thirdparty/patches/sqlparse/0001-....patch.
+    """
     run_impala_shell_cmd(r'''-q "select '\\\\'; select '\\'';" -B''')
 
-  @pytest.mark.execute_serially
-  def test_default_db(self):
-    args = '-d %s -q "describe %s" --quiet' % (TEST_DB, TEST_TBL)
+  def test_default_db(self, empty_table):
+    db_name, table_name = empty_table.split('.')
+    args = '-d %s -q "describe %s" --quiet' % (db_name, table_name)
     run_impala_shell_cmd(args)
-    args = '-q "describe %s"' % TEST_TBL
+    args = '-q "describe %s"' % table_name
     run_impala_shell_cmd(args, expect_success=False)
     # test keyword parquet is interpreted as an identifier
     # when passed as an argument to -d
@@ -100,26 +122,25 @@ class TestImpalaShell(object):
     result = run_impala_shell_cmd(args)
     assert "Query: use `parquet`" in result.stderr, result.stderr
 
-  @pytest.mark.execute_serially
+  @pytest.mark.execute_serially  # This tests invalidates metadata, and must run serially
   def test_refresh_on_connect(self):
+    """Confirm that the -r option refreshes the catalog."""
     args = '-r -q "%s"' % DEFAULT_QUERY
     result = run_impala_shell_cmd(args)
     assert 'Invalidating Metadata' in result.stderr, result.stderr
 
-  @pytest.mark.execute_serially
   def test_unsecure_message(self):
     results = run_impala_shell_cmd("")
     assert "Starting Impala Shell without Kerberos authentication" in results.stderr
 
-  @pytest.mark.execute_serially
-  def test_print_header(self):
-    args = '--print_header -B --output_delim="," -q "select * from %s.%s"' % (TEST_DB,
-                                                                              TEST_TBL)
+  def test_print_header(self, populated_table):
+    args = '--print_header -B --output_delim="," -q "select * from %s"' % populated_table
     result = run_impala_shell_cmd(args)
     result_rows = result.stdout.strip().split('\n')
     assert len(result_rows) == 4
     assert result_rows[0].split(',') == ['i', 's']
-    args = '-B --output_delim="," -q "select * from %s.%s"' % (TEST_DB, TEST_TBL)
+
+    args = '-B --output_delim="," -q "select * from %s"' % populated_table
     result = run_impala_shell_cmd(args)
     result_rows = result.stdout.strip().split('\n')
     assert len(result_rows) == 3
@@ -144,7 +165,7 @@ class TestImpalaShell(object):
     try:
       call(["klist"])
       expected_error_msg = ("-k requires a valid kerberos ticket but no valid kerberos "
-          "ticket found.")
+                            "ticket found.")
       assert expected_error_msg in results.stderr
     except OSError:
       assert 'klist not found on the system' in results.stderr
@@ -155,7 +176,6 @@ class TestImpalaShell(object):
     results = run_impala_shell_cmd(args, expect_success=False)
     assert "Using service name 'foobar'" in results.stderr
 
-  @pytest.mark.execute_serially
   def test_continue_on_error(self):
     args = '-c -q "select foo; select bar;"'
     run_impala_shell_cmd(args)
@@ -163,7 +183,6 @@ class TestImpalaShell(object):
     args = '-q "select foo; select bar;"'
     run_impala_shell_cmd(args, expect_success=False)
 
-  @pytest.mark.execute_serially
   def test_execute_queries_from_file(self):
     args = '-f %s/test_file_comments.sql --quiet -B' % QUERY_FILE_PATH
     result = run_impala_shell_cmd(args)
@@ -172,10 +191,9 @@ class TestImpalaShell(object):
     result = run_impala_shell_cmd(args)
     assert output == result.stdout, "Queries with comments not parsed correctly"
 
-  @pytest.mark.execute_serially
   def test_completed_query_errors(self):
     args = ('-q "set abort_on_error=false;'
-        ' select count(*) from functional_seq_snap.bad_seq_snap"')
+            ' select count(*) from functional_seq_snap.bad_seq_snap"')
     result = run_impala_shell_cmd(args)
     assert 'WARNINGS:' in result.stderr
     assert 'Bad synchronization marker' in result.stderr
@@ -183,14 +201,13 @@ class TestImpalaShell(object):
     assert 'Actual: ' in result.stderr
     assert 'Problem parsing file' in result.stderr
 
-    # Regression test for CDH-21036
-    # do not print warning log in quiet mode
+  def test_no_warnings_in_log_with_quiet_mode(self):
+    """Regression test for CDH-21036."""
     args = ('-q "set abort_on_error=false;'
-        ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
+            ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
     result = run_impala_shell_cmd(args)
     assert 'WARNINGS:' not in result.stderr
 
-  @pytest.mark.execute_serially
   def test_output_format(self):
     expected_output = ['1'] * 3
     args = '-q "select 1,1,1" -B --quiet'
@@ -204,12 +221,11 @@ class TestImpalaShell(object):
                                   expect_success=False)
     assert "Illegal delimiter" in result.stderr
 
-  @pytest.mark.execute_serially
-  def test_do_methods(self):
+  def test_do_methods(self, empty_table):
     """Ensure that the do_ methods in the shell work.
 
-    Some of the do_ methods are implicitly tested in other tests, and as part of the test
-    setup.
+    Some of the do_ methods are implicitly tested in other tests, and as part of the
+    test setup.
     """
     # explain
     args = '-q "explain select 1"'
@@ -247,13 +263,12 @@ class TestImpalaShell(object):
     args = '-q "set default_order_by_limit=10=50"'
     run_impala_shell_cmd(args, expect_success=False)
     # describe and desc should return the same result.
-    args = '-q "describe %s.%s" -B' % (TEST_DB, TEST_TBL)
+    args = '-q "describe %s" -B' % empty_table
     result_describe = run_impala_shell_cmd(args)
-    args = '-q "desc %s.%s" -B' % (TEST_DB, TEST_TBL)
+    args = '-q "desc %s" -B' % empty_table
     result_desc = run_impala_shell_cmd(args)
     assert result_describe.stdout == result_desc.stdout
 
-  @pytest.mark.execute_serially
   def test_runtime_profile(self):
     # test summary is in both the profile printed by the
     # -p option and the one printed by the profile command
@@ -265,7 +280,6 @@ class TestImpalaShell(object):
     assert len(re.findall(regex, result_set.stdout)) == 2, \
         "Could not detect two profiles, stdout: %s" % result_set.stdout
 
-  @pytest.mark.execute_serially
   def test_summary(self):
     args = "-q 'select count(*) from functional.alltypes; summary;'"
     result_set = run_impala_shell_cmd(args)
@@ -286,7 +300,7 @@ class TestImpalaShell(object):
 
   @pytest.mark.execute_serially
   def test_queries_closed(self):
-    """Regression test for IMPALA-897"""
+    """Regression test for IMPALA-897."""
     args = '-f %s/test_close_queries.sql --quiet -B' % QUERY_FILE_PATH
     cmd = "%s %s" % (SHELL_CMD, args)
     # Execute the shell command async
@@ -300,9 +314,8 @@ class TestImpalaShell(object):
     assert get_shell_cmd_result(p).rc == 0
     assert 0 == impalad_service.get_num_in_flight_queries()
 
-  @pytest.mark.execute_serially
   def test_cancellation(self):
-    """Test cancellation (Ctrl+C event)"""
+    """Test cancellation (Ctrl+C event)."""
     args = '-q "select sleep(10000)"'
     cmd = "%s %s" % (SHELL_CMD, args)
 
@@ -313,46 +326,44 @@ class TestImpalaShell(object):
 
     assert "Cancelling Query" in result.stderr, result.stderr
 
-  @pytest.mark.execute_serially
-  def test_get_log_once(self):
+  def test_get_log_once(self, empty_table):
     """Test that get_log() is always called exactly once."""
-    pytest.xfail(reason="The shell doesn't fetch all the warning logs.")
     # Query with fetch
     args = '-q "select * from functional.alltypeserror"'
     result = run_impala_shell_cmd(args)
     assert result.stderr.count('WARNINGS') == 1
 
     # Insert query (doesn't fetch)
-    INSERT_TBL = "alltypes_get_log"
-    DROP_ARGS = '-q "drop table if exists %s.%s"' % (TEST_DB, INSERT_TBL)
-    run_impala_shell_cmd(DROP_ARGS)
-    args = '-q "create table %s.%s like functional.alltypeserror"' % (TEST_DB, INSERT_TBL)
-    run_impala_shell_cmd(args)
-    args = '-q "insert overwrite %s.%s partition(year, month)' \
-           'select * from functional.alltypeserror"' % (TEST_DB, INSERT_TBL)
-    result = run_impala_shell_cmd(args)
-    assert result.stderr.count('WARNINGS') == 1
-    run_impala_shell_cmd(DROP_ARGS)
+    drop_args = '-q "drop table if exists %s"' % empty_table
+    run_impala_shell_cmd(drop_args)
 
-  @pytest.mark.execute_serially
+    args = '-q "create table %s like functional.alltypeserror"' % empty_table
+    run_impala_shell_cmd(args)
+
+    args = '-q "insert overwrite %s partition(year, month)' \
+           'select * from functional.alltypeserror"' % empty_table
+    result = run_impala_shell_cmd(args)
+
+    assert result.stderr.count('WARNINGS') == 1
+
   def test_international_characters(self):
     """Sanity test to ensure that the shell can read international characters."""
-    RUSSIAN_CHARS = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
+    russian_chars = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
                      u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
-    args = """-B -q "select '%s'" """ % RUSSIAN_CHARS
+    args = """-B -q "select '%s'" """ % russian_chars
     result = run_impala_shell_cmd(args.encode('utf-8'))
     assert 'UnicodeDecodeError' not in result.stderr
-    #print result.stdout.encode('utf-8')
-    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
+    assert russian_chars.encode('utf-8') in result.stdout
 
-  @pytest.mark.execute_serially
+  @pytest.mark.execute_serially  # This tests invalidates metadata, and must run serially
   def test_config_file(self):
-    """Test the optional configuration file"""
+    """Test the optional configuration file."""
     # Positive tests
     args = '--config_file=%s/good_impalarc' % QUERY_FILE_PATH
     result = run_impala_shell_cmd(args)
-    assert 'Query: select 1' in  result.stderr
+    assert 'Query: select 1' in result.stderr
     assert 'Invalidating Metadata' in result.stderr
+
     # override option in config file through command line
     args = '--config_file=%s/good_impalarc --query="select 2"' % QUERY_FILE_PATH
     result = run_impala_shell_cmd(args)
@@ -366,9 +377,8 @@ class TestImpalaShell(object):
     args = '--config_file=%s/bad_impalarc' % QUERY_FILE_PATH
     run_impala_shell_cmd(args, expect_success=False)
 
-  @pytest.mark.execute_serially
   def test_execute_queries_from_stdin(self):
-    """ Test that queries get executed correctly when STDIN is given as the sql file """
+    """Test that queries get executed correctly when STDIN is given as the sql file."""
     args = '-f - --quiet -B'
     query_file = "%s/test_file_comments.sql" % QUERY_FILE_PATH
     query_file_handle = None
@@ -377,7 +387,7 @@ class TestImpalaShell(object):
       query = query_file_handle.read()
       query_file_handle.close()
     except Exception, e:
-      assert query_file_handle != None, "Exception %s: Could not find query file" % e
+      assert query_file_handle is not None, "Exception %s: Could not find query file" % e
     result = run_impala_shell_cmd(args, expect_success=True, stdin_input=query)
     output = result.stdout
 
@@ -385,17 +395,17 @@ class TestImpalaShell(object):
     result = run_impala_shell_cmd(args)
     assert output == result.stdout, "Queries from STDIN not parsed correctly."
 
-  @pytest.mark.execute_serially
   def test_allow_creds_in_clear(self):
     args = '-l'
     result = run_impala_shell_cmd(args, expect_success=False)
-    assert "LDAP credentials may not be sent over insecure connections. " +\
-    "Enable SSL or set --auth_creds_ok_in_clear" in result.stderr
+    err_msg = ("LDAP credentials may not be sent over insecure connections. "
+               "Enable SSL or set --auth_creds_ok_in_clear")
+
+    assert err_msg in result.stderr
 
     # TODO: Without an Impala daemon running LDAP authentication, we can't test if
     # --auth_creds_ok_in_clear works when correctly set.
 
-  @pytest.mark.execute_serially
   def test_ldap_password_from_shell(self):
     args = "-l --auth_creds_ok_in_clear --ldap_password_cmd='%s'"
     result = run_impala_shell_cmd(args % 'cmddoesntexist', expect_success=False)
@@ -408,16 +418,15 @@ class TestImpalaShell(object):
     # TODO: Without an Impala daemon with LDAP authentication enabled, we can't test the
     # positive case where the password is correct.
 
-  @pytest.mark.execute_serially
   def test_var_substitution(self):
     args = '--var=foo=123 --var=BAR=456 --delimited --output_delimiter=" " -c -f %s' \
-      % (os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql'))
+           % (os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql'))
     result = run_impala_shell_cmd(args, expect_success=True)
     assert_var_substitution(result)
 
 
 def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
-  """Runs the Impala shell on the commandline.
+  """Run the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
