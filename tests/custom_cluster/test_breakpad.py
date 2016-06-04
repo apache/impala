@@ -21,7 +21,7 @@ import tempfile
 import time
 
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
-from signal import SIGSEGV, SIGKILL
+from signal import SIGKILL, SIGSEGV, SIGUSR1
 from tests.common.skip import SkipIfBuildType
 from subprocess import CalledProcessError
 
@@ -85,12 +85,12 @@ class TestBreakpad(CustomClusterTestSuite):
     processes = self.cluster.impalads + [self.cluster.catalogd, self.cluster.statestored]
     processes = filter(None, processes)
     self.kill_processes(processes, signal)
-    self.assert_all_processes_killed()
+    signal is SIGUSR1 or self.assert_all_processes_killed()
 
   def kill_processes(self, processes, signal):
     for process in processes:
       process.kill(signal)
-    self.wait_for_all_processes_dead(processes)
+    signal is SIGUSR1 or self.wait_for_all_processes_dead(processes)
 
   def wait_for_all_processes_dead(self, processes, timeout=300):
     for process in processes:
@@ -103,6 +103,25 @@ class TestBreakpad(CustomClusterTestSuite):
       except psutil.TimeoutExpired:
         raise RuntimeError("Unable to kill %s (pid %d) after %d seconds." %
             (psutil_process.name, psutil_process.pid, timeout))
+
+  def get_num_processes(self, daemon):
+    self.cluster.refresh()
+    if daemon == 'impalad':
+      return len(self.cluster.impalads)
+    elif daemon == 'catalogd':
+      return self.cluster.catalogd and 1 or 0
+    elif daemon == 'statestored':
+      return self.cluster.statestored and 1 or 0
+    raise RuntimeError("Unknown daemon name: %s" % daemon)
+
+  def wait_for_num_processes(self, daemon, num_expected, timeout=60):
+    end = time.time() + timeout
+    self.cluster.refresh()
+    num_processes = self.get_num_processes(daemon)
+    while num_processes != num_expected and time.time() <= end:
+      time.sleep(1)
+      num_processes = self.get_num_processes(daemon)
+    return num_processes
 
   def assert_all_processes_killed(self):
     self.cluster.refresh()
@@ -130,8 +149,30 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_all_minidumps() == 0
     self.start_cluster()
     assert self.count_all_minidumps() == 0
-    cluster_size = len(self.cluster.impalads)
+    cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
+    self.assert_num_logfile_entries(1)
+    assert self.count_minidumps('impalad') == cluster_size
+    assert self.count_minidumps('statestored') == 1
+    assert self.count_minidumps('catalogd') == 1
+
+  @pytest.mark.execute_serially
+  def test_sigusr1_writes_minidump(self):
+    """Check that when a daemon receives SIGUSR1 it writes a minidump file."""
+    assert self.count_all_minidumps() == 0
+    self.start_cluster()
+    assert self.count_all_minidumps() == 0
+    cluster_size = self.get_num_processes('impalad')
+    self.kill_cluster(SIGUSR1)
+    # Breakpad forks to write its minidump files, wait for all the clones to terminate.
+    assert self.wait_for_num_processes('impalad', cluster_size, 5) == cluster_size
+    assert self.wait_for_num_processes('catalogd', 1, 5) == 1
+    assert self.wait_for_num_processes('statestored', 1, 5) == 1
+    # Make sure impalad still answers queries.
+    client = self.create_impala_client()
+    self.execute_query_expect_success(client, "SELECT COUNT(*) FROM functional.alltypes")
+    # Kill the cluster. Sending SIGKILL will not trigger minidumps to be written.
+    self.kill_cluster(SIGKILL)
     self.assert_num_logfile_entries(1)
     assert self.count_minidumps('impalad') == cluster_size
     assert self.count_minidumps('statestored') == 1
@@ -148,7 +189,7 @@ class TestBreakpad(CustomClusterTestSuite):
     # configuration, which is a FLAGS_log_dir/minidumps.
     self.start_cluster_with_args()
     assert self.count_all_minidumps(minidump_base_dir) == 0
-    cluster_size = len(self.cluster.impalads)
+    cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(1)
     assert self.count_minidumps('impalad', minidump_base_dir) == cluster_size
@@ -164,7 +205,7 @@ class TestBreakpad(CustomClusterTestSuite):
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(1)
     self.start_cluster()
-    expected_impalads = min(len(self.cluster.impalads), 2)
+    expected_impalads = min(self.get_num_processes('impalad'), 2)
     assert self.count_minidumps('impalad') == expected_impalads
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
@@ -183,7 +224,7 @@ class TestBreakpad(CustomClusterTestSuite):
     the cluster. Clean up the single minidump file and return its size.
     """
     self.cluster.refresh()
-    assert len(self.cluster.impalads) > 0
+    assert self.get_num_processes('impalad') > 0
     # Make one impalad write a minidump.
     self.kill_processes(self.cluster.impalads[:1], SIGSEGV)
     # Kill the rest of the cluster.

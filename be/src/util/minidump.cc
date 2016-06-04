@@ -21,10 +21,11 @@
 #include <google_breakpad/common/minidump_format.h>
 #include <third_party/lss/linux_syscall_support.h>
 #include <ctime>
+#include <fstream>
 #include <glob.h>
 #include <iomanip>
-#include <fstream>
 #include <map>
+#include <signal.h>
 
 #include "common/logging.h"
 #include "common/version.h"
@@ -47,6 +48,10 @@ DECLARE_int32(minidump_size_limit_hint_kb);
 #define MINIDUMP_LOG_BUF_SIZE 256
 
 namespace impala {
+
+/// Breakpad ExceptionHandler. It registers its own signal handlers to write minidump
+/// files during process crashes, but also can be used to write minidumps directly.
+static google_breakpad::ExceptionHandler* minidump_exception_handler = NULL;
 
 /// Callback for breakpad. It is called by breakpad whenever a minidump file has been
 /// written and should not be called directly. It logs the event before breakpad crashes
@@ -78,6 +83,21 @@ static bool DumpCallback(const google_breakpad::MinidumpDescriptor& descriptor,
   // this values is true, then no other handlers will be called. Breakpad will still crash
   // the process.
   return succeeded;
+}
+
+/// Signal handler to write a minidump file outside of crashes.
+static void HandleSignal(int signal) {
+  minidump_exception_handler->WriteMinidump(FLAGS_minidump_path, DumpCallback, NULL);
+}
+
+/// Register our signal handler to write minidumps on SIGUSR1.
+static void SetupSignalHandler() {
+  DCHECK(minidump_exception_handler != NULL);
+  struct sigaction sig_action;
+  memset(&sig_action, 0, sizeof(sig_action));
+  sigemptyset(&sig_action.sa_mask);
+  sig_action.sa_handler = &HandleSignal;
+  sigaction(SIGUSR1, &sig_action, NULL);
 }
 
 /// Check the number of minidump files and removes the oldest ones to maintain an upper
@@ -201,9 +221,12 @@ Status RegisterMinidump(const char* cmd_line_path) {
   }
 
   // Intentionally leaked. We want this to have the lifetime of the process.
-  google_breakpad::ExceptionHandler* eh =
+  DCHECK(minidump_exception_handler == NULL);
+  minidump_exception_handler =
       new google_breakpad::ExceptionHandler(desc, NULL, DumpCallback, NULL, true, -1);
-  (void)eh;
+
+  // Setup signal handler for SIGUSR1.
+  SetupSignalHandler();
 
   return Status::OK();
 }
