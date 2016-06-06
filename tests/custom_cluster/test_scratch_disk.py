@@ -38,9 +38,10 @@ class TestScratchDir(CustomClusterTestSuite):
   in_mem_query = """
       select o_orderdate, o_custkey, o_comment from tpch.orders
       """
-  # Memory limit that is low enough to get Impala to spill to disk when executing
-  # spill_query and high enough that we can execute in_mem_query without spilling.
-  mem_limit = "200m"
+  # Block manager memory limit that is low enough to force Impala to spill to disk when
+  # executing spill_query and high enough that we can execute in_mem_query without
+  # spilling.
+  max_block_mgr_memory = "64m"
 
   def count_nonempty_dirs(self, dirs):
     count = 0
@@ -99,7 +100,7 @@ class TestScratchDir(CustomClusterTestSuite):
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=1)
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = self.mem_limit
+    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     self.execute_query_expect_success(client, self.spill_query, exec_option)
@@ -113,7 +114,7 @@ class TestScratchDir(CustomClusterTestSuite):
     self.assert_impalad_log_contains("WARNING",
         "Running without spill to disk: no scratch directories provided\.")
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = self.mem_limit
+    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail
@@ -132,7 +133,7 @@ class TestScratchDir(CustomClusterTestSuite):
     self.assert_impalad_log_contains("WARNING", "Could not remove and recreate directory "
             + ".*: cannot use it for scratch\. Error was: .*", expected_count=5)
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = self.mem_limit
+    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail
@@ -153,7 +154,7 @@ class TestScratchDir(CustomClusterTestSuite):
         + "Encountered exception while verifying existence of directory path",
         expected_count=5)
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = self.mem_limit
+    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail
