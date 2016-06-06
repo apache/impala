@@ -46,6 +46,9 @@ Status ThriftClientImpl::Open() {
 }
 
 Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
+  // Socket creation failures are not recoverable.
+  if (!socket_create_status_.ok()) return socket_create_status_;
+
   uint32_t try_count = 0L;
   while (true) {
     ++try_count;
@@ -91,7 +94,7 @@ Status ThriftClientImpl::CreateSocket() {
       ssl_factory_->loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
       socket_ = ssl_factory_->createSocket(address_.hostname, address_.port);
     } catch (const TException& e) {
-      return Status(Substitute("Failed to create socket: $0", e.what()));
+      return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED, e.what());
     }
   }
 

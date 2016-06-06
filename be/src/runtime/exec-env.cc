@@ -422,7 +422,7 @@ Status ExecEnv::StartServices() {
   if (statestore_subscriber_.get() != NULL) {
     Status status = statestore_subscriber_->Start();
     if (!status.ok()) {
-      status.AddDetail("State Store Subscriber did not start up.");
+      status.AddDetail("Statestore subscriber did not start up.");
       return status;
     }
   }
