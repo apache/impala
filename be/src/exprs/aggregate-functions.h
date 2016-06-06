@@ -38,6 +38,10 @@ class AggregateFunctions {
   template <typename T>
   static void InitZero(FunctionContext*, T* dst);
 
+  // Sets dst's value to src. Handles deallocation if src and dst are StringVals.
+  template <typename T>
+  static void UpdateVal(FunctionContext*, const T& src, T* dst);
+
   /// StringVal GetValue() function that returns a copy of src
   static StringVal StringValGetValue(FunctionContext* ctx, const StringVal& src);
 
@@ -232,11 +236,21 @@ class AggregateFunctions {
 
   /// Implements LAST_VALUE.
   template <typename T>
-  static void LastValUpdate(FunctionContext*, const T& src, T* dst);
-  template <typename T>
   static void LastValRemove(FunctionContext*, const T& src, T* dst);
 
-  /// Implements FIRST_VALUE.
+  // Implements LAST_VALUE_IGNORE_NULLS
+  template <typename T>
+  static void LastValIgnoreNullsInit(FunctionContext*, StringVal* dst);
+  template <typename T>
+  static void LastValIgnoreNullsUpdate(FunctionContext*, const T& src, StringVal* dst);
+  template <typename T>
+  static void LastValIgnoreNullsRemove(FunctionContext*, const T& src, StringVal* dst);
+  template <typename T>
+  static T LastValIgnoreNullsGetValue(FunctionContext* ctx, const StringVal& src);
+  template <typename T>
+  static T LastValIgnoreNullsFinalize(FunctionContext* ctx, const StringVal& src);
+
+  /// Implements FIRST_VALUE. Requires a start bound of UNBOUNDED PRECEDING.
   template <typename T>
   static void FirstValUpdate(FunctionContext*, const T& src, T* dst);
   /// Implements FIRST_VALUE for some windows that require rewrites during planning.
@@ -245,6 +259,9 @@ class AggregateFunctions {
   template <typename T>
   static void FirstValRewriteUpdate(FunctionContext*, const T& src, const BigIntVal&,
       T* dst);
+  /// Implements FIRST_VALUE_IGNORE_NULLS. Requires a start bound of UNBOUNDED PRECEDING.
+  template <typename T>
+  static void FirstValIgnoreNullsUpdate(FunctionContext*, const T& src, T* dst);
 
   /// OffsetFn*() implement LAG and LEAD. Init() sets the default value (the last
   /// constant parameter) as dst.

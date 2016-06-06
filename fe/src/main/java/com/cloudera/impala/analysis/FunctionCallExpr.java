@@ -463,6 +463,11 @@ public class FunctionCallExpr extends Expr {
       if (aggFn.ignoresDistinct()) params_.setIsDistinct(false);
     }
 
+    if (params_.isIgnoreNulls() && !isAnalyticFnCall_) {
+      throw new AnalysisException("Function " + fnName_.getFunction().toUpperCase()
+          + " does not accept the keyword IGNORE NULLS.");
+    }
+
     if (isScalarFunction()) validateScalarFnParams(params_);
     if (fn_ instanceof AggregateFunction
         && ((AggregateFunction) fn_).isAnalyticFn()

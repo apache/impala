@@ -78,8 +78,10 @@ public class AnalyticExpr extends Expr {
 
   private static String LEAD = "lead";
   private static String LAG = "lag";
-  private static String FIRSTVALUE = "first_value";
-  private static String LASTVALUE = "last_value";
+  private static String FIRST_VALUE = "first_value";
+  private static String LAST_VALUE = "last_value";
+  private static String FIRST_VALUE_IGNORE_NULLS = "first_value_ignore_nulls";
+  private static String LAST_VALUE_IGNORE_NULLS = "last_value_ignore_nulls";
   private static String RANK = "rank";
   private static String DENSERANK = "dense_rank";
   private static String ROWNUMBER = "row_number";
@@ -446,6 +448,14 @@ public class AnalyticExpr extends Expr {
           "DISTINCT not allowed in analytic function: " + getFnCall().toSql());
     }
 
+    if (getFnCall().getParams().isIgnoreNulls()) {
+      String fnName = getFnCall().getFnName().getFunction();
+      if (!fnName.equals(LAST_VALUE) && !fnName.equals(FIRST_VALUE)) {
+        throw new AnalysisException("Function " + fnName.toUpperCase()
+            + " does not accept the keyword IGNORE NULLS.");
+      }
+    }
+
     // check for correct composition of analytic expr
     Function fn = getFnCall().getFn();
     if (!(fn instanceof AggregateFunction)) {
@@ -551,19 +561,8 @@ public class AnalyticExpr extends Expr {
    *    Explicitly set the default arguments to for BE simplicity.
    *    Set a window for lead(): UNBOUNDED PRECEDING to OFFSET FOLLOWING.
    *    Set a window for lag(): UNBOUNDED PRECEDING to OFFSET PRECEDING.
-   * 3. UNBOUNDED FOLLOWING windows:
-   *    Reverse the ordering and window if the start bound is not UNBOUNDED PRECEDING.
-   *    Flip first_value() and last_value().
-   * 4. first_value():
-   *    Set the upper boundary to CURRENT_ROW if the lower boundary is
-   *    UNBOUNDED_PRECEDING.
-   * 5. Explicitly set the default window if no window was given but there
-   *    are order-by elements.
-   * 6. FIRST_VALUE without UNBOUNDED PRECEDING gets rewritten to use a different window
-   *    and change the function to return the last value. We either set the fn to be
-   *    'last_value' or 'first_value_rewrite', which simply wraps the 'last_value'
-   *    implementation but allows us to handle the first rows in a partition in a special
-   *    way in the backend. There are a few cases:
+   * 3. FIRST_VALUE without UNBOUNDED PRECEDING or IGNORE NULLS gets rewritten to use a
+   *    different window and function. There are a few cases:
    *     a) Start bound is X FOLLOWING or CURRENT ROW (X=0):
    *        Use 'last_value' with a window where both bounds are X FOLLOWING (or
    *        CURRENT ROW). Setting the start bound to X following is necessary because the
@@ -579,11 +578,28 @@ public class AnalyticExpr extends Expr {
    *        first Y rows in a partition have empty windows and should be NULL. An extra
    *        parameter with the integer constant Y is added to indicate to the backend
    *        that NULLs should be added for the first Y rows.
+   *    The performance optimization here and in 5. below cannot be applied in the case of
+   *    IGNORE NULLS because they change what values appear in the window, which in the
+   *    IGNORE NULLS case could mean the correct value to return isn't even in the window,
+   *    eg. if all of the values in the rewritten window are NULL but one of the values in
+   *    the original window isn't.
+   * 4. Start bound is not UNBOUNDED PRECEDING and either the end bound is UNBOUNDED
+   *    FOLLOWING or the function is first_value(... ignore nulls):
+   *    Reverse the ordering and window, and flip first_value() and last_value().
+   * 5. first_value() with UNBOUNDED PRECEDING and not IGNORE NULLS:
+   *    Set the end boundary to CURRENT_ROW.
+   * 6. Rewrite IGNORE NULLS as regular FunctionCallExprs with '_ignore_nulls'
+   *    appended to the function name, because the BE implements them as different
+   *    functions.
+   * 7. Explicitly set the default window if no window was given but there
+   *    are order-by elements.
+   * 8. first/last_value() with RANGE window:
+   *    Rewrite as a ROWS window.
    */
   private void standardize(Analyzer analyzer) {
     FunctionName analyticFnName = getFnCall().getFnName();
 
-    // Set a window from UNBOUNDED PRECEDING to CURRENT_ROW for row_number().
+    // 1. Set a window from UNBOUNDED PRECEDING to CURRENT_ROW for row_number().
     if (analyticFnName.getFunction().equals(ROWNUMBER)) {
       Preconditions.checkState(window_ == null, "Unexpected window set for row_numer()");
       window_ = new AnalyticWindow(AnalyticWindow.Type.ROWS,
@@ -593,7 +609,7 @@ public class AnalyticExpr extends Expr {
       return;
     }
 
-    // Explicitly set the default arguments to lead()/lag() for BE simplicity.
+    // 2. Explicitly set the default arguments to lead()/lag() for BE simplicity.
     // Set a window for lead(): UNBOUNDED PRECEDING to OFFSET FOLLOWING,
     // Set a window for lag(): UNBOUNDED PRECEDING to OFFSET PRECEDING.
     if (isOffsetFn(getFnCall().getFn())) {
@@ -640,13 +656,15 @@ public class AnalyticExpr extends Expr {
       return;
     }
 
-    if (analyticFnName.getFunction().equals(FIRSTVALUE)
+    // 3.
+    if (analyticFnName.getFunction().equals(FIRST_VALUE)
         && window_ != null
-        && window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+        && window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING
+        && !getFnCall().getParams().isIgnoreNulls()) {
       if (window_.getLeftBoundary().getType() != BoundaryType.PRECEDING) {
         window_ = new AnalyticWindow(window_.getType(), window_.getLeftBoundary(),
             window_.getLeftBoundary());
-        fnCall_ = new FunctionCallExpr(new FunctionName("last_value"),
+        fnCall_ = new FunctionCallExpr(new FunctionName(LAST_VALUE),
             getFnCall().getParams());
       } else {
         List<Expr> paramExprs = Expr.cloneList(getFnCall().getParams().exprs());
@@ -665,7 +683,7 @@ public class AnalyticExpr extends Expr {
         window_ = new AnalyticWindow(window_.getType(),
             new Boundary(BoundaryType.UNBOUNDED_PRECEDING, null),
             window_.getLeftBoundary());
-        fnCall_ = new FunctionCallExpr(new FunctionName("first_value_rewrite"),
+        fnCall_ = new FunctionCallExpr(new FunctionName(FIRST_VALUE_REWRITE),
             new FunctionParams(paramExprs));
         fnCall_.setIsInternalFnCall(true);
       }
@@ -677,21 +695,24 @@ public class AnalyticExpr extends Expr {
       analyticFnName = getFnCall().getFnName();
     }
 
-    // Reverse the ordering and window for windows ending with UNBOUNDED FOLLOWING,
-    // and and not starting with UNBOUNDED PRECEDING.
+    // 4. Reverse the ordering and window for windows not starting with UNBOUNDED
+    // PRECEDING and either: ending with UNBOUNDED FOLLOWING or
+    // first_value(... ignore nulls)
     if (window_ != null
-        && window_.getRightBoundary().getType() == BoundaryType.UNBOUNDED_FOLLOWING
-        && window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+        && window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING
+        && (window_.getRightBoundary().getType() == BoundaryType.UNBOUNDED_FOLLOWING
+            || (analyticFnName.getFunction().equals(FIRST_VALUE)
+                && getFnCall().getParams().isIgnoreNulls()))) {
       orderByElements_ = OrderByElement.reverse(orderByElements_);
       window_ = window_.reverse();
 
       // Also flip first_value()/last_value(). For other analytic functions there is no
       // need to also change the function.
       FunctionName reversedFnName = null;
-      if (analyticFnName.getFunction().equals(FIRSTVALUE)) {
-        reversedFnName = new FunctionName(LASTVALUE);
-      } else if (analyticFnName.getFunction().equals(LASTVALUE)) {
-        reversedFnName = new FunctionName(FIRSTVALUE);
+      if (analyticFnName.getFunction().equals(FIRST_VALUE)) {
+        reversedFnName = new FunctionName(LAST_VALUE);
+      } else if (analyticFnName.getFunction().equals(LAST_VALUE)) {
+        reversedFnName = new FunctionName(FIRST_VALUE);
       }
       if (reversedFnName != null) {
         fnCall_ = new FunctionCallExpr(reversedFnName, getFnCall().getParams());
@@ -701,19 +722,47 @@ public class AnalyticExpr extends Expr {
       analyticFnName = getFnCall().getFnName();
     }
 
-    // Set the upper boundary to CURRENT_ROW for first_value() if the lower boundary
-    // is UNBOUNDED_PRECEDING.
-    if (window_ != null
+    // 5. Set the start boundary to CURRENT_ROW for first_value() if the end boundary
+    // is UNBOUNDED_PRECEDING and IGNORE NULLS is not set.
+    if (analyticFnName.getFunction().equals(FIRST_VALUE)
+        && window_ != null
         && window_.getLeftBoundary().getType() == BoundaryType.UNBOUNDED_PRECEDING
         && window_.getRightBoundary().getType() != BoundaryType.PRECEDING
-        && analyticFnName.getFunction().equals(FIRSTVALUE)) {
+        && !getFnCall().getParams().isIgnoreNulls()) {
       window_.setRightBoundary(new Boundary(BoundaryType.CURRENT_ROW, null));
     }
 
-    // Set the default window.
+    // 6. Set the default window.
     if (!orderByElements_.isEmpty() && window_ == null) {
       window_ = AnalyticWindow.DEFAULT_WINDOW;
       resetWindow_ = true;
+    }
+
+    // 7. Change first_value/last_value RANGE windows to ROWS.
+    if ((analyticFnName.getFunction().equals(FIRST_VALUE)
+         || analyticFnName.getFunction().equals(LAST_VALUE))
+        && window_ != null
+        && window_.getType() == AnalyticWindow.Type.RANGE) {
+      window_ = new AnalyticWindow(AnalyticWindow.Type.ROWS, window_.getLeftBoundary(),
+          window_.getRightBoundary());
+    }
+
+    // 8. Append IGNORE NULLS to fn name if set.
+    if (getFnCall().getParams().isIgnoreNulls()) {
+      if (analyticFnName.getFunction().equals(LAST_VALUE)) {
+        fnCall_ = new FunctionCallExpr(new FunctionName(LAST_VALUE_IGNORE_NULLS),
+            getFnCall().getParams());
+      } else {
+        Preconditions.checkState(analyticFnName.getFunction().equals(FIRST_VALUE));
+        fnCall_ = new FunctionCallExpr(new FunctionName(FIRST_VALUE_IGNORE_NULLS),
+            getFnCall().getParams());
+      }
+
+      fnCall_.setIsAnalyticFnCall(true);
+      fnCall_.setIsInternalFnCall(true);
+      fnCall_.analyzeNoThrow(analyzer);
+      analyticFnName = getFnCall().getFnName();
+      Preconditions.checkState(type_.equals(fnCall_.getType()));
     }
   }
 

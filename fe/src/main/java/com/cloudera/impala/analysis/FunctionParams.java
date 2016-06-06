@@ -23,18 +23,25 @@ import java.util.List;
 class FunctionParams implements Cloneable {
   private final boolean isStar_;
   private boolean isDistinct_;
+  private boolean isIgnoreNulls_;
   private final List<Expr> exprs_;
 
   // c'tor for non-star params
-  public FunctionParams(boolean isDistinct, List<Expr> exprs) {
-    isStar_ = false;
+  public FunctionParams(boolean isDistinct, boolean isIgnoreNulls, List<Expr> exprs) {
+    this.isStar_ = false;
     this.isDistinct_ = isDistinct;
+    this.isIgnoreNulls_ = isIgnoreNulls;
     this.exprs_ = exprs;
   }
 
-  // c'tor for non-star, non-distinct params
+  // c'tor for non-star, non-ignore-nulls params
+  public FunctionParams(boolean isDistinct, List<Expr> exprs) {
+    this(isDistinct, false, exprs);
+  }
+
+  // c'tor for non-star, non-distinct, non-ignore-nulls params
   public FunctionParams(List<Expr> exprs) {
-    this(false, exprs);
+    this(false, false, exprs);
   }
 
   static public FunctionParams createStarParam() {
@@ -43,6 +50,7 @@ class FunctionParams implements Cloneable {
 
   public boolean isStar() { return isStar_; }
   public boolean isDistinct() { return isDistinct_; }
+  public boolean isIgnoreNulls() { return isIgnoreNulls_; }
   public List<Expr> exprs() { return exprs_; }
   public void setIsDistinct(boolean v) { isDistinct_ = v; }
   public int size() { return exprs_ == null ? 0 : exprs_.size(); }
@@ -52,5 +60,6 @@ class FunctionParams implements Cloneable {
     exprs_ = null;
     isStar_ = true;
     isDistinct_ = false;
+    isIgnoreNulls_ = false;
   }
 }

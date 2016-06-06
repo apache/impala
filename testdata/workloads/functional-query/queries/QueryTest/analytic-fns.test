@@ -1108,7 +1108,7 @@ select
 first_value(-32.9) over (order by id rows between 92 preceding and unbounded following),
 first_value(1.1) over (order by id rows between 92 preceding and 1 preceding)
 from alltypestiny
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 -32.9,NULL
 -32.9,1.1
 -32.9,1.1
@@ -1127,7 +1127,7 @@ select id, date_string_col,
 first_value(id) over (partition by date_string_col order by id
                       rows between 10 preceding and 3 preceding)
 from alltypes where id < 15 order by id
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0,'01/01/09',NULL
 1,'01/01/09',NULL
 2,'01/01/09',NULL
@@ -1637,4 +1637,259 @@ SMALLINT
 ---- RESULTS
 NULL
 NULL
+====
+---- QUERY
+# Start IGNORE NULLS
+# Test all possible combinations of bound types for last_value that don't get rewritten.
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and current row),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and unbounded following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between 2 preceding and 1 preceding),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between 2 preceding and current row),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between 1 preceding and 2 following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between current row and current row),
+  last_value(cast(tinyint_col as string) ignore nulls) over
+    (order by id rows between current row and 1 following),
+  last_value(cast(tinyint_col as string) ignore nulls) over
+    (order by id rows between 1 following and 2 following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id range between unbounded preceding and current row),
+  last_value(tinyint_col ignore nulls) over
+    (order by id range between unbounded preceding and unbounded following)
+from functional.alltypesagg where id < 21
+---- TYPES
+INT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, STRING, STRING, TINYINT, TINYINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,NULL,NULL,NULL,NULL,9,NULL,NULL,1,NULL,'NULL','1',NULL,9
+0,NULL,NULL,NULL,1,9,NULL,NULL,2,NULL,'1','2',NULL,9
+1,1,NULL,1,2,9,NULL,1,3,1,'2','3',1,9
+2,2,1,2,3,9,1,2,4,2,'3','4',2,9
+3,3,2,3,4,9,2,3,5,3,'4','5',3,9
+4,4,3,4,5,9,3,4,6,4,'5','6',4,9
+5,5,4,5,6,9,4,5,7,5,'6','7',5,9
+6,6,5,6,7,9,5,6,8,6,'7','8',6,9
+7,7,6,7,8,9,6,7,9,7,'8','9',7,9
+8,8,7,8,9,9,7,8,9,8,'9','9',8,9
+9,9,8,9,9,9,8,9,9,9,'9','NULL',9,9
+10,NULL,9,9,9,9,9,9,1,NULL,'NULL','1',9,9
+10,NULL,9,9,1,9,9,9,2,NULL,'1','2',9,9
+11,1,9,1,2,9,NULL,1,3,1,'2','3',1,9
+12,2,1,2,3,9,1,2,4,2,'3','4',2,9
+13,3,2,3,4,9,2,3,5,3,'4','5',3,9
+14,4,3,4,5,9,3,4,6,4,'5','6',4,9
+15,5,4,5,6,9,4,5,7,5,'6','7',5,9
+16,6,5,6,7,9,5,6,8,6,'7','8',6,9
+17,7,6,7,8,9,6,7,9,7,'8','9',7,9
+18,8,7,8,9,9,7,8,9,8,'9','9',8,9
+19,9,8,9,9,9,8,9,9,9,'9','NULL',9,9
+20,NULL,9,9,9,9,9,9,9,NULL,'NULL','NULL',9,9
+20,NULL,9,9,9,9,9,9,NULL,NULL,'NULL','NULL',9,9
+====
+---- QUERY
+# Test the remaining combinations of bound types. These are handled separately from above
+# because they are rewritten as first_value() functions, so their results can be returned
+# in a different order, since there isn't a total ordering on id.
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between 1 preceding and unbounded following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between current row and unbounded following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between 2 following and unbounded following),
+  last_value(tinyint_col ignore nulls) over
+    (order by id range between current row and unbounded following)
+from functional.alltypesagg where id < 21 order by id
+---- TYPES
+INT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,NULL,9,9,9,9
+0,NULL,9,9,9,9
+1,1,9,9,9,9
+2,2,9,9,9,9
+3,3,9,9,9,9
+4,4,9,9,9,9
+5,5,9,9,9,9
+6,6,9,9,9,9
+7,7,9,9,9,9
+8,8,9,9,9,9
+9,9,9,9,9,9
+10,NULL,9,9,9,9
+10,NULL,9,9,9,9
+11,1,9,9,9,9
+12,2,9,9,9,9
+13,3,9,9,9,9
+14,4,9,9,9,9
+15,5,9,9,9,9
+16,6,9,9,9,9
+17,7,9,9,9,9
+18,8,9,9,NULL,9
+19,9,9,9,NULL,9
+20,NULL,9,NULL,NULL,NULL
+20,NULL,NULL,NULL,NULL,NULL
+====
+---- QUERY
+# Test all combinations of bound types for first_value that don't get rewritten.
+select id, tinyint_col,
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and current row),
+  first_value(cast(tinyint_col as string) ignore nulls) over
+    (order by id rows between unbounded preceding and 1 following),
+  first_value(cast(tinyint_col as string) ignore nulls) over
+    (order by id rows between unbounded preceding and unbounded following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id range between unbounded preceding and current row),
+  first_value(tinyint_col ignore nulls) over
+    (order by id range between unbounded preceding and unbounded following)
+from functional.alltypesagg where id < 21
+---- TYPES
+INT, TINYINT, TINYINT, TINYINT, STRING, STRING, TINYINT, TINYINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,NULL,NULL,NULL,'NULL','1',NULL,1
+0,NULL,NULL,NULL,'1','1',NULL,1
+1,1,NULL,1,'1','1',1,1
+2,2,1,1,'1','1',1,1
+3,3,1,1,'1','1',1,1
+4,4,1,1,'1','1',1,1
+5,5,1,1,'1','1',1,1
+6,6,1,1,'1','1',1,1
+7,7,1,1,'1','1',1,1
+8,8,1,1,'1','1',1,1
+9,9,1,1,'1','1',1,1
+10,NULL,1,1,'1','1',1,1
+10,NULL,1,1,'1','1',1,1
+11,1,1,1,'1','1',1,1
+12,2,1,1,'1','1',1,1
+13,3,1,1,'1','1',1,1
+14,4,1,1,'1','1',1,1
+15,5,1,1,'1','1',1,1
+16,6,1,1,'1','1',1,1
+17,7,1,1,'1','1',1,1
+18,8,1,1,'1','1',1,1
+19,9,1,1,'1','1',1,1
+20,NULL,1,1,'1','1',1,1
+20,NULL,1,1,'1','1',1,1
+====
+---- QUERY
+# Test combinations of bound types for first_value that get rewritten as last_value.
+select id, tinyint_col,
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between 2 preceding and 1 preceding),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between 1 preceding and current row),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between 1 preceding and 1 following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between 1 preceding and unbounded following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between current row and current row),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between current row and 1 following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between current row and unbounded following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between 1 following and 2 following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id rows between 2 following and unbounded following),
+  first_value(tinyint_col ignore nulls) over
+    (order by id range between current row and unbounded following)
+from functional.alltypesagg where id < 21
+---- TYPES
+INT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,NULL,NULL,NULL,NULL,1,NULL,NULL,1,1,1,1
+0,NULL,NULL,NULL,1,1,NULL,1,1,1,2,1
+1,1,NULL,1,1,1,1,1,1,2,3,1
+2,2,1,1,1,1,2,2,2,3,4,2
+3,3,1,2,2,2,3,3,3,4,5,3
+4,4,2,3,3,3,4,4,4,5,6,4
+5,5,3,4,4,4,5,5,5,6,7,5
+6,6,4,5,5,5,6,6,6,7,8,6
+7,7,5,6,6,6,7,7,7,8,9,7
+8,8,6,7,7,7,8,8,8,9,1,8
+9,9,7,8,8,8,9,9,9,NULL,1,9
+10,NULL,8,9,9,9,NULL,NULL,1,1,1,1
+10,NULL,9,NULL,1,1,NULL,1,1,1,2,1
+11,1,NULL,1,1,1,1,1,1,2,3,1
+12,2,1,1,1,1,2,2,2,3,4,2
+13,3,1,2,2,2,3,3,3,4,5,3
+14,4,2,3,3,3,4,4,4,5,6,4
+15,5,3,4,4,4,5,5,5,6,7,5
+16,6,4,5,5,5,6,6,6,7,8,6
+17,7,5,6,6,6,7,7,7,8,9,7
+18,8,6,7,7,7,8,8,8,9,NULL,8
+19,9,7,8,8,8,9,9,9,NULL,NULL,9
+20,NULL,8,9,9,9,NULL,NULL,NULL,NULL,NULL,NULL
+20,NULL,9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+====
+---- QUERY
+# Test all possible types for last_value (except decimal).
+select id,
+  last_value(bool_col ignore nulls) over (order by id),
+  last_value(tinyint_col ignore nulls) over (order by id),
+  last_value(smallint_col ignore nulls) over (order by id),
+  last_value(int_col ignore nulls) over (order by id),
+  last_value(bigint_col ignore nulls) over (order by id),
+  last_value(float_col ignore nulls) over (order by id),
+  last_value(double_col ignore nulls) over (order by id),
+  last_value(string_col ignore nulls) over (order by id),
+  last_value(timestamp_col ignore nulls) over (order by id)
+from functional.alltypesagg where id < 5
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, TIMESTAMP
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,NULL,NULL,NULL,NULL,NULL,NULL,'0',2010-01-01 00:00:00
+0,true,NULL,NULL,NULL,NULL,NULL,NULL,'0',2010-01-01 00:00:00
+1,false,1,1,1,10,1.100000023841858,10.1,'1',2010-01-01 00:01:00
+2,true,2,2,2,20,2.200000047683716,20.2,'2',2010-01-01 00:02:00.100000000
+3,false,3,3,3,30,3.299999952316284,30.3,'3',2010-01-01 00:03:00.300000000
+4,true,4,4,4,40,4.400000095367432,40.4,'4',2010-01-01 00:04:00.600000000
+====
+---- QUERY
+# Test all possible types for first_value (except decimal).
+select id,
+  first_value(bool_col ignore nulls) over (order by id),
+  first_value(tinyint_col ignore nulls) over (order by id),
+  first_value(smallint_col ignore nulls) over (order by id),
+  first_value(int_col ignore nulls) over (order by id),
+  first_value(bigint_col ignore nulls) over (order by id),
+  first_value(float_col ignore nulls) over (order by id),
+  first_value(double_col ignore nulls) over (order by id),
+  first_value(string_col ignore nulls) over (order by id),
+  first_value(timestamp_col ignore nulls) over (order by id)
+from functional.alltypesagg where id < 5
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, TIMESTAMP
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,NULL,NULL,NULL,NULL,NULL,NULL,'0',2010-01-01 00:00:00
+0,true,NULL,NULL,NULL,NULL,NULL,NULL,'0',2010-01-01 00:00:00
+1,true,1,1,1,10,1.100000023841858,10.1,'0',2010-01-01 00:00:00
+2,true,1,1,1,10,1.100000023841858,10.1,'0',2010-01-01 00:00:00
+3,true,1,1,1,10,1.100000023841858,10.1,'0',2010-01-01 00:00:00
+4,true,1,1,1,10,1.100000023841858,10.1,'0',2010-01-01 00:00:00
+====
+---- QUERY
+select
+last_value(d1 ignore nulls) over (order by d1),
+first_value(d1 ignore nulls) over (order by d1)
+from functional.decimal_tbl
+---- TYPES
+DECIMAL, DECIMAL
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1234,1234
+2345,1234
+12345,1234
+12345,1234
+132842,1234
 ====

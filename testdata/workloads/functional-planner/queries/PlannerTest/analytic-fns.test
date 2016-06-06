@@ -687,7 +687,7 @@ first_value(int_col)
   over(partition by double_col, tinyint_col order by int_col desc
   rows between 2 preceding and 2 following),
 # sort group 2
-last_value(int_col)
+last_value(int_col ignore nulls)
   over(partition by double_col, tinyint_col order by int_col asc
   rows between 2 preceding and 2 following),
 # different partition
@@ -734,7 +734,7 @@ from functional.alltypesagg
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
 |
 04:ANALYTIC
-|  functions: last_value(int_col)
+|  functions: last_value_ignore_nulls(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -790,7 +790,7 @@ from functional.alltypesagg
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
 |
 04:ANALYTIC
-|  functions: last_value(int_col)
+|  functions: last_value_ignore_nulls(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -1521,9 +1521,10 @@ from functional.alltypesagg
    partitions=11/11 files=11 size=814.73KB
 ====
 # Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
-# and not starting with UNBOUNDED PRECEDING, and change first_value() to last_value().
-# Set the upper boundary to CURRENT_ROW for first_value() if the lower boundary is
-# UNBOUNDED_PRECEDING.
+# and either not starting with UNBOUNDED PRECEDING or first_value(... IGNORE NULLS), and
+# change first_value() to last_value().
+# Set the end boundary to CURRENT_ROW for first_value() if the start boundary is
+# UNBOUNDED_PRECEDING and not IGNORE NULLS.
 select
 # windows, sort order and function should be reversed
 last_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
@@ -1531,22 +1532,31 @@ last_value(int_col) over(partition by tinyint_col order by id desc nulls first, 
 # TODO: Revert window when RANGE offsets are supported
 last_value(int_col) over(partition by tinyint_col order by id asc nulls last
                           range between current row and unbounded following),
-#                          range between 4 preceding and unbounded following),
 # windows, sort order and function should remain unchanged
-first_value(bigint_col) over(partition by tinyint_col order by id),
+first_value(bigint_col ignore nulls) over(partition by tinyint_col order by id),
 first_value(bigint_col) over(partition by tinyint_col order by id, int_col
                              rows between 6 preceding and 8 following),
 # TODO: Revert window when RANGE offsets are supported
 first_value(bigint_col) over(partition by tinyint_col order by id
-                             range between unbounded preceding and unbounded following)
-#                             range between unbounded preceding and 10 following)
+                             range between unbounded preceding and unbounded following),
+# window, order, and function should be reversed
+first_value(tinyint_col ignore nulls) over (order by id
+                                            rows between 1 following and 2 following)
 from functional.alltypesagg
 ---- PLAN
+09:ANALYTIC
+|  functions: last_value_ignore_nulls(tinyint_col)
+|  order by: id DESC
+|  window: ROWS BETWEEN 2 PRECEDING AND 1 PRECEDING
+|
+08:SORT
+|  order by: id DESC NULLS FIRST
+|
 07:ANALYTIC
-|  functions: first_value(bigint_col)
+|  functions: first_value_ignore_nulls(bigint_col), first_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 06:ANALYTIC
 |  functions: first_value(int_col)
@@ -1570,7 +1580,7 @@ from functional.alltypesagg
 |  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
@@ -1582,12 +1592,12 @@ from functional.alltypesagg
 # and not starting with UNBOUNDED PRECEDING, and change last_value() to first_value()
 select
 # windows, sort order and function should be reversed
-last_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
-                          rows between 2 preceding and unbounded following),
+last_value(int_col) over(partition by tinyint_col order by id desc nulls first,
+                    bool_col asc nulls last
+                    rows between 2 preceding and unbounded following),
 # TODO: Revert window when RANGE offsets are supported
 last_value(int_col) over(partition by tinyint_col order by id asc nulls last
                           range between current row and unbounded following),
-#                          range between 4 preceding and unbounded following),
 # windows, sort order and function should remain unchanged
 last_value(bigint_col) over(partition by tinyint_col order by id),
 last_value(bigint_col) over(partition by tinyint_col order by id, int_col
@@ -1595,20 +1605,19 @@ last_value(bigint_col) over(partition by tinyint_col order by id, int_col
 # TODO: Revert window when RANGE offsets are supported
 last_value(bigint_col) over(partition by tinyint_col order by id
                             range between unbounded preceding and unbounded following)
-#                            range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
 08:ANALYTIC
 |  functions: last_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
 07:ANALYTIC
 |  functions: last_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 06:ANALYTIC
 |  functions: first_value(int_col)
@@ -1632,7 +1641,7 @@ from functional.alltypesagg
 |  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
@@ -1798,7 +1807,7 @@ where year = 2009 and tinyint_col + 1 = 1
 |  functions: last_value(tinyint_col)
 |  partition by: id, year
 |  order by: int_col ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
 01:SORT
 |  order by: id ASC NULLS FIRST, year ASC NULLS FIRST, int_col ASC
@@ -2177,6 +2186,25 @@ WRITE TO HDFS [default.impala_2832, OVERWRITE=false]
 |
 01:SORT
 |  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# For first/last_value(), ranges windows get rewritten as rows windows,
+# so these should be grouped.
+select last_value(int_col) over (order by bigint_col
+                                 range between unbounded preceding and current row),
+first_value(int_col) over (order by bigint_col
+                           rows between unbounded preceding and current row)
+from functional.alltypes
+---- PLAN
+02:ANALYTIC
+|  functions: last_value(int_col), first_value(int_col)
+|  order by: bigint_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: bigint_col ASC
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

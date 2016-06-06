@@ -717,6 +717,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk(
         "select id from functional.alltypes order by rank() over (order by tinyint_col)");
 
+    // last_value/first_value
+    AnalyzesOk(
+        "select first_value(tinyint_col) over (order by id) from functional.alltypesagg");
+    AnalyzesOk(
+        "select last_value(tinyint_col) over (order by id) from functional.alltypesagg");
+    AnalyzesOk("select first_value(tinyint_col ignore nulls) over (order by id) from "
+        + "functional.alltypesagg");
+    AnalyzesOk("select last_value(tinyint_col ignore nulls) over (order by id) from "
+        + "functional.alltypesagg");
+
     // legal combinations of analytic and agg functions
     AnalyzesOk("select sum(count(id)) over (partition by min(int_col) "
         + "order by max(bigint_col)) from functional.alltypes group by id, tinyint_col "
@@ -840,6 +850,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "select min(id) over (order by tinyint_col) as X from functional.alltypes "
           + "group by id, tinyint_col order by rank() over (order by X)",
         "Nesting of analytic expressions is not allowed");
+    // IGNORE NULLS may only be used with first_value/last_value
+    AnalysisError(
+        "select sum(id ignore nulls) over (order by id) from functional.alltypes",
+        "Function SUM does not accept the keyword IGNORE NULLS.");
     // IMPALA-1256: AnalyticExpr.resetAnalysisState() didn't sync up w/ orderByElements_
     AnalyzesOk("with t as ("
         + "select * from (select sum(t1.year) over ("
@@ -1576,6 +1590,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Function functional.extract conflicts with the EXTRACT builtin");
     AnalysisError("select date_part(year from now())",
         "Function DATE_PART does not accept the keyword FROM");
+
+    // IGNORE NULLS may only be used with first_value/last_value
+    AnalysisError("select lower('FOO' ignore nulls)",
+        "Function LOWER does not accept the keyword IGNORE NULLS.");
   }
 
   @Test

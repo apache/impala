@@ -2592,6 +2592,8 @@ function_params ::=
   {: RESULT = new FunctionParams(false, exprs); :}
   | KW_DISTINCT:distinct expr_list:exprs
   {: RESULT = new FunctionParams(true, exprs); :}
+  | expr_list:exprs KW_IGNORE KW_NULLS
+  {: RESULT = new FunctionParams(false, true, exprs); :}
   ;
 
 predicate ::=

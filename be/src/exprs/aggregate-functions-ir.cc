@@ -188,6 +188,34 @@ void AggregateFunctions::InitZero(FunctionContext*, DecimalVal* dst) {
   dst->val16 = 0;
 }
 
+template <typename T>
+void AggregateFunctions::UpdateVal(FunctionContext* ctx, const T& src, T* dst) {
+  *dst = src;
+}
+
+template <>
+void AggregateFunctions::UpdateVal(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  if (src.is_null) {
+    if (!dst->is_null) ctx->Free(dst->ptr);
+    *dst = StringVal::null();
+    return;
+  }
+
+  uint8_t* new_ptr;
+  if (dst->is_null) {
+    new_ptr = ctx->Allocate(src.len);
+  } else {
+    new_ptr = ctx->Reallocate(dst->ptr, src.len);
+  }
+  // Note that a zero-length string is not the same as StringVal::null().
+  RETURN_IF_NULL(ctx, new_ptr);
+  dst->ptr = new_ptr;
+  memcpy(dst->ptr, src.ptr, src.len);
+  dst->is_null = false;
+  dst->len = src.len;
+}
+
 StringVal AggregateFunctions::StringValGetValue(
     FunctionContext* ctx, const StringVal& src) {
   if (src.is_null) return src;
@@ -1369,34 +1397,6 @@ BigIntVal AggregateFunctions::RankFinalize(FunctionContext* ctx,
 }
 
 template <typename T>
-void AggregateFunctions::LastValUpdate(FunctionContext* ctx, const T& src, T* dst) {
-  *dst = src;
-}
-
-template <>
-void AggregateFunctions::LastValUpdate(FunctionContext* ctx, const StringVal& src,
-    StringVal* dst) {
-  if (src.is_null) {
-    if (!dst->is_null) ctx->Free(dst->ptr);
-    *dst = StringVal::null();
-    return;
-  }
-
-  uint8_t* new_ptr;
-  if (dst->is_null) {
-    new_ptr = ctx->Allocate(src.len);
-  } else {
-    new_ptr = ctx->Reallocate(dst->ptr, src.len);
-  }
-  // Note that a zero-length string is not the same as StringVal::null().
-  RETURN_IF_NULL(ctx, new_ptr);
-  dst->ptr = new_ptr;
-  memcpy(dst->ptr, src.ptr, src.len);
-  dst->is_null = false;
-  dst->len = src.len;
-}
-
-template <typename T>
 void AggregateFunctions::LastValRemove(FunctionContext* ctx, const T& src, T* dst) {
   if (ctx->impl()->num_removes() >= ctx->impl()->num_updates()) *dst = T::null();
 }
@@ -1408,6 +1408,119 @@ void AggregateFunctions::LastValRemove(FunctionContext* ctx, const StringVal& sr
     if (!dst->is_null) ctx->Free(dst->ptr);
     *dst = StringVal::null();
   }
+}
+
+// Returns the current size of the window.
+inline int GetWindowSize(FunctionContext* ctx) {
+  return ctx->impl()->num_updates() - ctx->impl()->num_removes();
+}
+
+// LastValIgnoreNulls is a wrapper around LastVal. It works by not calling UpdateVal
+// if the value being added to the window is null, so that we will return the most
+// recently seen non-null value.
+// The one special case to consider is when all of the values in the window are null
+// and we therefore need to return null. To handle this, we track the number of nulls
+// currently in the window, and set the value to be returned to null if the number of
+// nulls is the same as the window size.
+template <typename T>
+struct LastValIgnoreNullsState {
+  T last_val;
+  // Number of nulls currently in the window, to detect when the window only has nulls.
+  int64_t num_nulls;
+};
+
+template <typename T>
+void AggregateFunctions::LastValIgnoreNullsInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(LastValIgnoreNullsState<T>));
+  LastValIgnoreNullsState<T>* state =
+      reinterpret_cast<LastValIgnoreNullsState<T>*>(dst->ptr);
+  state->last_val = T::null();
+  state->num_nulls = 0;
+}
+
+template <typename T>
+void AggregateFunctions::LastValIgnoreNullsUpdate(FunctionContext* ctx, const T& src,
+      StringVal* dst) {
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(LastValIgnoreNullsState<T>), dst->len);
+  LastValIgnoreNullsState<T>* state =
+      reinterpret_cast<LastValIgnoreNullsState<T>*>(dst->ptr);
+
+  if (!src.is_null) {
+    UpdateVal(ctx, src, &state->last_val);
+  } else {
+    ++state->num_nulls;
+    DCHECK_LE(state->num_nulls, GetWindowSize(ctx));
+    if (GetWindowSize(ctx) == state->num_nulls) {
+      // Call UpdateVal here to set the value to null because it handles deallocation
+      // of StringVals correctly.
+      UpdateVal(ctx, T::null(), &state->last_val);
+    }
+  }
+}
+
+template <typename T>
+void AggregateFunctions::LastValIgnoreNullsRemove(FunctionContext* ctx, const T& src,
+      StringVal* dst) {
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(LastValIgnoreNullsState<T>), dst->len);
+  LastValIgnoreNullsState<T>* state =
+      reinterpret_cast<LastValIgnoreNullsState<T>*>(dst->ptr);
+  LastValRemove(ctx, src, &state->last_val);
+
+  if (src.is_null) --state->num_nulls;
+  DCHECK_GE(state->num_nulls, 0);
+  if (GetWindowSize(ctx) == state->num_nulls) {
+    // Call UpdateVal here to set the value to null because it handles deallocation
+    // of StringVals correctly.
+    UpdateVal(ctx, T::null(), &state->last_val);
+  }
+}
+
+template <typename T>
+T AggregateFunctions::LastValIgnoreNullsGetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(sizeof(LastValIgnoreNullsState<T>), src.len);
+  LastValIgnoreNullsState<T>* state =
+      reinterpret_cast<LastValIgnoreNullsState<T>*>(src.ptr);
+  return state->last_val;
+}
+
+template <>
+StringVal AggregateFunctions::LastValIgnoreNullsGetValue(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(sizeof(LastValIgnoreNullsState<StringVal>), src.len);
+  LastValIgnoreNullsState<StringVal>* state =
+      reinterpret_cast<LastValIgnoreNullsState<StringVal>*>(src.ptr);
+
+  if (state->last_val.is_null) {
+    return StringVal::null();
+  } else {
+    return StringVal::CopyFrom(ctx, state->last_val.ptr, state->last_val.len);
+  }
+}
+
+template <typename T>
+T AggregateFunctions::LastValIgnoreNullsFinalize(FunctionContext* ctx,
+      const StringVal& src) {
+  DCHECK(!src.is_null);
+  T result = LastValIgnoreNullsGetValue<T>(ctx, src);
+  ctx->Free(src.ptr);
+  return result;
+}
+
+template <>
+StringVal AggregateFunctions::LastValIgnoreNullsFinalize(FunctionContext* ctx,
+      const StringVal& src) {
+  DCHECK(!src.is_null);
+  LastValIgnoreNullsState<StringVal>* state =
+      reinterpret_cast<LastValIgnoreNullsState<StringVal>*>(src.ptr);
+  StringVal result = LastValIgnoreNullsGetValue<StringVal>(ctx, src);
+  if (!state->last_val.is_null) ctx->Free(state->last_val.ptr);
+  ctx->Free(src.ptr);
+  return result;
 }
 
 template <typename T>
@@ -1437,7 +1550,25 @@ void AggregateFunctions::FirstValUpdate(FunctionContext* ctx, const StringVal& s
 template <typename T>
 void AggregateFunctions::FirstValRewriteUpdate(FunctionContext* ctx, const T& src,
     const BigIntVal&, T* dst) {
-  LastValUpdate<T>(ctx, src, dst);
+  UpdateVal<T>(ctx, src, dst);
+}
+
+template <typename T>
+void AggregateFunctions::FirstValIgnoreNullsUpdate(FunctionContext*, const T& src,
+    T* dst) {
+  // Store the first non-null value encountered, unlike FirstValUpdate which always stores
+  // the first value even if it is null.
+  if (!dst->is_null || src.is_null) return;
+  *dst = src;
+}
+
+template <>
+void AggregateFunctions::FirstValIgnoreNullsUpdate(FunctionContext* ctx,
+    const StringVal& src, StringVal* dst) {
+  // Store the first non-null value encountered, unlike FirstValUpdate which always stores
+  // the first value even if it is null.
+  if (!dst->is_null || src.is_null) return;
+  CopyStringVal(ctx, src, dst);
 }
 
 template <typename T>
@@ -1457,6 +1588,27 @@ void AggregateFunctions::OffsetFnUpdate(FunctionContext* ctx, const T& src,
 
 // Stamp out the templates for the types we need.
 template void AggregateFunctions::InitZero<BigIntVal>(FunctionContext*, BigIntVal* dst);
+
+template void AggregateFunctions::UpdateVal<BooleanVal>(
+    FunctionContext*, const BooleanVal& src, BooleanVal* dst);
+template void AggregateFunctions::UpdateVal<TinyIntVal>(
+    FunctionContext*, const TinyIntVal& src, TinyIntVal* dst);
+template void AggregateFunctions::UpdateVal<SmallIntVal>(
+    FunctionContext*, const SmallIntVal& src, SmallIntVal* dst);
+template void AggregateFunctions::UpdateVal<IntVal>(
+    FunctionContext*, const IntVal& src, IntVal* dst);
+template void AggregateFunctions::UpdateVal<BigIntVal>(
+    FunctionContext*, const BigIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::UpdateVal<FloatVal>(
+    FunctionContext*, const FloatVal& src, FloatVal* dst);
+template void AggregateFunctions::UpdateVal<DoubleVal>(
+    FunctionContext*, const DoubleVal& src, DoubleVal* dst);
+template void AggregateFunctions::UpdateVal<StringVal>(
+    FunctionContext*, const StringVal& src, StringVal* dst);
+template void AggregateFunctions::UpdateVal<TimestampVal>(
+    FunctionContext*, const TimestampVal& src, TimestampVal* dst);
+template void AggregateFunctions::UpdateVal<DecimalVal>(
+    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
 template void AggregateFunctions::AvgUpdate<BigIntVal>(
     FunctionContext* ctx, const BigIntVal& input, StringVal* dst);
@@ -1754,27 +1906,6 @@ template void AggregateFunctions::KnuthVarUpdate(
 template void AggregateFunctions::KnuthVarUpdate(
     FunctionContext*, const DoubleVal&, StringVal*);
 
-template void AggregateFunctions::LastValUpdate<BooleanVal>(
-    FunctionContext*, const BooleanVal& src, BooleanVal* dst);
-template void AggregateFunctions::LastValUpdate<TinyIntVal>(
-    FunctionContext*, const TinyIntVal& src, TinyIntVal* dst);
-template void AggregateFunctions::LastValUpdate<SmallIntVal>(
-    FunctionContext*, const SmallIntVal& src, SmallIntVal* dst);
-template void AggregateFunctions::LastValUpdate<IntVal>(
-    FunctionContext*, const IntVal& src, IntVal* dst);
-template void AggregateFunctions::LastValUpdate<BigIntVal>(
-    FunctionContext*, const BigIntVal& src, BigIntVal* dst);
-template void AggregateFunctions::LastValUpdate<FloatVal>(
-    FunctionContext*, const FloatVal& src, FloatVal* dst);
-template void AggregateFunctions::LastValUpdate<DoubleVal>(
-    FunctionContext*, const DoubleVal& src, DoubleVal* dst);
-template void AggregateFunctions::LastValUpdate<StringVal>(
-    FunctionContext*, const StringVal& src, StringVal* dst);
-template void AggregateFunctions::LastValUpdate<TimestampVal>(
-    FunctionContext*, const TimestampVal& src, TimestampVal* dst);
-template void AggregateFunctions::LastValUpdate<DecimalVal>(
-    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
-
 template void AggregateFunctions::LastValRemove<BooleanVal>(
     FunctionContext*, const BooleanVal& src, BooleanVal* dst);
 template void AggregateFunctions::LastValRemove<TinyIntVal>(
@@ -1795,6 +1926,111 @@ template void AggregateFunctions::LastValRemove<TimestampVal>(
     FunctionContext*, const TimestampVal& src, TimestampVal* dst);
 template void AggregateFunctions::LastValRemove<DecimalVal>(
     FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+
+template void AggregateFunctions::LastValIgnoreNullsInit<BooleanVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<TinyIntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<SmallIntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<IntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<BigIntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<FloatVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<DoubleVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<StringVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<TimestampVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::LastValIgnoreNullsInit<DecimalVal>(
+    FunctionContext*, StringVal*);
+
+template void AggregateFunctions::LastValIgnoreNullsUpdate<BooleanVal>(
+    FunctionContext*, const BooleanVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<TinyIntVal>(
+    FunctionContext*, const TinyIntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<SmallIntVal>(
+    FunctionContext*, const SmallIntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<IntVal>(
+    FunctionContext*, const IntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<BigIntVal>(
+    FunctionContext*, const BigIntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<FloatVal>(
+    FunctionContext*, const FloatVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<DoubleVal>(
+    FunctionContext*, const DoubleVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<StringVal>(
+    FunctionContext*, const StringVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<TimestampVal>(
+    FunctionContext*, const TimestampVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsUpdate<DecimalVal>(
+    FunctionContext*, const DecimalVal& src, StringVal* dst);
+
+template void AggregateFunctions::LastValIgnoreNullsRemove<BooleanVal>(
+    FunctionContext*, const BooleanVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<TinyIntVal>(
+    FunctionContext*, const TinyIntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<SmallIntVal>(
+    FunctionContext*, const SmallIntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<IntVal>(
+    FunctionContext*, const IntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<BigIntVal>(
+    FunctionContext*, const BigIntVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<FloatVal>(
+    FunctionContext*, const FloatVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<DoubleVal>(
+    FunctionContext*, const DoubleVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<StringVal>(
+    FunctionContext*, const StringVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<TimestampVal>(
+    FunctionContext*, const TimestampVal& src, StringVal* dst);
+template void AggregateFunctions::LastValIgnoreNullsRemove<DecimalVal>(
+    FunctionContext*, const DecimalVal& src, StringVal* dst);
+
+template BooleanVal AggregateFunctions::LastValIgnoreNullsGetValue<BooleanVal>(
+    FunctionContext*, const StringVal&);
+template TinyIntVal AggregateFunctions::LastValIgnoreNullsGetValue<TinyIntVal>(
+    FunctionContext*, const StringVal&);
+template SmallIntVal AggregateFunctions::LastValIgnoreNullsGetValue<SmallIntVal>(
+    FunctionContext*, const StringVal&);
+template IntVal AggregateFunctions::LastValIgnoreNullsGetValue<IntVal>(
+    FunctionContext*, const StringVal&);
+template BigIntVal AggregateFunctions::LastValIgnoreNullsGetValue<BigIntVal>(
+    FunctionContext*, const StringVal&);
+template FloatVal AggregateFunctions::LastValIgnoreNullsGetValue<FloatVal>(
+    FunctionContext*, const StringVal&);
+template DoubleVal AggregateFunctions::LastValIgnoreNullsGetValue<DoubleVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::LastValIgnoreNullsGetValue<StringVal>(
+    FunctionContext*, const StringVal&);
+template TimestampVal AggregateFunctions::LastValIgnoreNullsGetValue<TimestampVal>(
+    FunctionContext*, const StringVal&);
+template DecimalVal AggregateFunctions::LastValIgnoreNullsGetValue<DecimalVal>(
+    FunctionContext*, const StringVal&);
+
+template BooleanVal AggregateFunctions::LastValIgnoreNullsFinalize<BooleanVal>(
+    FunctionContext*, const StringVal&);
+template TinyIntVal AggregateFunctions::LastValIgnoreNullsFinalize<TinyIntVal>(
+    FunctionContext*, const StringVal&);
+template SmallIntVal AggregateFunctions::LastValIgnoreNullsFinalize<SmallIntVal>(
+    FunctionContext*, const StringVal&);
+template IntVal AggregateFunctions::LastValIgnoreNullsFinalize<IntVal>(
+    FunctionContext*, const StringVal&);
+template BigIntVal AggregateFunctions::LastValIgnoreNullsFinalize<BigIntVal>(
+    FunctionContext*, const StringVal&);
+template FloatVal AggregateFunctions::LastValIgnoreNullsFinalize<FloatVal>(
+    FunctionContext*, const StringVal&);
+template DoubleVal AggregateFunctions::LastValIgnoreNullsFinalize<DoubleVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::LastValIgnoreNullsFinalize<StringVal>(
+    FunctionContext*, const StringVal&);
+template TimestampVal AggregateFunctions::LastValIgnoreNullsFinalize<TimestampVal>(
+    FunctionContext*, const StringVal&);
+template DecimalVal AggregateFunctions::LastValIgnoreNullsFinalize<DecimalVal>(
+    FunctionContext*, const StringVal&);
 
 template void AggregateFunctions::FirstValUpdate<BooleanVal>(
     FunctionContext*, const BooleanVal& src, BooleanVal* dst);
@@ -1837,6 +2073,27 @@ template void AggregateFunctions::FirstValRewriteUpdate<TimestampVal>(
     FunctionContext*, const TimestampVal& src, const BigIntVal&, TimestampVal* dst);
 template void AggregateFunctions::FirstValRewriteUpdate<DecimalVal>(
     FunctionContext*, const DecimalVal& src, const BigIntVal&, DecimalVal* dst);
+
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<BooleanVal>(
+    FunctionContext*, const BooleanVal& src, BooleanVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<TinyIntVal>(
+    FunctionContext*, const TinyIntVal& src, TinyIntVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<SmallIntVal>(
+    FunctionContext*, const SmallIntVal& src, SmallIntVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<IntVal>(
+    FunctionContext*, const IntVal& src, IntVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<BigIntVal>(
+    FunctionContext*, const BigIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<FloatVal>(
+    FunctionContext*, const FloatVal& src, FloatVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<DoubleVal>(
+    FunctionContext*, const DoubleVal& src, DoubleVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<StringVal>(
+    FunctionContext*, const StringVal& src, StringVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<TimestampVal>(
+    FunctionContext*, const TimestampVal& src, TimestampVal* dst);
+template void AggregateFunctions::FirstValIgnoreNullsUpdate<DecimalVal>(
+    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
 template void AggregateFunctions::OffsetFnInit<BooleanVal>(
     FunctionContext*, BooleanVal*);
