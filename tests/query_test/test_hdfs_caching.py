@@ -5,13 +5,15 @@ import logging
 import os
 import pytest
 from copy import copy
-from subprocess import call
+from subprocess import check_call, call
+from time import time
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import *
 from tests.common.test_vector import *
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.util.filesystem_utils import get_fs_path
 from tests.util.shell_util import exec_process
 
 # End to end test that hdfs caching is working.
@@ -86,6 +88,67 @@ class TestHdfsCaching(ImpalaTestSuite):
     for x in xrange(1, num_iters):
       result = self.execute_query(query_string)
       assert(len(result.data) == 2)
+
+# A separate class has been created for "test_hdfs_caching_fallback_path" to make it
+# run as a part of exhaustive tests which require the workload to be 'functional-query'.
+# TODO: Move this to TestHdfsCaching once we make exhaustive tests run for other workloads
+@SkipIfS3.caching
+@SkipIfIsilon.caching
+@SkipIfLocal.caching
+class TestHdfsCachingFallbackPath(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @SkipIfS3.hdfs_encryption
+  @SkipIfIsilon.hdfs_encryption
+  @SkipIfLocal.hdfs_encryption
+  def test_hdfs_caching_fallback_path(self, vector, unique_database, testid_checksum):
+    """ This tests the code path of the query execution where the hdfs cache read fails
+    and the execution falls back to the normal read path. To reproduce this situation we
+    rely on IMPALA-3679, where zcrs are not supported with encryption zones. This makes
+    sure ReadFromCache() fails and falls back to ReadRange() to read the scan range."""
+
+    if self.exploration_strategy() != 'exhaustive' or\
+        vector.get_value('table_format').file_format != 'text':
+      pytest.skip()
+
+    # Create a new encryption zone and copy the tpch.nation table data into it.
+    encrypted_table_dir = get_fs_path("/test-warehouse/" + testid_checksum)
+    create_query_sql = "CREATE EXTERNAL TABLE %s.cached_nation like tpch.nation "\
+        "LOCATION '%s'" % (unique_database, encrypted_table_dir)
+    check_call(["hdfs", "dfs", "-mkdir", encrypted_table_dir], shell=False)
+    check_call(["hdfs", "crypto", "-createZone", "-keyName", "testKey1", "-path",\
+        encrypted_table_dir], shell=False)
+    check_call(["hdfs", "dfs", "-cp", get_fs_path("/test-warehouse/tpch.nation/*.tbl"),\
+        encrypted_table_dir], shell=False)
+    # Reduce the scan range size to force the query to have multiple scan ranges.
+    exec_options = vector.get_value('exec_option')
+    exec_options['max_scan_range_length'] = 1024
+    try:
+      self.execute_query_expect_success(self.client, create_query_sql)
+      # Cache the table data
+      self.execute_query_expect_success(self.client, "ALTER TABLE %s.cached_nation set "
+         "cached in 'testPool'" % unique_database)
+      # Wait till the whole path is cached. We set a deadline of 20 seconds for the path
+      # to be cached to make sure this doesn't loop forever in case of caching errors.
+      caching_deadline = time.time() + 20
+      while not is_path_fully_cached(encrypted_table_dir):
+        if time.time() > caching_deadline:
+          pytest.fail("Timed out caching path: " + encrypted_table_dir)
+        time.sleep(2)
+      self.execute_query_expect_success(self.client, "invalidate metadata "
+          "%s.cached_nation" % unique_database);
+      result = self.execute_query_expect_success(self.client, "select count(*) from "
+          "%s.cached_nation" % unique_database, exec_options)
+      assert(len(result.data) == 1)
+      assert(result.data[0] == '25')
+    except Exception as e:
+      pytest.fail("Failure in test_hdfs_caching_fallback_path: " + str(e))
+    finally:
+      check_call(["hdfs", "dfs", "-rm", "-r", "-f", "-skipTrash", encrypted_table_dir],\
+          shell=False)
+
 
 @SkipIfS3.caching
 @SkipIfIsilon.caching
@@ -179,6 +242,16 @@ def drop_cache_directives_for_path(path):
   rc, stdout, stderr = exec_process("hdfs cacheadmin -removeDirectives -path %s" % path)
   assert rc == 0, \
       "Error removing cache directive for path %s (%s, %s)" % (path, stdout, stderr)
+
+def is_path_fully_cached(path):
+  """Returns true if all the bytes of the path are cached, false otherwise"""
+  rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -stats -path %s" % path)
+  assert rc == 0
+  caching_stats = stdout.strip("\n").split("\n")[-1].split()
+  # Compare BYTES_NEEDED and BYTES_CACHED, the output format is as follows
+  # "ID POOL REPL EXPIRY PATH BYTES_NEEDED BYTES_CACHED FILES_NEEDED FILES_CACHED"
+  return len(caching_stats) > 0 and caching_stats[5] == caching_stats[6]
+
 
 def get_cache_directive_for_path(path):
   rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -path %s" % path)

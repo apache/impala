@@ -423,9 +423,14 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
     DCHECK(cached_buffer_ == NULL);
     cached_buffer_ = hadoopReadZero(hdfs_file_->file(),
         io_mgr_->cached_read_options_, len());
-
-    // Data was not cached, caller will fall back to normal read path.
-    if (cached_buffer_ == NULL) return Status::OK();
+  }
+  // Data was not cached, caller will fall back to normal read path.
+  if (cached_buffer_ == NULL) {
+    VLOG_QUERY << "Cache read failed for scan range: " << DebugString()
+        << ". Switching to disk read path.";
+    // Clean up the scan range state before re-issuing it.
+    Close();
+    return Status::OK();
   }
 
   // Cached read succeeded.
