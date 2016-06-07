@@ -2,17 +2,25 @@
 
 set -euo pipefail
 
-# Prefer the virtualenv pip since this is what will actually be used during the
+# Prefer the virtualenv pip and python since this is what will actually be used during the
 # installation and it may be a different version than the system default.
 VIRTUAL_ENV_PIP="$IMPALA_HOME"/infra/python/env/bin/pip
 if [[ -e "$VIRTUAL_ENV_PIP" ]]; then
   PIP="$VIRTUAL_ENV_PIP"
+  # Assume python is also available in the virtualenv.
+  PYTHON="$IMPALA_HOME"/infra/python/env/bin/python
 else
   PIP=pip
+  PYTHON=python
 fi
 
 DIR=$(dirname "$0")
-# Ignore the dev version of Impyla, it can't be downloaded (it needs to be built and
-# copied into the deps folder).
-"$PIP" install --download "$DIR" \
-    -r <(cat "$DIR"/requirements.txt | grep -v "impyla.*dev")
+# Download but don't install all packages listed in requirements.txt.
+"$PIP" install --download "$DIR" -r "$DIR"/requirements.txt
+
+# Directly download required packages not listed in requirements.txt.
+# For virtualenv, other scripts rely on the .tar.gz package (not a .whl package).
+# kudu-python is downloaded separately because pip install attempts to execute a
+# setup.py subcommand for kudu-python that can fail even if the download succeeds.
+$PYTHON $DIR/pip_download.py virtualenv 13.0.1
+$PYTHON $DIR/pip_download.py kudu-python 0.1.1

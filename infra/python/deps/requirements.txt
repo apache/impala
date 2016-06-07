@@ -1,4 +1,4 @@
-# To download requirements use the downlod_requirements script in this dir.
+# To download requirements use the download_requirements script in this dir.
 
 # Remember, all modules below need to support python 2.6.
 
@@ -61,7 +61,8 @@ texttable == 0.8.3
 # The virtualenv may need to be functional even if the toolchain isn't present. The
 # bootstap_virtualenv.py script special-cases kudu-python, the line below is actually
 # functional and determines the expected kudu-python version. The version must be listed
-# in the format below including # and spacing. Keep this formatting!
+# in the format below including # and spacing. Keep this formatting! The kudu-python
+# version in download_requirements must be kept in sync with this version.
 # kudu-python==0.1.1
   Cython == 0.23.4
   numpy == 1.10.4
