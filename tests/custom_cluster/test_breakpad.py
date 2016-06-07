@@ -15,10 +15,12 @@
 import glob
 import os
 import pytest
+import psutil
 import shutil
 import tempfile
 import time
 
+from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
 from signal import SIGSEGV, SIGKILL
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -45,14 +47,21 @@ class TestBreakpad(CustomClusterTestSuite):
   def teardown_method(self, method):
     # Override parent
     # Stop the cluster to prevent future accesses to self.tmp_dir.
-    self._stop_impala_cluster()
+    self.kill_cluster(SIGKILL)
     assert self.tmp_dir
     shutil.rmtree(self.tmp_dir)
 
   @classmethod
-  def teardown_class(cls):
+  def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
-      return
+      pytest.skip('breakpad tests only run in exhaustive')
+    # Disable core dumps for this test
+    setrlimit(RLIMIT_CORE, (0, RLIM_INFINITY))
+
+  @classmethod
+  def teardown_class(cls):
+    # Re-enable core dumps
+    setrlimit(RLIMIT_CORE, (RLIM_INFINITY, RLIM_INFINITY))
     # Start default cluster for subsequent tests (verify_metrics).
     cls._start_impala_cluster([])
 
@@ -71,14 +80,27 @@ class TestBreakpad(CustomClusterTestSuite):
 
   def kill_cluster(self, signal):
     self.cluster.refresh()
-    cluster = self.cluster
-    for impalad in cluster.impalads:
-      impalad.kill(signal)
-    cluster.statestored.kill(signal)
-    cluster.catalogd.kill(signal)
-    # Wait for daemons to finish writing minidumps
-    time.sleep(1)
+    processes = self.cluster.impalads + [self.cluster.catalogd, self.cluster.statestored]
+    processes = filter(None, processes)
+    self.kill_processes(processes, signal)
     self.assert_all_processes_killed()
+
+  def kill_processes(self, processes, signal):
+    for process in processes:
+      process.kill(signal)
+    self.wait_for_all_processes_dead(processes)
+
+  def wait_for_all_processes_dead(self, processes, timeout=300):
+    for process in processes:
+      try:
+        pid = process.get_pid()
+        if not pid:
+          continue
+        psutil_process = psutil.Process(pid)
+        psutil_process.wait(timeout)
+      except psutil.TimeoutExpired:
+        raise RuntimeError("Unable to kill %s (pid %d) after %d seconds." %
+            (psutil_process.name, psutil_process.pid, timeout))
 
   def assert_all_processes_killed(self):
     self.cluster.refresh()
@@ -158,11 +180,10 @@ class TestBreakpad(CustomClusterTestSuite):
     """Kill a single impalad with SIGSEGV to make it write a minidump. Kill the rest of
     the cluster. Clean up the single minidump file and return its size.
     """
+    self.cluster.refresh()
     assert len(self.cluster.impalads) > 0
     # Make one impalad write a minidump.
-    self.cluster.impalads[0].kill(SIGSEGV)
-    # Wait for the minidump to be written before killing the rest of the cluster.
-    time.sleep(1)
+    self.kill_processes(self.cluster.impalads[:1], SIGSEGV)
     # Kill the rest of the cluster.
     self.kill_cluster(SIGKILL)
     assert self.count_minidumps('impalad') == 1
