@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # see testdata/avro_schema_resolution
-select * from schema_resolution_test
+select * from functional_avro_snap.schema_resolution_test
 ---- TYPES
 boolean, int, long, float, double, string, string, string
 ---- RESULTS
@@ -15,9 +15,9 @@ false,2,2,2,2,'serialized string','','NULL'
 # IMPALA-1947: A TIMESTAMP from the column definitions results in a STRING column
 # backed by a stored Avro STRING during table loading.
 # See testdata/avro_schema_resolution
-select * from no_avro_schema where year = 2009 order by id limit 1
+select * from functional_avro_snap.no_avro_schema where year = 2009 order by id limit 1
 union all
-select * from no_avro_schema where year = 2010 order by id limit 1
+select * from functional_avro_snap.no_avro_schema where year = 2010 order by id limit 1
 ---- TYPES
 int, boolean, int, int, int, bigint, float, double, string, string, string, int, int
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -73,4 +73,108 @@ int, string
 3,'3'
 4,'4'
 4,'4'
+====
+---- QUERY
+# IMPALA-3687: Create a table with mismatched column definitions and Avro schema.
+CREATE EXTERNAL TABLE alltypesagg_mismatch_column_name_comment (
+  id INT COMMENT 'int commnet',
+  bool_col BOOLEAN COMMENT 'bool commnet',
+  tinyint_col float COMMENT 'tinyint comment',
+  smallint_col double COMMENT 'smallint comment',
+  int_col INT COMMENT 'int comment',
+  bigint_col BIGINT COMMENT 'bigint comment',
+  float_col FLOAT COMMENT 'float comment',
+  double_col DOUBLE COMMENT 'double comment',
+  date_string_col STRING COMMENT 'string comment',
+  char_col char(2) COMMENT 'char comment',
+  varchar_col varchar(5) COMMENT 'varchar comment'
+)
+STORED AS AVRO
+TBLPROPERTIES ('avro.schema.literal'= '{
+"fields": [
+{"type": ["int", "null"], "name": "id_mismatch", "doc": "int comment mismatch"},
+{"type": ["boolean", "null"], "name": "bool_col_mismatch", "doc": "bool comment mismatch"},
+{"type": ["int", "null"], "name": "tinyint_col_mismatch", "doc": "tinyint comment mismatch"},
+{"type": ["int", "null"], "name": "smallint_col_mismatch", "doc": "smallint comment mismatch"},
+{"type": ["int", "null"], "name": "int_col_mismatch", "doc": "int comment mismatch"},
+{"type": ["long", "null"], "name": "bigint_col_mismatch", "doc": "bigint comment mismatch"},
+{"type": ["float", "null"], "name": "float_col_mismatch", "doc": "float comment mismatch"},
+{"type": ["double", "null"], "name": "double_col_mismatch", "doc": "double comment mismatch"},
+{"type": ["string", "null"], "name": "date_string_col_mismatch", "doc": "string comment mismatch"},
+{"type": ["string", "null"], "name": "char_col_mismatch", "doc": "char comment mismatch"},
+{"type": ["string", "null"], "name": "varchar_col_mismatch", "doc": "varchar comment mismatch"}],
+"type": "record", "name": "a"}')
+====
+---- QUERY
+# We favor Avro schema definition over column definitions except for CHAR/VARCHAR, for
+# which we use the type from the column definition.
+DESCRIBE alltypesagg_mismatch_column_name_comment
+---- RESULTS
+'id_mismatch','int','int comment mismatch'
+'bool_col_mismatch','boolean','bool comment mismatch'
+'tinyint_col_mismatch','int','tinyint comment mismatch'
+'smallint_col_mismatch','int','smallint comment mismatch'
+'int_col_mismatch','int','int comment mismatch'
+'bigint_col_mismatch','bigint','bigint comment mismatch'
+'float_col_mismatch','float','float comment mismatch'
+'double_col_mismatch','double','double comment mismatch'
+'date_string_col_mismatch','string','string comment mismatch'
+'char_col_mismatch','char(2)','char comment mismatch'
+'varchar_col_mismatch','varchar(5)','varchar comment mismatch'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# IMPALA-3687: Create a table with only Avro schema and later alter it to be a mismatched
+# schema.
+CREATE EXTERNAL TABLE alltypesagg_alter_avro_name_comment
+STORED AS AVRO
+TBLPROPERTIES ('avro.schema.literal'= '{
+"fields": [
+{"type": ["int", "null"], "name": "id", "doc": "int comment"},
+{"type": ["boolean", "null"], "name": "bool_col", "doc": "bool comment"},
+{"type": ["int", "null"], "name": "tinyint_col", "doc": "tinyint comment"},
+{"type": ["int", "null"], "name": "smallint_col", "doc": "smallint comment"},
+{"type": ["int", "null"], "name": "int_col", "doc": "int comment"},
+{"type": ["long", "null"], "name": "bigint_col", "doc": "bigint comment"},
+{"type": ["float", "null"], "name": "float_col", "doc": "float comment"},
+{"type": ["double", "null"], "name": "double_col", "doc": "double comment"},
+{"type": ["string", "null"], "name": "date_string_col", "doc": "string comment"},
+{"type": ["string", "null"], "name": "char_col", "doc": "char comment"},
+{"type": ["string", "null"], "name": "varchar_col", "doc": "varchar comment"}],
+"type": "record", "name": "a"}');
+
+ALTER TABLE alltypesagg_alter_avro_name_comment SET TBLPROPERTIES ('avro.schema.literal'= '{
+"fields": [
+{"type": ["int", "null"], "name": "id_mismatch", "doc": "int comment mismatch"},
+{"type": ["boolean", "null"], "name": "bool_col_mismatch", "doc": "bool comment mismatch"},
+{"type": ["int", "null"], "name": "tinyint_col_mismatch", "doc": "tinyint comment mismatch"},
+{"type": ["int", "null"], "name": "smallint_col_mismatch", "doc": "smallint comment mismatch"},
+{"type": ["int", "null"], "name": "int_col_mismatch", "doc": "int comment mismatch"},
+{"type": ["long", "null"], "name": "bigint_col_mismatch", "doc": "bigint comment mismatch"},
+{"type": ["float", "null"], "name": "float_col_mismatch", "doc": "float comment mismatch"},
+{"type": ["double", "null"], "name": "double_col_mismatch", "doc": "double comment mismatch"},
+{"type": ["string", "null"], "name": "date_string_col_mismatch", "doc": "string comment mismatch"},
+{"type": ["string", "null"], "name": "char_col_mismatch", "doc": "char comment mismatch"},
+{"type": ["string", "null"], "name": "varchar_col_mismatch", "doc": "varchar comment mismatch"}],
+"type": "record", "name": "a"}');
+
+REFRESH alltypesagg_alter_avro_name_comment;
+====
+---- QUERY
+DESCRIBE alltypesagg_alter_avro_name_comment
+---- RESULTS
+'id_mismatch','int','int comment mismatch'
+'bool_col_mismatch','boolean','bool comment mismatch'
+'tinyint_col_mismatch','int','tinyint comment mismatch'
+'smallint_col_mismatch','int','smallint comment mismatch'
+'int_col_mismatch','int','int comment mismatch'
+'bigint_col_mismatch','bigint','bigint comment mismatch'
+'float_col_mismatch','float','float comment mismatch'
+'double_col_mismatch','double','double comment mismatch'
+'date_string_col_mismatch','string','string comment mismatch'
+'char_col_mismatch','string','char comment mismatch'
+'varchar_col_mismatch','string','varchar comment mismatch'
+---- TYPES
+string, string, string
 ====

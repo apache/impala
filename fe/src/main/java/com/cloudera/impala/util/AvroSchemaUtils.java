@@ -109,14 +109,10 @@ public class AvroSchemaUtils {
    * resolution policy:
    *
    * Mismatched number of columns -> Prefer Avro columns.
-   * Mismatched name/type -> Prefer Avro column, except:
-   *   A CHAR/VARCHAR column definition maps to an Avro STRING, and is preserved
-   *   as a CHAR/VARCHAR in the reconciled schema.
-   *
-   * Behavior for TIMESTAMP:
-   * A TIMESTAMP column definition maps to an Avro STRING and is presented as a STRING
-   * in the reconciled schema, because Avro has no binary TIMESTAMP representation.
-   * As a result, no Avro table may have a TIMESTAMP column.
+   * Always prefer Avro schema except for column type CHAR/VARCHAR/STRING:
+   *   A CHAR/VARCHAR/STRING column definition maps to an Avro STRING. The reconciled
+   *   column will preserve the type in the column definition but use the column name
+   *   and comment from the Avro schema.
    */
   public static List<ColumnDef> reconcileSchemas(
       List<ColumnDef> colDefs, List<ColumnDef> avroCols, StringBuilder warning) {
@@ -135,12 +131,21 @@ public class AvroSchemaUtils {
       Preconditions.checkNotNull(colDef.getType());
       Preconditions.checkNotNull(avroCol.getType());
 
-      // A CHAR/VARCHAR column definition maps to an Avro STRING, and is preserved
-      // as a CHAR/VARCHAR in the reconciled schema.
+      // A CHAR/VARCHAR/STRING column definition maps to an Avro STRING, and is preserved
+      // as a CHAR/VARCHAR/STRING in the reconciled schema. Column name and comment
+      // are taken from the Avro schema.
       if ((colDef.getType().isStringType() && avroCol.getType().isStringType())) {
         Preconditions.checkState(
             avroCol.getType().getPrimitiveType() == PrimitiveType.STRING);
-        result.add(colDef);
+        ColumnDef reconciledColDef = new ColumnDef(
+            avroCol.getColName(), colDef.getTypeDef(), avroCol.getComment());
+        try {
+          reconciledColDef.analyze();
+        } catch (AnalysisException e) {
+          Preconditions.checkNotNull(
+              null, "reconciledColDef.analyze() should never throw.");
+        }
+        result.add(reconciledColDef);
       } else {
         result.add(avroCol);
       }

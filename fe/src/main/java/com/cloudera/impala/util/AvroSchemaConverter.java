@@ -40,6 +40,11 @@ import com.google.common.collect.Lists;
  * Error behavior: These functions throw an UnsupportedOperationException when failing
  * to generate an Impala-compatible Avro schema, e.g., because of an unknown type or a
  * type not supported by Impala.
+ *
+ * Behavior for TIMESTAMP:
+ * A TIMESTAMP column definition maps to an Avro STRING and is created as a STRING column,
+ * because Avro has no binary TIMESTAMP representation. As a result, no Avro table may
+ * have a TIMESTAMP column.
  */
 public class AvroSchemaConverter {
   // Arbitrarily chosen schema name and record prefix. Note that

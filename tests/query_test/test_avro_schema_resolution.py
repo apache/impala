@@ -20,8 +20,8 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'avro' and\
         v.get_value('table_format').compression_codec == 'snap')
 
-  def test_avro_schema_resolution(self, vector):
-    self.run_test_case('QueryTest/avro-schema-resolution', vector)
+  def test_avro_schema_resolution(self, vector, unique_database):
+    self.run_test_case('QueryTest/avro-schema-resolution', vector, unique_database)
 
   def test_avro_c_lib_unicode_nulls(self, vector):
     """Test for IMPALA-1136 and IMPALA-2161 and unicode characters in the

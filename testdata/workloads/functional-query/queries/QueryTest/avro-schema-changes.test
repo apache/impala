@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# Create a table with default fileformat and later change it to avro using
+# Create a table with default fileformat and later change it to Avro using
 # alter sql. The query runs with stale metadata and a warning should be raised.
 # Invalidating metadata should cause the Avro schema to be properly set upon the
 # next metadata load.
