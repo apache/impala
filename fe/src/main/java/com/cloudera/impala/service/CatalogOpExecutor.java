@@ -366,12 +366,14 @@ public class CatalogOpExecutor {
           // Create and add HdfsPartition object to the corresponding HdfsTable and load
           // its block metadata. Get the new table object with an updated catalog
           // version. If the partition already exists in Hive and "IfNotExists" is true,
-          // then null is returned.
+          // then return without populating the response object.
           Table refreshedTable = alterTableAddPartition(tbl,
               addPartParams.getPartition_spec(), addPartParams.isIf_not_exists(),
               addPartParams.getLocation(), addPartParams.getCache_op());
-          if (refreshedTable != null) refreshedTable.setCatalogVersion(newCatalogVersion);
-          addTableToCatalogUpdate(refreshedTable, response.result);
+          if (refreshedTable != null) {
+            refreshedTable.setCatalogVersion(newCatalogVersion);
+            addTableToCatalogUpdate(refreshedTable, response.result);
+          }
           return;
         case DROP_COLUMN:
           TAlterTableDropColParams dropColParams = params.getDrop_col_params();
@@ -389,13 +391,16 @@ public class CatalogOpExecutor {
               params.getDrop_partition_params();
           // Drop the partition from the corresponding table. Get the table object
           // with an updated catalog version. If the partition does not exist and
-          // "IfExists" is true, null is returned. If "purge" option is specified
-          // partition data is purged by skipping Trash, if configured.
+          // "IfExists" is true, then return without populating the response object.
+          // If "purge" option is specified partition data is purged by skipping
+          // Trash, if configured.
           refreshedTable = alterTableDropPartition(tbl,
               dropPartParams.getPartition_spec(),
               dropPartParams.isIf_exists(), dropPartParams.isPurge());
-          if (refreshedTable != null) refreshedTable.setCatalogVersion(newCatalogVersion);
-          addTableToCatalogUpdate(refreshedTable, response.result);
+          if (refreshedTable != null) {
+            refreshedTable.setCatalogVersion(newCatalogVersion);
+            addTableToCatalogUpdate(refreshedTable, response.result);
+          }
           return;
         case RENAME_TABLE:
         case RENAME_VIEW:
