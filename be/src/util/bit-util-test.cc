@@ -21,7 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "gutil/bits.h"
-#include "util/bit-util.inline.h"
+#include "util/bit-util.h"
 #include "util/cpu-info.h"
 
 #include "common/names.h"

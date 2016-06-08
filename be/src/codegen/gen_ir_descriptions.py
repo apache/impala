@@ -106,6 +106,7 @@ ir_functions = [
   ["READ_AVRO_STRING", "ReadAvroString"],
   ["READ_AVRO_VARCHAR", "ReadAvroVarchar"],
   ["READ_AVRO_CHAR", "ReadAvroChar"],
+  ["READ_AVRO_DECIMAL", "ReadAvroDecimal"],
   ["HDFS_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
   ["HDFS_SCANNER_GET_CONJUNCT_CTX", "GetConjunctCtx"],
   ["STRING_TO_BOOL", "IrStringToBool"],

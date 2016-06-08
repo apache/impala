@@ -31,6 +31,7 @@ add_library(Util
   avro-util.cc
   benchmark.cc
   bitmap.cc
+  bit-util.cc
   bloom-filter.cc
   cgroups-mgr.cc
   codec.cc

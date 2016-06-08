@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#ifndef IMPALA_BIT_UTIL_INLINE_H
-#define IMPALA_BIT_UTIL_INLINE_H
-
 #include "util/bit-util.h"
 
 namespace impala {
 
-inline void BitUtil::ByteSwap(void* dest, const void* source, int len) {
+void BitUtil::ByteSwap(void* dest, const void* source, int len) {
   uint8_t* dst = reinterpret_cast<uint8_t*>(dest);
   const uint8_t* src = reinterpret_cast<const uint8_t*>(source);
   switch (len) {
@@ -126,5 +122,3 @@ inline void BitUtil::ByteSwap(void* dest, const void* source, int len) {
 }
 
 }
-
-#endif

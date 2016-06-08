@@ -167,7 +167,7 @@ class BitUtil {
   /// Write the swapped bytes into dest; source and dest must not overlap.
   /// This function is optimized for len <= 16. It reverts to a slow loop-based
   /// swap for len > 16.
-  static inline void ByteSwap(void* dest, const void* source, int len);
+  static void ByteSwap(void* dest, const void* source, int len);
 
   /// Converts to big endian format (if not already in big endian) from the
   /// machine's native endian format.

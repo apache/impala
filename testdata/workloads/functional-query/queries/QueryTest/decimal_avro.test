@@ -38,3 +38,18 @@ select count(*) from avro_decimal_tbl
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+select l_shipmode, count(distinct l_quantity), avg(l_extendedprice), max(l_discount), ndv(l_tax)
+from tpch_avro_snap.lineitem
+group by l_shipmode
+---- RESULTS
+'SHIP',50,38267.37,0.10,9
+'REG AIR',50,38268.41,0.10,9
+'TRUCK',50,38209.82,0.10,9
+'RAIL',50,38269.81,0.10,9
+'FOB',50,38246.23,0.10,9
+'MAIL',50,38224.29,0.10,9
+'AIR',50,38299.98,0.10,9
+----TYPES
+STRING,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
