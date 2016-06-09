@@ -33,6 +33,7 @@ DEBUG_ACTIONS = [None, 'WAIT']
 # Extra dimensions to test order by without limit
 SORT_QUERY = 'select * from lineitem order by l_orderkey'
 SORT_CANCEL_DELAY = range(6, 10)
+SORT_BLOCK_MGR_LIMIT = ['0', '300m'] # Test spilling and non-spilling sorts.
 
 class TestCancellation(ImpalaTestSuite):
   @classmethod
@@ -46,6 +47,7 @@ class TestCancellation(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(TestDimension('query_type', *QUERY_TYPE))
     cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
     cls.TestMatrix.add_dimension(TestDimension('action', *DEBUG_ACTIONS))
+    cls.TestMatrix.add_dimension(TestDimension('max_block_mgr_memory', 0))
 
     cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS' or (\
         v.get_value('table_format').file_format in ['text', 'parquet'] and\
@@ -81,6 +83,8 @@ class TestCancellation(ImpalaTestSuite):
     # node ID 0 is the scan node
     debug_action = '0:GETNEXT:' + action if action != None else ''
     vector.get_value('exec_option')['debug_action'] = debug_action
+
+    vector.get_value('exec_option')['max_block_mgr_memory'] = vector.get_value('max_block_mgr_memory')
 
     # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):
@@ -163,18 +167,19 @@ class TestCancellationSerial(TestCancellation):
     except AssertionError:
       pytest.xfail("IMPALA-551: File handle leak for INSERT")
 
-  class TestCancellationFullSort(TestCancellation):
-    @classmethod
-    def add_test_dimensions(cls):
-      super(TestCancellation, cls).add_test_dimensions()
-      # Override dimensions to only execute the order-by without limit query.
-      cls.TestMatrix.add_dimension(TestDimension('query', SORT_QUERY))
-      cls.TestMatrix.add_dimension(TestDimension('query_type', 'SELECT'))
-      cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *SORT_CANCEL_DELAY))
-      cls.TestMatrix.add_dimension(TestDimension('action', None))
-      cls.TestMatrix.add_constraint(lambda v:\
-         v.get_value('table_format').file_format =='parquet' and\
-         v.get_value('table_format').compression_codec == 'none')
+class TestCancellationFullSort(TestCancellation):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCancellation, cls).add_test_dimensions()
+    # Override dimensions to only execute the order-by without limit query.
+    cls.TestMatrix.add_dimension(TestDimension('query', SORT_QUERY))
+    cls.TestMatrix.add_dimension(TestDimension('query_type', 'SELECT'))
+    cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *SORT_CANCEL_DELAY))
+    cls.TestMatrix.add_dimension(TestDimension('max_block_mgr_memory', *SORT_BLOCK_MGR_LIMIT))
+    cls.TestMatrix.add_dimension(TestDimension('action', None))
+    cls.TestMatrix.add_constraint(lambda v:\
+       v.get_value('table_format').file_format =='parquet' and\
+       v.get_value('table_format').compression_codec == 'none')
 
-    def test_cancel_sort(self, vector):
-      self.execute_cancel_test(vector)
+  def test_cancel_sort(self, vector):
+    self.execute_cancel_test(vector)
