@@ -68,6 +68,8 @@
 #include "exec/base-sequence-scanner.h"
 
 #include <avro/basics.h>
+
+#include "exec/read-write-util.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 
@@ -105,6 +107,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   }
 
  private:
+  friend class HdfsAvroScannerTest;
+
   struct AvroFileHeader : public BaseSequenceScanner::FileHeader {
     /// The root of the file schema tree (i.e. the top-level record schema of the file)
     ScopedAvroSchemaElement schema;
@@ -131,7 +135,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static const std::string AVRO_SNAPPY_CODEC;
   static const std::string AVRO_DEFLATE_CODEC;
 
-  typedef int (*DecodeAvroDataFn)(HdfsAvroScanner*, int, MemPool*, uint8_t**,
+  typedef int (*DecodeAvroDataFn)(HdfsAvroScanner*, int, MemPool*, uint8_t**, uint8_t*,
                                   Tuple*, TupleRow*);
 
   /// The codegen'd version of DecodeAvroData() if available, NULL otherwise.
@@ -172,17 +176,18 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Returns the number of tuples to be committed.
   /// - max_tuples: the maximum number of tuples to write
   /// - data: serialized record data. Is advanced as records are read.
+  /// - data_end: pointer to the end of the data buffer (i.e. the first invalid byte).
   /// - pool: memory pool to allocate string data from
   /// - tuple: tuple pointer to copy objects to
   /// - tuple_row: tuple row of written tuples
-  int DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data,
+  int DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data, uint8_t* data_end,
       Tuple* tuple, TupleRow* tuple_row);
 
   /// Materializes a single tuple from serialized record data. Will return false and set
   /// error in parse_status_ if memory limit is exceeded when allocating new char buffer.
   /// See comments below for ReadAvroChar().
   bool MaterializeTuple(const AvroSchemaElement& record_schema, MemPool* pool,
-      uint8_t** data, Tuple* tuple);
+      uint8_t** data, uint8_t* data_end, Tuple* tuple);
 
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   /// functions.
@@ -208,63 +213,80 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   ///     the bail_out block or some basic blocks before that.
   /// - bail_out: the block to jump to if anything fails. This is used in particular by
   ///     ReadAvroChar() which can exceed memory limit during allocation from MemPool.
-  /// - this_val, pool_val, tuple_val, data_val: arguments to MaterializeTuple()
+  /// - this_val, pool_val, tuple_val, data_val, data_end_val: arguments to
+  ///     MaterializeTuple()
   static Status CodegenReadRecord(
       const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNode* node,
       LlvmCodeGen* codegen, void* builder, llvm::Function* fn,
       llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out, llvm::Value* this_val,
-      llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val);
+      llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val,
+      llvm::Value* data_end_val);
 
   /// Creates the IR for reading an Avro scalar at builder's current insert point.
   static Status CodegenReadScalar(const AvroSchemaElement& element,
       SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder,
-      llvm::BasicBlock* end_field_block, llvm::BasicBlock* bail_out_block,
       llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
-      llvm::Value* data_val);
+      llvm::Value* data_val, llvm::Value* data_end_val, llvm::Value** ret_val);
 
   /// The following are cross-compiled functions for parsing a serialized Avro primitive
   /// type and writing it to a slot. They can also be used for skipping a field without
   /// writing it to a slot by setting 'write_slot' to false.
   /// - data: Serialized record data. Is advanced past the read field.
+  /// - data_end: pointer to the end of the data buffer (i.e. the first invalid byte).
   /// The following arguments are used only if 'write_slot' is true:
   /// - slot: The tuple slot to write the parsed field into.
   /// - type: The type of the slot. (This is necessary because there is not a 1:1 mapping
   ///         between Avro types and Impala's primitive types.)
   /// - pool: MemPool for string data.
   ///
-  /// ReadAvroChar() will return false and set error in parse_status_ if memory limit
-  /// is exceeded when allocating the new char buffer. It returns true otherwise.
+  /// All return false and set parse_status_ on error (e.g. mem limit exceeded when
+  /// allocating buffer, malformed data), and return true otherwise.
   ///
-  void ReadAvroBoolean(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
-  void ReadAvroInt32(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
-  void ReadAvroInt64(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
-  void ReadAvroFloat(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
-  void ReadAvroDouble(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
-  void ReadAvroVarchar(
-      PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
-      MemPool* pool);
-  bool ReadAvroChar(
-      PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
-      MemPool* pool);
-  void ReadAvroString(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroBoolean(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroInt32(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroInt64(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroFloat(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroDouble(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroChar(PrimitiveType type, int max_len, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroString(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
+
+  /// Helper function for some of the above. Returns the the length of certain varlen
+  /// types and updates 'data'. Returns true on success, returns false and updates
+  /// parse_status_ on error.
+  ReadWriteUtil::ZLongResult ReadFieldLen(uint8_t** data, uint8_t* data_end);
 
   /// Same as the above functions, except takes the size of the decimal slot (i.e. 4, 8, or
   /// 16) instead of the type (which should be TYPE_DECIMAL). The slot size is passed
   /// explicitly, rather than passing a ColumnType, so we can easily pass in a constant in
   /// the codegen'd MaterializeTuple() function. If 'write_slot' is false, 'slot_byte_size'
   /// is ignored.
-  void ReadAvroDecimal(
-      int slot_byte_size, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroDecimal(
+      int slot_byte_size, uint8_t** data, uint8_t* data_end, bool write_slot, void* slot,
+      MemPool* pool);
 
-  /// Reads and advances 'data' past the union branch index and returns true if the
-  /// corresponding element is non-null. 'null_union_position' must be 0 or 1.
-  bool ReadUnionType(int null_union_position, uint8_t** data);
+  /// Reads and advances 'data' past the union branch index and sets 'is_null' according
+  /// to if the corresponding element is null. 'null_union_position' must be 0 or
+  /// 1. Returns false and sets parse_status_ if there's an error, otherwise returns true.
+  bool ReadUnionType(int null_union_position, uint8_t** data, uint8_t* data_end,
+      bool* is_null);
+
+  /// Helper functions to set parse_status_ outside of xcompiled functions. This is to
+  /// avoid including string construction, etc. in the IR, which boths bloats it and can
+  /// contain exception handling code.
+  void SetStatusCorruptData(TErrorCode::type error_code);
+  void SetStatusInvalidValue(TErrorCode::type error_code, int64_t len);
+
+  /// Unit test constructor
+  HdfsAvroScanner();
 
   static const char* LLVM_CLASS_NAME;
 };

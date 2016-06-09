@@ -420,6 +420,9 @@ class HdfsScanner {
   /// WriteCompleteTuple() because it's easier than writing IR to access
   /// scanner_conjunct_ctxs_.
   ExprContext* GetConjunctCtx(int idx) const;
+
+  /// Unit test constructor
+  HdfsScanner();
 };
 
 }

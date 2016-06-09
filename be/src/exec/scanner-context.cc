@@ -121,7 +121,12 @@ void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool don
 Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
 
-  // io_buffer_ should only be null the first time this is called
+  // Nothing to do if we've already processed all data in the file
+  int64_t offset = file_offset() + boundary_buffer_bytes_left_;
+  int64_t file_bytes_remaining = file_desc()->file_length - offset;
+  if (io_buffer_ == NULL && file_bytes_remaining == 0) return Status::OK();
+
+  // Otherwise, io_buffer_ should only be null the first time this is called
   DCHECK(io_buffer_ != NULL ||
          (total_bytes_returned_ == 0 && completed_io_buffers_.empty()));
 
@@ -140,11 +145,9 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
     RETURN_IF_ERROR(scan_range_->GetNext(&io_buffer_));
   } else {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
-    int64_t offset = file_offset() + boundary_buffer_bytes_left_;
 
     int64_t read_past_buffer_size = read_past_size_cb_.empty() ?
         DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
-    int64_t file_bytes_remaining = file_desc()->file_length - offset;
     read_past_buffer_size = ::max(read_past_buffer_size, read_past_size);
     read_past_buffer_size = ::min(read_past_buffer_size, file_bytes_remaining);
     // We're reading past the scan range. Be careful not to read past the end of file.
@@ -258,7 +261,7 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
 
   // We have enough bytes in io_buffer_ or couldn't read more bytes
   int64_t requested_bytes_left = requested_len - boundary_buffer_bytes_left_;
-  DCHECK_GE(requested_len, 0);
+  DCHECK_GE(requested_bytes_left, 0);
   int64_t num_bytes = min(io_buffer_bytes_left_, requested_bytes_left);
   *out_len = boundary_buffer_bytes_left_ + num_bytes;
   DCHECK_LE(*out_len, requested_len);
@@ -305,4 +308,8 @@ Status ScannerContext::Stream::ReportIncompleteRead(int64_t length, int64_t byte
 
 Status ScannerContext::Stream::ReportInvalidRead(int64_t length) {
   return Status(TErrorCode::SCANNER_INVALID_READ, length, filename(), file_offset());
+}
+
+Status ScannerContext::Stream::ReportInvalidInt() {
+  return Status(TErrorCode::SCANNER_INVALID_INT, filename(), file_offset());
 }

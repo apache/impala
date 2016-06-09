@@ -241,6 +241,7 @@ class ScannerContext {
     /// Error-reporting functions.
     Status ReportIncompleteRead(int64_t length, int64_t bytes_read);
     Status ReportInvalidRead(int64_t length);
+    Status ReportInvalidInt();
   };
 
   bool HasStream() {

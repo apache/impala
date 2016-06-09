@@ -129,6 +129,9 @@ class BaseSequenceScanner : public HdfsScanner {
   /// If true, this scanner object is only for processing the header.
   bool only_parsing_header_;
 
+  /// Unit test constructor
+  BaseSequenceScanner();
+
  private:
   /// Set to true when this scanner has processed all the bytes it is responsible
   /// for, i.e., when it reads a sync occurring completely in the next scan

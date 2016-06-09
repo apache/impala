@@ -230,9 +230,16 @@ def verify_results(expected_results, actual_results, order_matters):
 
 def verify_errors(expected_errors, actual_errors):
   """Convert the errors to our test format, treating them as a single string column row
-  set. This requires enclosing the data in single quotes."""
-  expected = QueryTestResult(["'%s'" % l for l in expected_errors if l], ['STRING'],
-      ['DUMMY_LABEL'], order_matters=False)
+  set if not a row_regex. This requires enclosing the data in single quotes."""
+  converted_expected_errors = []
+  for expected_error in expected_errors:
+    if not expected_error: continue
+    if ROW_REGEX_PREFIX.match(expected_error):
+      converted_expected_errors.append(expected_error)
+    else:
+      converted_expected_errors.append("'%s'" % expected_error)
+  expected = QueryTestResult(converted_expected_errors, ['STRING'], ['DUMMY_LABEL'],
+      order_matters=False)
   actual = QueryTestResult(["'%s'" % l for l in actual_errors if l], ['STRING'],
       ['DUMMY_LABEL'], order_matters=False)
   VERIFIER_MAP['VERIFY_IS_EQUAL'](expected, actual)

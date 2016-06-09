@@ -84,13 +84,43 @@ class ReadWriteUtil {
   /// Determines the total length in bytes of a Writable VInt/VLong from the first byte.
   static int DecodeVIntSize(int8_t byte);
 
+  /// Return values for ReadZLong() and ReadZInt(). We return these in a single struct,
+  /// rather than using an output parameter, for performance (this way both values are
+  /// returned as registers).
+  template <typename T>
+  struct ZResult {
+    /// False if there was a problem reading the value.
+    bool ok;
+    /// The decoded value. Only valid if 'ok' is true.
+    T val;
+
+    ZResult(T v) : ok(true), val(v) { }
+    static ZResult error() { return ZResult(); }
+
+   private:
+    ZResult() : ok(false) { }
+  };
+
+  typedef ZResult<int64_t> ZLongResult;
+  typedef ZResult<int32_t> ZIntResult;
+
   /// Read a zig-zag encoded long. This is the integer encoding defined by google.com
-  /// protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding
-  /// *buf is incremented past the encoded long.
-  static int64_t ReadZLong(uint8_t** buf);
+  /// protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding. *buf
+  /// is incremented past the encoded long. 'buf_end' should point to the end of 'buf'
+  /// (i.e. the first invalid byte).
+  ///
+  /// Returns a non-OK result if the encoded int spans too much many bytes. Unspecified
+  /// for values that have the correct number of bytes but overflow the destination type
+  /// (for both long and int, there are extra bits in the highest-order byte).
+  static inline ZLongResult ReadZLong(uint8_t** buf, uint8_t* buf_end) {
+    return ReadZInteger<MAX_ZLONG_LEN, ZLongResult>(buf, buf_end);
+  }
+
 
   /// Read a zig-zag encoded int.
-  static int32_t ReadZInt(uint8_t** buf);
+  static inline ZIntResult ReadZInt(uint8_t** buf, uint8_t* buf_end) {
+    return ReadZInteger<MAX_ZINT_LEN, ZIntResult>(buf, buf_end);
+  }
 
   /// The following methods read data from a buffer without assuming the buffer is long
   /// enough. If the buffer isn't long enough or another error occurs, they return false
@@ -104,6 +134,12 @@ class ReadWriteUtil {
 
   /// Skip the next num_bytes bytes.
   static bool SkipBytes(uint8_t** buf, int* buf_len, int num_bytes, Status* status);
+
+ private:
+  /// Implementation for ReadZLong() and ReadZInt(). MAX_LEN is MAX_ZLONG_LEN or
+  /// MAX_ZINT_LEN.
+  template<int MAX_LEN, typename ZResult>
+  static ZResult ReadZInteger(uint8_t** buf, uint8_t* buf_end);
 };
 
 template<>
@@ -211,11 +247,6 @@ inline int64_t ReadWriteUtil::PutVLong(int64_t val, uint8_t* buf) {
 
 inline int64_t ReadWriteUtil::PutVInt(int32_t val, uint8_t* buf) {
   return PutVLong(val, buf);
-}
-
-inline int32_t ReadWriteUtil::ReadZInt(uint8_t** buf) {
-  int64_t zlong = ReadZLong(buf);
-  return static_cast<int32_t>(zlong);
 }
 
 template <class T>

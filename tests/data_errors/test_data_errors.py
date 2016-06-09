@@ -75,6 +75,18 @@ class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):
     self.run_test_case('DataErrorsTest/hdfs-rcfile-scan-node-errors', vector)
 
 
+class TestAvroErrors(TestDataErrors):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAvroErrors, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'avro' and
+        v.get_value('table_format').compression_codec == 'snap')
+
+  def test_avro_errors(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('DataErrorsTest/avro-errors', vector)
+
 class TestHBaseDataErrors(TestDataErrors):
   @classmethod
   def add_test_dimensions(cls):

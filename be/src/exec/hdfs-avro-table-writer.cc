@@ -71,7 +71,8 @@ inline void HdfsAvroTableWriter::AppendField(const ColumnType& type, const void*
   // Each avro field is written as union, which is a ZLong indicating the union
   // field followed by the encoded value. Impala/Hive always stores values as
   // a union of [ColumnType, NULL].
-  // TODO check if we want to support [NULL, ColumnType] union
+  // TODO: the writer may be asked to write [NULL, ColumnType] unions. It is wrong
+  // for us to assume [ColumnType, NULL].
 
   if (value == NULL) {
     // indicate the second field of the union

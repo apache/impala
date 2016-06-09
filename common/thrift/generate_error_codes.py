@@ -245,6 +245,26 @@ error_codes = (
   ("PARTITIONED_AGG_REPARTITION_FAILS", 78,  "Cannot perform aggregation at node with "
    "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
    "level $1. Number of rows $2."),
+
+  ("AVRO_TRUNCATED_BLOCK", 79, "File '$0' is corrupt: truncated data block at offset $1"),
+
+  ("AVRO_INVALID_UNION", 80, "File '$0' is corrupt: invalid union value $1 at offset $2"),
+
+  ("AVRO_INVALID_BOOLEAN", 81, "File '$0' is corrupt: invalid boolean value $1 at offset "
+   "$2"),
+
+  ("AVRO_INVALID_LENGTH", 82, "File '$0' is corrupt: invalid length $1 at offset $2"),
+
+  ("SCANNER_INVALID_INT", 83, "File '$0' is corrupt: invalid encoded integer at offset $1"),
+
+  ("AVRO_INVALID_RECORD_COUNT", 84, "File '$0' is corrupt: invalid record count $1 at "
+   "offset $2"),
+
+  ("AVRO_INVALID_COMPRESSED_SIZE", 85, "File '$0' is corrupt: invalid compressed block "
+   "size $1 at offset $2"),
+
+  ("AVRO_INVALID_METADATA_COUNT", 86, "File '$0' is corrupt: invalid metadata count $1 "
+   "at offset $2"),
 )
 
 import sys

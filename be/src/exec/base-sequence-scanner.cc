@@ -22,6 +22,7 @@
 #include "runtime/string-search.h"
 #include "util/codec.h"
 #include "util/runtime-profile-counters.h"
+#include "util/test-info.h"
 
 #include "common/names.h"
 
@@ -69,6 +70,15 @@ BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state
     block_start_(0),
     total_block_size_(0),
     num_syncs_(0) {
+}
+
+BaseSequenceScanner::BaseSequenceScanner()
+  : HdfsScanner(),
+    header_(NULL),
+    block_start_(0),
+    total_block_size_(0),
+    num_syncs_(0) {
+  DCHECK(TestInfo::is_test());
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {

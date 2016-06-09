@@ -1,0 +1,19 @@
+These Avro files were created by modifying Impala's HdfsAvroTableWriter.
+
+String Data
+-----------
+These files' schemas have a single nullable string column 's'.
+
+negative_string_len.avro: contains two values, but the second value has a negative length.
+
+invalid_union.avro: contains three values, all of which have an invalid union value (4,
+which decodes to 2). Also has a single extra byte at the end (0x0a), which will be
+interpreted as a malformed data block.
+
+truncated_string.avro: contains one value, which is missing the last byte.
+
+Float Data
+----------
+These files' schemas have a single nullable float column 'c1'.
+
+truncated_float.avro: contains two float values. The second is missing the last byte.

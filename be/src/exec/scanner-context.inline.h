@@ -146,16 +146,20 @@ inline bool ScannerContext::Stream::ReadVLong(int64_t* value, Status* status) {
 }
 
 inline bool ScannerContext::Stream::ReadZLong(int64_t* value, Status* status) {
-  uint64_t zlong = 0;
-  int shift = 0;
-  uint8_t* byte;
-  do {
-    DCHECK_LE(shift, 64);
-    RETURN_IF_FALSE(ReadBytes(1, &byte, status));
-    zlong |= static_cast<uint64_t>(*byte & 0x7f) << shift;
-    shift += 7;
-  } while (*byte & 0x80);
-  *value = (zlong >> 1) ^ -(zlong & 1);
+  uint8_t* bytes;
+  int64_t bytes_len;
+  RETURN_IF_FALSE(
+      GetBytes(ReadWriteUtil::MAX_ZLONG_LEN, &bytes, &bytes_len, status, true));
+
+  uint8_t* new_bytes = bytes;
+  ReadWriteUtil::ZLongResult r = ReadWriteUtil::ReadZLong(&new_bytes, bytes + bytes_len);
+  if (UNLIKELY(!r.ok)) {
+    *status = ReportInvalidInt();
+    return false;
+  }
+  *value = r.val;
+  int64_t bytes_read = new_bytes - bytes;
+  RETURN_IF_FALSE(SkipBytes(bytes_read, status));
   return true;
 }
 

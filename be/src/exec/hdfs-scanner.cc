@@ -41,6 +41,7 @@
 #include "util/runtime-profile-counters.h"
 #include "util/sse-util.h"
 #include "util/string-parser.h"
+#include "util/test-info.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
@@ -69,6 +70,26 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       data_buffer_pool_(new MemPool(scan_node->mem_tracker())),
       decompress_timer_(NULL),
       write_tuples_fn_(NULL) {
+}
+
+HdfsScanner::HdfsScanner()
+    : scan_node_(NULL),
+      state_(NULL),
+      context_(NULL),
+      stream_(NULL),
+      scanner_conjunct_ctxs_(NULL),
+      template_tuple_(NULL),
+      tuple_byte_size_(-1),
+      tuple_(NULL),
+      batch_(NULL),
+      tuple_mem_(NULL),
+      num_null_bytes_(-1),
+      parse_status_(Status::OK()),
+      decompression_type_(THdfsCompression::NONE),
+      data_buffer_pool_(NULL),
+      decompress_timer_(NULL),
+      write_tuples_fn_(NULL) {
+  DCHECK(TestInfo::is_test());
 }
 
 HdfsScanner::~HdfsScanner() {
