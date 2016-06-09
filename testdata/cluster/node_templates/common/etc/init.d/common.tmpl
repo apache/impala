@@ -9,6 +9,8 @@ export YARN_CONF_DIR="$HADOOP_CONF_DIR"
 # stopping the processes if the pid file has been removed for whatever reason.
 export HADOOP_OPTS+=" -D${KILL_CLUSTER_MARKER}"
 export YARN_OPTS+=" -D${KILL_CLUSTER_MARKER}"
+# This is for KMS.
+export CATALINA_OPTS+=" -D${KILL_CLUSTER_MARKER}"
 
 : ${SERVICE_NAME=$(basename "$0")}
 PID_FILE="$PID_DIR/$SERVICE_NAME"
