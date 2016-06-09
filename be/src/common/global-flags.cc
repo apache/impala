@@ -98,6 +98,11 @@ DEFINE_int32(stress_datastream_recvr_delay_ms, 0, "A stress option that causes d
 DEFINE_bool(skip_file_runtime_filtering, false, "Skips file-based runtime filtering in "
     "order to provide a regression test for IMPALA-3798. Effective in debug builds "
     "only.");
+DEFINE_int32(fault_injection_rpc_delay_ms, 0, "A fault injection option that causes "
+    "rpc server handling to be delayed to trigger an RPC timeout on the caller side. "
+    "Effective in debug builds only.");
+DEFINE_int32(fault_injection_rpc_type, 0, "A fault injection option that specifies "
+    "which rpc call will be injected with the delay. Effective in debug builds only.");
 #endif
 
 DEFINE_bool(disable_kudu, false, "If true, Kudu features will be disabled.");

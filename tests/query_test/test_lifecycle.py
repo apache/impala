@@ -21,7 +21,11 @@ from tests.verifiers.metric_verifier import MetricVerifier
 class TestFragmentLifecycle(ImpalaTestSuite):
   """Using the debug action interface, check that failed queries correctly clean up *all*
   fragments"""
+  # TODO: The metric num-fragments-in-flight might not be 0 yet due
+  # to previous tests. Check the value change instead of 0 to reduce
+  # flaky. However, this might not capture some failures.
 
+  IN_FLIGHT_FRAGMENTS = "impala-server.num-fragments-in-flight"
   @classmethod
   def get_workload(self):
     return 'functional'
@@ -29,22 +33,24 @@ class TestFragmentLifecycle(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_failure_in_prepare(self):
     # Fail the scan node
+    verifiers = [ MetricVerifier(i.service, [self.IN_FLIGHT_FRAGMENTS])
+        for i in ImpalaCluster().impalads ]
     self.client.execute("SET DEBUG_ACTION='-1:0:PREPARE:FAIL'");
     try:
       self.client.execute("SELECT COUNT(*) FROM functional.alltypes")
       assert "Query should have thrown an error"
     except ImpalaBeeswaxException:
       pass
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
 
     for v in verifiers:
-      v.wait_for_metric("impala-server.num-fragments-in-flight", 0)
+      v.wait_for_metric_reset(self.IN_FLIGHT_FRAGMENTS)
 
   @pytest.mark.execute_serially
   def test_failure_in_prepare_multi_fragment(self):
     # Test that if one fragment fails that the others are cleaned up during the ensuing
     # cancellation.
-
+    verifiers = [ MetricVerifier(i.service, [self.IN_FLIGHT_FRAGMENTS])
+        for i in ImpalaCluster().impalads ]
     # Fail the scan node
     self.client.execute("SET DEBUG_ACTION='-1:0:PREPARE:FAIL'");
 
@@ -56,10 +62,9 @@ class TestFragmentLifecycle(ImpalaTestSuite):
     except ImpalaBeeswaxException:
       pass
 
-    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
     for v in verifiers:
       # Long timeout required because fragments may be blocked while sending data, default
       # timeout is 60s before they wake up and cancel themselves.
       #
       # TODO: Fix when we have cancellable RPCs.
-      v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=65)
+      v.wait_for_metric_reset(self.IN_FLIGHT_FRAGMENTS, timeout=65)

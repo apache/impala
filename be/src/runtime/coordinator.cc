@@ -1486,8 +1486,14 @@ void Coordinator::CancelRemoteFragments() {
     VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
                << exec_state->fragment_instance_id() << " backend="
                << exec_state->impalad_address();
-    Status rpc_status = backend_client.DoRpc(
-        &ImpalaBackendClient::CancelPlanFragment, params, &res);
+    Status rpc_status;
+    // Try to send the RPC 3 times before failing.
+    bool retry_is_safe;
+    for (int i = 0; i < 3; ++i) {
+      rpc_status = backend_client.DoRpc(&ImpalaBackendClient::CancelPlanFragment,
+          params, &res, &retry_is_safe);
+      if (rpc_status.ok() || !retry_is_safe) break;
+    }
     if (!rpc_status.ok()) {
       exec_state->status()->MergeStatus(rpc_status);
       stringstream msg;

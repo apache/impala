@@ -654,24 +654,22 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
   Status status;
   if (is_heartbeat) {
     status = SendHeartbeat(subscriber.get());
-    if (status.code() == TErrorCode::RPC_TIMEOUT) {
-      // Rewrite status to make it more useful, while preserving the stack
-      status.SetErrorMsg(ErrorMsg(TErrorCode::RPC_TIMEOUT, Substitute(
-          "Subscriber $0 ($1) timed-out during heartbeat RPC. Timeout is $2s.",
-          subscriber->id(), lexical_cast<string>(subscriber->network_address()),
-          FLAGS_statestore_heartbeat_tcp_timeout_seconds)));
+    if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
+      // Add details to status to make it more useful, while preserving the stack
+      status.AddDetail(Substitute(
+          "Subscriber $0 timed-out during heartbeat RPC. Timeout is $1s.",
+          subscriber->id(), FLAGS_statestore_heartbeat_tcp_timeout_seconds));
     }
 
     deadline_ms = UnixMillis() + FLAGS_statestore_heartbeat_frequency_ms;
   } else {
     bool update_skipped;
     status = SendTopicUpdate(subscriber.get(), &update_skipped);
-    if (status.code() == TErrorCode::RPC_TIMEOUT) {
-      // Rewrite status to make it more useful, while preserving the stack
-      status.SetErrorMsg(ErrorMsg(TErrorCode::RPC_TIMEOUT, Substitute(
-          "Subscriber $0 ($1) timed-out during topic-update RPC. Timeout is $2s.",
-          subscriber->id(), lexical_cast<string>(subscriber->network_address()),
-          FLAGS_statestore_update_tcp_timeout_seconds)));
+    if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
+      // Add details to status to make it more useful, while preserving the stack
+      status.AddDetail(Substitute(
+          "Subscriber $0 timed-out during topic-update RPC. Timeout is $1s.",
+          subscriber->id(), FLAGS_statestore_update_tcp_timeout_seconds));
     }
     // If the subscriber responded that it skipped the last update sent, we assume that
     // it was busy doing something else, and back off slightly before sending another.

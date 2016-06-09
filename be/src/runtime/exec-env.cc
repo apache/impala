@@ -130,6 +130,18 @@ DEFINE_int32(coordinator_rpc_threads, 12, "(Advanced) Number of threads availabl
 
 DECLARE_string(ssl_client_ca_certificate);
 
+DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connections.");
+// When network is unstable, TCP will retry and sending could take longer time.
+// Choose 5 minutes as default timeout because we don't want RPC timeout be triggered
+// by intermittent network issue. The timeout should not be too long either, otherwise
+// query could hang for a while before it's cancelled.
+DEFINE_int32(backend_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
+    "TSocket send/recv timeout in milliseconds for a backend client RPC. ");
+
+DEFINE_int32(catalog_client_connection_num_retries, 3, "Retry catalog connections.");
+DEFINE_int32(catalog_client_rpc_timeout_ms, 0, "(Advanced) The underlying TSocket "
+    "send/recv timeout in milliseconds for a catalog client RPC.");
+
 // The key for a variable set in Impala's test environment only, to allow the
 // resource-broker to correctly map node addresses into a form that Llama understand.
 const static string PSEUDO_DISTRIBUTED_CONFIG_KEY =
@@ -145,10 +157,14 @@ ExecEnv::ExecEnv()
   : metrics_(new MetricGroup("impala-metrics")),
     stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
-        new ImpalaBackendClientCache(
+        new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries,
+            0, FLAGS_backend_client_rpc_timeout_ms,
+            FLAGS_backend_client_rpc_timeout_ms,
             "", !FLAGS_ssl_client_ca_certificate.empty())),
     catalogd_client_cache_(
-        new CatalogServiceClientCache(
+        new CatalogServiceClientCache(FLAGS_catalog_client_connection_num_retries,
+            0, FLAGS_catalog_client_rpc_timeout_ms,
+            FLAGS_catalog_client_rpc_timeout_ms,
             "", !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
@@ -195,14 +211,21 @@ ExecEnv::ExecEnv()
   if (FLAGS_enable_rm) resource_broker_->set_scheduler(scheduler_.get());
 }
 
+// TODO: Need refactor to get rid of duplicated code.
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
                  int webserver_port, const string& statestore_host, int statestore_port)
   : metrics_(new MetricGroup("impala-metrics")),
     stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
-        new ImpalaBackendClientCache("", !FLAGS_ssl_client_ca_certificate.empty())),
+        new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries,
+            0, FLAGS_backend_client_rpc_timeout_ms,
+            FLAGS_backend_client_rpc_timeout_ms,
+            "", !FLAGS_ssl_client_ca_certificate.empty())),
     catalogd_client_cache_(
-        new CatalogServiceClientCache("", !FLAGS_ssl_client_ca_certificate.empty())),
+        new CatalogServiceClientCache(FLAGS_catalog_client_connection_num_retries,
+            0, FLAGS_catalog_client_rpc_timeout_ms,
+            FLAGS_catalog_client_rpc_timeout_ms,
+            "", !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),

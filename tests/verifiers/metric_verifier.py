@@ -31,9 +31,12 @@ METRIC_LIST = [
 
 class MetricVerifier(object):
   """Reuseable class that can verify common metrics"""
-  def __init__(self, impalad_service):
+  def __init__(self, impalad_service, metrics_list=[]):
     """Initialize module given an ImpalaService object"""
     self.impalad_service = impalad_service
+    self.initial_metrics = {}
+    for metric in metrics_list:
+      self.initial_metrics[metric] = self.impalad_service.get_metric_value(metric)
 
   def verify_metrics_are_zero(self, timeout=60):
     """Test that all the metric in METRIC_LIST are 0"""
@@ -54,3 +57,8 @@ class MetricVerifier(object):
 
   def wait_for_metric(self, metric_name, expected_value, timeout=60):
     self.impalad_service.wait_for_metric_value(metric_name, expected_value, timeout)
+
+  def wait_for_metric_reset(self, metric_name, timeout=60):
+    if metric_name in self.initial_metrics:
+      self.impalad_service.wait_for_metric_value(metric_name,
+          self.initial_metrics[metric_name], timeout)

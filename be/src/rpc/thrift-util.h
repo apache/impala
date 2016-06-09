@@ -151,8 +151,8 @@ std::ostream& operator<<(std::ostream& out, const TColumnValue& colval);
 /// string representation
 bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b);
 
-/// Returns true if the TException corresponds to a TCP socket recv or send timeout.
-bool IsTimeoutTException(const apache::thrift::TException& e);
+/// Returns true if the TException corresponds to a TCP socket recv timeout.
+bool IsRecvTimeoutTException(const apache::thrift::TException& e);
 
 }
 

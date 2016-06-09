@@ -143,6 +143,26 @@ void ClientCacheHelper::ReleaseClient(ClientKey* client_key) {
   *client_key = NULL;
 }
 
+void ClientCacheHelper::DestroyClient(ClientKey* client_key) {
+  DCHECK(*client_key != NULL) << "Trying to destroy NULL client";
+  shared_ptr<ThriftClientImpl> client_impl;
+  ClientMap::iterator client;
+  {
+    lock_guard<mutex> lock(client_map_lock_);
+    client = client_map_.find(*client_key);
+    DCHECK(client != client_map_.end());
+    client_impl = client->second;
+  }
+  VLOG(1) << "Broken Connection, destroy client for " << client_impl->address();
+
+  client_impl->Close();
+  if (metrics_enabled_) total_clients_metric_->Increment(-1);
+  if (metrics_enabled_) clients_in_use_metric_->Increment(-1);
+  lock_guard<mutex> lock(client_map_lock_);
+  client_map_.erase(client);
+  *client_key = NULL;
+}
+
 void ClientCacheHelper::CloseConnections(const TNetworkAddress& address) {
   PerHostCache* cache;
   {
