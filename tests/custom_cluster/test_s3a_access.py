@@ -43,14 +43,6 @@ class TestS3AAccess(CustomClusterTestSuite):
   def teardown_class(cls):
     os.remove(BAD_KEY_FILE)
 
-  def teardown_method(self, method):
-    self._drop_test_tbl()
-
-  def _drop_test_tbl(self):
-    client = self._get_impala_client()
-    self.execute_query_expect_success(client,
-        "DROP TABLE IF EXISTS tinytable_s3")
-
   def _get_impala_client(self):
     impalad = self.cluster.get_any_impalad()
     return impalad.service.create_beeswax_client()
@@ -59,14 +51,29 @@ class TestS3AAccess(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     "-s3a_access_key_cmd=\"%s\"\
      -s3a_secret_key_cmd=\"%s\"" % (BAD_KEY_FILE, BAD_KEY_FILE))
-  def test_keys_do_not_work(self):
+  def test_ddl_keys_ignored(self, unique_database):
+    '''DDL statements will ignore the S3 keys passed to Impala because the code path
+    that it exercises goes through the Hive Metastore which should have the correct keys
+    from the core-site configuration.'''
+    client = self._get_impala_client()
+    # This is repeated in the test below (because it's necessary there), but we still
+    # want to make sure that it is tested separately as it's a good test practice.
+    self.execute_query_expect_success(client,
+        "create external table if not exists {0}.tinytable_s3 like functional.tinytable \
+         location '{1}/tinytable'".format(unique_database, WAREHOUSE))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    "-s3a_access_key_cmd=\"%s\"\
+     -s3a_secret_key_cmd=\"%s\"" % (BAD_KEY_FILE, BAD_KEY_FILE))
+  def test_keys_do_not_work(self, unique_database):
     '''Test that using incorrect S3 access and secret keys will not allow Impala to
-    query S3. CREATE statements will work because that goes through the Hive Metastore
-    which should have the correct keys.
+    query S3.
     TODO: We don't have the test infrastructure in place yet to check if the keys do work
     in a custom cluster test. (See IMPALA-3422)'''
     client = self._get_impala_client()
     self.execute_query_expect_success(client,
-        "create external table if not exists tinytable_s3 like functional.tinytable \
-         location '{0}/tinytable'".format(WAREHOUSE))
-    self.execute_query_expect_failure(client, "select * from tinytable_s3")
+        "create external table if not exists {0}.tinytable_s3 like functional.tinytable \
+         location '{1}/tinytable'".format(unique_database, WAREHOUSE))
+    self.execute_query_expect_failure(client, "select * from {0}.tinytable_s3"
+        .format(unique_database))

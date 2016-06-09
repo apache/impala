@@ -85,6 +85,12 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
       hdfsBuilder* hdfs_builder = hdfsNewBuilder();
       hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
       if (!s3a_access_key_.empty()) {
+        // Use a new instance of the filesystem object to be sure that it picks up the
+        // configuration changes we're going to make. Without this call, a cached
+        // filesystem object is used which is unaffected by calls to
+        // hdfsBuilderConfSetStr(). This is unexpected behavior in the HDFS API, but is
+        // unlikely to change.
+        hdfsBuilderSetForceNewInstance(hdfs_builder);
         hdfsBuilderConfSetStr(hdfs_builder, "fs.s3a.access.key", s3a_access_key_.c_str());
         hdfsBuilderConfSetStr(hdfs_builder, "fs.s3a.secret.key", s3a_secret_key_.c_str());
       }
