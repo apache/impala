@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "service/impala-server.h"
+#include "service/impala-http-handler.h"
 
 #include <sstream>
 #include <boost/thread/mutex.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "catalog/catalog-util.h"
+#include "service/impala-server.h"
 #include "service/query-exec-state.h"
-#include "util/webserver.h"
-
 #include "gen-cpp/beeswax_types.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/redactor.h"
 #include "util/summary-util.h"
 #include "util/time.h"
 #include "util/url-coding.h"
+#include "util/webserver.h"
 
 #include "common/names.h"
 
@@ -40,76 +40,81 @@ using namespace strings;
 
 DECLARE_int32(query_log_size);
 
-void ImpalaServer::RegisterWebserverCallbacks(Webserver* webserver) {
-  DCHECK(webserver != NULL);
+namespace {
 
-  Webserver::UrlCallback hadoop_varz_callback =
-      bind<void>(mem_fn(&ImpalaServer::HadoopVarzUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/hadoop-varz", "hadoop-varz.tmpl",
-      hadoop_varz_callback);
-
-  Webserver::UrlCallback query_json_callback =
-      bind<void>(mem_fn(&ImpalaServer::QueryStateUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/queries", "queries.tmpl",
-      query_json_callback);
-
-  Webserver::UrlCallback sessions_json_callback =
-      bind<void>(mem_fn(&ImpalaServer::SessionsUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/sessions", "sessions.tmpl",
-      sessions_json_callback);
-
-  Webserver::UrlCallback catalog_callback =
-      bind<void>(mem_fn(&ImpalaServer::CatalogUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/catalog", "catalog.tmpl",
-      catalog_callback);
-
-  Webserver::UrlCallback catalog_objects_callback =
-      bind<void>(mem_fn(&ImpalaServer::CatalogObjectsUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/catalog_object", "catalog_object.tmpl",
-      catalog_objects_callback, false);
-
-  Webserver::UrlCallback profile_callback =
-      bind<void>(mem_fn(&ImpalaServer::QueryProfileUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/query_profile", "query_profile.tmpl",
-      profile_callback, false);
-
-  Webserver::UrlCallback cancel_callback =
-      bind<void>(mem_fn(&ImpalaServer::CancelQueryUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/cancel_query", "common-pre.tmpl", cancel_callback,
-      false);
-
-  Webserver::UrlCallback profile_encoded_callback =
-      bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/query_profile_encoded", "raw_text.tmpl",
-      profile_encoded_callback, false);
-
-  Webserver::UrlCallback inflight_query_ids_callback =
-      bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/inflight_query_ids", "raw_text.tmpl",
-      inflight_query_ids_callback, false);
-
-  Webserver::UrlCallback query_summary_callback =
-      bind<void>(mem_fn(&ImpalaServer::QuerySummaryCallback), this, false, true, _1, _2);
-  webserver->RegisterUrlCallback("/query_summary", "query_summary.tmpl",
-      query_summary_callback, false);
-
-  Webserver::UrlCallback query_plan_callback =
-      bind<void>(mem_fn(&ImpalaServer::QuerySummaryCallback), this, true, true, _1, _2);
-  webserver->RegisterUrlCallback("/query_plan", "query_plan.tmpl",
-      query_plan_callback, false);
-
-  Webserver::UrlCallback query_plan_text_callback =
-      bind<void>(mem_fn(&ImpalaServer::QuerySummaryCallback), this, false, false, _1, _2);
-  webserver->RegisterUrlCallback("/query_plan_text", "query_plan_text.tmpl",
-      query_plan_text_callback, false);
-  webserver->RegisterUrlCallback("/query_stmt", "query_stmt.tmpl",
-      query_plan_text_callback, false);
+// Helper method to turn a class + a method to invoke into a UrlCallback
+template<typename T, class F>
+Webserver::UrlCallback MakeCallback(T* caller, const F& fnc) {
+  return [caller, fnc](const auto& args, auto* doc) {
+    (caller->*fnc)(args, doc);
+  };
 }
 
-void ImpalaServer::HadoopVarzUrlCallback(const Webserver::ArgumentMap& args,
+// We expect the query id to be passed as one parameter, 'query_id'.
+// Returns true if the query id was present and valid; false otherwise.
+static Status ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
+  Webserver::ArgumentMap::const_iterator it = args.find("query_id");
+  if (it == args.end()) {
+    return Status("No 'query_id' argument found");
+  } else {
+    if (ParseId(it->second, id)) return Status::OK();
+    return Status(Substitute("Could not parse 'query_id' argument: $0", it->second));
+  }
+}
+
+}
+
+void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
+  DCHECK(webserver != NULL);
+
+  webserver->RegisterUrlCallback("/hadoop-varz", "hadoop-varz.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::HadoopVarzHandler));
+
+  webserver->RegisterUrlCallback("/queries", "queries.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::QueryStateHandler));
+
+  webserver->RegisterUrlCallback("/sessions", "sessions.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::SessionsHandler));
+
+  webserver->RegisterUrlCallback("/catalog", "catalog.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::CatalogHandler));
+
+  webserver->RegisterUrlCallback("/catalog_object", "catalog_object.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::CatalogObjectsHandler), false);
+
+  webserver->RegisterUrlCallback("/query_profile", "query_profile.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::QueryProfileHandler), false);
+
+  webserver->RegisterUrlCallback("/cancel_query", "common-pre.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::CancelQueryHandler), false);
+
+  webserver->RegisterUrlCallback("/query_profile_encoded", "raw_text.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::QueryProfileEncodedHandler), false);
+
+  webserver->RegisterUrlCallback("/inflight_query_ids", "raw_text.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::InflightQueryIdsHandler), false);
+
+  webserver->RegisterUrlCallback("/query_summary", "query_summary.tmpl",
+      [this](const auto& args, auto* doc) {
+        this->QuerySummaryHandler(false, true, args, doc); }, false);
+
+  webserver->RegisterUrlCallback("/query_plan", "query_plan.tmpl",
+      [this](const auto& args, auto* doc) {
+        this->QuerySummaryHandler(true, true, args, doc); }, false);
+
+  webserver->RegisterUrlCallback("/query_plan_text", "query_plan_text.tmpl",
+      [this](const auto& args, auto* doc) {
+        this->QuerySummaryHandler(false, false, args, doc); }, false);
+
+  webserver->RegisterUrlCallback("/query_stmt", "query_stmt.tmpl",
+      [this](const auto& args, auto* doc) {
+        this->QuerySummaryHandler(false, false, args, doc); }, false);
+}
+
+void ImpalaHttpHandler::HadoopVarzHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TGetAllHadoopConfigsResponse response;
-  Status status  = exec_env_->frontend()->GetAllHadoopConfigs(&response);
+  Status status  = server_->exec_env_->frontend()->GetAllHadoopConfigs(&response);
   if (!status.ok()) return;
 
   Value configs(kArrayType);
@@ -125,19 +130,7 @@ void ImpalaServer::HadoopVarzUrlCallback(const Webserver::ArgumentMap& args,
   document->AddMember("configs", configs, document->GetAllocator());
 }
 
-// We expect the query id to be passed as one parameter, 'query_id'.
-// Returns true if the query id was present and valid; false otherwise.
-static Status ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
-  Webserver::ArgumentMap::const_iterator it = args.find("query_id");
-  if (it == args.end()) {
-    return Status("No 'query_id' argument found");
-  } else {
-    if (ParseId(it->second, id)) return Status::OK();
-    return Status(Substitute("Could not parse 'query_id' argument: $0", it->second));
-  }
-}
-
-void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::CancelQueryHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TUniqueId unique_id;
   Status status = ParseQueryId(args, &unique_id);
@@ -147,7 +140,7 @@ void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
     return;
   }
   Status cause("Cancelled from Impala's debug web interface");
-  status = UnregisterQuery(unique_id, true, &cause);
+  status = server_->UnregisterQuery(unique_id, true, &cause);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -157,7 +150,7 @@ void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
   document->AddMember("contents", message, document->GetAllocator());
 }
 
-void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::QueryProfileHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TUniqueId unique_id;
   Status parse_status = ParseQueryId(args, &unique_id);
@@ -168,7 +161,7 @@ void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
   }
 
   stringstream ss;
-  Status status = GetRuntimeProfileStr(unique_id, false, &ss);
+  Status status = server_->GetRuntimeProfileStr(unique_id, false, &ss);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -181,7 +174,7 @@ void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
       document->GetAllocator());
 }
 
-void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TUniqueId unique_id;
   stringstream ss;
@@ -189,7 +182,7 @@ void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& 
   if (!status.ok()) {
     ss << status.GetDetail();
   } else {
-    Status status = GetRuntimeProfileStr(unique_id, true, &ss);
+    Status status = server_->GetRuntimeProfileStr(unique_id, true, &ss);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
@@ -200,11 +193,12 @@ void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& 
   document->AddMember("contents", profile, document->GetAllocator());
 }
 
-void ImpalaServer::InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
-  lock_guard<mutex> l(query_exec_state_map_lock_);
+  lock_guard<mutex> l(server_->query_exec_state_map_lock_);
   stringstream ss;
-  for (const QueryExecStateMap::value_type& exec_state: query_exec_state_map_) {
+  for (const ImpalaServer::QueryExecStateMap::value_type& exec_state:
+       server_->query_exec_state_map_) {
     ss << exec_state.second->query_id() << "\n";
   }
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
@@ -212,7 +206,7 @@ void ImpalaServer::InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& arg
   document->AddMember("contents", query_ids, document->GetAllocator());
 }
 
-void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
+void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
     Value* value, Document* document) {
   Value user(record.effective_user.c_str(), document->GetAllocator());
   value->AddMember("effective_user", user, document->GetAllocator());
@@ -292,20 +286,22 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
   value->AddMember("waiting_time", val_waiting_time, document->GetAllocator());
 }
 
-void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::QueryStateHandler(const Webserver::ArgumentMap& args,
     Document* document) {
-  set<QueryStateRecord, QueryStateRecordLessThan> sorted_query_records;
+  set<ImpalaServer::QueryStateRecord, ImpalaServer::QueryStateRecordLessThan>
+      sorted_query_records;
   {
-    lock_guard<mutex> l(query_exec_state_map_lock_);
-    for(const QueryExecStateMap::value_type& exec_state: query_exec_state_map_) {
+    lock_guard<mutex> l(server_->query_exec_state_map_lock_);
+    for (const ImpalaServer::QueryExecStateMap::value_type& exec_state:
+         server_->query_exec_state_map_) {
       // TODO: Do this in the browser so that sorts on other keys are possible.
-      sorted_query_records.insert(QueryStateRecord(*exec_state.second));
+      sorted_query_records.insert(ImpalaServer::QueryStateRecord(*exec_state.second));
     }
   }
 
   Value in_flight_queries(kArrayType);
   int64_t num_waiting_queries = 0;
-  for (const QueryStateRecord& record: sorted_query_records) {
+  for (const ImpalaServer::QueryStateRecord& record: sorted_query_records) {
     Value record_json(kObjectType);
     QueryStateToJson(record, &record_json, document);
 
@@ -330,8 +326,8 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
 
   Value completed_queries(kArrayType);
   {
-    lock_guard<mutex> l(query_log_lock_);
-    for (const QueryStateRecord& log_entry: query_log_) {
+    lock_guard<mutex> l(server_->query_log_lock_);
+    for (const ImpalaServer::QueryStateRecord& log_entry: server_->query_log_) {
       Value record_json(kObjectType);
       QueryStateToJson(log_entry, &record_json, document);
       completed_queries.PushBack(record_json, document->GetAllocator());
@@ -343,8 +339,9 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
 
   Value query_locations(kArrayType);
   {
-    lock_guard<mutex> l(query_locations_lock_);
-    for (const QueryLocations::value_type& location: query_locations_) {
+    lock_guard<mutex> l(server_->query_locations_lock_);
+    for (const ImpalaServer::QueryLocations::value_type& location:
+         server_->query_locations_) {
       Value location_json(kObjectType);
       Value location_name(lexical_cast<string>(location.first).c_str(),
           document->GetAllocator());
@@ -358,12 +355,13 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
 }
 
 
-void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
-  lock_guard<mutex> l(session_state_map_lock_);
+  lock_guard<mutex> l(server_->session_state_map_lock_);
   Value sessions(kArrayType);
-  for (const SessionStateMap::value_type& session: session_state_map_) {
-    shared_ptr<SessionState> state = session.second;
+  for (const ImpalaServer::SessionStateMap::value_type& session:
+           server_->session_state_map_) {
+    shared_ptr<ImpalaServer::SessionState> state = session.second;
     Value session_json(kObjectType);
     Value type(PrintTSessionType(state->session_type).c_str(),
         document->GetAllocator());
@@ -408,14 +406,15 @@ void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
   }
 
   document->AddMember("sessions", sessions, document->GetAllocator());
-  document->AddMember("num_sessions", static_cast<uint64_t>(session_state_map_.size()),
+  document->AddMember("num_sessions",
+      static_cast<uint64_t>(server_->session_state_map_.size()),
       document->GetAllocator());
 }
 
-void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::CatalogHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TGetDbsResult get_dbs_result;
-  Status status = exec_env_->frontend()->GetDbs(NULL, NULL, &get_dbs_result);
+  Status status = server_->exec_env_->frontend()->GetDbs(NULL, NULL, &get_dbs_result);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -429,8 +428,8 @@ void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     database.AddMember("name", str, document->GetAllocator());
 
     TGetTablesResult get_table_results;
-    Status status =
-        exec_env_->frontend()->GetTableNames(db.db_name, NULL, NULL, &get_table_results);
+    Status status = server_->exec_env_->frontend()->GetTableNames(
+        db.db_name, NULL, NULL, &get_table_results);
     if (!status.ok()) {
       Value error(status.GetDetail().c_str(), document->GetAllocator());
       database.AddMember("error", error, document->GetAllocator());
@@ -454,7 +453,7 @@ void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
   document->AddMember("databases", databases, document->GetAllocator());
 }
 
-void ImpalaServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
+void ImpalaHttpHandler::CatalogObjectsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   Webserver::ArgumentMap::const_iterator object_type_arg = args.find("object_type");
   Webserver::ArgumentMap::const_iterator object_name_arg = args.find("object_name");
@@ -468,7 +467,7 @@ void ImpalaServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
 
     // Get the object and dump its contents.
     TCatalogObject result;
-    Status status = exec_env_->frontend()->GetCatalogObject(request, &result);
+    Status status = server_->exec_env_->frontend()->GetCatalogObject(request, &result);
     if (status.ok()) {
       Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
       document->AddMember("thrift_string", debug_string, document->GetAllocator());
@@ -482,6 +481,8 @@ void ImpalaServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
     document->AddMember("error", error, document->GetAllocator());
   }
 }
+
+namespace {
 
 // Helper for PlanToJson(), processes a single list of plan nodes which are the
 // DFS-flattened representation of a single plan fragment. Called recursively, the
@@ -603,7 +604,9 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
   value->AddMember("plan_nodes", nodes, document->GetAllocator());
 }
 
-void ImpalaServer::QuerySummaryCallback(bool include_json_plan, bool include_summary,
+}
+
+void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include_summary,
     const Webserver::ArgumentMap& args, Document* document) {
   TUniqueId query_id;
   Status status = ParseQueryId(args, &query_id);
@@ -623,7 +626,8 @@ void ImpalaServer::QuerySummaryCallback(bool include_json_plan, bool include_sum
 
   // Search the in-flight queries first, followed by the archived ones.
   {
-    shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
+    shared_ptr<ImpalaServer::QueryExecState> exec_state =
+        server_->GetQueryExecState(query_id, true);
     if (exec_state != NULL) {
       found = true;
       lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
@@ -647,9 +651,10 @@ void ImpalaServer::QuerySummaryCallback(bool include_json_plan, bool include_sum
   }
 
   if (!found) {
-    lock_guard<mutex> l(query_log_lock_);
-    QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
-    if (query_record == query_log_index_.end()) {
+    lock_guard<mutex> l(server_->query_log_lock_);
+    ImpalaServer::QueryLogIndex::const_iterator query_record =
+        server_->query_log_index_.find(query_id);
+    if (query_record == server_->query_log_index_.end()) {
       const string& err = Substitute("Unknown query id: $0", PrintId(query_id));
       Value json_error(err.c_str(), document->GetAllocator());
       document->AddMember("error", json_error, document->GetAllocator());

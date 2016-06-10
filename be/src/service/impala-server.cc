@@ -53,6 +53,7 @@
 #include "runtime/tmp-file-mgr.h"
 #include "service/fragment-exec-state.h"
 #include "service/impala-internal-service.h"
+#include "service/impala-http-handler.h"
 #include "service/query-exec-state.h"
 #include "scheduling/simple-scheduler.h"
 #include "util/bit-util.h"
@@ -312,7 +313,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     ERR_load_crypto_strings();
   }
 
-  RegisterWebserverCallbacks(exec_env->webserver());
+  http_handler_.reset(new ImpalaHttpHandler(this));
+  http_handler_->RegisterHandlers(exec_env->webserver());
 
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(exec_env->metrics()->GetChildGroup("impala-server"));

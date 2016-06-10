@@ -25,7 +25,7 @@ add_library(Service
   fragment-mgr.cc
   hs2-util.cc
   impala-server.cc
-  impala-server-callbacks.cc
+  impala-http-handler.cc
   impala-hs2-server.cc
   impala-beeswax-server.cc
   query-exec-state.cc
