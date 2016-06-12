@@ -126,6 +126,10 @@ class KuduScanner {
 
   /// List of string slots that need relocation for their auxiliary memory.
   std::vector<SlotDescriptor*> string_slots_;
+
+  /// Number of string slots that need relocation (i.e. size of string_slots_), stored
+  /// separately to avoid calling vector::size() in the hot path (IMPALA-3348).
+  int num_string_slots_;
 };
 
 } /// namespace impala

@@ -59,7 +59,8 @@ KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
     state_(state),
     cur_kudu_batch_num_read_(0),
     last_alive_time_micros_(0),
-    tuple_num_null_bytes_(scan_node_->tuple_desc()->num_null_bytes()) {
+    tuple_num_null_bytes_(scan_node_->tuple_desc()->num_null_bytes()),
+    num_string_slots_(0) {
 }
 
 Status KuduScanner::Open() {
@@ -68,6 +69,7 @@ Status KuduScanner::Open() {
   for (int i = 0; i < scan_node_->tuple_desc_->slots().size(); ++i) {
     if (scan_node_->tuple_desc_->slots()[i]->type().IsStringType()) {
       string_slots_.push_back(scan_node_->tuple_desc_->slots()[i]);
+      ++num_string_slots_;
     }
   }
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
@@ -236,7 +238,7 @@ bool KuduScanner::IsSlotNull(Tuple* tuple, const SlotDescriptor& slot) {
 }
 
 Status KuduScanner::RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool) {
-  for (int i = 0; i < string_slots_.size(); ++i) {
+  for (int i = 0; i < num_string_slots_; ++i) {
     const SlotDescriptor* slot = string_slots_[i];
     // NULL handling was done in KuduRowToImpalaTuple.
     if (IsSlotNull(tuple, *slot)) continue;
