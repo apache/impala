@@ -47,8 +47,6 @@ class SkipIfS3:
 class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
       reason="--skip_hbase argument specified")
-  not_default_fs = pytest.mark.skipif(not IS_DEFAULT_FS,
-      reason="Default filesystem needed")
   kudu_not_supported = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
       reason="Kudu is not supported")
   not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")

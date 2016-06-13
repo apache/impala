@@ -279,7 +279,6 @@ class TestDdlStatements(TestDdlBase):
       self.filesystem_client.delete_file_dir('test-warehouse/%s' % dir_, recursive=True)
 
   @pytest.mark.execute_serially
-  @SkipIf.not_default_fs
   def test_alter_set_column_stats(self, vector):
     self._create_db('alter_table_test_db', sync=True)
     self.run_test_case('QueryTest/alter-table-set-column-stats',

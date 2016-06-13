@@ -21,7 +21,6 @@ from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIf, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
-@SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestComputeStats(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -134,7 +133,6 @@ class TestHbaseComputeStats(ImpalaTestSuite):
       unique_database)
 
 
-@SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestCorruptTableStats(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
