@@ -57,11 +57,9 @@ public class TableLoader {
   public Table load(Db db, String tblName) {
     String fullTblName = db.getName() + "." + tblName;
     LOG.info("Loading metadata for: " + fullTblName);
-    MetaStoreClient msClient = null;
     Table table;
     // turn all exceptions into TableLoadingException
-    try {
-      msClient = catalog_.getMetaStoreClient();
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = null;
       // All calls to getTable() need to be serialized due to HIVE-5457.
       synchronized (metastoreAccessLock_) {
@@ -97,8 +95,6 @@ public class TableLoader {
           catalog_.getNextTableId(), db, tblName, new TableLoadingException(
           "Failed to load metadata for table: " + fullTblName + ". Running " +
           "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
-    } finally {
-      if (msClient != null) msClient.release();
     }
     return table;
   }

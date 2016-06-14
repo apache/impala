@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.log4j.Logger;
@@ -93,7 +93,7 @@ public class MetaStoreUtil {
    * configuring retires at the connection level so it can be enabled independently.
    */
   public static List<org.apache.hadoop.hive.metastore.api.Partition> fetchAllPartitions(
-      HiveMetaStoreClient client, String dbName, String tblName, int numRetries)
+      IMetaStoreClient client, String dbName, String tblName, int numRetries)
       throws MetaException, TException {
     Preconditions.checkArgument(numRetries >= 0);
     int retryAttempt = 0;
@@ -124,7 +124,7 @@ public class MetaStoreUtil {
    * Will throw a MetaException if any partitions in 'partNames' do not exist.
    */
   public static List<Partition> fetchPartitionsByName(
-      HiveMetaStoreClient client, List<String> partNames, String dbName, String tblName)
+      IMetaStoreClient client, List<String> partNames, String dbName, String tblName)
       throws MetaException, TException {
     LOG.trace(String.format("Fetching %d partitions for: %s.%s using partition " +
         "batch size: %d", partNames.size(), dbName, tblName, maxPartitionsPerRpc_));

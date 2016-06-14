@@ -177,8 +177,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         CatalogOpExecutor.createMetaStoreTable(createStmt_.toThrift());
 
-    MetaStoreClient client = analyzer.getCatalog().getMetaStoreClient();
-    try {
+    try (MetaStoreClient client = analyzer.getCatalog().getMetaStoreClient()) {
       // Set a valid location of this table using the same rules as the metastore. If the
       // user specified a location for the table this will be a no-op.
       msTbl.getSd().setLocation(analyzer.getCatalog().getTablePath(msTbl).toString());
@@ -199,8 +198,6 @@ public class CreateTableAsSelectStmt extends StatementBase {
       throw new AnalysisException(e.getMessage(), e);
     } catch (Exception e) {
       throw new AnalysisException(e.getMessage(), e);
-    } finally {
-      client.release();
     }
 
     // Finally, run analysis on the insert statement.

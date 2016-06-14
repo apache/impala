@@ -557,8 +557,7 @@ public class CatalogServiceCatalog extends Catalog {
       // step.
       ConcurrentHashMap<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
       List<TTableName> tblsToBackgroundLoad = Lists.newArrayList();
-      MetaStoreClient msClient = metaStoreClientPool_.getClient();
-      try {
+      try (MetaStoreClient msClient = getMetaStoreClient()) {
         for (String dbName: msClient.getHiveClient().getAllDatabases()) {
           List<org.apache.hadoop.hive.metastore.api.Function> javaFns =
               Lists.newArrayList();
@@ -592,8 +591,6 @@ public class CatalogServiceCatalog extends Catalog {
             }
           }
         }
-      } finally {
-        msClient.release();
       }
       dbCache_.set(newDbCache);
       // Submit tables for background loading.
@@ -859,8 +856,7 @@ public class CatalogServiceCatalog extends Catalog {
     synchronized(tbl) {
       long newCatalogVersion = incrementAndGetCatalogVersion();
       catalogLock_.writeLock().unlock();
-      MetaStoreClient msClient = getMetaStoreClient();
-      try {
+      try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = null;
         try {
           msTbl = msClient.getHiveClient().getTable(db.getName(),
@@ -870,8 +866,6 @@ public class CatalogServiceCatalog extends Catalog {
               db.getName() + "." + tblName.getTable_name(), e);
         }
         tbl.load(true, msClient.getHiveClient(), msTbl);
-      } finally {
-        msClient.release();
       }
       tbl.setCatalogVersion(newCatalogVersion);
       return tbl;
@@ -954,8 +948,7 @@ public class CatalogServiceCatalog extends Catalog {
     // 3) unknown (null) - There was exception thrown by the metastore client.
     Boolean tableExistsInMetaStore;
     Db db = null;
-    MetaStoreClient msClient = getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Database msDb = null;
       try {
         tableExistsInMetaStore = msClient.getHiveClient().tableExists(dbName, tblName);
@@ -995,8 +988,6 @@ public class CatalogServiceCatalog extends Catalog {
           return false;
         }
       }
-    } finally {
-      msClient.release();
     }
 
     // Add a new uninitialized table to the table cache, effectively invalidating
@@ -1193,8 +1184,7 @@ public class CatalogServiceCatalog extends Catalog {
           : hdfsPartition.getPartitionName();
       LOG.debug(String.format("Refreshing Partition metadata: %s %s",
           hdfsTable.getFullName(), partitionName));
-      MetaStoreClient msClient = getMetaStoreClient();
-      try {
+      try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
         try {
           hmsPartition = msClient.getHiveClient().getPartition(
@@ -1212,8 +1202,6 @@ public class CatalogServiceCatalog extends Catalog {
               + hdfsTable.getFullName() + " " + partitionName, e);
         }
         hdfsTable.reloadPartition(hdfsPartition, hmsPartition);
-      } finally {
-        msClient.release();
       }
       hdfsTable.setCatalogVersion(newCatalogVersion);
       return hdfsTable;

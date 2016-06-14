@@ -420,8 +420,7 @@ public class CatalogTest {
 
     // Now attempt to update a column's stats with mismatched stats data and ensure
     // we get the expected results.
-    MetaStoreClient client = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       // Load some string stats data and use it to update the stats of different
       // typed columns.
       ColumnStatisticsData stringColStatsData = client.getHiveClient()
@@ -447,10 +446,6 @@ public class CatalogTest {
       // Now try to apply a matching column stats data and ensure it succeeds.
       assertTrue(table.getColumn("string_col").updateStats(stringColStatsData));
       assertEquals(1178, table.getColumn("string_col").getStats().getNumDistinctValues());
-    } finally {
-      // Make sure to invalidate the metadata so the next test isn't using bad col stats
-      //catalog_.refreshTable("functional", "alltypesagg", false);
-      client.release();
     }
   }
 

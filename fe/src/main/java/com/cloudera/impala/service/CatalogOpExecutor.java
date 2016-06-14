@@ -470,8 +470,7 @@ public class CatalogOpExecutor {
       boolean reloadFileMetadata, boolean reloadTableSchema,
       Set<String> partitionsToUpdate) throws CatalogException {
     Preconditions.checkState(Thread.holdsLock(tbl));
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           getMetaStoreTable(msClient, tbl);
       if (tbl instanceof HdfsTable) {
@@ -480,8 +479,6 @@ public class CatalogOpExecutor {
       } else {
         tbl.load(true, msClient.getHiveClient(), msTbl);
       }
-    } finally {
-      msClient.release();
     }
     tbl.setCatalogVersion(newCatalogVersion);
   }
@@ -544,7 +541,9 @@ public class CatalogOpExecutor {
       setViewAttributes(params, msTbl);
       LOG.debug(String.format("Altering view %s", tableName));
       applyAlterTable(msTbl);
-      tbl.load(true, catalog_.getMetaStoreClient().getHiveClient(), msTbl);
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        tbl.load(true, msClient.getHiveClient(), msTbl);
+      }
       tbl.setCatalogVersion(newCatalogVersion);
       addTableToCatalogUpdate(tbl, resp.result);
     }
@@ -583,10 +582,9 @@ public class CatalogOpExecutor {
       }
     }
 
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     int numTargetedPartitions = 0;
     int numUpdatedColumns = 0;
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Update the table and partition row counts based on the query results.
       List<HdfsPartition> modifiedParts = Lists.newArrayList();
       if (params.isSetTable_stats()) {
@@ -616,8 +614,6 @@ public class CatalogOpExecutor {
       // Update the table stats. Apply the table alteration last to ensure the
       // lastDdlTime is as accurate as possible.
       applyAlterTable(msTbl);
-    } finally {
-      msClient.release();
     }
 
     // Set the results to be reported to the client.
@@ -812,33 +808,32 @@ public class CatalogOpExecutor {
     LOG.debug("Creating database " + dbName);
     Db newDb = null;
     synchronized (metastoreDdlLock_) {
-      MetaStoreClient msClient = catalog_.getMetaStoreClient();
-      try {
-        msClient.getHiveClient().createDatabase(db);
-        newDb = catalog_.addDb(dbName, db);
-      } catch (AlreadyExistsException e) {
-        if (!params.if_not_exists) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        try {
+          msClient.getHiveClient().createDatabase(db);
+          newDb = catalog_.addDb(dbName, db);
+        } catch (AlreadyExistsException e) {
+          if (!params.if_not_exists) {
+            throw new ImpalaRuntimeException(
+                String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
+          }
+          LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
+              "IF NOT EXISTS was specified.", e, dbName));
+          newDb = catalog_.getDb(dbName);
+          if (newDb == null) {
+            try {
+              org.apache.hadoop.hive.metastore.api.Database msDb =
+                  msClient.getHiveClient().getDatabase(dbName);
+              newDb = catalog_.addDb(dbName, msDb);
+            } catch (TException e1) {
+              throw new ImpalaRuntimeException(
+                  String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e1);
+            }
+          }
+        } catch (TException e) {
           throw new ImpalaRuntimeException(
               String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
         }
-        LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
-            "IF NOT EXISTS was specified.", e, dbName));
-        newDb = catalog_.getDb(dbName);
-        if (newDb == null) {
-          try {
-            org.apache.hadoop.hive.metastore.api.Database msDb =
-                msClient.getHiveClient().getDatabase(dbName);
-            newDb = catalog_.addDb(dbName, msDb);
-          } catch (TException e1) {
-            throw new ImpalaRuntimeException(
-                String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e1);
-          }
-        }
-      } catch (TException e) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
-      } finally {
-        msClient.release();
       }
 
       Preconditions.checkNotNull(newDb);
@@ -1031,8 +1026,7 @@ public class CatalogOpExecutor {
   private int dropColumnStats(Table table) throws ImpalaRuntimeException {
     Preconditions.checkState(Thread.holdsLock(table));
     int numColsUpdated = 0;
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       for (Column col: table.getColumns()) {
         // Skip columns that don't have stats.
         if (!col.getStats().hasStats()) continue;
@@ -1051,8 +1045,6 @@ public class CatalogOpExecutor {
                   "delete_table_column_statistics"), e);
         }
       }
-    } finally {
-      msClient.release();
     }
     return numColsUpdated;
   }
@@ -1127,16 +1119,13 @@ public class CatalogOpExecutor {
     }
 
     TCatalogObject removedObject = new TCatalogObject();
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     synchronized (metastoreDdlLock_) {
-      try {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().dropDatabase(
             params.getDb(), true, params.if_exists, params.cascade);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);
-      } finally {
-        msClient.release();
       }
       Db removedDb = catalog_.removeDb(params.getDb());
       // If no db was removed as part of this operation just return the current catalog
@@ -1179,7 +1168,6 @@ public class CatalogOpExecutor {
         // Do nothing
       }
 
-      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       Db db = catalog_.getDb(params.getTable_name().db_name);
       if (db == null) {
         if (params.if_exists) return;
@@ -1203,14 +1191,12 @@ public class CatalogOpExecutor {
             "not allowed on a " + (params.is_table ? "view: " : "table: ") + tableName;
         throw new CatalogException(errorMsg);
       }
-      try {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().dropTable(
             tableName.getDb(), tableName.getTbl(), true, params.if_exists, params.purge);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
-      } finally {
-        msClient.release();
       }
 
       Table table = catalog_.removeTable(params.getTable_name().db_name,
@@ -1499,10 +1485,9 @@ public class CatalogOpExecutor {
       boolean ifNotExists, THdfsCachingOp cacheOp, List<TDistributeParam> distribute_by,
       TDdlExecResponse response)
       throws ImpalaException {
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     synchronized (metastoreDdlLock_) {
 
-      try {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().createTable(newTable);
         // If this table should be cached, and the table location was not specified by
         // the user, an extra step is needed to read the table to find the location.
@@ -1523,8 +1508,6 @@ public class CatalogOpExecutor {
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
-      } finally {
-        msClient.release();
       }
 
       // Forward the operation to a specific storage backend. If the operation fails,
@@ -1532,15 +1515,12 @@ public class CatalogOpExecutor {
       try {
         createDdlDelegate(newTable).setDistributeParams(distribute_by).createTable();
       } catch (ImpalaRuntimeException e) {
-        MetaStoreClient c = catalog_.getMetaStoreClient();
-        try {
+        try (MetaStoreClient c = catalog_.getMetaStoreClient()) {
           c.getHiveClient().dropTable(newTable.getDbName(), newTable.getTableName(),
               false, ifNotExists);
         } catch (Exception hE) {
           throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
               "dropTable"), hE);
-        } finally {
-          c.release();
         }
         throw e;
       }
@@ -1672,10 +1652,9 @@ public class CatalogOpExecutor {
     Long parentTblCacheDirId =
         HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
 
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     partition = createHmsPartition(partitionSpec, msTbl, tableName, location);
 
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Add the new partition.
       partition = msClient.getHiveClient().add_partition(partition);
       String cachePoolName = null;
@@ -1721,8 +1700,6 @@ public class CatalogOpExecutor {
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
-    } finally {
-      msClient.release();
     }
     if (cacheIds != null) catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
     // Return the table object with an updated catalog version after creating the
@@ -1764,10 +1741,9 @@ public class CatalogOpExecutor {
         }
       }
     }
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     PartitionDropOptions dropOptions = PartitionDropOptions.instance();
     dropOptions.purgeData(purge);
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().dropPartition(tableName.getDb(),
           tableName.getTbl(), values, dropOptions);
       updateLastDdlTime(msTbl, msClient);
@@ -1784,8 +1760,6 @@ public class CatalogOpExecutor {
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "dropPartition"), e);
-    } finally {
-      msClient.release();
     }
     return catalog_.dropPartition(tbl, partitionSpec);
   }
@@ -1827,8 +1801,7 @@ public class CatalogOpExecutor {
         oldTbl.getMetaStoreTable().deepCopy();
     msTbl.setDbName(newTableName.getDb());
     msTbl.setTableName(newTableName.getTbl());
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Workaround for HIVE-9720/IMPALA-1711: When renaming a table with column
       // stats across databases, we save, drop and restore the column stats because
       // the HMS does not properly move them to the new table via alteration.
@@ -1864,8 +1837,6 @@ public class CatalogOpExecutor {
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
-    } finally {
-      msClient.release();
     }
     // Rename the table in the Catalog and get the resulting catalog object.
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
@@ -2222,8 +2193,7 @@ public class CatalogOpExecutor {
     }
 
     // Add partitions to metastore.
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // ifNotExists and needResults are true.
       hmsPartitions = msClient.getHiveClient().add_partitions(hmsPartitions,
           true, true);
@@ -2252,8 +2222,6 @@ public class CatalogOpExecutor {
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
-    } finally {
-      msClient.release();
     }
 
     if (!cacheIds.isEmpty()) {
@@ -2305,8 +2273,7 @@ public class CatalogOpExecutor {
   public boolean addJavaFunctionToHms(String db,
       org.apache.hadoop.hive.metastore.api.Function fn, boolean ifNotExists)
       throws ImpalaRuntimeException{
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().createFunction(fn);
     } catch(AlreadyExistsException e) {
       if (!ifNotExists) {
@@ -2319,8 +2286,6 @@ public class CatalogOpExecutor {
           fn.getFunctionName(), e);
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "createFunction"), e);
-    } finally {
-      msClient.release();
     }
     return true;
   }
@@ -2331,8 +2296,7 @@ public class CatalogOpExecutor {
    */
   public boolean dropJavaFunctionFromHms(String db, String fn, boolean ifExists)
       throws ImpalaRuntimeException {
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().dropFunction(db, fn);
     } catch (NoSuchObjectException e) {
       if (!ifExists) {
@@ -2344,8 +2308,6 @@ public class CatalogOpExecutor {
       LOG.error("Error executing dropFunction() metastore call: " + fn, e);
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "dropFunction"), e);
-    } finally {
-      msClient.release();
     }
     return true;
   }
@@ -2355,14 +2317,11 @@ public class CatalogOpExecutor {
    */
   private void applyAlterDatabase(Db db)
       throws ImpalaRuntimeException {
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().alterDatabase(db.getName(), db.getMetaStoreDb());
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alterDatabase"), e);
-    } finally {
-      msClient.release();
     }
   }
 
@@ -2376,9 +2335,8 @@ public class CatalogOpExecutor {
    */
   private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws ImpalaRuntimeException {
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     long lastDdlTime = -1;
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       lastDdlTime = calculateDdlTime(msTbl);
       msTbl.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
       msClient.getHiveClient().alter_table(
@@ -2387,7 +2345,6 @@ public class CatalogOpExecutor {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
     } finally {
-      msClient.release();
       catalog_.updateLastDdlTime(
           new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
     }
@@ -2395,8 +2352,7 @@ public class CatalogOpExecutor {
 
   private void applyAlterPartition(Table tbl, HdfsPartition partition)
       throws ImpalaException {
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       TableName tableName = tbl.getTableName();
       msClient.getHiveClient().alter_partition(
           tableName.getDb(), tableName.getTbl(), partition.toHmsPartition());
@@ -2406,8 +2362,6 @@ public class CatalogOpExecutor {
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partition"), e);
-    } finally {
-      msClient.release();
     }
   }
 
@@ -2549,8 +2503,7 @@ public class CatalogOpExecutor {
     }
     if (hmsPartitions.size() == 0) return;
 
-    MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
       for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
         int numPartitionsToUpdate =
@@ -2575,8 +2528,6 @@ public class CatalogOpExecutor {
               String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
         }
       }
-    } finally {
-      msClient.release();
     }
   }
 
@@ -2879,8 +2830,7 @@ public class CatalogOpExecutor {
         }
 
         if (!partsToCreate.isEmpty()) {
-          MetaStoreClient msClient = catalog_.getMetaStoreClient();
-          try {
+          try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
             org.apache.hadoop.hive.metastore.api.Table msTbl =
                 table.getMetaStoreTable().deepCopy();
             List<org.apache.hadoop.hive.metastore.api.Partition> hmsParts =
@@ -2958,8 +2908,6 @@ public class CatalogOpExecutor {
                 "AlreadyExistsException thrown although ifNotExists given", e);
           } catch (Exception e) {
             throw new InternalException("Error adding partitions", e);
-          } finally {
-            msClient.release();
           }
         }
       }

@@ -41,7 +41,7 @@ import org.apache.hadoop.fs.VolumeId;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -977,7 +977,7 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     load(reuseMetadata, client, msTbl, true, true, null);
   }
@@ -1009,7 +1009,7 @@ public class HdfsTable extends Table {
    * If any of these occur, user has to execute "invalidate metadata" to invalidate the
    * metadata cache of the table and trigger a fresh load.
    */
-  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl, boolean loadFileMetadata,
       boolean loadTableSchema, Set<String> partitionsToUpdate)
       throws TableLoadingException {
@@ -1098,7 +1098,7 @@ public class HdfsTable extends Table {
    * file/block metadata reload for the partitions specified in 'partitionsToUpdate', if
    * any, or for all the table partitions if 'partitionsToUpdate' is null.
    */
-  private void updatePartitionsFromHms(HiveMetaStoreClient client,
+  private void updatePartitionsFromHms(IMetaStoreClient client,
       Set<String> partitionsToUpdate, boolean loadFileMetadata) throws Exception {
     LOG.debug("sync table partitions: " + name_);
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
@@ -1262,7 +1262,7 @@ public class HdfsTable extends Table {
    * as Avro. Additionally, this method also reconciles the schema if the column
    * definitions from the metastore differ from the Avro schema.
    */
-  private void setAvroSchema(HiveMetaStoreClient client,
+  private void setAvroSchema(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
     Preconditions.checkState(isSchemaLoaded_);
     String inputFormat = msTbl.getSd().getInputFormat();
@@ -1324,7 +1324,7 @@ public class HdfsTable extends Table {
   /**
    * Loads table schema and column stats from Hive Metastore.
    */
-  private void loadSchema(HiveMetaStoreClient client,
+  private void loadSchema(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
     nonPartFieldSchemas_.clear();
     // set nullPartitionKeyValue from the hive conf.
@@ -1356,7 +1356,7 @@ public class HdfsTable extends Table {
    * table partitions.
    */
   private void loadPartitionsFromMetastore(List<HdfsPartition> partitions,
-      HiveMetaStoreClient client) throws Exception {
+      IMetaStoreClient client) throws Exception {
     Preconditions.checkNotNull(partitions);
     if (partitions.isEmpty()) return;
     LOG.info(String.format("Incrementally updating %d/%d partitions.",
@@ -1373,7 +1373,7 @@ public class HdfsTable extends Table {
    * 'partitionNames' and adds them to the internal list of table partitions.
    */
   private void loadPartitionsFromMetastore(Set<String> partitionNames,
-      HiveMetaStoreClient client) throws Exception {
+      IMetaStoreClient client) throws Exception {
     Preconditions.checkNotNull(partitionNames);
     if (partitionNames.isEmpty()) return;
     // Load partition metadata from Hive Metastore.

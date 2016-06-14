@@ -24,7 +24,7 @@ import java.util.Set;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.log4j.Logger;
@@ -133,7 +133,7 @@ public class KuduTable extends Table {
   /**
    * Load the columns from the schema list
    */
-  private void loadColumns(List<FieldSchema> schema, HiveMetaStoreClient client,
+  private void loadColumns(List<FieldSchema> schema, IMetaStoreClient client,
       Set<String> keyColumns) throws TableLoadingException {
 
     if (keyColumns.size() == 0 || keyColumns.size() > schema.size()) {
@@ -168,7 +168,7 @@ public class KuduTable extends Table {
   }
 
   @Override
-  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     // TODO handle 'reuseMetadata'
     if (getMetaStoreTable() == null || !tableParamsAreValid(msTbl.getParameters())) {

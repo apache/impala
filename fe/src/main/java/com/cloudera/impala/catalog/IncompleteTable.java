@@ -20,7 +20,7 @@ package com.cloudera.impala.catalog;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.JniUtil;
@@ -70,7 +70,7 @@ public class IncompleteTable extends Table {
   }
 
   @Override
-  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     if (cause_ instanceof TableLoadingException) {
       throw (TableLoadingException) cause_;

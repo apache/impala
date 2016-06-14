@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -113,7 +113,7 @@ public abstract class Table implements CatalogObject {
    * Populate members of 'this' from metastore info. If 'reuseMetadata' is true, reuse
    * valid existing metadata.
    */
-  public abstract void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public abstract void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
 
   public void addColumn(Column col) {
@@ -157,7 +157,7 @@ public abstract class Table implements CatalogObject {
    * errors are logged and ignored, since the absence of column stats is not critical to
    * the correctness of the system.
    */
-  protected void loadAllColumnStats(HiveMetaStoreClient client) {
+  protected void loadAllColumnStats(IMetaStoreClient client) {
     LOG.debug("Loading column stats for table: " + name_);
     List<ColumnStatisticsObj> colStats;
 

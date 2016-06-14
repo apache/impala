@@ -207,19 +207,16 @@ public class ImpaladCatalog extends Catalog {
    */
   public Path getTablePath(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws NoSuchObjectException, MetaException, TException {
-    MetaStoreClient client = getMetaStoreClient();
-    try {
+    try (MetaStoreClient msClient = getMetaStoreClient()) {
       // If the table did not have its path set, build the path based on the the
       // location property of the parent database.
       if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
         String dbLocation =
-            client.getHiveClient().getDatabase(msTbl.getDbName()).getLocationUri();
+            msClient.getHiveClient().getDatabase(msTbl.getDbName()).getLocationUri();
         return new Path(dbLocation, msTbl.getTableName().toLowerCase());
       } else {
         return new Path(msTbl.getSd().getLocation());
       }
-    } finally {
-      client.release();
     }
   }
 

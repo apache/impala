@@ -20,7 +20,7 @@ package com.cloudera.impala.catalog;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,7 +139,7 @@ public class DataSourceTable extends Table {
    * Throws a TableLoadingException if the metadata is incompatible with what we
    * support.
    */
-  private void loadColumns(List<FieldSchema> fieldSchemas, HiveMetaStoreClient client)
+  private void loadColumns(List<FieldSchema> fieldSchemas, IMetaStoreClient client)
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s: fieldSchemas) {
@@ -159,7 +159,7 @@ public class DataSourceTable extends Table {
   }
 
   @Override
-  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     Preconditions.checkNotNull(msTbl);
     msTable_ = msTbl;

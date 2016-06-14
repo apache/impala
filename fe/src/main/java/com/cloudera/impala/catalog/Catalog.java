@@ -60,7 +60,7 @@ public abstract class Catalog {
   // Initial catalog version.
   public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final String DEFAULT_DB = "default";
-  private static final int META_STORE_CLIENT_POOL_SIZE = 5;
+  private static final int META_STORE_CLIENT_POOL_SIZE = 10;
 
   public static final String BUILTINS_DB = "_impala_builtins";
 

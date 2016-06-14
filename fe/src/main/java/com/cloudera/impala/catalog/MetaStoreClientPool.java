@@ -20,20 +20,28 @@ package com.cloudera.impala.catalog;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaHook;
+import org.apache.hadoop.hive.metastore.HiveMetaHookLoader;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
 
 /**
- * Manages a pool of HiveMetaStoreClient connections. If the connection pool is empty
- * a new client is created and added to the pool. There is no size limit.
+ * Manages a pool of RetryingMetaStoreClient connections. If the connection pool is empty
+ * a new client is created and added to the pool. The idle pool can expand till a maximum
+ * size of MAX_HMS_CONNECTION_POOL_SIZE, beyond which the connections are closed.
  */
 public class MetaStoreClientPool {
   // Key for config option read from hive-site.xml
   private static final String HIVE_METASTORE_CNXN_DELAY_MS_CONF =
       "impala.catalog.metastore.cnxn.creation.delay.ms";
   private static final int DEFAULT_HIVE_METASTORE_CNXN_DELAY_MS_CONF = 0;
+  // Maximum number of idle metastore connections in the connection pool at any point.
+  private static final int MAX_HMS_CONNECTION_POOL_SIZE = 32;
   // Number of milliseconds to sleep between creation of HMS connections. Used to debug
   // IMPALA-825.
   private final int clientCreationDelayMs_;
@@ -46,29 +54,40 @@ public class MetaStoreClientPool {
   private final Object poolCloseLock_ = new Object();
   private final HiveConf hiveConf_;
 
+  // Required for creating an instance of RetryingMetaStoreClient.
+  private static final HiveMetaHookLoader dummyHookLoader = new HiveMetaHookLoader() {
+    @Override
+    public HiveMetaHook getHook(org.apache.hadoop.hive.metastore.api.Table tbl)
+        throws MetaException {
+      return null;
+    }
+  };
+
   /**
-   * A wrapper around the HiveMetaStoreClient that manages interactions with the
-   * connection pool.
+   * A wrapper around the RetryingMetaStoreClient that manages interactions with the
+   * connection pool. This implements the AutoCloseable interface and hence the callers
+   * should use the try-with-resources statement while creating an instance.
    */
-  public class MetaStoreClient {
-    private final HiveMetaStoreClient hiveClient_;
+  public class MetaStoreClient implements AutoCloseable {
+    private final IMetaStoreClient hiveClient_;
     private boolean isInUse_;
 
     private MetaStoreClient(HiveConf hiveConf) {
       try {
         LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool_.size());
-        this.hiveClient_ = new HiveMetaStoreClient(hiveConf);
+        hiveClient_ = RetryingMetaStoreClient.getProxy(hiveConf, dummyHookLoader,
+            HiveMetaStoreClient.class.getName());
       } catch (Exception e) {
         // Turn in to an unchecked exception
         throw new IllegalStateException(e);
       }
-      this.isInUse_ = false;
+      isInUse_ = false;
     }
 
     /**
-     * Returns the internal HiveMetaStoreClient object.
+     * Returns the internal RetryingMetaStoreClient object.
      */
-    public HiveMetaStoreClient getHiveClient() {
+    public IMetaStoreClient getHiveClient() {
       return hiveClient_;
     }
 
@@ -76,27 +95,26 @@ public class MetaStoreClientPool {
      * Returns this client back to the connection pool. If the connection pool has been
      * closed, just close the Hive client connection.
      */
-    public void release() {
+    @Override
+    public void close() {
       Preconditions.checkState(isInUse_);
       isInUse_ = false;
-      // Ensure the connection isn't returned to the pool if the pool has been closed.
+      // Ensure the connection isn't returned to the pool if the pool has been closed
+      // or if the number of connections in the pool exceeds MAX_HMS_CONNECTION_POOL_SIZE.
       // This lock is needed to ensure proper behavior when a thread reads poolClosed
       // is false, but a call to pool.close() comes in immediately afterward.
       synchronized (poolCloseLock_) {
-        if (poolClosed_) {
+        if (poolClosed_ || clientPool_.size() >= MAX_HMS_CONNECTION_POOL_SIZE) {
           hiveClient_.close();
         } else {
-          // TODO: Currently the pool does not work properly because we cannot
-          // reuse MetastoreClient connections. No reason to add this client back
-          // to the pool. See HIVE-5181.
-          // clientPool.add(this);
-          hiveClient_.close();
+          clientPool_.offer(this);
         }
       }
     }
 
     // Marks this client as in use
     private void markInUse() {
+      Preconditions.checkState(!isInUse_);
       isInUse_ = true;
     }
   }
@@ -106,7 +124,7 @@ public class MetaStoreClientPool {
   }
 
   public MetaStoreClientPool(int initialSize, HiveConf hiveConf) {
-    this.hiveConf_ = hiveConf;
+    hiveConf_ = hiveConf;
     clientCreationDelayMs_ = hiveConf_.getInt(HIVE_METASTORE_CNXN_DELAY_MS_CONF,
         DEFAULT_HIVE_METASTORE_CNXN_DELAY_MS_CONF);
     addClients(initialSize);
@@ -138,18 +156,13 @@ public class MetaStoreClientPool {
     // The pool was empty so create a new client and return that.
     // Serialize client creation to defend against possible race conditions accessing
     // local Kerberos state (see IMPALA-825).
-    synchronized (this) {
-      try {
-        Thread.sleep(clientCreationDelayMs_);
-      } catch (InterruptedException e) {
-        /* ignore */
-      }
-      if (client == null) {
-        client = new MetaStoreClient(hiveConf_);
-      } else {
-        // TODO: Due to Hive Metastore bugs, there is leftover state from previous client
-        // connections so we are unable to reuse the same connection. For now simply
-        // reconnect each time. One possible culprit is HIVE-5181.
+    if (client == null) {
+      synchronized (this) {
+        try {
+          Thread.sleep(clientCreationDelayMs_);
+        } catch (InterruptedException e) {
+          /* ignore */
+        }
         client = new MetaStoreClient(hiveConf_);
       }
     }

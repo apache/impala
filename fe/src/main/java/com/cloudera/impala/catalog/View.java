@@ -21,7 +21,7 @@ import java.io.StringReader;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import com.cloudera.impala.analysis.ParseNode;
@@ -99,7 +99,7 @@ public class View extends Table {
   }
 
   @Override
-  public void load(boolean reuseMetadata, HiveMetaStoreClient client,
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     try {
       clearColumns();
