@@ -23,7 +23,8 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 
-// TODO: CHAR, VARCHAR (IMPALA-3658)
+// TODO: IMPALA-3658: complete CHAR unit tests.
+// TODO: IMPALA-3658: complete VARCHAR unit tests.
 
 namespace impala {
 
@@ -51,6 +52,21 @@ class HdfsAvroScannerTest : public testing::Test {
     }
   }
 
+  template<typename T>
+  void CheckReadResult(T expected_val, int expected_encoded_len,
+      TErrorCode::type expected_error, T val, bool success, int actual_encoded_len) {
+    bool expect_success = expected_error == TErrorCode::OK;
+    EXPECT_EQ(success, expect_success);
+
+    if (success) {
+      EXPECT_TRUE(scanner_.parse_status_.ok());
+      EXPECT_EQ(val, expected_val);
+      EXPECT_EQ(expected_encoded_len, actual_encoded_len);
+    } else {
+      EXPECT_EQ(scanner_.parse_status_.code(), expected_error);
+    }
+  }
+
   // Templated function for calling different ReadAvro* functions.
   //
   // PrimitiveType is a template parameter so we can pass in int 'slot_byte_size' to
@@ -62,22 +78,12 @@ class HdfsAvroScannerTest : public testing::Test {
       TErrorCode::type expected_error = TErrorCode::OK) {
     // Reset parse_status_
     scanner_.parse_status_ = Status::OK();
-
     uint8_t* new_data = data;
     T slot;
-    bool expect_success = expected_error == TErrorCode::OK;
-
     bool success = (scanner_.*read_fn)(type, &new_data, data + data_len, true, &slot,
         NULL);
-    EXPECT_EQ(success, expect_success);
-
-    if (success) {
-      EXPECT_TRUE(scanner_.parse_status_.ok());
-      EXPECT_EQ(slot, expected_val);
-      EXPECT_EQ(new_data, data + expected_encoded_len);
-    } else {
-      EXPECT_EQ(scanner_.parse_status_.code(), expected_error);
-    }
+    CheckReadResult(expected_val, expected_encoded_len, expected_error, slot, success,
+        new_data - data);
   }
 
   void TestReadAvroBoolean(uint8_t* data, int64_t data_len, bool expected_val,
@@ -131,11 +137,47 @@ class HdfsAvroScannerTest : public testing::Test {
         expected_val, 8, expected_error);
   }
 
+  void TestReadAvroChar(int max_len, uint8_t* data, int64_t data_len,
+      StringValue expected_val, int expected_encoded_len,
+      TErrorCode::type expected_error = TErrorCode::OK) {
+    // Reset parse_status_
+    scanner_.parse_status_ = Status::OK();
+    uint8_t* new_data = data;
+    char slot[max<int>(sizeof(StringValue), max_len)];
+    bool success = scanner_.ReadAvroChar(TYPE_CHAR, max_len, &new_data, data + data_len,
+        true, slot, NULL);
+    StringValue value;
+    if (max_len <= ColumnType::MAX_CHAR_INLINE_LENGTH) {
+      // Convert to non-inlined string value for comparison.
+      value.len = max_len;
+      value.ptr = slot;
+    } else {
+      value = *reinterpret_cast<StringValue*>(slot);
+    }
+    CheckReadResult(expected_val, expected_encoded_len, expected_error, value, success,
+        new_data - data);
+  }
+
+  void TestReadAvroVarchar(int max_len, uint8_t* data, int64_t data_len,
+      StringValue expected_val, int expected_encoded_len,
+      TErrorCode::type expected_error = TErrorCode::OK) {
+    // Reset parse_status_
+    scanner_.parse_status_ = Status::OK();
+
+    uint8_t* new_data = data;
+    StringValue slot;
+    bool success = scanner_.ReadAvroVarchar(TYPE_VARCHAR, max_len, &new_data,
+        data + data_len, true, &slot, NULL);
+    CheckReadResult(expected_val, expected_encoded_len, expected_error, slot, success,
+        new_data - data);
+  }
+
   void TestReadAvroString(uint8_t* data, int64_t data_len, StringValue expected_val,
       int expected_encoded_len, TErrorCode::type expected_error = TErrorCode::OK) {
     TestReadAvroType(&HdfsAvroScanner::ReadAvroString, TYPE_STRING, data, data_len,
         expected_val, expected_encoded_len, expected_error);
   }
+
 
   template<typename T>
   void TestReadAvroDecimal(uint8_t* data, int64_t data_len, DecimalValue<T> expected_val,
@@ -280,6 +322,30 @@ TEST_F(HdfsAvroScannerTest, DoubleTest) {
   TestReadAvroDouble(data, 2, d, TErrorCode::AVRO_TRUNCATED_BLOCK);
   TestReadAvroDouble(data, 3, d, TErrorCode::AVRO_TRUNCATED_BLOCK);
   TestReadAvroDouble(data, 7, d, TErrorCode::AVRO_TRUNCATED_BLOCK);
+}
+
+TEST_F(HdfsAvroScannerTest, StringLengthOverflowTest) {
+  const char* s = "hello world";
+  StringValue sv(s);
+  // Test handling of strings that would overflow the StringValue::len 32-bit integer.
+  // Test cases with 0 and 1 in the upper bit of the 32-bit integer.
+  vector<int64_t> large_string_lens({0x1FFFFFFFF, 0x0FFFFFFFF, 0x100000000});
+  for (int64_t large_string_len: large_string_lens) {
+    LOG(INFO) << "Testing large string of length " << large_string_len;
+    vector<uint8_t> large_buffer(large_string_len + ReadWriteUtil::MAX_ZLONG_LEN);
+    int64_t zlong_len = ReadWriteUtil::PutZLong(large_string_len, large_buffer.data());
+    memcpy(large_buffer.data() + zlong_len, s, strlen(s));
+
+    // CHAR and VARCHAR truncation should still work in this case.
+    TestReadAvroChar(sv.len, large_buffer.data(), large_buffer.size(), sv,
+        zlong_len + large_string_len);
+    TestReadAvroVarchar(sv.len, large_buffer.data(), large_buffer.size(), sv,
+        zlong_len + large_string_len);
+
+    // Interpreting as a string would overflow length field.
+    TestReadAvroString(large_buffer.data(), large_buffer.size(), sv, -1,
+        TErrorCode::SCANNER_STRING_LENGTH_OVERFLOW);
+  }
 }
 
 TEST_F(HdfsAvroScannerTest, StringTest) {

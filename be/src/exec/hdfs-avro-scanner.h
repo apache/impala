@@ -284,6 +284,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// contain exception handling code.
   void SetStatusCorruptData(TErrorCode::type error_code);
   void SetStatusInvalidValue(TErrorCode::type error_code, int64_t len);
+  void SetStatusValueOverflow(TErrorCode::type error_code, int64_t len, int64_t limit);
 
   /// Unit test constructor
   HdfsAvroScanner();

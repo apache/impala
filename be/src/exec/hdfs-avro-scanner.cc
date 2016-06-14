@@ -655,6 +655,16 @@ void HdfsAvroScanner::SetStatusInvalidValue(TErrorCode::type error_code, int64_t
   }
 }
 
+void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_t len,
+    int64_t limit) {
+  DCHECK(parse_status_.ok());
+  if (TestInfo::is_test()) {
+    parse_status_ = Status(error_code, "test file", len, limit, 123);
+  } else {
+    parse_status_ = Status(error_code, stream_->filename(), len, limit, stream_->file_offset());
+  }
+}
+
 // This function produces a codegen'd function equivalent to MaterializeTuple() but
 // optimized for the table schema. Via helper functions CodegenReadRecord() and
 // CodegenReadScalar(), it eliminates the conditionals necessary when interpreting the

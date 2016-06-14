@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <limits>
 
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/read-write-util.h"
@@ -21,6 +22,7 @@
 
 using namespace impala;
 using namespace strings;
+using std::numeric_limits;
 
 // Functions in this file are cross-compiled to IR with clang.
 
@@ -183,8 +185,10 @@ bool HdfsAvroScanner::ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t**
   if (write_slot) {
     DCHECK(type == TYPE_VARCHAR);
     StringValue* sv = reinterpret_cast<StringValue*>(slot);
-    int str_len = std::min(static_cast<int>(len.val), max_len);
-    DCHECK(str_len >= 0);
+    // 'max_len' is an int, so the result of min() should always be in [0, INT_MAX].
+    // We need to be careful not to truncate the length before evaluating min().
+    int str_len = static_cast<int>(std::min<int64_t>(len.val, max_len));
+    DCHECK_GE(str_len, 0);
     sv->len = str_len;
     sv->ptr = reinterpret_cast<char*>(*data);
   }
@@ -199,7 +203,10 @@ bool HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** da
   if (write_slot) {
     DCHECK(type == TYPE_CHAR);
     ColumnType ctype = ColumnType::CreateCharType(max_len);
-    int str_len = std::min(static_cast<int>(len.val), max_len);
+    // 'max_len' is an int, so the result of min() should always be in [0, INT_MAX].
+    // We need to be careful not to truncate the length before evaluating min().
+    int str_len = static_cast<int>(std::min<int64_t>(len.val, max_len));
+    DCHECK_GE(str_len, 0);
     if (ctype.IsVarLenStringType()) {
       StringValue* sv = reinterpret_cast<StringValue*>(slot);
       sv->ptr = reinterpret_cast<char*>(pool->TryAllocate(max_len));
@@ -227,6 +234,11 @@ bool HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
   if (UNLIKELY(!len.ok)) return false;
   if (write_slot) {
     DCHECK(type == TYPE_STRING);
+    if (UNLIKELY(len.val > numeric_limits<int>::max())) {
+      SetStatusValueOverflow(TErrorCode::SCANNER_STRING_LENGTH_OVERFLOW, len.val,
+          numeric_limits<int>::max());
+      return false;
+    }
     StringValue* sv = reinterpret_cast<StringValue*>(slot);
     sv->len = len.val;
     sv->ptr = reinterpret_cast<char*>(*data);

@@ -265,6 +265,9 @@ error_codes = (
 
   ("AVRO_INVALID_METADATA_COUNT", 86, "File '$0' is corrupt: invalid metadata count $1 "
    "at offset $2"),
+
+  ("SCANNER_STRING_LENGTH_OVERFLOW", 87, "File '$0' could not be read: string $1 was "
+    "longer than supported limit of $2 bytes at offset $3"),
 )
 
 import sys
