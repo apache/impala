@@ -2751,11 +2751,18 @@ public class ParserTest {
     ParsesOk("invalidate metadata Foo.S");
     ParsesOk("refresh Foo");
     ParsesOk("refresh Foo.S");
+    ParsesOk("refresh Foo partition (col=2)");
+    ParsesOk("refresh Foo.S partition (col=2)");
+    ParsesOk("refresh Foo.S partition (col1 = 2, col2 = 3)");
 
     ParserError("invalidate");
     ParserError("invalidate metadata Foo.S.S");
+    ParserError("invalidate metadata partition (col=2)");
+    ParserError("invalidate metadata Foo.S partition (col=2)");
     ParserError("REFRESH Foo.S.S");
     ParserError("refresh");
+    ParserError("refresh Foo.S partition (col1 = 2, col2)");
+    ParserError("refresh Foo.S partition ()");
   }
 
   @Test

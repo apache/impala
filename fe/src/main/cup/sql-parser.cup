@@ -621,11 +621,13 @@ overwrite_val ::=
 
 reset_metadata_stmt ::=
   KW_INVALIDATE KW_METADATA
-  {: RESULT = new ResetMetadataStmt(null, false); :}
+  {: RESULT = new ResetMetadataStmt(null, false, null); :}
   | KW_INVALIDATE KW_METADATA table_name:table
-  {: RESULT = new ResetMetadataStmt(table, false); :}
+  {: RESULT = new ResetMetadataStmt(table, false, null); :}
   | KW_REFRESH table_name:table
-  {: RESULT = new ResetMetadataStmt(table, true); :}
+  {: RESULT = new ResetMetadataStmt(table, true, null); :}
+  | KW_REFRESH table_name:table partition_spec:partition
+  {: RESULT = new ResetMetadataStmt(table, true, partition); :}
   ;
 
 explain_stmt ::=

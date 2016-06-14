@@ -645,6 +645,8 @@ public class AnalyzerTest {
     AnalyzesOk("refresh functional.alltypessmall");
     AnalyzesOk("refresh functional.alltypes_view");
     AnalyzesOk("refresh functional.bad_serde");
+    AnalyzesOk("refresh functional.alltypessmall partition (year=2009, month=1)");
+    AnalyzesOk("refresh functional.alltypessmall partition (year=2009, month=NULL)");
 
     // invalidate metadata <table name> checks the Hive Metastore for table existence
     // and should not throw an AnalysisError if the table or db does not exist.
@@ -655,6 +657,19 @@ public class AnalyzerTest {
         "Table does not exist: functional.unknown_table");
     AnalysisError("refresh unknown_db.unknown_table",
         "Database does not exist: unknown_db");
+    AnalysisError("refresh functional.alltypessmall partition (year=2009, int_col=10)",
+        "Column 'int_col' is not a partition column in table: functional.alltypessmall");
+    AnalysisError("refresh functional.alltypessmall partition (year=2009)",
+        "Items in partition spec must exactly match the partition columns in "
+            + "the table definition: functional.alltypessmall (1 vs 2)");
+    AnalysisError("refresh functional.alltypessmall partition (year=2009, year=2009)",
+        "Duplicate partition key name: year");
+    AnalysisError(
+        "refresh functional.alltypessmall partition (year=2009, month='foo')",
+        "Value of partition spec (column=month) has incompatible type: 'STRING'. "
+            + "Expected type: 'INT'");
+    AnalysisError("refresh functional.zipcode_incomes partition (year=2009, month=1)",
+        "Table is not partitioned: functional.zipcode_incomes");
   }
 
   @Test

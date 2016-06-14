@@ -389,7 +389,8 @@ public class AnalysisContext {
       throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(analysisResult_);
     Analyzer analyzer = getAnalyzer();
-    // Process statements for which column-level privilege requests may be registered.
+    // Process statements for which column-level privilege requests may be registered
+    // except for DESCRIBE TABLE or REFRESH/INVALIDATE statements
     if (analysisResult_.isQueryStmt() || analysisResult_.isInsertStmt() ||
         analysisResult_.isUpdateStmt() || analysisResult_.isDeleteStmt() ||
         analysisResult_.isCreateTableAsSelectStmt() ||
@@ -434,7 +435,8 @@ public class AnalysisContext {
       for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
         Preconditions.checkState(
             !(privReq.getAuthorizeable() instanceof AuthorizeableColumn) ||
-            analysisResult_.isDescribeTableStmt());
+            analysisResult_.isDescribeTableStmt() ||
+            analysisResult_.isResetMetadataStmt());
         authorizePrivilegeRequest(authzChecker, privReq);
       }
     }

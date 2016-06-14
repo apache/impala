@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.util.StringUtils;
@@ -85,6 +86,7 @@ import com.cloudera.impala.util.MetaStoreUtil;
 import com.cloudera.impala.util.TAccessLevelUtil;
 import com.cloudera.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -1919,5 +1921,35 @@ public class HdfsTable extends Table {
       }
     }
     return result;
+  }
+
+  /**
+   * Constructs a partition name from a list of TPartitionKeyValue objects.
+   */
+  public static String constructPartitionName(List<TPartitionKeyValue> partitionSpec) {
+    List<String> partitionCols = Lists.newArrayList();
+    List<String> partitionVals = Lists.newArrayList();
+    for (TPartitionKeyValue kv: partitionSpec) {
+      partitionCols.add(kv.getName());
+      partitionVals.add(kv.getValue());
+    }
+    return org.apache.hadoop.hive.common.FileUtils.makePartName(partitionCols,
+        partitionVals);
+  }
+
+  /**
+   * Reloads the metadata of partition 'oldPartition' by removing
+   * it from the table and reconstructing it from the HMS partition object
+   * 'hmsPartition'. If old partition is null then nothing is removed and
+   * and partition constructed from 'hmsPartition' is simply added.
+   */
+  public void reloadPartition(HdfsPartition oldPartition, Partition hmsPartition)
+      throws CatalogException {
+    HdfsPartition refreshedPartition = createPartition(
+        hmsPartition.getSd(), hmsPartition);
+    Preconditions.checkArgument(oldPartition == null
+        || oldPartition.compareTo(refreshedPartition) == 0);
+    dropPartition(oldPartition);
+    addPartition(refreshedPartition);
   }
 }

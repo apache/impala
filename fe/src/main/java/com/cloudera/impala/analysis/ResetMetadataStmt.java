@@ -21,6 +21,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * Representation of a REFRESH/INVALIDATE METADATA statement.
@@ -32,10 +33,17 @@ public class ResetMetadataStmt extends StatementBase {
   // true if it is a REFRESH statement.
   private final boolean isRefresh_;
 
-  public ResetMetadataStmt(TableName name, boolean isRefresh) {
+  // not null when refreshing a single partition
+  private final PartitionSpec partitionSpec_;
+
+  public ResetMetadataStmt(TableName name, boolean isRefresh,
+      PartitionSpec partitionSpec) {
     Preconditions.checkArgument(!isRefresh || name != null);
+    Preconditions.checkArgument(isRefresh || partitionSpec == null);
     this.tableName_ = name;
     this.isRefresh_ = isRefresh;
+    this.partitionSpec_ = partitionSpec;
+    if (partitionSpec_ != null) partitionSpec_.setTableName(tableName_);
   }
 
   public TableName getTableName() { return tableName_; }
@@ -57,6 +65,10 @@ public class ResetMetadataStmt extends StatementBase {
           // to Impala.
           throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG + tableName_);
         }
+        if (partitionSpec_ != null) {
+          partitionSpec_.setPrivilegeRequirement(Privilege.ANY);
+          partitionSpec_.analyze(analyzer);
+        }
       } else {
         // Verify the user has privileges to access this table.
         analyzer.registerPrivReq(new PrivilegeRequestBuilder()
@@ -77,6 +89,7 @@ public class ResetMetadataStmt extends StatementBase {
     }
 
     if (tableName_ != null) result.append(" ").append(tableName_);
+    if (partitionSpec_ != null) result.append(" " + partitionSpec_.toSql());
     return result.toString();
   }
 
@@ -85,6 +98,9 @@ public class ResetMetadataStmt extends StatementBase {
     params.setIs_refresh(isRefresh_);
     if (tableName_ != null) {
       params.setTable_name(new TTableName(tableName_.getDb(), tableName_.getTbl()));
+    }
+    if (partitionSpec_ != null) {
+      params.setPartition_spec(partitionSpec_.toThrift());
     }
     return params;
   }

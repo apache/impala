@@ -2749,7 +2749,12 @@ public class CatalogOpExecutor {
         if (tbl == null) {
           modifiedObjects.second = null;
         } else {
-          modifiedObjects.second = catalog_.reloadTable(tbl);
+          if (req.isSetPartition_spec()) {
+            modifiedObjects.second = catalog_.reloadPartition(tbl,
+                req.getPartition_spec());
+          } else {
+            modifiedObjects.second = catalog_.reloadTable(tbl);
+          }
         }
       } else {
         wasRemoved = catalog_.invalidateTable(req.getTable_name(), modifiedObjects);

@@ -791,6 +791,10 @@ public class AuthorizationTest {
     AuthzOk("refresh functional.alltypesagg");
     AuthzOk("invalidate metadata functional.view_view");
     AuthzOk("refresh functional.view_view");
+    // Positive cases for checking refresh partition
+    AuthzOk("refresh functional.alltypesagg partition (year=2010, month=1, day=1)");
+    AuthzOk("refresh functional.alltypes partition (year=2009, month=1)");
+    AuthzOk("refresh functional_seq_snap.alltypes partition (year=2009, month=1)");
 
     AuthzError("invalidate metadata unknown_db.alltypessmall",
         "User '%s' does not have privileges to access: unknown_db.alltypessmall");
@@ -815,6 +819,12 @@ public class AuthorizationTest {
 
     AuthzError("invalidate metadata",
         "User '%s' does not have privileges to access: server");
+    AuthzError(
+        "refresh functional_rc.alltypesagg partition (year=2010, month=1, day=1)",
+        "User '%s' does not have privileges to access: functional_rc.alltypesagg");
+    AuthzError(
+        "refresh functional_rc.alltypesagg partition (year=2010, month=1, day=9999)",
+        "User '%s' does not have privileges to access: functional_rc.alltypesagg");
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.

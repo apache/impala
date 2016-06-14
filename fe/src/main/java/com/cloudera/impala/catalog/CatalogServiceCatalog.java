@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FunctionType;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.ResourceType;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
@@ -1167,4 +1168,52 @@ public class CatalogServiceCatalog extends Catalog {
   public TableId getNextTableId() { return new TableId(nextTableId_.getAndIncrement()); }
   public SentryProxy getSentryProxy() { return sentryProxy_; }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
+
+  /**
+   * Reloads metadata for the partition defined by the partition spec
+   * 'partitionSpec' in table 'tbl'. Returns the table object with partition
+   * metadata reloaded
+   */
+  public Table reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec)
+      throws CatalogException {
+    catalogLock_.writeLock().lock();
+    synchronized (tbl) {
+      long newCatalogVersion = incrementAndGetCatalogVersion();
+      catalogLock_.writeLock().unlock();
+      HdfsTable hdfsTable = (HdfsTable) tbl;
+      HdfsPartition hdfsPartition = hdfsTable
+          .getPartitionFromThriftPartitionSpec(partitionSpec);
+      // Retrieve partition name from existing partition or construct it from
+      // the partition spec
+      String partitionName = hdfsPartition == null
+          ? HdfsTable.constructPartitionName(partitionSpec)
+          : hdfsPartition.getPartitionName();
+      LOG.debug(String.format("Refreshing Partition metadata: %s %s",
+          hdfsTable.getFullName(), partitionName));
+      MetaStoreClient msClient = getMetaStoreClient();
+      try {
+        org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
+        try {
+          hmsPartition = msClient.getHiveClient().getPartition(
+              hdfsTable.getDb().getName(), hdfsTable.getName(), partitionName);
+        } catch (NoSuchObjectException e) {
+          // If partition does not exist in Hive Metastore, remove it from the
+          // catalog
+          if (hdfsPartition != null) {
+            hdfsTable.dropPartition(partitionSpec);
+            hdfsTable.setCatalogVersion(newCatalogVersion);
+          }
+          return hdfsTable;
+        } catch (Exception e) {
+          throw new CatalogException("Error loading metadata for partition: "
+              + hdfsTable.getFullName() + " " + partitionName, e);
+        }
+        hdfsTable.reloadPartition(hdfsPartition, hmsPartition);
+      } finally {
+        msClient.release();
+      }
+      hdfsTable.setCatalogVersion(newCatalogVersion);
+      return hdfsTable;
+    }
+  }
 }

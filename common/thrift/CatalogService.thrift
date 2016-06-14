@@ -186,6 +186,10 @@ struct TResetMetadataRequest {
   // Fully qualified name of the table to refresh or invalidate; not set if invalidating
   // the entire catalog
   3: optional CatalogObjects.TTableName table_name
+
+  // If set, refreshes the specified partition, otherwise
+  // refreshes the whole table
+  5: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
 }
 
 // Response from TResetMetadataRequest
