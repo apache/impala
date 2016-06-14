@@ -21,6 +21,7 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsCachePool;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 
 /**
@@ -43,7 +44,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     CatalogServiceCatalog catalogServerCatalog =
         CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig());
     // Bootstrap the catalog by adding all dbs, tables, and functions.
-    for (Db db: catalogServerCatalog.getDbs(null)) {
+    for (Db db: catalogServerCatalog.getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
       // Adding DB should include all tables/fns in that database.
       addDb(db);
     }

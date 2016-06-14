@@ -129,13 +129,10 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns databases that match dbPattern. See filterStringsByPattern for details of
-   * the pattern match semantics.
-   *
-   * dbPattern may be null (and thus matches everything).
+   * Returns all databases that match 'matcher'.
    */
-  public List<Db> getDbs(String dbPattern) {
-    return filterCatalogObjectsByPattern(dbCache_.get().values(), dbPattern);
+  public List<Db> getDbs(PatternMatcher matcher) {
+    return filterCatalogObjectsByPattern(dbCache_.get().values(), matcher);
   }
 
   /**
@@ -163,22 +160,20 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns a list of tables in the supplied database that match
-   * tablePattern. See filterStringsByPattern for details of the pattern match semantics.
+   * Returns all tables in 'dbName' that match 'matcher'.
    *
-   * dbName must not be null, but tablePattern may be null (and thus matches
-   * everything).
+   * dbName must not be null.
    *
    * Table names are returned unqualified.
    */
-  public List<String> getTableNames(String dbName, String tablePattern)
+  public List<String> getTableNames(String dbName, PatternMatcher matcher)
       throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
     Db db = getDb(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    return filterStringsByPattern(db.getAllTableNames(), tablePattern);
+    return filterStringsByPattern(db.getAllTableNames(), matcher);
   }
 
   /**
@@ -224,23 +219,22 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns a list of data sources names that match pattern. See filterStringsByPattern
-   * for details of the pattern match semantics.
+   * Returns a list of data sources names that match pattern.
+   *
+   * @see PatternMatcher#matches(String) for details of the pattern match semantics.
    *
    * pattern may be null (and thus matches everything).
    */
   public List<String> getDataSourceNames(String pattern) {
-    return filterStringsByPattern(dataSources_.keySet(), pattern);
+    return filterStringsByPattern(dataSources_.keySet(),
+        PatternMatcher.createHivePatternMatcher(pattern));
   }
 
   /**
-   * Returns a list of data sources that match pattern. See filterStringsByPattern
-   * for details of the pattern match semantics.
-   *
-   * pattern may be null (and thus matches everything).
+   * Returns all DataSources that match 'matcher'.
    */
-  public List<DataSource> getDataSources(String pattern) {
-    return filterCatalogObjectsByPattern(dataSources_.getValues(), pattern);
+  public List<DataSource> getDataSources(PatternMatcher matcher) {
+    return filterCatalogObjectsByPattern(dataSources_.getValues(), matcher);
   }
 
   /**
@@ -326,26 +320,16 @@ public abstract class Catalog {
   public MetaStoreClient getMetaStoreClient() { return metaStoreClientPool_.getClient(); }
 
   /**
-   * Implement Hive's pattern-matching semantics for SHOW statements. The only
-   * metacharacters are '*' which matches any string of characters, and '|'
-   * which denotes choice.  Doing the work here saves loading tables or
-   * databases from the metastore (which Hive would do if we passed the call
-   * through to the metastore client).
-   *
-   * If matchPattern is null, all strings are considered to match. If it is the
-   * empty string, no strings match.
+   * Return all members of 'candidates' that match 'matcher'.
+   * The results are sorted in String.CASE_INSENSITIVE_ORDER.
+   * matcher must not be null.
    */
   private List<String> filterStringsByPattern(Iterable<String> candidates,
-      String matchPattern) {
-    List<String> filtered;
-    if (matchPattern == null) {
-      filtered = Lists.newArrayList(candidates);
-    } else {
-      PatternMatcher matcher = PatternMatcher.createHivePatternMatcher(matchPattern);
-      filtered = Lists.newArrayList();
-      for (String candidate: candidates) {
-        if (matcher.matches(candidate)) filtered.add(candidate);
-      }
+      PatternMatcher matcher) {
+    Preconditions.checkNotNull(matcher);
+    List<String> filtered = Lists.newArrayList();
+    for (String candidate: candidates) {
+      if (matcher.matches(candidate)) filtered.add(candidate);
     }
     Collections.sort(filtered, String.CASE_INSENSITIVE_ORDER);
     return filtered;
@@ -361,26 +345,16 @@ public abstract class Catalog {
   private static final CatalogObjectOrder CATALOG_OBJECT_ORDER = new CatalogObjectOrder();
 
   /**
-   * Implement Hive's pattern-matching semantics for SHOW statements. The only
-   * metacharacters are '*' which matches any string of characters, and '|'
-   * which denotes choice.  Doing the work here saves loading tables or
-   * databases from the metastore (which Hive would do if we passed the call
-   * through to the metastore client).
-   *
-   * If matchPattern is null, all strings are considered to match. If it is the
-   * empty string, no strings match.
+   * Return all members of 'candidates' that match 'matcher'.
+   * The results are sorted in CATALOG_OBJECT_ORDER.
+   * matcher must not be null.
    */
   private <T extends CatalogObject> List<T> filterCatalogObjectsByPattern(
-      Iterable<? extends T> candidates, String matchPattern) {
-    List<T> filtered;
-    if (matchPattern == null) {
-      filtered = Lists.newArrayList(candidates);
-    } else {
-      PatternMatcher matcher = PatternMatcher.createHivePatternMatcher(matchPattern);
-      filtered = Lists.newArrayList();
-      for (T candidate: candidates) {
-        if (matcher.matches(candidate.getName())) filtered.add(candidate);
-      }
+      Iterable<? extends T> candidates, PatternMatcher matcher) {
+    Preconditions.checkNotNull(matcher);
+    List<T> filtered = Lists.newArrayList();
+    for (T candidate: candidates) {
+      if (matcher.matches(candidate.getName())) filtered.add(candidate);
     }
     Collections.sort(filtered, CATALOG_OBJECT_ORDER);
     return filtered;

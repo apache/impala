@@ -428,17 +428,18 @@ public class Db implements CatalogObject {
   }
 
   /**
-   * Returns all functions that match 'fnPattern'.
+   * Returns all functions that match the pattern of 'matcher'.
    */
   public List<Function> getFunctions(TFunctionCategory category,
-      PatternMatcher fnPattern) {
+      PatternMatcher matcher) {
+    Preconditions.checkNotNull(matcher);
     List<Function> result = Lists.newArrayList();
     synchronized (functions_) {
       for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
-        if (!fnPattern.matches(fns.getKey())) continue;
+        if (!matcher.matches(fns.getKey())) continue;
         for (Function fn: fns.getValue()) {
-          if (fn.userVisible() &&
-              (category == null || Function.categoryMatch(fn, category))) {
+          if ((category == null || Function.categoryMatch(fn, category))
+              && fn.userVisible()) {
             result.add(fn);
           }
         }

@@ -154,6 +154,32 @@ show tables in functional like 'alltypesagg*'
 STRING
 ====
 ---- QUERY
+# Impala only considers '*' and '|' as meta-characters in SHOW statements
+# See IMPALA-3744
+show tables in functional like 'alltypesag.'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show tables in functional like 'alltypesag.*'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show tables in functional like 'alltypesagg%'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show tables in functional like 'alltypesag_'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
 # Coverage of syntax variations.
 show tables in functional 'alltypesagg'
 ---- RESULTS
@@ -208,6 +234,32 @@ STRING,STRING
 show databases like 'def*'
 ---- RESULTS
 'default','Default Hive database'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# Impala only considers '*' and '|' as meta-characters in SHOW statements
+# See IMPALA-3744
+show databases like 'defaul.*'
+---- RESULTS
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+show databases like 'defaul_'
+---- RESULTS
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+show databases like 'def%'
+---- RESULTS
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+show databases like 'defaul.'
+---- RESULTS
 ---- TYPES
 STRING,STRING
 ====

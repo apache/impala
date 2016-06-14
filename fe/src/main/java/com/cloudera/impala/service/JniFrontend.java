@@ -85,6 +85,7 @@ import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateMembershipRequest;
 import com.cloudera.impala.util.GlogAppender;
+import com.cloudera.impala.util.PatternMatcher;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -224,7 +225,14 @@ public class JniFrontend {
   }
 
   /**
-   * Returns a list of table names matching an optional pattern.
+   * Implement Hive's pattern-matching semantics for "SHOW TABLE [[LIKE] 'pattern']", and
+   * return a list of table names matching an optional pattern.
+   * The only metacharacters are '*' which matches any string of characters, and '|'
+   * which denotes choice.  Doing the work here saves loading tables or databases from the
+   * metastore (which Hive would do if we passed the call through to the metastore
+   * client). If the pattern is null, all strings are considered to match. If it is an
+   * empty string, no strings match.
+   *
    * The argument is a serialized TGetTablesParams object.
    * The return type is a serialised TGetTablesResult object.
    * @see Frontend#getTableNames
@@ -238,7 +246,8 @@ public class JniFrontend {
         ImpalaInternalAdminUser.getInstance();
 
     Preconditions.checkState(!params.isSetSession() || user != null );
-    List<String> tables = frontend_.getTableNames(params.db, params.pattern, user);
+    List<String> tables = frontend_.getTableNames(params.db,
+        PatternMatcher.createHivePatternMatcher(params.pattern), user);
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
@@ -271,10 +280,13 @@ public class JniFrontend {
   }
 
   /**
-   * Returns a list of databases matching an optional pattern.
+   * Implement Hive's pattern-matching semantics for "SHOW DATABASES [[LIKE] 'pattern']",
+   * and return a list of databases matching an optional pattern.
+   * @see JniFrontend#getTableNames(byte[]) for more detail.
+   *
    * The argument is a serialized TGetDbParams object.
    * The return type is a serialised TGetDbResult object.
-   * @see Frontend#getDbParams
+   * @see Frontend#getDbs
    */
   public byte[] getDbs(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetDbsParams params = new TGetDbsParams();
@@ -283,7 +295,8 @@ public class JniFrontend {
     User user = params.isSetSession() ?
         new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
         ImpalaInternalAdminUser.getInstance();
-    List<Db> dbs = frontend_.getDbs(params.pattern, user);
+    List<Db> dbs = frontend_.getDbs(
+        PatternMatcher.createHivePatternMatcher(params.pattern), user);
     TGetDbsResult result = new TGetDbsResult();
     List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
     for (Db db: dbs) tDbs.add(db.toThrift());

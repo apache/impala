@@ -259,7 +259,7 @@ public class CatalogServiceCatalog extends Catalog {
     resp.setMax_catalog_version(Catalog.INITIAL_CATALOG_VERSION);
     catalogLock_.readLock().lock();
     try {
-      for (Db db: getDbs(null)) {
+      for (Db db: getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
         TCatalogObject catalogDb = new TCatalogObject(TCatalogObjectType.DATABASE,
             db.getCatalogVersion());
         catalogDb.setDb(db.toThrift());

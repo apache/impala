@@ -223,27 +223,28 @@ public class MetadataOp {
   }
 
   /**
-   * Returns the list of schemas, tables, columns and user functions that satisfy the
-   * search pattern. catalogName, schemaName, tableName, columnName and functionName
-   * are JDBC search patterns.
+   * Returns the list of schemas, tables, columns and user functions that match the
+   * corresponding matchers.
    *
-   * The return value DbsTablesColumns.dbs contains the list of databases that satisfy
-   * the "schemaName" search pattern.
-   * DbsTablesColumns.tableNames[i] contains the list of tables inside dbs[i] that satisfy
-   * the "tableName" search pattern.
-   * DbsTablesColumns.columns[i][j] contains the list of columns of table[j] in dbs[i]
-   * that satisfy the search condition "columnName".
-   * DbsTablesColumns.functions[i] contains the list of functions inside dbs[i] that
-   * satisfy the "functionName" search pattern.
+   * The return value 'result.dbs' contains the list of databases that match
+   * 'schemaPatternMatcher'.
+   * 'result.tableNames[i]' contains the list of tables inside dbs[i] that match
+   * 'tablePatternMatcher'.
+   * 'result.columns[i][j]' contains the list of columns of table[j] in dbs[i]
+   * that match 'columnPatternMatcher'.
+   * result.functions[i] contains the list of functions inside dbs[i] that
+   * match 'fnPatternMatcher'.
    *
-   * If functionName is not null, then only function metadata will be returned.
-   * If tableName is null, then DbsTablesColumns.tableNames and DbsTablesColumns.columns
-   * will not be populated.
-   * If columns is null, then DbsTablesColumns.columns will not be populated.
+   * If 'fnPatternMatcher' is not PatternMatcher.MATCHER_MATCH_NONE, then only function
+   * metadata will be returned.
+   * If 'tablePatternMatcher' is PatternMatcher.MATCHER_MATCH_NONE, then
+   * 'result.tableNames' and 'result.columns' will not be populated.
+   * If columns is null, then 'result.columns' will not be populated.
    */
   private static DbsMetadata getDbsMetadata(Frontend fe, String catalogName,
-      String schemaName, String tableName, String columnName, String functionName,
-      User user) throws ImpalaException {
+      PatternMatcher schemaPatternMatcher, PatternMatcher tablePatternMatcher,
+      PatternMatcher columnPatternMatcher, PatternMatcher fnPatternMatcher, User user)
+      throws ImpalaException {
     DbsMetadata result = new DbsMetadata();
 
     // Hive does not have a catalog concept. Returns nothing if the request specifies an
@@ -252,25 +253,17 @@ public class MetadataOp {
       return result;
     }
 
-    // Creates the schema, table, column and function search patterns
-    PatternMatcher schemaPattern = PatternMatcher.createJdbcPatternMatcher(schemaName);
-    PatternMatcher tablePattern = PatternMatcher.createJdbcPatternMatcher(tableName);
-    PatternMatcher columnPattern = PatternMatcher.createJdbcPatternMatcher(columnName);
-    PatternMatcher fnPattern = PatternMatcher.createJdbcPatternMatcher(functionName);
-
     ImpaladCatalog catalog = fe.getCatalog();
-    for (Db db: fe.getDbs(null, user)) {
-      if (!schemaPattern.matches(db.getName())) continue;
-      if (functionName != null) {
+    for (Db db: fe.getDbs(schemaPatternMatcher, user)) {
+      if (fnPatternMatcher != PatternMatcher.MATCHER_MATCH_NONE) {
         // Get function metadata
-        List<Function> fns = db.getFunctions(null, fnPattern);
+        List<Function> fns = db.getFunctions(null, fnPatternMatcher);
         result.functions.add(fns);
       } else {
         // Get table metadata
         List<String> tableList = Lists.newArrayList();
         List<List<Column>> tablesColumnsList = Lists.newArrayList();
-        for (String tabName: fe.getTableNames(db.getName(), "*", user)) {
-          if (!tablePattern.matches(tabName)) continue;
+        for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
           tableList.add(tabName);
           Table table = null;
           try {
@@ -286,7 +279,7 @@ public class MetadataOp {
           if (!table.isLoaded()) {
             result.missingTbls.add(new TableName(db.getName(), tabName));
           } else {
-            columns.addAll(fe.getColumns(table, columnPattern, user));
+            columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
           }
           tablesColumnsList.add(columns);
         }
@@ -326,9 +319,12 @@ public class MetadataOp {
 
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
     DbsMetadata dbsMetadata = null;
+    PatternMatcher schemaMatcher = PatternMatcher.createJdbcPatternMatcher(schemaName);
+    PatternMatcher tableMatcher = PatternMatcher.createJdbcPatternMatcher(tableName);
+    PatternMatcher columnMatcher = PatternMatcher.createJdbcPatternMatcher(columnName);
     while (dbsMetadata == null || !dbsMetadata.missingTbls.isEmpty()) {
-      dbsMetadata = getDbsMetadata(fe, catalogName,
-          schemaName, tableName, columnName, null, user);
+      dbsMetadata = getDbsMetadata(fe, catalogName, schemaMatcher, tableMatcher,
+          columnMatcher, PatternMatcher.MATCHER_MATCH_NONE, user);
       if (!fe.requestTblLoadAndWait(dbsMetadata.missingTbls)) {
         LOG.info("Timed out waiting for missing tables. Load request will be retried.");
       }
@@ -413,7 +409,10 @@ public class MetadataOp {
 
     // Get the list of schemas that satisfy the search condition.
     DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName,
-        schemaName, null, null, null, user);
+        PatternMatcher.createJdbcPatternMatcher(schemaName),
+        PatternMatcher.MATCHER_MATCH_NONE,
+        PatternMatcher.MATCHER_MATCH_NONE,
+        PatternMatcher.MATCHER_MATCH_NONE, user);
 
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
       String dbName = dbsMetadata.dbs.get(i);
@@ -457,7 +456,10 @@ public class MetadataOp {
 
     // Get the list of schemas, tables that satisfy the search conditions.
     DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName,
-        schemaName, tableName, null, null, user);
+        PatternMatcher.createJdbcPatternMatcher(schemaName),
+        PatternMatcher.createJdbcPatternMatcher(tableName),
+        PatternMatcher.MATCHER_MATCH_NONE,
+        PatternMatcher.MATCHER_MATCH_NONE, user);
 
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
       String dbName = dbsMetadata.dbs.get(i);
@@ -529,7 +531,10 @@ public class MetadataOp {
     }
 
     DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName,
-        schemaName, null, null, functionName, user);
+        PatternMatcher.createJdbcPatternMatcher(schemaName),
+        PatternMatcher.MATCHER_MATCH_NONE,
+        PatternMatcher.MATCHER_MATCH_NONE,
+        PatternMatcher.createJdbcPatternMatcher(functionName), user);
     for (List<Function> fns: dbsMetadata.functions) {
       for (Function fn: fns) {
         result.rows.add(createFunctionResultRow(fn));

@@ -15,6 +15,7 @@
 package com.cloudera.impala.util;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,7 +32,8 @@ public class PatternMatcher {
   // any of the patterns.
   private List<Pattern> patterns_;
 
-  // Returns true if the candidate matches.
+  // Returns true if patterns_ is null or the candidate matches.
+  // Returns false if patterns_ is empty or the candidate mismatches.
   public boolean matches(String candidate) {
     if (patterns_ == null) return true;
     if (patterns_.isEmpty()) return false;
@@ -41,6 +43,21 @@ public class PatternMatcher {
     return false;
   }
 
+  // Immutable pattern matcher that matches all
+  private final static class MatchAllPatternMatcher extends PatternMatcher {
+    MatchAllPatternMatcher() {}
+    public boolean matches(String candidate) { return true; }
+  }
+
+  // Immutable pattern matcher that matches none
+  private final static class MatchNonePatternMatcher extends PatternMatcher {
+    MatchNonePatternMatcher() {}
+    public boolean matches(String candidate) { return false; }
+  }
+
+  public static final PatternMatcher MATCHER_MATCH_ALL = new MatchAllPatternMatcher();
+  public static final PatternMatcher MATCHER_MATCH_NONE = new MatchNonePatternMatcher();
+
   /**
    * Creates a pattern matcher for hive patterns.
    * The only metacharacters are '*' which matches any string of characters, and '|'
@@ -49,18 +66,18 @@ public class PatternMatcher {
    * empty string, no strings match.
    */
   public static PatternMatcher createHivePatternMatcher(String hivePattern) {
+    if (hivePattern == null) return MATCHER_MATCH_ALL;
+    if (hivePattern.isEmpty()) return MATCHER_MATCH_NONE;
     PatternMatcher result = new PatternMatcher();
-    if (hivePattern != null) {
-      result.patterns_ = Lists.newArrayList();
-      // Hive ignores pretty much all metacharacters, so we have to escape them.
-      final String metaCharacters = "+?.^()]\\/{}";
-      final Pattern regex = Pattern.compile("([" + Pattern.quote(metaCharacters) + "])");
+    result.patterns_ = Lists.newArrayList();
+    // Hive ignores pretty much all metacharacters, so we have to escape them.
+    final String metaCharacters = "+?.^()]\\/{}";
+    final Pattern regex = Pattern.compile("([" + Pattern.quote(metaCharacters) + "])");
 
-      for (String pattern: Arrays.asList(hivePattern.split("\\|"))) {
-        Matcher matcher = regex.matcher(pattern);
-        pattern = matcher.replaceAll("\\\\$1").replace("*", ".*");
-        result.patterns_.add(Pattern.compile(pattern));
-      }
+    for (String pattern: Arrays.asList(hivePattern.split("\\|"))) {
+      Matcher matcher = regex.matcher(pattern);
+      pattern = matcher.replaceAll("\\\\$1").replace("*", ".*");
+      result.patterns_.add(Pattern.compile(pattern));
     }
     return result;
   }
@@ -69,12 +86,11 @@ public class PatternMatcher {
    * Creates a matcher object for JDBC match strings.
    */
   public static PatternMatcher createJdbcPatternMatcher(String pattern) {
-    String wildcardPattern = ".*";
-    String workPattern = pattern;
-    if (workPattern == null || pattern.isEmpty()) {
-      workPattern = "%";
+    if (pattern == null || pattern.isEmpty()) {
+      return MATCHER_MATCH_ALL;
     }
-    String result = workPattern
+    String wildcardPattern = ".*";
+    String result = pattern
         .replaceAll("([^\\\\])%", "$1" + wildcardPattern)
         .replaceAll("\\\\%", "%")
         .replaceAll("^%", wildcardPattern)
