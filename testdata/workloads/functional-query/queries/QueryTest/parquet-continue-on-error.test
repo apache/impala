@@ -83,3 +83,21 @@ bigint
 ---- ERRORS
 Column metadata states there are 11 values, but read 10 values from column id. file: hdfs://regex:.$
 ====
+---- QUERY
+SELECT * from bad_parquet_strings_negative_len
+---- TYPES
+STRING
+---- RESULTS
+---- ERRORS
+row_regex: .*File '.*/plain-encoded-negative-len.parq' is corrupt: error decoding value of type STRING at offset 58.*
+row_regex: .*File '.*/dict-encoded-negative-len.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary.*
+====
+---- QUERY
+SELECT * from bad_parquet_strings_out_of_bounds
+---- TYPES
+STRING
+---- RESULTS
+---- ERRORS
+row_regex: .*File '.*/plain-encoded-out-of-bounds.parq' is corrupt: error decoding value of type STRING at offset 58.*
+row_regex: .*File '.*/dict-encoded-out-of-bounds.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary.*
+====

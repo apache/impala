@@ -567,6 +567,7 @@ class HdfsParquetScanner::BaseScalarColumnReader :
 
     num_buffered_values_ = 0;
     data_ = NULL;
+    data_end_ = NULL;
     stream_ = stream;
     metadata_ = metadata;
     num_values_read_ = 0;
@@ -614,6 +615,9 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   /// Pointer to start of next value in data page
   uint8_t* data_;
 
+  /// End of the data page.
+  const uint8_t* data_end_;
+
   /// Decoder for definition levels.
   LevelDecoder def_levels_;
 
@@ -654,9 +658,11 @@ class HdfsParquetScanner::BaseScalarColumnReader :
   template <bool ADVANCE_REP_LEVEL>
   bool NextLevels();
 
-  /// Creates a dictionary decoder from values/size and store in class. Subclass must
-  /// implement this.
-  virtual DictDecoderBase* CreateDictionaryDecoder(uint8_t* values, int size) = 0;
+  /// Creates a dictionary decoder from values/size. 'decoder' is set to point to a
+  /// dictionary decoder stored in this object. Subclass must implement this. Returns
+  /// an error status if the dictionary values could not be decoded successfully.
+  virtual Status CreateDictionaryDecoder(uint8_t* values, int size,
+      DictDecoderBase** decoder) = 0;
 
   /// Return true if the column has an initialized dictionary decoder. Subclass must
   /// implement this.
@@ -880,10 +886,15 @@ class HdfsParquetScanner::ScalarColumnReader :
     return true;
   }
 
-  virtual DictDecoderBase* CreateDictionaryDecoder(uint8_t* values, int size) {
-    dict_decoder_.Reset(values, size, fixed_len_size_);
+  virtual Status CreateDictionaryDecoder(uint8_t* values, int size,
+      DictDecoderBase** decoder) {
+    if (!dict_decoder_.Reset(values, size, fixed_len_size_)) {
+        return Status(TErrorCode::PARQUET_CORRUPT_DICTIONARY, filename(),
+            slot_desc_->type().DebugString(), "could not decode dictionary");
+    }
     dict_decoder_init_ = true;
-    return &dict_decoder_;
+    *decoder = &dict_decoder_;
+    return Status::OK();
   }
 
   virtual bool HasDictionaryDecoder() {
@@ -935,7 +946,13 @@ class HdfsParquetScanner::ScalarColumnReader :
       }
     } else {
       DCHECK_EQ(page_encoding_, parquet::Encoding::PLAIN);
-      data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
+      int encoded_len =
+          ParquetPlainEncoder::Decode<T>(data_, data_end_, fixed_len_size_, val_ptr);
+      if (UNLIKELY(encoded_len < 0)) {
+        SetPlainDecodeError();
+        return false;
+      }
+      data_ += encoded_len;
     }
     if (UNLIKELY(NeedsConversion() &&
             !ConvertSlot(&val, reinterpret_cast<T*>(slot), pool))) {
@@ -961,7 +978,12 @@ class HdfsParquetScanner::ScalarColumnReader :
   /// Pull out slow-path Status construction code from ReadRepetitionLevel()/
   /// ReadDefinitionLevel() for performance.
   void __attribute__((noinline)) SetDictDecodeError() {
-    parent_->parse_status_ = Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, filename());
+    parent_->parse_status_ = Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, filename(),
+        slot_desc_->type().DebugString(), stream_->file_offset());
+  }
+  void __attribute__((noinline)) SetPlainDecodeError() {
+    parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_PLAIN_VALUE, filename(),
+        slot_desc_->type().DebugString(), stream_->file_offset());
   }
 
   /// Dictionary decoder for decoding column values.
@@ -1046,10 +1068,11 @@ class HdfsParquetScanner::BoolColumnReader :
   }
 
  protected:
-  virtual DictDecoderBase* CreateDictionaryDecoder(uint8_t* values, int size) {
+  virtual Status CreateDictionaryDecoder(uint8_t* values, int size,
+      DictDecoderBase** decoder) {
     DCHECK(false) << "Dictionary encoding is not supported for bools. Should never "
                   << "have gotten this far.";
-    return NULL;
+    return Status::OK();
   }
 
   virtual bool HasDictionaryDecoder() {
@@ -1414,6 +1437,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
       }
 
       if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
+      data_end_ = data_ + data_size;
 
       uint8_t* dict_values = NULL;
       if (decompressor_.get() != NULL) {
@@ -1427,9 +1451,18 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
         RETURN_IF_ERROR(decompressor_->ProcessBlock32(true, data_size, data_,
             &uncompressed_size, &dict_values));
         VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
+        if (current_page_header_.uncompressed_page_size != uncompressed_size) {
+          return Status(Substitute("Error decompressing dictionary page in file '$0'. "
+              "Expected $1 uncompressed bytes but got $2", filename(),
+              current_page_header_.uncompressed_page_size, uncompressed_size));
+        }
         data_size = uncompressed_size;
       } else {
-        FILE_CHECK_EQ(data_size, current_page_header_.uncompressed_page_size);
+        if (current_page_header_.uncompressed_page_size != data_size) {
+          return Status(Substitute("Error reading dictionary page in file '$0'. "
+              "Expected $1 bytes but got $2", filename(),
+              current_page_header_.uncompressed_page_size, data_size));
+        }
         // Copy dictionary from io buffer (which will be recycled as we read
         // more data) to a new buffer
         dict_values = parent_->dictionary_pool_->TryAllocate(data_size);
@@ -1442,11 +1475,13 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
         memcpy(dict_values, data_, data_size);
       }
 
-      DictDecoderBase* dict_decoder = CreateDictionaryDecoder(dict_values, data_size);
+      DictDecoderBase* dict_decoder;
+      RETURN_IF_ERROR(CreateDictionaryDecoder(dict_values, data_size, &dict_decoder));
       if (dict_header != NULL &&
           dict_header->num_values != dict_decoder->num_entries()) {
-        return Status(Substitute(
-            "Invalid dictionary. Expected $0 entries but data contained $1 entries",
+        return Status(TErrorCode::PARQUET_CORRUPT_DICTIONARY, filename(),
+            slot_desc_->type().DebugString(),
+            Substitute("Expected $0 entries but data contained $1 entries",
             dict_header->num_values, dict_decoder->num_entries()));
       }
       // Done with dictionary page, read next page
@@ -1463,6 +1498,7 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
     // TODO: when we start using page statistics, we will need to ignore certain corrupt
     // statistics. See IMPALA-2208 and PARQUET-251.
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
+    data_end_ = data_ + data_size;
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
     num_values_read_ += num_buffered_values_;
 
@@ -1481,12 +1517,21 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
           &decompressed_buffer));
       VLOG_FILE << "Decompressed " << current_page_header_.compressed_page_size
                 << " to " << uncompressed_size;
-      FILE_CHECK_EQ(current_page_header_.uncompressed_page_size, uncompressed_size);
+      if (current_page_header_.uncompressed_page_size != uncompressed_size) {
+        return Status(Substitute("Error decompressing data page in file '$0'. "
+            "Expected $1 uncompressed bytes but got $2", filename(),
+            current_page_header_.uncompressed_page_size, uncompressed_size));
+      }
       data_ = decompressed_buffer;
       data_size = current_page_header_.uncompressed_page_size;
+      data_end_ = data_ + data_size;
     } else {
       DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
-      FILE_CHECK_EQ(current_page_header_.compressed_page_size, uncompressed_size);
+      if (current_page_header_.compressed_page_size != uncompressed_size) {
+        return Status(Substitute("Error reading data page in file '$0'. "
+            "Expected $1 bytes but got $2", filename(),
+            current_page_header_.compressed_page_size, uncompressed_size));
+      }
     }
 
     // Initialize the repetition level data
@@ -1530,7 +1575,7 @@ Status HdfsParquetScanner::LevelDecoder::Init(const string& filename,
         return status;
       }
       if (num_bytes < 0) {
-        return Status(TErrorCode::PARQUET_CORRUPT_VALUE, filename, num_bytes);
+        return Status(TErrorCode::PARQUET_CORRUPT_RLE_BYTES, filename, num_bytes);
       }
       int bit_width = Bits::Log2Ceiling64(max_level + 1);
       Reset(*data, num_bytes, bit_width);
@@ -2241,7 +2286,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
 
   // Make sure footer has enough bytes to contain the required information.
   if (remaining_bytes_buffered < 0) {
-    return Status(Substitute("File '$0' is invalid.  Missing metadata.", filename()));
+    return Status(Substitute("File '$0' is invalid. Missing metadata.", filename()));
   }
 
   // Validate magic file bytes are correct.
@@ -2839,8 +2884,9 @@ Status HdfsParquetScanner::InitColumns(
 
     // TODO: this will need to change when we have co-located files and the columns
     // are different files.
-    if (!col_chunk.file_path.empty()) {
-      FILE_CHECK_EQ(col_chunk.file_path, string(filename()));
+    if (!col_chunk.file_path.empty() && col_chunk.file_path != filename()) {
+      return Status(Substitute("Expected parquet column file path '$0' to match "
+          "filename '$1'", col_chunk.file_path, filename()));
     }
 
     const DiskIoMgr::ScanRange* split_range =
@@ -3150,8 +3196,11 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
     // All readers should have exhausted the final data page. This could fail if one
     // column has more values than stated in the metadata, meaning the final data page
     // will still have unread values.
-    // TODO for 2.3: make this a bad status
-    FILE_CHECK_EQ(reader->num_buffered_values_, 0);
+    if (reader->num_buffered_values_ != 0) {
+      return Status(Substitute("Corrupt parquet metadata in file '$0': metadata reports "
+          "'$1' more values in data page than actually present", filename(),
+          reader->num_buffered_values_));
+    }
     // Sanity check that the num_values_read_ value is the same for all readers. All
     // readers should have been advanced in lockstep (the above check is more likely to
     // fail if this not the case though, since num_values_read_ is only updated at the end

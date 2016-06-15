@@ -47,8 +47,9 @@ void ValidateDict(const vector<T>& values, int fixed_buffer_byte_size) {
   EXPECT_GT(data_len, 0);
   encoder.ClearIndices();
 
-  DictDecoder<T> decoder(
-      dict_buffer, encoder.dict_encoded_size(), fixed_buffer_byte_size);
+  DictDecoder<T> decoder;
+  ASSERT_TRUE(
+      decoder.Reset(dict_buffer, encoder.dict_encoded_size(), fixed_buffer_byte_size));
   decoder.SetData(data_buffer, data_len);
   for (T i: values) {
     T j;
@@ -130,17 +131,41 @@ TEST(DictTest, TestNumbers) {
   TestNumbers<float>(ParquetPlainEncoder::ByteSize(ColumnType(TYPE_FLOAT)));
   TestNumbers<double>(ParquetPlainEncoder::ByteSize(ColumnType(TYPE_DOUBLE)));
 
-  for (int i = 1; i <=16; ++i) {
+  for (int i = 1; i <= 16; ++i) {
     if (i <= 4) TestNumbers<Decimal4Value>(i);
     if (i <= 8) TestNumbers<Decimal8Value>(i);
     TestNumbers<Decimal16Value>(i);
   }
 }
 
+TEST(DictTest, TestInvalidStrings) {
+  uint8_t buffer[sizeof(int32_t) + 10];
+  int32_t len = -10;
+  memcpy(buffer, &len, sizeof(int32_t));
+
+  // Test a dictionary with a string encoded with negative length. Initializing
+  // the decoder should fail.
+  DictDecoder<StringValue> decoder;
+  ASSERT_FALSE(decoder.Reset(buffer, sizeof(buffer), 0));
+}
+
+TEST(DictTest, TestStringBufferOverrun) {
+  // Test string length past end of buffer.
+  uint8_t buffer[sizeof(int32_t) + 10];
+  int32_t len = 100;
+  memcpy(buffer, &len, sizeof(int32_t));
+
+  // Initializing the dictionary should fail, since the string would reference
+  // invalid memory.
+  DictDecoder<StringValue> decoder;
+  ASSERT_FALSE(decoder.Reset(buffer, sizeof(buffer), 0));
+}
+
+
 }
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

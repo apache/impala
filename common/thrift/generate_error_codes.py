@@ -119,7 +119,7 @@ error_codes = (
   ("UDF_VERIFY_FAILED", 33,
    "Failed to verify function $0 from LLVM module $1, see log for more details."),
 
-  ("PARQUET_CORRUPT_VALUE", 34, "File $0 corrupt. RLE level data bytes = $1"),
+  ("PARQUET_CORRUPT_RLE_BYTES", 34, "File $0 corrupt. RLE level data bytes = $1"),
 
   ("AVRO_DECIMAL_RESOLUTION_ERROR", 35, "Column '$0' has conflicting Avro decimal types. "
    "Table schema $1: $2, file schema $1: $3"),
@@ -154,8 +154,8 @@ error_codes = (
   ("PARQUET_NUM_COL_VALS_ERROR", 45, "Mismatched number of values in column index $0 "
    "($1 vs. $2). file=$3"),
 
-  ("PARQUET_DICT_DECODE_FAILURE", 46, "Failed to decode dictionary-encoded value. "
-   "file=$0"),
+  ("PARQUET_DICT_DECODE_FAILURE", 46, "File '$0' is corrupt: error decoding "
+   "dictionary-encoded value of type $1 at offset $2"),
 
   ("SSL_PASSWORD_CMD_FAILED", 47,
    "SSL private-key password command ('$0') failed with error: $1"),
@@ -268,6 +268,12 @@ error_codes = (
 
   ("SCANNER_STRING_LENGTH_OVERFLOW", 87, "File '$0' could not be read: string $1 was "
     "longer than supported limit of $2 bytes at offset $3"),
+
+  ("PARQUET_CORRUPT_PLAIN_VALUE", 88, "File '$0' is corrupt: error decoding value of type "
+   "$1 at offset $2"),
+
+  ("PARQUET_CORRUPT_DICTIONARY", 89, "File '$0' is corrupt: error reading dictionary for "
+   "data of type $1: $2"),
 )
 
 import sys

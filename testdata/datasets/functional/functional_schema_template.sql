@@ -1363,6 +1363,22 @@ bad_parquet
 field STRING
 ====
 ---- DATASET
+-- Can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh.
+functional
+---- BASE_TABLE_NAME
+bad_parquet_strings_negative_len
+---- COLUMNS
+s STRING
+====
+---- DATASET
+-- Can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh.
+functional
+---- BASE_TABLE_NAME
+bad_parquet_strings_out_of_bounds
+---- COLUMNS
+s STRING
+====
+---- DATASET
 -- IMPALA-2130: Wrong verification of parquet file version
 functional
 ---- BASE_TABLE_NAME

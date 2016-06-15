@@ -38,6 +38,8 @@ table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 table_name:bad_avro_snap_strings, constraint:restrict_to, table_format:avro/snap/block
 table_name:bad_avro_snap_floats, constraint:restrict_to, table_format:avro/snap/block
 table_name:bad_parquet, constraint:restrict_to, table_format:parquet/none/none
+table_name:bad_parquet_strings_negative_len, constraint:restrict_to, table_format:parquet/none/none
+table_name:bad_parquet_strings_out_of_bounds, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_magic_number, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_metadata_len, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_dict_page_offset, constraint:restrict_to, table_format:parquet/none/none

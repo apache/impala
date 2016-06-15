@@ -5,5 +5,5 @@ select * from bad_rle_counts
 bigint
 ---- RESULTS
 ---- ERRORS
-Failed to decode dictionary-encoded value. file: hdfs://regex:.$
+row_regex: .*File '.*/bad_rle_repeat_count.parquet' is corrupt: error decoding dictionary-encoded value of type BIGINT at offset 55.*
 ====

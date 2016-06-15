@@ -184,19 +184,18 @@ class DictDecoderBase {
 template<typename T>
 class DictDecoder : public DictDecoderBase {
  public:
-  /// The input buffer containing the dictionary.  'dict_len' is the byte length
-  /// of dict_buffer.
+  /// Construct empty dictionary.
+  DictDecoder() {}
+
+  /// Initialize the decoder with an input buffer containing the dictionary.
+  /// 'dict_len' is the byte length of dict_buffer.
   /// For string data, the decoder returns StringValues with data directly from
   /// dict_buffer (i.e. no copies).
   /// fixed_len_size is the size that must be passed to decode fixed-length
   /// dictionary values (values stored using FIXED_LEN_BYTE_ARRAY).
-  DictDecoder(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
-
-  /// Construct empty dictionary.
-  DictDecoder() {}
-
-  /// Reset decoder to fresh state.
-  void Reset(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
+  /// Returns true if the dictionary values were all successfully decoded, or false
+  /// if the dictionary was corrupt.
+  bool Reset(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
 
   virtual int num_entries() const { return dict_.size(); }
 
@@ -312,22 +311,19 @@ inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
 }
 
 template<typename T>
-inline DictDecoder<T>::DictDecoder(uint8_t* dict_buffer, int dict_len,
-    int fixed_len_size) {
-  Reset(dict_buffer, dict_len, fixed_len_size);
-}
-
-template<typename T>
-inline void DictDecoder<T>::Reset(uint8_t* dict_buffer, int dict_len,
+inline bool DictDecoder<T>::Reset(uint8_t* dict_buffer, int dict_len,
     int fixed_len_size) {
   dict_.clear();
   uint8_t* end = dict_buffer + dict_len;
   while (dict_buffer < end) {
     T value;
-    dict_buffer +=
-        ParquetPlainEncoder::Decode(dict_buffer, fixed_len_size, &value);
+    int decoded_len =
+        ParquetPlainEncoder::Decode(dict_buffer, end, fixed_len_size, &value);
+    if (UNLIKELY(decoded_len < 0)) return false;
+    dict_buffer += decoded_len;
     dict_.push_back(value);
   }
+  return true;
 }
 
 }

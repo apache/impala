@@ -275,6 +275,17 @@ function load-custom-data {
   hadoop fs -put -f ${IMPALA_HOME}/testdata/data/long_page_header.parquet \
                     /test-warehouse/bad_parquet_parquet
 
+  # IMPALA-3732: parquet files with corrupt strings
+  local parq_file
+  for parq_file in dict-encoded-negative-len.parq plain-encoded-negative-len.parq; do
+    hadoop fs -put -f ${IMPALA_HOME}/testdata/bad_parquet_data/$parq_file \
+                    /test-warehouse/bad_parquet_strings_negative_len_parquet
+  done
+  for parq_file in dict-encoded-out-of-bounds.parq plain-encoded-out-of-bounds.parq; do
+    hadoop fs -put -f ${IMPALA_HOME}/testdata/bad_parquet_data/$parq_file \
+                    /test-warehouse/bad_parquet_strings_out_of_bounds_parquet
+  done
+
   # Remove all index files in this partition.
   hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/*.lzo.index
 

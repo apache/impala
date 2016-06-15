@@ -1,0 +1,10 @@
+These Parquet files were created by modifying Impala's HdfsParquetTableWriter.
+
+String Data
+-----------
+These files have a single nullable string column 's'.
+
+dict-encoded-negative-len.parq: a single dictionary-encoded value with a negative length.
+dict-encoded-out-of-bounds.parq: a single dictionary-encoded value with a length past end of page.
+plain-encoded-negative-len.parq: a single plain-encoded value with a negative length.
+plain-encoded-out-of-bounds.parq: a single plain-encoded value with a length past end of page.

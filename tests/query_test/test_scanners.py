@@ -218,7 +218,7 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet', vector)
 
   @SkipIfOldAggsJoins.nested_types
-  def test_file_metadata_discrepancy(self, vector):
+  def test_corrupt_files(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('QueryTest/parquet-continue-on-error', vector)
     vector.get_value('exec_option')['abort_on_error'] = 1

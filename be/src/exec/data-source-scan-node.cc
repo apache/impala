@@ -168,20 +168,25 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
   switch (type.GetByteSize()) {
     case 4: {
       Decimal4Value* val = reinterpret_cast<Decimal4Value*>(slot);
-      if (len > sizeof(Decimal4Value)) return Status(ERROR_INVALID_DECIMAL);
-      // TODO: Move Decode() to a more generic utils class (here and below)
-      ParquetPlainEncoder::Decode(buffer, len, val);
+      if (UNLIKELY(len > sizeof(Decimal4Value) ||
+          ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
+        return Status(ERROR_INVALID_DECIMAL);
+      }
     }
     case 8: {
       Decimal8Value* val = reinterpret_cast<Decimal8Value*>(slot);
-      if (len > sizeof(Decimal8Value)) return Status(ERROR_INVALID_DECIMAL);
-      ParquetPlainEncoder::Decode(buffer, len, val);
+      if (UNLIKELY(len > sizeof(Decimal8Value) ||
+          ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
+        return Status(ERROR_INVALID_DECIMAL);
+      }
       break;
     }
     case 16: {
       Decimal16Value* val = reinterpret_cast<Decimal16Value*>(slot);
-      if (len > sizeof(Decimal16Value)) return Status(ERROR_INVALID_DECIMAL);
-      ParquetPlainEncoder::Decode(buffer, len, val);
+      if (UNLIKELY(len > sizeof(Decimal16Value) ||
+          ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
+        return Status(ERROR_INVALID_DECIMAL);
+      }
       break;
     }
     default: DCHECK(false);

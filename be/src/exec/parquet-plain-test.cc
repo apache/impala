@@ -26,6 +26,26 @@
 
 namespace impala {
 
+/// Test that the decoder fails when asked to decode a truncated value.
+template <typename T>
+void TestTruncate(const T& v, int expected_byte_size) {
+  uint8_t buffer[expected_byte_size];
+  int encoded_size = ParquetPlainEncoder::Encode(buffer, expected_byte_size, v);
+  EXPECT_EQ(encoded_size, expected_byte_size);
+
+  // Check all possible truncations of the buffer.
+  for (int truncated_size = encoded_size - 1; truncated_size >= 0; --truncated_size) {
+    T result;
+    /// Copy to heap-allocated buffer so that ASAN can detect buffer overruns.
+    uint8_t* truncated_buffer = new uint8_t[truncated_size];
+    memcpy(truncated_buffer, buffer, truncated_size);
+    int decoded_size = ParquetPlainEncoder::Decode(truncated_buffer,
+        truncated_buffer + truncated_size, expected_byte_size, &result);
+    EXPECT_EQ(-1, decoded_size);
+    delete[] truncated_buffer;
+  }
+}
+
 template <typename T>
 void TestType(const T& v, int expected_byte_size) {
   uint8_t buffer[expected_byte_size];
@@ -33,9 +53,12 @@ void TestType(const T& v, int expected_byte_size) {
   EXPECT_EQ(encoded_size, expected_byte_size);
 
   T result;
-  int decoded_size = ParquetPlainEncoder::Decode(buffer, expected_byte_size, &result);
+  int decoded_size = ParquetPlainEncoder::Decode(buffer, buffer + expected_byte_size,
+      expected_byte_size, &result);
   EXPECT_EQ(decoded_size, expected_byte_size);
   EXPECT_EQ(result, v);
+
+  TestTruncate(v, expected_byte_size);
 }
 
 TEST(PlainEncoding, Basic) {
@@ -119,6 +142,19 @@ TEST(PlainEncoding, DecimalBigEndian) {
   size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d16), d16);
   ASSERT_EQ(size, sizeof(d16));
   ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d16), sizeof(d16)), 0);
+}
+
+/// Test that corrupt strings are handled correctly.
+TEST(PlainEncoding, CorruptString) {
+  // Test string with negative length.
+  uint8_t buffer[sizeof(int32_t) + 10];
+  int32_t len = -10;
+  memcpy(buffer, &len, sizeof(int32_t));
+
+  StringValue result;
+  int decoded_size =
+      ParquetPlainEncoder::Decode(buffer, buffer + sizeof(buffer), 0, &result);
+  EXPECT_EQ(decoded_size, -1);
 }
 
 }
