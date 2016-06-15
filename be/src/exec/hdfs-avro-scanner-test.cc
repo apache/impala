@@ -442,9 +442,8 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
   TestReadAvroDecimal(data, 1, d16v, -1, TErrorCode::AVRO_TRUNCATED_BLOCK);
   TestReadAvroDecimal(data, 4, d16v, -1, TErrorCode::AVRO_TRUNCATED_BLOCK);
 
-  bool overflow;
-  d16v = Decimal16Value::FromDouble(38, 0, .1e38d, &overflow);
-  DCHECK(!overflow);
+  /// Produce a very large decimal value.
+  memset(&d16v.value(), 0xFF, sizeof(d16v.value()));
   data[0] = 32; // decodes to 16
 #if __BYTE_ORDER == __LITTLE_ENDIAN
   BitUtil::ByteSwap(&data[1], &d16v.value(), 16);

@@ -107,15 +107,15 @@ TEST(ZigzagTest, Errors) {
   // Test 100-byte int
   uint8_t* buf_ptr = static_cast<uint8_t*>(buf);
   int64_t buf_len = sizeof(buf);
-  EXPECT_TRUE(ReadWriteUtil::ReadZLong(&buf_ptr, buf + buf_len).error);
-  EXPECT_TRUE(ReadWriteUtil::ReadZInt(&buf_ptr, buf + buf_len).error);
+  EXPECT_FALSE(ReadWriteUtil::ReadZLong(&buf_ptr, buf + buf_len).ok);
+  EXPECT_FALSE(ReadWriteUtil::ReadZInt(&buf_ptr, buf + buf_len).ok);
 
   // Test truncated int
   buf_ptr = static_cast<uint8_t*>(buf);
   buf_len = ReadWriteUtil::MAX_ZLONG_LEN - 1;
-  EXPECT_TRUE(ReadWriteUtil::ReadZLong(&buf_ptr, buf + buf_len).error);
+  EXPECT_FALSE(ReadWriteUtil::ReadZLong(&buf_ptr, buf + buf_len).ok);
   buf_len = ReadWriteUtil::MAX_ZINT_LEN - 1;
-  EXPECT_TRUE(ReadWriteUtil::ReadZInt(&buf_ptr, buf + buf_len).error);
+  EXPECT_FALSE(ReadWriteUtil::ReadZInt(&buf_ptr, buf + buf_len).ok);
 }
 
   // Test weird encodings and values that are arguably invalid but we still accept
