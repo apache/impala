@@ -34,6 +34,7 @@ There are {{num_sessions}} active sessions.
     <th>Expired</th>
     <th>Closed</th>
     <th>Ref count</th>
+    <th>Action</th>
   </tr>
 {{#sessions}}
   <tr>
@@ -51,6 +52,7 @@ There are {{num_sessions}} active sessions.
     <td>{{expired}}</td>
     <td>{{closed}}</td>
     <td>{{ref_count}}</td>
+    <td><a href='/close_session?session_id={{session_id}}'>Close Session</a></td>
   </tr>
 {{/sessions}}
 </table>

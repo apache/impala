@@ -50,15 +50,16 @@ Webserver::UrlCallback MakeCallback(T* caller, const F& fnc) {
   };
 }
 
-// We expect the query id to be passed as one parameter, 'query_id'.
-// Returns true if the query id was present and valid; false otherwise.
-static Status ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
-  Webserver::ArgumentMap::const_iterator it = args.find("query_id");
+// We expect the id to be passed as one parameter. Eg: 'query_id' or 'session_id'.
+// Returns true if the id was present and valid; false otherwise.
+static Status ParseIdFromArguments(const Webserver::ArgumentMap& args, TUniqueId* id,
+    const std::string &to_find) {
+  Webserver::ArgumentMap::const_iterator it = args.find(to_find);
   if (it == args.end()) {
-    return Status("No 'query_id' argument found");
+    return Status(Substitute("No '$0' argument found.", to_find));
   } else {
     if (ParseId(it->second, id)) return Status::OK();
-    return Status(Substitute("Could not parse 'query_id' argument: $0", it->second));
+    return Status(Substitute("Could not parse '$0' argument: $1", to_find, it->second));
   }
 }
 
@@ -87,6 +88,9 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
 
   webserver->RegisterUrlCallback("/cancel_query", "common-pre.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::CancelQueryHandler), false);
+
+  webserver->RegisterUrlCallback("/close_session", "common-pre.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::CloseSessionHandler), false);
 
   webserver->RegisterUrlCallback("/query_profile_encoded", "raw_text.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::QueryProfileEncodedHandler), false);
@@ -133,7 +137,7 @@ void ImpalaHttpHandler::HadoopVarzHandler(const Webserver::ArgumentMap& args,
 void ImpalaHttpHandler::CancelQueryHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TUniqueId unique_id;
-  Status status = ParseQueryId(args, &unique_id);
+  Status status = ParseIdFromArguments(args, &unique_id, "query_id");
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -150,10 +154,32 @@ void ImpalaHttpHandler::CancelQueryHandler(const Webserver::ArgumentMap& args,
   document->AddMember("contents", message, document->GetAllocator());
 }
 
+void ImpalaHttpHandler::CloseSessionHandler(const Webserver::ArgumentMap& args,
+    Document* document) {
+  TUniqueId unique_id;
+  Status status = ParseIdFromArguments(args, &unique_id, "session_id");
+  if (!status.ok()) {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+  Status cause("Session closed from Impala's debug web interface");
+  status = server_->CloseSessionInternal(unique_id, true);
+  if (!status.ok()) {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+  stringstream ss;
+  ss << "Session " << unique_id << " closed successfully";
+  Value message(ss.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", message, document->GetAllocator());
+}
+
 void ImpalaHttpHandler::QueryProfileHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   TUniqueId unique_id;
-  Status parse_status = ParseQueryId(args, &unique_id);
+  Status parse_status = ParseIdFromArguments(args, &unique_id, "query_id");
   if (!parse_status.ok()) {
     Value error(parse_status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -178,7 +204,7 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
     Document* document) {
   TUniqueId unique_id;
   stringstream ss;
-  Status status = ParseQueryId(args, &unique_id);
+  Status status = ParseIdFromArguments(args, &unique_id, "query_id");
   if (!status.ok()) {
     ss << status.GetDetail();
   } else {
@@ -609,7 +635,7 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
 void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include_summary,
     const Webserver::ArgumentMap& args, Document* document) {
   TUniqueId query_id;
-  Status status = ParseQueryId(args, &query_id);
+  Status status = ParseIdFromArguments(args, &query_id, "query_id");
   if (!status.ok()) {
     // Redact the error message, it may contain part or all of the query.
     Value json_error(RedactCopy(status.GetDetail()).c_str(), document->GetAllocator());

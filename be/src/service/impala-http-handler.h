@@ -92,6 +92,10 @@ class ImpalaHttpHandler {
   void CancelQueryHandler(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 
+  /// Closes an active session with a client.
+  void CloseSessionHandler(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
+
   /// Upon return, 'document' will contain the query profile as a base64 encoded object in
   /// 'contents'.
   void QueryProfileEncodedHandler(const Webserver::ArgumentMap& args,
