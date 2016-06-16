@@ -363,8 +363,11 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
   local_time_percent_ = ::min(1.0, local_time_percent_) * 100;
 
   // Recurse on children
-  for (int i = 0; i < children_.size(); ++i) {
-    children_[i].first->ComputeTimeInProfile(total);
+  {
+    lock_guard<SpinLock> l(children_lock_);
+    for (int i = 0; i < children_.size(); ++i) {
+      children_[i].first->ComputeTimeInProfile(total);
+    }
   }
 }
 
