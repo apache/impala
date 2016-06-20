@@ -86,21 +86,48 @@ string Benchmark::Measure() {
   // Run a warmup to iterate through the data
   benchmarks_[0].fn(10, benchmarks_[0].args);
 
-  stringstream ss;
-  for (int i = 0; i < benchmarks_.size(); ++i) {
-    benchmarks_[i].rate = Measure(benchmarks_[i].fn, benchmarks_[i].args);
-  }
+  // The number of times a benchmark is repeated
+  const int NUM_REPS = 60;
+  // Which percentiles of the benchmark to report. Reports the LO_PERCENT, MID_PERCENT,
+  // and HI_PERCENT percentile result.
+  const int LO_PERCENT = 10;
+  const int MID_PERCENT = 50;
+  const int HI_PERCENT = 100 - LO_PERCENT;
+  const size_t LO_IDX =
+      floor(((LO_PERCENT / 100.0) * static_cast<double>(NUM_REPS)) - 0.5);
+  const size_t MID_IDX =
+      floor(((MID_PERCENT / 100.0) * static_cast<double>(NUM_REPS)) - 0.5);
+  const size_t HI_IDX =
+      floor(((HI_PERCENT / 100.0) * static_cast<double>(NUM_REPS)) - 0.5);
 
-  int function_out_width = 30;
-  int rate_out_width = 20;
-  int comparison_out_width = 20;
-  int padding = 0;
-  int total_width = function_out_width + rate_out_width + comparison_out_width + padding;
+  const int function_out_width = 35;
+  const int rate_out_width = 10;
+  const int percentile_out_width = 9;
+  const int comparison_out_width = 11;
+  const int padding = 0;
+  const int total_width = function_out_width + rate_out_width + 3 * comparison_out_width +
+      3 * percentile_out_width + padding;
+
+  stringstream ss;
+  for (int j = 0; j < NUM_REPS; ++j) {
+    for (int i = 0; i < benchmarks_.size(); ++i) {
+      benchmarks_[i].rates.push_back(Measure(benchmarks_[i].fn, benchmarks_[i].args));
+    }
+  }
 
   ss << name_ << ":"
      << setw(function_out_width - name_.size() - 1) << "Function"
-     << setw(rate_out_width) << "Rate (iters/ms)"
-     << setw(comparison_out_width) << "Comparison" << endl;
+     << setw(rate_out_width) << "iters/ms"
+     << setw(percentile_out_width -4) << LO_PERCENT << "%ile"
+     << setw(percentile_out_width - 4) << MID_PERCENT << "%ile"
+     << setw(percentile_out_width - 4) << HI_PERCENT << "%ile"
+     << setw(comparison_out_width - 4) << LO_PERCENT << "%ile"
+     << setw(comparison_out_width - 4) << MID_PERCENT << "%ile"
+     << setw(comparison_out_width - 4) << HI_PERCENT << "%ile" << endl;
+  ss << setw(function_out_width + rate_out_width + 3 * percentile_out_width +
+            comparison_out_width) << "(relative)"
+     << setw(comparison_out_width) << "(relative)"
+     << setw(comparison_out_width) << "(relative)" << endl;
   for (int i = 0; i < total_width; ++i) {
     ss << '-';
   }
@@ -108,12 +135,24 @@ string Benchmark::Measure() {
 
   int previous_baseline_idx = -1;
   for (int i = 0; i < benchmarks_.size(); ++i) {
-    double base_line = benchmarks_[benchmarks_[i].baseline_idx].rate;
+    sort(benchmarks_[i].rates.begin(), benchmarks_[i].rates.end());
+    const double base_line_lo = benchmarks_[benchmarks_[i].baseline_idx].rates[LO_IDX];
+    const double base_line_mid = benchmarks_[benchmarks_[i].baseline_idx].rates[MID_IDX];
+    const double base_line_hi = benchmarks_[benchmarks_[i].baseline_idx].rates[HI_IDX];
     if (previous_baseline_idx != benchmarks_[i].baseline_idx && i > 0) ss << endl;
     ss << setw(function_out_width) << benchmarks_[i].name
-       << setw(rate_out_width) << setprecision(4) << benchmarks_[i].rate
-       << setw(comparison_out_width - 1) << setprecision(4)
-       << (benchmarks_[i].rate / base_line) << "X" << endl;
+       << setw(rate_out_width + percentile_out_width) << setprecision(3)
+           << benchmarks_[i].rates[LO_IDX]
+       << setw(percentile_out_width) << setprecision(3)
+           << benchmarks_[i].rates[MID_IDX]
+       << setw(percentile_out_width) << setprecision(3)
+           << benchmarks_[i].rates[HI_IDX]
+       << setw(comparison_out_width - 1) << setprecision(3)
+       << (benchmarks_[i].rates[LO_IDX] / base_line_lo) << "X"
+       << setw(comparison_out_width - 1) << setprecision(3)
+       << (benchmarks_[i].rates[MID_IDX] / base_line_mid) << "X"
+       << setw(comparison_out_width - 1) << setprecision(3)
+       << (benchmarks_[i].rates[HI_IDX] / base_line_hi) << "X" << endl;
     previous_baseline_idx = benchmarks_[i].baseline_idx;
   }
 

@@ -62,13 +62,13 @@ class Benchmark {
   /// harness function will automatically ramp up the batch_size.  The benchmark
   /// will take *at least* initial_batch_size * function invocation time.
   static double Measure(BenchmarkFunction function, void* args,
-      int max_time = 1000, int initial_batch_size = 1000);
+      int max_time = 50, int initial_batch_size = 10);
 
   struct BenchmarkResult {
     std::string name;
     BenchmarkFunction fn;
     void* args;
-    double rate;
+    std::vector<double> rates;
     int baseline_idx;
   };
 
