@@ -16,7 +16,7 @@ fi
 
 DIR=$(dirname "$0")
 # Download but don't install all packages listed in requirements.txt.
-"$PIP" install --download "$DIR" -r "$DIR"/requirements.txt
+"$PIP" -q install --download "$DIR" -r "$DIR"/requirements.txt
 
 # Directly download required packages not listed in requirements.txt.
 # For virtualenv, other scripts rely on the .tar.gz package (not a .whl package).
