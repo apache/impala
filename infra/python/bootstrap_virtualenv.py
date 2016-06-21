@@ -82,8 +82,11 @@ def exec_pip_install(args, **popen_kwargs):
   # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
   # virtualenv using an absolute path. If the path to the virtualenv is very long, the
   # hashbang won't work.
+  #
+  # Passes --no-binary for IMPALA-3767: without this, Cython (and
+  # several other packages) fail download.
   exec_cmd([os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
-    "install", "--no-index", "--find-links",
+    "install", "--no-binary", "--no-index", "--find-links",
     "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR))] + args, **popen_kwargs)
 
 
