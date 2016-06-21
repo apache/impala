@@ -19,7 +19,7 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.skip import SkipIfS3, SkipIfLocal
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
 
 TEST_TBL = 'read_only_tbl'
 TBL_LOC = '%s/%s' % (WAREHOUSE, TEST_TBL)
@@ -49,8 +49,12 @@ class TestHdfsPermissions(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir('test-warehouse/%s' % TEST_TBL, recursive=True)
 
   def test_insert_into_read_only_table(self, vector):
+    permission = 444
+    if IS_ISILON:
+      # In Isilon OneFS 8.0, a change was introduced that requires this. See IMPALA-3698.
+      permission = 544
     # Create a directory that is read-only
-    self.hdfs_client.make_dir('test-warehouse/%s' % TEST_TBL, permission=444)
+    self.hdfs_client.make_dir('test-warehouse/%s' % TEST_TBL, permission=permission)
     self.client.execute("create external table %s (i int) location '%s'"
         % (TEST_TBL, TBL_LOC))
     try:
