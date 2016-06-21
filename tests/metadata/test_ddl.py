@@ -17,7 +17,7 @@ import time
 import getpass
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal, SkipIfOldAggsJoins
+from tests.common.skip import SkipIf, SkipIfLocal, SkipIfOldAggsJoins
 from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
 from test_ddl_base import TestDdlBase
 
@@ -195,6 +195,11 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/create-database', vector,
         multiple_impalad=self._use_multiple_impalad(vector))
 
+  # There is a query in QueryTest/create-table that references nested types, which is not
+  # supported if old joins and aggs are enabled. Since we do not get any meaningful
+  # additional coverage by running a DDL test under the old aggs and joins, it can be
+  # skipped.
+  @SkipIfOldAggsJoins.nested_types
   @pytest.mark.execute_serially
   def test_create_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
