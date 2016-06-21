@@ -3,6 +3,7 @@
 # over which archive type is downloaded and what post-download steps are executed.
 import hashlib
 import json
+import os.path
 from urllib import urlopen, URLopener
 import sys
 
@@ -11,16 +12,26 @@ pkg_version = sys.argv[2]
 pkg_type = 'sdist' # Don't download wheel archives for now
 pkg_info = json.loads(urlopen('https://pypi.python.org/pypi/%s/json' % pkg_name).read())
 
+def check_md5sum(filename, expected_md5):
+  expected_md5 = pkg['md5_digest']
+  actual_md5 = hashlib.md5(open(filename).read()).hexdigest()
+  return actual_md5 == expected_md5
+
 found = False
 downloader = URLopener()
 for pkg in pkg_info['releases'][pkg_version]:
   if pkg['packagetype'] == pkg_type:
-    print "Downloading %s from %s " % (pkg['filename'], pkg['url'])
-    downloader.retrieve(pkg['url'], pkg['filename'])
+    filename = pkg['filename']
     expected_md5 = pkg['md5_digest']
-    actual_md5 = hashlib.md5(open(pkg['filename']).read()).hexdigest()
-    if actual_md5 != expected_md5:
-      print "MD5 mismatch: %s v. %s" % (expected_md5, actual_md5)
+    print "Downloading %s from %s " % (filename, pkg['url'])
+    if os.path.isfile(filename) and check_md5sum(filename, expected_md5):
+      print "File with matching md5sum already exists, skipping download."
+      found = True
+      break
+    downloader.retrieve(pkg['url'], filename)
+    actual_md5 = hashlib.md5(open(filename).read()).hexdigest()
+    if not check_md5sum(filename, expected_md5):
+      print "MD5 mismatch in file %s." % filename
       sys.exit(1)
     found = True
     break

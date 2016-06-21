@@ -22,5 +22,7 @@ DIR=$(dirname "$0")
 # For virtualenv, other scripts rely on the .tar.gz package (not a .whl package).
 # kudu-python is downloaded separately because pip install attempts to execute a
 # setup.py subcommand for kudu-python that can fail even if the download succeeds.
-$PYTHON $DIR/pip_download.py virtualenv 13.0.1
-$PYTHON $DIR/pip_download.py kudu-python 0.1.1
+pushd $DIR
+$PYTHON ./pip_download.py virtualenv 13.1.0
+$PYTHON ./pip_download.py kudu-python 0.1.1
+popd
