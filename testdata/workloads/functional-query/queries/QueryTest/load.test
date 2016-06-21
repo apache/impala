@@ -3,13 +3,11 @@
 alter table functional.test_load add partition
 (year=2009, month=1)
 ---- RESULTS
-
 ====
 ---- QUERY
 alter table functional.test_load add partition
 (year=2010, month=1)
 ---- RESULTS
-
 ====
 ---- QUERY
 # Insert some data into one of the partitions, used to verify we are not clobbering

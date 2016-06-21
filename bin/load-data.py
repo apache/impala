@@ -5,6 +5,7 @@
 # all data via Hive except for parquet data which needs to be loaded via Impala.
 # Most ddl commands are executed by Impala.
 import collections
+import getpass
 import os
 import re
 import sqlparse
@@ -12,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
-import getpass
+import traceback
 from itertools import product
 from optparse import OptionParser
 from Queue import Queue
@@ -137,9 +138,11 @@ def exec_impala_query_from_file(file_name):
     for query in queries:
       query = sqlparse.format(query.rstrip(';'), strip_comments=True)
       print '(%s):\n%s\n' % (file_name, query.strip())
-      result = impala_client.execute(query)
+      if query.strip() != "":
+        result = impala_client.execute(query)
   except Exception as e:
     print "Data Loading from Impala failed with error: %s" % str(e)
+    traceback.print_exc()
     is_success = False
   finally:
     impala_client.close_connection()

@@ -16,14 +16,22 @@
 # Tests Impala properly handles errors when reading and writing data.
 
 import pytest
+import random
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfLocal
+from tests.common.test_dimensions import create_exec_option_dimension
 
 class TestDataErrors(ImpalaTestSuite):
+  # batch_size of 1 can expose some interesting corner cases at row batch boundaries.
+  BATCH_SIZES = [0, 1]
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestDataErrors, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(
+        create_exec_option_dimension(batch_sizes=cls.BATCH_SIZES))
+
 
   @classmethod
   def get_workload(self):

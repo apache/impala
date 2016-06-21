@@ -6,7 +6,9 @@ import logging
 import math
 import re
 
-from tests.util.test_file_parser import remove_comments
+from functools import wraps
+from tests.util.test_file_parser import (join_section_lines, remove_comments,
+    split_section_lines)
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_result_verfier')
@@ -189,11 +191,24 @@ def assert_args_not_none(*args):
   for arg in args:
     assert arg is not None
 
-def verify_query_result_is_subset(expected_results, actual_results):
+def convert_results_to_sets(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
   expected_set = set(map(str, expected_results.rows))
   actual_set = set(map(str, actual_results.rows))
+  return expected_set, actual_set
+
+def verify_query_result_is_subset(expected_results, actual_results):
+  """Check whether the results in expected_results are a subset of the results in
+  actual_results. This uses set semantics, i.e. any duplicates are ignored."""
+  expected_set, actual_set = convert_results_to_sets(expected_results, actual_results)
   assert expected_set <= actual_set
+
+def verify_query_result_is_superset(expected_results, actual_results):
+  """Check whether the results in expected_results are a superset of the results in
+  actual_results. This uses set semantics, i.e. any duplicates are ignored."""
+  expected_set, actual_set = convert_results_to_sets(expected_results, actual_results)
+  assert expected_set >= actual_set
+
 
 def verify_query_result_is_equal(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
@@ -210,6 +225,7 @@ def verify_query_result_is_not_in(expected_results, actual_results):
 # add more verifiers in the future. If a tag is not found, it defaults to verifying
 # equality.
 VERIFIER_MAP = {'VERIFY_IS_SUBSET' : verify_query_result_is_subset,
+                'VERIFY_IS_SUPERSET' : verify_query_result_is_superset,
                 'VERIFY_IS_EQUAL_SORTED'  : verify_query_result_is_equal,
                 'VERIFY_IS_EQUAL'  : verify_query_result_is_equal,
                 'VERIFY_IS_NOT_IN' : verify_query_result_is_not_in,
@@ -271,13 +287,13 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     return
 
   if 'ERRORS' in test_section:
-    expected_errors = remove_comments(test_section['ERRORS']).split('\n')
+    expected_errors = split_section_lines(remove_comments(test_section['ERRORS']))
     actual_errors = apply_error_match_filter(exec_result.log.split('\n'))
     try:
       verify_errors(expected_errors, actual_errors)
     except AssertionError:
       if update_section:
-        test_section['ERRORS'] = '\n'.join(actual_errors)
+        test_section['ERRORS'] = join_section_lines(actual_errors)
       else:
         raise
 
@@ -285,7 +301,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     # Distinguish between an empty list and a list with an empty string.
     expected_types = list()
     if test_section.get('TYPES'):
-      expected_types = [c.strip().upper() for c in test_section['TYPES'].split(',')]
+      expected_types = [c.strip().upper() for c in test_section['TYPES'].rstrip('\n').split(',')]
 
     # Avro does not support as many types as Hive, so the Avro test tables may
     # have different column types than we expect (e.g., INT instead of
@@ -305,7 +321,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
       verify_results(expected_types, actual_types, order_matters=True)
     except AssertionError:
       if update_section:
-        test_section['TYPES'] = ', '.join(actual_types)
+        test_section['TYPES'] = join_section_lines([', '.join(actual_types)])
       else:
         raise
   else:
@@ -327,7 +343,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
       verify_results(expected_labels, actual_labels, order_matters=True)
     except AssertionError:
       if update_section:
-        test_section['LABELS'] = ', '.join(actual_labels)
+        test_section['LABELS'] = join_section_lines([', '.join(actual_labels)])
       else:
         raise
 
@@ -351,7 +367,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     expected_results_list = map(lambda s: s.replace('\n', '\\n'),
         re.findall(r'\[(.*?)\]', expected_results, flags=re.DOTALL))
   else:
-    expected_results_list = expected_results.split('\n')
+    expected_results_list = split_section_lines(expected_results)
   expected = QueryTestResult(expected_results_list, expected_types,
       actual_labels, order_matters)
   actual = QueryTestResult(parse_result_rows(exec_result), actual_types,
@@ -361,7 +377,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     VERIFIER_MAP[verifier](expected, actual)
   except AssertionError:
     if update_section:
-      test_section['RESULTS'] = '\n'.join(actual.result_list)
+      test_section['RESULTS'] = join_section_lines(actual.result_list)
     else:
       raise
 
@@ -392,7 +408,7 @@ def parse_result_rows(exec_result):
   """
   raw_result = exec_result.data
   if not raw_result:
-    return ['']
+    return []
 
   # If the schema is 'None' assume this is an insert statement
   if exec_result.schema is None:

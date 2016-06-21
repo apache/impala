@@ -369,7 +369,7 @@ class ImpalaBeeswaxClient(object):
     if query_type == 'use':
       # TODO: "use <database>" does not currently throw an error. Need to update this
       # to handle the error case once that behavior has been changed.
-      return ImpalaBeeswaxResult(query=query_string, success=True, data=[''])
+      return ImpalaBeeswaxResult(query=query_string, success=True, data=[])
 
     # Result fetching for insert is different from other queries.
     exec_result = None

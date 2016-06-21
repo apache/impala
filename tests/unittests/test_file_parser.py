@@ -48,8 +48,8 @@ class TestTestFileParser(BaseTestSuite):
     results = parse_test_file_text(test_text, VALID_SECTIONS)
     assert len(results) == 3
     print results[0]
-    expected_results = {'QUERY': '# comment\nSELECT blah from Foo\ns',
-                        'TYPES': 'string', 'RESULTS': "'Hi'"}
+    expected_results = {'QUERY': '# comment\nSELECT blah from Foo\ns\n',
+                        'TYPES': 'string\n', 'RESULTS': "'Hi'\n"}
     assert results[0] == expected_results
 
   def test_invalid_section(self):
@@ -57,8 +57,8 @@ class TestTestFileParser(BaseTestSuite):
     valid_sections = ['QUERY', 'RESULTS']
     results = parse_test_file_text(test_text, valid_sections, skip_unknown_sections=True)
     assert len(results) == 3
-    expected_results = {'QUERY': '# comment\nSELECT blah from Foo\ns',
-                        'RESULTS': "'Hi'"}
+    expected_results = {'QUERY': '# comment\nSELECT blah from Foo\ns\n',
+                        'RESULTS': "'Hi'\n"}
     assert results[0] == expected_results
 
     # In this case, instead of ignoring the invalid section we should get an error
@@ -72,20 +72,20 @@ class TestTestFileParser(BaseTestSuite):
   def test_parse_query_name(self):
     results = parse_test_file_text(test_text, VALID_SECTIONS, False)
     assert len(results) == 3
-    expected_results = {'QUERY': 'SELECT int_col from Bar',
-                        'TYPES': 'int', 'RESULTS': '231',
+    expected_results = {'QUERY': 'SELECT int_col from Bar\n',
+                        'TYPES': 'int\n', 'RESULTS': '231\n',
                         'QUERY_NAME': 'TEST_WORKLOAD_Q2'}
     assert results[2] == expected_results
 
   def test_parse_commented_out_test_as_comment(self):
     results = parse_test_file_text(test_text, VALID_SECTIONS)
     assert len(results) == 3
-    expected_results = {'QUERY': 'SELECT 2', 'RESULTS': "'Hello'",
+    expected_results = {'QUERY': 'SELECT 2\n', 'RESULTS': "'Hello'\n",
                         'TYPES': "string\n#====\n"\
-                        "# SHOULD PARSE COMMENTED OUT TEST PROPERLY\n"\
-                        "#---- QUERY: TEST_WORKLOAD_Q2\n"\
-                        "#SELECT int_col from Bar\n"\
-                        "#---- RESULTS\n#231\n#---- TYPES\n#int"}
+                        "# SHOULD PARSE COMMENTED OUT TEST PROPERLY\n"
+                        "#---- QUERY: TEST_WORKLOAD_Q2\n"
+                        "#SELECT int_col from Bar\n"
+                        "#---- RESULTS\n#231\n#---- TYPES\n#int\n"}
     print expected_results
     print results[1]
     assert results[1] == expected_results

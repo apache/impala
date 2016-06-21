@@ -21,9 +21,9 @@ SUBSECTION_DELIMITER = "----"
 class QueryTestSectionReader(object):
   @staticmethod
   def build_query(query_section_text):
-    """Build a query by stripping comments and trailing semi-colons."""
+    """Build a query by stripping comments and trailing newlines and semi-colons."""
     query_section_text = remove_comments(query_section_text)
-    return query_section_text.rstrip(';')
+    return query_section_text.rstrip("\n;")
 
   @staticmethod
   def get_table_name_components(table_format, table_name, scale_factor=''):
@@ -175,7 +175,12 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
         subsection_name, subsection_comment = subsection_info
 
       lines_content = lines[1:-1]
+
       subsection_str = '\n'.join([line for line in lines_content])
+      if len(lines_content) != 0:
+        # Add trailing newline to last line if present. This disambiguates between the
+        # case of no lines versus a single line with no text.
+        subsection_str += "\n"
 
       if subsection_name not in valid_section_names:
         if skip_unknown_sections or not subsection_name:
@@ -213,6 +218,22 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       sections.append(parsed_sections)
   return sections
 
+def split_section_lines(section_str):
+  """
+  Given a section string as produced by parse_test_file_text(), split it into separate
+  lines. The section string must have a trailing newline.
+  """
+  if section_str == '':
+    return []
+  assert section_str[-1] == '\n'
+  # Trim off the trailing newline and split into lines.
+  return section_str[:-1].split('\n')
+
+def join_section_lines(lines):
+  """
+  The inverse of split_section_lines().
+  """
+  return '\n'.join(lines) + '\n'
 
 def write_test_file(test_file_name, test_file_sections, encoding=None):
   """

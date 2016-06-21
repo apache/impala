@@ -260,8 +260,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
       bool write_slot, void* slot, MemPool* pool);
 
   /// Helper function for some of the above. Returns the the length of certain varlen
-  /// types and updates 'data'. Returns true on success, returns false and updates
-  /// parse_status_ on error.
+  /// types and updates 'data'. If an error is encountered returns a non-ok result and
+  /// updates parse_status_.
   ReadWriteUtil::ZLongResult ReadFieldLen(uint8_t** data, uint8_t* data_end);
 
   /// Same as the above functions, except takes the size of the decimal slot (i.e. 4, 8, or

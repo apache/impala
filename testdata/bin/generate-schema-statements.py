@@ -479,7 +479,7 @@ def generate_statements(output_name, test_vectors, sections,
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
     for section in sections:
-      table_name = section['BASE_TABLE_NAME']
+      table_name = section['BASE_TABLE_NAME'].strip()
       db_suffix = build_db_suffix(file_format, codec, compression_type)
       db_name = '{0}{1}'.format(data_set, options.scale_factor)
       db = '{0}{1}'.format(db_name, db_suffix)
@@ -523,9 +523,9 @@ def generate_statements(output_name, test_vectors, sections,
       if not options.scale_factor and section['LOAD_LOCAL']:
         load = section['LOAD_LOCAL']
 
-      columns = eval_section(section['COLUMNS'])
-      partition_columns = section['PARTITION_COLUMNS']
-      row_format = section['ROW_FORMAT']
+      columns = eval_section(section['COLUMNS']).strip()
+      partition_columns = section['PARTITION_COLUMNS'].strip()
+      row_format = section['ROW_FORMAT'].strip()
 
       # Force reloading of the table if the user specified the --force option or
       # if the table is partitioned and there was no ALTER section specified. This is to
