@@ -13,11 +13,14 @@
 # limitations under the License.
 #
 # Impala tests for ALTER TABLE RECOVER PARTITIONS statement
-import pytest
-from tests.common.test_dimensions import ALL_NODES_ONLY
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
+from tests.common.test_dimensions import ALL_NODES_ONLY
+from tests.common.test_dimensions import create_exec_option_dimension
+from tests.util.filesystem_utils import WAREHOUSE
+
+from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 # Validates ALTER TABLE RECOVER PARTITIONS statement
 

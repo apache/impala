@@ -2,16 +2,14 @@
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 
 import os
-import random
-from subprocess import check_call
-
 import pytest
+import random
+from subprocess import call, check_call
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfOldAggsJoins, SkipIfIsilon, SkipIfS3, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
-from subprocess import call, check_call
 
 @SkipIfOldAggsJoins.nested_types
 class TestNestedTypes(ImpalaTestSuite):

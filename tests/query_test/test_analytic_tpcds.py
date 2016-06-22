@@ -14,8 +14,6 @@
 #
 # Targeted tests to validate analytic functions use TPCDS dataset.
 
-import logging
-import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_parquet_dimension, TestDimension
 

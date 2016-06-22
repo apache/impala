@@ -1,11 +1,11 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # Common test dimensions and associated utility functions.
-import logging
+
 import os
 from itertools import product
+
 from tests.common.test_vector import TestDimension
-from os.path import isfile
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 

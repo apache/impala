@@ -14,12 +14,11 @@
 #
 # Validates that casting to Decimal works.
 #
-import logging
 import pytest
 from decimal import Decimal, getcontext, ROUND_DOWN
 from metacomm.combinatorics.all_pairs2 import all_pairs2 as all_pairs
-from random import shuffle, randint, seed
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from random import randint
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import TestDimension, TestMatrix
 

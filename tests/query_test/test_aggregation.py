@@ -1,14 +1,14 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Validates all aggregate functions across all datatypes
 #
-import logging
 import pytest
-from tests.common.test_vector import *
+
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import SkipIfOldAggsJoins, SkipIfS3
-from tests.util.test_file_parser import QueryTestSectionReader
+from tests.common.test_dimensions import (
+    create_exec_option_dimension,
+    create_uncompressed_text_dimension)
+from tests.common.test_vector import TestDimension
+from tests.common.skip import SkipIfOldAggsJoins
 
 agg_functions = ['sum', 'count', 'min', 'max', 'avg']
 

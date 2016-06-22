@@ -15,9 +15,11 @@
 # Impala process failure test suite
 
 import pytest
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.custom_cluster_test_suite import NUM_SUBSCRIBERS, CLUSTER_SIZE
-from time import sleep
+
+from tests.common.custom_cluster_test_suite import (
+    NUM_SUBSCRIBERS,
+    CLUSTER_SIZE,
+    CustomClusterTestSuite)
 
 # The exact query doesn't matter much for these tests, just want a query that touches
 # data on all nodes.

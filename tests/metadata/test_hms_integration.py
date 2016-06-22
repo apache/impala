@@ -25,10 +25,12 @@ import pytest
 import random
 import string
 from subprocess import call
-from tests.common.test_result_verifier import *
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 
 @SkipIfS3.hive
 @SkipIfIsilon.hive

@@ -14,11 +14,13 @@
 
 import pytest
 from copy import copy
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.test_vector import *
+from tests.common.test_vector import TestDimension
+
 
 @SkipIf.kudu_not_supported
 class TestKuduOperations(ImpalaTestSuite):

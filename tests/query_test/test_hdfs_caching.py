@@ -1,18 +1,15 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Validates limit on scan nodes
-#
-import logging
-import os
+
 import pytest
-from copy import copy
-from subprocess import check_call, call
-from time import time
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import *
-from tests.common.test_vector import *
+import re
+import time
+from subprocess import check_call
+
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.shell_util import exec_process
 

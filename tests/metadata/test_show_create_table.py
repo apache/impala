@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pprint
 import re
 import shlex
-from subprocess import call
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIf, SkipIfS3
-from tests.util.filesystem_utils import WAREHOUSE
-from tests.util.test_file_parser import remove_comments
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIf
+from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
 
 
 # The purpose of the show create table tests are to ensure that the "SHOW CREATE TABLE"

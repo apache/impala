@@ -14,39 +14,48 @@
 #
 # The base class that should be used for almost all Impala tests
 
+import grp
 import logging
 import os
 import pprint
 import pwd
 import pytest
-import grp
 import re
-import string
 import subprocess
 import time
-from getpass import getuser
 from functools import wraps
-from impala._thrift_gen.ImpalaService.ttypes import TImpalaQueryOptions
+from getpass import getuser
 from random import choice
 from subprocess import check_call
-from tests.common.impala_service import ImpaladService
-from tests.common.impala_connection import ImpalaConnection, create_connection
-from tests.common.test_dimensions import *
-from tests.common.test_result_verifier import *
-from tests.common.test_vector import *
-from tests.util.test_file_parser import *
-from tests.util.thrift_util import create_transport
+
 from tests.common.base_test_suite import BaseTestSuite
+from tests.common.impala_connection import create_connection
+from tests.common.impala_service import ImpaladService
+from tests.common.test_dimensions import (
+    ALL_BATCH_SIZES,
+    ALL_CLUSTER_SIZES,
+    ALL_DISABLE_CODEGEN_OPTIONS,
+    ALL_NODES_ONLY,
+    TableFormatInfo,
+    create_exec_option_dimension,
+    get_dataset_from_workload,
+    load_table_info_dimension)
+from tests.common.test_result_verifier import verify_raw_results, verify_runtime_profile
+from tests.common.test_vector import TestDimension
 from tests.performance.query import Query
-from tests.performance.query_executor import JdbcQueryExecConfig
 from tests.performance.query_exec_functions import execute_using_jdbc
+from tests.performance.query_executor import JdbcQueryExecConfig
+from tests.util.filesystem_utils import IS_S3, S3_BUCKET_NAME
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 from tests.util.s3_util import S3Client
-from tests.util.filesystem_utils import IS_S3, IS_HDFS, S3_BUCKET_NAME
+from tests.util.test_file_parser import (
+    QueryTestSectionReader,
+    parse_query_test_file,
+    write_test_file)
+from tests.util.thrift_util import create_transport
 
 # Imports required for Hive Metastore Client
 from hive_metastore import ThriftHiveMetastore
-from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 
 logging.basicConfig(level=logging.INFO, format='-- %(message)s')

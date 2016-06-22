@@ -1,15 +1,13 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted Impala insert tests
-#
-import logging
-import os
+
 import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
-from tests.util.filesystem_utils import get_fs_path
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.common.test_vector import TestDimension
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']

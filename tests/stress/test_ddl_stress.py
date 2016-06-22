@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import pytest
-import re
 import uuid
-from subprocess import call
-from tests.common.test_vector import TestDimension
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.test_vector import TestDimension
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10

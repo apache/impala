@@ -15,10 +15,10 @@
 #
 # Tests Impala properly handles errors when reading and writing data.
 
+import pytest
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfLocal
-import random
-import pytest
 
 class TestDataErrors(ImpalaTestSuite):
   @classmethod

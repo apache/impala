@@ -14,9 +14,10 @@
 # limitations under the License.
 #
 # Utility for computing table statistics of tables in the Hive Metastore
-import sys
+
 from optparse import OptionParser
-from tests.beeswax.impala_beeswax import *
+
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 
 def compute_stats(impala_client, db_names=None, table_names=None,
     continue_on_error=False):

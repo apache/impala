@@ -17,7 +17,6 @@ import os
 import fnmatch
 import re
 
-from collections import defaultdict
 from tests.performance.query import Query
 from tests.util.test_file_parser import parse_query_test_file
 

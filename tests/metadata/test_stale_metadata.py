@@ -1,11 +1,11 @@
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 
-import random
 from subprocess import check_call
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_test_suite import create_single_exec_option_dimension
 from tests.common.skip import SkipIfS3
+from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 
 class TestRewrittenFile(ImpalaTestSuite):

@@ -13,20 +13,22 @@
 # limitations under the License.
 
 import logging
-from tests.common.test_dimensions import (TableFormatInfo,
-    load_table_info_dimension,
-    get_dataset_from_workload)
-from tests.performance.query import Query, ImpalaQueryResult, HiveQueryResult
-from tests.performance.query_executor import (BeeswaxQueryExecConfig,
+
+from tests.common.test_dimensions import (
+    TableFormatInfo,
+    get_dataset_from_workload,
+    load_table_info_dimension)
+from tests.performance.query_executor import (
+    BeeswaxQueryExecConfig,
+    HiveHS2QueryConfig,
     ImpalaHS2QueryConfig,
     JdbcQueryExecConfig,
-    HiveHS2QueryConfig,
     QueryExecutor)
 from tests.performance.query_exec_functions import (
+    execute_using_hive_hs2,
     execute_using_impala_beeswax,
     execute_using_impala_hs2,
-    execute_using_jdbc,
-    execute_using_hive_hs2)
+    execute_using_jdbc)
 from tests.performance.scheduler import Scheduler
 
 # Setup Logging

@@ -23,7 +23,6 @@ import time
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
 from tests.shell.util import run_impala_shell_cmd, ImpalaShell
-from tests.common.impala_cluster import ImpalaCluster
 
 class TestClientSsl(CustomClusterTestSuite):
   """Tests for a client using SSL (particularly, the Impala Shell) """

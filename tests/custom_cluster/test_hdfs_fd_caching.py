@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import pytest
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfLocal
-from tests.common.test_dimensions import (TestDimension,
-    create_single_exec_option_dimension,
-    create_parquet_dimension)
 from tests.common.skip import SkipIfS3
 
 @SkipIfS3.caching

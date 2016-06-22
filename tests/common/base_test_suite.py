@@ -2,11 +2,9 @@
 #
 # The base class that should be used for tests.
 import logging
-import os
-import pytest
-from tests.common.test_dimensions import *
-from tests.common.test_result_verifier import *
-from tests.common.test_vector import *
+
+from tests.common.test_vector import TestMatrix
+
 LOG = logging.getLogger('base_test_suite')
 
 # Base class for tests.

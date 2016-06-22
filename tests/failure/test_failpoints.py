@@ -3,17 +3,15 @@
 # two types of failures - cancellation of the query and a failure test hook.
 #
 import os
-import pytest
 import re
-from copy import copy
 from collections import defaultdict
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import ImpalaTestSuite, ALL_NODES_ONLY, LOG
-from tests.common.test_vector import TestDimension
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal
-from tests.util.test_file_parser import QueryTestSectionReader
 from time import sleep
+
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_test_suite import ImpalaTestSuite, LOG
+from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_vector import TestDimension
 
 FAILPOINT_ACTION = ['FAIL', 'CANCEL']
 FAILPOINT_LOCATION = ['PREPARE', 'PREPARE_SCANNER', 'OPEN', 'GETNEXT', 'CLOSE']

@@ -1,10 +1,9 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted Impala HBase Tests
-#
-import logging
+
 import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestHBaseQueries(ImpalaTestSuite):
   @classmethod

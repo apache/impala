@@ -12,17 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import pytest
-import shlex
-import time
-from subprocess import call
-from tests.common.test_result_verifier import *
-from tests.util.shell_util import exec_process
-from tests.common.test_vector import *
-from tests.common.test_dimensions import ALL_NODES_ONLY
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests specific to partition metadata.

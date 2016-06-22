@@ -3,9 +3,7 @@
 # These queries are already run as part of our performance benchmarking.
 # Additionally, we don't get any 'extra' coverage from them, so they're
 # not an essential part of functional verification.
-import logging
-import pytest
-from tests.common.test_vector import *
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestTargetedPerf(ImpalaTestSuite):

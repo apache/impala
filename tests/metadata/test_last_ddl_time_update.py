@@ -1,9 +1,8 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Impala tests for DDL statements
 import time
-from tests.common.skip import SkipIfS3
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 
 # Checks that ALTER and INSERT statements update the last DDL time of the modified table.

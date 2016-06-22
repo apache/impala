@@ -2,12 +2,12 @@
 # Validates table stored on the LocalFileSystem.
 #
 import pytest
-import os
 from subprocess import check_call, call
+
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.skip import SkipIf
-from tests.util.filesystem_utils import get_secondary_fs_path, S3_BUCKET_NAME, ISILON_NAMENODE
+from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.util.filesystem_utils import get_secondary_fs_path
 
 @SkipIf.no_secondary_fs
 class TestMultipleFilesystems(ImpalaTestSuite):

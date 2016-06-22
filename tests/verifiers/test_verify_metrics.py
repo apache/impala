@@ -14,10 +14,7 @@
 #
 # Verification of impalad metrics after a test run.
 
-import logging
-import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import TestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestValidateMetrics(ImpalaTestSuite):

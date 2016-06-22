@@ -7,11 +7,8 @@
 # The second way this module can be used to to initialize it and call the actions
 # directly (ex. kill_random_impalad()). This provides a bit more control over exactly
 # when a failure will happen and is useful for targeted test scenarios.
+
 import logging
-import os
-import sys
-import time
-from tests.common.impala_cluster import *
 from random import choice
 from threading import Timer
 

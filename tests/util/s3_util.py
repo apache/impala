@@ -18,7 +18,6 @@
 # to access Amazon S3.
 
 import boto3
-import copy
 from tests.util.filesystem_base import BaseFilesystem
 
 class S3Client(BaseFilesystem):
@@ -31,7 +30,7 @@ class S3Client(BaseFilesystem):
     self.s3client = boto3.client('s3')
 
   def create_file(self, path, file_data, overwrite=True):
-    if not overwrite and self.exists(filename): return False
+    if not overwrite and self.exists(path): return False
     self.s3client.put_object(Bucket=self.bucketname, Key=path, Body=file_data)
     return True
 

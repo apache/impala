@@ -1,13 +1,11 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-#
-import os
+
 import pytest
 import re
-from time import sleep
+
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.util.test_file_parser import QueryTestSectionReader
+from tests.common.test_vector import TestDimension
 
 # Number of times to execute each query
 NUM_ITERATIONS = 5

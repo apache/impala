@@ -1,25 +1,25 @@
 # Copyright (c) 2014 Cloudera, Inc. All rights reserved.
 # Tests admission control
 
-import sys
+import logging
+import os
 import pytest
-import threading
 import re
-
+import sys
+import threading
 from time import sleep, time
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 from tests.common.test_vector import TestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
 
-import logging
-import os
 
 LOG = logging.getLogger('admission_test')
 

@@ -1,13 +1,13 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This module is used for common utilities related to parsing test files
-import collections
+
 import codecs
+import collections
 import logging
 import re
 from collections import defaultdict
-from os.path import isfile, isdir
-from tests.common.test_dimensions import TableFormatInfo
+from os.path import isfile
 from textwrap import dedent
 
 LOG = logging.getLogger('impala_test_suite')

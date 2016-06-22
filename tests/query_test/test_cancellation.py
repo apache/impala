@@ -2,7 +2,6 @@
 # Tests query cancellation using the ImpalaService.Cancel API
 #
 
-import os
 import pytest
 import threading
 from random import choice
@@ -10,8 +9,6 @@ from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3
-from tests.util.test_file_parser import QueryTestSectionReader
 from tests.verifiers.metric_verifier import MetricVerifier
 
 # Queries to execute. Use the TPC-H dataset because tables are large so queries take some

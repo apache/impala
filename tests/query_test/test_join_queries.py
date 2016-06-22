@@ -1,13 +1,17 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted tests for Impala joins
 #
-import logging
-import os
 import pytest
 from copy import copy
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins, SkipIfLocal
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import (
+    SkipIf,
+    SkipIfIsilon,
+    SkipIfLocal,
+    SkipIfOldAggsJoins,
+    SkipIfS3)
+from tests.common.test_vector import TestDimension
 
 class TestJoinQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]

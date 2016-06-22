@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import getpass
-import pytest
 import os
+import pytest
 import stat
 import tempfile
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf
 from tests.util.filesystem_utils import WAREHOUSE

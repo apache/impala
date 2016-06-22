@@ -1,8 +1,6 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Functional tests for LOAD DATA statements.
 
-import os
-import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,

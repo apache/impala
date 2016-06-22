@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import getpass
-import logging
 import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
-from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
+from tests.common.test_vector import TestDimension
 from tests.util.shell_util import exec_process
 
 TEST_DB = 'test_encryption_db'

@@ -12,22 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-import os
-import time
-import threading
-import socket
-import uuid
-import urllib2
 import json
+import socket
+import threading
+import time
+import urllib2
+import uuid
 
-from tests.common.environ import specific_build_type_timeout
-
-from thrift.transport import TSocket
-from thrift.transport import TTransport
+from Types.ttypes import TNetworkAddress
 from thrift.protocol import TBinaryProtocol
 from thrift.server.TServer import TServer
-from Types.ttypes import TNetworkAddress
+from thrift.transport import TSocket
+from thrift.transport import TTransport
 
 import StatestoreService.StatestoreSubscriber as Subscriber
 import StatestoreService.StatestoreService as Statestore
@@ -35,6 +31,8 @@ from StatestoreService.StatestoreSubscriber import TUpdateStateResponse
 from StatestoreService.StatestoreSubscriber import TTopicRegistration
 from ErrorCodes.ttypes import TErrorCode
 from Status.ttypes import TStatus
+
+from tests.common.environ import specific_build_type_timeout
 
 # Tests for the statestore. The StatestoreSubscriber class is a skeleton implementation of
 # a Python-based statestore subscriber with additional hooks to allow testing. Each

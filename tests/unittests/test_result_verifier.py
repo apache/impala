@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import pytest
-from tests.common.test_result_verifier import *
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_result_verifier import create_query_result
 
 # Unittest class for the test_result_verifier module.
 class TestResultVerifier(ImpalaTestSuite):

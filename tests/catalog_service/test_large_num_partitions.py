@@ -15,15 +15,8 @@
 # Tests to validate the Catalog Service works properly when partitions
 # need to be fetched in multiple batches.
 
-import logging
-import pytest
-import os
-from subprocess import call
-from tests.common.test_vector import *
-from tests.common.test_dimensions import *
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_cluster import ImpalaCluster
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.test_dimensions import create_single_exec_option_dimension
 
 class TestLargeNumPartitions(ImpalaTestSuite):
   @classmethod

@@ -22,7 +22,6 @@ import re
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import IS_LOCAL
 from time import sleep
 

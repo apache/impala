@@ -1,12 +1,14 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Impala tests for queries that query metadata and set session settings
-import logging
-import os
+
 import pytest
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfIsilon, SkipIfS3, SkipIfLocal
-from tests.common.test_vector import *
+from tests.common.test_dimensions import ALL_NODES_ONLY
+from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import get_fs_path
 
 # TODO: For these tests to pass, all table metadata must be created exhaustively.

@@ -6,23 +6,29 @@
 # tests can run with the normal exploration strategy and the overall test runtime doesn't
 # explode.
 
-import logging
+import os
 import pytest
 import random
+import re
 import tempfile
 from copy import deepcopy
+from parquet.ttypes import ConvertedType
 from subprocess import call, check_call
 
 from testdata.common import widetable
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.util.test_file_parser import *
+from tests.common.impala_test_suite import ImpalaTestSuite, LOG
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins, SkipIfLocal
+from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_result_verifier import (
+    parse_column_types,
+    parse_column_labels,
+    QueryTestResult,
+    parse_result_rows)
+from tests.common.test_vector import TestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 from tests.util.get_parquet_metadata import get_parquet_metadata
-from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins, SkipIfLocal
+from tests.util.test_file_parser import QueryTestSectionReader
 
-from parquet.ttypes import ConvertedType
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]

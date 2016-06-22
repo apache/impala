@@ -37,9 +37,7 @@
 #    not (v.get_value('col_type') == 'bool and v.get_value('agg_func') == 'sum'))
 #
 # Additional examples of usage can be found within the test suites.
-import collections
-import logging
-import os
+
 from itertools import product
 
 # A list of test dimension values.

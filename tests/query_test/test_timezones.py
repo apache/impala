@@ -6,12 +6,7 @@
 # tests can run with the normal exploration strategy and the overall test runtime doesn't
 # explode.
 
-import logging
-import pytest
-
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestTimeZones(ImpalaTestSuite):
   @classmethod

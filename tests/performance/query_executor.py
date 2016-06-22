@@ -29,9 +29,6 @@
 import logging
 import os
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
-from tests.performance.query import Query, HiveQueryResult, ImpalaQueryResult
-from impala.dbapi import connect as connect_to_impala
 # Setup logging for this module.
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
 LOG = logging.getLogger('query_executor')

@@ -1,13 +1,9 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
-import logging
-import os
 import pytest
-from copy import copy
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
-from tests.util.filesystem_utils import WAREHOUSE
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import create_exec_option_dimension
 
 class TestStringQueries(ImpalaTestSuite):
   @classmethod

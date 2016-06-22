@@ -17,9 +17,8 @@
 # vector. It treats a workload an the unit of parallelism.
 
 import logging
-import os
 
-from collections import defaultdict, deque
+from collections import defaultdict
 from copy import deepcopy
 from random import shuffle
 from sys import exit

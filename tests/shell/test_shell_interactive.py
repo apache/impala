@@ -14,20 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import pexpect
 import pytest
-import re
 import shutil
-import socket
 import signal
+import socket
 import sys
+from time import sleep
 
-from subprocess import Popen, PIPE
 from tests.common.impala_service import ImpaladService
 from tests.common.skip import SkipIfLocal
-from time import sleep
 from util import assert_var_substitution, ImpalaShell
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
@@ -70,7 +67,6 @@ class TestImpalaShellInteractive(object):
   @pytest.mark.execute_serially
   def test_compute_stats_with_live_progress_options(self):
     """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
-    impalad = ImpaladService(socket.getfqdn())
     p = ImpalaShell()
     p.send_cmd("set live_progress=True")
     p.send_cmd("set live_summary=True")

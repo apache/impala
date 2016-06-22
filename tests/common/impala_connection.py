@@ -16,15 +16,11 @@
 # in the future will support HS2 connections. Provides tracing around all
 # operations.
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
-from thrift.transport.TSocket import TSocket
-from thrift.protocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport, TTransportException
-from getpass import getuser
-
 import abc
 import logging
-import os
+
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
+
 
 LOG = logging.getLogger('impala_connection')
 console_handler = logging.StreamHandler()

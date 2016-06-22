@@ -14,8 +14,6 @@
 #
 # Verfier for common impalad metrics
 
-import pytest
-
 # List of metrics that should be equal to zero when there are no outstanding queries.
 METRIC_LIST = [
                # TODO (IMPALA-3377): Re-enable

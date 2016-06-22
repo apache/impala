@@ -14,18 +14,17 @@
 
 import glob
 import os
-import pytest
 import psutil
+import pytest
 import shutil
 import tempfile
 import time
-
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
-from signal import SIGKILL, SIGSEGV, SIGUSR1
-from tests.common.skip import SkipIfBuildType
+from signal import SIGSEGV, SIGKILL, SIGUSR1
 from subprocess import CalledProcessError
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfBuildType
 
 DAEMONS = ['impalad', 'statestored', 'catalogd']
 DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']

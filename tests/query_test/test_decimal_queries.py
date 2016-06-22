@@ -1,11 +1,10 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted tests for decimal type.
-#
-import logging
-import pytest
+
 from copy import copy
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_vector import TestDimension
 
 class TestDecimalQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]

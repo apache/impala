@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+
+import getpass
 import pytest
 import time
-import getpass
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIf, SkipIfLocal, SkipIfOldAggsJoins
-from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
+
 from test_ddl_base import TestDdlBase
+from tests.common.impala_test_suite import LOG
+from tests.common.skip import SkipIf, SkipIfLocal, SkipIfOldAggsJoins
+from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL, IS_S3
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):

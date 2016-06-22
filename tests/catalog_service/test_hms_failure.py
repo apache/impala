@@ -14,16 +14,13 @@
 #
 # Tests to validate the Catalog Service continues to function even if the HMS fails.
 
-import logging
 import pytest
 import os
 from subprocess import check_call
-from tests.common.test_vector import *
-from tests.common.test_dimensions import *
-from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfIsilon
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import IS_ISILON, IS_LOCAL
 
 class TestHiveMetaStoreFailure(ImpalaTestSuite):

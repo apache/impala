@@ -1,13 +1,9 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Validates limit on scan nodes
-#
-import logging
-import pytest
-from copy import copy
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import *
-from tests.util.test_file_parser import QueryTestSectionReader
+from tests.common.test_vector import TestDimension
 
 class TestLimit(ImpalaTestSuite):
   LIMIT_VALUES = [1, 2, 3, 4, 5, 10, 100, 5000]

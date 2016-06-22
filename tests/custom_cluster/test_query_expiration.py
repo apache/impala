@@ -16,10 +16,9 @@
 
 import pytest
 import threading
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.custom_cluster_test_suite import NUM_SUBSCRIBERS, CLUSTER_SIZE
 from time import sleep, time
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 class TestQueryExpiration(CustomClusterTestSuite):
   """Tests query expiration logic"""

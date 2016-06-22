@@ -12,14 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-import sys
-import re
-import random
-from copy import copy
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 def transpose_results(result):
   """Given a query result (list of strings, each string represents a row), return a list

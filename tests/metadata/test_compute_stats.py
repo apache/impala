@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
 from subprocess import check_call
 
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIf, SkipIfLocal
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.test_dimensions import (
+    create_exec_option_dimension,
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
 class TestComputeStats(ImpalaTestSuite):

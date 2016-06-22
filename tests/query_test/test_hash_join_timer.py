@@ -2,6 +2,7 @@
 
 import pytest
 import re
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import TestDimension
 
@@ -94,7 +95,6 @@ class TestHashJoinTimer(ImpalaTestSuite):
     profile = self.client.get_runtime_profile(handle)
     check_execsummary_count = 0
     check_fragment_count = 0
-    async_build = False
 
     for line in profile.split("\n"):
         # Matching for ExecSummary

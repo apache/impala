@@ -1,15 +1,12 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # General Impala query tests
-#
+
 import copy
-import logging
-import os
 import pytest
+
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import *
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3
+from tests.common.test_vector import TestVector
 
 class TestQueries(ImpalaTestSuite):
   @classmethod
@@ -183,4 +180,3 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     vector.get_value('exec_option')['disable_outermost_topn'] = 1
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-large-sorts', vector)
-

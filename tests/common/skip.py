@@ -17,13 +17,12 @@
 # annotate the class or test routine with the marker.
 #
 
-import re
 import os
 import pytest
 from functools import partial
+
 from tests.common.environ import IMPALAD_BUILD, USING_OLD_AGGS_JOINS
 from tests.util.filesystem_utils import (
-    IS_DEFAULT_FS,
     IS_ISILON,
     IS_LOCAL,
     IS_S3,

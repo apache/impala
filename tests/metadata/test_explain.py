@@ -1,12 +1,11 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Functional tests running EXPLAIN statements.
 #
-import logging
 import pytest
 import re
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3, SkipIfLocal
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the different explain levels [0-3] on a few queries.

@@ -14,15 +14,15 @@
 #
 # Hdfs access utilities
 
+import getpass
+import httplib
+import requests
 from os import environ
 from os.path import join as join_path
 from pywebhdfs.webhdfs import PyWebHdfsClient, errors, _raise_pywebhdfs_exception
 from xml.etree.ElementTree import parse
+
 from tests.util.filesystem_base import BaseFilesystem
-import getpass
-import httplib
-import requests
-import types
 
 class PyWebHdfsClientWithChmod(PyWebHdfsClient, BaseFilesystem):
   def chmod(self, path, permission):

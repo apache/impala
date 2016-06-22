@@ -1,10 +1,6 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-import pytest
-from subprocess import call
-from subprocess import check_call
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 # This test requires that testdata/avro_schema_resolution/create_table.sql has been run
 class TestAvroSchemaResolution(ImpalaTestSuite):

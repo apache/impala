@@ -15,7 +15,7 @@
 import getpass
 import pytest
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from TCLIService import TCLIService, constants
+from TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 USER_NAME = getpass.getuser()

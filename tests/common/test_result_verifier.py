@@ -1,14 +1,11 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This modules contians utility functions used to help verify query test results.
-#
+
 import logging
 import math
-import os
-import pytest
-import sys
 import re
-from functools import wraps
+
 from tests.util.test_file_parser import remove_comments
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
@@ -125,7 +122,7 @@ def try_compile_regex(row_string):
     pattern = row_string[len(ROW_REGEX_PREFIX_PATTERN):].strip()
     regex = re.compile(pattern)
     if regex is None:
-      assert False, "Invalid row regex specification: %s" % self.row_string
+      assert False, "Invalid row regex specification: %s" % row_string
     return regex
   return None
 

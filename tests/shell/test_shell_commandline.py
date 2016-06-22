@@ -16,16 +16,14 @@
 import os
 import pytest
 import re
-import shlex
 import signal
 
-from subprocess import Popen, PIPE, call
+from subprocess import call
 from tests.common.impala_service import ImpaladService
-from time import sleep
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.patterns import is_valid_impala_identifier
-from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
+from time import sleep
 from util import IMPALAD, SHELL_CMD
+from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
 
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')

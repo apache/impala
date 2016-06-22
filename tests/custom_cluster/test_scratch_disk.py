@@ -14,17 +14,13 @@
 #
 # Tests for query expiration.
 
-import pytest
-import threading
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.custom_cluster_test_suite import NUM_SUBSCRIBERS, CLUSTER_SIZE
-from time import sleep, time
-import stat
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-import shutil
 import os
-import random
+import pytest
+import shutil
+import stat
 import tempfile
+
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 class TestScratchDir(CustomClusterTestSuite):
 

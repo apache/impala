@@ -21,7 +21,6 @@ import string
 import subprocess
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfS3, SkipIfIsilon
 
 class TestParquetMaxPageHeader(CustomClusterTestSuite):

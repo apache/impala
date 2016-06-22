@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from tests.common.test_vector import *
-from tests.common.test_dimensions import ALL_NODES_ONLY
-from tests.common.impala_test_suite import *
-from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL
+from tests.common.test_dimensions import (
+    ALL_NODES_ONLY,
+    create_exec_option_dimension,
+    create_uncompressed_text_dimension)
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.filesystem_utils import WAREHOUSE
 
 # Base class that most DDL tests inherit from. The tests have a few common functions,
 # as well as test dimensions and setup/teardown.

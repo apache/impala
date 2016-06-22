@@ -11,9 +11,7 @@
 #   result = client.execute(query_string)
 #   where result is an object of the class ImpalaBeeswaxResult.
 import time
-import sys
 import shlex
-import traceback
 import getpass
 import re
 
@@ -26,11 +24,8 @@ try:
 except ImportError:
   pass
 from impala._thrift_gen.ImpalaService import ImpalaService
-from impala._thrift_gen.ImpalaService.ImpalaService import (TImpalaQueryOptions,
-    TResetTableReq)
 from tests.util.thrift_util import create_transport
-from thrift.transport.TSocket import TSocket
-from thrift.transport.TTransport import TBufferedTransport, TTransportException
+from thrift.transport.TTransport import TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 

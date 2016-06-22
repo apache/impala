@@ -1,11 +1,9 @@
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 # Functional tests running the TPCH workload.
-#
-import logging
-import pytest
-from tests.common.impala_test_suite import ImpalaTestSuite,\
-    create_single_exec_option_dimension
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfOldAggsJoins
+from tests.common.test_dimensions import create_single_exec_option_dimension
 
 @SkipIfOldAggsJoins.nested_types
 class TestTpchNestedQuery(ImpalaTestSuite):

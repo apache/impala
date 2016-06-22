@@ -13,10 +13,10 @@
 # limitations under the License.
 #
 
+import pytest
 import time
 
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfOldAggsJoins
 
 @SkipIfLocal.multiple_impalad

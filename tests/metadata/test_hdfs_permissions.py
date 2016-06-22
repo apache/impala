@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import os
-import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfLocal
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
 
 TEST_TBL = 'read_only_tbl'

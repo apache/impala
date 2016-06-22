@@ -17,13 +17,16 @@
 import logging
 import psutil
 import socket
-
 from getpass import getuser
 from random import choice
 from signal import SIGKILL
-from tests.common.impala_service import *
-from tests.util.shell_util import exec_process_async, exec_process
 from time import sleep
+
+from tests.common.impala_service import (
+    CatalogdService,
+    ImpaladService,
+    StateStoredService)
+from tests.util.shell_util import exec_process_async, exec_process
 
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_cluster')

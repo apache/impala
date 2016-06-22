@@ -15,18 +15,14 @@
 # Basic object model of a Impala Services (impalad + statestored). Provides a way to
 # programatically interact with the services and perform operations such as querying
 # the debug webpage, getting metric values, or creating client connections.
+
 import json
 import logging
-import os
 import re
-import sys
 import urllib
-
-from collections import defaultdict
-from HTMLParser import HTMLParser
-from tests.common.impala_connection import ImpalaConnection, create_connection
-from tests.common.impala_connection import create_ldap_connection
 from time import sleep, time
+
+from tests.common.impala_connection import create_connection, create_ldap_connection
 
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_service')

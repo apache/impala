@@ -1,11 +1,9 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Validates limit on scan nodes
-#
-import logging
+
 import pytest
-from copy import copy
+
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import *
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader

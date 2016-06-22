@@ -1,10 +1,8 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Unit tests for the test file parser
-#
-import logging
-import pytest
-from tests.util.test_file_parser import *
+
 from tests.common.base_test_suite import BaseTestSuite
+from tests.util.test_file_parser import parse_test_file_text
 
 test_text = """
 # Text before in the header (before the first ====) should be ignored

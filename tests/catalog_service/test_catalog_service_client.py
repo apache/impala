@@ -16,20 +16,18 @@
 
 import logging
 import pytest
-from tests.common.test_vector import *
-from tests.common.test_dimensions import *
-from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_cluster import ImpalaCluster
 
 from CatalogService import CatalogService
-from CatalogService.CatalogService import TGetFunctionsRequest, TGetFunctionsResponse
+from CatalogService.CatalogService import TGetFunctionsRequest
 from ErrorCodes.ttypes import TErrorCode
-from Status.ttypes import TStatus
-from thrift.transport.TSocket import TSocket
 from thrift.protocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport, TTransportException
+
+from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.thrift_util import create_transport
+
 
 LOG = logging.getLogger('test_catalog_service_client')
 

@@ -14,11 +14,10 @@
 #
 # Tests for SET <query option>
 
-import logging
-import pytest
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_dimensions import *
-from tests.common.impala_test_suite import ImpalaTestSuite, SINGLE_NODE_ONLY
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 
 class TestSet(ImpalaTestSuite):
   @classmethod

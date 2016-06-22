@@ -19,15 +19,7 @@ from datetime import datetime
 from impala.dbapi import connect
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
 from sys import maxint
-from tests.performance.query import Query, HiveQueryResult, ImpalaQueryResult
-from tests.performance.query_executor import (
-    QueryExecConfig,
-    ImpalaQueryExecConfig,
-    JdbcQueryExecConfig,
-    BeeswaxQueryExecConfig,
-    ImpalaHS2QueryConfig,
-    HiveHS2QueryConfig
-    )
+from tests.performance.query import HiveQueryResult, ImpalaQueryResult
 from tests.util.shell_util import exec_process
 from time import time
 import threading
@@ -98,7 +90,7 @@ def get_hs2_impala_cursor(impalad, use_kerberos=False, database=None):
   """
   try:
     host, port = impalad.split(":")
-  except ValueError, v:
+  except ValueError:
     host, port = impalad, DEFAULT_HS2_PORT
   cursor = None
   try:

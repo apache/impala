@@ -1,16 +1,20 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted Impala insert tests
-#
-import logging
-import os
+
 import pytest
+
 from testdata.common import widetable
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3, SkipIfLocal
-from tests.util.filesystem_utils import IS_LOCAL
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfLocal
+from tests.common.test_dimensions import (
+    create_exec_option_dimension,
+    create_uncompressed_text_dimension)
+from tests.common.test_result_verifier import (
+    parse_column_types,
+    parse_column_labels,
+    QueryTestResult,
+    parse_result_rows)
+from tests.common.test_vector import TestDimension
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']

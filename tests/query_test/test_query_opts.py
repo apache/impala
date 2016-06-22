@@ -17,14 +17,11 @@
 #       to make it easier to handle startup failures (right now it waits 60sec to
 #       timeout).
 
-from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
+from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 class TestQueryOptions(ImpalaTestSuite):
   @classmethod

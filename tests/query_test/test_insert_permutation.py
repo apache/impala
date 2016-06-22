@@ -1,12 +1,10 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted Impala insert tests
-#
-import logging
-import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import (
+    create_exec_option_dimension,
+    create_uncompressed_text_dimension)
 
 class TestInsertQueriesWithPermutation(ImpalaTestSuite):
   """

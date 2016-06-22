@@ -1,10 +1,12 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Functional tests running the TPC-DS workload
 #
-import logging
 import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    is_supported_insert_format)
 
 class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod

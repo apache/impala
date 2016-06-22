@@ -1,15 +1,18 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 import os
+import pytest
+from subprocess import check_call
+
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
-from tests.common.skip import SkipIfS3
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, IS_S3
-from subprocess import check_call
 
 class TestUdfs(ImpalaTestSuite):
   @classmethod
