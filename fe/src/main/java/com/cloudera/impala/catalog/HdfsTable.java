@@ -207,6 +207,10 @@ public class HdfsTable extends Table {
   // operation), when only non-partition columns are required.
   private final List<FieldSchema> nonPartFieldSchemas_ = Lists.newArrayList();
 
+  // Flag to check if the table schema has been loaded. Used as a precondition
+  // for setAvroSchema().
+  private boolean isSchemaLoaded_ = false;
+
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
   // Caching this configuration object makes calls to getFileSystem much quicker
@@ -1255,7 +1259,7 @@ public class HdfsTable extends Table {
    */
   private void setAvroSchema(HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
-    Preconditions.checkState(!nonPartFieldSchemas_.isEmpty());
+    Preconditions.checkState(isSchemaLoaded_);
     String inputFormat = msTbl.getSd().getInputFormat();
     if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO
         || hasAvroData_) {
@@ -1339,6 +1343,7 @@ public class HdfsTable extends Table {
     addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
     addColumnsFromFieldSchemas(nonPartFieldSchemas_);
     loadAllColumnStats(client);
+    isSchemaLoaded_ = true;
   }
 
   /**
