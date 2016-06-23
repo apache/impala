@@ -22,7 +22,6 @@
 #include <string>
 #include <stdint.h>
 
-#include "bufferpool/buffer-allocator.h"
 #include "common/atomic.h"
 #include "common/status.h"
 #include "gutil/macros.h"
@@ -125,7 +124,7 @@ class ReservationTracker;
 ///   calling Unpin() on the page. The page may then be written to disk and its buffer
 ///   repurposed internally by BufferPool.
 /// * Once the operator needs the page's contents again and has sufficient unused
-///   reservations, it can call Pin(), which brings the page's contents back into memory,
+///   reservation, it can call Pin(), which brings the page's contents back into memory,
 ///   perhaps in a different buffer. Therefore the operator must fix up any pointers into
 ///   the previous buffer.
 /// * If the operator is done with the page, it can call FreeBuffer() to destroy the
@@ -157,10 +156,10 @@ class BufferPool {
   ~BufferPool();
 
   /// Register a client. Returns an error status and does not register the client if the
-  /// arguments are invalid. 'name' is an arbitrary used to identify the client in any
-  /// errors messages or logging. 'client' is the client to register. 'client' should not
-  /// already be registered.
-  Status RegisterClient(const std::string& name, ReservationTracker* reservations,
+  /// arguments are invalid. 'name' is an arbitrary name used to identify the client in
+  /// any errors messages or logging. 'client' is the client to register. 'client' should
+  /// not already be registered.
+  Status RegisterClient(const std::string& name, ReservationTracker* reservation,
       Client* client);
 
   /// Deregister 'client' if it is registered. Idempotent.
@@ -168,7 +167,7 @@ class BufferPool {
 
   /// Create a new page of 'len' bytes with pin count 1. 'len' must be a page length
   /// supported by BufferPool (see BufferPool class comment). The client must have
-  /// sufficient unused reservations to pin the new page (otherwise it will DCHECK).
+  /// sufficient unused reservation to pin the new page (otherwise it will DCHECK).
   /// CreatePage() only fails when a system error prevents the buffer pool from fulfilling
   /// the reservation.
   /// On success, the handle is mapped to the new page.
@@ -229,6 +228,13 @@ class BufferPool {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferPool);
+
+  /// The minimum length of a buffer in bytes. All buffers and pages are a multiple of
+  /// this length. This is always a power of two.
+  const int64_t min_buffer_len_;
+
+  /// The maximum physical memory in bytes that can be used for buffers.
+  const int64_t buffer_bytes_limit_;
 };
 
 /// External representation of a client of the BufferPool. Clients are used for
@@ -239,17 +245,25 @@ class BufferPool {
 /// Client methods or BufferPool methods with the Client as an argument is not supported.
 class BufferPool::Client {
  public:
-  Client() {}
+  Client() : reservation_(NULL) {}
   /// Client must be deregistered.
   ~Client() { DCHECK(!is_registered()); }
 
-  bool is_registered() const;
-  ReservationTracker* reservations();
+  bool is_registered() const { return reservation_ != NULL; }
+  ReservationTracker* reservation() { return reservation_; }
 
   std::string DebugString() const;
 
  private:
+  friend class BufferPool;
   DISALLOW_COPY_AND_ASSIGN(Client);
+
+  /// A name identifying the client.
+  std::string name_;
+
+  /// The reservation tracker for the client. NULL means the client isn't registered.
+  /// All pages pinned by the client count as usage against 'reservation_'.
+  ReservationTracker* reservation_;
 };
 
 

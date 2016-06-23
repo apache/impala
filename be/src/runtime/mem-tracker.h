@@ -37,6 +37,7 @@
 
 namespace impala {
 
+class ReservationTrackerCounters;
 class MemTracker;
 class QueryResourceMgr;
 
@@ -84,6 +85,10 @@ class MemTracker {
 
   /// Removes this tracker from parent_->child_trackers_.
   void UnregisterFromParent();
+
+  /// Include counters from a ReservationTracker in logs and other diagnostics.
+  /// The counters should be owned by the fragment's RuntimeProfile.
+  void EnableReservationReporting(const ReservationTrackerCounters& counters);
 
   /// Returns a MemTracker object for query 'id'.  Calling this with the same id will
   /// return the same MemTracker object.  An example of how this is used is to pass it
@@ -331,6 +336,8 @@ class MemTracker {
   void RegisterMetrics(MetricGroup* metrics, const std::string& prefix);
 
   /// Logs the usage of this tracker and all of its children (recursively).
+  /// TODO: once all memory is accounted in ReservationTracker hierarchy, move
+  /// reporting there.
   std::string LogUsage(const std::string& prefix = "") const;
 
   /// Log the memory usage when memory limit is exceeded and return a status object with
@@ -436,6 +443,11 @@ class MemTracker {
   /// to Consume()/Release(). Only used for the process tracker, thus parent_ should be
   /// NULL if consumption_metric_ is set.
   UIntGauge* consumption_metric_;
+
+  /// If non-NULL, counters from a corresponding ReservationTracker that should be
+  /// reported in logs and other diagnostics. The counters are owned by the fragment's
+  /// RuntimeProfile.
+  boost::scoped_ptr<ReservationTrackerCounters> reservation_counters_;
 
   std::vector<MemTracker*> all_trackers_;  // this tracker plus all of its ancestors
   std::vector<MemTracker*> limit_trackers_;  // all_trackers_ with valid limits

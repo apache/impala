@@ -485,7 +485,6 @@ class ThreadCounterMeasurement {
   MonotonicStopWatch sw_;
   RuntimeProfile::ThreadCounters* counters_;
 };
-
 }
 
 #endif

@@ -162,6 +162,7 @@ if (DOXYGEN_FOUND)
   # Possible to not input the subdirs one by one?
   set(CMAKE_DOXYGEN_INPUT
     ${CMAKE_SOURCE_DIR}/be/src
+    ${CMAKE_SOURCE_DIR}/be/src/bufferpool/
     ${CMAKE_SOURCE_DIR}/be/src/catalog/
     ${CMAKE_SOURCE_DIR}/be/src/common/
     ${CMAKE_SOURCE_DIR}/be/src/exec/
@@ -258,6 +259,7 @@ if (NOT APPLE)
 endif()
 set (IMPALA_LINK_LIBS
   ${WL_START_GROUP}
+  BufferPool
   Catalog
   CodeGen
   Common
@@ -283,6 +285,7 @@ set (IMPALA_LINK_LIBS
 # libraries when dynamic linking is enabled.
 if (BUILD_SHARED_LIBS)
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
+    BufferPool
     Runtime
     Exec
     CodeGen
@@ -414,6 +417,7 @@ endfunction(COMPILE_TO_IR)
 add_subdirectory(src/gutil)
 
 # compile these subdirs using their own CMakeLists.txt
+add_subdirectory(src/bufferpool)
 add_subdirectory(src/catalog)
 add_subdirectory(src/codegen)
 add_subdirectory(src/common)
@@ -441,6 +445,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable")
 add_subdirectory(generated-sources/gen-cpp)
 
 link_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/bufferpool
   ${CMAKE_CURRENT_SOURCE_DIR}/build/catalog
   ${CMAKE_CURRENT_SOURCE_DIR}/build/common
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec

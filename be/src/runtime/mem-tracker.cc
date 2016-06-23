@@ -22,9 +22,10 @@
 #include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
+#include "bufferpool/reservation-tracker-counters.h"
+#include "resourcebroker/resource-broker.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
-#include "resourcebroker/resource-broker.h"
 #include "scheduling/query-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/mem-info.h"
@@ -134,6 +135,11 @@ void MemTracker::UnregisterFromParent() {
   child_tracker_it_ = parent_->child_trackers_.end();
 }
 
+void MemTracker::EnableReservationReporting(const ReservationTrackerCounters& counters) {
+  reservation_counters_.reset(new ReservationTrackerCounters);
+  *reservation_counters_ = counters;
+}
+
 int64_t MemTracker::GetPoolMemReserved() const {
   // Pool trackers should have a pool_name_ and no limit.
   DCHECK(!pool_name_.empty());
@@ -205,8 +211,7 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
     // First time this id registered, make a new object.  Give a shared ptr to
     // the caller and put a weak ptr in the map.
     shared_ptr<MemTracker> tracker = make_shared<MemTracker>(byte_limit,
-        rm_reserved_limit, Substitute("Query($0) Limit", lexical_cast<string>(id)),
-        parent);
+        rm_reserved_limit, Substitute("Query($0)", lexical_cast<string>(id)), parent);
     tracker->auto_unregister_ = true;
     tracker->query_id_ = id;
     request_to_mem_trackers_[id] = tracker;
@@ -246,17 +251,26 @@ void MemTracker::RefreshConsumptionFromMetric() {
 }
 
 // Calling this on the query tracker results in output like:
-// Query Limit: memory limit exceeded. Limit=100.00 MB Consumption=106.19 MB
-//   Fragment 5b45e83bbc2d92bd:d3ff8a7df7a2f491:  Consumption=52.00 KB
-//     AGGREGATION_NODE (id=6):  Consumption=44.00 KB
-//     EXCHANGE_NODE (id=5):  Consumption=0.00
-//     DataStreamMgr:  Consumption=0.00
-//   Fragment 5b45e83bbc2d92bd:d3ff8a7df7a2f492:  Consumption=100.00 KB
-//     AGGREGATION_NODE (id=2):  Consumption=36.00 KB
-//     AGGREGATION_NODE (id=4):  Consumption=40.00 KB
-//     EXCHANGE_NODE (id=3):  Consumption=0.00
-//     DataStreamMgr:  Consumption=0.00
-//     DataStreamSender:  Consumption=16.00 KB
+//
+//  Query(4a4c81fedaed337d:4acadfda00000000) Limit=10.00 GB Total=508.28 MB Peak=508.45 MB
+//    Fragment 4a4c81fedaed337d:4acadfda00000000: Total=8.00 KB Peak=8.00 KB
+//      EXCHANGE_NODE (id=4): Total=0 Peak=0
+//      DataStreamRecvr: Total=0 Peak=0
+//    Block Manager: Limit=6.68 GB Total=394.00 MB Peak=394.00 MB
+//    Fragment 4a4c81fedaed337d:4acadfda00000006: Total=233.72 MB Peak=242.24 MB
+//      AGGREGATION_NODE (id=1): Total=139.21 MB Peak=139.84 MB
+//      HDFS_SCAN_NODE (id=0): Total=93.94 MB Peak=102.24 MB
+//      DataStreamSender (dst_id=2): Total=45.99 KB Peak=85.99 KB
+//    Fragment 4a4c81fedaed337d:4acadfda00000003: Total=274.55 MB Peak=274.62 MB
+//      AGGREGATION_NODE (id=3): Total=274.50 MB Peak=274.50 MB
+//      EXCHANGE_NODE (id=2): Total=0 Peak=0
+//      DataStreamRecvr: Total=45.91 KB Peak=684.07 KB
+//      DataStreamSender (dst_id=4): Total=680.00 B Peak=680.00 B
+//
+// If 'reservation_metrics_' are set, we ge a more granular breakdown:
+//   TrackerName: Limit=5.00 MB BufferPoolUsed/Reservation=0/5.00 MB OtherMemory=1.04 MB
+//                Total=6.04 MB Peak=6.45 MB
+//
 string MemTracker::LogUsage(const string& prefix) const {
   if (!log_usage_if_zero_ && consumption() == 0) return "";
 
@@ -267,7 +281,24 @@ string MemTracker::LogUsage(const string& prefix) const {
   if (rm_reserved_limit_ > 0) {
     ss << " RM Limit=" << PrettyPrinter::Print(rm_reserved_limit_, TUnit::BYTES);
   }
-  ss << " Consumption=" << PrettyPrinter::Print(consumption(), TUnit::BYTES);
+
+  int64_t total = consumption();
+  int64_t peak = consumption_->value();
+  if (reservation_counters_ != NULL) {
+    int64_t reservation = reservation_counters_->peak_reservation->current_value();
+    int64_t used_reservation =
+        reservation_counters_->peak_used_reservation->current_value();
+    int64_t reservation_limit = reservation_counters_->reservation_limit->value();
+    ss << " BufferPoolUsed/Reservation="
+       << PrettyPrinter::Print(used_reservation, TUnit::BYTES) << "/"
+       << PrettyPrinter::Print(reservation, TUnit::BYTES);
+    if (reservation_limit != numeric_limits<int64_t>::max()) {
+      ss << " BufferPoolLimit=" << PrettyPrinter::Print(reservation_limit, TUnit::BYTES);
+    }
+    ss << " OtherMemory=" << PrettyPrinter::Print(total - reservation, TUnit::BYTES);
+  }
+  ss << " Total=" << PrettyPrinter::Print(total, TUnit::BYTES)
+     << " Peak=" << PrettyPrinter::Print(peak, TUnit::BYTES);
 
   stringstream prefix_ss;
   prefix_ss << prefix << "  ";
