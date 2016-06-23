@@ -67,3 +67,72 @@ select * from avro_alter_table_add_new_column
 ---- TYPES
 string, string, boolean, int, bigint, float, double, string, decimal, string
 ====
+---- QUERY
+# IMPALA-3776: Create an Avro table, add a column to the Avro schema and make sure
+# describe and describe formatted still work.
+CREATE TABLE avro_alter_schema_add_new_column (old_col string) STORED AS AVRO;
+
+ALTER TABLE avro_alter_schema_add_new_column SET TBLPROPERTIES (
+'avro.schema.literal'=' {
+"namespace": "org.apache.test",
+"name": "avro_alter_schema_add_new_column",
+"type": "record",
+"fields": [
+{ "name":"old_col", "type":"string" },
+{ "name":"new_col", "type":"string" }
+]
+}'
+);
+
+REFRESH avro_alter_schema_add_new_column;
+====
+---- QUERY
+# The new column now has to show up in describe.
+DESCRIBE avro_alter_schema_add_new_column;
+---- TYPES
+string,string,string
+---- RESULTS
+'old_col','string','from deserializer'
+'new_col','string','from deserializer'
+====
+---- QUERY
+# The new column now has to show up in describe formatted.
+DESCRIBE FORMATTED avro_alter_schema_add_new_column;
+---- TYPES
+string,string,string
+---- RESULTS: VERIFY_IS_SUBSET
+'old_col','STRING','from deserializer'
+'new_col','STRING','from deserializer'
+====
+---- QUERY
+# IMPALA-3776: Create an Avro table, remove a column from the Avro schema and make sure
+# describe and describe formatted still work.
+CREATE TABLE avro_alter_schema_remove_column (col1 string, col2 string) STORED AS AVRO;
+
+ALTER TABLE avro_alter_schema_remove_column SET TBLPROPERTIES (
+'avro.schema.literal'=' {
+"namespace": "org.apache.test",
+"name": "avro_alter_schema_remove_column",
+"type": "record",
+"fields": [
+{ "name":"col1", "type":"string" }
+]
+}'
+);
+REFRESH avro_alter_schema_remove_column;
+====
+---- QUERY
+# The new column now must not show up in describe.
+DESCRIBE avro_alter_schema_remove_column;
+---- TYPES
+string,string,string
+---- RESULTS
+'col1','string','from deserializer'
+====
+---- QUERY
+DESCRIBE FORMATTED avro_alter_schema_remove_column;
+---- TYPES
+string,string,string
+---- RESULTS: VERIFY_IS_SUBSET
+'col1','STRING','from deserializer'
+====

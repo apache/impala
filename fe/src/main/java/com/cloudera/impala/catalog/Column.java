@@ -17,14 +17,19 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.List;
+
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnStats;
+import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Internal representation of column-related metadata.
@@ -113,5 +118,15 @@ public class Column {
     colDesc.setPosition(position_);
     colDesc.setCol_stats(getStats().toThrift());
     return colDesc;
+  }
+
+  public static List<FieldSchema> toFieldSchemas(List<Column> columns) {
+    return Lists.transform(columns, new Function<Column, FieldSchema>() {
+      public FieldSchema apply(Column column) {
+        Preconditions.checkNotNull(column.getType());
+        return new FieldSchema(column.getName(), column.getType().toSql(),
+            column.getComment());
+      }
+    });
   }
 }

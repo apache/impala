@@ -48,9 +48,10 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
       assert comparison.data[x] == result.data[x]
 
   def test_avro_schema_changes(self, vector, unique_database):
-    """Test for IMPALA-3314 and IMPALA-3513: Impalad shouldn't crash with stale avro
+    """Test for IMPALA-3314 and IMPALA-3513: Impalad shouldn't crash with stale Avro
     metadata. Instead, should provide a meaningful error message.
-    Test for IMPALA-3092: Impala should be able to query an avro table after ALTER TABLE
+    Test for IMPALA-3092: Impala should be able to query an Avro table after ALTER TABLE
     ... ADD COLUMN ...
+    Test for IMPALA-3776: Fix describe formatted when changing Avro schema.
     """
     self.run_test_case('QueryTest/avro-schema-changes', vector, unique_database)

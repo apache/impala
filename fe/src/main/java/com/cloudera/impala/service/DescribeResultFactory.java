@@ -21,12 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.StructField;
 import com.cloudera.impala.catalog.StructType;
@@ -185,14 +185,11 @@ public class DescribeResultFactory {
 
     org.apache.hadoop.hive.metastore.api.Table msTable =
         table.getMetaStoreTable().deepCopy();
-    // Fixup the metastore table so the output of DESCRIBE FORMATTED|EXTENDED matches
-    // Hive's. This is to distinguish between empty comments and no comments
-    // (value is null).
-    for (FieldSchema fs: msTable.getSd().getCols())
-      fs.setComment(table.getColumn(fs.getName()).getComment());
-    for (FieldSchema fs: msTable.getPartitionKeys()) {
-      fs.setComment(table.getColumn(fs.getName()).getComment());
-    }
+    // For some table formats (e.g. Avro) the column list in the table can differ from the
+    // one returned by the Hive metastore. To handle this we use the column list from the
+    // table which has already reconciled those differences.
+    msTable.getSd().setCols(Column.toFieldSchemas(table.getNonClusteringColumns()));
+    msTable.setPartitionKeys(Column.toFieldSchemas(table.getClusteringColumns()));
 
     // To avoid initializing any of the SerDe classes in the metastore table Thrift
     // struct, create the ql.metadata.Table object by calling the empty c'tor and
