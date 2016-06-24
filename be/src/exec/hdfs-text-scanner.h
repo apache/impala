@@ -83,7 +83,7 @@ class HdfsTextScanner : public HdfsScanner {
   bool only_parsing_header_;
 
  private:
-  const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes
+  const static int NEXT_BLOCK_READ_SIZE = 64 * 1024; //bytes
 
   /// Initializes this scanner for this context.  The context maps to a single
   /// scan range.

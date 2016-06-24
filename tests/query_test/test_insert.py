@@ -49,6 +49,35 @@ class TestInsertQueries(ImpalaTestSuite):
       cls.TestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').compression_codec == 'none')
 
+  def test_insert_large_string(self, vector, unique_database):
+    """Test handling of large strings in inserter and scanner."""
+    table_format = vector.get_value('table_format')
+    table_name = unique_database + ".insert_largestring"
+
+    file_format = vector.get_value('table_format').file_format
+    if file_format == "parquet":
+      stored_as = file_format
+    else:
+      assert file_format == "text"
+      stored_as = "textfile"
+    self.client.execute("""
+        create table {0}
+        stored as {1} as
+        select repeat('AZ', 128 * 1024 * 1024) as s""".format(table_name, stored_as))
+
+    # Make sure it produces correct result when materializing no tuples.
+    result = self.client.execute("select count(*) from {0}".format(table_name))
+    assert result.data == ["1"]
+
+    # Make sure it got the length right.
+    result = self.client.execute("select length(s) from {0}".format(table_name))
+    assert result.data == [str(2 * 128 * 1024 * 1024)]
+
+    # Spot-check the data.
+    result = self.client.execute(
+        "select substr(s, 200 * 1024 * 1024, 5) from {0}".format(table_name))
+    assert result.data == ["ZAZAZ"]
+
   @classmethod
   def setup_class(cls):
     super(TestInsertQueries, cls).setup_class()

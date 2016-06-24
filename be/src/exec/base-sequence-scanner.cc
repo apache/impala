@@ -33,8 +33,7 @@ const int BaseSequenceScanner::SYNC_MARKER = -1;
 
 // Constants used in ReadPastSize()
 static const double BLOCK_SIZE_PADDING_PERCENT = 0.1;
-static const int REMAINING_BLOCK_SIZE_GUESS = 100 * 1024; // bytes
-static const int MIN_SYNC_READ_SIZE = 10 * 1024; // bytes
+static const int MIN_SYNC_READ_SIZE = 64 * 1024; // bytes
 
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
@@ -301,11 +300,9 @@ void BaseSequenceScanner::CloseFileRanges(const char* filename) {
 
 int BaseSequenceScanner::ReadPastSize(int64_t file_offset) {
   DCHECK_GE(total_block_size_, 0);
-  if (total_block_size_ == 0) {
-    // This scan range didn't include a complete block, so we have no idea how many bytes
-    // remain in the block. Guess.
-    return REMAINING_BLOCK_SIZE_GUESS;
-  }
+  // This scan range didn't include a complete block, so we have no idea how many bytes
+  // remain in the block. Let ScannerContext use its default strategy.
+  if (total_block_size_ == 0) return 0;
   DCHECK_GE(num_syncs_, 2);
   int average_block_size = total_block_size_ / (num_syncs_ - 1);
 
@@ -315,7 +312,5 @@ int BaseSequenceScanner::ReadPastSize(int64_t file_offset) {
   int bytes_left = max(average_block_size - block_bytes_read, 0);
   // Include some padding
   bytes_left += average_block_size * BLOCK_SIZE_PADDING_PERCENT;
-
-  int max_read_size = state_->io_mgr()->max_read_buffer_size();
-  return min(max(bytes_left, MIN_SYNC_READ_SIZE), max_read_size);
+  return max(bytes_left, MIN_SYNC_READ_SIZE);
 }

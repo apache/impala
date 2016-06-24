@@ -97,11 +97,16 @@ class ScannerContext {
     void set_contains_tuple_data(bool v) { contains_tuple_data_ = v; }
 
     /// Callback that returns the buffer size to use when reading past the end of the scan
-    /// range.  By default a constant value is used, which scanners can override with this
-    /// callback.  The callback takes the file offset of the asynchronous read (this may be
-    /// more than file_offset() due to data being assembled in the boundary buffer).
-    /// Reading past the end of the scan range is likely a remote read, so we want to
-    /// minimize the number of io requests as well as the data volume.
+    /// range. Reading past the end of the scan range is likely a remote read, so we want
+    /// find a good trade-off between io requests and data volume. Scanners that have
+    /// some information about the optimal read size can provide this callback to
+    /// override the default read-size doubling strategy (see GetNextBuffer()). If the
+    /// callback returns a positive length, this overrides the default strategy. If the
+    /// callback returns a length greater than the max read size, the max read size will
+    /// be used.
+    ///
+    /// The callback takes the file offset of the asynchronous read (this may be more
+    /// than file_offset() due to data being assembled in the boundary buffer).
     typedef boost::function<int (int64_t)> ReadPastSizeCallback;
     void set_read_past_size_cb(ReadPastSizeCallback cb) { read_past_size_cb_ = cb; }
 
@@ -176,7 +181,13 @@ class ScannerContext {
     /// earlier, i.e. the file was truncated.
     int64_t file_len_;
 
+    /// Callback if a scanner wants to implement custom logic for guessing how far to
+    /// read past the end of the scan range.
     ReadPastSizeCallback read_past_size_cb_;
+
+    /// The next amount we should read past the end of the file, if using the default
+    /// doubling algorithm. Unused if 'read_past_size_cb_' is set.
+    int64_t next_read_past_size_bytes_;
 
     /// The current io buffer. This starts as NULL before we've read any bytes.
     DiskIoMgr::BufferDescriptor* io_buffer_;
@@ -223,14 +234,16 @@ class ScannerContext {
     /// Gets (and blocks) for the next io buffer. After fetching all buffers in the scan
     /// range, performs synchronous reads past the scan range until EOF.
     //
-    /// When performing a synchronous read, the read size is the max of read_past_size and
-    /// the result returned by read_past_size_cb_() (or DEFAULT_READ_PAST_SIZE if no
-    /// callback is set). read_past_size is not used otherwise.
-    //
-    /// Updates io_buffer_, io_buffer_bytes_left_, and io_buffer_pos_.  If GetNextBuffer()
-    /// is called after all bytes in the file have been returned, io_buffer_bytes_left_
-    /// will be set to 0. In the non-error case, io_buffer_ is never set to NULL, even if
-    /// it contains 0 bytes.
+    /// When performing a synchronous read, the read size is the max of 'read_past_size'
+    /// and either the result of read_past_size_cb_(), or the result of iteratively
+    /// doubling INIT_READ_PAST_SIZE up to the max read size. 'read_past_size' is not
+    /// used otherwise. This is done to find a balance between reading too much data
+    /// and issuing too many small reads.
+    ///
+    /// Updates 'io_buffer_', 'io_buffer_bytes_left_', and 'io_buffer_pos_'.  If
+    /// GetNextBuffer() is called after all bytes in the file have been returned,
+    /// 'io_buffer_bytes_left_' will be set to 0. In the non-error case, 'io_buffer_' is
+    /// never set to NULL, even if it contains 0 bytes.
     Status GetNextBuffer(int64_t read_past_size = 0);
 
     /// If 'batch' is not NULL, attaches all completed io buffers and the boundary mem

@@ -46,9 +46,10 @@ class StringBuffer {
   }
 
   /// Append 'str' to the current string, allocating a new buffer as necessary.
+  /// Return error status if memory limit is exceeded.
   Status Append(const char* str, int64_t str_len) {
     int64_t new_len = len_ + str_len;
-    if (new_len > buffer_size_) RETURN_IF_ERROR(GrowBuffer(new_len));
+    if (UNLIKELY(new_len > buffer_size_)) RETURN_IF_ERROR(GrowBuffer(new_len));
     memcpy(buffer_ + len_, str, str_len);
     len_ += str_len;
     return Status::OK();

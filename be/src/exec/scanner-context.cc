@@ -29,7 +29,7 @@
 using namespace impala;
 using namespace strings;
 
-static const int64_t DEFAULT_READ_PAST_SIZE = 1024; // in bytes
+static const int64_t INIT_READ_PAST_SIZE_BYTES = 64 * 1024;
 
 // We always want output_buffer_bytes_left_ to be non-NULL, so we can avoid a NULL check
 // in GetBytes(). We use this variable, which is set to 0, to initialize
@@ -57,6 +57,7 @@ void ScannerContext::ReleaseCompletedResources(RowBatch* batch, bool done) {
 
 ScannerContext::Stream::Stream(ScannerContext* parent)
   : parent_(parent),
+    next_read_past_size_bytes_(INIT_READ_PAST_SIZE_BYTES),
     boundary_pool_(new MemPool(parent->scan_node_->mem_tracker())),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())) {
 }
@@ -146,10 +147,19 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   } else {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
 
-    int64_t read_past_buffer_size = read_past_size_cb_.empty() ?
-        DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
+    int64_t read_past_buffer_size = 0;
+    int64_t max_buffer_size = parent_->state_->io_mgr()->max_read_buffer_size();
+    if (!read_past_size_cb_.empty()) read_past_buffer_size = read_past_size_cb_(offset);
+    if (read_past_buffer_size <= 0) {
+      // Either no callback was set or the callback did not return an estimate. Use
+      // the default doubling strategy.
+      read_past_buffer_size = next_read_past_size_bytes_;
+      next_read_past_size_bytes_ =
+          min<int64_t>(next_read_past_size_bytes_ * 2, max_buffer_size);
+    }
     read_past_buffer_size = ::max(read_past_buffer_size, read_past_size);
     read_past_buffer_size = ::min(read_past_buffer_size, file_bytes_remaining);
+    read_past_buffer_size = ::min(read_past_buffer_size, max_buffer_size);
     // We're reading past the scan range. Be careful not to read past the end of file.
     DCHECK_GE(read_past_buffer_size, 0);
     if (read_past_buffer_size == 0) {
@@ -235,25 +245,24 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
     }
   }
 
-  // Resize the buffer to the right size.
-  RETURN_IF_ERROR(boundary_buffer_->GrowBuffer(requested_len));
-
   while (requested_len > boundary_buffer_bytes_left_ + io_buffer_bytes_left_) {
-    // We need to fetch more bytes. Copy the end of the current buffer and fetch the next
-    // one.
-    RETURN_IF_ERROR(boundary_buffer_->Append(io_buffer_pos_, io_buffer_bytes_left_));
-    boundary_buffer_bytes_left_ += io_buffer_bytes_left_;
-
-    RETURN_IF_ERROR(GetNextBuffer());
-    if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
-
-    if (io_buffer_bytes_left_ == 0) {
-      // No more bytes (i.e. EOF)
-      break;
+    // We must copy the remainder of 'io_buffer_' to 'boundary_buffer_' before advancing
+    // to handle the case when the read straddles a block boundary. Preallocate
+    // 'boundary_buffer_' to avoid unnecessary resizes for large reads.
+    if (io_buffer_bytes_left_ > 0) {
+      RETURN_IF_ERROR(boundary_buffer_->GrowBuffer(requested_len));
+      RETURN_IF_ERROR(boundary_buffer_->Append(io_buffer_pos_, io_buffer_bytes_left_));
+      boundary_buffer_bytes_left_ += io_buffer_bytes_left_;
     }
+
+    int64_t remaining_requested_len = requested_len - boundary_buffer_->len();
+    RETURN_IF_ERROR(GetNextBuffer(remaining_requested_len));
+    if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
+    // No more bytes (i.e. EOF).
+    if (io_buffer_bytes_left_ == 0) break;
   }
 
-  // We have enough bytes in io_buffer_ or couldn't read more bytes
+  // We have read the full 'requested_len' bytes or couldn't read more bytes.
   int64_t requested_bytes_left = requested_len - boundary_buffer_bytes_left_;
   DCHECK_GE(requested_bytes_left, 0);
   int64_t num_bytes = min(io_buffer_bytes_left_, requested_bytes_left);
