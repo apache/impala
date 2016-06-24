@@ -117,8 +117,15 @@ class LikePredicate: public Predicate {
   static void RegexpLikePrepare(impala_udf::FunctionContext* context,
       impala_udf::FunctionContext::FunctionStateScope scope);
 
-  /// Handles regexp_like() when 3 parameters are passed to it
+  /// The cross-compiled wrapper to call RegexpLikeInternal() which is not cross-compiled.
   static impala_udf::BooleanVal RegexpLike(impala_udf::FunctionContext* context,
+      const impala_udf::StringVal& val, const impala_udf::StringVal& pattern,
+      const impala_udf::StringVal& match_parameter);
+
+  /// Handles regexp_like() when 3 parameters are passed to it. This is intentionally
+  /// not cross-compiled as there is no performance benefit in doing so and it will
+  /// consume extra codegen time.
+  static impala_udf::BooleanVal RegexpLikeInternal(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern,
       const impala_udf::StringVal& match_parameter);
 

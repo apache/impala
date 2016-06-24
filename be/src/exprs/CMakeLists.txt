@@ -39,6 +39,7 @@ add_library(Exprs
   in-predicate-ir.cc
   is-not-empty-predicate.cc
   is-null-predicate-ir.cc
+  like-predicate.cc
   like-predicate-ir.cc
   literal.cc
   math-functions-ir.cc
