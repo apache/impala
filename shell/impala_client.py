@@ -229,10 +229,12 @@ class ImpalaClient(object):
     self.transport.open()
     protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
     self.imp_service = ImpalaService.Client(protocol)
-    result = self.imp_service.PingImpalaService()
-    server_version = result.version
+    result = self.ping_impala_service()
     self.connected = True
-    return server_version
+    return result.version
+
+  def ping_impala_service(self):
+    return self.imp_service.PingImpalaService()
 
   def close_connection(self):
     """Close the transport if it's still open"""

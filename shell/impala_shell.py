@@ -676,9 +676,7 @@ class ImpalaShell(cmd.Cmd):
 
   def _connect(self):
     try:
-      server_version = self.imp_client.connect()
-      if server_version:
-        self.server_version = server_version
+      self.server_version = self.imp_client.connect()
     except TApplicationException:
       # We get a TApplicationException if the transport is valid,
       # but the RPC does not exist.
@@ -859,13 +857,28 @@ class ImpalaShell(cmd.Cmd):
 
     The execution time is printed and the query is closed if it hasn't been already
     """
-    try:
-      self._print_if_verbose("Query: %s" % (query.query,))
-      start_time = time.time()
 
+    self._print_if_verbose("Query: %s" % (query.query,))
+    # TODO: Clean up this try block and refactor it (IMPALA-3814)
+    try:
+      # Get the hostname, webserver port and the current coordinator time.
+      coordinator = self.imp_client.ping_impala_service()
+      # If the coordinator is on a different time zone, the epoch time returned will be
+      # different than from this system, so time.localtime(coordinator.epoch_time) will
+      # return the timestamp of the server.
+      self._print_if_verbose("Query submitted at: %s (Coordinator: %s)" % (time.strftime(
+          "%Y-%m-%d %H:%M:%S", time.localtime(coordinator.epoch_time)),
+          coordinator.webserver_address))
+
+      start_time = time.time()
       self.last_query_handle = self.imp_client.execute_query(query)
       self.query_handle_closed = False
       self.last_summary = time.time()
+      if coordinator.webserver_address:
+        self._print_if_verbose(
+            "Query progress can be monitored at: %s/query_plan?query_id=%s" %
+            (coordinator.webserver_address, self.last_query_handle.id))
+
       wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,
           self._periodic_wait_callback)
       # Reset the progress stream.

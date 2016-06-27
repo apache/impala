@@ -240,6 +240,12 @@ struct TInsertResult {
 struct TPingImpalaServiceResp {
   // The Impala service's version string.
   1: string version
+
+  // The Impalad's webserver address.
+  2: string webserver_address
+
+  // The Impalad's server time.
+  3: i64 epoch_time
 }
 
 // Parameters for a ResetTable request which will invalidate a table's metadata.

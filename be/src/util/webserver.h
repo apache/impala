@@ -87,6 +87,9 @@ class Webserver {
   /// True if serving all traffic over SSL, false otherwise
   bool IsSecure() const;
 
+  /// Returns the URL to the webserver as a string.
+  string Url();
+
  private:
   /// Contains all information relevant to rendering one Url. Each Url has one callback
   /// that produces the output to render. The callback either produces a Json document

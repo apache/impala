@@ -215,6 +215,11 @@ bool Webserver::IsSecure() const {
   return !FLAGS_webserver_certificate_file.empty();
 }
 
+string Webserver::Url() {
+  return Substitute("$0://$1:$2", IsSecure() ? "https" : "http",
+      http_address_.hostname, http_address_.port);
+}
+
 Status Webserver::Start() {
   LOG(INFO) << "Starting webserver on " << http_address_;
 

@@ -417,3 +417,13 @@ class TestImpalaShell(ImpalaTestSuite):
            % (os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql'))
     result = run_impala_shell_cmd(args, expect_success=True)
     assert_var_substitution(result)
+
+  def test_query_start_time_message(self):
+    results = run_impala_shell_cmd('--query="select 1"')
+    assert "Query submitted at: " in results.stderr
+
+  def test_query_coordinator_link_message(self):
+    results = run_impala_shell_cmd('--query="select 1"')
+    assert "(Coordinator: " in results.stderr
+    assert "Query progress can be monitored at: " in results.stderr
+
