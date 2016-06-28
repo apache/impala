@@ -95,6 +95,9 @@ DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory all
     "debug builds only.");
 DEFINE_int32(stress_datastream_recvr_delay_ms, 0, "A stress option that causes data "
     "stream receiver registration to be delayed. Effective in debug builds only.");
+DEFINE_bool(skip_file_runtime_filtering, false, "Skips file-based runtime filtering in "
+    "order to provide a regression test for IMPALA-3798. Effective in debug builds "
+    "only.");
 #endif
 
 DEFINE_bool(disable_kudu, false, "If true, Kudu features will be disabled.");

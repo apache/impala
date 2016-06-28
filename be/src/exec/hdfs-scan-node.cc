@@ -67,6 +67,10 @@ DEFINE_int32(runtime_filter_wait_time_ms, 1000, "(Advanced) the maximum time, in
 DECLARE_string(cgroup_hierarchy_path);
 DECLARE_bool(enable_rm);
 
+#ifndef NDEBUG
+DECLARE_bool(skip_file_runtime_filtering);
+#endif
+
 namespace filesystem = boost::filesystem;
 using namespace impala;
 using namespace llvm;
@@ -184,6 +188,9 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 
 bool HdfsScanNode::FilePassesFilterPredicates(const vector<FilterContext>& filter_ctxs,
     const THdfsFileFormat::type& format, HdfsFileDesc* file) {
+#ifndef NDEBUG
+  if (FLAGS_skip_file_runtime_filtering) return true;
+#endif
   if (filter_ctxs_.size() == 0) return true;
   ScanRangeMetadata* metadata =
       reinterpret_cast<ScanRangeMetadata*>(file->splits[0]->meta_data());
@@ -1132,7 +1139,7 @@ void HdfsScanNode::ScannerThread() {
 }
 
 bool HdfsScanNode::PartitionPassesFilterPredicates(int32_t partition_id,
-    const string& stats_name,  const vector<FilterContext>& filter_ctxs) {
+    const string& stats_name, const vector<FilterContext>& filter_ctxs) {
   if (filter_ctxs.size() == 0) return true;
   DCHECK_EQ(filter_ctxs.size(), filter_ctxs_.size())
       << "Mismatched number of filter contexts";
@@ -1152,10 +1159,22 @@ bool HdfsScanNode::PartitionPassesFilterPredicates(int32_t partition_id,
     bool processed = ctx.filter->HasBloomFilter();
     bool passed_filter = ctx.filter->Eval<void>(e, ctx.expr->root()->type());
     ctx.stats->IncrCounters(stats_name, 1, processed, !passed_filter);
-    if (!passed_filter)  return false;
+    if (!passed_filter) return false;
   }
 
   return true;
+}
+
+namespace {
+
+// Returns true if 'format' uses a scanner derived from BaseSequenceScanner. Used to
+// workaround IMPALA-3798.
+bool FileFormatIsSequenceBased(THdfsFileFormat::type format) {
+  return format == THdfsFileFormat::SEQUENCE_FILE ||
+      format == THdfsFileFormat::RC_FILE ||
+      format == THdfsFileFormat::AVRO;
+}
+
 }
 
 Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
@@ -1171,14 +1190,21 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
                             << " partition_id=" << partition_id
                             << "\n" << PrintThrift(runtime_state_->fragment_params());
 
-  if (!PartitionPassesFilterPredicates(partition_id, FilterStats::SPLITS_KEY,
-          filter_ctxs)) {
-    // Avoid leaking unread buffers in scan_range.
-    scan_range->Cancel(Status::CANCELLED);
-    // Mark scan range as done.
-    scan_ranges_complete_counter()->Add(1);
-    progress_.Update(1);
-    return Status::OK();
+  // IMPALA-3798: Filtering before the scanner is created can cause hangs if a header
+  // split is filtered out, for sequence-based file formats. If the scanner does not
+  // process the header split, the remaining scan ranges in the file will not be marked as
+  // done. See FilePassesFilterPredicates() for the correct logic to mark all splits in a
+  // file as done; the correct fix here is to do that for every file in a thread-safe way.
+  if (!FileFormatIsSequenceBased(partition->file_format())) {
+    if (!PartitionPassesFilterPredicates(partition_id, FilterStats::SPLITS_KEY,
+            filter_ctxs)) {
+      // Avoid leaking unread buffers in scan_range.
+      scan_range->Cancel(Status::CANCELLED);
+      // Mark scan range as done.
+      scan_ranges_complete_counter()->Add(1);
+      progress_.Update(1);
+      return Status::OK();
+    }
   }
 
   ScannerContext context(runtime_state_, this, partition, scan_range, filter_ctxs);
