@@ -25,6 +25,7 @@ import re
 import sys
 import tarfile
 
+from contextlib import closing
 from optparse import OptionParser
 
 class FileArchiver(object):
@@ -67,7 +68,7 @@ class FileArchiver(object):
     if num_files == 0:
       size = 0
     else:
-      with tarfile.open(self.output_file_path, mode='w:gz') as out:
+      with closing(tarfile.open(self.output_file_path, mode='w:gz')) as out:
         for i in xrange(num_files):
           out.add(self.file_list[i])
       size = os.stat(self.output_file_path).st_size
