@@ -177,7 +177,7 @@ function load-aux-workloads {
     if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
         --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\
         --dataset_dir=${IMPALA_AUX_DATASET_DIR}\
-        --exploration_strategy=core ${LOAD_DATA_ARGS} &>> $LOG_FILE; then
+        --exploration_strategy=core ${LOAD_DATA_ARGS} >> $LOG_FILE 2>&1; then
       echo Error loading aux workloads. The end of the log file is:
       tail -n 20 $LOG_FILE
       return 1

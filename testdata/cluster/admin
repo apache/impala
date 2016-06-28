@@ -90,10 +90,10 @@ fi
 EASY_ACCESS_LOG_DIR="$IMPALA_CLUSTER_LOGS_DIR"
 MINIKDC_INIT=${IMPALA_HOME}/testdata/bin/minikdc.sh
 
-if $IS_OSX; then
+FIND_EXECUTABLE_FILTER="-executable"
+if ! find /dev/null "${FIND_EXECUTABLE_FILTER}" 2> /dev/null; then
+  # OSX and RHEL5, among others, don't have -executable
   FIND_EXECUTABLE_FILTER="-perm +0111"
-else
-  FIND_EXECUTABLE_FILTER="-executable"
 fi
 
 #
