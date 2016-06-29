@@ -101,11 +101,10 @@ void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args
   Value overview(ss.str().c_str(), document->GetAllocator());
   document->AddMember("overview", overview, document->GetAllocator());
 
-  if (args.find("detailed") != args.end()) {
-    // Dump all mem trackers.
-    Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
-    document->AddMember("detailed", detailed, document->GetAllocator());
-  }
+  // Dump all mem trackers.
+  Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
+  document->AddMember("detailed", detailed, document->GetAllocator());
+
 }
 
 void impala::AddDefaultUrlCallbacks(
