@@ -27,87 +27,99 @@ namespace impala {
 
 /// Dynamic-sizable string (similar to std::string) but without as many
 /// copies and allocations.
-/// StringBuffer is a buffer of char allocated from 'pool'. Current usage and size of the
-/// buffer are tracked in 'len_' and 'buffer_size_' respectively. It supports a subset of
-/// the std::string functionality but will only allocate bigger string buffers as
-/// necessary. std::string tries to be immutable and will reallocate very often.
-/// std::string should be avoided in all hot paths.
+/// StringBuffer wraps a StringValue object with a pool and memory buffer length.
+/// It supports a subset of the std::string functionality but will only allocate
+/// bigger string buffers as necessary.  std::string tries to be immutable and will
+/// reallocate very often.  std::string should be avoided in all hot paths.
 class StringBuffer {
  public:
   /// C'tor for StringBuffer.  Memory backing the string will be allocated from
   /// the pool as necessary. Can optionally be initialized from a StringValue.
   StringBuffer(MemPool* pool, StringValue* str = NULL)
-      : pool_(pool), buffer_(NULL), len_(0), buffer_size_(0) {
+      : pool_(pool), buffer_size_(0) {
     DCHECK(pool_ != NULL);
     if (str != NULL) {
-      buffer_ = str->ptr;
-      len_ = buffer_size_ = str->len;
+      string_value_ = *str;
+      buffer_size_ = str->len;
     }
   }
 
   /// Append 'str' to the current string, allocating a new buffer as necessary.
-  Status Append(const char* str, int64_t str_len) {
-    int64_t new_len = len_ + str_len;
+  /// Return error status if memory limit is exceeded.
+  Status Append(const char* str, int len) {
+    int new_len = len + string_value_.len;
     if (new_len > buffer_size_) RETURN_IF_ERROR(GrowBuffer(new_len));
-    memcpy(buffer_ + len_, str, str_len);
-    len_ += str_len;
+    memcpy(string_value_.ptr + string_value_.len, str, len);
+    string_value_.len = new_len;
     return Status::OK();
   }
 
-  /// Wrapper around append() for input type 'uint8_t'.
-  Status Append(const uint8_t* str, int64_t str_len) {
-    return Append(reinterpret_cast<const char*>(str), str_len);
+  /// TODO: switch everything to uint8_t?
+  Status Append(const uint8_t* str, int len) {
+    return Append(reinterpret_cast<const char*>(str), len);
   }
 
-  /// Clear the underlying StringValue. The allocated buffer can be reused.
-  void Clear() { len_ = 0; }
+  /// Assigns contents to StringBuffer. Return error status if memory limit is exceeded.
+  Status Assign(const char* str, int len) {
+    Clear();
+    return Append(str, len);
+  }
 
-  /// Reset the usage and size of the buffer. Note that the allocated buffer is
-  /// retained but cannot be reused.
+  /// Clear the underlying StringValue.  The allocated buffer can be reused.
+  void Clear() {
+    string_value_.len = 0;
+  }
+
+  /// Clears the underlying buffer and StringValue
   void Reset() {
-    len_ = 0;
+    string_value_.len = 0;
     buffer_size_ = 0;
-    buffer_ = NULL;
   }
 
-  /// Returns true if no byte is consumed in the buffer.
-  bool IsEmpty() const { return len_ == 0; }
-
-  /// Grows the buffer to be at least 'new_size', copying over the previous data
-  /// into the new buffer. The old buffer is not freed. Return an error status if
-  /// growing the buffer will exceed memory limit.
-  Status GrowBuffer(int64_t new_size) {
-    if (LIKELY(new_size > buffer_size_)) {
-      int64_t old_size = buffer_size_;
-      buffer_size_ = std::max<int64_t>(buffer_size_ * 2, new_size);
-      char* new_buffer = reinterpret_cast<char*>(pool_->TryAllocate(buffer_size_));
-      if (UNLIKELY(new_buffer == NULL)) {
-        string details = Substitute("StringBuffer failed to grow buffer from $0 "
-            "to $1 bytes.", old_size, buffer_size_);
-        return pool_->mem_tracker()->MemLimitExceeded(NULL, details, buffer_size_);
-      }
-      if (LIKELY(len_ > 0)) memcpy(new_buffer, buffer_, len_);
-      buffer_ = new_buffer;
-    }
-    return Status::OK();
+  /// Returns whether the current string is empty
+  bool Empty() const {
+    return string_value_.len == 0;
   }
 
-  /// Returns the number of bytes consumed in the buffer.
-  int64_t len() const { return len_; }
+  /// Returns the length of the current string
+  int Size() const {
+    return string_value_.len;
+  }
 
-  /// Returns the pointer to the buffer. Note that it's the caller's responsibility
-  /// to not retain the pointer to 'buffer_' across call to Append() as the buffer_
-  /// may be relocated in Append().
-  char* buffer() const { return buffer_; }
+  /// Returns the underlying StringValue
+  const StringValue& str() const {
+    return string_value_;
+  }
 
-  /// Returns the size of the buffer.
-  int64_t buffer_size() const { return buffer_size_; }
+  /// Returns the buffer size
+  int buffer_size() const {
+    return buffer_size_;
+  }
 
  private:
+  /// Grows the buffer backing the string to be at least new_size, copying over the
+  /// previous string data into the new buffer. Return error status if memory limit
+  /// is exceeded.
+  Status GrowBuffer(int new_len) {
+    // TODO: Release/reuse old buffers somehow
+    buffer_size_ = std::max(buffer_size_ * 2, new_len);
+    DCHECK_LE(buffer_size_, StringValue::MAX_LENGTH);
+    char* new_buffer = reinterpret_cast<char*>(pool_->TryAllocate(buffer_size_));
+    if (UNLIKELY(new_buffer == NULL)) {
+      string details = Substitute("StringBuffer failed to grow buffer by $0 bytes.",
+          buffer_size_);
+      return pool_->mem_tracker()->MemLimitExceeded(NULL, details, buffer_size_);
+    }
+    if (LIKELY(string_value_.len > 0)) {
+      memcpy(new_buffer, string_value_.ptr, string_value_.len);
+    }
+    string_value_.ptr = new_buffer;
+    return Status::OK();
+  }
+
   MemPool* pool_;
-  char* buffer_;
-  int64_t len_;         // number of bytes consumed in the buffer.
-  int64_t buffer_size_; // size of the buffer.
+  StringValue string_value_;
+  int buffer_size_;
 };
 
 }

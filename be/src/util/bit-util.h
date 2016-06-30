@@ -23,7 +23,6 @@
 #endif
 
 #include <boost/type_traits/make_unsigned.hpp>
-#include <limits>
 
 #include "common/compiler-util.h"
 #include "util/cpu-info.h"
@@ -204,36 +203,31 @@ class BitUtil {
   static inline uint16_t FromBigEndian(uint16_t val) { return val; }
 #endif
 
-  /// Returns true if 'value' is a non-negative 32-bit integer.
-  static inline bool IsNonNegative32Bit(int64_t value) {
-    return (uint64_t)value <= std::numeric_limits<int32_t>::max();
-  }
-
-  /// Logical right shift for signed integer types
-  /// This is needed because the C >> operator does arithmetic right shift
-  /// Negative shift amounts lead to undefined behavior
+  // Logical right shift for signed integer types
+  // This is needed because the C >> operator does arithmetic right shift
+  // Negative shift amounts lead to undefined behavior
   template<typename T>
   static T ShiftRightLogical(T v, int shift) {
     // Conversion to unsigned ensures most significant bits always filled with 0's
     return static_cast<typename make_unsigned<T>::type>(v) >> shift;
   }
 
-  /// Get an specific bit of a numeric type
+  // Get an specific bit of a numeric type
   template<typename T>
   static inline int8_t GetBit(T v, int bitpos) {
     T masked = v & (static_cast<T>(0x1) << bitpos);
     return static_cast<int8_t>(ShiftRightLogical(masked, bitpos));
   }
 
-  /// Set a specific bit to 1
-  /// Behavior when bitpos is negative is undefined
+  // Set a specific bit to 1
+  // Behavior when bitpos is negative is undefined
   template<typename T>
   static T SetBit(T v, int bitpos) {
     return v | (static_cast<T>(0x1) << bitpos);
   }
 
-  /// Set a specific bit to 0
-  /// Behavior when bitpos is negative is undefined
+  // Set a specific bit to 0
+  // Behavior when bitpos is negative is undefined
   template<typename T>
   static T UnsetBit(T v, int bitpos) {
     return v & ~(static_cast<T>(0x1) << bitpos);

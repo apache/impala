@@ -234,9 +234,15 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
       boundary_buffer_->Clear();
     }
   }
-
-  // Resize the buffer to the right size.
-  RETURN_IF_ERROR(boundary_buffer_->GrowBuffer(requested_len));
+  // Workaround IMPALA-1619. Fail the request if requested_len is more than 1GB.
+  // StringBuffer can only handle 32-bit allocations and StringBuffer::Append()
+  // will allocate twice the current buffer size, cause int overflow.
+  // TODO: Revert once IMPALA-1619 is fixed.
+  if (UNLIKELY(requested_len > StringValue::MAX_LENGTH)) {
+    LOG(WARNING) << "Requested buffer size " << requested_len << "B > 1GB."
+        << GetStackTrace();
+    return Status(Substitute("Requested buffer size $0B > 1GB", requested_len));
+  }
 
   while (requested_len > boundary_buffer_bytes_left_ + io_buffer_bytes_left_) {
     // We need to fetch more bytes. Copy the end of the current buffer and fetch the next
@@ -267,8 +273,8 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
   } else {
     RETURN_IF_ERROR(boundary_buffer_->Append(io_buffer_pos_, num_bytes));
     boundary_buffer_bytes_left_ += num_bytes;
-    boundary_buffer_pos_ = reinterpret_cast<uint8_t*>(boundary_buffer_->buffer()) +
-        boundary_buffer_->len() - boundary_buffer_bytes_left_;
+    boundary_buffer_pos_ = reinterpret_cast<uint8_t*>(boundary_buffer_->str().ptr) +
+                           boundary_buffer_->Size() - boundary_buffer_bytes_left_;
     io_buffer_bytes_left_ -= num_bytes;
     io_buffer_pos_ += num_bytes;
 

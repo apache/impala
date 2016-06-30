@@ -3,9 +3,6 @@
 import os
 import pytest
 import random
-import snappy
-import string
-import struct
 import subprocess
 from os.path import join
 from subprocess import call
@@ -147,23 +144,19 @@ class TestTableWriters(ImpalaTestSuite):
 
 @pytest.mark.execute_serially
 class TestLargeCompressedFile(ImpalaTestSuite):
-  """
-  Tests that Impala handles compressed files in HDFS larger than 1GB.
-  This test creates a 2GB test data file and loads it into a table.
-  """
+  """ Tests that we gracefully handle when a compressed file in HDFS is larger
+  than 1GB.
+  This test creates a testing data file that is over 1GB and loads it to a table.
+  Then verifies Impala will gracefully fail the query.
+  TODO: Once IMPALA-1619 is fixed, modify the test to test > 2GB file."""
+
   TABLE_NAME = "large_compressed_file"
   TABLE_LOCATION = get_fs_path("/test-warehouse/large_compressed_file")
-  """
-  Name the file with ".snappy" extension to let scanner treat it as
-  a snappy block compressed file.
-  """
+  """ Name the file with ".snappy" extension to let scanner treat it
+  as a snappy compressed file."""
   FILE_NAME = "largefile.snappy"
-  # Maximum uncompressed size of an outer block in a snappy block compressed file.
-  CHUNK_SIZE = 1024 * 1024 * 1024
-  # Limit the max file size to 2GB or too much memory may be needed when
-  # uncompressing the buffer. 2GB is sufficient to show that we support
-  # size beyond maximum 32-bit signed value.
-  MAX_FILE_SIZE = 2 * CHUNK_SIZE
+  LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  MAX_FILE_SIZE = 1024 * 1024 * 1024
 
   @classmethod
   def get_workload(self):
@@ -177,59 +170,48 @@ class TestLargeCompressedFile(ImpalaTestSuite):
       pytest.skip("skipping if it's not exhaustive test.")
     cls.TestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format =='text' and
-        v.get_value('table_format').compression_codec == 'snap'))
+        v.get_value('table_format').compression_codec == 'none'))
 
   def teardown_method(self, method):
     self.__drop_test_table()
 
+  def __gen_char_or_num(self):
+    return random.choice(self.LETTERS)
+
   def __generate_file(self, file_name, file_size):
     """Generate file with random data and a specified size."""
-    content = "Lots of content here there here there here there"
-    # Permutate the input buffer.
-    payload = ''
-    for i in range(1024):
-      payload += ''.join(random.sample(content, len(content))) + ','
-
-    compressed_payload = snappy.compress(payload)
-    compressed_size = len(compressed_payload)
-
-    num_chunks = int(math.ceil(file_size / self.CHUNK_SIZE))
-    num_iterations = self.CHUNK_SIZE / (compressed_size + 4)
-    total_size = num_iterations * len(payload)
-
+    s = ''
+    for j in range(1024):
+      s = s + self.__gen_char_or_num()
     put = subprocess.Popen(["hadoop", "fs", "-put", "-f", "-", file_name],
-        stdin=subprocess.PIPE, bufsize=-1)
-    """
-    The layout of a snappy-block compressed file is one or more blocks
-    of the following nested structure:
-    - <big endian 32-bit value encoding the uncompresed size>
-    - one or more blocks of the following structure:
-      - <big endian 32-bit value encoding the compressed size>
-      - <raw bits compressed by snappy algorithm>
-    """
-    for i in range(num_chunks):
-      put.stdin.write(struct.pack('>i', total_size))
-      for j in range(num_iterations):
-        put.stdin.write(struct.pack('>i', compressed_size))
-        put.stdin.write(compressed_payload)
+                           stdin=subprocess.PIPE, bufsize=-1)
+    remain = file_size % 1024
+    for i in range(int(file_size / 1024)):
+      put.stdin.write(s)
+    put.stdin.write(s[0:remain])
     put.stdin.close()
     put.wait()
 
   def test_query_large_file(self, vector):
     self.__create_test_table();
     dst_path = "%s/%s" % (self.TABLE_LOCATION, self.FILE_NAME)
-    file_size = self.MAX_FILE_SIZE
+    file_size = self.MAX_FILE_SIZE + 1
     self.__generate_file(dst_path, file_size)
     self.client.execute("refresh %s" % self.TABLE_NAME)
 
-    # Query the table
-    result = self.client.execute("select * from %s limit 1" % self.TABLE_NAME)
+    # Query the table and check for expected error.
+    expected_error = 'Requested buffer size %dB > 1GB' % file_size
+    try:
+      result = self.client.execute("select * from %s limit 1" % self.TABLE_NAME)
+      assert False, "Query was expected to fail"
+    except Exception as e:
+      error_msg = str(e)
+      assert expected_error in error_msg
 
   def __create_test_table(self):
     self.__drop_test_table()
-    self.client.execute("CREATE TABLE %s (col string) " \
-        "ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '%s'"
-        % (self.TABLE_NAME, self.TABLE_LOCATION))
+    self.client.execute("CREATE TABLE %s (col string) LOCATION '%s'"
+      % (self.TABLE_NAME, self.TABLE_LOCATION))
 
   def __drop_test_table(self):
     self.client.execute("DROP TABLE IF EXISTS %s" % self.TABLE_NAME)

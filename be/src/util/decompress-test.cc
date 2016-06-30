@@ -121,8 +121,10 @@ class DecompressorTest : public ::testing::Test {
       EXPECT_GE(max_compressed_length, 0);
       uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
       compressed_length = max_compressed_length;
+
+
       EXPECT_OK(compressor->ProcessBlock(true, input_len, input, &compressed_length,
-          &compressed));
+                                           &compressed));
     }
 
     output_len = decompressor->MaxOutputLen(compressed_length, compressed);

@@ -58,9 +58,6 @@ struct FieldLocation {
   char* start;
   /// Encodes the length and whether or not this fields needs to be unescaped.
   /// If len < 0, then the field needs to be unescaped.
-  ///
-  /// Currently, 'len' has to fit in a 32-bit integer as that's the limit for StringValue
-  /// and StringVal. All other types shouldn't be anywhere near this limit.
   int len;
 
   static const char* LLVM_CLASS_NAME;

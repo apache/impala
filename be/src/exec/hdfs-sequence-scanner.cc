@@ -229,15 +229,15 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   for (int i = 0; i < num_to_process; ++i) {
     int num_fields = 0;
     if (delimited_text_parser_->escape_char() == '\0') {
-      RETURN_IF_ERROR(delimited_text_parser_->ParseSingleTuple<false>(
+      delimited_text_parser_->ParseSingleTuple<false>(
           record_locations_[i].len,
           reinterpret_cast<char*>(record_locations_[i].record),
-          &field_locations_[field_location_offset], &num_fields));
+          &field_locations_[field_location_offset], &num_fields);
     } else {
-      RETURN_IF_ERROR(delimited_text_parser_->ParseSingleTuple<true>(
+      delimited_text_parser_->ParseSingleTuple<true>(
           record_locations_[i].len,
           reinterpret_cast<char*>(record_locations_[i].record),
-          &field_locations_[field_location_offset], &num_fields));
+          &field_locations_[field_location_offset], &num_fields);
     }
     DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
     field_location_offset += num_fields;

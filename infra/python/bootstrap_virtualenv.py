@@ -123,16 +123,8 @@ def detect_python_cmd():
 
 
 def install_deps():
-  toolchain_dir = os.environ.get("IMPALA_TOOLCHAIN", "")
-  snappy_version = os.environ.get("IMPALA_SNAPPY_VERSION", "")
-  snappy_dir = toolchain_dir + "/snappy-" + snappy_version
-  lib_path = snappy_dir + "/lib:" + os.environ.get("LD_LIBRARY_PATH", "")
-  include_dir = snappy_dir + "/include"
-  args = ["--global-option", "build_ext", "--global-option", "-L"+ lib_path,
-    "--global-option", "-I" + include_dir, "-r", REQS_PATH]
-
   LOG.info("Installing packages into the virtualenv")
-  exec_pip_install(args)
+  exec_pip_install(["-r", REQS_PATH])
   shutil.copyfile(REQS_PATH, INSTALLED_REQS_PATH)
 
 

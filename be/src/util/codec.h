@@ -150,6 +150,11 @@ class Codec {
 
   bool supports_streaming() const { return supports_streaming_; }
 
+  /// Largest block we will compress/decompress: 2GB.
+  /// We are dealing with compressed blocks that are never this big but we want to guard
+  /// against a corrupt file that has the block length as some large number.
+  static const int MAX_BLOCK_SIZE = (2L * 1024 * 1024 * 1024) - 1;
+
  protected:
   /// Create a compression operator
   /// Inputs:

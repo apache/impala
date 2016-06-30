@@ -182,13 +182,15 @@ Status Codec::ProcessBlock32(bool output_preallocated, int input_length,
     const uint8_t* input, int* output_length, uint8_t** output) {
   int64_t input_len64 = input_length;
   int64_t output_len64 = *output_length;
-  RETURN_IF_ERROR(
-      ProcessBlock(output_preallocated, input_len64, input, &output_len64, output));
-  // Buffer size should be between [0, (2^31 - 1)] bytes.
-  if (UNLIKELY(!BitUtil::IsNonNegative32Bit(output_len64))) {
+  RETURN_IF_ERROR(ProcessBlock(output_preallocated, input_len64, input, &output_len64,
+                               output));
+  // Check whether we are going to have an overflow if we are going to cast from int64_t
+  // to int.
+  // TODO: Is there a faster way to do this check?
+  if (UNLIKELY(output_len64 > numeric_limits<int>::max())) {
     return Status(Substitute("Arithmetic overflow in codec function. Output length is $0",
         output_len64));;
   }
-  *output_length = static_cast<int>(output_len64);
+  *output_length = static_cast<int32_t>(output_len64);
   return Status::OK();
 }

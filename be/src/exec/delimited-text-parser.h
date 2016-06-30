@@ -32,9 +32,9 @@ class DelimitedTextParser {
   ///   collection_item_delim: delimits collection items
   ///   escape_char: escape delimiters, make them part of the data.
   //
-  /// 'num_cols' is the total number of columns including partition keys.
+  /// num_cols is the total number of columns including partition keys.
   //
-  /// 'is_materialized_col' should be initialized to an array of length 'num_cols', with
+  /// is_materialized_col should be initialized to an array of length 'num_cols', with
   /// is_materialized_col[i] = <true if column i should be materialized, false otherwise>
   /// Owned by caller.
   //
@@ -73,8 +73,6 @@ class DelimitedTextParser {
   ///   num_fields: Number of materialized fields parsed
   ///   next_column_start: pointer within file_buffer_ where the next field starts
   ///                      after the return from the call to ParseData
-  /// Returns an error status if any column exceeds the size limit.
-  /// See AddColumn() for details.
   Status ParseFieldLocations(int max_tuples, int64_t remaining_len,
       char** byte_buffer_ptr, char** row_end_locations,
       FieldLocation* field_locations,
@@ -86,10 +84,9 @@ class DelimitedTextParser {
   ///   col.
   /// - *num_fields returns the number of fields processed.
   /// This function is used to parse sequence file records which do not need to
-  /// parse for tuple delimiters. Returns an error status if any column exceeds the
-  /// size limit. See AddColumn() for details.
+  /// parse for tuple delimiters.
   template <bool process_escapes>
-  Status ParseSingleTuple(int64_t len, char* buffer, FieldLocation* field_locations,
+  void ParseSingleTuple(int64_t len, char* buffer, FieldLocation* field_locations,
       int* num_fields);
 
   /// FindFirstInstance returns the position after the first non-escaped tuple
@@ -97,7 +94,7 @@ class DelimitedTextParser {
   /// Used to find the start of a tuple if jumping into the middle of a text file.
   /// Also used to find the sync marker for Sequenced and RC files.
   /// If no tuple delimiter is found within the buffer, return -1;
-  int64_t FindFirstInstance(const char* buffer, int64_t len);
+  int FindFirstInstance(const char* buffer, int len);
 
   /// Will we return the current column to the query?
   /// Hive allows cols at the end of the table that are not in the schema.  We'll
@@ -107,18 +104,17 @@ class DelimitedTextParser {
   }
 
   /// Fill in columns missing at the end of the tuple.
-  /// 'len' and 'last_column' may contain the length and the pointer to the
+  /// len and last_column may contain the length and the pointer to the
   /// last column on which the file ended without a delimiter.
   /// Fills in the offsets and lengths in field_locations.
-  /// If parsing stopped on a delimiter and there is no last column then length will be 0.
+  /// If parsing stopped on a delimiter and there is no last column then len will be  0.
   /// Other columns beyond that are filled with 0 length fields.
-  /// 'num_fields' points to an initialized count of fields and will incremented
+  /// num_fields points to an initialized count of fields and will incremented
   /// by the number fields added.
-  /// 'field_locations' will be updated with the start and length of the fields.
-  /// Returns an error status if 'len' exceeds the size limit specified in AddColumn().
+  /// field_locations will be updated with the start and length of the fields.
   template <bool process_escapes>
-  Status FillColumns(int64_t len, char** last_column, int* num_fields,
-      impala::FieldLocation* field_locations);
+  void FillColumns(int len, char** last_column,
+                   int* num_fields, impala::FieldLocation* field_locations);
 
   /// Return true if we have not seen a tuple delimiter for the current tuple being
   /// parsed (i.e., the last byte read was not a tuple delimiter).
@@ -132,28 +128,24 @@ class DelimitedTextParser {
   /// Template parameter:
   ///   process_escapes -- if true the the column may have escape characters
   ///                      and the negative of the len will be stored.
-  ///   len: length of the current column. The length of a column must fit in a 32-bit
-  ///        signed integer (i.e. <= 2147483647 bytes). If a column is larger than that,
-  ///        it will be treated as an error.
+  ///   len: lenght of the current column.
   /// Input/Output:
   ///   next_column_start: Start of the current column, moved to the start of the next.
   ///   num_fields: current number of fields processed, updated to next field.
   /// Output:
   ///   field_locations: updated with start and length of current field.
-  /// Return an error status if 'len' exceeds the size limit specified above.
   template <bool process_escapes>
-  Status AddColumn(int64_t len, char** next_column_start, int* num_fields,
-      FieldLocation* field_locations);
+  void AddColumn(int len, char** next_column_start, int* num_fields,
+                 FieldLocation* field_locations);
 
   /// Helper routine to parse delimited text using SSE instructions.
   /// Identical arguments as ParseFieldLocations.
   /// If the template argument, 'process_escapes' is true, this function will handle
   /// escapes, otherwise, it will assume the text is unescaped.  By using templates,
   /// we can special case the un-escaped path for better performance.  The unescaped
-  /// path is optimized away by the compiler. Returns an error status if the length
-  /// of any column exceeds the size limit. See AddColumn() for details.
+  /// path is optimized away by the compiler.
   template <bool process_escapes>
-  Status ParseSse(int max_tuples, int64_t* remaining_len,
+  void ParseSse(int max_tuples, int64_t* remaining_len,
       char** byte_buffer_ptr, char** row_end_locations_,
       FieldLocation* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
