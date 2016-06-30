@@ -15,6 +15,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfBuildType
 
 class TestImpala3798(CustomClusterTestSuite):
   """Regression test for IMPALA-3798, which is a hang that occurs when an Avro file is not
@@ -28,6 +29,7 @@ class TestImpala3798(CustomClusterTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--skip_file_runtime_filtering=true")
   def test_sequence_file_filtering_race(self, vector):
