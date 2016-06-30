@@ -294,6 +294,11 @@ function load-custom-data {
   hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
                     /test-warehouse/tinytable_seq_snap
 
+  # IMPALA-1619: payload compressed with snappy used for constructing large snappy block
+  # compressed file
+  hadoop fs -put -f ${IMPALA_HOME}/testdata/compressed_formats/compressed_payload.snap \
+                    /test-warehouse/compressed_payload.snap
+
   beeline -n $USER -u "${JDBC_URL}" -f\
     ${IMPALA_HOME}/testdata/avro_schema_resolution/create_table.sql
 }

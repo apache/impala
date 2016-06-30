@@ -274,6 +274,9 @@ error_codes = (
 
   ("PARQUET_CORRUPT_DICTIONARY", 89, "File '$0' is corrupt: error reading dictionary for "
    "data of type $1: $2"),
+
+  ("TEXT_PARSER_TRUNCATED_COLUMN", 90, "Length of column is $0 which exceeds maximum "
+   "supported length of 2147483647 bytes.")
 )
 
 import sys

@@ -79,7 +79,7 @@ class FunctionContextImpl {
   /// FreeLocalAllocations(). This is used where the lifetime of the allocation is clear.
   /// For UDFs, the allocations can be freed at the row level.
   /// TODO: free them at the batch level and save some copies?
-  uint8_t* AllocateLocal(int byte_size) noexcept;
+  uint8_t* AllocateLocal(int64_t byte_size) noexcept;
 
   /// Frees all allocations returned by AllocateLocal().
   void FreeLocalAllocations() noexcept;
@@ -121,7 +121,7 @@ class FunctionContextImpl {
   /// if necessary.
   ///
   /// Return false if 'buf' is null; returns true otherwise.
-  bool CheckAllocResult(const char* fn_name, uint8_t* buf, int byte_size);
+  bool CheckAllocResult(const char* fn_name, uint8_t* buf, int64_t byte_size);
 
   /// Preallocated buffer for storing varargs (if the function has any). Allocated and
   /// owned by this object, but populated by an Expr function.

@@ -21,6 +21,9 @@
 
 #include "common/names.h"
 
+// Maximum allocation size which exceeds 32-bit.
+#define LARGE_ALLOC_SIZE (1LL << 32)
+
 namespace impala {
 
 // Utility class to call private functions on MemPool.
@@ -125,6 +128,11 @@ TEST(MemPoolTest, Basic) {
     p2.FreeAll();
     p3.FreeAll();
   }
+
+  // Test zero byte allocation.
+  uint8_t* ptr = p.Allocate(0);
+  EXPECT_TRUE(ptr != NULL);
+  EXPECT_EQ(0, p.GetTotalChunkSizes());
 }
 
 // Test that we can keep an allocated chunk and a free chunk.
@@ -192,6 +200,22 @@ TEST(MemPoolTest, ReturnPartial) {
     EXPECT_EQ(2, ptr[i]);
   }
 
+  // Try ReturnPartialAllocations() with 64-bit values.
+  uint8_t* ptr4 = p.Allocate(LARGE_ALLOC_SIZE + 512);
+  EXPECT_EQ(1024 + LARGE_ALLOC_SIZE + 512, p.total_allocated_bytes());
+  memset(ptr4, 3, 512 * 2);
+  p.ReturnPartialAllocation(LARGE_ALLOC_SIZE);
+  uint8_t* ptr5 = p.Allocate(512);
+  EXPECT_TRUE(ptr5 == ptr4 + 512);
+  memset(ptr5, 4, 512);
+
+  for (int i = 0; i < 512; ++i) {
+    EXPECT_EQ(3, ptr4[i]);
+  }
+  for (int i = 512; i < 512 * 2; ++i) {
+    EXPECT_EQ(4, ptr4[i]);
+  }
+
   p.FreeAll();
 }
 
@@ -252,51 +276,50 @@ TEST(MemPoolTest, Limits) {
   ASSERT_TRUE(MemPoolTest::CheckIntegrity(p2, false));
 
   // Try To allocate 20 bytes, this should succeed. TryAllocate() should leave the
-  // pool in a functional state..
+  // pool in a functional state.
   result = p2->TryAllocate(20);
   ASSERT_TRUE(result != NULL);
   ASSERT_TRUE(MemPoolTest::CheckIntegrity(p2, false));
-
 
   p2->FreeAll();
   delete p2;
 }
 
 TEST(MemPoolTest, MaxAllocation) {
-  int64_t int_max_rounded = BitUtil::RoundUp(INT_MAX, 8);
+  int64_t int_max_rounded = BitUtil::RoundUp(LARGE_ALLOC_SIZE, 8);
 
-  // Allocate a single INT_MAX chunk
+  // Allocate a single LARGE_ALLOC_SIZE chunk
   MemTracker tracker;
   MemPool p1(&tracker);
-  uint8_t* ptr = p1.Allocate(INT_MAX);
+  uint8_t* ptr = p1.Allocate(LARGE_ALLOC_SIZE);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(int_max_rounded, p1.GetTotalChunkSizes());
   EXPECT_EQ(int_max_rounded, p1.total_allocated_bytes());
   p1.FreeAll();
 
-  // Allocate a small chunk (INITIAL_CHUNK_SIZE) followed by an INT_MAX chunk
+  // Allocate a small chunk (INITIAL_CHUNK_SIZE) followed by an LARGE_ALLOC_SIZE chunk
   MemPool p2(&tracker);
   p2.Allocate(8);
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE, p2.GetTotalChunkSizes());
   EXPECT_EQ(8, p2.total_allocated_bytes());
-  ptr = p2.Allocate(INT_MAX);
+  ptr = p2.Allocate(LARGE_ALLOC_SIZE);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE + int_max_rounded,
       p2.GetTotalChunkSizes());
   EXPECT_EQ(8LL + int_max_rounded, p2.total_allocated_bytes());
   p2.FreeAll();
 
-  // Allocate three INT_MAX chunks followed by a small chunk followed by another INT_MAX
-  // chunk
+  // Allocate three LARGE_ALLOC_SIZE chunks followed by a small chunk
+  // followed by another LARGE_ALLOC_SIZE chunk.
   MemPool p3(&tracker);
-  p3.Allocate(INT_MAX);
+  p3.Allocate(LARGE_ALLOC_SIZE);
   // Allocates new int_max_rounded chunk
-  ptr = p3.Allocate(INT_MAX);
+  ptr = p3.Allocate(LARGE_ALLOC_SIZE);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(int_max_rounded * 2, p3.GetTotalChunkSizes());
   EXPECT_EQ(int_max_rounded * 2, p3.total_allocated_bytes());
   // Allocates new int_max_rounded chunk
-  ptr = p3.Allocate(INT_MAX);
+  ptr = p3.Allocate(LARGE_ALLOC_SIZE);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(int_max_rounded * 3, p3.GetTotalChunkSizes());
   EXPECT_EQ(int_max_rounded * 3, p3.total_allocated_bytes());
@@ -308,7 +331,7 @@ TEST(MemPoolTest, MaxAllocation) {
   EXPECT_EQ(int_max_rounded * 3 + MemPoolTest::MAX_CHUNK_SIZE, p3.GetTotalChunkSizes());
   EXPECT_EQ(int_max_rounded * 3 + 8, p3.total_allocated_bytes());
   // Allocates new int_max_rounded chunk
-  ptr = p3.Allocate(INT_MAX);
+  ptr = p3.Allocate(LARGE_ALLOC_SIZE);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(int_max_rounded * 4 + MemPoolTest::MAX_CHUNK_SIZE, p3.GetTotalChunkSizes());
   EXPECT_EQ(int_max_rounded * 4 + 8, p3.total_allocated_bytes());

@@ -85,6 +85,22 @@ TEST(FreePoolTest, Basic) {
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 64);
 
   mem_pool.FreeAll();
+
+  // Try making allocations larger than 1GB.
+  uint8_t* p5 = pool.Allocate(1LL << 32);
+  EXPECT_TRUE(p5 != NULL);
+  for (int64_t i = 0; i < (1LL << 32); i += (1 << 29)) {
+    *(p5 + i) = i;
+  }
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), (1LL << 32) + 8);
+
+  // Test zero-byte allocation.
+  p5 = pool.Allocate(0);
+  EXPECT_TRUE(p5 != NULL);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), (1LL << 32) + 8);
+  pool.Free(p5);
+
+  mem_pool.FreeAll();
 }
 
 // In this test we make two allocations at increasing sizes and then we
@@ -96,13 +112,13 @@ TEST(FreePoolTest, Loop) {
   MemPool mem_pool(&tracker);
   FreePool pool(&mem_pool);
 
-  map<int, pair<uint8_t*, uint8_t*> > primed_allocations;
-  vector<int> allocation_sizes;
+  map<int64_t, pair<uint8_t*, uint8_t*> > primed_allocations;
+  vector<int64_t> allocation_sizes;
 
   int64_t expected_pool_size = 0;
 
   // Pick a non-power of 2 to exercise more code.
-  for (int size = 3; size < 1024 * 1024 * 1024; size *= 3) {
+  for (int64_t size = 5; size < 6LL * 1024 * 1024 * 1024; size *= 5) {
     uint8_t* p1 = pool.Allocate(size);
     uint8_t* p2 = pool.Allocate(size);
     EXPECT_TRUE(p1 != NULL);
@@ -162,6 +178,11 @@ TEST(FreePoolTest, ReAlloc) {
   // The original 600 allocation should be there.
   ptr = pool.Allocate(600);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8);
+
+  // Try allocation larger than 1GB.
+  uint8_t* ptr4 = pool.Reallocate(ptr3, 1LL << 32);
+  EXPECT_TRUE(ptr3 != ptr4);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8 + (1LL << 32) + 8);
 
   mem_pool.FreeAll();
 }

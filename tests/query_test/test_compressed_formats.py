@@ -3,6 +3,8 @@
 import os
 import pytest
 import random
+import string
+import struct
 import subprocess
 from os.path import join
 from subprocess import call
@@ -144,19 +146,23 @@ class TestTableWriters(ImpalaTestSuite):
 
 @pytest.mark.execute_serially
 class TestLargeCompressedFile(ImpalaTestSuite):
-  """ Tests that we gracefully handle when a compressed file in HDFS is larger
-  than 1GB.
-  This test creates a testing data file that is over 1GB and loads it to a table.
-  Then verifies Impala will gracefully fail the query.
-  TODO: Once IMPALA-1619 is fixed, modify the test to test > 2GB file."""
-
+  """
+  Tests that Impala handles compressed files in HDFS larger than 1GB.
+  This test creates a 2GB test data file and loads it into a table.
+  """
   TABLE_NAME = "large_compressed_file"
   TABLE_LOCATION = get_fs_path("/test-warehouse/large_compressed_file")
-  """ Name the file with ".snappy" extension to let scanner treat it
-  as a snappy compressed file."""
+  """
+  Name the file with ".snappy" extension to let scanner treat it as
+  a snappy block compressed file.
+  """
   FILE_NAME = "largefile.snappy"
-  LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  MAX_FILE_SIZE = 1024 * 1024 * 1024
+  # Maximum uncompressed size of an outer block in a snappy block compressed file.
+  CHUNK_SIZE = 1024 * 1024 * 1024
+  # Limit the max file size to 2GB or too much memory may be needed when
+  # uncompressing the buffer. 2GB is sufficient to show that we support
+  # size beyond maximum 32-bit signed value.
+  MAX_FILE_SIZE = 2 * CHUNK_SIZE
 
   @classmethod
   def get_workload(self):
@@ -170,48 +176,65 @@ class TestLargeCompressedFile(ImpalaTestSuite):
       pytest.skip("skipping if it's not exhaustive test.")
     cls.TestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format =='text' and
-        v.get_value('table_format').compression_codec == 'none'))
+        v.get_value('table_format').compression_codec == 'snap'))
 
   def teardown_method(self, method):
     self.__drop_test_table()
 
-  def __gen_char_or_num(self):
-    return random.choice(self.LETTERS)
-
   def __generate_file(self, file_name, file_size):
     """Generate file with random data and a specified size."""
-    s = ''
-    for j in range(1024):
-      s = s + self.__gen_char_or_num()
-    put = subprocess.Popen(["hadoop", "fs", "-put", "-f", "-", file_name],
-                           stdin=subprocess.PIPE, bufsize=-1)
-    remain = file_size % 1024
-    for i in range(int(file_size / 1024)):
-      put.stdin.write(s)
-    put.stdin.write(s[0:remain])
-    put.stdin.close()
-    put.wait()
+
+    # Read the payload compressed using snappy. The compressed payload
+    # is generated from a string of 50176 bytes.
+    payload_size = 50176
+    hdfs_cat = subprocess.Popen(["hadoop", "fs", "-cat",
+        "/test-warehouse/compressed_payload.snap"], stdout=subprocess.PIPE)
+    compressed_payload = hdfs_cat.stdout.read()
+    compressed_size = len(compressed_payload)
+    hdfs_cat.stdout.close()
+    hdfs_cat.wait()
+
+    # The layout of a snappy-block compressed file is one or more
+    # of the following nested structure which is called "chunk" in
+    # the code below:
+    #
+    # - <big endian 32-bit value encoding the uncompresed size>
+    # - one or more blocks of the following structure:
+    #   - <big endian 32-bit value encoding the compressed size>
+    #   - <raw bits compressed by snappy algorithm>
+
+    # Number of nested structures described above.
+    num_chunks = int(math.ceil(file_size / self.CHUNK_SIZE))
+    # Number of compressed snappy blocks per chunk.
+    num_blocks_per_chunk = self.CHUNK_SIZE / (compressed_size + 4)
+    # Total uncompressed size of a nested structure.
+    total_chunk_size = num_blocks_per_chunk * payload_size
+
+    hdfs_put = subprocess.Popen(["hadoop", "fs", "-put", "-f", "-", file_name],
+        stdin=subprocess.PIPE, bufsize=-1)
+    for i in range(num_chunks):
+      hdfs_put.stdin.write(struct.pack('>i', total_chunk_size))
+      for j in range(num_blocks_per_chunk):
+        hdfs_put.stdin.write(struct.pack('>i', compressed_size))
+        hdfs_put.stdin.write(compressed_payload)
+    hdfs_put.stdin.close()
+    hdfs_put.wait()
 
   def test_query_large_file(self, vector):
     self.__create_test_table();
     dst_path = "%s/%s" % (self.TABLE_LOCATION, self.FILE_NAME)
-    file_size = self.MAX_FILE_SIZE + 1
+    file_size = self.MAX_FILE_SIZE
     self.__generate_file(dst_path, file_size)
     self.client.execute("refresh %s" % self.TABLE_NAME)
 
-    # Query the table and check for expected error.
-    expected_error = 'Requested buffer size %dB > 1GB' % file_size
-    try:
-      result = self.client.execute("select * from %s limit 1" % self.TABLE_NAME)
-      assert False, "Query was expected to fail"
-    except Exception as e:
-      error_msg = str(e)
-      assert expected_error in error_msg
+    # Query the table
+    result = self.client.execute("select * from %s limit 1" % self.TABLE_NAME)
 
   def __create_test_table(self):
     self.__drop_test_table()
-    self.client.execute("CREATE TABLE %s (col string) LOCATION '%s'"
-      % (self.TABLE_NAME, self.TABLE_LOCATION))
+    self.client.execute("CREATE TABLE %s (col string) " \
+        "ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '%s'"
+        % (self.TABLE_NAME, self.TABLE_LOCATION))
 
   def __drop_test_table(self):
     self.client.execute("DROP TABLE IF EXISTS %s" % self.TABLE_NAME)

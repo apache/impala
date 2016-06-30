@@ -1,0 +1,4 @@
+This folder contains a file necessary to test Impala's support for snappy block compressed
+file larger than 1GB. In particular, compressed_payload.snap is a string of 50176 bytes
+compressed using snappy. It's the building block for constructing a large snappy block
+compressed file. Please see test_compressed_formats.py for details.
