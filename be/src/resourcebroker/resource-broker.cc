@@ -151,7 +151,7 @@ Status ResourceBroker::Init() {
     return Status("No Llama addresses configured (see --llama_addresses)");
   }
 
-  shared_ptr<TProcessor> llama_callback_proc(
+  boost::shared_ptr<TProcessor> llama_callback_proc(
       new llama::LlamaNotificationServiceProcessor(llama_callback_thrift_iface_));
   llama_callback_server_.reset(new ThriftServer("llama-callback", llama_callback_proc,
       llama_callback_address_.port, NULL, metrics_, 5));

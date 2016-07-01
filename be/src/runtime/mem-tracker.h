@@ -19,8 +19,6 @@
 #include <stdint.h>
 #include <map>
 #include <vector>
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -92,7 +90,7 @@ class MemTracker {
   /// 'parent' as the parent tracker.
   /// byte_limit and parent must be the same for all GetMemTracker() calls with the
   /// same id.
-  static boost::shared_ptr<MemTracker> GetQueryMemTracker(const TUniqueId& id,
+  static std::shared_ptr<MemTracker> GetQueryMemTracker(const TUniqueId& id,
       int64_t byte_limit, int64_t rm_reserved_limit, MemTracker* parent,
       QueryResourceMgr* res_mgr);
 
@@ -408,7 +406,7 @@ class MemTracker {
   /// contains only weak ptrs.  MemTrackers that are handed out via GetQueryMemTracker()
   /// are shared ptrs.  When all the shared ptrs are no longer referenced, the MemTracker
   /// d'tor will be called at which point the weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<MemTracker>>
+  typedef boost::unordered_map<TUniqueId, std::weak_ptr<MemTracker>>
   RequestTrackersMap;
   static RequestTrackersMap request_to_mem_trackers_;
 

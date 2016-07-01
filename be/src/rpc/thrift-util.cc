@@ -14,7 +14,6 @@
 
 #include "rpc/thrift-util.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "util/hash-util.h"
@@ -74,8 +73,8 @@ ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :
   }
 }
 
-shared_ptr<TProtocol> CreateDeserializeProtocol(
-    shared_ptr<TMemoryBuffer> mem, bool compact) {
+boost::shared_ptr<TProtocol> CreateDeserializeProtocol(
+    boost::shared_ptr<TMemoryBuffer> mem, bool compact) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> tproto_factory;
     return tproto_factory.getProtocol(mem);

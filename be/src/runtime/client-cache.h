@@ -141,20 +141,20 @@ class ClientCacheHelper {
   boost::mutex cache_lock_;
 
   /// Map from an address to a PerHostCache containing a list of keys that have entries in
-  /// client_map_ for that host. The value type is wrapped in a shared_ptr so that the copy
-  /// c'tor for PerHostCache is not required.
+  /// client_map_ for that host. The value type is wrapped in a shared_ptr so that the
+  /// copy c'tor for PerHostCache is not required.
   typedef boost::unordered_map<
-      TNetworkAddress, boost::shared_ptr<PerHostCache>> PerHostCacheMap;
+      TNetworkAddress, std::shared_ptr<PerHostCache>> PerHostCacheMap;
   PerHostCacheMap per_host_caches_;
 
   /// Protects client_map_.
   boost::mutex client_map_lock_;
 
   /// Map from client key back to its associated ThriftClientImpl transport. This is where
-  /// all the clients are actually stored, and client instances are owned by this class and
-  /// persist for exactly as long as they are present in this map.
+  /// all the clients are actually stored, and client instances are owned by this class
+  /// and persist for exactly as long as they are present in this map.
   /// We use a map (vs. unordered_map) so we get iterator consistency across operations.
-  typedef std::map<ClientKey, boost::shared_ptr<ThriftClientImpl>> ClientMap;
+  typedef std::map<ClientKey, std::shared_ptr<ThriftClientImpl>> ClientMap;
   ClientMap client_map_;
 
   /// Number of attempts to make to open a connection. 0 means retry indefinitely.

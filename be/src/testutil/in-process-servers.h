@@ -16,7 +16,6 @@
 #define IMPALA_TESTUTIL_IN_PROCESS_SERVERS_H
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "common/status.h"
 #include "util/thread.h"

@@ -70,9 +70,9 @@ int StatestoredMain(int argc, char** argv) {
 
   Statestore statestore(metrics.get());
   statestore.RegisterWebpages(webserver.get());
-  shared_ptr<TProcessor> processor(
+  boost::shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore.thrift_iface()));
-  shared_ptr<TProcessorEventHandler> event_handler(
+  boost::shared_ptr<TProcessorEventHandler> event_handler(
       new RpcEventHandler("statestore", metrics.get()));
   processor->setEventHandler(event_handler);
 

@@ -17,7 +17,6 @@
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
 #include <vector>
 #include <string>
 
@@ -266,7 +265,7 @@ class RuntimeState {
   Status CreateCodegen();
 
   /// Use a custom block manager for the query for testing purposes.
-  void set_block_mgr(const boost::shared_ptr<BufferedBlockMgr>& block_mgr) {
+  void set_block_mgr(const std::shared_ptr<BufferedBlockMgr>& block_mgr) {
     block_mgr_ = block_mgr;
   }
 
@@ -326,7 +325,7 @@ class RuntimeState {
 
   /// MemTracker that is shared by all fragment instances running on this host.
   /// The query mem tracker must be released after the instance_mem_tracker_.
-  boost::shared_ptr<MemTracker> query_mem_tracker_;
+  std::shared_ptr<MemTracker> query_mem_tracker_;
 
   /// Memory usage of this fragment instance
   boost::scoped_ptr<MemTracker> instance_mem_tracker_;
@@ -350,7 +349,7 @@ class RuntimeState {
   /// BufferedBlockMgr object used to allocate and manage blocks of input data in memory
   /// with a fixed memory budget.
   /// The block mgr is shared by all fragments for this query.
-  boost::shared_ptr<BufferedBlockMgr> block_mgr_;
+  std::shared_ptr<BufferedBlockMgr> block_mgr_;
 
   /// This is the node id of the root node for this plan fragment. This is used as the
   /// hash seed and has two useful properties:

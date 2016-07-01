@@ -260,7 +260,7 @@ class Coordinator {
   /// is no coordinator fragment (i.e. executor_ == NULL). If executor_ is not NULL,
   /// this->runtime_state()->query_mem_tracker() returns the query mem tracker.
   /// (See this->query_mem_tracker())
-  boost::shared_ptr<MemTracker> query_mem_tracker_;
+  std::shared_ptr<MemTracker> query_mem_tracker_;
 
   /// owned by plan root, which resides in runtime_state_'s pool
   const RowDescriptor* row_desc_;

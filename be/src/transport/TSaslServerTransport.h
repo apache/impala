@@ -33,7 +33,7 @@
 namespace apache { namespace thrift { namespace transport {
 
 /**
- * 
+ *
  * This transport implements the Simple Authentication and Security Layer (SASL).
  * see: http://www.ietf.org/rfc/rfc2222.txt.  It is based on and depends
  * on the presence of the cyrus-sasl library.
@@ -173,8 +173,9 @@ class TSaslServerTransport : public TSaslTransport {
     std::map<std::string, TSaslServerDefinition*> serverDefinitionMap_;
 
     /* Map from a transport to its Sasl Transport (wrapped by a TBufferedTransport). */
-    std::map<boost::shared_ptr<TTransport>,
-        boost::shared_ptr<TBufferedTransport>> transportMap_;
+    typedef std::map<boost::shared_ptr<TTransport>,
+                     boost::shared_ptr<TBufferedTransport>> TransportMap;
+    TransportMap transportMap_;
 
     /* Lock to synchronize the transport map. */
     boost::mutex transportMap_mutex_;

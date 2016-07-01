@@ -830,7 +830,7 @@ Status SaslAuthProvider::Start() {
 }
 
 Status SaslAuthProvider::GetServerTransportFactory(
-    shared_ptr<TTransportFactory>* factory) {
+    boost::shared_ptr<TTransportFactory>* factory) {
   DCHECK(!principal_.empty() || has_ldap_);
 
   // This is the heart of the link between this file and thrift.  Here we
@@ -868,10 +868,10 @@ Status SaslAuthProvider::GetServerTransportFactory(
 }
 
 Status SaslAuthProvider::WrapClientTransport(const string& hostname,
-    shared_ptr<TTransport> raw_transport, const string& service_name,
-    shared_ptr<TTransport>* wrapped_transport) {
+    boost::shared_ptr<TTransport> raw_transport, const string& service_name,
+    boost::shared_ptr<TTransport>* wrapped_transport) {
 
-  shared_ptr<sasl::TSasl> sasl_client;
+  boost::shared_ptr<sasl::TSasl> sasl_client;
   const map<string, string> props; // Empty; unused by thrift
   const string auth_id; // Empty; unused by thrift
 
@@ -898,15 +898,16 @@ Status SaslAuthProvider::WrapClientTransport(const string& hostname,
   return Status::OK();
 }
 
-Status NoAuthProvider::GetServerTransportFactory(shared_ptr<TTransportFactory>* factory) {
+Status NoAuthProvider::GetServerTransportFactory(
+    boost::shared_ptr<TTransportFactory>* factory) {
   // No Sasl - yawn.  Here, have a regular old buffered transport.
   factory->reset(new ThriftServer::BufferedTransportFactory());
   return Status::OK();
 }
 
 Status NoAuthProvider::WrapClientTransport(const string& hostname,
-    shared_ptr<TTransport> raw_transport, const string& dummy_service,
-    shared_ptr<TTransport>* wrapped_transport) {
+    boost::shared_ptr<TTransport> raw_transport, const string& dummy_service,
+    boost::shared_ptr<TTransport>* wrapped_transport) {
   // No Sasl - yawn.  Don't do any transport wrapping for clients.
   *wrapped_transport = raw_transport;
   return Status::OK();

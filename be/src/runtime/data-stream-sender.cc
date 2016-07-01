@@ -15,7 +15,6 @@
 #include "runtime/data-stream-sender.h"
 
 #include <iostream>
-#include <boost/shared_ptr.hpp>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"

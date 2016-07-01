@@ -590,7 +590,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // query options.
   // TODO: put secret in session state map and check it
   // TODO: Fix duplication of code between here and ConnectionStart().
-  shared_ptr<SessionState> state(new SessionState());
+  shared_ptr<SessionState> state = make_shared<SessionState>();
   state->closed = false;
   state->start_time = TimestampValue::LocalTime();
   state->session_type = TSessionType::HIVESERVER2;

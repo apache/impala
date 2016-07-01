@@ -75,9 +75,9 @@ int CatalogdMain(int argc, char** argv) {
   CatalogServer catalog_server(metrics.get());
   ABORT_IF_ERROR(catalog_server.Start());
   catalog_server.RegisterWebpages(webserver.get());
-  shared_ptr<TProcessor> processor(
+  boost::shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
-  shared_ptr<TProcessorEventHandler> event_handler(
+  boost::shared_ptr<TProcessorEventHandler> event_handler(
       new RpcEventHandler("catalog-server", metrics.get()));
   processor->setEventHandler(event_handler);
 

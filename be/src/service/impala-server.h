@@ -314,11 +314,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// Return exec state for given query_id, or NULL if not found.
   /// If 'lock' is true, the returned exec state's lock() will be acquired before
   /// the query_exec_state_map_lock_ is released.
-  boost::shared_ptr<QueryExecState> GetQueryExecState(
+  std::shared_ptr<QueryExecState> GetQueryExecState(
       const TUniqueId& query_id, bool lock);
 
-  /// Writes the session id, if found, for the given query to the output parameter. Returns
-  /// false if no query with the given ID is found.
+  /// Writes the session id, if found, for the given query to the output
+  /// parameter. Returns false if no query with the given ID is found.
   bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
 
   /// Updates the number of databases / tables metrics from the FE catalog
@@ -333,20 +333,20 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// query_session_state is a snapshot of session state that changes when the
   /// query was run. (e.g. default database).
   Status Execute(TQueryCtx* query_ctx,
-                 boost::shared_ptr<SessionState> session_state,
-                 boost::shared_ptr<QueryExecState>* exec_state);
+                 std::shared_ptr<SessionState> session_state,
+                 std::shared_ptr<QueryExecState>* exec_state);
 
   /// Implements Execute() logic, but doesn't unregister query on error.
   Status ExecuteInternal(const TQueryCtx& query_ctx,
-                         boost::shared_ptr<SessionState> session_state,
+                         std::shared_ptr<SessionState> session_state,
                          bool* registered_exec_state,
-                         boost::shared_ptr<QueryExecState>* exec_state);
+                         std::shared_ptr<QueryExecState>* exec_state);
 
   /// Registers the query exec state with query_exec_state_map_ using the globally
   /// unique query_id and add the query id to session state's open query list.
   /// The caller must have checked out the session state.
-  Status RegisterQuery(boost::shared_ptr<SessionState> session_state,
-      const boost::shared_ptr<QueryExecState>& exec_state);
+  Status RegisterQuery(std::shared_ptr<SessionState> session_state,
+      const std::shared_ptr<QueryExecState>& exec_state);
 
   /// Adds the query to the set of in-flight queries for the session. The query remains
   /// in-flight until the query is unregistered.  Until a query is in-flight, an attempt
@@ -357,8 +357,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// (e.g. via an RPC) and the session close path can close (cancel and unregister) it.
   /// The query must have already been registered using RegisterQuery().  The caller
   /// must have checked out the session state.
-  Status SetQueryInflight(boost::shared_ptr<SessionState> session_state,
-      const boost::shared_ptr<QueryExecState>& exec_state);
+  Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
+      const std::shared_ptr<QueryExecState>& exec_state);
 
   /// Unregister the query by cancelling it, removing exec_state from
   /// query_exec_state_map_, and removing the query id from session state's in-flight
@@ -695,7 +695,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// map from query id to exec state; QueryExecState is owned by us and referenced
   /// as a shared_ptr to allow asynchronous deletion
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<QueryExecState>>
+  typedef boost::unordered_map<TUniqueId, std::shared_ptr<QueryExecState>>
       QueryExecStateMap;
   QueryExecStateMap query_exec_state_map_;
   boost::mutex query_exec_state_map_lock_;  // protects query_exec_state_map_
@@ -792,11 +792,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
    public:
     ScopedSessionState(ImpalaServer* impala) : impala_(impala) { }
 
-    /// Marks a session as in-use, and saves it so that it can be unmarked when this object
-    /// goes out of scope. Returns OK unless there is an error in GetSessionState.
+    /// Marks a session as in-use, and saves it so that it can be unmarked when this
+    /// object goes out of scope. Returns OK unless there is an error in GetSessionState.
     /// Must only be called once per ScopedSessionState.
     Status WithSession(const TUniqueId& session_id,
-        boost::shared_ptr<SessionState>* session = NULL) {
+        std::shared_ptr<SessionState>* session = NULL) {
       DCHECK(session_.get() == NULL);
       RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
       if (session != NULL) (*session) = session_;
@@ -812,7 +812,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
    private:
     /// Reference-counted pointer to the session state object.
-    boost::shared_ptr<SessionState> session_;
+    std::shared_ptr<SessionState> session_;
 
     /// Saved so that we can access ImpalaServer methods to get / return session state.
     ImpalaServer* impala_;
@@ -822,22 +822,21 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   friend class ScopedSessionState;
 
   /// Protects session_state_map_. Should be taken before any query exec-state locks,
-  /// including query_exec_state_map_lock_. Should be taken before individual session-state
-  /// locks.
+  /// including query_exec_state_map_lock_. Should be taken before individual
+  /// session-state locks.
   boost::mutex session_state_map_lock_;
 
   /// A map from session identifier to a structure containing per-session information
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<SessionState>>
-    SessionStateMap;
+  typedef boost::unordered_map<TUniqueId, std::shared_ptr<SessionState>> SessionStateMap;
   SessionStateMap session_state_map_;
 
   /// Protects connection_to_sessions_map_. May be taken before session_state_map_lock_.
   boost::mutex connection_to_sessions_map_lock_;
 
-  /// Map from a connection ID to the associated list of sessions so that all can be closed
-  /// when the connection ends. HS2 allows for multiplexing several sessions across a
-  /// single connection. If a session has already been closed (only possible via HS2) it is
-  /// not removed from this map to avoid the cost of looking it up.
+  /// Map from a connection ID to the associated list of sessions so that all can be
+  /// closed when the connection ends. HS2 allows for multiplexing several sessions across
+  /// a single connection. If a session has already been closed (only possible via HS2) it
+  /// is not removed from this map to avoid the cost of looking it up.
   typedef boost::unordered_map<TUniqueId, std::vector<TUniqueId>>
     ConnectionToSessionMap;
   ConnectionToSessionMap connection_to_sessions_map_;
@@ -847,11 +846,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// If mark_active is true, also checks if the session is expired or closed and
   /// increments the session's reference counter if it is still alive.
   Status GetSessionState(const TUniqueId& session_id,
-      boost::shared_ptr<SessionState>* session_state, bool mark_active = false);
+      std::shared_ptr<SessionState>* session_state, bool mark_active = false);
 
   /// Decrement the session's reference counter and mark last_accessed_ms so that state
   /// expiration can proceed.
-  inline void MarkSessionInactive(boost::shared_ptr<SessionState> session) {
+  inline void MarkSessionInactive(std::shared_ptr<SessionState> session) {
     boost::lock_guard<boost::mutex> l(session->lock);
     DCHECK_GT(session->ref_count, 0);
     --session->ref_count;

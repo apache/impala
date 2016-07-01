@@ -446,8 +446,8 @@ class DataStreamTest : public testing::Test {
 
   // Start backend in separate thread.
   void StartBackend() {
-    shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
-    shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
+    boost::shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
+    boost::shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
     server_ = new ThriftServer("DataStreamTest backend", processor, FLAGS_port, NULL);
     server_->Start();
   }

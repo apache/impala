@@ -15,8 +15,6 @@
 #ifndef IMPALA_RUNTIME_BUFFERED_BLOCK_MGR
 #define IMPALA_RUNTIME_BUFFERED_BLOCK_MGR
 
-#include <boost/shared_ptr.hpp>
-
 #include "runtime/disk-io-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 
@@ -305,7 +303,7 @@ class BufferedBlockMgr {
   /// - buffer_size: maximum size of each buffer.
   static Status Create(RuntimeState* state, MemTracker* parent,
       RuntimeProfile* profile, TmpFileMgr* tmp_file_mgr, int64_t mem_limit,
-      int64_t buffer_size, boost::shared_ptr<BufferedBlockMgr>* block_mgr);
+      int64_t buffer_size, std::shared_ptr<BufferedBlockMgr>* block_mgr);
 
   ~BufferedBlockMgr();
 
@@ -637,7 +635,7 @@ class BufferedBlockMgr {
   /// map contains only weak ptrs. BufferedBlockMgrs that are handed out are shared ptrs.
   /// When all the shared ptrs are no longer referenced, the BufferedBlockMgr
   /// d'tor will be called at which point the weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<BufferedBlockMgr>>
+  typedef boost::unordered_map<TUniqueId, std::weak_ptr<BufferedBlockMgr>>
       BlockMgrsMap;
   static BlockMgrsMap query_to_block_mgrs_;
 

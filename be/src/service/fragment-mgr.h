@@ -15,7 +15,6 @@
 #ifndef IMPALA_SERVICE_FRAGMENT_MGR_H
 #define IMPALA_SERVICE_FRAGMENT_MGR_H
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -58,7 +57,7 @@ class FragmentMgr {
 
   /// Returns a shared pointer to the FragmentExecState if one can be found for the
   /// given id. If the id is not found, the shared pointer will contain NULL.
-  boost::shared_ptr<FragmentExecState> GetFragmentExecState(
+  std::shared_ptr<FragmentExecState> GetFragmentExecState(
       const TUniqueId& fragment_instance_id);
 
   /// Publishes a global runtime filter to a local fragment.
@@ -71,7 +70,7 @@ class FragmentMgr {
 
   /// Map from fragment instance id to exec state; FragmentExecState is owned by us and
   /// referenced as a shared_ptr to allow asynchronous calls to CancelPlanFragment()
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<FragmentExecState>>
+  typedef boost::unordered_map<TUniqueId, std::shared_ptr<FragmentExecState>>
   FragmentExecStateMap;
   FragmentExecStateMap fragment_exec_state_map_;
 

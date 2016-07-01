@@ -34,7 +34,6 @@ DECLARE_string(ssl_private_key);
 
 using namespace apache::thrift;
 using namespace impala;
-using boost::shared_ptr;
 
 InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     const string& statestore_host, int statestore_port) {
@@ -153,7 +152,7 @@ InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port
 
 Status InProcessStatestore::Start() {
   webserver_->Start();
-  shared_ptr<TProcessor> processor(
+  boost::shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore_->thrift_iface()));
 
   statestore_server_.reset(new ThriftServer("StatestoreService", processor,

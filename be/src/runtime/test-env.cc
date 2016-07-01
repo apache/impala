@@ -16,7 +16,11 @@
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
 
-using namespace boost;
+#include <memory>
+
+#include "common/names.h"
+
+using boost::scoped_ptr;
 
 namespace impala {
 

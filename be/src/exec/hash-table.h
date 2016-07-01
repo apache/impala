@@ -51,10 +51,10 @@ class HashTable;
 /// joins and aggregation where the input/build tuple row descriptor is different from the
 /// find/probe descriptor. The implementation is designed to allow codegen for some paths.
 //
-/// In addition to the hash table there is also an accompanying hash table context that
-/// is used for insertions and probes. For example, the hash table context stores
-/// evaluated expr results for the current row being processed when possible into a
-/// contiguous memory buffer. This allows for efficient hash computation.
+/// In addition to the hash table there is also an accompanying hash table context that is
+/// used for insertions and probes. For example, the hash table context stores evaluated
+/// expr results for the current row being processed when possible into a contiguous
+/// memory buffer. This allows for efficient hash computation.
 //
 /// The hash table does not support removes. The hash table is not thread safe.
 /// The table is optimized for the partition hash aggregation and hash joins and is not

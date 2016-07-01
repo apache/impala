@@ -91,14 +91,15 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
 
   // Called when a client connects; we create per-client state and call any
   // ConnectionHandlerIf handler.
-  virtual void* createContext(shared_ptr<TProtocol> input, shared_ptr<TProtocol> output);
+  virtual void* createContext(boost::shared_ptr<TProtocol> input,
+      boost::shared_ptr<TProtocol> output);
 
   // Called when a client starts an RPC; we set the thread-local connection context.
-  virtual void processContext(void* context, shared_ptr<TTransport> output);
+  virtual void processContext(void* context, boost::shared_ptr<TTransport> output);
 
   // Called when a client disconnects; we call any ConnectionHandlerIf handler.
-  virtual void deleteContext(void* serverContext, shared_ptr<TProtocol> input,
-      shared_ptr<TProtocol> output);
+  virtual void deleteContext(void* serverContext, boost::shared_ptr<TProtocol> input,
+      boost::shared_ptr<TProtocol> output);
 
   // Waits for a timeout of TIMEOUT_MS for a server to signal that it has started
   // correctly.
@@ -218,12 +219,12 @@ const ThriftServer::ConnectionContext* ThriftServer::GetThreadConnectionContext(
   return __connection_context__;
 }
 
-void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtocol> input,
-    shared_ptr<TProtocol> output) {
+void* ThriftServer::ThriftServerEventProcessor::createContext(
+    boost::shared_ptr<TProtocol> input, boost::shared_ptr<TProtocol> output) {
   TSocket* socket = NULL;
   TTransport* transport = input->getTransport().get();
-  shared_ptr<ConnectionContext> connection_ptr =
-      shared_ptr<ConnectionContext>(new ConnectionContext);
+  boost::shared_ptr<ConnectionContext> connection_ptr =
+      boost::shared_ptr<ConnectionContext>(new ConnectionContext);
   TTransport* underlying_transport =
       (static_cast<TBufferedTransport*>(transport))->getUnderlyingTransport().get();
   if (!thrift_server_->auth_provider_->is_sasl()) {
@@ -267,12 +268,12 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
 }
 
 void ThriftServer::ThriftServerEventProcessor::processContext(void* context,
-    shared_ptr<TTransport> transport) {
+    boost::shared_ptr<TTransport> transport) {
   __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
 }
 
 void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext,
-    shared_ptr<TProtocol> input, shared_ptr<TProtocol> output) {
+    boost::shared_ptr<TProtocol> input, boost::shared_ptr<TProtocol> output) {
   __connection_context__ = (ConnectionContext*) serverContext;
 
   if (thrift_server_->connection_handler_ != NULL) {
@@ -289,9 +290,9 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
   }
 }
 
-ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& processor,
-    int port, AuthProvider* auth_provider, MetricGroup* metrics, int num_worker_threads,
-    ServerType server_type)
+ThriftServer::ThriftServer(const string& name,
+    const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
+    MetricGroup* metrics, int num_worker_threads, ServerType server_type)
     : started_(false),
       port_(port),
       ssl_enabled_(false),
@@ -336,11 +337,11 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
   const string password_;
 };
 
-Status ThriftServer::CreateSocket(shared_ptr<TServerTransport>* socket) {
+Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
   if (ssl_enabled()) {
     // This 'factory' is only called once, since CreateSocket() is only called from
     // Start()
-    shared_ptr<TSSLSocketFactory> socket_factory(
+    boost::shared_ptr<TSSLSocketFactory> socket_factory(
         new ImpalaSslSocketFactory(key_password_));
     socket_factory->overrideDefaultPasswordCallback();
     try {
@@ -390,20 +391,20 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
 
 Status ThriftServer::Start() {
   DCHECK(!started_);
-  shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  shared_ptr<ThreadFactory> thread_factory(
+  boost::shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
+  boost::shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("thrift-server", name_));
 
   // Note - if you change the transport types here, you must check that the
   // logic in createContext is still accurate.
-  shared_ptr<TServerTransport> server_socket;
-  shared_ptr<TTransportFactory> transport_factory;
+  boost::shared_ptr<TServerTransport> server_socket;
+  boost::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
   switch (server_type_) {
     case ThreadPool:
       {
-        shared_ptr<ThreadManager> thread_mgr(
+        boost::shared_ptr<ThreadManager> thread_mgr(
             ThreadManager::newSimpleThreadManager(num_worker_threads_));
         thread_mgr->threadFactory(thread_factory);
         thread_mgr->start();
@@ -421,7 +422,7 @@ Status ThriftServer::Start() {
       LOG(ERROR) << error_msg.str();
       return Status(error_msg.str());
   }
-  shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
+  boost::shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
       new ThriftServer::ThriftServerEventProcessor(this));
   server_->setServerEventHandler(event_processor);
 

@@ -52,9 +52,9 @@ class DummyStatestoreService : public StatestoreServiceIf {
   }
 };
 
-shared_ptr<TProcessor> MakeProcessor() {
-  shared_ptr<DummyStatestoreService> service(new DummyStatestoreService());
-  return shared_ptr<TProcessor>(new StatestoreServiceProcessor(service));
+boost::shared_ptr<TProcessor> MakeProcessor() {
+  boost::shared_ptr<DummyStatestoreService> service(new DummyStatestoreService());
+  return boost::shared_ptr<TProcessor>(new StatestoreServiceProcessor(service));
 }
 
 int GetServerPort() {

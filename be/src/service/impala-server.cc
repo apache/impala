@@ -1069,7 +1069,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
   lock_guard<mutex> l(session_state_map_lock_);
   SessionStateMap::iterator i = session_state_map_.find(session_id);
   if (i == session_state_map_.end()) {
-    *session_state = boost::shared_ptr<SessionState>();
+    *session_state = std::shared_ptr<SessionState>();
     return Status("Invalid session id");
   } else {
     if (mark_active) {
@@ -1839,13 +1839,13 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   DCHECK((hs2_port == 0) == (hs2_server == NULL));
   DCHECK((be_port == 0) == (be_server == NULL));
 
-  shared_ptr<ImpalaServer> handler(new ImpalaServer(exec_env));
+  boost::shared_ptr<ImpalaServer> handler(new ImpalaServer(exec_env));
 
   if (beeswax_port != 0 && beeswax_server != NULL) {
     // Beeswax FE must be a TThreadPoolServer because ODBC and Hue only support
     // TThreadPoolServer.
-    shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
-    shared_ptr<TProcessorEventHandler> event_handler(
+    boost::shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
+    boost::shared_ptr<TProcessorEventHandler> event_handler(
         new RpcEventHandler("beeswax", exec_env->metrics()));
     beeswax_processor->setEventHandler(event_handler);
     *beeswax_server = new ThriftServer(BEESWAX_SERVER_NAME, beeswax_processor,
@@ -1864,9 +1864,9 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
 
   if (hs2_port != 0 && hs2_server != NULL) {
     // HiveServer2 JDBC driver does not support non-blocking server.
-    shared_ptr<TProcessor> hs2_fe_processor(
+    boost::shared_ptr<TProcessor> hs2_fe_processor(
         new ImpalaHiveServer2ServiceProcessor(handler));
-    shared_ptr<TProcessorEventHandler> event_handler(
+    boost::shared_ptr<TProcessorEventHandler> event_handler(
         new RpcEventHandler("hs2", exec_env->metrics()));
     hs2_fe_processor->setEventHandler(event_handler);
 
@@ -1885,11 +1885,12 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   }
 
   if (be_port != 0 && be_server != NULL) {
-    shared_ptr<FragmentMgr> fragment_mgr(new FragmentMgr());
-    shared_ptr<ImpalaInternalService> thrift_if(
+    boost::shared_ptr<FragmentMgr> fragment_mgr(new FragmentMgr());
+    boost::shared_ptr<ImpalaInternalService> thrift_if(
         new ImpalaInternalService(handler, fragment_mgr));
-    shared_ptr<TProcessor> be_processor(new ImpalaInternalServiceProcessor(thrift_if));
-    shared_ptr<TProcessorEventHandler> event_handler(
+    boost::shared_ptr<TProcessor> be_processor(
+        new ImpalaInternalServiceProcessor(thrift_if));
+    boost::shared_ptr<TProcessorEventHandler> event_handler(
         new RpcEventHandler("backend", exec_env->metrics()));
     be_processor->setEventHandler(event_handler);
 

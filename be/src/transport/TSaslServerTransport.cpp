@@ -39,7 +39,7 @@
 using namespace sasl;
 
 namespace apache { namespace thrift { namespace transport {
-TSaslServerTransport::TSaslServerTransport(shared_ptr<TTransport> transport)
+TSaslServerTransport::TSaslServerTransport(boost::shared_ptr<TTransport> transport)
    : TSaslTransport(transport) {
 }
 
@@ -50,7 +50,7 @@ TSaslServerTransport::TSaslServerTransport(const string& mechanism,
                                            unsigned flags,
                                            const map<string, string>& props,
                                            const vector<struct sasl_callback>& callbacks,
-                                           shared_ptr<TTransport> transport)
+                                           boost::shared_ptr<TTransport> transport)
      : TSaslTransport(transport) {
   addServerDefinition(mechanism, protocol, serverName, realm, flags,
       props, callbacks);
@@ -112,8 +112,8 @@ void TSaslServerTransport::handleSaslStartMessage() {
 
 }
 
-shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
-    shared_ptr<TTransport> trans) {
+boost::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
+    boost::shared_ptr<TTransport> trans) {
   lock_guard<mutex> l(transportMap_mutex_);
   // Thrift servers use both an input and an output transport to communicate with
   // clients. In principal, these can be different, but for SASL clients we require them
@@ -135,13 +135,13 @@ shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // ensure that when ret_transport is eventually deleted, its corresponding map entry is
   // removed. That is likely to be error prone given the locking involved; for now we go
   // with the simple solution.
-  map<shared_ptr<TTransport>, shared_ptr<TBufferedTransport>>::iterator trans_map =
-      transportMap_.find(trans);
+  TransportMap::iterator trans_map = transportMap_.find(trans);
   VLOG_EVERY_N(2, 100) << "getTransport(): transportMap_ size is: "
                        << transportMap_.size();
-  shared_ptr<TBufferedTransport> ret_transport;
+  boost::shared_ptr<TBufferedTransport> ret_transport;
   if (trans_map == transportMap_.end()) {
-    shared_ptr<TTransport> wrapped(new TSaslServerTransport(serverDefinitionMap_, trans));
+    boost::shared_ptr<TTransport> wrapped(
+        new TSaslServerTransport(serverDefinitionMap_, trans));
     ret_transport.reset(new TBufferedTransport(wrapped,
             impala::ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES));
     ret_transport.get()->open();

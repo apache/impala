@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// The motivation for the using declarations below is to allow accessing the most relevant
-/// and most frequently used library classes without having to explicitly pull them into
-/// the global namespace. The goal is that when readers sees a usage of vector (etc.) without
-/// any further specialization they can rely on the fact that it will be a std::vector.
+/// The motivation for the using declarations below is to allow accessing the most
+/// relevant and most frequently used library classes without having to explicitly pull
+/// them into the global namespace. The goal is that when readers sees a usage of vector
+/// (etc.) without any further specialization they can rely on the fact that it will be a
+/// std::vector.
 //
 /// Instead of actually including the header files for the symbols, this file only checks
-/// if certain include guards are defined before applying the using declaration. This makes sure
-/// that including this file has no impact on the compile time.
+/// if certain include guards are defined before applying the using declaration. This
+/// makes sure that including this file has no impact on the compile time.
 //
 /// Please make sure that this file is included last in the cc file's include list to make
 /// sure that all relevant include guards are defined.
@@ -109,6 +110,11 @@ using std::max;
 using std::sort;
 #endif
 
+#ifdef _GLIBCXX_MEMORY
+using std::make_shared;
+using std::shared_ptr;
+#endif
+
 #ifdef BOOST_THREAD_THREAD_COMMON_HPP
 using boost::thread;
 #endif
@@ -145,10 +151,6 @@ using boost::lock_guard;
 using boost::unique_lock;
 using boost::shared_lock;
 using boost::upgrade_lock;
-#endif
-
-#ifdef BOOST_SMART_PTR_SHARED_PTR_HPP_INCLUDED
-using boost::shared_ptr;
 #endif
 
 #ifdef BOOST_SMART_PTR_SCOPED_PTR_HPP_INCLUDED

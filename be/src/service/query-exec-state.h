@@ -56,7 +56,7 @@ class QueryExecStateCleaner;
 class ImpalaServer::QueryExecState {
  public:
   QueryExecState(const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
-      ImpalaServer* server, boost::shared_ptr<ImpalaServer::SessionState> session);
+      ImpalaServer* server, std::shared_ptr<ImpalaServer::SessionState> session);
 
   ~QueryExecState();
 
@@ -228,7 +228,7 @@ class ImpalaServer::QueryExecState {
   bool is_block_on_wait_joining_;
 
   /// Session that this query is from
-  boost::shared_ptr<SessionState> session_;
+  std::shared_ptr<SessionState> session_;
 
   /// Resource assignment determined by scheduler. Owned by obj_pool_.
   boost::scoped_ptr<QuerySchedule> schedule_;

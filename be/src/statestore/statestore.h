@@ -350,7 +350,7 @@ class Statestore {
   /// Subscribers are held in shared_ptrs so that RegisterSubscriber() may overwrite their
   /// entry in this map while UpdateSubscriber() tries to update an existing registration
   /// without risk of use-after-free.
-  typedef boost::unordered_map<SubscriberId, boost::shared_ptr<Subscriber>>
+  typedef boost::unordered_map<SubscriberId, std::shared_ptr<Subscriber>>
     SubscriberMap;
   SubscriberMap subscribers_;
 

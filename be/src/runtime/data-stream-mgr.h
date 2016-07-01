@@ -19,7 +19,6 @@
 #include <list>
 #include <set>
 #include <boost/thread/mutex.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
@@ -71,7 +70,7 @@ class DataStreamMgr {
   /// single stream.
   /// Ownership of the receiver is shared between this DataStream mgr instance and the
   /// caller.
-  boost::shared_ptr<DataStreamRecvr> CreateRecvr(
+  std::shared_ptr<DataStreamRecvr> CreateRecvr(
       RuntimeState* state, const RowDescriptor& row_desc,
       const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
       int num_senders, int buffer_size, RuntimeProfile* profile,
@@ -122,7 +121,7 @@ class DataStreamMgr {
   /// we don't want to create a map<pair<TUniqueId, PlanNodeId>, DataStreamRecvr*>,
   /// because that requires a bunch of copying of ids for lookup
   typedef boost::unordered_multimap<uint32_t,
-      boost::shared_ptr<DataStreamRecvr>> RecvrMap;
+      std::shared_ptr<DataStreamRecvr>> RecvrMap;
   RecvrMap receiver_map_;
 
   /// (Fragment instance id, Plan node id) pair that uniquely identifies a stream.
@@ -155,7 +154,7 @@ class DataStreamMgr {
   /// Return the receiver for given fragment_instance_id/node_id, or NULL if not found. If
   /// 'acquire_lock' is false, assumes lock_ is already being held and won't try to
   /// acquire it.
-  boost::shared_ptr<DataStreamRecvr> FindRecvr(const TUniqueId& fragment_instance_id,
+  std::shared_ptr<DataStreamRecvr> FindRecvr(const TUniqueId& fragment_instance_id,
       PlanNodeId node_id, bool acquire_lock = true);
 
   /// Calls FindRecvr(), but if NULL is returned, wait for up to
@@ -172,7 +171,7 @@ class DataStreamMgr {
   ///
   /// 2. *already_unregistered == false: the receiver has yet to arrive when this method
   /// returns, and the timeout has expired
-  boost::shared_ptr<DataStreamRecvr> FindRecvrOrWait(
+  std::shared_ptr<DataStreamRecvr> FindRecvrOrWait(
       const TUniqueId& fragment_instance_id, PlanNodeId node_id,
       bool* already_unregistered);
 
@@ -182,7 +181,7 @@ class DataStreamMgr {
   inline uint32_t GetHashValue(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 
   /// The coordination primitive used to signal the arrival of a waited-for receiver
-  typedef Promise<boost::shared_ptr<DataStreamRecvr>> RendezvousPromise;
+  typedef Promise<std::shared_ptr<DataStreamRecvr>> RendezvousPromise;
 
   /// A reference-counted promise-wrapper used to coordinate between senders and
   /// receivers. The ref_count field tracks the number of senders waiting for the arrival

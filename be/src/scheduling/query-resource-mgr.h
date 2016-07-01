@@ -28,7 +28,6 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/shared_ptr.hpp>
 #include <string>
 
 namespace impala {
@@ -195,12 +194,12 @@ class QueryResourceMgr {
   /// parent QueryResourceMgr has been destroyed.
   /// TODO: Combine with ShouldExit(), and replace with AtomicBool when we have such a
   /// thing.
-  boost::shared_ptr<AtomicInt32> early_exit_;
+  std::shared_ptr<AtomicInt32> early_exit_;
 
   /// Signals to the destructor that the vcore acquisition thread is currently in an
   /// Expand() RPC. If so, the destructor does not need to wait for the acquisition thread
   /// to exit.
-  boost::shared_ptr<AtomicInt32> thread_in_expand_;
+  std::shared_ptr<AtomicInt32> thread_in_expand_;
 
   /// Creates the llama resource for the memory and/or cores specified, associated with
   /// the reservation context.
@@ -209,8 +208,8 @@ class QueryResourceMgr {
   /// Run as a thread owned by acquire_cpu_thread_. Waits for notification from
   /// NotifyThreadUsageChange(), then checks the subscription level to decide if more
   /// VCores are needed, and starts a new expansion request if so.
-  void AcquireVcoreResources(boost::shared_ptr<AtomicInt32 > thread_in_expand,
-      boost::shared_ptr<AtomicInt32> early_exit);
+  void AcquireVcoreResources(std::shared_ptr<AtomicInt32 > thread_in_expand,
+      std::shared_ptr<AtomicInt32> early_exit);
 
   /// True if thread:VCore subscription is too high, meaning more VCores are required.
   /// Must be called holding threads_running_ lock.

@@ -133,7 +133,7 @@ class StatestoreSubscriber {
   boost::shared_ptr<StatestoreSubscriberIf> thrift_iface_;
 
   /// Container for the heartbeat server.
-  boost::shared_ptr<ThriftServer> heartbeat_server_;
+  std::shared_ptr<ThriftServer> heartbeat_server_;
 
   /// Failure detector that tracks heartbeat messages from the statestore.
   boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
