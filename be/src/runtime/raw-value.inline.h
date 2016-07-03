@@ -108,11 +108,7 @@ inline uint32_t RawValue::GetHashValueNonNull<int8_t>(const int8_t* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_TINYINT);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash1(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 1, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 1, seed);
 }
 
 template<>
@@ -120,11 +116,7 @@ inline uint32_t RawValue::GetHashValueNonNull<int16_t>(const int16_t* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_SMALLINT);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash2(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 2, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 2, seed);
 }
 
 template<>
@@ -132,11 +124,7 @@ inline uint32_t RawValue::GetHashValueNonNull<int32_t>(const int32_t* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_INT);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash4(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 4, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 4, seed);
 }
 
 template<>
@@ -144,11 +132,7 @@ inline uint32_t RawValue::GetHashValueNonNull<int64_t>(const int64_t* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_BIGINT);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash8(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 8, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 8, seed);
 }
 
 template<>
@@ -156,11 +140,7 @@ inline uint32_t RawValue::GetHashValueNonNull<float>(const float* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_FLOAT);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash4(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 4, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 4, seed);
 }
 
 template<>
@@ -168,11 +148,7 @@ inline uint32_t RawValue::GetHashValueNonNull<double>(const double* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_DOUBLE);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash8(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 8, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 8, seed);
 }
 
 template<>
@@ -180,14 +156,15 @@ inline uint32_t RawValue::GetHashValueNonNull<impala::StringValue>(
     const impala::StringValue* v,const ColumnType& type, uint32_t seed) {
   DCHECK(v != NULL);
   if (type.type == TYPE_CHAR) {
-    return HashUtil::Hash(StringValue::CharSlotToPtr(
-        reinterpret_cast<const void*>(v), type),type.len, seed);
+    return HashUtil::MurmurHash2_64(
+        StringValue::CharSlotToPtr(reinterpret_cast<const void*>(v), type), type.len,
+        seed);
   } else {
     DCHECK(type.type == TYPE_STRING || type.type == TYPE_VARCHAR);
     if (v->len == 0) {
       return HashUtil::HashCombine32(HASH_VAL_EMPTY, seed);
     }
-    return HashUtil::Hash(v->ptr, v->len, seed);
+    return HashUtil::MurmurHash2_64(v->ptr, v->len, seed);
   }
 }
 
@@ -196,11 +173,7 @@ inline uint32_t RawValue::GetHashValueNonNull<TimestampValue>(
     const TimestampValue* v, const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_TIMESTAMP);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash12(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 12, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 12, seed);
 }
 
 template<>
@@ -208,11 +181,7 @@ inline uint32_t RawValue::GetHashValueNonNull<Decimal4Value>(
     const Decimal4Value* v, const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_DECIMAL);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash4(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 4, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 4, seed);
 }
 
 template<>
@@ -220,11 +189,7 @@ inline uint32_t RawValue::GetHashValueNonNull<Decimal8Value>(
     const Decimal8Value* v, const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_DECIMAL);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash8(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 8, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 8, seed);
 }
 
 template<>
@@ -232,11 +197,7 @@ inline uint32_t RawValue::GetHashValueNonNull<Decimal16Value>(
     const Decimal16Value* v, const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_DECIMAL);
   DCHECK(v != NULL);
-  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
-    return HashUtil::CrcHash16(v, seed);
-  } else {
-    return HashUtil::MurmurHash2_64(v, 16, seed);
-  }
+  return HashUtil::MurmurHash2_64(v, 16, seed);
 }
 
 template<typename T>
@@ -249,6 +210,8 @@ inline uint32_t RawValue::GetHashValue(const T* v, const ColumnType& type,
 
 inline uint32_t RawValue::GetHashValue(const void* v, const ColumnType& type,
     uint32_t seed) {
+  //The choice of hash function needs to be consistent across all hosts of the cluster.
+
   // Use HashCombine with arbitrary constant to ensure we don't return seed.
   if (v == NULL) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
 

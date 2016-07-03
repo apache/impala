@@ -228,14 +228,6 @@ class HashUtil {
     // Rehash32to32(hash2) is minimal.
     return (static_cast<uint64_t>(hash) * m + a) >> 32;
   }
-
-  static inline uint64_t Rehash32to64(const uint32_t hash) {
-    static const uint64_t m1 = 0x47b6137a44974d91ull, m2 = 0x8824ad5ba2b7289cull,
-                          a1 = 0x705495c62df1424aull, a2 = 0x9efc49475c6bfb31ull;
-    const uint64_t hash1 = (static_cast<uint64_t>(hash) * m1 + a1) >> 32;
-    const uint64_t hash2 = (static_cast<uint64_t>(hash) * m2 + a2) >> 32;
-    return hash1 | (hash2 << 32);
-  }
 };
 
 }
