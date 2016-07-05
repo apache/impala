@@ -60,6 +60,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.hive.executor.UdfExecutor;
 import com.cloudera.impala.thrift.TCatalog;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -458,7 +459,7 @@ public class CatalogServiceCatalog extends Catalog {
       // Load each method in the UDF class and create the corresponding Impala Function
       // object.
       for (Method m: udfClass.getMethods()) {
-        if (!m.getName().equals("evaluate")) continue;
+        if (!m.getName().equals(UdfExecutor.UDF_FUNCTION_NAME)) continue;
         Function fn = ScalarFunction.fromHiveFunction(db,
             function.getFunctionName(), function.getClassName(),
             m.getParameterTypes(), m.getReturnType(), jarUri);
@@ -481,6 +482,11 @@ public class CatalogServiceCatalog extends Catalog {
     } catch (Exception e) {
       LOG.error("Skipping function load: " + function.getFunctionName(), e);
       throw new ImpalaRuntimeException("Error extracting functions", e);
+    } catch (LinkageError e) {
+      String errorMsg = "Error resolving dependencies for Java function: " + db + "." +
+          function.getFunctionName();
+      LOG.error(errorMsg);
+      throw new ImpalaRuntimeException(errorMsg, e);
     }
     return result;
   }

@@ -61,7 +61,7 @@ import com.google.common.collect.Lists;
 public class UdfExecutor {
   private static final Logger LOG = Logger.getLogger(UdfExecutor.class);
   // By convention, the function in the class must be called evaluate()
-  private static final String UDF_FUNCTION_NAME = "evaluate";
+  public static final String UDF_FUNCTION_NAME = "evaluate";
 
   // Object to deserialize ctor params from BE.
   private final static TBinaryProtocol.Factory PROTOCOL_FACTORY =

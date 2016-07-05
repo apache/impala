@@ -156,6 +156,26 @@ class TestUdfPersistence(CustomClusterTestSuite):
   @SkipIfS3.hive
   @SkipIfLocal.hive
   @pytest.mark.execute_serially
+  def test_corrupt_java_udf(self):
+    """ IMPALA-3820: This tests if the Catalog server can gracefully handle
+    Java UDFs with unresolved dependencies."""
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    # Create a Java UDF with unresolved dependencies from Hive and
+    # restart the Catalog server. Catalog should ignore the
+    # function load.
+    self.run_stmt_in_hive("create function %s.corrupt_udf as \
+        'com.cloudera.impala.UnresolvedUdf' using jar '%s'"
+        % (self.JAVA_FN_TEST_DB, self.JAVA_UDF_JAR))
+    self.__restart_cluster()
+    # Make sure the function count is 0
+    self.verify_function_count(
+        "SHOW FUNCTIONS in {0}".format(self.JAVA_FN_TEST_DB), 0)
+
+
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
+  @SkipIfLocal.hive
+  @pytest.mark.execute_serially
   def test_java_udfs_hive_integration(self):
     ''' This test checks the integration between Hive and Impala on
     CREATE FUNCTION and DROP FUNCTION statements for persistent Java UDFs.
