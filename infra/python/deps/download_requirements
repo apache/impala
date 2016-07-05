@@ -16,7 +16,9 @@ fi
 
 DIR=$(dirname "$0")
 # Download but don't install all packages listed in requirements.txt.
-"$PIP" -q install --download "$DIR" -r "$DIR"/requirements.txt
+# Don't use pip to download Impyla because its setup.py requires a newer version
+# of setuptools than is available on some systems we support (e.g. CentOS 6).
+"$PIP" -q install --download "$DIR" -r <(grep -v "impyla" "$DIR"/requirements.txt)
 
 # Directly download required packages not listed in requirements.txt.
 # For virtualenv, other scripts rely on the .tar.gz package (not a .whl package).
@@ -25,4 +27,6 @@ DIR=$(dirname "$0")
 pushd $DIR
 $PYTHON ./pip_download.py virtualenv 13.1.0
 $PYTHON ./pip_download.py kudu-python 0.1.1
+IMPYLA_VERSION=$(grep impyla ./requirements.txt | grep -o '[0-9.]*')
+$PYTHON ./pip_download.py impyla ${IMPYLA_VERSION}
 popd
