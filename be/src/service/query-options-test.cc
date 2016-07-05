@@ -18,6 +18,7 @@
 #include <inttypes.h>
 #include <gtest/gtest.h>
 #include <string>
+#include <gutil/strings/substitute.h>
 
 #include "runtime/runtime-filter.h"
 #include "testutil/gtest-util.h"
@@ -26,6 +27,7 @@
 using namespace boost;
 using namespace impala;
 using namespace std;
+using namespace strings;
 
 TEST(QueryOptions, SetBloomSize) {
   TQueryOptions options;
@@ -78,6 +80,29 @@ TEST(QueryOptions, SetFilterWait) {
   EXPECT_OK(SetQueryOption("RUNTIME_FILTER_WAIT_TIME_MS",
       lexical_cast<string>(numeric_limits<int32_t>::max()), &options, NULL));
   EXPECT_EQ(numeric_limits<int32_t>::max(), options.runtime_filter_wait_time_ms);
+}
+
+TEST(QueryOptions, MaxScanRangeLength) {
+  vector<pair<string, int64_t>> vals = {{"4GB", 4L * 1024 * 1024 * 1024},
+                                        {"-1M", -1},
+                                        {"0B", 0},
+                                        {"1024", 1024},
+                                        {"9223372036854775807", 9223372036854775807},
+                                        {"9223372036854775808", -1}, // 2**63
+                                        {"Not a number!", -1}};
+  for (const auto& val: vals) {
+    TQueryOptions options;
+    QueryOptionsMask mask;
+    Status status = ParseQueryOptions(
+        Substitute("MAX_SCAN_RANGE_LENGTH=$0", val.first), &options, &mask);
+    int64_t expected = val.second;
+    if (expected == -1) {
+      EXPECT_FALSE(status.ok());
+    } else {
+      EXPECT_OK(status);
+      EXPECT_EQ(expected, options.max_scan_range_length);
+    }
+  }
 }
 
 TEST(QueryOptions, ParseQueryOptions) {

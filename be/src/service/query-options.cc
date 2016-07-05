@@ -134,9 +134,12 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::NUM_NODES:
         query_options->__set_num_nodes(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
-        query_options->__set_max_scan_range_length(atol(value.c_str()));
+      case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH: {
+        int64_t scan_length = 0;
+        RETURN_IF_ERROR(ParseMemValue(value, "scan range length", &scan_length));
+        query_options->__set_max_scan_range_length(scan_length);
         break;
+      }
       case TImpalaQueryOptions::MAX_IO_BUFFERS:
         query_options->__set_max_io_buffers(atoi(value.c_str()));
         break;
