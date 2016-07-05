@@ -337,6 +337,14 @@ class TestParquet(ImpalaTestSuite):
         'ScanRangesComplete: ([0-9]*)', runtime_profile)
     num_rows_read_list = re.findall('RowsRead: [0-9.K]* \(([0-9]*)\)', runtime_profile)
 
+    REGEX_UNIT_SECOND = "[0-9]*[s]*[0-9]*[.]*[0-9]*[nm]*[s]*"
+    REGEX_MIN_MAX_FOOTER_PROCESSING_TIME = \
+        ("FooterProcessingTime: \(Avg: %s ; \(Min: (%s) ; Max: (%s) ; "
+            "Number of samples: %s\)" % (REGEX_UNIT_SECOND, REGEX_UNIT_SECOND,
+            REGEX_UNIT_SECOND, "[0-9]*"))
+    footer_processing_time_list = re.findall(
+        REGEX_MIN_MAX_FOOTER_PROCESSING_TIME, runtime_profile)
+
     # This will fail if the number of impalads != 3
     # The fourth fragment is the "Averaged Fragment"
     assert len(num_row_groups_list) == 4
@@ -358,6 +366,16 @@ class TestParquet(ImpalaTestSuite):
 
     for scan_ranges_complete in scan_ranges_complete_list:
       assert int(scan_ranges_complete) == ranges_per_node
+
+    # This checks if the SummaryStatsCounter works correctly. When there is one scan
+    # range per node, we verify that the FooterProcessingTime counter has the min, max
+    # and average values as the same since we have only one sample (i.e. only one range)
+    # TODO: Test this for multiple ranges per node as well. This requires parsing the
+    # stat times as strings and comparing if min <= avg <= max.
+    if ranges_per_node == 1:
+      for min_max_time in footer_processing_time_list:
+        # Assert that (min == avg == max)
+        assert min_max_time[0] == min_max_time[1] == min_max_time[2] != 0
 
   def test_annotate_utf8_option(self, vector, unique_database):
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")

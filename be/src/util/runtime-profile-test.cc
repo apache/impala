@@ -258,6 +258,65 @@ TEST(CountersTest, HighWaterMarkCounters) {
   EXPECT_EQ(bytes_counter->value(), 28);
 }
 
+TEST(CountersTest, SummaryStatsCounters) {
+  ObjectPool pool;
+  RuntimeProfile profile1(&pool, "Profile 1");
+  RuntimeProfile::SummaryStatsCounter* summary_stats_counter_1 =
+    profile1.AddSummaryStatsCounter("summary_stats", TUnit::UNIT);
+
+  EXPECT_EQ(summary_stats_counter_1->value(), 0);
+  EXPECT_EQ(summary_stats_counter_1->MinValue(), numeric_limits<int64_t>::max());
+  EXPECT_EQ(summary_stats_counter_1->MaxValue(), numeric_limits<int64_t>::min());
+
+  summary_stats_counter_1->UpdateCounter(10);
+  EXPECT_EQ(summary_stats_counter_1->value(), 10);
+  EXPECT_EQ(summary_stats_counter_1->MinValue(), 10);
+  EXPECT_EQ(summary_stats_counter_1->MaxValue(), 10);
+
+  // Check that the average stays the same when updating with the same number.
+  summary_stats_counter_1->UpdateCounter(10);
+  EXPECT_EQ(summary_stats_counter_1->value(), 10);
+  EXPECT_EQ(summary_stats_counter_1->MinValue(), 10);
+  EXPECT_EQ(summary_stats_counter_1->MaxValue(), 10);
+
+  summary_stats_counter_1->UpdateCounter(40);
+  EXPECT_EQ(summary_stats_counter_1->value(), 20);
+  EXPECT_EQ(summary_stats_counter_1->MinValue(), 10);
+  EXPECT_EQ(summary_stats_counter_1->MaxValue(), 40);
+
+  // Verify an update with 0. This should still change the average as the number of
+  // samples increase
+  summary_stats_counter_1->UpdateCounter(0);
+  EXPECT_EQ(summary_stats_counter_1->value(), 15);
+  EXPECT_EQ(summary_stats_counter_1->MinValue(), 0);
+  EXPECT_EQ(summary_stats_counter_1->MaxValue(), 40);
+
+  // Verify a negative update..
+  summary_stats_counter_1->UpdateCounter(-40);
+  EXPECT_EQ(summary_stats_counter_1->value(), 4);
+  EXPECT_EQ(summary_stats_counter_1->MinValue(), -40);
+  EXPECT_EQ(summary_stats_counter_1->MaxValue(), 40);
+
+  RuntimeProfile profile2(&pool, "Profile 2");
+  RuntimeProfile::SummaryStatsCounter* summary_stats_counter_2 =
+    profile2.AddSummaryStatsCounter("summary_stats", TUnit::UNIT);
+
+  summary_stats_counter_2->UpdateCounter(100);
+  EXPECT_EQ(summary_stats_counter_2->value(), 100);
+  EXPECT_EQ(summary_stats_counter_2->MinValue(), 100);
+  EXPECT_EQ(summary_stats_counter_2->MaxValue(), 100);
+
+  TRuntimeProfileTree tprofile1;
+  profile1.ToThrift(&tprofile1);
+
+  // Merge profile1 and profile2 and check that profile2 is overwritten.
+  profile2.Update(tprofile1);
+  EXPECT_EQ(summary_stats_counter_2->value(), 4);
+  EXPECT_EQ(summary_stats_counter_2->MinValue(), -40);
+  EXPECT_EQ(summary_stats_counter_2->MaxValue(), 40);
+
+}
+
 TEST(CountersTest, DerivedCounters) {
   ObjectPool pool;
   RuntimeProfile profile(&pool, "Profile");

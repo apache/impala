@@ -150,6 +150,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
       metadata_range_(NULL),
       dictionary_pool_(new MemPool(scan_node->mem_tracker())),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
+      process_footer_timer_stats_(NULL),
       num_cols_counter_(NULL),
       num_row_groups_counter_(NULL),
       codegend_process_scratch_batch_fn_(NULL) {
@@ -164,6 +165,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
+  process_footer_timer_stats_ =
+      ADD_SUMMARY_STATS_TIMER(
+          scan_node_->runtime_profile(), "FooterProcessingTime");
 
   codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
       scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
@@ -184,12 +188,21 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
 
+  // Each scan node can process multiple splits. Each split processes the footer once.
+  // We use a timer to measure the time taken to ProcessFooter() per split and add
+  // this time to the averaged timer.
+  MonotonicStopWatch single_footer_process_timer;
+  single_footer_process_timer.Start();
   // First process the file metadata in the footer.
-  Status status = ProcessFooter();
+  Status footer_status = ProcessFooter();
+  single_footer_process_timer.Stop();
+
+  process_footer_timer_stats_->UpdateCounter(single_footer_process_timer.ElapsedTime());
+
   // Release I/O buffers immediately to make sure they are cleaned up
   // in case we return a non-OK status anywhere below.
   context_->ReleaseCompletedResources(NULL, true);
-  RETURN_IF_ERROR(status);
+  RETURN_IF_ERROR(footer_status);
 
   // Parse the file schema into an internal representation for schema resolution.
   schema_resolver_.reset(new ParquetSchemaResolver(*scan_node_->hdfs_table(),
