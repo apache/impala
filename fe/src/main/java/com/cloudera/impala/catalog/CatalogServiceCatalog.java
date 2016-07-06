@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -160,7 +161,16 @@ public class CatalogServiceCatalog extends Catalog {
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
-    cachePoolReader_.scheduleAtFixedRate(new CachePoolReader(), 0, 1, TimeUnit.MINUTES);
+    try {
+      // We want only 'true' HDFS filesystems to poll the HDFS cache (i.e not S3,
+      // local, etc.)
+      if (FileSystemUtil.getDefaultFileSystem() instanceof DistributedFileSystem) {
+        cachePoolReader_.scheduleAtFixedRate(
+            new CachePoolReader(), 0, 1, TimeUnit.MINUTES);
+      }
+    } catch (IOException e) {
+      LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
+    }
     if (sentryConfig != null) {
       sentryProxy_ = new SentryProxy(sentryConfig, this, kerberosPrincipal);
     } else {

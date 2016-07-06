@@ -323,9 +323,14 @@ public class FileSystemUtil {
     return isDistributedFileSystem(path.getFileSystem(CONF));
   }
 
-  public static DistributedFileSystem getDistributedFileSystem() throws IOException {
+  public static FileSystem getDefaultFileSystem() throws IOException {
     Path path = new Path(FileSystem.getDefaultUri(CONF));
     FileSystem fs = path.getFileSystem(CONF);
+    return fs;
+  }
+
+  public static DistributedFileSystem getDistributedFileSystem() throws IOException {
+    FileSystem fs = getDefaultFileSystem();
     Preconditions.checkState(fs instanceof DistributedFileSystem);
     return (DistributedFileSystem) fs;
   }
