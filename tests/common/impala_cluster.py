@@ -96,23 +96,23 @@ class ImpalaCluster(object):
     for pid in psutil.get_pid_list():
       try:
         process = psutil.Process(pid)
+        try:
+          if process.username != getuser():
+            continue
+        except KeyError, e:
+          if "uid not found" in str(e):
+            continue
+          raise
+        if process.name == 'impalad' and len(process.cmdline) >= 1:
+          impalads.append(ImpaladProcess(process.cmdline))
+        elif process.name == 'statestored' and len(process.cmdline) >= 1:
+          statestored.append(StateStoreProcess(process.cmdline))
+        elif process.name == 'catalogd' and len(process.cmdline) >= 1:
+          catalogd = CatalogdProcess(process.cmdline)
       except psutil.NoSuchProcess, e:
         # A process from get_pid_list() no longer exists, continue.
         LOG.info(e)
         continue
-      try:
-        if process.username != getuser():
-          continue
-      except KeyError, e:
-        if "uid not found" in str(e):
-          continue
-        raise
-      if process.name == 'impalad' and len(process.cmdline) >= 1:
-        impalads.append(ImpaladProcess(process.cmdline))
-      elif process.name == 'statestored' and len(process.cmdline) >= 1:
-        statestored.append(StateStoreProcess(process.cmdline))
-      elif process.name == 'catalogd' and len(process.cmdline) >=1:
-        catalogd = CatalogdProcess(process.cmdline)
     return impalads, statestored, catalogd
 
 # Represents a process running on a machine and common actions that can be performed
