@@ -63,7 +63,7 @@ ScannerContext::Stream::Stream(ScannerContext* parent)
 }
 
 ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
-  Stream* stream = state_->obj_pool()->Add(new Stream(this));
+  std::unique_ptr<Stream> stream(new Stream(this));
   stream->scan_range_ = range;
   stream->file_desc_ = scan_node_->GetFileDesc(stream->filename());
   stream->file_len_ = stream->file_desc_->file_length;
@@ -76,8 +76,8 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   stream->output_buffer_bytes_left_ =
       const_cast<int64_t*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
   stream->contains_tuple_data_ = scan_node_->tuple_desc()->ContainsStringData();
-  streams_.push_back(stream);
-  return stream;
+  streams_.push_back(std::move(stream));
+  return streams_.back().get();
 }
 
 void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool done) {

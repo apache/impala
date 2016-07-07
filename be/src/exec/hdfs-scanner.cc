@@ -209,6 +209,8 @@ Status HdfsScanner::CommitRows(int num_rows) {
 
 void HdfsScanner::AddFinalRowBatch() {
   DCHECK(batch_ != NULL);
+  // Cannot DCHECK(stream_ != NULL) as parquet scanner sets it to NULL in ProcessSplit().
+  stream_ = NULL;
   context_->ReleaseCompletedResources(batch_, /* done */ true);
   scan_node_->AddMaterializedRowBatch(batch_);
   batch_ = NULL;

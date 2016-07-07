@@ -180,6 +180,7 @@ void HdfsTextScanner::Close() {
     decompressor_->Close();
     decompressor_.reset(NULL);
   }
+  THdfsCompression::type compression = stream_->file_desc()->file_compression;
   if (batch_ != NULL) {
     AttachPool(data_buffer_pool_.get(), false);
     AttachPool(boundary_pool_.get(), false);
@@ -189,9 +190,9 @@ void HdfsTextScanner::Close() {
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(boundary_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
+  // Must happen after AddFinalRowBatch() is called.
   if (!only_parsing_header_) {
-    scan_node_->RangeComplete(
-        THdfsFileFormat::TEXT, stream_->file_desc()->file_compression);
+    scan_node_->RangeComplete(THdfsFileFormat::TEXT, compression);
   }
   HdfsScanner::Close();
 }

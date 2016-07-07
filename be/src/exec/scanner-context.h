@@ -264,7 +264,7 @@ class ScannerContext {
   Stream* GetStream(int idx = 0) {
     DCHECK_GE(idx, 0);
     DCHECK_LT(idx, streams_.size());
-    return streams_[idx];
+    return streams_[idx].get();
   }
 
   /// If a non-NULL 'batch' is passed, attaches completed io buffers and boundary mem pools
@@ -304,8 +304,8 @@ class ScannerContext {
 
   HdfsPartitionDescriptor* partition_desc_;
 
-  /// Vector of streams.  Non-columnar formats will always have one stream per context.
-  std::vector<Stream*> streams_;
+  /// Vector of streams. Non-columnar formats will always have one stream per context.
+  std::vector<std::unique_ptr<Stream>> streams_;
 
   /// Always equal to the sum of completed_io_buffers_.size() across all streams.
   int num_completed_io_buffers_;
