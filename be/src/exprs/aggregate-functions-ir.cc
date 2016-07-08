@@ -1388,6 +1388,7 @@ void AggregateFunctions::LastValUpdate(FunctionContext* ctx, const StringVal& sr
   } else {
     new_ptr = ctx->Reallocate(dst->ptr, src.len);
   }
+  // Note that a zero-length string is not the same as StringVal::null().
   RETURN_IF_NULL(ctx, new_ptr);
   dst->ptr = new_ptr;
   memcpy(dst->ptr, src.ptr, src.len);

@@ -286,7 +286,6 @@ inline bool FunctionContextImpl::CheckAllocResult(const char* fn_name,
 
 uint8_t* FunctionContext::Allocate(int byte_size) noexcept {
   assert(!impl_->closed_);
-  if (byte_size == 0) return NULL;
   uint8_t* buffer = impl_->pool_->Allocate(byte_size);
   if (UNLIKELY(!impl_->CheckAllocResult("FunctionContext::Allocate",
       buffer, byte_size))) {
@@ -418,7 +417,6 @@ void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
 
 uint8_t* FunctionContextImpl::AllocateLocal(int64_t byte_size) noexcept {
   assert(!closed_);
-  if (byte_size == 0) return NULL;
   uint8_t* buffer = pool_->Allocate(byte_size);
   if (UNLIKELY(!CheckAllocResult("FunctionContextImpl::AllocateLocal",
       buffer, byte_size))) {

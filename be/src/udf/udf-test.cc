@@ -123,8 +123,9 @@ IntVal ValidateFail(FunctionContext* context) {
 }
 
 IntVal ValidateMem(FunctionContext* context) {
-  EXPECT_TRUE(context->Allocate(0) == NULL);
-  uint8_t* buffer = context->Allocate(10);
+  uint8_t* buffer = context->Allocate(0);
+  EXPECT_TRUE(buffer != NULL);
+  buffer = context->Reallocate(buffer, 10);
   EXPECT_TRUE(buffer != NULL);
   memset(buffer, 0, 10);
   context->Free(buffer);

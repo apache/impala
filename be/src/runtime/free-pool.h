@@ -62,12 +62,10 @@ class FreePool {
       return NULL;
     }
 #endif
-    ++net_allocations_;
-    if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
-
     /// Return a non-NULL dummy pointer. NULL is reserved for failures.
     if (UNLIKELY(size == 0)) return mem_pool_->EmptyAllocPtr();
-
+    ++net_allocations_;
+    if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
     int free_list_idx = Bits::Log2Ceiling64(size);
     DCHECK_LT(free_list_idx, NUM_LISTS);
     FreeListNode* allocation = lists_[free_list_idx].next;
@@ -92,12 +90,12 @@ class FreePool {
   }
 
   void Free(uint8_t* ptr) {
+    if (UNLIKELY(ptr == NULL || ptr == mem_pool_->EmptyAllocPtr())) return;
     --net_allocations_;
     if (FLAGS_disable_mem_pools) {
       free(ptr);
       return;
     }
-    if (UNLIKELY(ptr == NULL || ptr == mem_pool_->EmptyAllocPtr())) return;
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG
