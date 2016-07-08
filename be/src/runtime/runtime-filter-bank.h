@@ -106,7 +106,7 @@ class RuntimeFilterBank {
   void Close();
 
   static const int64_t MIN_BLOOM_FILTER_SIZE = 4 * 1024;           // 4KB
-  static const int64_t MAX_BLOOM_FILTER_SIZE = 16 * 1024 * 1024;   // 16MB
+  static const int64_t MAX_BLOOM_FILTER_SIZE = 512 * 1024 * 1024;  // 512MB
 
  private:
   /// Returns the the space (in bytes) required for a filter to achieve the configured

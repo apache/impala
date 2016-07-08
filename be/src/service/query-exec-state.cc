@@ -550,6 +550,7 @@ void ImpalaServer::QueryExecState::Done() {
       LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
             << " because of error: " << status.GetDetail();
     }
+    coord_->TearDown();
   }
 
   // Update result set cache metrics, and update mem limit accounting.

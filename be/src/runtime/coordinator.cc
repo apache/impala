@@ -250,6 +250,80 @@ class Coordinator::FragmentInstanceState {
   int64_t rpc_latency_;
 };
 
+
+/// State of filters that are received for aggregation.
+///
+/// A broadcast join filter is published as soon as the first update is received for it
+/// and subsequent updates are ignored (as they will be the same).
+/// Updates for a partitioned join filter are aggregated in 'bloom_filter' and this is
+/// published once 'pending_count' reaches 0 and if the filter was not disabled before
+/// that.
+///
+/// A filter is disabled if an always_true filter update is received, an OOM is hit,
+/// filter aggregation is complete or if the query is complete.
+/// Once a filter is disabled, subsequent updates for that filter are ignored.
+class Coordinator::FilterState {
+ public:
+  FilterState(const TRuntimeFilterDesc& desc, const TPlanNodeId& src) : desc_(desc),
+      src_(src), pending_count_(0), first_arrival_time_(0L), completion_time_(0L),
+      disabled_(false) { }
+
+  TBloomFilter* bloom_filter() { return bloom_filter_.get(); }
+  boost::unordered_set<int>* src_fragment_instance_idxs() {
+    return &src_fragment_instance_idxs_;
+  }
+  std::vector<FilterTarget>* targets() { return &targets_; }
+  int64_t first_arrival_time() const { return first_arrival_time_; }
+  int64_t completion_time() const { return completion_time_; }
+  const TPlanNodeId& src() const { return src_; }
+  const TRuntimeFilterDesc& desc() const { return desc_; }
+  int pending_count() const { return pending_count_; }
+  void set_pending_count(int pending_count) { pending_count_ = pending_count; }
+  bool disabled() const { return disabled_; }
+
+  /// Aggregates partitioned join filters and updates memory consumption.
+  /// Disables filter if always_true filter is received or OOM is hit.
+  void ApplyUpdate(const TUpdateFilterParams& params, Coordinator* coord);
+
+  /// Disables a filter. A disabled filter consumes no memory.
+  void Disable(MemTracker* tracker);
+
+ private:
+  /// Contains the specification of the runtime filter.
+  TRuntimeFilterDesc desc_;
+
+  TPlanNodeId src_;
+  std::vector<FilterTarget> targets_;
+
+  // Index into fragment_instance_states_ for source fragment instances.
+  boost::unordered_set<int> src_fragment_instance_idxs_;
+
+  /// Number of remaining backends to hear from before filter is complete.
+  int pending_count_;
+
+  /// BloomFilter aggregated from all source plan nodes, to be broadcast to all
+  /// destination plan fragment instances. Owned by this object so that it can be
+  /// deallocated once finished with. Only set for partitioned joins (broadcast joins
+  /// need no aggregation).
+  /// In order to avoid memory spikes, an incoming filter is moved (vs. copied) to the
+  /// output structure in the case of a broadcast join. Similarly, for partitioned joins,
+  /// the filter is moved from the following member to the output structure.
+  std::unique_ptr<TBloomFilter> bloom_filter_;
+
+  /// Time at which first local filter arrived.
+  int64_t first_arrival_time_;
+
+  /// Time at which all local filters arrived.
+  int64_t completion_time_;
+
+  /// True if the filter is permanently disabled for this query.
+  bool disabled_;
+
+  /// TODO: Add a per-object lock so that we can avoid holding the global filter_lock_
+  /// for every filter update.
+
+};
+
 void Coordinator::FragmentInstanceState::ComputeTotalSplitSize(
     const PerNodeScanRanges& per_node_scan_ranges) {
   total_split_size_ = 0;
@@ -285,10 +359,18 @@ Coordinator::Coordinator(const TQueryOptions& query_options, ExecEnv* exec_env,
     obj_pool_(new ObjectPool()),
     query_events_(events),
     filter_routing_table_complete_(false),
-    filter_mode_(query_options.runtime_filter_mode) {
+    filter_mode_(query_options.runtime_filter_mode),
+    torn_down_(false) {
 }
 
 Coordinator::~Coordinator() {
+  DCHECK(torn_down_) << "TearDown() must be called before Coordinator is destroyed";
+
+  // This may be NULL while executing UDFs.
+  if (filter_mem_tracker_.get() != nullptr) {
+    filter_mem_tracker_->UnregisterFromParent();
+  }
+  filter_mem_tracker_.reset();
   query_mem_tracker_.reset();
 }
 
@@ -425,6 +507,9 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
     executor_.reset(NULL);
   }
+  filter_mem_tracker_.reset(new MemTracker(-1, -1, "Runtime Filter (Coordinator)",
+      query_mem_tracker(), false));
+
   // Initialize the execution profile structures.
   InitExecProfile(request);
 
@@ -460,14 +545,15 @@ void Coordinator::UpdateFilterRoutingTable(const vector<TPlanNode>& plan_nodes,
       if (filter_mode_ == TRuntimeFilterMode::LOCAL && !filter.has_local_targets) {
         continue;
       }
-      FilterState* f = &(filter_routing_table_[filter.filter_id]);
+      FilterRoutingTable::iterator i = filter_routing_table_.emplace(
+          filter.filter_id, FilterState(filter, plan_node.node_id)).first;
+      FilterState* f = &(i->second);
       if (plan_node.__isset.hash_join_node) {
-        f->desc = filter;
-        f->src = plan_node.node_id;
-        // Set the 'pending_count' to zero to indicate that for a filter with local-only
+        // Set the 'pending_count_' to zero to indicate that for a filter with local-only
         // targets the coordinator does not expect to receive any filter updates.
-        f->pending_count = filter.is_broadcast_join ?
+        int pending_count = filter.is_broadcast_join ?
             (filter.has_remote_targets ? 1 : 0) : num_hosts;
+        f->set_pending_count(pending_count);
         vector<int> src_idxs;
         for (int i = 0; i < num_hosts; ++i) {
           src_idxs.push_back(start_fragment_instance_idx + i);
@@ -482,7 +568,7 @@ void Coordinator::UpdateFilterRoutingTable(const vector<TPlanNode>& plan_nodes,
           random_shuffle(src_idxs.begin(), src_idxs.end());
           src_idxs.resize(MAX_BROADCAST_FILTER_PRODUCERS);
         }
-        f->src_fragment_instance_idxs.insert(src_idxs.begin(), src_idxs.end());
+        f->src_fragment_instance_idxs()->insert(src_idxs.begin(), src_idxs.end());
       } else if (plan_node.__isset.hdfs_scan_node) {
         auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
         DCHECK(it != filter.planid_to_target_ndx.end());
@@ -494,7 +580,7 @@ void Coordinator::UpdateFilterRoutingTable(const vector<TPlanNode>& plan_nodes,
         for (int i = 0; i < num_hosts; ++i) {
           target.fragment_instance_idxs.insert(start_fragment_instance_idx + i);
         }
-        f->targets.push_back(target);
+        f->targets()->push_back(target);
       } else {
         DCHECK(false) << "Unexpected plan node with runtime filters: "
             << ThriftDebugString(plan_node);
@@ -605,17 +691,18 @@ string Coordinator::FilterDebugString() {
     table_printer.AddColumn("First arrived", false);
     table_printer.AddColumn("Completed", false);
   }
+  table_printer.AddColumn("Enabled", false);
   lock_guard<SpinLock> l(filter_lock_);
-  for (const FilterRoutingTable::value_type& v: filter_routing_table_) {
+  for (FilterRoutingTable::value_type& v: filter_routing_table_) {
     vector<string> row;
-    const FilterState& state = v.second;
+    FilterState& state = v.second;
     row.push_back(lexical_cast<string>(v.first));
-    row.push_back(lexical_cast<string>(state.src));
+    row.push_back(lexical_cast<string>(state.src()));
     vector<string> target_ids;
     vector<string> num_target_instances;
     vector<string> target_types;
     vector<string> partition_filter;
-    for (const auto& target: state.targets) {
+    for (const FilterTarget& target: *state.targets()) {
       target_ids.push_back(lexical_cast<string>(target.node_id));
       num_target_instances.push_back(
           lexical_cast<string>(target.fragment_instance_idxs.size()));
@@ -628,20 +715,22 @@ string Coordinator::FilterDebugString() {
     row.push_back(join(partition_filter, ", "));
 
     if (filter_mode_ == TRuntimeFilterMode::GLOBAL) {
-      int pending_count = state.completion_time != 0L ? 0 : state.pending_count;
+      int pending_count = state.completion_time() != 0L ? 0 : state.pending_count();
       row.push_back(Substitute("$0 ($1)", pending_count,
-          state.src_fragment_instance_idxs.size()));
-      if (state.first_arrival_time == 0L) {
+          state.src_fragment_instance_idxs()->size()));
+      if (state.first_arrival_time() == 0L) {
         row.push_back("N/A");
       } else {
-        row.push_back(PrettyPrinter::Print(state.first_arrival_time, TUnit::TIME_NS));
+        row.push_back(PrettyPrinter::Print(state.first_arrival_time(), TUnit::TIME_NS));
       }
-      if (state.completion_time == 0L) {
+      if (state.completion_time() == 0L) {
         row.push_back("N/A");
       } else {
-        row.push_back(PrettyPrinter::Print(state.completion_time, TUnit::TIME_NS));
+        row.push_back(PrettyPrinter::Print(state.completion_time(), TUnit::TIME_NS));
       }
     }
+
+    row.push_back(!state.disabled() ? "true" : "false");
     table_printer.AddRow(row);
   }
   // Add a line break, as in all contexts this is called we need to start a new line to
@@ -1793,8 +1882,8 @@ void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
           if (filter_it == filter_routing_table_.end()) continue;
           FilterState* f = &filter_it->second;
           if (plan_node.__isset.hash_join_node) {
-            if (f->src_fragment_instance_idxs.find(instance_state_idx) ==
-                f->src_fragment_instance_idxs.end()) {
+            if (f->src_fragment_instance_idxs()->find(instance_state_idx) ==
+                f->src_fragment_instance_idxs()->end()) {
               DCHECK(desc.is_broadcast_join);
               continue;
             }
@@ -1931,6 +2020,16 @@ void DistributeFilters(shared_ptr<TPublishFilterParams> params, TNetworkAddress 
 
 }
 
+void Coordinator::TearDown() {
+  DCHECK(!torn_down_) << "Coordinator::TearDown() may not be called twice";
+  torn_down_ = true;
+  lock_guard<SpinLock> l(filter_lock_);
+  for (auto& filter: filter_routing_table_) {
+    FilterState* state = &filter.second;
+    state->Disable(filter_mem_tracker_.get());
+  }
+}
+
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";
@@ -1952,58 +2051,112 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     }
     FilterState* state = &it->second;
 
-    DCHECK(state->desc.has_remote_targets)
+    DCHECK(state->desc().has_remote_targets)
           << "Coordinator received filter that has only local targets";
 
-    // Check if the filter has already been sent, which could happen in two cases: if one
-    // local filter had always_true set - no point waiting for other local filters that
-    // can't affect the aggregated global filter, or if this is a broadcast join, and
-    // another local filter was already received.
-    if (state->pending_count == 0) return;
-    DCHECK_EQ(state->completion_time, 0L);
-    if (state->first_arrival_time == 0L) {
-      state->first_arrival_time = query_events_->ElapsedTime();
-    }
+    // Check if the filter has already been sent, which could happen in three cases:
+    //   * if one local filter had always_true set - no point waiting for other local
+    //     filters that can't affect the aggregated global filter
+    //   * if this is a broadcast join, and another local filter was already received
+    //   * if the filter could not be allocated and so an always_true filter was sent
+    //     immediately.
+    if (state->disabled()) return;
 
     if (filter_updates_received_->value() == 0) {
       query_events_->MarkEvent("First dynamic filter received");
     }
     filter_updates_received_->Add(1);
-    if (params.bloom_filter.always_true) {
-      state->bloom_filter = NULL;
-      state->pending_count = 0;
-    } else {
-      if (state->bloom_filter == NULL) {
-        state->bloom_filter = obj_pool()->Add(new BloomFilter(params.bloom_filter));
-      } else {
-        // TODO: Implement BloomFilter::Or(const ThriftBloomFilter&)
-        state->bloom_filter->Or(BloomFilter(params.bloom_filter));
-      }
-      if (--state->pending_count > 0) return;
-    }
 
-    // No more filters are pending on this filter ID. Create a distribution payload and
+    state->ApplyUpdate(params, this);
+
+    if (state->pending_count() > 0 && !state->disabled()) return;
+    // At this point, we either disabled this filter or aggregation is complete.
+    DCHECK(state->disabled() || state->pending_count() == 0);
+
+    // No more updates are pending on this filter ID. Create a distribution payload and
     // offer it to the queue.
-    DCHECK_EQ(state->pending_count, 0);
-    state->completion_time = query_events_->ElapsedTime();
-    for (const auto& target: state->targets) {
+    for (FilterTarget target: *state->targets()) {
       // Don't publish the filter to targets that are in the same fragment as the join
       // that produced it.
       if (target.is_local) continue;
       target_fragment_instance_idxs.insert(target.fragment_instance_idxs.begin(),
           target.fragment_instance_idxs.end());
     }
-    BloomFilter::ToThrift(state->bloom_filter, &rpc_params->bloom_filter);
+
+    // Assign outgoing bloom filter.
+    if (state->bloom_filter() != NULL) {
+      // Complete filter case.
+      // TODO: Replace with move() in Thrift 0.9.3.
+      TBloomFilter* aggregated_filter = state->bloom_filter();
+      filter_mem_tracker_->Release(aggregated_filter->directory.size());
+      swap(rpc_params->bloom_filter, *aggregated_filter);
+      DCHECK_EQ(aggregated_filter->directory.size(), 0);
+    } else {
+      // Disabled filter case (due to OOM or due to receiving an always_true filter).
+      rpc_params->bloom_filter.always_true = true;
+    }
+
+    // Filter is complete, and can be released.
+    state->Disable(filter_mem_tracker_.get());
+    DCHECK_EQ(state->bloom_filter(), reinterpret_cast<TBloomFilter*>(NULL));
   }
 
   rpc_params->filter_id = params.filter_id;
 
-  for (const auto& target_idx: target_fragment_instance_idxs) {
+  for (int32_t target_idx: target_fragment_instance_idxs) {
     FragmentInstanceState* fragment_inst = fragment_instance_states_[target_idx];
     DCHECK(fragment_inst != NULL) << "Missing fragment instance: " << target_idx;
     exec_env_->rpc_pool()->Offer(bind<void>(DistributeFilters, rpc_params,
         fragment_inst->impalad_address(), fragment_inst->fragment_instance_id()));
   }
+}
+
+
+void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
+    Coordinator* coord) {
+  DCHECK_GT(pending_count_, 0);
+  DCHECK_EQ(completion_time_, 0L);
+  if (first_arrival_time_ == 0L) {
+    first_arrival_time_ = coord->query_events_->ElapsedTime();
+  }
+
+  --pending_count_;
+  if (params.bloom_filter.always_true) {
+    Disable(coord->filter_mem_tracker_.get());
+  } else if (bloom_filter_.get() == NULL) {
+    int64_t heap_space = params.bloom_filter.directory.size();
+    if (!coord->filter_mem_tracker_.get()->TryConsume(heap_space)) {
+      VLOG_QUERY << "Not enough memory to allocate filter: "
+                 << PrettyPrinter::Print(heap_space, TUnit::BYTES)
+                 << " (query: " << PrintId(coord->query_id()) << ")";
+      // Disable, as one missing update means a correct filter cannot be produced.
+      Disable(coord->filter_mem_tracker_.get());
+    } else {
+      bloom_filter_.reset(new TBloomFilter());
+      // Workaround for fact that parameters are const& for Thrift RPCs - yet we want to
+      // move the payload from the request rather than copy it and take double the memory
+      // cost. After this point, params.bloom_filter is an empty filter and should not be
+      // read.
+      TBloomFilter* non_const_filter =
+          &const_cast<TBloomFilter&>(params.bloom_filter);
+      swap(*bloom_filter_.get(), *non_const_filter);
+      DCHECK_EQ(non_const_filter->directory.size(), 0);
+    }
+  } else {
+    BloomFilter::Or(params.bloom_filter, bloom_filter_.get());
+  }
+
+  if (pending_count_ == 0 || disabled_) {
+    completion_time_ = coord->query_events_->ElapsedTime();
+  }
+}
+
+void Coordinator::FilterState::Disable(MemTracker* tracker) {
+  disabled_ = true;
+  if (bloom_filter_.get() == NULL) return;
+  int64_t heap_space = bloom_filter_.get()->directory.size();
+  tracker->Release(heap_space);
+  bloom_filter_.reset();
 }
 
 }

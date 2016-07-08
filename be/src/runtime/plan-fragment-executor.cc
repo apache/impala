@@ -86,6 +86,7 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   lock_guard<mutex> l(prepare_lock_);
   DCHECK(!is_prepared_);
+
   if (is_cancelled_) return Status::CANCELLED;
 
   is_prepared_ = true;

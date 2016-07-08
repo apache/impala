@@ -48,7 +48,6 @@
 namespace impala {
 
 class CountingBarrier;
-class BloomFilter;
 class DataStreamMgr;
 class DataSink;
 class RowBatch;
@@ -191,8 +190,12 @@ class Coordinator {
   /// filter to fragment instances.
   void UpdateFilter(const TUpdateFilterParams& params);
 
+  /// Called once the query is complete to tear down any remaining state.
+  void TearDown();
+
  private:
   class FragmentInstanceState;
+  struct FilterState;
 
   /// Typedef for boost utility to compute averaged stats
   /// TODO: including the median doesn't compile, looks like some includes are missing
@@ -364,7 +367,7 @@ class Coordinator {
   /// returned, successfully or not. Initialised during StartRemoteFragments().
   boost::scoped_ptr<CountingBarrier> exec_complete_barrier_;
 
-  // Represents a runtime filter target.
+  /// Represents a runtime filter target.
   struct FilterTarget {
     TPlanNodeId node_id;
     bool is_local;
@@ -376,31 +379,6 @@ class Coordinator {
       is_bound_by_partition_columns = tFilterTarget.is_bound_by_partition_columns;
       is_local = tFilterTarget.is_local_target;
     }
-  };
-
-  struct FilterState {
-    TRuntimeFilterDesc desc;
-
-    TPlanNodeId src;
-    std::vector<FilterTarget> targets;
-
-    // Index into fragment_instance_states_ for source fragment instances.
-    boost::unordered_set<int> src_fragment_instance_idxs;
-
-    /// Number of remaining backends to hear from before filter is complete.
-    int pending_count;
-
-    /// BloomFilter aggregated from all source plan nodes, to be broadcast to all
-    /// destination plan fragment instances. Owned by the coordinator's object pool.
-    BloomFilter* bloom_filter;
-
-    /// Time at which first local filter arrived.
-    int64_t first_arrival_time;
-
-    /// Time at which all local filters arrived.
-    int64_t completion_time;
-
-    FilterState() : bloom_filter(NULL), first_arrival_time(0L), completion_time(0L) { }
   };
 
   /// Protects filter_routing_table_.
@@ -420,6 +398,13 @@ class Coordinator {
 
   /// The filtering mode for this query. Set in constructor.
   const TRuntimeFilterMode::type filter_mode_;
+
+  /// Tracks the memory consumed by runtime filters during aggregation. Child of
+  /// query_mem_tracker_.
+  std::unique_ptr<MemTracker> filter_mem_tracker_;
+
+  /// True if and only if TearDown() has been called.
+  bool torn_down_;
 
   /// Returns a pretty-printed table of the current filter state.
   std::string FilterDebugString();

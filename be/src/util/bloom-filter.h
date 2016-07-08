@@ -78,8 +78,8 @@ class BloomFilter {
   /// high probabilty) if it is not.
   bool Find(const uint32_t hash) const;
 
-  /// Computes the logical OR of this filter with 'other' and stores the result in 'this'.
-  void Or(const BloomFilter& other);
+  /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
+  static void Or(const TBloomFilter& in, TBloomFilter* out);
 
   /// As more distinct items are inserted into a BloomFilter, the false positive rate
   /// rises. MaxNdv() returns the NDV (number of distinct values) at which a BloomFilter

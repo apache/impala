@@ -83,13 +83,16 @@ void BloomFilter::ToThrift(const BloomFilter* filter, TBloomFilter* thrift) {
   filter->ToThrift(thrift);
 }
 
-void BloomFilter::Or(const BloomFilter& other) {
-  DCHECK_EQ(log_num_buckets_, other.log_num_buckets_);
-  BucketWord* dir_ptr = reinterpret_cast<BucketWord*>(directory_);
-  const BucketWord* other_dir_ptr = reinterpret_cast<const BucketWord*>(other.directory_);
-  int directory_size_in_words = directory_size() / sizeof(BucketWord);
-  // TODO: use SIMD here:
-  for (int i = 0; i < directory_size_in_words; ++i) dir_ptr[i] |= other_dir_ptr[i];
+void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
+  DCHECK(out != NULL);
+  DCHECK_EQ(in.log_heap_space, out->log_heap_space);
+  out->always_true |= in.always_true;
+  if (out->always_true) {
+    out->directory.resize(0);
+    return;
+  }
+
+  for (int i = 0; i < in.directory.size(); ++i) out->directory[i] |= in.directory[i];
 }
 
 // The following three methods are derived from

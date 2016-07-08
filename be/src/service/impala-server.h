@@ -51,7 +51,6 @@ namespace impala {
 class ExecEnv;
 class DataSink;
 class CancellationWork;
-class Coordinator;
 class ImpalaHttpHandler;
 class RowDescriptor;
 class TCatalogUpdate;

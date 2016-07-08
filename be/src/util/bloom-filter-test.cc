@@ -247,21 +247,42 @@ TEST(BloomFilter, Thrift) {
   EXPECT_EQ(to_thrift.always_true, true);
 }
 
-TEST(BloomFilter, Or) {
+TEST(BloomFilter, ThriftOr) {
   BloomFilter bf1(BloomFilter::MinLogSpace(100, 0.01));
   BloomFilter bf2(BloomFilter::MinLogSpace(100, 0.01));
+
   for (int i = 60; i < 80; ++i) BfInsert(bf2, i);
-
   for (int i = 0; i < 10; ++i) BfInsert(bf1, i);
-  bf2.Or(bf1);
-  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(bf2, i));
-  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf2, i));
 
-  for (int i = 11; i < 50; ++i) BfInsert(bf1, i);
-  bf2.Or(bf1);
-  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(bf2, i));
-  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf2, i));
-  ASSERT_FALSE(BfFind(bf2, 81));
+  TBloomFilter bf1_thrift;
+  TBloomFilter bf2_thrift;
+
+  // Create TBloomFilter with BloomFilter values.
+  BloomFilter::ToThrift(&bf1, &bf1_thrift);
+  BloomFilter::ToThrift(&bf2, &bf2_thrift);
+
+  // Or the TBloomFilters.
+  BloomFilter::Or(bf1_thrift, &bf2_thrift);
+
+  // Apply aggregated TBloomFilter to BloomFilter to verify values with BfFind().
+  BloomFilter bf3(bf2_thrift);
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(bf3, i));
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf3, i));
+
+  // Insert another value to aggregated BloomFilter.
+  for (int i = 11; i < 50; ++i) BfInsert(bf3, i);
+
+  // Convert to TBloomFilter again and do Or().
+  TBloomFilter bf3_thrift;
+  BloomFilter::ToThrift(&bf3, &bf3_thrift);
+
+  BloomFilter::Or(bf1_thrift, &bf3_thrift);
+
+  // Apply TBloomFilter back to BloomFilter and verify if aggregation was correct.
+  BloomFilter bf4(bf3_thrift);
+  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(bf4, i));
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf4, i));
+  ASSERT_FALSE(BfFind(bf4, 81));
 }
 
 }  // namespace impala
