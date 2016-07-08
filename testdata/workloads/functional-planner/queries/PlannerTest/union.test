@@ -2689,3 +2689,85 @@ select l_orderkey from tpch.lineitem UNION DISTINCT (select l_orderkey from tpch
 01:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
 ====
+# IMPALA-3678: Predicates migrated into a union operand should be placed into
+# a SelectNode if that union operand has an order by + limit.
+select * from
+  ((select * from functional.alltypes)
+    union all
+   (select * from functional.alltypes order by id)
+    union all
+   (select * from functional.alltypessmall order by id limit 10)
+    union all
+   (select * from functional.alltypestiny order by id limit 20 offset 10)) v
+where v.id < 10 and v.int_col > 20
+---- PLAN
+00:UNION
+|
+|--08:SELECT
+|  |  predicates: id < 10, int_col > 20
+|  |
+|  07:TOP-N [LIMIT=20 OFFSET=10]
+|  |  order by: id ASC
+|  |
+|  06:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+|--05:SELECT
+|  |  predicates: id < 10, int_col > 20
+|  |
+|  04:TOP-N [LIMIT=10]
+|  |  order by: id ASC
+|  |
+|  03:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 files=4 size=6.32KB
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: functional.alltypes.id < 10, functional.alltypes.int_col > 20
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.id < 10, functional.alltypes.int_col > 20
+====
+# IMPALA-3678: Same as above but with union distinct.
+select * from
+  ((select * from functional.alltypes)
+    union distinct
+   (select * from functional.alltypes order by id)
+    union distinct
+   (select * from functional.alltypessmall order by id limit 10)
+    union distinct
+   (select * from functional.alltypestiny order by id limit 20 offset 10)) v
+where v.id < 10 and v.int_col > 20
+---- PLAN
+09:AGGREGATE [FINALIZE]
+|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|
+00:UNION
+|
+|--08:SELECT
+|  |  predicates: id < 10, int_col > 20
+|  |
+|  07:TOP-N [LIMIT=20 OFFSET=10]
+|  |  order by: id ASC
+|  |
+|  06:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+|--05:SELECT
+|  |  predicates: id < 10, int_col > 20
+|  |
+|  04:TOP-N [LIMIT=10]
+|  |  order by: id ASC
+|  |
+|  03:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 files=4 size=6.32KB
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: functional.alltypes.id < 10, functional.alltypes.int_col > 20
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.id < 10, functional.alltypes.int_col > 20
+====

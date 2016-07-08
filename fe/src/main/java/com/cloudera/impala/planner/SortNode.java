@@ -89,7 +89,8 @@ public class SortNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
-    assignConjuncts(analyzer);
+    // Do not assignConjuncts() here, so that conjuncts bound by this SortNode's tuple id
+    // can be placed in a downstream SelectNode. A SortNode cannot evaluate conjuncts.
     Preconditions.checkState(conjuncts_.isEmpty());
     // Compute the memory layout for the generated tuple.
     computeMemLayout(analyzer);

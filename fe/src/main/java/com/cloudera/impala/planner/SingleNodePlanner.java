@@ -1595,6 +1595,9 @@ public class SingleNodePlanner {
         }
       }
       PlanNode opPlan = createQueryPlan(queryStmt, op.getAnalyzer(), false);
+      // There may still be unassigned conjuncts if the operand has an order by + limit.
+      // Place them into a SelectNode on top of the operand's plan.
+      opPlan = addUnassignedConjuncts(analyzer, opPlan.getTupleIds(), opPlan);
       if (opPlan instanceof EmptySetNode) continue;
       unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
     }
