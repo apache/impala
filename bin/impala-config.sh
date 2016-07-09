@@ -66,9 +66,14 @@ fi
 # If enabled, debug symbols are added to cross-compiled IR.
 : ${ENABLE_IMPALA_IR_DEBUG_INFO=false}
 
+if [ -d $IMPALA_HOME/thirdparty ]; then
+  NO_THIRDPARTY=false
+else
+  NO_THIRDPARTY=true
+fi
 # If true, download and use the CDH components from S3 instead of the ones
 # in $IMPALA_HOME/thirdparty.
-: ${DOWNLOAD_CDH_COMPONENTS=false}
+: ${DOWNLOAD_CDH_COMPONENTS=$NO_THIRDPARTY}
 
 export IMPALA_TOOLCHAIN
 export SKIP_TOOLCHAIN_BOOTSTRAP
@@ -426,26 +431,27 @@ alias gerrit-verify-merge="${IMPALA_AUX_TEST_HOME}/jenkins/gerrit-verify-merge.s
 # A marker in the environment to prove that we really did source this file
 export IMPALA_CONFIG_SOURCED=1
 
-echo "IMPALA_HOME            = $IMPALA_HOME"
-echo "HADOOP_HOME            = $HADOOP_HOME"
-echo "HADOOP_CONF_DIR        = $HADOOP_CONF_DIR"
-echo "MINI_DFS_BASE_DATA_DIR = $MINI_DFS_BASE_DATA_DIR"
-echo "HIVE_HOME              = $HIVE_HOME"
-echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
-echo "HBASE_HOME             = $HBASE_HOME"
-echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
-echo "MINIKDC_HOME           = $MINIKDC_HOME"
-echo "THRIFT_HOME            = $THRIFT_HOME"
-echo "HADOOP_LZO             = $HADOOP_LZO"
-echo "IMPALA_LZO             = $IMPALA_LZO"
-echo "CLASSPATH              = $CLASSPATH"
-echo "LIBHDFS_OPTS           = $LIBHDFS_OPTS"
-echo "PYTHONPATH             = $PYTHONPATH"
-echo "JAVA_HOME              = $JAVA_HOME"
-echo "LD_LIBRARY_PATH        = $LD_LIBRARY_PATH"
-echo "LD_PRELOAD             = $LD_PRELOAD"
-echo "POSTGRES_JDBC_DRIVER   = $POSTGRES_JDBC_DRIVER"
-echo "IMPALA_TOOLCHAIN       = $IMPALA_TOOLCHAIN"
+echo "IMPALA_HOME             = $IMPALA_HOME"
+echo "HADOOP_HOME             = $HADOOP_HOME"
+echo "HADOOP_CONF_DIR         = $HADOOP_CONF_DIR"
+echo "MINI_DFS_BASE_DATA_DIR  = $MINI_DFS_BASE_DATA_DIR"
+echo "HIVE_HOME               = $HIVE_HOME"
+echo "HIVE_CONF_DIR           = $HIVE_CONF_DIR"
+echo "HBASE_HOME              = $HBASE_HOME"
+echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
+echo "MINIKDC_HOME            = $MINIKDC_HOME"
+echo "THRIFT_HOME             = $THRIFT_HOME"
+echo "HADOOP_LZO              = $HADOOP_LZO"
+echo "IMPALA_LZO              = $IMPALA_LZO"
+echo "CLASSPATH               = $CLASSPATH"
+echo "LIBHDFS_OPTS            = $LIBHDFS_OPTS"
+echo "PYTHONPATH              = $PYTHONPATH"
+echo "JAVA_HOME               = $JAVA_HOME"
+echo "LD_LIBRARY_PATH         = $LD_LIBRARY_PATH"
+echo "LD_PRELOAD              = $LD_PRELOAD"
+echo "POSTGRES_JDBC_DRIVER    = $POSTGRES_JDBC_DRIVER"
+echo "IMPALA_TOOLCHAIN        = $IMPALA_TOOLCHAIN"
+echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

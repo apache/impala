@@ -2,31 +2,15 @@
 
 set -euo pipefail
 
-# Prefer the virtualenv pip and python since this is what will actually be used during the
-# installation and it may be a different version than the system default.
-VIRTUAL_ENV_PIP="$IMPALA_HOME"/infra/python/env/bin/pip
-if [[ -e "$VIRTUAL_ENV_PIP" ]]; then
-  PIP="$VIRTUAL_ENV_PIP"
-  # Assume python is also available in the virtualenv.
-  PYTHON="$IMPALA_HOME"/infra/python/env/bin/python
-else
-  PIP=pip
-  PYTHON=python
-fi
-
 DIR=$(dirname "$0")
-# Download but don't install all packages listed in requirements.txt.
-# Don't use pip to download Impyla because its setup.py requires a newer version
-# of setuptools than is available on some systems we support (e.g. CentOS 6).
-"$PIP" -q install --download "$DIR" -r <(grep -v "impyla" "$DIR"/requirements.txt)
 
-# Directly download required packages not listed in requirements.txt.
+pushd $DIR
+PY26=$(./find_py26.py)
+# Directly download packages listed in requirements.txt, but don't install them.
+$PY26 pip_download.py
 # For virtualenv, other scripts rely on the .tar.gz package (not a .whl package).
+$PY26 pip_download.py virtualenv 13.1.0
 # kudu-python is downloaded separately because pip install attempts to execute a
 # setup.py subcommand for kudu-python that can fail even if the download succeeds.
-pushd $DIR
-$PYTHON ./pip_download.py virtualenv 13.1.0
-$PYTHON ./pip_download.py kudu-python 0.1.1
-IMPYLA_VERSION=$(grep impyla ./requirements.txt | grep -o '[0-9.]*')
-$PYTHON ./pip_download.py impyla ${IMPYLA_VERSION}
+$PY26 pip_download.py kudu-python 0.1.1
 popd
