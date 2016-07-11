@@ -1,0 +1,73 @@
+The following SSL certificates are used in our tests. This lists what each certificate is
+responsible for and how they were created:
+
+  1) wildcardCA.pem & wildcardCA.key:
+
+    This is a root certificate and its key which was used to sign wildcard-cert.pem and
+    wildcard-san-cert.pem. (Added as a part of IMPALA-3159)
+
+    This was created using the following commands:
+
+      openssl genrsa -out wildcardCA.key 2048
+
+      openssl req -x509 -new -nodes -key wildcardCA.key -sha256 -days 10000 \
+          -out wildcardCA.pem
+        (Fill in all the details according to prompts)
+
+-------------
+  2) wildcard-cert.pem & wildcard-cert.key:
+
+    This is a wildcard certificate and its corresponding key which has its commonName as
+    "*". This means it should match with any host. (Added as a part of IMPALA-3159)
+
+    This was created using the following commands:
+
+      openssl genrsa -out wildcard-cert.key 2048
+
+      openssl req -new -key wildcard-cert.key -out wildcard-cert.csr
+        (Fill in all the details according to prompts)
+
+      openssl x509 -req -in wildcard-cert.csr -CA wildcardCA.pem -CAkey wildcardCA.key \
+          -CAcreateserial -out wildcard-cert.pem -days 10000 -sha256
+
+-------------
+  3) wildcard-san-cert.pem & wildcard-san-cert.key:
+
+    This is a certificate and its corresponding key which has 2 SANs
+    (subjectAlternativeName). One is "localhost" and the other is a wildcard ("*").
+    (Added as a part of IMPALA-3159)
+
+    This was created using the following commands:
+
+      openssl genrsa -out wildcard-san-cert.key 2048
+
+      openssl req -new -sha256 -key wildcard-san-cert.key \
+          -subj "/C=US/ST=CA/L=SF/O=Cloudera/CN=badCN" -reqexts SAN \
+          -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:localhost,DNS:*")) \
+          -out wildcard-san-cert.csr
+
+      openssl x509 -req -in wildcard-san-cert.csr -CA wildcardCA.pem \
+          -CAkey wildcardCA.key -CAcreateserial \
+          -extfile <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:localhost,DNS:*")) \
+          -extensions SAN -out wildcard-san-cert.pem -days 10000 -sha256
+
+-------------
+  4) server-cert.pem & server-cert.key:
+
+    This is a self-signed certificate and its corresponding key which has the commonName
+    as "localhost".
+
+      This was created the same as 1) with a different commonName.
+
+-------------
+  5) incorrect-commonname-cert.pem & incorrect-commonname-cert.key:
+
+    This is a certificate and its corresponding key that has an incorrect commonName,
+    which means that it should not match with any host. (Added as a part of IMPALA-3159)
+
+      This was created the same as 1) with a different commonName.
+
+-------------
+To verify the contents of any certificate, do the following:
+
+  openssl x509 -in <certificate_name> -text

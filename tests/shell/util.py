@@ -85,13 +85,24 @@ def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
   """
-  p = ImpalaShell(shell_args)
-  result = p.get_result(stdin_input)
-  cmd = "%s %s" % (SHELL_CMD, shell_args)
+  result = run_impala_shell_cmd_no_expect(shell_args, stdin_input)
   if expect_success:
     assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (cmd, result.stderr)
   else:
     assert result.rc != 0, "Cmd %s was expected to fail" % cmd
+  return result
+
+def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None):
+  """Runs the Impala shell on the commandline.
+
+  'shell_args' is a string which represents the commandline options.
+  Returns a ImpalaShellResult.
+
+  Does not assert based on success or failure of command.
+  """
+  p = ImpalaShell(shell_args)
+  result = p.get_result(stdin_input)
+  cmd = "%s %s" % (SHELL_CMD, shell_args)
   return result
 
 class ImpalaShellResult(object):

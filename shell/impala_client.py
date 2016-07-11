@@ -253,16 +253,16 @@ class ImpalaClient(object):
     if self.use_ssl:
       # TSSLSocket needs the ssl module, which may not be standard on all Operating
       # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
-      from thrift.transport import TSSLSocket
+      from TSSLSocketWithWildcardSAN import TSSLSocketWithWildcardSAN
 
     # sasl does not accept unicode strings, explicitly encode the string into ascii.
     host, port = self.impalad[0].encode('ascii', 'ignore'), int(self.impalad[1])
     if self.use_ssl:
       if self.ca_cert is None:
         # No CA cert means don't try to verify the certificate
-        sock = TSSLSocket.TSSLSocket(host, port, validate=False)
+        sock = TSSLSocketWithWildcardSAN(host, port, validate=False)
       else:
-        sock = TSSLSocket.TSSLSocket(host, port, validate=True, ca_certs=self.ca_cert)
+        sock = TSSLSocketWithWildcardSAN(host, port, validate=True, ca_certs=self.ca_cert)
     else:
       sock = TSocket(host, port)
     if not (self.use_ldap or self.use_kerberos):
