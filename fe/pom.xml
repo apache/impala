@@ -184,12 +184,6 @@
     </dependency>
 
     <dependency>
-      <groupId>org.apache.shiro</groupId>
-      <artifactId>shiro-core</artifactId>
-      <version>1.2.1</version>
-    </dependency>
-
-    <dependency>
       <groupId>commons-lang</groupId>
       <artifactId>commons-lang</artifactId>
       <version>2.6</version>
@@ -229,12 +223,6 @@
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
       <version>${env.IMPALA_THRIFT_JAVA_VERSION}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.derby</groupId>
-      <artifactId>derby</artifactId>
-      <version>10.4.2.0</version>
     </dependency>
 
     <dependency>
