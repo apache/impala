@@ -54,19 +54,32 @@ import org.apache.hadoop.hive.ql.udf.UDFUnhex;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocolFactory;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.thrift.TFunction;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.THiveUdfExecutorCtorParams;
 import com.cloudera.impala.util.UnsafeUtil;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
 @SuppressWarnings("restriction")
 public class UdfExecutorTest {
   private final String HIVE_BUILTIN_JAR = System.getenv("HIVE_HOME") + "/" +
       "lib/hive-exec-" + System.getenv("IMPALA_HIVE_VERSION") + ".jar";
+
+  // Object to serialize ctor params of UdfExecutor.
+  private final static TBinaryProtocol.Factory PROTOCOL_FACTORY =
+      new TBinaryProtocol.Factory();
 
   // Allocations from the native heap. These are freed in bulk.
   ArrayList<Long> allocations_ = Lists.newArrayList();
@@ -181,21 +194,70 @@ public class UdfExecutorTest {
     return Type.INVALID;
   }
 
-  // Runs the hive udf contained in c. Validates that c.evaluate(args) == retValue.
-  // Arguments and return value cannot be NULL.
-  void TestUdfImpl(String jar, Class<?> c, Object expectedValue,
-      Type expectedType, boolean validate, Object... args)
-      throws MalformedURLException, ImpalaRuntimeException {
-    Type[] argTypes = new Type[args.length];
+  // Validate the argument's type. To mimic the behavior of the BE, only primitive types
+  // are allowed.
+  void validateArgType(Object w) {
+    if (w instanceof String ||
+        w instanceof ImpalaIntWritable ||
+        w instanceof ImpalaFloatWritable ||
+        w instanceof ImpalaBigIntWritable ||
+        w instanceof ImpalaDoubleWritable ||
+        w instanceof ImpalaBooleanWritable ||
+        w instanceof ImpalaTinyIntWritable ||
+        w instanceof ImpalaSmallIntWritable) {
+      return;
+    }
+    Preconditions.checkArgument(false);
+  }
+
+  /**
+   * Creates a UdfExecutor object.
+   *
+   * @param jarFile: Path to jar containing the UDF. Empty string means using the current
+   *                 jar file.
+   * @param udfClassPath: fully qualified class path for the UDF.
+   * @param retType: the return type of the UDF
+   * @param args: the input parameters of the UDF
+   */
+  UdfExecutor createUdfExecutor(String jarFile, String udfClassPath, Type retType,
+      Object... args) throws ImpalaException, TException {
+    int inputBufferSize = 0;
+    ArrayList<Integer> inputByteOffsets = Lists.newArrayList();
+    ArrayList<Type> argTypes = Lists.newArrayList();
     for (int i = 0; i < args.length; ++i) {
       Preconditions.checkNotNull(args[i]);
-      argTypes[i] = getType(args[i]);
+      Type argType = getType(args[i]);
+      inputByteOffsets.add(new Integer(inputBufferSize));
+      inputBufferSize += argType.getSlotSize();
+      argTypes.add(argType);
     }
 
-    UdfExecutor e = new UdfExecutor(jar, c.getName(), expectedType, argTypes);
+    jarFile = Strings.nullToEmpty(jarFile);
+    ScalarFunction scalar_fn = ScalarFunction.createForTesting("default", "fn", argTypes,
+        retType, /* unused */jarFile, udfClassPath, null, null, TFunctionBinaryType.JAVA);
+    TFunction fn = scalar_fn.toThrift();
+
+    long inputNullsPtr = allocate(argTypes.size());
+    long inputBufferPtr = allocate(inputBufferSize);
+    long outputNullPtr = allocate(1);
+    long outputBufferPtr = allocate(retType.getSlotSize());
+
+    THiveUdfExecutorCtorParams params = new THiveUdfExecutorCtorParams(fn, jarFile,
+        inputByteOffsets, inputNullsPtr, inputBufferPtr, outputNullPtr, outputBufferPtr);
+    TSerializer serializer = new TSerializer(PROTOCOL_FACTORY);
+    return new UdfExecutor(serializer.serialize(params));
+  }
+
+  // Runs the hive udf contained in c. Validates that c.evaluate(args) == retValue.
+  // Arguments and return value cannot be NULL.
+  void TestUdfImpl(String jarFile, Class<?> c, Object expectedValue,
+      Type expectedType, boolean validate, Object... args)
+    throws ImpalaException, MalformedURLException, TException {
+    UdfExecutor e = createUdfExecutor(jarFile, c.getName(), expectedType, args);
     Method method = e.getMethod();
     Object[] inputArgs = new Object[args.length];
     for (int i = 0; i < args.length; ++i) {
+      validateArgType(args[i]);
       if (args[i] instanceof String) {
         // For authoring the test, we'll just pass string and make the proper
         // object here.
@@ -270,22 +332,22 @@ public class UdfExecutorTest {
   }
 
   void TestUdf(String jar, Class<?> c, Writable expectedValue, Object... args)
-      throws MalformedURLException, ImpalaRuntimeException {
+      throws MalformedURLException, ImpalaException, TException {
     TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args);
   }
 
   void TestUdf(String jar, Class<?> c, String expectedValue, Object... args)
-      throws MalformedURLException, ImpalaRuntimeException {
+      throws MalformedURLException, ImpalaException, TException {
     TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args);
   }
 
   void TestHiveUdf(Class<?> c, Writable expectedValue, Object... args)
-      throws MalformedURLException, ImpalaRuntimeException {
+      throws MalformedURLException, ImpalaException, TException {
     TestUdfImpl(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), true, args);
   }
 
   void TestHiveUdfNoValidate(Class<?> c, Writable expectedValue, Object... args)
-      throws MalformedURLException, ImpalaRuntimeException {
+      throws MalformedURLException, ImpalaException, TException {
     TestUdfImpl(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), false, args);
   }
 
@@ -294,7 +356,7 @@ public class UdfExecutorTest {
   // UDFs are correct (i.e. replicate expr-test). The most interesting thing to test for
   // here is that we can drive all the UDFs.
   public void HiveMathTest()
-      throws ImpalaRuntimeException, MalformedURLException {
+      throws ImpalaException, MalformedURLException, TException {
     TestHiveUdfNoValidate(UDFRand.class, createDouble(0));
     TestHiveUdfNoValidate(UDFRand.class, createDouble(0), createBigInt(10));
     TestHiveUdf(UDFExp.class, createDouble(Math.exp(10)), createDouble(10));
@@ -333,10 +395,11 @@ public class UdfExecutorTest {
   @Test
   // Tests all the hive string UDFs. We are not testing for correctness of the UDFs
   // so it is sufficient to just cover the types.
-  public void HiveStringsTest() throws ImpalaRuntimeException, MalformedURLException {
+  public void HiveStringsTest()
+      throws ImpalaException, MalformedURLException, TException {
     TestHiveUdf(UDFAscii.class, createInt('1'), "123");
     TestHiveUdf(UDFFindInSet.class, createInt(2), "31", "12,31,23");
-    TestHiveUdf(UDFLength.class, createInt(5), createText("Hello"));
+    TestHiveUdf(UDFLength.class, createInt(5), "Hello");
     TestHiveUdf(UDFRepeat.class, createText("abcabc"), "abc", createInt(2));
     TestHiveUdf(UDFReverse.class, createText("cba"), "abc");
     TestHiveUdf(UDFSpace.class, createText("    "), createInt(4));
@@ -347,7 +410,8 @@ public class UdfExecutorTest {
 
   @Test
   // Test identity for all types
-  public void BasicTest() throws ImpalaRuntimeException, MalformedURLException {
+  public void BasicTest()
+      throws ImpalaException, MalformedURLException, TException {
     TestUdf(null, TestUdf.class, createBoolean(true), createBoolean(true));
     TestUdf(null, TestUdf.class, createTinyInt(1), createTinyInt(1));
     TestUdf(null, TestUdf.class, createSmallInt(1), createSmallInt(1));

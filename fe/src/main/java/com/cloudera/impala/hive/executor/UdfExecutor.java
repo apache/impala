@@ -61,7 +61,7 @@ public class UdfExecutor {
   private static final String UDF_FUNCTION_NAME = "evaluate";
 
   // Object to deserialize ctor params from BE.
-  private final static TBinaryProtocol.Factory protocolFactory =
+  private final static TBinaryProtocol.Factory PROTOCOL_FACTORY =
     new TBinaryProtocol.Factory();
 
   private UDF udf_;
@@ -98,10 +98,6 @@ public class UdfExecutor {
   // as these objects are reused across calls to evaluate().
   private Object[] inputObjects_;
   private Object[] inputArgs_; // inputArgs_[i] is either inputObjects_[i] or null
-
-  // Allocations made from the native heap that need to be cleaned when this object
-  // is GC'ed.
-  private final ArrayList<Long> allocations_ = Lists.newArrayList();
 
   // Data types that are supported as return or argument types in Java UDFs.
   public enum JavaUdfDataType {
@@ -196,7 +192,7 @@ public class UdfExecutor {
    */
   public UdfExecutor(byte[] thriftParams) throws ImpalaException {
     THiveUdfExecutorCtorParams request = new THiveUdfExecutorCtorParams();
-    JniUtil.deserializeThrift(protocolFactory, request, thriftParams);
+    JniUtil.deserializeThrift(PROTOCOL_FACTORY, request, thriftParams);
 
     String className = request.fn.scalar_fn.symbol;
     String jarFile = request.local_location;
@@ -219,41 +215,6 @@ public class UdfExecutor {
     init(jarFile, className, retType, parameterTypes);
   }
 
-  /**
-   * Creates a UdfExecutor object, loading the class and validating it
-   * has the proper function. This constructor is only used for testing.
-   *
-   * @param jarFile: Path to jar containing the UDF. null indicates to use the current
-   * jar file.
-   * @param udfPath: fully qualified class path for the UDF
-   */
-  public UdfExecutor(String jarFile, String udfPath,
-      Type retType, Type... parameterTypes)
-      throws ImpalaRuntimeException {
-
-    inputBufferOffsets_ = new int[parameterTypes.length];
-
-    int inputBufferSize = 0;
-    for (int i = 0; i < parameterTypes.length; ++i) {
-      inputBufferOffsets_[i] = inputBufferSize;
-      inputBufferSize += parameterTypes[i].getSlotSize();
-    }
-
-    inputBufferPtr_ = UnsafeUtil.UNSAFE.allocateMemory(inputBufferSize);
-    inputNullsPtr_ = UnsafeUtil.UNSAFE.allocateMemory(parameterTypes.length);
-    outputBufferPtr_ = UnsafeUtil.UNSAFE.allocateMemory(retType.getSlotSize());
-    outputNullPtr_ = UnsafeUtil.UNSAFE.allocateMemory(1);
-    allocations_.add(inputBufferPtr_);
-    allocations_.add(inputNullsPtr_);
-    allocations_.add(outputBufferPtr_);
-    allocations_.add(outputNullPtr_);
-    outBufferStringPtr_ = 0;
-    outBufferCapacity_ = 0;
-
-    init(jarFile, udfPath, retType, parameterTypes);
-  }
-
-
   @Override
   protected void finalize() throws Throwable {
     close();
@@ -267,11 +228,6 @@ public class UdfExecutor {
     UnsafeUtil.UNSAFE.freeMemory(outBufferStringPtr_);
     outBufferStringPtr_ = 0;
     outBufferCapacity_ = 0;
-
-    for (long ptr: allocations_) {
-      UnsafeUtil.UNSAFE.freeMemory(ptr);
-    }
-    allocations_.clear();
   }
 
   /**
