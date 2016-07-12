@@ -38,8 +38,9 @@ const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state)
-    : BaseSequenceScanner(scan_node, state),
+HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    bool add_batches_to_queue)
+    : BaseSequenceScanner(scan_node, state, add_batches_to_queue),
       unparsed_data_buffer_(NULL),
       num_buffered_records_in_compressed_block_(0) {
 }
@@ -86,8 +87,8 @@ Status HdfsSequenceScanner::InitNewRange() {
   return Status::OK();
 }
 
-Status HdfsSequenceScanner::Prepare(ScannerContext* context) {
-  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
+Status HdfsSequenceScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Open(context));
 
   // Allocate the scratch space for two pass parsing.  The most fields we can go
   // through in one parse pass is the batch size (tuples) * the number of fields per tuple

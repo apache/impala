@@ -52,8 +52,9 @@ const string AVRO_MEM_LIMIT_EXCEEDED = "HdfsAvroScanner::$0() failed to allocate
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
-  : BaseSequenceScanner(scan_node, state),
+HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    bool add_batches_to_queue)
+  : BaseSequenceScanner(scan_node, state, add_batches_to_queue),
     avro_header_(NULL),
     codegend_decode_avro_data_(NULL) {
 }
@@ -65,8 +66,8 @@ HdfsAvroScanner::HdfsAvroScanner()
   DCHECK(TestInfo::is_test());
 }
 
-Status HdfsAvroScanner::Prepare(ScannerContext* context) {
-  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
+Status HdfsAvroScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Open(context));
   if (scan_node_->avro_schema().schema == NULL) {
     return Status("Missing Avro schema in scan node. This could be due to stale "
         "metadata. Running 'invalidate metadata <tablename>' may resolve the problem.");

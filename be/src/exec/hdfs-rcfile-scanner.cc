@@ -50,15 +50,16 @@ const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'R', 'C', 'F', 1};
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state)
-    : BaseSequenceScanner(scan_node, state) {
+HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    bool add_batches_to_queue)
+    : BaseSequenceScanner(scan_node, state, add_batches_to_queue) {
 }
 
 HdfsRCFileScanner::~HdfsRCFileScanner() {
 }
 
-Status HdfsRCFileScanner::Prepare(ScannerContext* context) {
-  RETURN_IF_ERROR(BaseSequenceScanner::Prepare(context));
+Status HdfsRCFileScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(BaseSequenceScanner::Open(context));
   text_converter_.reset(
       new TextConverter(0, scan_node_->hdfs_table()->null_column_value()));
   scan_node_->IncNumScannersCodegenDisabled();

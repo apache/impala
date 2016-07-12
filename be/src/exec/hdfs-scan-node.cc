@@ -64,8 +64,6 @@ DEFINE_bool(suppress_unknown_disk_id_warnings, false,
     " provide volume/disk information.");
 DEFINE_int32(runtime_filter_wait_time_ms, 1000, "(Advanced) the maximum time, in ms, "
     "that a scan node will wait for expected runtime filters to arrive.");
-DECLARE_string(cgroup_hierarchy_path);
-DECLARE_bool(enable_rm);
 
 #ifndef NDEBUG
 DECLARE_bool(skip_file_runtime_filtering);
@@ -194,7 +192,7 @@ bool HdfsScanNode::FilePassesFilterPredicates(const vector<FilterContext>& filte
   if (filter_ctxs_.size() == 0) return true;
   ScanRangeMetadata* metadata =
       reinterpret_cast<ScanRangeMetadata*>(file->splits[0]->meta_data());
-  if (!PartitionPassesFilterPredicates(metadata->partition_id, FilterStats::FILES_KEY,
+  if (!PartitionPassesFilters(metadata->partition_id, FilterStats::FILES_KEY,
           filter_ctxs)) {
     for (int j = 0; j < file->splits.size(); ++j) {
       // Mark range as complete to ensure progress.
@@ -372,7 +370,7 @@ void* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
   return it->second;
 }
 
-Status HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
+Status HdfsScanNode::CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
     ScannerContext* context, scoped_ptr<HdfsScanner>* scanner) {
   DCHECK(context != NULL);
   THdfsCompression::type compression =
@@ -386,20 +384,20 @@ Status HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
       if (compression == THdfsCompression::LZO) {
         scanner->reset(HdfsLzoTextScanner::GetHdfsLzoTextScanner(this, runtime_state_));
       } else {
-        scanner->reset(new HdfsTextScanner(this, runtime_state_));
+        scanner->reset(new HdfsTextScanner(this, runtime_state_, true));
       }
       break;
     case THdfsFileFormat::SEQUENCE_FILE:
-      scanner->reset(new HdfsSequenceScanner(this, runtime_state_));
+      scanner->reset(new HdfsSequenceScanner(this, runtime_state_, true));
       break;
     case THdfsFileFormat::RC_FILE:
-      scanner->reset(new HdfsRCFileScanner(this, runtime_state_));
+      scanner->reset(new HdfsRCFileScanner(this, runtime_state_, true));
       break;
     case THdfsFileFormat::AVRO:
-      scanner->reset(new HdfsAvroScanner(this, runtime_state_));
+      scanner->reset(new HdfsAvroScanner(this, runtime_state_, true));
       break;
     case THdfsFileFormat::PARQUET:
-      scanner->reset(new HdfsParquetScanner(this, runtime_state_));
+      scanner->reset(new HdfsParquetScanner(this, runtime_state_, true));
       break;
     default:
       return Status(Substitute("Unknown Hdfs file format type: $0",
@@ -408,8 +406,8 @@ Status HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
   DCHECK(scanner->get() != NULL);
   Status status = ExecDebugAction(TExecNodePhase::PREPARE_SCANNER, runtime_state_);
   if (status.ok()) {
-    status = scanner->get()->Prepare(context);
-    if (!status.ok()) scanner->get()->Close();
+    status = scanner->get()->Open(context);
+    if (!status.ok()) scanner->get()->Close(scanner->get()->batch());
   } else {
     context->ClearStreams();
   }
@@ -1140,7 +1138,7 @@ void HdfsScanNode::ScannerThread() {
   runtime_state_->resource_pool()->ReleaseThreadToken(false);
 }
 
-bool HdfsScanNode::PartitionPassesFilterPredicates(int32_t partition_id,
+bool HdfsScanNode::PartitionPassesFilters(int32_t partition_id,
     const string& stats_name, const vector<FilterContext>& filter_ctxs) {
   if (filter_ctxs.size() == 0) return true;
   DCHECK_EQ(filter_ctxs.size(), filter_ctxs_.size())
@@ -1198,8 +1196,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   // done. See FilePassesFilterPredicates() for the correct logic to mark all splits in a
   // file as done; the correct fix here is to do that for every file in a thread-safe way.
   if (!FileFormatIsSequenceBased(partition->file_format())) {
-    if (!PartitionPassesFilterPredicates(partition_id, FilterStats::SPLITS_KEY,
-            filter_ctxs)) {
+    if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
       // Avoid leaking unread buffers in scan_range.
       scan_range->Cancel(Status::CANCELLED);
       // Mark scan range as done.
@@ -1211,7 +1208,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
 
   ScannerContext context(runtime_state_, this, partition, scan_range, filter_ctxs);
   scoped_ptr<HdfsScanner> scanner;
-  Status status = CreateAndPrepareScanner(partition, &context, &scanner);
+  Status status = CreateAndOpenScanner(partition, &context, &scanner);
   if (!status.ok()) {
     // If preparation fails, avoid leaking unread buffers in the scan_range.
     scan_range->Cancel(status);
@@ -1243,7 +1240,9 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     VLOG_QUERY << ss.str();
   }
 
-  scanner->Close();
+  // Transfer the remaining resources to the final row batch (if any) and add it to
+  // the row batch queue.
+  scanner->Close(scanner->batch());
   return status;
 }
 

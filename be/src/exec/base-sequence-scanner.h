@@ -38,8 +38,8 @@ class BaseSequenceScanner : public HdfsScanner {
   static Status IssueInitialRanges(HdfsScanNode* scan_node,
                                    const std::vector<HdfsFileDesc*>& files);
 
-  virtual Status Prepare(ScannerContext* context);
-  virtual void Close();
+  virtual Status Open(ScannerContext* context);
+  virtual void Close(RowBatch* row_batch);
   virtual Status ProcessSplit();
 
   virtual ~BaseSequenceScanner();
@@ -99,7 +99,7 @@ class BaseSequenceScanner : public HdfsScanner {
   /// Returns type of scanner: e.g. rcfile, seqfile
   virtual THdfsFileFormat::type file_format() const = 0;
 
-  BaseSequenceScanner(HdfsScanNode*, RuntimeState*);
+  BaseSequenceScanner(HdfsScanNode*, RuntimeState*, bool);
 
   /// Read and validate sync marker against header_->sync.  Returns non-ok if the sync
   /// marker did not match. Scanners should always use this function to read sync markers,

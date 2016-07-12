@@ -230,10 +230,11 @@ class Tuple;
 /// A scanner for reading RCFiles into tuples.
 class HdfsRCFileScanner : public BaseSequenceScanner {
  public:
-  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state);
+  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
+      bool add_batches_to_queue);
   virtual ~HdfsRCFileScanner();
 
-  virtual Status Prepare(ScannerContext* context);
+  virtual Status Open(ScannerContext* context);
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 

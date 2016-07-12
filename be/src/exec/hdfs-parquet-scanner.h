@@ -317,17 +317,18 @@ class BoolColumnReader;
 /// the ScannerContext.
 class HdfsParquetScanner : public HdfsScanner {
  public:
-  HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state);
-
+  HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state,
+      bool add_batches_to_queue);
   virtual ~HdfsParquetScanner() {};
-  virtual Status Prepare(ScannerContext* context);
-  virtual void Close();
-  virtual Status ProcessSplit();
 
   /// Issue just the footer range for each file.  We'll then parse the footer and pick
   /// out the columns we want.
   static Status IssueInitialRanges(HdfsScanNode* scan_node,
                                    const std::vector<HdfsFileDesc*>& files);
+
+  virtual Status Open(ScannerContext* context);
+  virtual Status ProcessSplit();
+  virtual void Close(RowBatch* row_batch);
 
   /// The repetition level is set to this value to indicate the end of a row group.
   static const int16_t ROW_GROUP_END = numeric_limits<int16_t>::min();
@@ -346,6 +347,20 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Size of the file footer.  This is a guess.  If this value is too little, we will
   /// need to issue another read.
   static const int64_t FOOTER_SIZE = 1024 * 100;
+
+  /// Index of the current row group being processed. Initialized to -1 which indicates
+  /// that we have not started processing the first row group yet (GetNext() has not yet
+  /// been called).
+  int32_t row_group_idx_;
+
+  /// Counts the number of rows processed for the current row group.
+  int64_t row_group_rows_read_;
+
+  /// Indicates whether we should advance to the next row group in the next GetNext().
+  /// Starts out as true to move to the very first row group.
+  bool advance_row_group_;
+
+  boost::scoped_ptr<ParquetSchemaResolver> schema_resolver_;
 
   /// Cached runtime filter contexts, one for each filter that applies to this column.
   vector<const FilterContext*> filter_ctxs_;
@@ -411,32 +426,35 @@ class HdfsParquetScanner : public HdfsScanner {
 
   const char* filename() const { return metadata_range_->file(); }
 
-  /// Reads data using 'column_readers' to materialize top-level tuples.
-  ///
-  /// Returns true when the row group is complete and execution can be safely resumed.
-  /// Returns false if execution should be aborted due to:
-  /// - parse_error_ is set
-  /// - query is cancelled
-  /// - scan node limit was reached
-  /// - the scanned file can be skipped based on runtime filters
-  /// When false is returned the column_readers are left in an undefined state and
-  /// execution should be aborted immediately by the caller.
-  ///
-  /// 'row_group_idx' is used for calling into ValidateEndOfRowGroup() when the end
-  /// of the row group is reached.
-  ///
-  /// If 'filters_pass' is set to false by this method, the partition columns associated
-  /// with this row group did not pass all the runtime filters (and therefore only filter
-  /// contexts that apply only to partition columns are checked).
-  bool AssembleRows(const std::vector<ParquetColumnReader*>& column_readers,
-      int row_group_idx, bool* filters_pass);
+  virtual Status GetNextInternal(RowBatch* row_batch, bool* eos);
+
+  /// Advances 'row_group_idx_' to the next non-empty row group and initializes
+  /// the column readers to scan it. Recoverable errors are logged to the runtime
+  /// state. Only returns a non-OK status if a non-recoverable error is encountered
+  /// (or abort_on_error is true). If OK is returned, 'parse_status_' is guaranteed
+  /// to be OK as well.
+  Status NextRowGroup();
+
+  /// Reads data using 'column_readers' to materialize top-level tuples into 'row_batch'.
+  /// Returns a non-OK status if a non-recoverable error was encountered and execution
+  /// of this query should be terminated immediately.
+  /// May set *skip_row_group to indicate that the current row group should be skipped,
+  /// e.g., due to a parse error, but execution should continue.
+  Status AssembleRows(const std::vector<ParquetColumnReader*>& column_readers,
+      RowBatch* row_batch, bool* skip_row_group);
+
+  /// Commit num_rows to the given row batch.
+  /// Returns OK if the query is not cancelled and hasn't exceeded any mem limits.
+  /// Scanner can call this with 0 rows to flush any pending resources (attached pools
+  /// and io buffers) to minimize memory consumption.
+  Status CommitRows(RowBatch* dst_batch, int num_rows);
 
   /// Evaluates runtime filters and conjuncts (if any) against the tuples in
-  /// 'scratch_batch_', and adds the surviving tuples to the output batch.
-  /// Transfers the ownership of tuple memory to the output batch when the
+  /// 'scratch_batch_', and adds the surviving tuples to the given batch.
+  /// Transfers the ownership of tuple memory to the target batch when the
   /// scratch batch is exhausted.
-  /// Returns the number of rows that should be committed to the output batch.
-  int TransferScratchTuples();
+  /// Returns the number of rows that should be committed to the given batch.
+  int TransferScratchTuples(RowBatch* dst_batch);
 
   /// Evaluates runtime filters (if any) against the given row. Returns true if
   /// they passed, false otherwise. Maintains the runtime filter stats, determines
@@ -474,8 +492,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.
-  /// *eosr is a return value.  If true, the scan range is complete (e.g. select count(*))
-  Status ProcessFooter(bool* eosr);
+  Status ProcessFooter();
 
   /// Populates 'column_readers' for the slots in 'tuple_desc', including creating child
   /// readers for any collections. Schema resolution is handled in this function as
@@ -516,6 +533,11 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Part of the HdfsScanner interface, not used in Parquet.
   Status InitNewRange() { return Status::OK(); };
+
+  /// Transfers the remaining resources backing tuples such as IO buffers and memory
+  /// from mem pools to the given row batch. Closes all column readers.
+  /// Should be called after completing a row group and when returning the last batch.
+  void FlushRowGroupResources(RowBatch* row_batch);
 };
 
 } // namespace impala

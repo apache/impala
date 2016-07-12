@@ -159,12 +159,13 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   /// SeqFile file: {'S', 'E', 'Q', 6}
   static const uint8_t SEQFILE_VERSION_HEADER[4];
 
-  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state);
+  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
+      bool add_batches_to_queue);
 
   virtual ~HdfsSequenceScanner();
-  
+
   /// Implementation of HdfsScanner interface.
-  virtual Status Prepare(ScannerContext* context);
+  virtual Status Open(ScannerContext* context);
 
   /// Codegen writing tuples and evaluating predicates.
   static llvm::Function* Codegen(HdfsScanNode*,
@@ -176,9 +177,9 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();
   virtual Status ProcessRange();
-  
-  virtual THdfsFileFormat::type file_format() const { 
-    return THdfsFileFormat::SEQUENCE_FILE; 
+
+  virtual THdfsFileFormat::type file_format() const {
+    return THdfsFileFormat::SEQUENCE_FILE;
   }
 
  private:
@@ -213,11 +214,11 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   ///   record_ptr: ponter to the record.
   ///   record_len: length of the record
   Status GetRecord(uint8_t** record_ptr, int64_t *record_len);
-  
+
   /// Appends the current file and line to the RuntimeState's error log.
   /// row_idx is 0-based (in current batch) where the parse error occurred.
   virtual void LogRowParseError(int row_idx, std::stringstream*);
-  
+
   /// Helper class for picking fields and rows from delimited text.
   boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;
   std::vector<FieldLocation> field_locations_;

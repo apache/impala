@@ -86,9 +86,9 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Avro file: {'O', 'b', 'j', 1}
   static const uint8_t AVRO_VERSION_HEADER[4];
 
-  HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state);
+  HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state, bool add_batches_to_queue);
 
-  virtual Status Prepare(ScannerContext* context);
+  virtual Status Open(ScannerContext* context);
 
   /// Codegen parsing records, writing tuples and evaluating predicates.
   static llvm::Function* Codegen(HdfsScanNode*,

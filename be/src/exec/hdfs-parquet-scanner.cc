@@ -132,8 +132,12 @@ DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
 
 namespace impala {
 
-HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state)
-    : HdfsScanner(scan_node, state),
+HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    bool add_batches_to_queue)
+    : HdfsScanner(scan_node, state, add_batches_to_queue),
+      row_group_idx_(-1),
+      row_group_rows_read_(0),
+      advance_row_group_(true),
       scratch_batch_(new ScratchTupleBatch(
           scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
       metadata_range_(NULL),
@@ -144,8 +148,9 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* st
   assemble_rows_timer_.Stop();
 }
 
-Status HdfsParquetScanner::Prepare(ScannerContext* context) {
-  RETURN_IF_ERROR(HdfsScanner::Prepare(context));
+Status HdfsParquetScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Open(context));
+  stream_->set_contains_tuple_data(false);
   metadata_range_ = stream_->scan_range();
   num_cols_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
@@ -162,55 +167,73 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
     if (!ctx->filter->AlwaysTrue()) filter_ctxs_.push_back(ctx);
   }
   filter_stats_.resize(filter_ctxs_.size());
+
+  DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
+
+  // First process the file metadata in the footer.
+  Status status = ProcessFooter();
+  // Release I/O buffers immediately to make sure they are cleaned up
+  // in case we return a non-OK status anywhere below.
+  context_->ReleaseCompletedResources(NULL, true);
+  RETURN_IF_ERROR(status);
+
+  // Parse the file schema into an internal representation for schema resolution.
+  schema_resolver_.reset(new ParquetSchemaResolver(*scan_node_->hdfs_table(),
+      state_->query_options().parquet_fallback_schema_resolution));
+  RETURN_IF_ERROR(schema_resolver_->Init(&file_metadata_, filename()));
+
+  // We've processed the metadata and there are columns that need to be materialized.
+  RETURN_IF_ERROR(CreateColumnReaders(
+      *scan_node_->tuple_desc(), *schema_resolver_, &column_readers_));
+  COUNTER_SET(num_cols_counter_,
+      static_cast<int64_t>(CountScalarColumns(column_readers_)));
+  // Set top-level template tuple.
+  template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
+
+  // The scanner-wide stream was used only to read the file footer.  Each column has added
+  // its own stream.
+  stream_ = NULL;
   return Status::OK();
 }
 
-void HdfsParquetScanner::Close() {
-  vector<THdfsCompression::type> compression_types;
-
-  // Visit each column reader, including collection reader children.
-  stack<ParquetColumnReader*> readers;
-  for (ParquetColumnReader* r: column_readers_) readers.push(r);
-  while (!readers.empty()) {
-    ParquetColumnReader* col_reader = readers.top();
-    readers.pop();
-
-    if (col_reader->IsCollectionReader()) {
-      CollectionColumnReader* collection_reader =
-          static_cast<CollectionColumnReader*>(col_reader);
-      for (ParquetColumnReader* r: *collection_reader->children()) readers.push(r);
-      continue;
-    }
-
-    BaseScalarColumnReader* scalar_reader =
-        static_cast<BaseScalarColumnReader*>(col_reader);
-    if (scalar_reader->decompressed_data_pool() != NULL) {
-      // No need to commit the row batches with the AttachPool() calls
-      // since AddFinalRowBatch() already does below.
-      AttachPool(scalar_reader->decompressed_data_pool(), false);
-    }
-    scalar_reader->Close();
-    compression_types.push_back(scalar_reader->codec());
-  }
-  if (batch_ != NULL) {
-    AttachPool(dictionary_pool_.get(), false);
-    AttachPool(scratch_batch_->mem_pool(), false);
-    AddFinalRowBatch();
+void HdfsParquetScanner::Close(RowBatch* row_batch) {
+  if (row_batch != NULL) {
+    FlushRowGroupResources(row_batch);
+    if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
   }
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(dictionary_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
-  // If this was a metadata only read (i.e. count(*)), there are no columns.
-  if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
-  scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
+
+  // Collect compression types for reporting completed ranges.
+  vector<THdfsCompression::type> compression_types;
+  stack<ParquetColumnReader*> readers;
+  for (ParquetColumnReader* r: column_readers_) readers.push(r);
+  while (!readers.empty()) {
+    ParquetColumnReader* reader = readers.top();
+    readers.pop();
+    if (reader->IsCollectionReader()) {
+      CollectionColumnReader* coll_reader = static_cast<CollectionColumnReader*>(reader);
+      for (ParquetColumnReader* r: *coll_reader->children()) readers.push(r);
+      continue;
+    }
+    BaseScalarColumnReader* scalar_reader = static_cast<BaseScalarColumnReader*>(reader);
+    compression_types.push_back(scalar_reader->codec());
+  }
   assemble_rows_timer_.Stop();
   assemble_rows_timer_.ReleaseCounter();
 
+  // If this was a metadata only read (i.e. count(*)), there are no columns.
+  if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
+  scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
+
   if (level_cache_pool_.get() != NULL) {
     level_cache_pool_->FreeAll();
-    level_cache_pool_.reset(NULL);
+    level_cache_pool_.reset();
   }
+
+  if (schema_resolver_.get() != NULL) schema_resolver_.reset();
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;
@@ -219,7 +242,7 @@ void HdfsParquetScanner::Close() {
         local.considered, local.rejected);
   }
 
-  HdfsScanner::Close();
+  HdfsScanner::Close(row_batch);
 }
 
 // Get the start of the column.
@@ -263,33 +286,102 @@ int HdfsParquetScanner::CountScalarColumns(const vector<ParquetColumnReader*>& c
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
-  DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
-  // First process the file metadata in the footer
-  bool eosr;
-  RETURN_IF_ERROR(ProcessFooter(&eosr));
-  if (eosr) return Status::OK();
+  DCHECK(add_batches_to_queue_);
+  bool scanner_eos = false;
+  do {
+    RETURN_IF_ERROR(StartNewRowBatch());
+    RETURN_IF_ERROR(GetNextInternal(batch_, &scanner_eos));
+    scan_node_->AddMaterializedRowBatch(batch_);
+  } while (!scanner_eos && !scan_node_->ReachedLimit());
 
-  // Parse the file schema into an internal representation for schema resolution.
-  ParquetSchemaResolver schema_resolver(*scan_node_->hdfs_table(),
-      state_->query_options().parquet_fallback_schema_resolution);
-  RETURN_IF_ERROR(schema_resolver.Init(&file_metadata_, filename()));
+  // Transfer the remaining resources to this new batch in Close().
+  RETURN_IF_ERROR(StartNewRowBatch());
+  return Status::OK();
+}
 
-  // We've processed the metadata and there are columns that need to be materialized.
-  RETURN_IF_ERROR(
-      CreateColumnReaders(*scan_node_->tuple_desc(), schema_resolver, &column_readers_));
-  COUNTER_SET(num_cols_counter_,
-      static_cast<int64_t>(CountScalarColumns(column_readers_)));
-  // Set top-level template tuple.
-  template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
+Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch, bool* eos) {
+  if (scan_node_->IsZeroSlotTableScan()) {
+    // There are no materialized slots, e.g. count(*) over the table.  We can serve
+    // this query from just the file metadata. We don't need to read the column data.
+    if (row_group_rows_read_ == file_metadata_.num_rows) {
+      *eos = true;
+      return Status::OK();
+    }
+    assemble_rows_timer_.Start();
+    int rows_remaining = file_metadata_.num_rows - row_group_rows_read_;
+    int max_tuples = min(row_batch->capacity(), rows_remaining);
+    TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
+    int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
+    Status status = CommitRows(row_batch, num_to_commit);
+    assemble_rows_timer_.Stop();
+    RETURN_IF_ERROR(status);
+    row_group_rows_read_ += num_to_commit;
+    COUNTER_ADD(scan_node_->rows_read_counter(), row_group_rows_read_);
+    return Status::OK();
+  }
 
-  // The scanner-wide stream was used only to read the file footer.  Each column has added
-  // its own stream.
-  stream_ = NULL;
+  // Transfer remaining tuples from the scratch batch.
+  if (!scratch_batch_->AtEnd()) {
+    assemble_rows_timer_.Start();
+    int num_row_to_commit = TransferScratchTuples(row_batch);
+    assemble_rows_timer_.Stop();
+    RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
+    if (row_batch->AtCapacity()) return Status::OK();
+  }
 
-  // Iterate through each row group in the file and process any row groups that fall
-  // within this split.
-  for (int i = 0; i < file_metadata_.row_groups.size(); ++i) {
-    const parquet::RowGroup& row_group = file_metadata_.row_groups[i];
+  while (advance_row_group_ || column_readers_[0]->RowGroupAtEnd()) {
+    if (!advance_row_group_) {
+      // End of the previous row group. Transfer resources and clear streams because
+      // we will create new streams for the next row group.
+      FlushRowGroupResources(row_batch);
+      context_->ClearStreams();
+      Status status =
+          ValidateEndOfRowGroup(column_readers_, row_group_idx_, row_group_rows_read_);
+      if (!status.ok()) RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
+    }
+    RETURN_IF_ERROR(NextRowGroup());
+    if (row_group_idx_ >= file_metadata_.row_groups.size()) {
+      *eos = true;
+      DCHECK(parse_status_.ok());
+      return Status::OK();
+    }
+  }
+
+  // Apply any runtime filters to static tuples containing the partition keys for this
+  // partition. If any filter fails, we return immediately and stop processing this
+  // scan range.
+  if (!scan_node_->PartitionPassesFilters(context_->partition_descriptor()->id(),
+      FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
+    *eos = true;
+    DCHECK(parse_status_.ok());
+    return Status::OK();
+  }
+  assemble_rows_timer_.Start();
+  Status status = AssembleRows(column_readers_, row_batch, &advance_row_group_);
+  assemble_rows_timer_.Stop();
+  RETURN_IF_ERROR(status);
+  if (!parse_status_.ok()) {
+    RETURN_IF_ERROR(state_->LogOrReturnError(parse_status_.msg()));
+    parse_status_ = Status::OK();
+  }
+
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::NextRowGroup() {
+  advance_row_group_ = false;
+  row_group_rows_read_ = 0;
+
+  // Loop until we have found a non-empty row group, and successfully initialized and
+  // seeded the column readers. Return a non-OK status from within loop only if the error
+  // is non-recoverable, otherwise log the error and continue with the next row group.
+  while (true) {
+    // Reset the parse status for the next row group.
+    parse_status_ = Status::OK();
+
+    ++row_group_idx_;
+    if (row_group_idx_ >= file_metadata_.row_groups.size()) break;
+    const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
     if (row_group.num_rows == 0) continue;
 
     const DiskIoMgr::ScanRange* split_range = reinterpret_cast<ScanRangeMetadata*>(
@@ -302,23 +394,16 @@ Status HdfsParquetScanner::ProcessSplit() {
     int64_t split_offset = split_range->offset();
     int64_t split_length = split_range->len();
     if (!(row_group_mid_pos >= split_offset &&
-        row_group_mid_pos < split_offset + split_length)) continue;
+        row_group_mid_pos < split_offset + split_length)) {
+      // A row group is processed by the scanner whose split overlaps with the row
+      // group's mid point. This row group will be handled by a different scanner.
+      continue;
+    }
     COUNTER_ADD(num_row_groups_counter_, 1);
 
-    // Attach any resources and clear the streams before starting a new row group. These
-    // streams could either be just the footer stream or streams for the previous row
-    // group.
-    context_->ReleaseCompletedResources(batch_, /* done */ true);
-    context_->ClearStreams();
-    // Commit the rows to flush the row batch from the previous row group
-    CommitRows(0);
-
-    RETURN_IF_ERROR(InitColumns(i, column_readers_));
-
-    assemble_rows_timer_.Start();
-
     // Prepare column readers for first read
-    bool continue_execution = true;
+    RETURN_IF_ERROR(InitColumns(row_group_idx_, column_readers_));
+    bool seeding_ok = true;
     for (ParquetColumnReader* col_reader: column_readers_) {
       // Seed collection and boolean column readers with NextLevel().
       // The ScalarColumnReaders use an optimized ReadValueBatch() that
@@ -328,48 +413,127 @@ Status HdfsParquetScanner::ProcessSplit() {
       // will allow better sharing of code between the row-wise and column-wise
       // materialization strategies.
       if (col_reader->NeedsSeedingForBatchedReading()) {
-        continue_execution = col_reader->NextLevels();
+        if (!col_reader->NextLevels()) {
+          seeding_ok = false;
+          break;
+        }
       }
-      if (!continue_execution) break;
       DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
     }
 
-    bool filters_pass = true;
-    if (continue_execution) {
-      continue_execution = AssembleRows(column_readers_, i, &filters_pass);
-      assemble_rows_timer_.Stop();
-    }
-
-    // Check the query_status_ before logging the parse_status_. query_status_ is merged
-    // with parse_status_ in AssembleRows(). It's misleading to log query_status_ as parse
-    // error because it is shared by all threads in the same fragment instance and it's
-    // unclear which threads caused the error.
-    //
-    // TODO: It's a really bad idea to propagate UDF error via the global RuntimeState.
-    // Store UDF error in thread local storage or make UDF return status so it can merge
-    // with parse_status_.
-    RETURN_IF_ERROR(state_->GetQueryStatus());
-    if (UNLIKELY(!parse_status_.ok())) {
+    if (!parse_status_.ok()) {
       RETURN_IF_ERROR(state_->LogOrReturnError(parse_status_.msg()));
+    } else if (seeding_ok) {
+      // Found a non-empty row group and successfully initialized the column readers.
+      break;
     }
-    if (scan_node_->ReachedLimit()) return Status::OK();
-    if (context_->cancelled()) return Status::OK();
-    if (!filters_pass) return Status::OK();
+  }
 
-    DCHECK(continue_execution || !state_->abort_on_error());
-    // We should be at the end of the row group if we get this far with no parse error
-    if (parse_status_.ok()) DCHECK(column_readers_[0]->RowGroupAtEnd());
-    // Reset parse_status_ for the next row group.
-    parse_status_ = Status::OK();
+  DCHECK(parse_status_.ok());
+  return Status::OK();
+}
+
+void HdfsParquetScanner::FlushRowGroupResources(RowBatch* row_batch) {
+  DCHECK(row_batch != NULL);
+  row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
+  row_batch->tuple_data_pool()->AcquireData(scratch_batch_->mem_pool(), false);
+  context_->ReleaseCompletedResources(row_batch, true);
+  for (ParquetColumnReader* col_reader: column_readers_) {
+    col_reader->Close(row_batch);
+  }
+}
+
+/// High-level steps of this function:
+/// 1. Allocate 'scratch' memory for tuples able to hold a full batch
+/// 2. Populate the slots of all scratch tuples one column reader at a time,
+///    using the ColumnReader::Read*ValueBatch() functions.
+/// 3. Evaluate runtime filters and conjuncts against the scratch tuples and
+///    set the surviving tuples in the output batch. Transfer the ownership of
+///    scratch memory to the output batch once the scratch memory is exhausted.
+/// 4. Repeat steps above until we are done with the row group or an error
+///    occurred.
+/// TODO: Since the scratch batch is populated in a column-wise fashion, it is
+/// difficult to maintain a maximum memory footprint without throwing away at least
+/// some work. This point needs further experimentation and thought.
+Status HdfsParquetScanner::AssembleRows(
+    const vector<ParquetColumnReader*>& column_readers, RowBatch* row_batch,
+    bool* skip_row_group) {
+  DCHECK(!column_readers.empty());
+  DCHECK(row_batch != NULL);
+  DCHECK_EQ(*skip_row_group, false);
+  DCHECK(scratch_batch_ != NULL);
+
+  while (!column_readers[0]->RowGroupAtEnd()) {
+    // Start a new scratch batch.
+    RETURN_IF_ERROR(scratch_batch_->Reset(state_));
+    int scratch_capacity = scratch_batch_->capacity();
+
+    // Initialize tuple memory.
+    for (int i = 0; i < scratch_capacity; ++i) {
+      InitTuple(template_tuple_, scratch_batch_->GetTuple(i));
+    }
+
+    // Materialize the top-level slots into the scratch batch column-by-column.
+    int last_num_tuples = -1;
+    int num_col_readers = column_readers.size();
+    bool continue_execution = true;
+    for (int c = 0; c < num_col_readers; ++c) {
+      ParquetColumnReader* col_reader = column_readers[c];
+      if (col_reader->max_rep_level() > 0) {
+        continue_execution = col_reader->ReadValueBatch(
+            scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
+            scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
+      } else {
+        continue_execution = col_reader->ReadNonRepeatedValueBatch(
+            scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
+            scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
+      }
+      if (UNLIKELY(!continue_execution)) {
+        *skip_row_group = true;
+        return Status::OK();
+      }
+      // Check that all column readers populated the same number of values.
+      if (c != 0) DCHECK_EQ(last_num_tuples, scratch_batch_->num_tuples);
+      last_num_tuples = scratch_batch_->num_tuples;
+    }
+    row_group_rows_read_ += scratch_batch_->num_tuples;
+    COUNTER_ADD(scan_node_->rows_read_counter(), scratch_batch_->num_tuples);
+
+    int num_row_to_commit = TransferScratchTuples(row_batch);
+    RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
+    if (row_batch->AtCapacity()) return Status::OK();
+  }
+
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
+  DCHECK(dst_batch != NULL);
+  dst_batch->CommitRows(num_rows);
+
+  // We need to pass the row batch to the scan node if there is too much memory attached,
+  // which can happen if the query is very selective. We need to release memory even
+  // if no rows passed predicates.
+  if (dst_batch->AtCapacity() || context_->num_completed_io_buffers() > 0) {
+    context_->ReleaseCompletedResources(dst_batch, /* done */ false);
+  }
+  if (context_->cancelled()) return Status::CANCELLED;
+  // TODO: It's a really bad idea to propagate UDF error via the global RuntimeState.
+  // Store UDF error in thread local storage or make UDF return status so it can merge
+  // with parse_status_.
+  RETURN_IF_ERROR(state_->GetQueryStatus());
+  // Free local expr allocations for this thread
+  for (const auto& kv: scanner_conjuncts_map_) {
+    ExprContext::FreeLocalAllocations(kv.second);
   }
   return Status::OK();
 }
 
-int HdfsParquetScanner::TransferScratchTuples() {
+int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   // This function must not be called when the output batch is already full. As long as
   // we always call CommitRows() after TransferScratchTuples(), the output batch can
   // never be empty.
-  DCHECK_LT(batch_->num_rows(), batch_->capacity());
+  DCHECK_LT(dst_batch->num_rows(), dst_batch->capacity());
 
   const bool has_filters = !filter_ctxs_.empty();
   const bool has_conjuncts = !scanner_conjunct_ctxs_->empty();
@@ -378,10 +542,11 @@ int HdfsParquetScanner::TransferScratchTuples() {
 
   // Start/end/current iterators over the output rows.
   DCHECK_EQ(scan_node_->tuple_idx(), 0);
-  DCHECK_EQ(batch_->row_desc().tuple_descriptors().size(), 1);
+  DCHECK_EQ(dst_batch->row_desc().tuple_descriptors().size(), 1);
   Tuple** output_row_start =
-      reinterpret_cast<Tuple**>(batch_->GetRow(batch_->num_rows()));
-  Tuple** output_row_end = output_row_start + (batch_->capacity() - batch_->num_rows());
+      reinterpret_cast<Tuple**>(dst_batch->GetRow(dst_batch->num_rows()));
+  Tuple** output_row_end =
+      output_row_start + (dst_batch->capacity() - dst_batch->num_rows());
   Tuple** output_row = output_row_start;
 
   // Start/end/current iterators over the scratch tuples.
@@ -397,7 +562,7 @@ int HdfsParquetScanner::TransferScratchTuples() {
     DCHECK(!has_filters);
     DCHECK(!has_conjuncts);
     DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
-    int num_tuples = min(batch_->capacity() - batch_->num_rows(),
+    int num_tuples = min(dst_batch->capacity() - dst_batch->num_rows(),
         scratch_batch_->num_tuples - scratch_batch_->tuple_idx);
     memset(output_row, 0, num_tuples * sizeof(Tuple*));
     scratch_batch_->tuple_idx += num_tuples;
@@ -430,7 +595,7 @@ int HdfsParquetScanner::TransferScratchTuples() {
   // quickly accumulate memory in the output batch, hit the memory capacity limit,
   // and return an output batch with relatively few rows.
   if (scratch_batch_->AtEnd()) {
-    batch_->tuple_data_pool()->AcquireData(scratch_batch_->mem_pool(), false);
+    dst_batch->tuple_data_pool()->AcquireData(scratch_batch_->mem_pool(), false);
   }
   return output_row - output_row_start;
 }
@@ -463,90 +628,6 @@ bool HdfsParquetScanner::EvalRuntimeFilters(TupleRow* row) {
     }
   }
   return true;
-}
-
-/// High-level steps of this function:
-/// 1. Allocate 'scratch' memory for tuples able to hold a full batch
-/// 2. Populate the slots of all scratch tuples one column reader at a time,
-///    using the ColumnReader::Read*ValueBatch() functions.
-/// 3. Evaluate runtime filters and conjuncts against the scratch tuples and
-///    set the surviving tuples in the output batch. Transfer the ownership of
-///    scratch memory to the output batch once the scratch memory is exhausted.
-/// 4. Repeat steps above until we are done with the row group or an error
-///    occurred.
-/// TODO: Since the scratch batch is populated in a column-wise fashion, it is
-/// difficult to maintain a maximum memory footprint without throwing away at least
-/// some work. This point needs further experimentation and thought.
-bool HdfsParquetScanner::AssembleRows(
-    const vector<ParquetColumnReader*>& column_readers, int row_group_idx, bool* filters_pass) {
-  DCHECK(!column_readers.empty());
-  DCHECK(scratch_batch_ != NULL);
-
-  int64_t rows_read = 0;
-  bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
-  while (!column_readers[0]->RowGroupAtEnd()) {
-    if (UNLIKELY(!continue_execution)) break;
-
-    // Apply any runtime filters to static tuples containing the partition keys for this
-    // partition. If any filter fails, we return immediately and stop processing this
-    // row group.
-    if (!scan_node_->PartitionPassesFilterPredicates(
-        context_->partition_descriptor()->id(),
-        FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
-      *filters_pass = false;
-      return false;
-    }
-
-    // Start a new scratch batch.
-    parse_status_.MergeStatus(scratch_batch_->Reset(state_));
-    if (UNLIKELY(!parse_status_.ok())) return false;
-    int scratch_capacity = scratch_batch_->capacity();
-
-    // Initialize tuple memory.
-    for (int i = 0; i < scratch_capacity; ++i) {
-      InitTuple(template_tuple_, scratch_batch_->GetTuple(i));
-    }
-
-    // Materialize the top-level slots into the scratch batch column-by-column.
-    int last_num_tuples = -1;
-    int num_col_readers = column_readers.size();
-    for (int c = 0; c < num_col_readers; ++c) {
-      ParquetColumnReader* col_reader = column_readers[c];
-      if (col_reader->max_rep_level() > 0) {
-        continue_execution = col_reader->ReadValueBatch(
-            scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
-            scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
-      } else {
-        continue_execution = col_reader->ReadNonRepeatedValueBatch(
-            scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
-            scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
-      }
-      if (UNLIKELY(!continue_execution)) return false;
-      // Check that all column readers populated the same number of values.
-      if (c != 0) DCHECK_EQ(last_num_tuples, scratch_batch_->num_tuples);
-      last_num_tuples = scratch_batch_->num_tuples;
-    }
-
-    // Keep transferring scratch tuples to output batches until the scratch batch
-    // is empty. CommitRows() creates new output batches as necessary.
-    do {
-      int num_row_to_commit = TransferScratchTuples();
-      parse_status_.MergeStatus(CommitRows(num_row_to_commit));
-      if (UNLIKELY(!parse_status_.ok())) return false;
-    } while (!scratch_batch_->AtEnd());
-
-    rows_read += scratch_batch_->num_tuples;
-    COUNTER_ADD(scan_node_->rows_read_counter(), scratch_batch_->num_tuples);
-    continue_execution &= parse_status_.ok();
-    continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
-  }
-
-  if (column_readers[0]->RowGroupAtEnd() && parse_status_.ok()) {
-    parse_status_ = ValidateEndOfRowGroup(column_readers, row_group_idx, rows_read);
-    continue_execution &= parse_status_.ok();
-  }
-
-  return continue_execution;
 }
 
 bool HdfsParquetScanner::AssembleCollection(
@@ -654,8 +735,7 @@ inline bool HdfsParquetScanner::ReadCollectionItem(
   return continue_execution;
 }
 
-Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
-  *eosr = false;
+Status HdfsParquetScanner::ProcessFooter() {
   int64_t len = stream_->scan_range()->len();
 
   // We're processing the scan range issued in IssueInitialRanges(). The scan range should
@@ -769,33 +849,6 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   if (file_metadata_.__isset.created_by) {
     file_version_ = ParquetFileVersion(file_metadata_.created_by);
   }
-
-  if (scan_node_->IsZeroSlotTableScan()) {
-    // There are no materialized slots, e.g. count(*) over the table.  We can serve
-    // this query from just the file metadata.  We don't need to read the column data.
-    int64_t num_tuples = file_metadata_.num_rows;
-    COUNTER_ADD(scan_node_->rows_read_counter(), num_tuples);
-
-    while (num_tuples > 0) {
-      MemPool* pool;
-      Tuple* tuple;
-      TupleRow* current_row;
-      int max_tuples = GetMemory(&pool, &tuple, &current_row);
-      max_tuples = min<int64_t>(max_tuples, num_tuples);
-      num_tuples -= max_tuples;
-
-      int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-      RETURN_IF_ERROR(CommitRows(num_to_commit));
-    }
-
-    *eosr = true;
-    return Status::OK();
-  } else if (file_metadata_.num_rows == 0) {
-    // Empty file
-    *eosr = true;
-    return Status::OK();
-  }
-
   if (file_metadata_.row_groups.empty()) {
     return Status(
         Substitute("Invalid file. This file: $0 has no row groups", filename()));
@@ -1075,7 +1128,7 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
     // column has more values than stated in the metadata, meaning the final data page
     // will still have unread values.
     if (reader->num_buffered_values_ != 0) {
-      return Status(Substitute("Corrupt parquet metadata in file '$0': metadata reports "
+      return Status(Substitute("Corrupt Parquet metadata in file '$0': metadata reports "
           "'$1' more values in data page than actually present", filename(),
           reader->num_buffered_values_));
     }

@@ -63,8 +63,9 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   return Status::OK();
 }
 
-BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state)
-  : HdfsScanner(node, state),
+BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state,
+    bool add_batches_to_queue)
+  : HdfsScanner(node, state, add_batches_to_queue),
     header_(NULL),
     block_start_(0),
     total_block_size_(0),
@@ -83,15 +84,17 @@ BaseSequenceScanner::BaseSequenceScanner()
 BaseSequenceScanner::~BaseSequenceScanner() {
 }
 
-Status BaseSequenceScanner::Prepare(ScannerContext* context) {
-  RETURN_IF_ERROR(HdfsScanner::Prepare(context));
+Status BaseSequenceScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Open(context));
   stream_->set_read_past_size_cb(bind(&BaseSequenceScanner::ReadPastSize, this, _1));
   bytes_skipped_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "BytesSkipped", TUnit::BYTES);
+  // Allocate a new row batch. May fail if mem limit is exceeded.
+  RETURN_IF_ERROR(StartNewRowBatch());
   return Status::OK();
 }
 
-void BaseSequenceScanner::Close() {
+void BaseSequenceScanner::Close(RowBatch* row_batch) {
   VLOG_FILE << "Bytes read past scan range: " << -stream_->bytes_left();
   VLOG_FILE << "Average block size: "
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
@@ -101,9 +104,10 @@ void BaseSequenceScanner::Close() {
     decompressor_->Close();
     decompressor_.reset(NULL);
   }
-  if (batch_ != NULL) {
-    AttachPool(data_buffer_pool_.get(), false);
-    AddFinalRowBatch();
+  if (row_batch != NULL) {
+    row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
+    context_->ReleaseCompletedResources(row_batch, true);
+    if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
   }
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
@@ -112,10 +116,11 @@ void BaseSequenceScanner::Close() {
   if (!only_parsing_header_ && header_ != NULL) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
-  HdfsScanner::Close();
+  HdfsScanner::Close(row_batch);
 }
 
 Status BaseSequenceScanner::ProcessSplit() {
+  DCHECK(add_batches_to_queue_);
   header_ = reinterpret_cast<FileHeader*>(
       scan_node_->GetFileMetadata(stream_->filename()));
   if (header_ == NULL) {

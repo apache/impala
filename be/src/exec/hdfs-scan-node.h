@@ -152,7 +152,7 @@ class HdfsScanNode : public ScanNode {
   /// Returns number of partition key slots.
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
-  const TupleDescriptor* tuple_desc() { return tuple_desc_; }
+  const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
 
   const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
 
@@ -262,7 +262,9 @@ class HdfsScanNode : public ScanNode {
 
   /// Called by the scanner when a range is complete.  Used to trigger done_ and
   /// to log progress.  This *must* only be called after the scanner has completely
-  /// finished the scan range (i.e. context->Flush()).
+  /// finished the scan range (i.e. context->Flush()), and has added the final
+  /// row batch to the row batch queue. Otherwise the last batch may be
+  /// lost due to racing with shutting down the row batch queue.
   void RangeComplete(const THdfsFileFormat::type& file_type,
       const THdfsCompression::type& compression_type);
   /// Same as above except for when multiple compression codecs were used
@@ -279,7 +281,7 @@ class HdfsScanNode : public ScanNode {
   void ComputeSlotMaterializationOrder(std::vector<int>* order) const;
 
   /// Returns true if there are no materialized slots, such as a count(*) over the table.
-  inline bool IsZeroSlotTableScan() {
+  inline bool IsZeroSlotTableScan() const {
     return materialized_slots().empty() && tuple_desc()->tuple_path().empty();
   }
 
@@ -305,12 +307,12 @@ class HdfsScanNode : public ScanNode {
   ///
   /// 'filter_ctxs' is either an empty list, in which case filtering is disabled and the
   /// function returns true, or a set of filter contexts to evaluate.
-  bool PartitionPassesFilterPredicates(int32_t partition_id,
-      const std::string& stats_name, const std::vector<FilterContext>& filter_ctxs);
+  bool PartitionPassesFilters(int32_t partition_id, const std::string& stats_name,
+      const std::vector<FilterContext>& filter_ctxs);
 
   const std::vector<FilterContext> filter_ctxs() const { return filter_ctxs_; }
 
- private:
+ protected:
   friend class ScannerContext;
 
   RuntimeState* runtime_state_;
@@ -503,15 +505,13 @@ class HdfsScanNode : public ScanNode {
   /// -1 if no callback is registered.
   int32_t rm_callback_id_;
 
-  /// Called when scanner threads are available for this scan node. This will
-  /// try to spin up as many scanner threads as the quota allows.
-  /// This is also called whenever a new range is added to the IoMgr to 'pull'
-  /// thread tokens if they are available.
+  /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
+  /// (e.g., when adding new ranges) or when threads are available for this scan node.
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
 
-  /// Create and prepare new scanner for this partition type.
+  /// Create and open new scanner for this partition type.
   /// If the scanner is successfully created, it is returned in 'scanner'.
-  Status CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
+  Status CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
       ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner);
 
   /// Main function for scanner thread. This thread pulls the next range to be

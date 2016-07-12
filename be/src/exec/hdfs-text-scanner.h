@@ -44,13 +44,14 @@ struct HdfsFileDesc;
 /// scanner for the tuple directly after it.
 class HdfsTextScanner : public HdfsScanner {
  public:
-  HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state);
+  HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
+      bool add_batches_to_queue);
   virtual ~HdfsTextScanner();
 
   /// Implementation of HdfsScanner interface.
-  virtual Status Prepare(ScannerContext* context);
+  virtual Status Open(ScannerContext* context);
   virtual Status ProcessSplit();
-  virtual void Close();
+  virtual void Close(RowBatch* row_batch);
 
   /// Issue io manager byte ranges for 'files'.
   static Status IssueInitialRanges(HdfsScanNode* scan_node,

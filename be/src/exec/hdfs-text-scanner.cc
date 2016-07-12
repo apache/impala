@@ -47,8 +47,9 @@ const string HdfsTextScanner::LZO_INDEX_SUFFIX = ".index";
 // progress.
 const int64_t COMPRESSED_DATA_FIXED_READ_SIZE = 1 * 1024 * 1024;
 
-HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state)
-    : HdfsScanner(scan_node, state),
+HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    bool add_batches_to_queue)
+    : HdfsScanner(scan_node, state, add_batches_to_queue),
       byte_buffer_ptr_(NULL),
       byte_buffer_end_(NULL),
       byte_buffer_read_size_(0),
@@ -145,6 +146,8 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 }
 
 Status HdfsTextScanner::ProcessSplit() {
+  DCHECK(add_batches_to_queue_);
+
   // Reset state for new scan range
   RETURN_IF_ERROR(InitNewRange());
 
@@ -173,28 +176,28 @@ Status HdfsTextScanner::ProcessSplit() {
   return Status::OK();
 }
 
-void HdfsTextScanner::Close() {
+void HdfsTextScanner::Close(RowBatch* row_batch) {
   // Need to close the decompressor before releasing the resources at AddFinalRowBatch(),
   // because in some cases there is memory allocated in decompressor_'s temp_memory_pool_.
   if (decompressor_.get() != NULL) {
     decompressor_->Close();
     decompressor_.reset(NULL);
   }
-  if (batch_ != NULL) {
-    AttachPool(data_buffer_pool_.get(), false);
-    AttachPool(boundary_pool_.get(), false);
-    AddFinalRowBatch();
+  if (row_batch != NULL) {
+    row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
+    row_batch->tuple_data_pool()->AcquireData(boundary_pool_.get(), false);
+    context_->ReleaseCompletedResources(row_batch, true);
+    if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
   }
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(boundary_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
-  // Must happen after AddFinalRowBatch() is called.
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(THdfsFileFormat::TEXT,
         stream_->file_desc()->file_compression);
   }
-  HdfsScanner::Close();
+  HdfsScanner::Close(row_batch);
 }
 
 Status HdfsTextScanner::InitNewRange() {
@@ -692,8 +695,8 @@ Function* HdfsTextScanner::Codegen(HdfsScanNode* node,
   return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
 }
 
-Status HdfsTextScanner::Prepare(ScannerContext* context) {
-  RETURN_IF_ERROR(HdfsScanner::Prepare(context));
+Status HdfsTextScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Open(context));
 
   parse_delimiter_timer_ = ADD_CHILD_TIMER(scan_node_->runtime_profile(),
       "DelimiterParseTime", ScanNode::SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
@@ -704,6 +707,8 @@ Status HdfsTextScanner::Prepare(ScannerContext* context) {
   field_locations_.resize(state_->batch_size() * scan_node_->materialized_slots().size());
   row_end_locations_.resize(state_->batch_size());
 
+  // Allocate a new row batch. May fail if mem limit is exceeded.
+  RETURN_IF_ERROR(StartNewRowBatch());
   return Status::OK();
 }
 

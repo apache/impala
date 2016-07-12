@@ -53,9 +53,11 @@ using namespace strings;
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 
-HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
+HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    bool add_batches_to_queue)
     : scan_node_(scan_node),
       state_(state),
+      add_batches_to_queue_(add_batches_to_queue),
       context_(NULL),
       stream_(NULL),
       scanner_conjunct_ctxs_(NULL),
@@ -75,6 +77,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
 HdfsScanner::HdfsScanner()
     : scan_node_(NULL),
       state_(NULL),
+      add_batches_to_queue_(true),
       context_(NULL),
       stream_(NULL),
       scanner_conjunct_ctxs_(NULL),
@@ -93,10 +96,9 @@ HdfsScanner::HdfsScanner()
 }
 
 HdfsScanner::~HdfsScanner() {
-  DCHECK(batch_ == NULL);
 }
 
-Status HdfsScanner::Prepare(ScannerContext* context) {
+Status HdfsScanner::Open(ScannerContext* context) {
   context_ = context;
   stream_ = context->GetStream();
 
@@ -116,13 +118,11 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
       state_, context_->partition_descriptor()->partition_key_value_ctxs());
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
 
-  // Allocate a new row batch. May fail if mem limit is exceeded.
-  RETURN_IF_ERROR(StartNewRowBatch());
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   return Status::OK();
 }
 
-void HdfsScanner::Close() {
+void HdfsScanner::Close(RowBatch* row_batch) {
   if (decompressor_.get() != NULL) decompressor_->Close();
   HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();
   for (; iter != scanner_conjuncts_map_.end(); ++iter) {
@@ -155,6 +155,7 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
 }
 
 Status HdfsScanner::StartNewRowBatch() {
+  DCHECK(add_batches_to_queue_);
   batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
       scan_node_->mem_tracker());
   int64_t tuple_buffer_size;
@@ -164,6 +165,7 @@ Status HdfsScanner::StartNewRowBatch() {
 }
 
 int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem) {
+  DCHECK(add_batches_to_queue_);
   DCHECK(batch_ != NULL);
   DCHECK_GT(batch_->capacity(), batch_->num_rows());
   *pool = batch_->tuple_data_pool();
@@ -185,6 +187,7 @@ Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool
 
 // TODO(skye): have this check scan_node_->ReachedLimit() and get rid of manual check?
 Status HdfsScanner::CommitRows(int num_rows) {
+  DCHECK(add_batches_to_queue_);
   DCHECK(batch_ != NULL);
   DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
   batch_->CommitRows(num_rows);
@@ -207,13 +210,6 @@ Status HdfsScanner::CommitRows(int num_rows) {
     ExprContext::FreeLocalAllocations(iter->second);
   }
   return Status::OK();
-}
-
-void HdfsScanner::AddFinalRowBatch() {
-  DCHECK(batch_ != NULL);
-  context_->ReleaseCompletedResources(batch_, /* done */ true);
-  scan_node_->AddMaterializedRowBatch(batch_);
-  batch_ = NULL;
 }
 
 // In this code path, no slots were materialized from the input files.  The only

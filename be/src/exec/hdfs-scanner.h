@@ -69,10 +69,16 @@ struct FieldLocation {
 /// HdfsScanner is the superclass for different hdfs file format parsers.  There is
 /// an instance of the scanner object created for each split, each driven by a different
 /// thread created by the scan node.  The scan node calls:
-/// 1. Prepare
-/// 2. ProcessSplit
-/// 3. Close
-/// ProcessSplit does not return until the split is complete (or an error) occurred.
+/// 1. Open()
+/// 2. ProcessSplit() or GetNext()*
+/// 3. Close()
+/// The scanner can be used in either of two modes, indicated via the add_batches_to_queue
+/// c'tor parameter.
+/// ProcessSplit() scans the split and adds materialized row batches to the scan node's
+/// row batch queue until the split is complete or an error occurred.
+/// GetNext() provides an iterator-like interface where the caller can request
+/// the next materialized row batch until the split has been fully processed (eos).
+///
 /// The HdfsScanner works in tandem with the ScannerContext to interleave IO
 /// and parsing.
 //
@@ -84,9 +90,9 @@ struct FieldLocation {
 /// 1. During the Prepare() phase of the ScanNode, the scanner subclass's static
 ///    Codegen() function will be called to perform codegen for that scanner type
 ///    for the specific tuple desc. This codegen'd function is cached in the HdfsScanNode.
-/// 2. During the GetNext() phase (where we create one Scanner for each scan range),
-///    the created scanner subclass can retrieve, from the scan node, the codegen'd
-///    function to use.
+/// 2. During the GetNext() phase of the scan node (where we create one Scanner for each
+///    scan range), the created scanner subclass can retrieve, from the scan node,
+///    the codegen'd function to use.
 /// This way, we only codegen once per scanner type, rather than once per scanner object.
 //
 /// This class also encapsulates row batch management.  Subclasses should call CommitRows()
@@ -100,21 +106,45 @@ class HdfsScanner {
   /// This probably ought to be a derived number from the environment.
   const static int FILE_BLOCK_SIZE = 4096;
 
-  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state);
+  /// If 'add_batches_to_queue' is true the caller must call ProcessSplit() and not
+  /// GetNext(). Row batches will be added to the scan node's row batch queue, including
+  /// the final one in Close().
+  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, bool add_batches_to_queue);
 
   virtual ~HdfsScanner();
 
   /// One-time initialisation of state that is constant across scan ranges.
-  virtual Status Prepare(ScannerContext* context);
+  virtual Status Open(ScannerContext* context);
+
+  /// Returns the next row batch from this scanner's split.
+  /// Recoverable errors are logged to the runtime state. Only returns a non-OK status
+  /// if a non-recoverable error is encountered (or abort_on_error is true). If OK is
+  /// returned, 'parse_status_' is guaranteed to be OK as well.
+  /// The memory referenced by the tuples is valid until this or any subsequently
+  /// returned batch is reset or destroyed.
+  /// Only valid to call if 'add_batches_to_queue_' is false.
+  Status GetNext(RowBatch* row_batch, bool* eos) {
+    DCHECK(!add_batches_to_queue_);
+    return GetNextInternal(row_batch, eos);
+  }
 
   /// Process an entire split, reading bytes from the context's streams.  Context is
   /// initialized with the split data (e.g. template tuple, partition descriptor, etc).
   /// This function should only return on error or end of scan range.
+  /// Only valid to call if 'add_batches_to_queue_' is true.
   virtual Status ProcessSplit() = 0;
 
-  /// Release all resources the scanner has allocated.  This is the last chance for the
-  /// scanner to attach any resources to the ScannerContext object.
-  virtual void Close();
+  /// Transfers the ownership of memory backing returned tuples such as IO buffers
+  /// and memory in mem pools to the given row batch. If the row batch is NULL,
+  /// those resources are released instead. In any case, releases all other resources
+  /// that are not backing returned rows (e.g. temporary decompression buffers).
+  virtual void Close(RowBatch* row_batch);
+
+  /// Only valid to call if 'add_batches_to_queue_' is true.
+  RowBatch* batch() const {
+    DCHECK(add_batches_to_queue_);
+    return batch_;
+  }
 
   /// Scanner subclasses must implement these static functions as well.  Unfortunately,
   /// c++ does not allow static virtual functions.
@@ -148,6 +178,11 @@ class HdfsScanner {
 
   /// RuntimeState for error reporting
   RuntimeState* state_;
+
+  /// True if the creator of this scanner intends to use ProcessSplit() and not GetNext).
+  /// Row batches will be added to the scan node's row batch queue, including the final
+  /// one in Close().
+  const bool add_batches_to_queue_;
 
   /// Context for this scanner
   ScannerContext* context_;
@@ -230,6 +265,13 @@ class HdfsScanner {
   /// Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
 
+  /// Implements GetNext(). Should be overridden by subclasses.
+  /// May be called even if 'add_batches_to_queue_' is true.
+  virtual Status GetNextInternal(RowBatch* row_batch, bool* eos) {
+    DCHECK(false) << "GetNextInternal() not implemented for this scanner type.";
+    return Status::OK();
+  }
+
   /// Initializes write_tuples_fn_ to the jitted function if codegen is possible.
   /// - partition - partition descriptor for this scanner/scan range
   /// - type - type for this scanner
@@ -238,6 +280,7 @@ class HdfsScanner {
       THdfsFileFormat::type type, const std::string& scanner_name);
 
   /// Set batch_ to a new row batch and update tuple_mem_ accordingly.
+  /// Only valid to call if 'add_batches_to_queue_' is true.
   Status StartNewRowBatch();
 
   /// Reset internal state for a new scan range.
@@ -251,6 +294,7 @@ class HdfsScanner {
   /// current row batch is complete and a new one is allocated).
   /// Memory returned from this call is invalidated after calling CommitRows().
   /// Callers must call GetMemory() again after calling this function.
+  /// Only valid to call if 'add_batches_to_queue_' is true.
   int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
 
   /// Gets memory for outputting tuples into the CollectionValue being constructed via
@@ -269,18 +313,15 @@ class HdfsScanner {
   /// Returns Status::OK if the query is not cancelled and hasn't exceeded any mem limits.
   /// Scanner can call this with 0 rows to flush any pending resources (attached pools
   /// and io buffers) to minimize memory consumption.
+  /// Only valid to call if 'add_batches_to_queue_' is true.
   Status CommitRows(int num_rows);
-
-  /// Attach all remaining resources from context_ to batch_ and send batch_ to the scan
-  /// node. This must be called after all rows have been committed and no further
-  /// resources are needed from context_ (in practice this will happen in each scanner
-  /// subclass's Close() implementation).
-  void AddFinalRowBatch();
 
   /// Release all memory in 'pool' to batch_. If commit_batch is true, the row batch
   /// will be committed. commit_batch should be true if the attached pool is expected
   /// to be non-trivial (i.e. a decompression buffer) to minimize scanner mem usage.
+  /// Only valid to call if 'add_batches_to_queue_' is true.
   void AttachPool(MemPool* pool, bool commit_batch) {
+    DCHECK(add_batches_to_queue_);
     DCHECK(batch_ != NULL);
     DCHECK(pool != NULL);
     batch_->tuple_data_pool()->AcquireData(pool, false);
@@ -315,6 +356,7 @@ class HdfsScanner {
   /// Returns the number of tuples added to the row batch.  This can be less than
   /// num_tuples/tuples_till_limit because of failed conjuncts.
   /// Returns -1 if parsing should be aborted due to parse errors.
+  /// Only valid to call if 'add_batches_to_queue_' is true.
   int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size,
       FieldLocation* fields, int num_tuples,
       int max_added_tuples, int slots_per_tuple, int row_start_indx);
