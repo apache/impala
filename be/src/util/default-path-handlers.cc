@@ -23,6 +23,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
 #include "util/pprof-path-handlers.h"
@@ -105,6 +106,16 @@ void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args
   Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
   document->AddMember("detailed", detailed, document->GetAllocator());
 
+  Value jvm(kObjectType);
+  ExecEnv::GetInstance()->metrics()->GetChildGroup("jvm")->ToJson(false, document, &jvm);
+
+  Value total(kArrayType);
+  for(SizeType i = 0; i < jvm["metrics"].Size(); ++i){
+    if (strstr(jvm["metrics"][i]["name"].GetString(), "total") != nullptr){
+      total.PushBack(jvm["metrics"][i], document->GetAllocator());
+    }
+  }
+  document->AddMember("jvm", total, document->GetAllocator());
 }
 
 void impala::AddDefaultUrlCallbacks(

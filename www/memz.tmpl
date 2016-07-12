@@ -19,10 +19,39 @@ limitations under the License.
 
 Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_limit}}</strong>
 
-<h3>tcmalloc</h2>
+<h3>tcmalloc</h3>
 <pre>{{overview}}</pre>
 
 <h3>Breakdown</h3>
 <pre>{{detailed}}</pre>
+
+<h3>JVM memory total usage</h3>
+
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Name</th>
+    <th>Value</th>
+    <th>Description</th>
+  </tr>
+  {{#jvm}}
+  <tr>
+    <td><tt>{{name}}</tt></td>
+    {{! Is this a stats metric? }}
+    {{?mean}}
+    <td>
+      Last (of {{count}}): <strong>{{last}}</strong>.
+      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
+    {{/mean}}
+    {{^mean}}
+    <td>
+      {{human_readable}}
+    </td>
+    {{/mean}}
+    <td>
+      {{description}}
+    </td>
+  </tr>
+  {{/jvm}}
+</table>
 
 {{> www/common-footer.tmpl }}
