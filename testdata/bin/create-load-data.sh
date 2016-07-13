@@ -396,8 +396,10 @@ fi
 
 if $KUDU_IS_SUPPORTED; then
   # Tests depend on the kudu data being clean, so load the data from scratch.
-  run-step "Loading Kudu data" load-kudu.log \
+  run-step "Loading Kudu functional" load-kudu.log \
         load-data "functional-query" "core" "kudu/none/none" force
+  run-step "Loading Kudu TPCH" load-kudu-tpch.log \
+        load-data "tpch" "core" "kudu/none/none" force
 fi
 run-step "Loading Hive UDFs" build-and-copy-hive-udfs.log \
     build-and-copy-hive-udfs

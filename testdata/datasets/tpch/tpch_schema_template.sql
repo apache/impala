@@ -24,6 +24,32 @@ L_SHIPMODE STRING
 L_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  L_ORDERKEY BIGINT,
+  L_PARTKEY BIGINT,
+  L_SUPPKEY BIGINT,
+  L_LINENUMBER INT,
+  L_QUANTITY DOUBLE,
+  L_EXTENDEDPRICE DOUBLE,
+  L_DISCOUNT DOUBLE,
+  L_TAX DOUBLE,
+  L_RETURNFLAG STRING,
+  L_LINESTATUS STRING,
+  L_SHIPDATE STRING,
+  L_COMMITDATE STRING,
+  L_RECEIPTDATE STRING,
+  L_SHIPINSTRUCT STRING,
+  L_SHIPMODE STRING,
+  L_COMMENT STRING
+)
+distribute by hash (l_orderkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'l_orderkey, l_partkey, l_suppkey, l_linenumber'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -46,6 +72,25 @@ P_RETAILPRICE DECIMAL(12,2)
 P_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  P_PARTKEY BIGINT,
+  P_NAME STRING,
+  P_MFGR STRING,
+  P_BRAND STRING,
+  P_TYPE STRING,
+  P_SIZE INT,
+  P_CONTAINER STRING,
+  P_RETAILPRICE DOUBLE,
+  P_COMMENT STRING
+)
+distribute by hash (p_partkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'p_partkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -64,6 +109,21 @@ PS_SUPPLYCOST DECIMAL(12,2)
 PS_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  PS_PARTKEY BIGINT,
+  PS_SUPPKEY BIGINT,
+  PS_AVAILQTY BIGINT,
+  PS_SUPPLYCOST DOUBLE,
+  PS_COMMENT STRING
+)
+distribute by hash (ps_partkey, ps_suppkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'ps_partkey, ps_suppkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -84,6 +144,23 @@ S_ACCTBAL DECIMAL(12,2)
 S_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  S_SUPPKEY BIGINT,
+  S_NAME STRING,
+  S_ADDRESS STRING,
+  S_NATIONKEY SMALLINT,
+  S_PHONE STRING,
+  S_ACCTBAL DOUBLE,
+  S_COMMENT STRING
+)
+distribute by hash (s_suppkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 's_suppkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -101,6 +178,20 @@ N_REGIONKEY SMALLINT
 N_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  N_NATIONKEY SMALLINT,
+  N_NAME STRING,
+  N_REGIONKEY SMALLINT,
+  N_COMMENT STRING
+)
+distribute by hash (n_nationkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'n_nationkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -117,6 +208,19 @@ R_NAME STRING
 R_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  R_REGIONKEY SMALLINT,
+  R_NAME STRING,
+  R_COMMENT STRING
+)
+distribute by hash (r_regionkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'r_regionkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -139,6 +243,25 @@ O_SHIPPRIORITY INT
 O_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  O_ORDERKEY BIGINT,
+  O_CUSTKEY BIGINT,
+  O_ORDERSTATUS STRING,
+  O_TOTALPRICE DOUBLE,
+  O_ORDERDATE STRING,
+  O_ORDERPRIORITY STRING,
+  O_CLERK STRING,
+  O_SHIPPRIORITY INT,
+  O_COMMENT STRING
+)
+distribute by hash (o_orderkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'o_orderkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -160,6 +283,24 @@ C_MKTSEGMENT STRING
 C_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  C_CUSTKEY BIGINT,
+  C_NAME STRING,
+  C_ADDRESS STRING,
+  C_NATIONKEY SMALLINT,
+  C_PHONE STRING,
+  C_ACCTBAL DOUBLE,
+  C_MKTSEGMENT STRING,
+  C_COMMENT STRING
+)
+distribute by hash (c_custkey) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'c_custkey'
+);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -173,6 +314,18 @@ revenue
 ---- COLUMNS
 supplier_no bigint
 total_revenue Decimal(38,4)
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  supplier_no bigint,
+  total_revevue double
+)
+distribute by hash (supplier_no) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'supplier_no'
+);
 ====
 ---- DATASET
 tpch
@@ -180,4 +333,15 @@ tpch
 max_revenue
 ---- COLUMNS
 max_revenue Decimal(38, 4)
+---- CREATE_KUDU
+create table {db_name}{db_suffix}.{table_name} (
+  max_revenue bigint
+)
+distribute by hash (max_revenue) into 9 buckets
+tblproperties(
+  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+  'kudu.master_addresses' = '127.0.0.1:7051',
+  'kudu.table_name' = '{table_name}',
+  'kudu.key_columns' = 'max_revenue'
+);
 ====

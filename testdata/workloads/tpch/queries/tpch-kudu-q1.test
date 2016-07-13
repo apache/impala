@@ -1,0 +1,32 @@
+====
+---- QUERY: TPCH-Q1
+# Q1 - Pricing Summary Report Query
+select
+  l_returnflag,
+  l_linestatus,
+  round(sum(l_quantity), 1) as sum_qty,
+  round(sum(l_extendedprice), 1) as sum_base_price,
+  round(sum(l_extendedprice * (1 - l_discount)), 1) as sum_disc_price,
+  round(sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), 1) as sum_charge,
+  round(avg(l_quantity), 1) as avg_qty,
+  round(avg(l_extendedprice), 1) as avg_price,
+  round(avg(l_discount), 1) as avg_disc,
+  count(*) as count_order
+from
+  lineitem
+where
+  l_shipdate <= '1998-09-02'
+group by
+  l_returnflag,
+  l_linestatus
+order by
+  l_returnflag,
+  l_linestatus
+---- RESULTS
+'A','F',37734107.0,56586554400.7,53758257134.9,55909065222.8,25.5,38273.1,0.0,1478493
+'N','F',991417.0,1487504710.4,1413082168.1,1469649223.2,25.5,38284.5,0.1,38854
+'N','O',74476040.0,111701729697.7,106118230307.6,110367043872.5,25.5,38249.1,0.0,2920374
+'R','F',37719753.0,56568041380.9,53741292684.6,55889619119.8,25.5,38250.9,0.1,1478870
+---- TYPES
+string, string, double, double, double, double, double, double, double, bigint
+====
