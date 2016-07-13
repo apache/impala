@@ -180,7 +180,6 @@ void HdfsTextScanner::Close() {
     decompressor_->Close();
     decompressor_.reset(NULL);
   }
-  THdfsCompression::type compression = stream_->file_desc()->file_compression;
   if (batch_ != NULL) {
     AttachPool(data_buffer_pool_.get(), false);
     AttachPool(boundary_pool_.get(), false);
@@ -192,7 +191,8 @@ void HdfsTextScanner::Close() {
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
   // Must happen after AddFinalRowBatch() is called.
   if (!only_parsing_header_) {
-    scan_node_->RangeComplete(THdfsFileFormat::TEXT, compression);
+    scan_node_->RangeComplete(THdfsFileFormat::TEXT,
+        stream_->file_desc()->file_compression);
   }
   HdfsScanner::Close();
 }
@@ -575,7 +575,7 @@ Status HdfsTextScanner::FillByteBufferCompressedFile(bool* eosr) {
       reinterpret_cast<uint8_t*>(byte_buffer_ptr_), &decompressed_len,
       &decompressed_buffer));
 
-  // Inform stream_ that the buffer with the compressed text can be released.
+  // Inform 'stream_' that the buffer with the compressed text can be released.
   context_->ReleaseCompletedResources(NULL, true);
 
   VLOG_FILE << "Decompressed " << byte_buffer_read_size_ << " to " << decompressed_len;

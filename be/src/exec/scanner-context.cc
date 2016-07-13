@@ -48,11 +48,18 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
   AddStream(scan_range);
 }
 
+ScannerContext::~ScannerContext() {
+  DCHECK(streams_.empty());
+}
+
 void ScannerContext::ReleaseCompletedResources(RowBatch* batch, bool done) {
   for (int i = 0; i < streams_.size(); ++i) {
     streams_[i]->ReleaseCompletedResources(batch, done);
   }
-  if (done) streams_.clear();
+}
+
+void ScannerContext::ClearStreams() {
+  streams_.clear();
 }
 
 ScannerContext::Stream::Stream(ScannerContext* parent)

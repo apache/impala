@@ -309,6 +309,7 @@ Status HdfsParquetScanner::ProcessSplit() {
     // streams could either be just the footer stream or streams for the previous row
     // group.
     context_->ReleaseCompletedResources(batch_, /* done */ true);
+    context_->ClearStreams();
     // Commit the rows to flush the row batch from the previous row group
     CommitRows(0);
 

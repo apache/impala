@@ -410,6 +410,8 @@ Status HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
   if (status.ok()) {
     status = scanner->get()->Prepare(context);
     if (!status.ok()) scanner->get()->Close();
+  } else {
+    context->ClearStreams();
   }
   return status;
 }
@@ -1234,9 +1236,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     // Parquet doesn't read the range end to end so the current offset isn't useful.
     // TODO: make sure the parquet reader is outputting as much diagnostic
     // information as possible.
-    // The error status may not necessarily be related to this scanner thread so this
-    // thread may have run to completion and closed all its streams already.
-    if (partition->file_format() != THdfsFileFormat::PARQUET && context.HasStream()) {
+    if (partition->file_format() != THdfsFileFormat::PARQUET) {
       ScannerContext::Stream* stream = context.GetStream();
       ss << " Processed " << stream->total_bytes_returned() << " bytes.";
     }

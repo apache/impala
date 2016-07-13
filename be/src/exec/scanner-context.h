@@ -60,6 +60,9 @@ class ScannerContext {
   ScannerContext(RuntimeState*, HdfsScanNode*, HdfsPartitionDescriptor*,
       DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs);
 
+  /// Destructor verifies that all stream objects have been released.
+  ~ScannerContext();
+
   /// Encapsulates a stream (continuous byte range) that can be read.  A context
   /// can contain one or more streams.  For non-columnar files, there is only
   /// one stream; for columnar, there is one stream per column.
@@ -257,10 +260,6 @@ class ScannerContext {
     Status ReportInvalidInt();
   };
 
-  bool HasStream() {
-    return !streams_.empty();
-  }
-
   Stream* GetStream(int idx = 0) {
     DCHECK_GE(idx, 0);
     DCHECK_LT(idx, streams_.size());
@@ -276,14 +275,18 @@ class ScannerContext {
   /// is set. In that case, contains_tuple_data_ should be false.
   //
   /// If 'done' is true, this is the final call for the current streams and any pending
-  /// resources in each stream are also passed to the row batch, and the streams are
-  /// cleared from this context.
+  /// resources in each stream are also passed to the row batch. Callers which want to
+  /// clear the streams from the context should also call ClearStreams().
   //
   /// This must be called with 'done' set when the scanner is complete and no longer needs
-  /// any resources (e.g. tuple memory, io buffers) returned from the current
-  /// streams. After calling with 'done' set, this should be called again if new streams
-  /// are created via AddStream().
+  /// any resources (e.g. tuple memory, io buffers) returned from the current streams.
+  /// After calling with 'done' set, this should be called again if new streams are
+  /// created via AddStream().
   void ReleaseCompletedResources(RowBatch* batch, bool done);
+
+  /// Releases all the Stream objects in the vector 'streams_' and reduces the vector's
+  /// size to 0.
+  void ClearStreams();
 
   /// Add a stream to this ScannerContext for 'range'. Returns the added stream.
   /// The stream is created in the runtime state's object pool
