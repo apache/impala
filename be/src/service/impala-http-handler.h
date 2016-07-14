@@ -133,6 +133,10 @@ class ImpalaHttpHandler {
   void CatalogObjectsHandler(const Webserver::ArgumentMap& args,
       rapidjson::Document* output);
 
+  // Returns memory usage for queries in flight.
+  void QueryMemoryHandler(const Webserver::ArgumentMap& args,
+      rapidjson::Document* output);
+
   /// Helper method to render a single QueryStateRecord as a Json object Used by
   /// QueryStateHandler().
   void QueryStateToJson(const ImpalaServer::QueryStateRecord& record,

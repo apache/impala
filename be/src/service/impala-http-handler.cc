@@ -19,9 +19,10 @@
 #include <gutil/strings/substitute.h>
 
 #include "catalog/catalog-util.h"
+#include "gen-cpp/beeswax_types.h"
+#include "runtime/mem-tracker.h"
 #include "service/impala-server.h"
 #include "service/query-exec-state.h"
-#include "gen-cpp/beeswax_types.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/redactor.h"
 #include "util/summary-util.h"
@@ -85,6 +86,9 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
 
   webserver->RegisterUrlCallback("/query_profile", "query_profile.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::QueryProfileHandler), false);
+
+  webserver->RegisterUrlCallback("/query_memory", "query_memory.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::QueryMemoryHandler), false);
 
   webserver->RegisterUrlCallback("/cancel_query", "common-pre.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::CancelQueryHandler), false);
@@ -230,6 +234,40 @@ void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& ar
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
   Value query_ids(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", query_ids, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::ArgumentMap& args,
+    Document* document) {
+  TUniqueId unique_id;
+  Status parse_status = ParseIdFromArguments(args, &unique_id, "query_id");
+  if (!parse_status.ok()) {
+    Value error(parse_status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+  shared_ptr<ImpalaServer::QueryExecState> exec_state =
+      server_->GetQueryExecState(unique_id, true);
+  string mem_usage_text;
+  // Search the in-flight queries, since only in-flight queries have a MemTracker
+  if (exec_state != NULL) {
+    lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+    // Only queries with coordinator have mem_tracker
+    if (exec_state->coord() == NULL) {
+      mem_usage_text =
+          "The query does not have memory tracking information available.";
+    } else {
+      MemTracker* query_mem_tracker = exec_state->coord()->query_mem_tracker();
+      mem_usage_text = query_mem_tracker->LogUsage();
+    }
+  } else {
+    mem_usage_text =
+        "The query is finished, current memory consumption is not available.";
+  }
+
+  Value mem_usage(mem_usage_text.c_str(), document->GetAllocator());
+  document->AddMember("mem_usage", mem_usage, document->GetAllocator());
+  document->AddMember("query_id", args.find("query_id")->second.c_str(),
+      document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
