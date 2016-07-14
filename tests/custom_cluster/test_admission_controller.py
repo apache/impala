@@ -11,6 +11,7 @@ from time import sleep, time
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import specific_build_type_timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
@@ -19,7 +20,6 @@ from tests.common.test_vector import TestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
-
 
 LOG = logging.getLogger('admission_test')
 
@@ -48,6 +48,10 @@ POOL_NAME = "default-pool"
 
 # The statestore heartbeat and topic update frequency (ms). Set low for testing.
 STATESTORE_RPC_FREQUENCY_MS = 500
+
+# Stress test timeout (seconds). The timeout needs to be significantly higher in code
+# coverage builds (IMPALA-3790).
+STRESS_TIMEOUT = specific_build_type_timeout(30, code_coverage_build_timeout=600)
 
 # The number of queries that can execute concurrently in the pool POOL_NAME.
 MAX_NUM_CONCURRENT_QUERIES = 5
@@ -379,7 +383,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
             metric_key(self.pool_name, 'total-%s' % short_name), 0)
     return metrics
 
-  def wait_for_metric_changes(self, metric_names, initial, expected_delta, timeout=30):
+  def wait_for_metric_changes(self, metric_names, initial, expected_delta):
     """
     Waits for the sum of metrics in metric_names to change by at least expected_delta.
 
@@ -408,11 +412,11 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         LOG.debug("Found all %s metrics after %s seconds", delta_sum,
             round(time() - start_time, 1))
         return (deltas, current)
-      assert (time() - start_time < timeout),\
-          "Timed out waiting %s seconds for metrics" % (timeout,)
+      assert (time() - start_time < STRESS_TIMEOUT),\
+          "Timed out waiting %s seconds for metrics" % (STRESS_TIMEOUT,)
       sleep(1)
 
-  def wait_for_statestore_updates(self, heartbeats, timeout=30):
+  def wait_for_statestore_updates(self, heartbeats):
     """Waits for a number of statestore heartbeats from all impalads."""
     start_time = time()
     num_impalads = len(self.impalads)
@@ -430,12 +434,12 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       for impalad in self.impalads:
         curr[impalad] = impalad.service.get_metric_value(\
             'statestore-subscriber.topic-update-interval-time')['count']
-      assert (time() - start_time < timeout),\
-          "Timed out waiting %s seconds for heartbeats" % (timeout,)
+      assert (time() - start_time < STRESS_TIMEOUT),\
+          "Timed out waiting %s seconds for heartbeats" % (STRESS_TIMEOUT,)
       sleep(STATESTORE_RPC_FREQUENCY_MS / float(1000))
     LOG.debug("Waited %s for %s heartbeats", round(time() - start_time, 1), heartbeats)
 
-  def wait_for_admitted_threads(self, num_threads, timeout=30):
+  def wait_for_admitted_threads(self, num_threads):
     """
     Wait for query submission threads to update after being admitted, as determined
     by observing metric changes. This is necessary because the metrics may change
@@ -448,9 +452,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # lock to synchronize before checking the list length (on which another thread
     # may call append() concurrently).
     while len(self.executing_threads) < num_threads:
-      assert (time() - start_time < timeout),\
+      assert (time() - start_time < STRESS_TIMEOUT),\
           "Timed out waiting %s seconds for %s admitted client rpcs to return" %\
-              (timeout, num_threads)
+              (STRESS_TIMEOUT, num_threads)
       sleep(0.1)
     LOG.debug("Found all %s admitted threads after %s seconds", num_threads,
         round(time() - start_time, 1))
