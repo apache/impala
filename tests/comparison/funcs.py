@@ -108,6 +108,11 @@ class Signature(object):
     self.return_type = return_type
     self.args = list(args)
 
+  def __repr__(self):
+    return "Signature<func: {func}, returns: {rt}, args: {arg_list}>".format(
+        func=repr(self.func), rt=repr(self.return_type),
+        arg_list=", ".join([repr(arg) for arg in self.args]))
+
   @property
   def input_types(self):
     return self.args[1:]
@@ -477,11 +482,13 @@ for func_name in ['In', 'NotIn']:
       [Boolean, Timestamp, Timestamp, Timestamp]])
 for comparator in ['GreaterThan', 'LessThan']:
   create_func(comparator, signatures=[
+      [Boolean, Char, Char],
       [Boolean, Number, Number],
       [Boolean, Timestamp, Timestamp]])
 for comparator in ['GreaterThanOrEquals', 'LessThanOrEquals']:
   # Avoid equality comparison on FLOATs
   create_func(comparator, signatures=[
+      [Boolean, Char, Char],
       [Boolean, Decimal, Decimal],
       [Boolean, Decimal, Int],
       [Boolean, Int, Decimal],

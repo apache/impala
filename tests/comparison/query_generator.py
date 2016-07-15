@@ -1465,33 +1465,44 @@ class QueryGenerator(object):
     return root_func, relational_funcs
 
 
-if __name__ == '__main__':
+def generate_queries_for_manual_inspection():
   '''Generate some queries for manual inspection. The query won't run anywhere because the
      tables used are fake. To make real queries, we'd need to connect to a database and
      read the table metadata and such.
   '''
+  from model_translator import SqlWriter
+
+  NUM_TABLES = 5
+  NUM_COLS_EACH_TYPE = 10
+  NUM_QUERIES = 3000
+
   tables = list()
   data_types = list(TYPES)
   data_types.remove(Float)
-  for table_idx in xrange(5):
+  for table_idx in xrange(NUM_TABLES):
     table = Table('table_%s' % table_idx)
     tables.append(table)
     cols = table.cols
-    for col_idx in xrange(3):
-      col_type = choice(data_types)
-      col = Column(table, '%s_col_%s' % (col_type.__name__.lower(), col_idx), col_type)
-      cols.append(col)
+    col_idx = 0
+    for _ in xrange(NUM_COLS_EACH_TYPE):
+      for col_type in data_types:
+        col = Column(table, '%s_col_%s' % (col_type.__name__.lower(), col_idx), col_type)
+        cols.append(col)
+        col_idx += 1
     table.cols = cols
 
   query_profile = DefaultProfile()
   query_generator = QueryGenerator(query_profile)
-  from model_translator import SqlWriter
   sql_writer = SqlWriter.create(dialect='IMPALA')
   ref_writer = SqlWriter.create(dialect='POSTGRESQL',
       nulls_order_asc=query_profile.nulls_order_asc())
-  for _ in range(3000):
+  for _ in xrange(NUM_QUERIES):
     query = query_generator.create_query(tables)
     print("Test db")
     print(sql_writer.write_query(query) + '\n')
     print("Ref db")
     print(ref_writer.write_query(query) + '\n')
+
+
+if __name__ == '__main__':
+  generate_queries_for_manual_inspection()

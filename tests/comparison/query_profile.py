@@ -25,9 +25,11 @@ from db_types import (
     Timestamp)
 from funcs import (
     And,
+    Coalesce,
     Equals,
     GreaterThan,
     GreaterThanOrEquals,
+    If,
     In,
     IsDistinctFrom,
     IsNotDistinctFrom,
@@ -78,18 +80,40 @@ class DefaultProfile(object):
             Int: 10,
             Timestamp: 1},
         'RELATIONAL_FUNCS': {
+        # The weights below are "best effort" suggestions. Because QueryGenerator
+        # prefers to set column types first, and some functions are "supported" only by
+        # some types, it means functions can be pruned off from this dictionary, and
+        # that will shift the probabilities. A quick example if that if a Char column is
+        # chosen: LessThan may not have a pre-defined signature for Char comparison, so
+        # LessThan shouldn't be chosen with Char columns. The tendency to prune will
+        # shift as the "funcs" module is adjusted to add/remove signatures.
+            And: 2,
+            Coalesce: 2,
             Equals: 40,
             GreaterThan: 2,
             GreaterThanOrEquals: 2,
             In: 2,
+            If: 2,
             IsDistinctFrom: 2,
             IsNotDistinctFrom: 1,
             IsNotDistinctFromOp: 1,
             LessThan: 2,
             LessThanOrEquals: 2,
             NotEquals: 2,
-            NotIn: 2},
+            NotIn: 2,
+            Or: 2,
+         },
         'CONJUNCT_DISJUNCTS': {
+        # And and Or appear both under RELATIONAL_FUNCS and CONJUNCT_DISJUNCTS for the
+        # following reasons:
+        # 1. And and Or are considered "relational" by virtue of taking two arguments
+        # and returning a Boolean. The crude signature selection means they could be
+        # selected, so we describe weights there.
+        # 2. They are set here explicitly as well so that
+        # QueryGenerator._create_bool_func_tree() can create a "more realistic"
+        # expression that has a Boolean operator at the top of the tree by explicitly
+        # asking for an And or Or.
+        # IMPALA-3896 tracks a better way to do this.
             And: 5,
             Or: 1},
         'ANALYTIC_WINDOW': {
@@ -226,14 +250,14 @@ class DefaultProfile(object):
       lower, upper = bounds
     return randint(lower, upper)
 
-  def _choose_from_weights(self, *weights):
+  def _choose_from_weights(self, *weight_args):
     '''Returns a value that is selected from the keys of weights with the probability
        determined by the values of weights.
     '''
-    if isinstance(weights[0], str):
-      weights = self.weights(*weights)
+    if isinstance(weight_args[0], str):
+      weights = self.weights(*weight_args)
     else:
-      weights = weights[0]
+      weights = weight_args[0]
     total_weight = sum(weights.itervalues())
     numeric_choice = randint(1, total_weight)
     for choice_, weight in weights.iteritems():
@@ -430,20 +454,19 @@ class DefaultProfile(object):
     '''
     if not signatures:
       raise Exception('At least one signature is required')
-    signatures = filter(
+    filtered_signatures = filter(
         lambda s: s.return_type == Boolean \
             and len(s.args) > 1 \
             and not any(a.is_subquery for a in s.args),
         signatures)
-    if not signatures:
+    if not filtered_signatures:
       raise Exception(
           'None of the provided signatures corresponded to a relational function')
     func_weights = self.weights('RELATIONAL_FUNCS')
-    missing_funcs = set(s.func for s in signatures) - set(func_weights)
+    missing_funcs = set(s.func for s in filtered_signatures) - set(func_weights)
     if missing_funcs:
-      raise Exception("Weights are missing for functions: %s"
-          % ", ".join([missing_funcs]))
-    return self.choose_func_signature(signatures, self.weights('RELATIONAL_FUNCS'))
+      raise Exception("Weights are missing for functions: {0}".format(missing_funcs))
+    return self.choose_func_signature(filtered_signatures, self.weights('RELATIONAL_FUNCS'))
 
   def choose_func_signature(self, signatures, _func_weights=None):
     '''Return a signature chosen from "signatures".'''
@@ -453,7 +476,11 @@ class DefaultProfile(object):
     type_weights = self.weights('TYPES')
 
     func_weights = _func_weights
-    if not func_weights:
+    if func_weights:
+      distinct_funcs_in_signatures = set([s.func for s in signatures])
+      pruned_func_weights = {f: func_weights[f] for f in distinct_funcs_in_signatures}
+      func_weights = pruned_func_weights
+    else:
       # First a function will be chosen then a signature. This is done so that the number
       # of signatures a function has doesn't influence its likelihood of being chosen.
       # Functions will be weighted based on the weight of the types in their arguments.
