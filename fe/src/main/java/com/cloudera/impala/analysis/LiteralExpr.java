@@ -49,7 +49,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   }
 
   /**
-   * Returns an analyzed literal of 'type'.
+   * Returns an analyzed literal of 'type'. Returns null for types that cannot be
+   * expressed as literals, e.g. TIMESTAMP.
    */
   public static LiteralExpr create(String value, Type type) throws AnalysisException {
     Preconditions.checkArgument(type.isValid());
@@ -79,8 +80,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case DATETIME:
       case TIMESTAMP:
         // TODO: we support TIMESTAMP but no way to specify it in SQL.
-        throw new AnalysisException(
-            "DATE/DATETIME/TIMESTAMP literals not supported: " + value);
+        return null;
       default:
         Preconditions.checkState(false,
             String.format("Literals of type '%s' not supported.", type.toSql()));
@@ -151,6 +151,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
+   * Returns null for types that cannot be expressed as literals, e.g. TIMESTAMP.
    * TODO: Support non-scalar types.
    */
   public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
@@ -216,8 +217,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case DATE:
       case DATETIME:
       case TIMESTAMP:
-        throw new AnalysisException(
-            "DATE/DATETIME/TIMESTAMP literals not supported: " + constExpr.toSql());
+        return null;
       default:
         Preconditions.checkState(false,
             String.format("Literals of type '%s' not supported.",

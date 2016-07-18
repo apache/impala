@@ -115,24 +115,35 @@ public class BinaryPredicate extends Predicate {
   }
 
   /**
-   * Returns a version of 'predicate' that always has the SlotRef, if there is one, on the
-   * left and the other expression on the right. This also folds constant children of the
-   * predicate into literals, if possible.
-   * Returns null if this is not a SlotRef comparison.
+   * Normalizes a 'predicate' consisting of an uncast SlotRef and a constant Expr into
+   * the following form: <SlotRef> <Op> <LiteralExpr>
+   * If 'predicate' cannot be expressed in this way, null is returned.
    */
   public static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
-      Analyzer analyzer)
-      throws AnalysisException {
-    SlotRef ref = predicate.getBoundSlot();
+      Analyzer analyzer) {
+    SlotRef ref = null;
+    if (predicate.getChild(0) instanceof SlotRef) {
+      ref = (SlotRef) predicate.getChild(0);
+    } else if (predicate.getChild(1) instanceof SlotRef) {
+      ref = (SlotRef) predicate.getChild(1);
+    }
+
     if (ref == null) return null;
-    if (ref != predicate.getChild(0).unwrapSlotRef(true)) {
-      Preconditions.checkState(ref == predicate.getChild(1).unwrapSlotRef(true));
+    if (ref != predicate.getChild(0)) {
+      Preconditions.checkState(ref == predicate.getChild(1));
       predicate = new BinaryPredicate(predicate.getOp().converse(), ref,
           predicate.getChild(0));
       predicate.analyzeNoThrow(analyzer);
     }
-    predicate.foldConstantChildren(analyzer);
+
+    try {
+      predicate.foldConstantChildren(analyzer);
+    } catch (AnalysisException ex) {
+      // Throws if the expression cannot be evaluated by the BE.
+      return null;
+    }
     predicate.analyzeNoThrow(analyzer);
+    if (!(predicate.getChild(1) instanceof LiteralExpr)) return null;
     return predicate;
   }
 

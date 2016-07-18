@@ -147,3 +147,24 @@ NODE 0:
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
 ====
+# IMPALA-3856: KuduScanNode crash when pushing predicates including a cast
+select o_orderkey from tpch_kudu.orders where o_orderkey < 10.0 order by 1
+---- PLAN
+01:SORT
+|  order by: o_orderkey ASC
+|
+00:SCAN KUDU [tpch_kudu.orders]
+   predicates: o_orderkey < 10.0
+====
+# IMPALA-3871: Casting literals to TIMESTAMP throw when pushed to KuduScanNode
+select t.c from
+  (select cast(o_orderdate as timestamp) c from tpch_kudu.orders where o_orderkey < 10) t
+where t.c <= cast('1995-01-01 00:00:00' as timestamp) order by c
+---- PLAN
+01:SORT
+|  order by: c ASC
+|
+00:SCAN KUDU [tpch_kudu.orders]
+   predicates: CAST(o_orderdate AS TIMESTAMP) <= CAST('1995-01-01 00:00:00' AS TIMESTAMP)
+   kudu predicates: o_orderkey <= 9
+====
