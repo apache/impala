@@ -20,6 +20,7 @@
 #define IMPALA_UTIL_CONTAINER_UTIL_H
 
 #include <map>
+#include <unordered_map>
 #include <boost/unordered_map.hpp>
 
 #include "util/hash-util.h"
@@ -35,6 +36,21 @@ inline std::size_t hash_value(const TNetworkAddress& host_port) {
   return HashUtil::Hash(&host_port.port, sizeof(host_port.port), hash);
 }
 
+}
+
+/// Hash function for std:: containers
+namespace std {
+
+template<> struct hash<impala::TNetworkAddress> {
+  std::size_t operator()(const impala::TNetworkAddress& host_port) const {
+    return impala::hash_value(host_port);
+  }
+};
+
+}
+
+namespace impala {
+
 struct HashTNetworkAddressPtr : public std::unary_function<TNetworkAddress*, size_t> {
   size_t operator()(const TNetworkAddress* const& p) const { return hash_value(*p); }
 };
@@ -49,10 +65,20 @@ struct TNetworkAddressPtrEquals : public std::unary_function<TNetworkAddress*, b
 
 /// FindOrInsert(): if the key is present, return the value; if the key is not present,
 /// create a new entry (key, default_val) and return default_val.
+/// TODO: replace with single template which takes a template param
 
 template <typename K, typename V>
 V* FindOrInsert(std::map<K,V>* m, const K& key, const V& default_val) {
   typename std::map<K,V>::iterator it = m->find(key);
+  if (it == m->end()) {
+    it = m->insert(std::make_pair(key, default_val)).first;
+  }
+  return &it->second;
+}
+
+template <typename K, typename V>
+V* FindOrInsert(std::unordered_map<K,V>* m, const K& key, const V& default_val) {
+  typename std::unordered_map<K,V>::iterator it = m->find(key);
   if (it == m->end()) {
     it = m->insert(std::make_pair(key, default_val)).first;
   }

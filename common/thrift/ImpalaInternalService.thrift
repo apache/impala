@@ -181,10 +181,11 @@ struct TQueryOptions {
   // "name".
   43: optional TParquetFallbackSchemaResolution parquet_fallback_schema_resolution = 0
 
-  // Multi-threaded execution: number of cores per query per node.
-  // > 0: multi-threaded execution mode, with given number of cores
+  // Multi-threaded execution: degree of parallelism (= number of active threads) per
+  // query per backend.
+  // > 0: multi-threaded execution mode, with given dop
   // 0: single-threaded execution mode
-  44: optional i32 mt_num_cores = 0
+  44: optional i32 mt_dop = 0
 
   // If true, INSERT writes to S3 go directly to their final location rather than being
   // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for
@@ -252,6 +253,7 @@ struct TClientRequest {
 // TODO: Separate into FE/BE initialized vars.
 struct TQueryCtx {
   // Client request containing stmt to execute and query options.
+  // TODO: rename to client_request, we have too many requests
   1: required TClientRequest request
 
   // A globally unique id assigned to the entire query in the BE.
@@ -302,9 +304,6 @@ struct TQueryCtx {
 // fragment.
 struct TPlanFragmentCtx {
   1: required Planner.TPlanFragment fragment
-
-  // total number of instances of this fragment
-  2: required i32 num_fragment_instances
 }
 
 // A scan range plus the parameters needed to execute that scan.
@@ -329,45 +328,42 @@ struct TPlanFragmentDestination {
 // TODO: for range partitioning, we also need to specify the range boundaries
 struct TPlanFragmentInstanceCtx {
   // The globally unique fragment instance id.
-  // Format: query id + query-wide fragment index
-  // The query-wide fragment index starts at 0, so that the query id
-  // and the id of the first fragment instance (the coordinator instance)
-  // are identical.
+  // Format: query id + query-wide fragment instance index
+  // The query-wide fragment instance index starts at 0, so that the query id
+  // and the id of the first fragment instance are identical.
+  // If there is a coordinator instance, it is the first one, with index 0.
   1: required Types.TUniqueId fragment_instance_id
 
   // Index of this fragment instance accross all instances of its parent fragment,
   // range [0, TPlanFragmentCtx.num_fragment_instances).
-  2: required i32 fragment_instance_idx
-
-  // Index of this fragment instance in Coordinator::fragment_instance_states_.
-  // TODO: remove; this is subsumed by the query-wide instance idx embedded
-  // in the fragment_instance_id
-  3: required i32 instance_state_idx
+  2: required i32 per_fragment_instance_idx
 
   // Initial scan ranges for each scan node in TPlanFragment.plan_tree
-  4: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+  3: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
 
   // Number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
   // needed to create a DataStreamRecvr
-  5: required map<Types.TPlanNodeId, i32> per_exch_num_senders
+  // TODO for per-query exec rpc: move these to TPlanFragmentCtx
+  4: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
   // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
-  6: list<TPlanFragmentDestination> destinations
+  // TODO for per-query exec rpc: move these to TPlanFragmentCtx
+  5: list<TPlanFragmentDestination> destinations
 
   // Debug options: perform some action in a particular phase of a particular node
-  7: optional Types.TPlanNodeId debug_node_id
-  8: optional PlanNodes.TExecNodePhase debug_phase
-  9: optional PlanNodes.TDebugAction debug_action
+  6: optional Types.TPlanNodeId debug_node_id
+  7: optional PlanNodes.TExecNodePhase debug_phase
+  8: optional PlanNodes.TDebugAction debug_action
 
   // The pool to which this request has been submitted. Used to update pool statistics
   // for admission control.
-  10: optional string request_pool
+  9: optional string request_pool
 
   // Id of this fragment in its role as a sender.
-  11: optional i32 sender_id
+  10: optional i32 sender_id
 }
 
 
@@ -461,31 +457,26 @@ struct TReportExecStatusParams {
   2: optional Types.TUniqueId query_id
 
   // required in V1
-  // Used to look up the fragment instance state in the coordinator, same value as
-  // TExecPlanFragmentParams.instance_state_idx.
-  3: optional i32 instance_state_idx
-
-  // required in V1
-  4: optional Types.TUniqueId fragment_instance_id
+  3: optional Types.TUniqueId fragment_instance_id
 
   // Status of fragment execution; any error status means it's done.
   // required in V1
-  5: optional Status.TStatus status
+  4: optional Status.TStatus status
 
   // If true, fragment finished executing.
   // required in V1
-  6: optional bool done
+  5: optional bool done
 
   // cumulative profile
   // required in V1
-  7: optional RuntimeProfile.TRuntimeProfileTree profile
+  6: optional RuntimeProfile.TRuntimeProfileTree profile
 
   // Cumulative structural changes made by a table sink
   // optional in V1
-  8: optional TInsertExecStatus insert_exec_status;
+  7: optional TInsertExecStatus insert_exec_status;
 
   // New errors that have not been reported to the coordinator
-  9: optional map<ErrorCodes.TErrorCode, TErrorLogEntry> error_log;
+  8: optional map<ErrorCodes.TErrorCode, TErrorLogEntry> error_log;
 }
 
 struct TReportExecStatusResult {

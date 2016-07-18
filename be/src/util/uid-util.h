@@ -45,7 +45,7 @@ inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, TUniqueId* unique_id
 /// Query id: uuid with bottom 4 bytes set to 0
 /// Fragment instance id: query id with instance index stored in the bottom 4 bytes
 
-const int64_t FRAGMENT_IDX_MASK = (1L << 32) - 1;
+constexpr int64_t FRAGMENT_IDX_MASK = (1L << 32) - 1;
 
 inline TUniqueId UuidToQueryId(const boost::uuids::uuid& uuid) {
   TUniqueId result;

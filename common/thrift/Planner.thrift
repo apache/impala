@@ -31,11 +31,14 @@ include "Partitions.thrift"
 // plan fragment, including how to produce and how to partition its output.
 // It leaves out node-specific parameters needed for the actual execution.
 struct TPlanFragment {
+  // Ordinal number of fragment within a query; range: 0..<total # fragments>
+  1: required Types.TFragmentIdx idx
+
   // display name to be shown in the runtime profile; unique within a query
-  1: required string display_name
+  2: required string display_name
 
   // no plan or descriptor table: query without From clause
-  2: optional PlanNodes.TPlan plan
+  3: optional PlanNodes.TPlan plan
 
   // exprs that produce values for slots of output tuple (one expr per slot);
   // if not set, plan fragment materializes full rows of plan_tree
@@ -74,6 +77,8 @@ struct TScanRangeLocation {
 }
 
 // A single scan range plus the hosts that serve it
+// TODO: rename to TScanRangeLocationList, having this differ from the above struct
+// by only a single letter has caused needless confusion
 struct TScanRangeLocations {
   1: required PlanNodes.TScanRange scan_range
   // non-empty list

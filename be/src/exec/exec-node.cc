@@ -264,7 +264,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
-      if (state->query_options().mt_num_cores > 0) {
+      if (state->query_options().mt_dop > 0) {
         *node = pool->Add(new HdfsScanNodeMt(pool, tnode, descs));
       } else {
         *node = pool->Add(new HdfsScanNode(pool, tnode, descs));

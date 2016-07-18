@@ -38,10 +38,8 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
 
 Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params) {
   VLOG_QUERY << "ExecPlanFragment() instance_id="
-             << exec_params.fragment_instance_ctx.fragment_instance_id
-             << " coord=" << exec_params.query_ctx.coord_address
-             << " fragment instance#="
-             << exec_params.fragment_instance_ctx.instance_state_idx;
+             << PrintId(exec_params.fragment_instance_ctx.fragment_instance_id)
+             << " coord=" << exec_params.query_ctx.coord_address;
 
   // Preparing and opening the fragment creates a thread and consumes a non-trivial
   // amount of memory. If we are already starved for memory, cancel the fragment as
@@ -146,6 +144,7 @@ void FragmentMgr::CancelPlanFragment(TCancelPlanFragmentResult& return_val,
 
 void FragmentMgr::PublishFilter(TPublishFilterResult& return_val,
     const TPublishFilterParams& params) {
+  VLOG_FILE << "PublishFilter(): dst_instance_id=" << params.dst_instance_id;
   shared_ptr<FragmentExecState> fragment_exec_state =
       GetFragmentExecState(params.dst_instance_id);
   if (fragment_exec_state.get() == NULL) {

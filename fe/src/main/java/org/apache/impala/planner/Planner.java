@@ -59,6 +59,11 @@ public class Planner {
     ctx_ = new PlannerContext(analysisResult, queryCtx);
   }
 
+  public TQueryCtx getQueryCtx() { return ctx_.getQueryCtx(); }
+  public AnalysisContext.AnalysisResult getAnalysisResult() {
+    return ctx_.getAnalysisResult();
+  }
+
   /**
    * Returns a list of plan fragments for executing an analyzed parse tree.
    * May return a single-node or distributed executable plan. If enabled (through a
@@ -203,6 +208,24 @@ public class Planner {
 
   /**
    * Return combined explain string for all plan fragments.
+   * Includes the estimated resource requirements from the request if set.
+   * Uses a default level of EXTENDED, unless overriden by the
+   * 'explain_level' query option.
+   */
+  public String getExplainString(ArrayList<PlanFragment> fragments,
+      TQueryExecRequest request) {
+    // use EXTENDED by default for all non-explain statements
+    TExplainLevel explainLevel = TExplainLevel.EXTENDED;
+    // use the query option for explain stmts and tests (e.g., planner tests)
+    if (ctx_.getAnalysisResult().isExplainStmt() || RuntimeEnv.INSTANCE.isTestEnv()) {
+      explainLevel = ctx_.getQueryOptions().getExplain_level();
+    }
+    return getExplainString(fragments, request, explainLevel);
+  }
+
+  /**
+   * Return combined explain string for all plan fragments and with an
+   * explicit explain level.
    * Includes the estimated resource requirements from the request if set.
    */
   public String getExplainString(ArrayList<PlanFragment> fragments,

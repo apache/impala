@@ -845,9 +845,7 @@ void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   // benchmarks show it to be slightly cheaper than contending for a
   // single generator under a lock (since random_generator is not
   // thread-safe).
-  random_generator uuid_generator;
-  uuid query_uuid = uuid_generator();
-  query_ctx->query_id = UuidToQueryId(query_uuid);
+  query_ctx->query_id = UuidToQueryId(random_generator()());
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
@@ -1077,9 +1075,8 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
 
 void ImpalaServer::ReportExecStatus(
     TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {
-  VLOG_FILE << "ReportExecStatus() query_id=" << params.query_id
-            << " fragment instance#=" << params.instance_state_idx
-            << " instance_id=" << params.fragment_instance_id
+  VLOG_FILE << "ReportExecStatus()"
+            << " instance_id=" << PrintId(params.fragment_instance_id)
             << " done=" << (params.done ? "true" : "false");
   // TODO: implement something more efficient here, we're currently
   // acquiring/releasing the map lock and doing a map lookup for
@@ -1090,10 +1087,8 @@ void ImpalaServer::ReportExecStatus(
     // This is expected occasionally (since a report RPC might be in flight while
     // cancellation is happening). Return an error to the caller to get it to stop.
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
-        "query ID (probably closed or cancelled). (query_id: $0, backend: $1, instance:"
-        " $2 done: $3)", PrintId(params.query_id),
-        params.instance_state_idx, PrintId(params.fragment_instance_id),
-        params.done);
+        "query ID (probably closed or cancelled). (instance: $0 done: $1)",
+        PrintId(params.fragment_instance_id), params.done);
     Status(TErrorCode::INTERNAL_ERROR, err).SetTStatus(&return_val);
     VLOG_QUERY << err;
     return;

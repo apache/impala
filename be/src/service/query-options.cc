@@ -395,16 +395,16 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
-      case TImpalaQueryOptions::MT_NUM_CORES: {
+      case TImpalaQueryOptions::MT_DOP: {
         StringParser::ParseResult result;
-        const int32_t num_cores =
+        const int32_t dop =
             StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
-        if (result != StringParser::PARSE_SUCCESS || num_cores < 0 || num_cores > 128) {
+        if (result != StringParser::PARSE_SUCCESS || dop < 0 || dop > 128) {
           return Status(
-              Substitute("$0 is not valid for mt_num_cores. Valid values are in "
+              Substitute("$0 is not valid for mt_dop. Valid values are in "
                 "[0, 128].", value));
         }
-        query_options->__set_mt_num_cores(num_cores);
+        query_options->__set_mt_dop(dop);
         break;
       }
       case TImpalaQueryOptions::S3_SKIP_INSERT_STAGING: {

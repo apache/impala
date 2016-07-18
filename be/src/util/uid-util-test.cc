@@ -31,12 +31,7 @@ TEST(UidUtil, FragmentInstanceId) {
 
   for (int i = 0; i < 100; ++i) {
     TUniqueId instance_id = CreateInstanceId(query_id, i);
-    EXPECT_EQ(instance_id.hi, query_id.hi);
-
-    TUniqueId qid = GetQueryId(instance_id);
-    EXPECT_EQ(qid.hi, query_id.hi);
-    EXPECT_EQ(qid.lo, query_id.lo);
-
+    EXPECT_EQ(GetQueryId(instance_id), query_id);
     EXPECT_EQ(GetInstanceIdx(instance_id), i);
   }
 }

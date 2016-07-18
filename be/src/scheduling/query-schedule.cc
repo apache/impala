@@ -52,24 +52,89 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     query_events_(query_events),
     num_fragment_instances_(0),
     num_scan_ranges_(0),
+    next_instance_id_(query_id),
     is_admitted_(false) {
   fragment_exec_params_.resize(request.fragments.size());
-  // Build two maps to map node ids to their fragments as well as to the offset in their
-  // fragment's plan's nodes list.
-  for (int i = 0; i < request.fragments.size(); ++i) {
-    int node_idx = 0;
-    for (const TPlanNode& node: request.fragments[i].plan.nodes) {
-      if (plan_node_to_fragment_idx_.size() < node.node_id + 1) {
-        plan_node_to_fragment_idx_.resize(node.node_id + 1);
-        plan_node_to_plan_node_idx_.resize(node.node_id + 1);
+  bool is_mt_execution = request.query_ctx.request.query_options.mt_dop > 0;
+
+  if (is_mt_execution) {
+    /// TODO-MT: remove else branch and move MtInit() logic here
+    MtInit();
+  } else {
+    // Build two maps to map node ids to their fragments as well as to the offset in their
+    // fragment's plan's nodes list.
+    for (int i = 0; i < request.fragments.size(); ++i) {
+      int node_idx = 0;
+      for (const TPlanNode& node: request.fragments[i].plan.nodes) {
+        if (plan_node_to_fragment_idx_.size() < node.node_id + 1) {
+          plan_node_to_fragment_idx_.resize(node.node_id + 1);
+          plan_node_to_plan_node_idx_.resize(node.node_id + 1);
+        }
+        DCHECK_EQ(plan_node_to_fragment_idx_.size(), plan_node_to_plan_node_idx_.size());
+        plan_node_to_fragment_idx_[node.node_id] = i;
+        plan_node_to_plan_node_idx_[node.node_id] = node_idx;
+        ++node_idx;
       }
-      DCHECK_EQ(plan_node_to_fragment_idx_.size(), plan_node_to_plan_node_idx_.size());
-      plan_node_to_fragment_idx_[node.node_id] = i;
-      plan_node_to_plan_node_idx_[node.node_id] = node_idx;
-      ++node_idx;
     }
   }
 }
+
+void QuerySchedule::MtInit() {
+  // extract TPlanFragments and order by fragment id
+  vector<const TPlanFragment*> fragments;
+  for (const TPlanExecInfo& plan_exec_info: request_.mt_plan_exec_info) {
+    for (const TPlanFragment& fragment: plan_exec_info.fragments) {
+      fragments.push_back(&fragment);
+    }
+  }
+  sort(fragments.begin(), fragments.end(),
+      [](const TPlanFragment* a, const TPlanFragment* b) { return a->idx < b->idx; });
+
+  DCHECK_EQ(mt_fragment_exec_params_.size(), 0);
+  for (const TPlanFragment* fragment: fragments) {
+    mt_fragment_exec_params_.emplace_back(*fragment);
+  }
+
+  // mark coordinator fragment
+  const TPlanFragment& coord_fragment = request_.mt_plan_exec_info[0].fragments[0];
+  if (coord_fragment.partition.type == TPartitionType::UNPARTITIONED) {
+    mt_fragment_exec_params_[coord_fragment.idx].is_coord_fragment = true;
+    next_instance_id_.lo = 1;  // generated instance ids start at 1
+  }
+
+  // compute input fragments and find max node id
+  int max_node_id = 0;
+  for (const TPlanExecInfo& plan_exec_info: request_.mt_plan_exec_info) {
+    for (const TPlanFragment& fragment: plan_exec_info.fragments) {
+      for (const TPlanNode& node: fragment.plan.nodes) {
+        max_node_id = max(node.node_id, max_node_id);
+      }
+    }
+
+    // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
+    for (int i = 1; i < plan_exec_info.fragments.size(); ++i) {
+      const TPlanFragment& fragment = plan_exec_info.fragments[i];
+      FragmentIdx dest_idx =
+          plan_exec_info.fragments[plan_exec_info.dest_fragment_idx[i - 1]].idx;
+      MtFragmentExecParams& dest_params = mt_fragment_exec_params_[dest_idx];
+      dest_params.input_fragments.push_back(fragment.idx);
+    }
+  }
+
+  // populate plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_
+  plan_node_to_fragment_idx_.resize(max_node_id + 1);
+  plan_node_to_plan_node_idx_.resize(max_node_id + 1);
+  for (const TPlanExecInfo& plan_exec_info: request_.mt_plan_exec_info) {
+    for (const TPlanFragment& fragment: plan_exec_info.fragments) {
+      for (int i = 0; i < fragment.plan.nodes.size(); ++i) {
+        const TPlanNode& node = fragment.plan.nodes[i];
+        plan_node_to_fragment_idx_[node.node_id] = fragment.idx;
+        plan_node_to_plan_node_idx_[node.node_id] = i;
+      }
+    }
+  }
+}
+
 
 int64_t QuerySchedule::GetClusterMemoryEstimate() const {
   DCHECK_GT(unique_hosts_.size(), 0);
@@ -120,6 +185,75 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
 
 void QuerySchedule::SetUniqueHosts(const unordered_set<TNetworkAddress>& unique_hosts) {
   unique_hosts_ = unique_hosts;
+}
+
+TUniqueId QuerySchedule::GetNextInstanceId() {
+  TUniqueId result = next_instance_id_;
+  ++next_instance_id_.lo;
+  return result;
+}
+
+const TPlanFragment& FInstanceExecParams::fragment() const {
+  return fragment_exec_params.fragment;
+}
+
+int QuerySchedule::GetNumFragmentInstances() const {
+  if (mt_fragment_exec_params_.empty()) return num_fragment_instances_;
+  int result = 0;
+  for (const MtFragmentExecParams& fragment_exec_params: mt_fragment_exec_params_) {
+    result += fragment_exec_params.instance_exec_params.size();
+  }
+  return result;
+}
+
+int QuerySchedule::GetNumRemoteFInstances() const {
+  bool has_coordinator_fragment = GetCoordFragment() != nullptr;
+  int result = GetNumFragmentInstances();
+  bool is_mt_execution = request_.query_ctx.request.query_options.mt_dop > 0;
+  if (is_mt_execution && has_coordinator_fragment) --result;
+  return result;
+}
+
+int QuerySchedule::GetTotalFInstances() const {
+  int result = GetNumRemoteFInstances();
+  return GetCoordFragment() != nullptr ? result + 1 : result;
+}
+
+const TPlanFragment* QuerySchedule::GetCoordFragment() const {
+  bool is_mt_exec = request_.query_ctx.request.query_options.mt_dop > 0;
+  const TPlanFragment* fragment = is_mt_exec
+      ? &request_.mt_plan_exec_info[0].fragments[0] : &request_.fragments[0];
+  if (fragment->partition.type == TPartitionType::UNPARTITIONED) {
+    return fragment;
+  } else {
+    return nullptr;
+  }
+}
+
+void QuerySchedule::GetTPlanFragments(vector<const TPlanFragment*>* fragments) const {
+  fragments->clear();
+  bool is_mt_exec = request_.query_ctx.request.query_options.mt_dop > 0;
+  if (is_mt_exec) {
+    for (const TPlanExecInfo& plan_info: request_.mt_plan_exec_info) {
+      for (const TPlanFragment& fragment: plan_info.fragments) {
+        fragments->push_back(&fragment);
+      }
+    }
+  } else {
+    for (const TPlanFragment& fragment: request_.fragments) {
+      fragments->push_back(&fragment);
+    }
+  }
+}
+
+const FInstanceExecParams& QuerySchedule::GetCoordInstanceExecParams() const {
+  const TPlanFragment& coord_fragment =  request_.mt_plan_exec_info[0].fragments[0];
+  DCHECK_EQ(coord_fragment.partition.type, TPartitionType::UNPARTITIONED);
+  const MtFragmentExecParams* fragment_params =
+      &mt_fragment_exec_params_[coord_fragment.idx];
+  DCHECK(fragment_params != nullptr);
+  DCHECK_EQ(fragment_params->instance_exec_params.size(), 1);
+  return fragment_params->instance_exec_params[0];
 }
 
 }

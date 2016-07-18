@@ -340,6 +340,25 @@ struct TLoadDataResp {
   1: required Data.TResultRow load_summary
 }
 
+// Execution parameters for a single plan; component of TQueryExecRequest
+struct TPlanExecInfo {
+  // fragments[i] may consume the output of fragments[j > i];
+  // fragments[0] is the root fragment and also the coordinator fragment, if
+  // it is unpartitioned.
+  1: required list<Planner.TPlanFragment> fragments
+
+  // Specifies the destination fragment of the output of each fragment.
+  // dest_fragment_idx.size() == fragments.size() - 1 and
+  // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
+  // TODO: remove; TPlanFragment.output_sink.dest_node_id is sufficient
+  2: optional list<i32> dest_fragment_idx
+
+  // A map from scan node ids to a list of scan range locations.
+  // The node ids refer to scan nodes in fragments[].plan_tree
+  3: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
+      per_node_scan_ranges
+}
+
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
 struct TQueryExecRequest {
   // global descriptor tbl for all fragments
@@ -348,12 +367,7 @@ struct TQueryExecRequest {
   // fragments[i] may consume the output of fragments[j > i];
   // fragments[0] is the root fragment and also the coordinator fragment, if
   // it is unpartitioned.
-  2: required list<Planner.TPlanFragment> fragments
-
-  // Multi-threaded execution: sequence of plans; the last one materializes
-  // the query result
-  // TODO: this will eventually supercede 'fragments'
-  14: optional list<Planner.TPlanFragmentTree> mt_plans
+  2: optional list<Planner.TPlanFragment> fragments
 
   // Specifies the destination fragment of the output of each fragment.
   // parent_fragment_idx.size() == fragments.size() - 1 and
@@ -364,6 +378,12 @@ struct TQueryExecRequest {
   // The node ids refer to scan nodes in fragments[].plan_tree
   4: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
       per_node_scan_ranges
+
+  // Multi-threaded execution: exec info for all plans; the first one materializes
+  // the query result
+  // TODO: this will eventually supercede fields fragments, dest_fragment_idx,
+  // per_node_scan_ranges
+  14: optional list<TPlanExecInfo> mt_plan_exec_info
 
   // Metadata of the query result set (only for select)
   5: optional Results.TResultSetMetadata result_set_metadata

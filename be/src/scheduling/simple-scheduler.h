@@ -88,7 +88,7 @@ class SimpleScheduler : public Scheduler {
   /// Register with the subscription manager if required
   virtual impala::Status Init();
 
-  virtual Status Schedule(Coordinator* coord, QuerySchedule* schedule);
+  virtual Status Schedule(QuerySchedule* schedule);
   virtual Status Release(QuerySchedule* schedule);
 
  private:
@@ -405,7 +405,39 @@ class SimpleScheduler : public Scheduler {
   void ComputeFragmentExecParams(const TQueryExecRequest& exec_request,
       QuerySchedule* schedule);
 
-  /// For each fragment in exec_request, compute the hosts on which to run the instances
+  /// Compute the assignment of scan ranges to hosts for each scan node in
+  /// the schedule's TQueryExecRequest.mt_plan_exec_info.
+  /// Unpartitioned fragments are assigned to the coordinator. Populate the schedule's
+  /// mt_fragment_exec_params_ with the resulting scan range assignment.
+  Status MtComputeScanRangeAssignment(QuerySchedule* schedule);
+
+  /// Compute the MtFragmentExecParams for all plans in the schedule's
+  /// TQueryExecRequest.mt_plan_exec_info.
+  /// This includes the routing information (destinations, per_exch_num_senders,
+  /// sender_id)
+  void MtComputeFragmentExecParams(QuerySchedule* schedule);
+
+  /// Recursively create FInstanceExecParams and set per_node_scan_ranges for
+  /// fragment_params and its input fragments via a depth-first traversal.
+  /// All fragments are part of plan_exec_info.
+  void MtComputeFragmentExecParams(const TPlanExecInfo& plan_exec_info,
+      MtFragmentExecParams* fragment_params, QuerySchedule* schedule);
+
+  /// Create instances of the fragment corresponding to fragment_params to run on the
+  /// selected replica hosts of the scan ranges of the node with id scan_id.
+  /// The maximum number of instances is the value of query option mt_dop.
+  /// This attempts to load balance among instances by computing the average number
+  /// of bytes per instances and then in a single pass assigning scan ranges to each
+  /// instances to roughly meet that average.
+  void MtCreateScanInstances(PlanNodeId scan_id,
+      MtFragmentExecParams* fragment_params, QuerySchedule* schedule);
+
+  /// For each instance of the single input fragment of the fragment corresponding to
+  /// fragment_params, create an instance for this fragment.
+  void MtCreateMirrorInstances(MtFragmentExecParams* fragment_params,
+      QuerySchedule* schedule);
+
+  /// For each fragment in exec_request, computes hosts on which to run the instances
   /// and stores result in fragment_exec_params_.hosts.
   void ComputeFragmentHosts(const TQueryExecRequest& exec_request,
       QuerySchedule* schedule);
@@ -414,6 +446,8 @@ class SimpleScheduler : public Scheduler {
   /// INVALID_PLAN_NODE_ID if no such node present.
   PlanNodeId FindLeftmostNode(
       const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
+  /// Same for scan nodes.
+  PlanNodeId FindLeftmostScan(const TPlan& plan);
 
   /// Return the index (w/in exec_request.fragments) of fragment that sends its output to
   /// exec_request.fragment[fragment_idx]'s leftmost ExchangeNode.

@@ -27,5 +27,6 @@ typedef int TupleId;
 typedef int SlotId;
 typedef int TableId;
 typedef int PlanNodeId;
+typedef int FragmentIdx;
 
 };

@@ -46,12 +46,10 @@ class Scheduler {
   /// List of server descriptors.
   typedef std::vector<TBackendDescriptor> BackendList;
 
-  /// Populates given query schedule whose execution is to be coordinated by coord.
-  /// Assigns fragments to hosts based on scan ranges in the query exec request.
-  /// If resource management is enabled, also reserves resources from the central
-  /// resource manager (Yarn via Llama) to run the query in. This function blocks until
-  /// the reservation request has been granted or denied.
-  virtual Status Schedule(Coordinator* coord, QuerySchedule* schedule) = 0;
+  /// Populates given query schedule and assigns fragments to hosts based on scan
+  /// ranges in the query exec request. Submits schedule to admission control before
+  /// returning.
+  virtual Status Schedule(QuerySchedule* schedule) = 0;
 
   /// Releases the reserved resources (if any) from the given schedule.
   virtual Status Release(QuerySchedule* schedule) = 0;

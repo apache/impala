@@ -374,9 +374,9 @@ public class PlannerTestBase extends FrontendTestBase {
   }
 
   /**
-   * Produces single-node and distributed plans for testCase and compares
+   * Produces single-node, distributed, and parallel plans for testCase and compares
    * plan and scan range results.
-   * Appends the actual single-node and distributed plan as well as the printed
+   * Appends the actual plans as well as the printed
    * scan ranges to actualOutput, along with the requisite section header.
    * locations to actualScanRangeLocations; compares both to the appropriate sections
    * of 'testCase'.
@@ -430,7 +430,7 @@ public class PlannerTestBase extends FrontendTestBase {
           ImpalaInternalServiceConstants.NUM_NODES_ALL);
     }
     if (section == Section.PARALLELPLANS) {
-      queryCtx.request.query_options.mt_num_cores = 2;
+      queryCtx.request.query_options.mt_dop = 2;
     }
     ArrayList<String> expectedPlan = testCase.getSectionContents(section);
     boolean sectionExists = expectedPlan != null && !expectedPlan.isEmpty();

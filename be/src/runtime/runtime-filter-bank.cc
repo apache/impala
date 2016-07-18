@@ -81,11 +81,13 @@ RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filte
   } else {
     if (consumed_filters_.find(filter_desc.filter_id) == consumed_filters_.end()) {
       consumed_filters_[filter_desc.filter_id] = ret;
+      VLOG_QUERY << "registered consumer filter " << filter_desc.filter_id;
     } else {
       // The filter has already been registered in this filter bank by another
       // target node.
       DCHECK_GT(filter_desc.targets.size(), 1);
       ret = consumed_filters_[filter_desc.filter_id];
+      VLOG_QUERY << "re-registered consumer filter " << filter_desc.filter_id;
     }
   }
   return ret;

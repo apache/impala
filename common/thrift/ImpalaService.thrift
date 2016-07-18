@@ -213,8 +213,9 @@ enum TImpalaQueryOptions {
   // is always, since fields IDs are NYI). Valid values are "position" and "name".
   PARQUET_FALLBACK_SCHEMA_RESOLUTION,
 
-  // Multi-threaded execution: number of cores per machine
-  MT_NUM_CORES,
+  // Multi-threaded execution: degree of parallelism = number of active threads per
+  // backend
+  MT_DOP,
 
   // If true, INSERT writes to S3 go directly to their final location rather than being
   // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for
