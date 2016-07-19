@@ -43,4 +43,7 @@ public class KuduPlannerTest extends PlannerTestBase {
     options.setExplain_level(TExplainLevel.VERBOSE);
     runPlannerTestFile("kudu-selectivity", options);
   }
+
+  @Test
+  public void testTpch() { runPlannerTestFile("tpch-kudu"); }
 }
