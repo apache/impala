@@ -59,7 +59,7 @@ def download_package(pkg_name, pkg_version):
       filename = pkg['filename']
       expected_md5 = pkg['md5_digest']
       if os.path.isfile(filename) and check_md5sum(filename, expected_md5):
-        print "File with matching md5sum already exists, skipping download."
+        print "File with matching md5sum already exists, skipping %s" % filename
         return True
       print "Downloading %s from %s " % (filename, pkg['url'])
       downloader.retrieve(pkg['url'], filename)
