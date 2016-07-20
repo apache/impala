@@ -208,11 +208,14 @@ Status HdfsTextTableWriter::Flush() {
 
 inline void HdfsTextTableWriter::PrintEscaped(const StringValue* str_val) {
   for (int i = 0; i < str_val->len; ++i) {
-    if (UNLIKELY(str_val->ptr[i] == field_delim_ || str_val->ptr[i] == escape_char_)) {
-      rowbatch_stringstream_ << escape_char_;
+    if (escape_char_ == '\0') {
+      rowbatch_stringstream_ << str_val->ptr[i];
+    } else {
+      if (UNLIKELY(str_val->ptr[i] == field_delim_ || str_val->ptr[i] == escape_char_)) {
+        rowbatch_stringstream_ << escape_char_;
+      }
+      rowbatch_stringstream_ << str_val->ptr[i];
     }
-    rowbatch_stringstream_ << str_val->ptr[i];
   }
 }
-
 }

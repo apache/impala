@@ -83,6 +83,15 @@ class TestInsertBehaviour(ImpalaTestSuite):
       assert self.filesystem_client.exists(table_dir + dir_), "Directory {0} was " \
           "unexpectedly deleted by INSERT OVERWRITE".format(table_dir + dir_)
 
+  def test_insert_ascii_nulls(self, unique_database):
+    TBL_NAME = '`{0}`.`null_insert`'.format(unique_database)
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % TBL_NAME)
+    self.execute_query_expect_success(self.client, "create table %s as select '\0' s"
+        % TBL_NAME)
+    result = self.execute_query_expect_success(self.client,
+        "SELECT LENGTH(s) FROM %s" % TBL_NAME)
+    assert int(result.get_data()) == 1
+
   @UniqueDatabase.parametrize(name_prefix='test_insert_alter_partition_location_db')
   def test_insert_alter_partition_location(self, unique_database):
     """Test that inserts after changing the location of a partition work correctly,
