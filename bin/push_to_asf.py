@@ -43,7 +43,6 @@ import subprocess
 import sys
 
 APACHE_REPO = "https://git-wip-us.apache.org/repos/asf/incubator-impala.git"
-GERRIT_URL_RE = re.compile(r"ssh://.+@gerrit.cloudera.org:29418/Impala")
 
 # Parsed options, filled in by main().
 OPTIONS = None
@@ -130,13 +129,14 @@ def check_gerrit_remote():
   Otherwise, exits with an error message.
   """
   try:
-    url = check_output(\
-        ['git', 'config', '--local', '--get', 'remote.gerrit.url']).strip()
+    url = check_output(['git', 'config', '--local', '--get',
+                        'remote.' + OPTIONS.remote + '.url']).strip()
   except subprocess.CalledProcessError:
     print >>sys.stderr, "No remote named 'gerrit'. Please set one up following "
     print >>sys.stderr, "the contributor guide."
     sys.exit(1)
-  if not GERRIT_URL_RE.match(url):
+  gerrit_url_re = re.compile(OPTIONS.gerrit)
+  if not gerrit_url_re.match(url):
     print >>sys.stderr, "Unexpected URL for remote 'gerrit'."
     print >>sys.stderr, "  Got:     ", url
     print >>sys.stderr, "  Expected to find host '%s' in the URL" % GERRIT_HOST
@@ -262,6 +262,14 @@ def main():
             "this script."))
   p.add_option("-n", "--dry-run", action="store_true",
                help="Perform git pushes with --dry-run")
+  p.add_option(
+      "-r",
+      "--remote",
+      dest="remote",
+      help="Name of the git remote that corresponds to gerrit",
+      default="asf-gerrit")
+  p.add_option("-g", "--gerrit", dest="gerrit", help="Gerrit URL regex",
+               default=r"ssh://.+@gerrit.cloudera.org:29418/ImpalaASF")
   OPTIONS, args = p.parse_args()
   if args:
     p.error("no arguments expected")
