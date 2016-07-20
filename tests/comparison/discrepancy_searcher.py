@@ -230,6 +230,10 @@ class QueryResultComparator(object):
 class QueryExecutor(object):
   '''Concurrently executes queries'''
 
+  # XXX: Set to false while IMPALA-3336 is a problem. Disabling random query options
+  # seems to reduce IMPALA-3336 occurances.
+  ENABLE_RANDOM_QUERY_OPTIONS = False
+
   # If the number of rows * cols is greater than this val, then the comparison will
   # be aborted. Raising this value also raises the risk of python being OOM killed. At
   # 10M python would get OOM killed occasionally even on a physical machine with 32GB
@@ -271,7 +275,7 @@ class QueryExecutor(object):
     # "CREATE VIEW <name> AS ...", this will be the value of "<name>".
     self._table_or_view_name = None
 
-  def set_impala_query_optons(self, cursor):
+  def set_impala_query_options(self, cursor):
     opts = """
         SET MEM_LIMIT={mem_limit};
         SET BATCH_SIZE={batch_size};
@@ -332,8 +336,8 @@ class QueryExecutor(object):
     query_threads = list()
     for sql_writer, cursor, log_file \
         in izip(self.sql_writers, self.cursors, self.query_logs):
-      if cursor.db_type == IMPALA:
-        self.set_impala_query_optons(cursor)
+      if self.ENABLE_RANDOM_QUERY_OPTIONS and cursor.db_type == IMPALA:
+        self.set_impala_query_options(cursor)
       query_thread = Thread(
           target=self._fetch_sql_results,
           args=[query, cursor, sql_writer, log_file],
