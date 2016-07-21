@@ -619,8 +619,7 @@ Status HdfsScanner::UpdateDecompressor(const string& codec) {
   return Status::OK();
 }
 
-bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
-    int row_idx) {
+bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors) {
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     if (errors[i]) {
       const SlotDescriptor* desc = scan_node_->materialized_slots()[i];
@@ -628,36 +627,25 @@ bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
       errors[i] = false;
     }
   }
-
-  // Call into subclass to log a more accurate error message.
-  if (state_->LogHasSpace()) {
-    stringstream ss;
-    ss << "file: " << stream_->filename() << endl << "record: ";
-    LogRowParseError(row_idx, &ss);
-    state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()), 2);
-  }
+  LogRowParseError();
 
   if (state_->abort_on_error()) DCHECK(!parse_status_.ok());
   return parse_status_.ok();
 }
 
-void HdfsScanner::LogRowParseError(int row_idx, stringstream* ss) {
-  // This is only called for text and seq files which should override this function.
-  DCHECK(false);
+void HdfsScanner::LogRowParseError() {
+  const string& s = Substitute("Error parsing row: file: $0, before offset: $1",
+      stream_->filename(), stream_->file_offset());
+  state_->LogError(ErrorMsg(TErrorCode::GENERAL, s));
 }
 
 void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     const char* data, int len) {
-  // len < 0 is used to indicate the data contains escape characters.  We don't care
-  // about that here and can just output the raw string.
-  if (len < 0) len = -len;
-
   if (state_->LogHasSpace() || state_->abort_on_error()) {
     stringstream ss;
     ss << "Error converting column: "
        << desc->col_pos() - scan_node_->num_partition_keys()
-       << " TO " << desc->type()
-       << " (Data is: " << string(data,len) << ")";
+       << " to " << desc->type();
 
     // When skipping multiple header lines we only try to skip them in the first scan
     // range. For subsequent scan ranges, it's impossible to determine how many lines

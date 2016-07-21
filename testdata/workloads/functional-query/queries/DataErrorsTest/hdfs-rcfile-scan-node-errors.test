@@ -3,113 +3,158 @@
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col from alltypeserror
 ---- ERRORS
-Error converting column: 1 TO BOOL
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1
-Error converting column: 2 TO TINYINT
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 2,true,err2,,2,20,2.000000,20.200000,01/01/09,2
-Error converting column: 3 TO SMALLINT
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 3,false,3,err3,,30,3.000000,30.300000,01/01/09,3
-Error converting column: 4 TO INT
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 4,true,4,4,err4,,4.000000,40.400000,01/01/09,4
-Error converting column: 5 TO BIGINT
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 5,false,5,5,5,err50,,50.500000,01/01/09,5
-Error converting column: 6 TO FLOAT
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 6,true,6,6,6,60,err6.000000,,01/01/09,6
-Error converting column: 7 TO DOUBLE
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 7,,,7,7,70,7.000000,err70.700000,01/01/09,7
-Error converting column: 1 TO BOOL
-Error converting column: 2 TO TINYINT
-Error converting column: 3 TO SMALLINT
-Error converting column: 4 TO INT
-Error converting column: 5 TO BIGINT
-Error converting column: 6 TO FLOAT
-Error converting column: 7 TO DOUBLE
-file: alltypeserror_rc/year=2009/month=1/000001_0
-line: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9
-Error converting column: 6 TO FLOAT
-Error converting column: 7 TO DOUBLE
-file: alltypeserror_rc/year=2009/month=2/000002_0
-line: 13,false,3,3,,,xyz3.000000,xyz30.300000,02/01/09,3
-Error converting column: 2 TO TINYINT
-file: alltypeserror_rc/year=2009/month=2/000002_0
-line: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5
-Error converting column: 7 TO DOUBLE
-file: alltypeserror_rc/year=2009/month=2/000002_0
-line: 17,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7
-Error converting column: 3 TO SMALLINT
-file: alltypeserror_rc/year=2009/month=3/000000_0
-line: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3
-Error converting column: 4 TO INT
-file: alltypeserror_rc/year=2009/month=3/000000_0
-line: 25,false,5,5,abc5,50,5.000000,50.500000,03/01/09,5
-Error converting column: 2 TO TINYINT
-file: alltypeserror_rc/year=2009/month=3/000000_0
-line: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
-Error converting column: 4 TO INT
-file: alltypeserror_rc/year=2009/month=3/000000_0
-line: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
+Error converting column: 3 to SMALLINT
+file: __HDFS_FILENAME__
+Error converting column: 4 to INT
+file: __HDFS_FILENAME__
+Error converting column: 2 to TINYINT
+file: __HDFS_FILENAME__
+Error converting column: 4 to INT
+file: __HDFS_FILENAME__
+Error converting column: 1 to BOOLEAN
+Error converting column: 2 to TINYINT
+Error converting column: 3 to SMALLINT
+Error converting column: 4 to INT
+Error converting column: 5 to BIGINT
+Error converting column: 6 to FLOAT
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 6 to FLOAT
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 2 to TINYINT
+file: __HDFS_FILENAME__
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 1 to BOOLEAN
+file: __HDFS_FILENAME__
+Error converting column: 2 to TINYINT
+file: __HDFS_FILENAME__
+Error converting column: 3 to SMALLINT
+file: __HDFS_FILENAME__
+Error converting column: 4 to INT
+file: __HDFS_FILENAME__
+Error converting column: 5 to BIGINT
+file: __HDFS_FILENAME__
+Error converting column: 6 to FLOAT
+file: __HDFS_FILENAME__
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 1 to BOOLEAN
+Error converting column: 2 to TINYINT
+Error converting column: 3 to SMALLINT
+Error converting column: 4 to INT
+Error converting column: 5 to BIGINT
+Error converting column: 6 to FLOAT
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+---- RESULTS
+0,NULL,NULL,0,0,0,0,0,'01/01/09','0'
+1,NULL,NULL,1,1,10,1,10.1,'01/01/09','1'
+10,NULL,NULL,NULL,0,0,0,0,'02/01/09','0'
+11,false,NULL,NULL,NULL,10,1,10.1,'02/01/09','1'
+12,true,2,NULL,NULL,NULL,2,20.2,'02/01/09','2'
+13,false,3,3,NULL,NULL,NULL,NULL,'02/01/09','3'
+14,true,4,4,4,40,NULL,NULL,'02/01/09','4'
+15,false,NULL,5,5,50,5,50.5,'02/01/09','5'
+16,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'02/01/09','6'
+17,false,7,7,7,70,7,NULL,'02/01/09','7'
+18,true,8,8,8,80,8,80.8,'02/01/09','8'
+19,false,9,9,9,90,9,90.90000000000001,'02/01/09','9'
+2,true,NULL,NULL,2,20,2,20.2,'01/01/09','2'
+20,true,0,0,0,0,0,0,'03/01/09','0'
+21,false,1,1,1,10,1,10.1,'03/01/09','1'
+22,true,2,2,2,20,2,20.2,'03/01/09','2'
+23,false,3,NULL,3,30,3,30.3,'03/01/09','3'
+24,true,4,4,4,40,4,40.4,'03/01/09','4'
+25,false,5,5,NULL,50,5,50.5,'03/01/09','5'
+26,true,6,6,6,60,6,60.6,'03/01/09','6'
+27,false,NULL,7,7,70,7,70.7,'03/01/09','7'
+28,true,8,8,8,80,8,80.8,'03/01/09','8'
+29,false,9,9,NULL,90,9,90.90000000000001,'03/01/09','9'
+3,false,3,NULL,NULL,30,3,30.3,'01/01/09','3'
+30,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','10'
+4,true,4,4,NULL,NULL,4,40.4,'01/01/09','4'
+5,false,5,5,5,NULL,NULL,50.5,'01/01/09','5'
+6,true,6,6,6,60,NULL,NULL,'01/01/09','6'
+7,NULL,NULL,7,7,70,7,NULL,'01/01/09','7'
+8,false,NULL,NULL,8,80,8,80.8,'01/01/09','8'
+9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9'
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING
 ====
 ---- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col from alltypeserrornonulls
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0'
+1,NULL,1,1,1,10,1,10.1,'01/01/09','1'
+10,true,0,0,0,0,0,0,'02/01/09','0'
+11,false,1,1,1,10,1,10.1,'02/01/09','1'
+12,true,2,2,2,20,2,20.2,'02/01/09','2'
+13,false,3,3,3,30,NULL,NULL,'02/01/09','3'
+14,true,4,4,4,40,4,40.4,'02/01/09','4'
+15,false,NULL,5,5,50,5,50.5,'02/01/09','5'
+16,true,6,6,6,60,6,60.6,'02/01/09','6'
+17,false,7,7,7,70,7,NULL,'02/01/09','7'
+18,true,8,8,8,80,8,80.8,'02/01/09','8'
+19,false,9,9,9,90,9,90.90000000000001,'02/01/09','9'
+2,true,NULL,2,2,20,2,20.2,'01/01/09','2'
+20,true,0,0,0,0,0,0,'03/01/09','0'
+21,false,1,1,1,10,1,10.1,'03/01/09','1'
+22,true,2,2,2,20,2,20.2,'03/01/09','2'
+23,false,3,NULL,3,30,3,30.3,'03/01/09','3'
+24,true,4,4,4,40,4,40.4,'03/01/09','4'
+25,false,5,5,NULL,50,5,50.5,'03/01/09','5'
+26,true,6,6,6,60,6,60.6,'03/01/09','6'
+27,false,NULL,7,7,70,7,70.7,'03/01/09','7'
+28,true,8,8,8,80,8,80.8,'03/01/09','8'
+29,false,9,9,NULL,90,9,90.90000000000001,'03/01/09','9'
+3,false,3,NULL,3,30,3,30.3,'01/01/09','3'
+4,true,4,4,NULL,40,4,40.4,'01/01/09','4'
+5,false,5,5,5,NULL,5,50.5,'01/01/09','5'
+6,true,6,6,6,60,NULL,60.6,'01/01/09','6'
+7,false,7,7,7,70,7,NULL,'01/01/09','7'
+8,false,8,8,8,80,8,80.8,'01/01/09','8'
+9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9'
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING
 ---- ERRORS
-Error converting column: 1 TO BOOL
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 1,errfalse,1,1,1,10,1.000000,10.100000,01/01/09,1
-Error converting column: 2 TO TINYINT
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 2,true,err2,2,2,20,2.000000,20.200000,01/01/09,2
-Error converting column: 3 TO SMALLINT
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 3,false,3,err3,3,30,3.000000,30.300000,01/01/09,3
-Error converting column: 4 TO INT
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 4,true,4,4,err4,40,4.000000,40.400000,01/01/09,4
-Error converting column: 5 TO BIGINT
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 5,false,5,5,5,err50,5.000000,50.500000,01/01/09,5
-Error converting column: 6 TO FLOAT
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 6,true,6,6,6,60,err6.000000,60.600000,01/01/09,6
-Error converting column: 7 TO DOUBLE
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 7,false,7,7,7,70,7.000000,err70.700000,01/01/09,7
-Error converting column: 1 TO BOOL
-Error converting column: 2 TO TINYINT
-Error converting column: 3 TO SMALLINT
-Error converting column: 4 TO INT
-Error converting column: 5 TO BIGINT
-Error converting column: 6 TO FLOAT
-Error converting column: 7 TO DOUBLE
-file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
-line: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9
-Error converting column: 6 TO FLOAT
-Error converting column: 7 TO DOUBLE
-file: alltypeserrornonulls_rc/year=2009/month=2/000002_0
-line: 13,false,3,3,3,30,xyz3.000000,xyz30.300000,02/01/09,3
-Error converting column: 2 TO TINYINT
-file: alltypeserrornonulls_rc/year=2009/month=2/000002_0
-line: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5
-Error converting column: 7 TO DOUBLE
-file: alltypeserrornonulls_rc/year=2009/month=2/000002_0
-line: 17,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7
-Error converting column: 3 TO SMALLINT
-file: alltypeserrornonulls_rc/year=2009/month=3/000000_0
-line: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3
-Error converting column: 4 TO INT
-file: alltypeserrornonulls_rc/year=2009/month=3/000000_0
-line: 25,false,5,5,abc5,50,5.000000,50.500000,03/01/09,5
-Error converting column: 2 TO TINYINT
-file: alltypeserrornonulls_rc/year=2009/month=3/000000_0
-line: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
-Error converting column: 4 TO INT
-file: alltypeserrornonulls_rc/year=2009/month=3/000000_0
-line: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
+Error converting column: 3 to SMALLINT
+file: __HDFS_FILENAME__
+Error converting column: 4 to INT
+file: __HDFS_FILENAME__
+Error converting column: 2 to TINYINT
+file: __HDFS_FILENAME__
+Error converting column: 4 to INT
+file: __HDFS_FILENAME__
+Error converting column: 6 to FLOAT
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 2 to TINYINT
+file: __HDFS_FILENAME__
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 1 to BOOLEAN
+file: __HDFS_FILENAME__
+Error converting column: 2 to TINYINT
+file: __HDFS_FILENAME__
+Error converting column: 3 to SMALLINT
+file: __HDFS_FILENAME__
+Error converting column: 4 to INT
+file: __HDFS_FILENAME__
+Error converting column: 5 to BIGINT
+file: __HDFS_FILENAME__
+Error converting column: 6 to FLOAT
+file: __HDFS_FILENAME__
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
+Error converting column: 1 to BOOLEAN
+Error converting column: 2 to TINYINT
+Error converting column: 3 to SMALLINT
+Error converting column: 4 to INT
+Error converting column: 5 to BIGINT
+Error converting column: 6 to FLOAT
+Error converting column: 7 to DOUBLE
+file: __HDFS_FILENAME__
 ====

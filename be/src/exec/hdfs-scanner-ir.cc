@@ -64,9 +64,7 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
 
     // Report parse errors
     if (UNLIKELY(error_in_row)) {
-      if (!ReportTupleParseError(fields, error, i + row_idx_start)) {
-        return -1;
-      }
+      if (!ReportTupleParseError(fields, error)) return -1;
     }
 
     // Advance to the start of the next tuple

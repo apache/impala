@@ -24,6 +24,7 @@ import re
 from functools import wraps
 from tests.util.test_file_parser import (join_section_lines, remove_comments,
     split_section_lines)
+from tests.util.hdfs_util import NAMENODE
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_result_verfier')
@@ -272,18 +273,20 @@ def verify_errors(expected_errors, actual_errors):
       ['DUMMY_LABEL'], order_matters=False)
   VERIFIER_MAP['VERIFY_IS_EQUAL'](expected, actual)
 
-def apply_error_match_filter(error_list):
+def apply_error_match_filter(error_list, replace_filenames=True):
   """Applies a filter to each entry in the given list of errors to ensure result matching
   is stable."""
-  updated_errors = list()
-  for row in error_list:
-    # The actual file path isn't very interesting and can vary. Filter it out.
-    row = re.sub(r'^file:.+$|file=.+$|file hdfs:.+$', 'file: hdfs://regex:.$', row)
+  file_regex = r'%s.*/[\w\.\-]+' % NAMENODE
+  def replace_fn(row):
+    # The actual file path isn't very interesting and can vary. Change it to a canonical
+    # string that allows result rows to sort in the same order as expected rows.
+    if replace_filenames: row = re.sub(file_regex, '__HDFS_FILENAME__', row)
     # The "Backend <id>" can also vary, so filter it out as well.
-    updated_errors.append(re.sub(r'Backend \d+:', '', row))
-  return updated_errors
+    return re.sub(r'Backend \d+:', '', row)
+  return [replace_fn(row) for row in error_list]
 
-def verify_raw_results(test_section, exec_result, file_format, update_section=False):
+def verify_raw_results(test_section, exec_result, file_format, update_section=False,
+                       replace_filenames=True):
   """
   Accepts a raw exec_result object and verifies it matches the expected results.
   If update_section is true, updates test_section with the actual results
@@ -294,16 +297,16 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
   result format used in the tests.
   """
   expected_results = None
-
   if 'RESULTS' in test_section:
     expected_results = remove_comments(test_section['RESULTS'])
   else:
+    assert 'ERRORS' not in test_section, "'ERRORS' section must have accompanying 'RESULTS' section"
     LOG.info("No results found. Skipping verification");
     return
-
   if 'ERRORS' in test_section:
     expected_errors = split_section_lines(remove_comments(test_section['ERRORS']))
-    actual_errors = apply_error_match_filter(exec_result.log.split('\n'))
+    actual_errors = apply_error_match_filter(exec_result.log.split('\n'),
+                                             replace_filenames)
     try:
       verify_errors(expected_errors, actual_errors)
     except AssertionError:
@@ -476,4 +479,3 @@ def verify_runtime_profile(expected, actual):
   assert len(unmatched_lines) == 0, ("Did not find matches for lines in runtime profile:"
       "\nEXPECTED LINES:\n%s\n\nACTUAL PROFILE:\n%s" % ('\n'.join(unmatched_lines),
         actual))
-

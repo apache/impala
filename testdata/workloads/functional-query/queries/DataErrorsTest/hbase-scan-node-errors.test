@@ -2,86 +2,86 @@
 ---- QUERY
 select * from hbasealltypeserror
 ---- ERRORS
-Error converting column d:timestamp_col: '0' TO TIMESTAMP
+Error converting column d:timestamp_col: '0' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 0
-Error converting column d:bool_col: 'errfalse' TO BOOL
+Error converting column d:bool_col: 'errfalse' to BOOL
 hbase table: functional_hbase.hbasealltypeserror
 row key: 1
-Error converting column d:double_col: 'xyz30.300000' TO DOUBLE
-Error converting column d:float_col: 'xyz3.000000' TO FLOAT
+Error converting column d:double_col: 'xyz30.300000' to DOUBLE
+Error converting column d:float_col: 'xyz3.000000' to FLOAT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 13
-Error converting column d:timestamp_col: '0009-01-01 00:00:00' TO TIMESTAMP
-Error converting column d:tinyint_col: 'xyz5' TO TINYINT
+Error converting column d:timestamp_col: '0009-01-01 00:00:00' to TIMESTAMP
+Error converting column d:tinyint_col: 'xyz5' to TINYINT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 15
-Error converting column d:timestamp_col: '0' TO TIMESTAMP
+Error converting column d:timestamp_col: '0' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 16
-Error converting column d:double_col: 'xyz70.700000' TO DOUBLE
+Error converting column d:double_col: 'xyz70.700000' to DOUBLE
 hbase table: functional_hbase.hbasealltypeserror
 row key: 17
-Error converting column d:timestamp_col: '1999-10-10 90:10:10' TO TIMESTAMP
-Error converting column d:tinyint_col: 'err2' TO TINYINT
+Error converting column d:timestamp_col: '1999-10-10 90:10:10' to TIMESTAMP
+Error converting column d:tinyint_col: 'err2' to TINYINT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 2
-Error converting column d:timestamp_col: '2020-20-10 10:10:10.123' TO TIMESTAMP
+Error converting column d:timestamp_col: '2020-20-10 10:10:10.123' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 21
-Error converting column d:timestamp_col: '2020-10-40 10:10:10.123' TO TIMESTAMP
+Error converting column d:timestamp_col: '2020-10-40 10:10:10.123' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 22
-Error converting column d:smallint_col: 'abc3' TO SMALLINT
-Error converting column d:timestamp_col: '2020-10-10 60:10:10.123' TO TIMESTAMP
+Error converting column d:smallint_col: 'abc3' to SMALLINT
+Error converting column d:timestamp_col: '2020-10-10 60:10:10.123' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 23
-Error converting column d:timestamp_col: '2020-10-10 10:70:10.123' TO TIMESTAMP
+Error converting column d:timestamp_col: '2020-10-10 10:70:10.123' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 24
-Error converting column d:int_col: 'abc5' TO INT
+Error converting column d:int_col: 'abc5' to INT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 25
-Error converting column d:tinyint_col: 'abc7' TO TINYINT
+Error converting column d:tinyint_col: 'abc7' to TINYINT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 27
-Error converting column d:int_col: 'abc9' TO INT
+Error converting column d:int_col: 'abc9' to INT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 29
-Error converting column d:smallint_col: 'err3' TO SMALLINT
-Error converting column d:timestamp_col: '2002-14-10 00:00:00' TO TIMESTAMP
+Error converting column d:smallint_col: 'err3' to SMALLINT
+Error converting column d:timestamp_col: '2002-14-10 00:00:00' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserror
 row key: 3
-Error converting column d:bigint_col: 'err300' TO BIGINT
-Error converting column d:bool_col: 't\rue' TO BOOL
-Error converting column d:double_col: 'err300.900000' TO DOUBLE
-Error converting column d:float_col: 'err30..000000' TO FLOAT
-Error converting column d:int_col: 'err30' TO INT
-Error converting column d:smallint_col: 'err30' TO SMALLINT
-Error converting column d:timestamp_col: '0000-01-01 00:00:00' TO TIMESTAMP
-Error converting column d:tinyint_col: 'err30' TO TINYINT
+Error converting column d:bigint_col: 'err300' to BIGINT
+Error converting column d:bool_col: 't\rue' to BOOL
+Error converting column d:double_col: 'err300.900000' to DOUBLE
+Error converting column d:float_col: 'err30..000000' to FLOAT
+Error converting column d:int_col: 'err30' to INT
+Error converting column d:smallint_col: 'err30' to SMALLINT
+Error converting column d:timestamp_col: '0000-01-01 00:00:00' to TIMESTAMP
+Error converting column d:tinyint_col: 'err30' to TINYINT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 30
-Error converting column d:int_col: 'err4' TO INT
+Error converting column d:int_col: 'err4' to INT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 4
-Error converting column d:bigint_col: 'err50' TO BIGINT
+Error converting column d:bigint_col: 'err50' to BIGINT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 5
-Error converting column d:float_col: 'err6.000000' TO FLOAT
+Error converting column d:float_col: 'err6.000000' to FLOAT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 6
-Error converting column d:double_col: 'err70.700000' TO DOUBLE
+Error converting column d:double_col: 'err70.700000' to DOUBLE
 hbase table: functional_hbase.hbasealltypeserror
 row key: 7
-Error converting column d:bigint_col: 'err90' TO BIGINT
-Error converting column d:bool_col: 'errtrue' TO BOOL
-Error converting column d:double_col: 'err90.900000' TO DOUBLE
-Error converting column d:float_col: 'err9.000000' TO FLOAT
-Error converting column d:int_col: 'err9' TO INT
-Error converting column d:smallint_col: 'err9' TO SMALLINT
-Error converting column d:timestamp_col: '0000-01-01 00:00:00' TO TIMESTAMP
-Error converting column d:tinyint_col: 'err9' TO TINYINT
+Error converting column d:bigint_col: 'err90' to BIGINT
+Error converting column d:bool_col: 'errtrue' to BOOL
+Error converting column d:double_col: 'err90.900000' to DOUBLE
+Error converting column d:float_col: 'err9.000000' to FLOAT
+Error converting column d:int_col: 'err9' to INT
+Error converting column d:smallint_col: 'err9' to SMALLINT
+Error converting column d:timestamp_col: '0000-01-01 00:00:00' to TIMESTAMP
+Error converting column d:tinyint_col: 'err9' to TINYINT
 hbase table: functional_hbase.hbasealltypeserror
 row key: 9
 ---- FILEERRORS
@@ -124,64 +124,64 @@ int, bigint, boolean, string, double, float, int, smallint, string, timestamp, t
 ---- QUERY
 select * from hbasealltypeserrornonulls
 ---- ERRORS
-Error converting column d:timestamp_col: '123456' TO TIMESTAMP
+Error converting column d:timestamp_col: '123456' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 0
-Error converting column d:bool_col: 'errfalse' TO BOOL
-Error converting column d:timestamp_col: '1990-00-01 10:10:10' TO TIMESTAMP
+Error converting column d:bool_col: 'errfalse' to BOOL
+Error converting column d:timestamp_col: '1990-00-01 10:10:10' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 1
-Error converting column d:double_col: 'xyz30.300000' TO DOUBLE
-Error converting column d:float_col: 'xyz3.000000' TO FLOAT
+Error converting column d:double_col: 'xyz30.300000' to DOUBLE
+Error converting column d:float_col: 'xyz3.000000' to FLOAT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 13
-Error converting column d:tinyint_col: 'xyz5' TO TINYINT
+Error converting column d:tinyint_col: 'xyz5' to TINYINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 15
-Error converting column d:double_col: 'xyz70.700000' TO DOUBLE
+Error converting column d:double_col: 'xyz70.700000' to DOUBLE
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 17
-Error converting column d:tinyint_col: 'err2' TO TINYINT
+Error converting column d:tinyint_col: 'err2' to TINYINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 2
-Error converting column d:smallint_col: 'abc3' TO SMALLINT
+Error converting column d:smallint_col: 'abc3' to SMALLINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 23
-Error converting column d:int_col: 'abc5' TO INT
-Error converting column d:timestamp_col: '2012-Mar-22 11:20:01.123' TO TIMESTAMP
+Error converting column d:int_col: 'abc5' to INT
+Error converting column d:timestamp_col: '2012-Mar-22 11:20:01.123' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 25
-Error converting column d:tinyint_col: 'abc7' TO TINYINT
+Error converting column d:tinyint_col: 'abc7' to TINYINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 27
-Error converting column d:timestamp_col: '11:20:01.123 2012-03-22 ' TO TIMESTAMP
+Error converting column d:timestamp_col: '11:20:01.123 2012-03-22 ' to TIMESTAMP
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 28
-Error converting column d:int_col: 'abc9' TO INT
+Error converting column d:int_col: 'abc9' to INT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 29
-Error converting column d:smallint_col: 'err3' TO SMALLINT
+Error converting column d:smallint_col: 'err3' to SMALLINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 3
-Error converting column d:int_col: 'err4' TO INT
+Error converting column d:int_col: 'err4' to INT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 4
-Error converting column d:bigint_col: 'err50' TO BIGINT
+Error converting column d:bigint_col: 'err50' to BIGINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 5
-Error converting column d:float_col: 'err6.000000' TO FLOAT
+Error converting column d:float_col: 'err6.000000' to FLOAT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 6
-Error converting column d:double_col: 'err70.700000' TO DOUBLE
+Error converting column d:double_col: 'err70.700000' to DOUBLE
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 7
-Error converting column d:bigint_col: 'err90' TO BIGINT
-Error converting column d:bool_col: 'errtrue' TO BOOL
-Error converting column d:double_col: 'err90.900000' TO DOUBLE
-Error converting column d:float_col: 'err9.000000' TO FLOAT
-Error converting column d:int_col: 'err9' TO INT
-Error converting column d:smallint_col: 'err9' TO SMALLINT
-Error converting column d:tinyint_col: 'err9' TO TINYINT
+Error converting column d:bigint_col: 'err90' to BIGINT
+Error converting column d:bool_col: 'errtrue' to BOOL
+Error converting column d:double_col: 'err90.900000' to DOUBLE
+Error converting column d:float_col: 'err9.000000' to FLOAT
+Error converting column d:int_col: 'err9' to INT
+Error converting column d:smallint_col: 'err9' to SMALLINT
+Error converting column d:tinyint_col: 'err9' to TINYINT
 hbase table: functional_hbase.hbasealltypeserrornonulls
 row key: 9
 ---- FILEERRORS

@@ -18,6 +18,10 @@
 # Utilities for supporting different filesystems.
 import os
 
+# FILESYSTEM_PREFIX is the path prefix that should be used in queries.  When running
+# the tests against the default filesystem (fs.defaultFS), FILESYSTEM_PREFIX is the
+# empty string.  When running against a secondary filesystem, it will be the scheme
+# and authority portion of the qualified path.
 FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX") or str()
 SECONDARY_FILESYSTEM = os.getenv("SECONDARY_FILESYSTEM") or str()
 FILESYSTEM = os.getenv("TARGET_FILESYSTEM")

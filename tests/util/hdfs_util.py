@@ -26,6 +26,28 @@ from pywebhdfs.webhdfs import PyWebHdfsClient, errors, _raise_pywebhdfs_exceptio
 from xml.etree.ElementTree import parse
 
 from tests.util.filesystem_base import BaseFilesystem
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
+
+class HdfsConfig(object):
+  """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
+  accessible via get()"""
+  def __init__(self, *filename):
+    self.conf = {}
+    for arg in filename:
+      tree = parse(arg)
+      for property in tree.getroot().getiterator('property'):
+        self.conf[property.find('name').text] = property.find('value').text
+
+  def get(self, key):
+    return self.conf.get(key)
+
+# Configuration object for the configuration that the minicluster will use.
+CORE_CONF = HdfsConfig(join_path(environ['HADOOP_CONF_DIR'], "core-site.xml"))
+# NAMENODE is the path prefix that should be used in results, since paths that come
+# out of Impala have been qualified.  When running against the default filesystem,
+# this will be the same as fs.defaultFS.  When running against a secondary filesystem,
+# this will be the same as FILESYSTEM_PREFIX.
+NAMENODE = FILESYSTEM_PREFIX or CORE_CONF.get('fs.defaultFS')
 
 class PyWebHdfsClientWithChmod(PyWebHdfsClient, BaseFilesystem):
   def chmod(self, path, permission):
@@ -117,19 +139,6 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient, BaseFilesystem):
     except errors.FileNotFound:
       return False
     return True
-
-class HdfsConfig(object):
-  """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
-  accessible via get()"""
-  def __init__(self, *filename):
-    self.conf = {}
-    for arg in filename:
-      tree = parse(arg)
-      for property in tree.getroot().getiterator('property'):
-        self.conf[property.find('name').text] = property.find('value').text
-
-  def get(self, key):
-    return self.conf.get(key)
 
 def get_hdfs_client_from_conf(conf):
   """Returns a new HTTP client for an HDFS cluster using an HdfsConfig object"""

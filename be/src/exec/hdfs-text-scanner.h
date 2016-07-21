@@ -165,10 +165,6 @@ class HdfsTextScanner : public HdfsScanner {
   /// the boundary pool.
   void WritePartialTuple(FieldLocation*, int num_fields, bool copy_strings);
 
-  /// Appends the current file and line to the RuntimeState's error log.
-  /// row_idx is 0-based (in current batch) where the parse error occured.
-  virtual void LogRowParseError(int row_idx, std::stringstream*);
-
   /// Mem pool for boundary_row_ and boundary_column_.
   boost::scoped_ptr<MemPool> boundary_pool_;
 

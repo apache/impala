@@ -372,23 +372,18 @@ class HdfsScanner {
 
   /// Utility function to report parse errors for each field.
   /// If errors[i] is nonzero, fields[i] had a parse error.
-  /// row_idx is the idx of the row in the current batch that had the parse error
   /// Returns false if parsing should be aborted.  In this case parse_status_ is set
   /// to the error.
   /// This is called from WriteAlignedTuples.
-  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, int row_idx);
+  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors);
 
   /// Triggers debug action of the scan node. This is currently used by parquet column
   /// readers to exercise various failure paths in parquet scanner. Returns the status
   /// returned by the scan node's TriggerDebugAction().
   Status TriggerDebugAction() { return scan_node_->TriggerDebugAction(); }
 
-  /// Utility function to append an error message for an invalid row.  This is called
-  /// from ReportTupleParseError()
-  /// row_idx is the index of the row in the current batch.  Subclasses should override
-  /// this function (i.e. text needs to join boundary rows).  Since this is only in the
-  /// error path, vtable overhead is acceptable.
-  virtual void LogRowParseError(int row_idx, std::stringstream*);
+  /// Utility function to append an error message for an invalid row.
+  void LogRowParseError();
 
   /// Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
   /// to the start of the tuple (e.g. fields[0] maps to slots[0]).

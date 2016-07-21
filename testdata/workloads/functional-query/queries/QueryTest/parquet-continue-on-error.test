@@ -40,7 +40,7 @@ bigint,bigint
 29,10
 30,10
 ---- ERRORS
-Column metadata states there are 50 values, but read 100 values from column element. file: hdfs://regex:.$
+Column metadata states there are 50 values, but read 100 values from column element. file=__HDFS_FILENAME__ (1 of 2 similar)
 ====
 ---- QUERY
 # Same as above but only selecting a single scalar column.
@@ -81,7 +81,7 @@ bigint
 29
 30
 ---- ERRORS
-Column metadata states there are 11 values, but read 10 values from column id. file: hdfs://regex:.$
+Column metadata states there are 11 values, but read 10 values from column id. file=__HDFS_FILENAME__
 ====
 ---- QUERY
 SELECT * from bad_parquet_strings_negative_len
@@ -89,8 +89,8 @@ SELECT * from bad_parquet_strings_negative_len
 STRING
 ---- RESULTS
 ---- ERRORS
-row_regex: .*File '.*/plain-encoded-negative-len.parq' is corrupt: error decoding value of type STRING at offset 58.*
-row_regex: .*File '.*/dict-encoded-negative-len.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary.*
+File '$NAMENODE/test-warehouse/bad_parquet_strings_negative_len_parquet/plain-encoded-negative-len.parq' is corrupt: error decoding value of type STRING at offset 58
+File '$NAMENODE/test-warehouse/bad_parquet_strings_negative_len_parquet/dict-encoded-negative-len.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary
 ====
 ---- QUERY
 SELECT * from bad_parquet_strings_out_of_bounds
@@ -98,6 +98,6 @@ SELECT * from bad_parquet_strings_out_of_bounds
 STRING
 ---- RESULTS
 ---- ERRORS
-row_regex: .*File '.*/plain-encoded-out-of-bounds.parq' is corrupt: error decoding value of type STRING at offset 58.*
-row_regex: .*File '.*/dict-encoded-out-of-bounds.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary.*
+File '$NAMENODE/test-warehouse/bad_parquet_strings_out_of_bounds_parquet/plain-encoded-out-of-bounds.parq' is corrupt: error decoding value of type STRING at offset 58
+File '$NAMENODE/test-warehouse/bad_parquet_strings_out_of_bounds_parquet/dict-encoded-out-of-bounds.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary
 ====

@@ -332,7 +332,7 @@ Status HdfsSequenceScanner::ProcessRange() {
           template_tuple_, &errors[0], &error_in_row);
 
       if (UNLIKELY(error_in_row)) {
-        ReportTupleParseError(&field_locations_[0], errors, 0);
+        ReportTupleParseError(&field_locations_[0], errors);
         RETURN_IF_ERROR(parse_status_);
       }
     } else {
@@ -504,10 +504,4 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   }
 
   return Status::OK();
-}
-
-void HdfsSequenceScanner::LogRowParseError(int row_idx, stringstream* ss) {
-  DCHECK_LT(row_idx, record_locations_.size());
-  *ss << string(reinterpret_cast<const char*>(record_locations_[row_idx].record),
-                  record_locations_[row_idx].len);
 }

@@ -2,23 +2,20 @@
 ---- QUERY
 select * from overflow
 ---- ERRORS
-Error converting column: 0 TO TINYINT (Data is: 1000)
-Error converting column: 1 TO SMALLINT (Data is: 100000)
-Error converting column: 2 TO INT (Data is: 10000000000000000)
-Error converting column: 3 TO BIGINT (Data is: 10000000000000000000)
-Error converting column: 4 TO FLOAT (Data is: 1e1000000)
-Error converting column: 5 TO DOUBLE (Data is: 1e10000)
-file: hdfs://regex:.$
-record: 1000,100000,10000000000000000,10000000000000000000,1e1000000,1e10000
-Error converting column: 0 TO TINYINT (Data is: -1000)
-Error converting column: 1 TO SMALLINT (Data is: -100000)
-Error converting column: 2 TO INT (Data is: -10000000000000000)
-Error converting column: 3 TO BIGINT (Data is: -10000000000000000000)
-Error converting column: 4 TO FLOAT (Data is: -1e1000000)
-Error converting column: 5 TO DOUBLE (Data is: -1e10000)
-file: hdfs://regex:.$
-record: -1000,-100000,-10000000000000000,-10000000000000000000,-1e1000000,-1e10000
-
+Error converting column: 0 to TINYINT
+Error converting column: 1 to SMALLINT
+Error converting column: 2 to INT
+Error converting column: 3 to BIGINT
+Error converting column: 4 to FLOAT
+Error converting column: 5 to DOUBLE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 0 to TINYINT
+Error converting column: 1 to SMALLINT
+Error converting column: 2 to INT
+Error converting column: 3 to BIGINT
+Error converting column: 4 to FLOAT
+Error converting column: 5 to DOUBLE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
 ---- RESULTS
 1,2,3,4,5.5,6.6
 NULL,NULL,NULL,NULL,NULL,NULL

@@ -48,13 +48,17 @@ from tests.common.test_vector import TestDimension
 from tests.performance.query import Query
 from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
-from tests.util.filesystem_utils import IS_S3, S3_BUCKET_NAME
-from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
+from tests.util.filesystem_utils import IS_S3, S3_BUCKET_NAME, FILESYSTEM_PREFIX
+from tests.util.hdfs_util import (
+  HdfsConfig,
+  get_hdfs_client,
+  get_hdfs_client_from_conf,
+  NAMENODE)
 from tests.util.s3_util import S3Client
 from tests.util.test_file_parser import (
-    QueryTestSectionReader,
-    parse_query_test_file,
-    write_test_file)
+  QueryTestSectionReader,
+  parse_query_test_file,
+  write_test_file)
 from tests.util.thrift_util import create_transport
 
 # Imports required for Hive Metastore Client
@@ -72,19 +76,8 @@ IMPALAD_HS2_HOST_PORT =\
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
-CORE_CONF = HdfsConfig(os.path.join(os.environ['HADOOP_CONF_DIR'], "core-site.xml"))
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
-# FILESYSTEM_PREFIX is the path prefix that should be used in queries.  When running
-# the tests against the default filesystem (fs.defaultFS), FILESYSTEM_PREFIX is the
-# empty string.  When running against a secondary filesystem, it will be the scheme
-# and authority porotion of the qualified path.
-FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX")
-# NAMENODE is the path prefix that should be used in results, since paths that come
-# out of Impala have been qualified.  When running against the default filesystem,
-# this will be the same as fs.defaultFS.  When running against a secondary filesystem,
-# this will be the same as FILESYSTEM_PREFIX.
-NAMENODE = FILESYSTEM_PREFIX or CORE_CONF.get('fs.defaultFS')
 # Match any SET statement. Assume that query options' names
 # only contain alphabets and underscores.
 SET_PATTERN = re.compile(r'\s*set\s*([a-zA-Z_]+)=*', re.I)
@@ -220,6 +213,27 @@ class ImpalaTestSuite(BaseTestSuite):
       if expected_str in actual_str: return
     assert False, 'Unexpected exception string: %s' % actual_str
 
+  def __verify_results_and_errors(self, vector, test_section, result, use_db):
+    """Verifies that both results and error sections are as expected. Rewrites both
+      by replacing $NAMENODE, $DATABASE and $IMPALA_HOME with their actual values, and
+      optionally rewriting filenames with __HDFS_FILENAME__, to ensure that expected and
+      actual values are easily compared.
+    """
+    replace_filenames_with_placeholder = True
+    for section_name in ('RESULTS', 'ERRORS'):
+      if section_name in test_section:
+        if "$NAMENODE" in test_section[section_name]:
+          replace_filenames_with_placeholder = False
+        test_section[section_name] = test_section[section_name] \
+                                     .replace('$NAMENODE', NAMENODE) \
+                                     .replace('$IMPALA_HOME', IMPALA_HOME)
+      if use_db:
+        test_section['RESULTS'] = test_section['RESULTS'].replace('$DATABASE', use_db)
+    verify_raw_results(test_section, result, vector.get_value('table_format').file_format,
+                       pytest.config.option.update_results,
+                       replace_filenames_with_placeholder)
+
+
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
       encoding=None, wait_secs_between_stmts=None):
     """
@@ -325,14 +339,11 @@ class ImpalaTestSuite(BaseTestSuite):
       if encoding: result.data = [row.decode(encoding) for row in result.data]
       # Replace $NAMENODE in the expected results with the actual namenode URI.
       if 'RESULTS' in test_section:
-        test_section['RESULTS'] = test_section['RESULTS'] \
-            .replace('$NAMENODE', NAMENODE) \
-            .replace('$IMPALA_HOME', IMPALA_HOME)
-        if use_db:
-          test_section['RESULTS'] = test_section['RESULTS'].replace('$DATABASE', use_db)
-        verify_raw_results(test_section, result,
-                         vector.get_value('table_format').file_format,
-                         pytest.config.option.update_results)
+        self.__verify_results_and_errors(vector, test_section, result, use_db)
+      else:
+        # TODO: Can't validate errors without expected results for now.
+        assert 'ERRORS' not in test_section,\
+          "'ERRORS' sections must have accompanying 'RESULTS' sections"
       # If --update_results, then replace references to the namenode URI with $NAMENODE.
       if pytest.config.option.update_results and 'RESULTS' in test_section:
         test_section['RESULTS'] = test_section['RESULTS'] \

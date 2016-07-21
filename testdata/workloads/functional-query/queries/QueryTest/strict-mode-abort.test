@@ -2,30 +2,30 @@
 ---- QUERY
 select tinyint_col from overflow
 ---- CATCH
-Error converting column: 0 TO TINYINT (Data is: 1000)
+Error converting column: 0 to TINYINT
 ====
 ---- QUERY
 select smallint_col from overflow
 ---- CATCH
-Error converting column: 1 TO SMALLINT (Data is: 100000)
+Error converting column: 1 to SMALLINT
 ====
 ---- QUERY
 select int_col from overflow
 ---- CATCH
-Error converting column: 2 TO INT (Data is: 10000000000000000)
+Error converting column: 2 to INT
 ====
 ---- QUERY
 select bigint_col from overflow
 ---- CATCH
-Error converting column: 3 TO BIGINT (Data is: 10000000000000000000)
+Error converting column: 3 to BIGINT
 ====
 ---- QUERY
 select float_col from overflow
 ---- CATCH
-Error converting column: 4 TO FLOAT (Data is: 1e1000000)
+Error converting column: 4 to FLOAT
 ====
 ---- QUERY
 select double_col from overflow
 ---- CATCH
-Error converting column: 5 TO DOUBLE (Data is: 1e10000)
+Error converting column: 5 to DOUBLE
 ====

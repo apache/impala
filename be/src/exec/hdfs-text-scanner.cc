@@ -722,25 +722,6 @@ Status HdfsTextScanner::Open(ScannerContext* context) {
   return Status::OK();
 }
 
-void HdfsTextScanner::LogRowParseError(int row_idx, stringstream* ss) {
-  DCHECK_LT(row_idx, row_end_locations_.size());
-  char* row_end = row_end_locations_[row_idx];
-  char* row_start;
-  if (row_idx == 0) {
-    row_start = batch_start_ptr_;
-  } else {
-    // Row start at 1 past the row end (i.e. the row delimiter) for the previous row
-    row_start = row_end_locations_[row_idx - 1] + 1;
-  }
-
-  if (!boundary_row_.IsEmpty()) {
-    // Log the beginning of the line from the previous file buffer(s).
-    *ss << string(boundary_row_.buffer(), boundary_row_.len());
-  }
-  // Log the erroneous line (or the suffix of a line if !boundary_line.empty()).
-  *ss << string(row_start, row_end - row_start);
-}
-
 // This function writes fields in 'field_locations_' to the row_batch.  This function
 // deals with tuples that straddle batches.  There are two cases:
 // 1. There is already a partial tuple in flight from the previous time around.
@@ -776,10 +757,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
         if (state_->abort_on_error()) {
           parse_status_ = Status(state_->ErrorLog());
         } else {
-          stringstream ss;
-          ss << "file: " << stream_->filename() << endl << "record: ";
-          LogRowParseError(0, &ss);
-          state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+          LogRowParseError();
         }
         if (!parse_status_.ok()) return 0;
         error_in_row_ = false;
