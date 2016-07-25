@@ -426,7 +426,7 @@ export CLASSPATH
 
 # Setup aliases
 # Helper alias to script that verifies and merges Gerrit changes
-alias gerrit-verify-merge="${IMPALA_AUX_TEST_HOME}/jenkins/gerrit-verify-merge.sh"
+alias gerrit-verify-only="${IMPALA_AUX_TEST_HOME}/jenkins/gerrit-verify-only.sh"
 
 # A marker in the environment to prove that we really did source this file
 export IMPALA_CONFIG_SOURCED=1
