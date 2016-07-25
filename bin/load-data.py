@@ -153,6 +153,15 @@ def exec_bash_script(file_name):
   print 'Executing Bash Command: ' + bash_cmd
   exec_cmd(bash_cmd, 'Error bash script: ' + file_name)
 
+def run_dataset_preload(dataset):
+  """Execute a preload script if present in dataset directory. E.g. to generate data
+  before loading"""
+  dataset_preload_script = os.path.join(DATASET_DIR, dataset, "preload")
+  if os.path.exists(dataset_preload_script):
+    print("Running preload script for " + dataset)
+    exec_cmd(dataset_preload_script, "Error executing preload script for " + dataset,
+        exit_on_error=True)
+
 def generate_schema_statements(workload):
   generate_cmd = GENERATE_SCHEMA_CMD % (options.exploration_strategy, workload,
                                         options.scale_factor)
@@ -259,6 +268,7 @@ if __name__ == "__main__":
   for workload in workloads:
     start_time = time.time()
     dataset = get_dataset_for_workload(workload)
+    run_dataset_preload(dataset)
     generate_schema_statements(workload)
     sql_dir = os.path.join(SQL_OUTPUT_DIR, dataset)
     assert os.path.isdir(sql_dir),\

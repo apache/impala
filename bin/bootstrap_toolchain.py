@@ -341,7 +341,7 @@ if __name__ == "__main__":
 
   packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "gcc", "gflags", "glog",
       "gperftools", "gtest", "kudu", "llvm", ("llvm", "3.8.0-asserts-p1"), "lz4",
-      "openldap", "rapidjson", "re2", "snappy", "thrift", "zlib"]
+      "openldap", "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"]
   bootstrap(toolchain_root, packages)
 
   # Download the CDH components if necessary.
