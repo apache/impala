@@ -43,6 +43,7 @@ import subprocess
 import sys
 
 APACHE_REPO = "https://git-wip-us.apache.org/repos/asf/incubator-impala.git"
+GERRIT_URL_RE = re.compile(r"ssh://.+@gerrit.cloudera.org:29418/Impala-ASF")
 
 # Parsed options, filled in by main().
 OPTIONS = None
@@ -106,18 +107,20 @@ def get_my_email():
 
 def check_apache_remote():
   """
-  Checks that there is a remote named 'apache' set up correctly.
+  Checks that there is a remote named <OPTIONS.apache_remote> set up correctly.
   Otherwise, exits with an error message.
   """
   try:
     url = check_output(\
-        ['git', 'config', '--local', '--get', 'remote.apache.url']).strip()
+        ['git', 'config', '--local', '--get',
+            'remote.' + OPTIONS.apache_remote + '.url']).strip()
   except subprocess.CalledProcessError:
-    print >>sys.stderr, "No remote named 'apache'. Please set one up, for example with: "
+    print >>sys.stderr, "No remote named " + OPTIONS.apache_remote + \
+        ". Please set one up, for example with: "
     print >>sys.stderr, "  git remote add apache", APACHE_REPO
     sys.exit(1)
   if url != APACHE_REPO:
-    print >>sys.stderr, "Unexpected URL for remote 'apache'."
+    print >>sys.stderr, "Unexpected URL for remote " + OPTIONS.apache_remote + "."
     print >>sys.stderr, "  Got:     ", url
     print >>sys.stderr, "  Expected:", APACHE_REPO
     sys.exit(1)
@@ -125,19 +128,20 @@ def check_apache_remote():
 
 def check_gerrit_remote():
   """
-  Checks that there is a remote named 'gerrit' set up correctly.
+  Checks that there is a remote named <OPTIONS.gerrit_remote> set up correctly.
   Otherwise, exits with an error message.
   """
   try:
     url = check_output(['git', 'config', '--local', '--get',
-                        'remote.' + OPTIONS.remote + '.url']).strip()
+                        'remote.' + OPTIONS.gerrit_remote + '.url']).strip()
   except subprocess.CalledProcessError:
-    print >>sys.stderr, "No remote named 'gerrit'. Please set one up following "
+    print >>sys.stderr, "No remote named " + OPTIONS.gerrit_remote + \
+        ". Please set one up following "
     print >>sys.stderr, "the contributor guide."
     sys.exit(1)
-  gerrit_url_re = re.compile(OPTIONS.gerrit)
-  if not gerrit_url_re.match(url):
-    print >>sys.stderr, "Unexpected URL for remote 'gerrit'."
+
+  if not GERRIT_URL_RE.match(url):
+    print >>sys.stderr, "Unexpected URL for remote " + OPTIONS.gerrit_remote
     print >>sys.stderr, "  Got:     ", url
     print >>sys.stderr, "  Expected to find host '%s' in the URL" % GERRIT_HOST
     sys.exit(1)
@@ -263,13 +267,17 @@ def main():
   p.add_option("-n", "--dry-run", action="store_true",
                help="Perform git pushes with --dry-run")
   p.add_option(
-      "-r",
-      "--remote",
-      dest="remote",
+      "-g",
+      "--gerrit_remote",
+      dest="gerrit_remote",
       help="Name of the git remote that corresponds to gerrit",
       default="asf-gerrit")
-  p.add_option("-g", "--gerrit", dest="gerrit", help="Gerrit URL regex",
-               default=r"ssh://.+@gerrit.cloudera.org:29418/ImpalaASF")
+  p.add_option(
+      "-a",
+      "--apache_remote",
+      dest="apache_remote",
+      help="Name of the git remote that corresponds to apache",
+      default="apache")
   OPTIONS, args = p.parse_args()
   if args:
     p.error("no arguments expected")
@@ -280,13 +288,13 @@ def main():
   check_gerrit_remote()
 
   # Ensure we have the latest state of gerrit.
-  fetch('gerrit')
+  fetch(OPTIONS.gerrit_remote)
 
   # Check the current state of branches on Apache.
   # For each branch, we try to update it if the revisions don't match.
-  apache_branches = get_branches('apache')
+  apache_branches = get_branches(OPTIONS.apache_remote)
   for branch, apache_sha in sorted(apache_branches.iteritems()):
-    gerrit_sha = rev_parse("remotes/gerrit/" + branch)
+    gerrit_sha = rev_parse("remotes/" + OPTIONS.gerrit_remote + "/" + branch)
     print "Branch '%s':\t" % branch,
     if gerrit_sha is None:
       print Colors.YELLOW, "found on Apache but not in gerrit", Colors.RESET
