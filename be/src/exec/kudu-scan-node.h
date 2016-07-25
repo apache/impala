@@ -163,10 +163,14 @@ class KuduScanNode : public ScanNode {
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
 
   /// Main function for scanner thread which executes a KuduScanner. Begins by processing
-  /// 'initial_range', once that range is completed it fetches more ranges with 'GetNextKeyRange()'
-  /// until there are no more ranges to fetch, an error occurred or the limit has been reached.
-  /// Scanned batches are enqueued in 'materialized_row_batches_'.
+  /// 'initial_range', and continues processing ranges returned by 'GetNextKeyRange()'
+  /// until there are no more ranges, an error occurs, or the limit is reached.
   void ScannerThread(const string& name, const TKuduKeyRange* initial_range);
+
+  /// Processes a single scan range. Row batches are fetched using 'scanner' and enqueued
+  /// in 'materialized_row_batches_' until the scanner reports eos for 'key_range', an
+  /// error occurs, or the limit is reached.
+  Status ProcessRange(KuduScanner* scanner, const TKuduKeyRange* key_range);
 
   /// Returns the next partition key range to read. Thread safe. Returns NULL if there are
   /// no more ranges.

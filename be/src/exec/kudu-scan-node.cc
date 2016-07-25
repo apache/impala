@@ -408,60 +408,80 @@ void KuduScanNode::ThreadTokenAvailableCb(
   }
 }
 
-void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* key_range) {
+Status KuduScanNode::ProcessRange(KuduScanner* scanner, const TKuduKeyRange* key_range) {
+  RETURN_IF_ERROR(scanner->OpenNextRange(*key_range));
+  bool eos = false;
+  while (!eos) {
+    gscoped_ptr<RowBatch> row_batch(new RowBatch(
+          row_desc(), runtime_state_->batch_size(), mem_tracker()));
+    RETURN_IF_ERROR(scanner->GetNext(row_batch.get(), &eos));
+    while (!done_) {
+      scanner->KeepKuduScannerAlive();
+      if (materialized_row_batches_->AddBatchWithTimeout(row_batch.get(), 1000000)) {
+        ignore_result(row_batch.release());
+        break;
+      }
+    }
+  }
+  // Mark the current scan range as complete.
+  if (eos) scan_ranges_complete_counter()->Add(1);
+  return Status::OK();
+}
+
+void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* initial_range) {
+  DCHECK(initial_range != NULL);
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   SCOPED_TIMER(runtime_state_->total_cpu_timer());
 
+  // Set to true if this thread observes that the number of optional threads has been
+  // exceeded and is exiting early.
+  bool optional_thread_exiting = false;
   KuduScanner scanner(this, runtime_state_);
   Status status = scanner.Open();
-  if (!status.ok()) goto done;
 
-  while (!done_) {
-    status = scanner.OpenNextRange(*key_range);
-    if (!status.ok()) goto done;
+  if (status.ok()) {
+    const TKuduKeyRange* key_range = initial_range;
+    while (!done_ && key_range != NULL) {
+      status = ProcessRange(&scanner, key_range);
+      if (!status.ok()) break;
 
-    // Keep looping through all the ranges.
-    bool eos = false;
-    while (!eos) {
-      // Keep looping through all the rows.
-      gscoped_ptr<RowBatch> row_batch(new RowBatch(
-          row_desc(), runtime_state_->batch_size(), mem_tracker()));
-      status = scanner.GetNext(row_batch.get(), &eos);
-      if (!status.ok()) goto done;
-      while (true) {
-        if (done_) goto done;
-        scanner.KeepKuduScannerAlive();
-        if (materialized_row_batches_->AddBatchWithTimeout(row_batch.get(), 1000000)) {
-          ignore_result(row_batch.release());
+      // Check if the number of optional threads has been exceeded.
+      if (runtime_state_->resource_pool()->optional_exceeded()) {
+        unique_lock<mutex> l(lock_);
+        // Don't exit if this is the last thread. Otherwise, the scan will indicate it's
+        // done before all ranges have been processed.
+        if (num_active_scanners_ > 1) {
+          --num_active_scanners_;
+          optional_thread_exiting = true;
           break;
         }
       }
+      key_range = GetNextKeyRange();
     }
-    // Mark the current scan range as complete.
-    scan_ranges_complete_counter()->Add(1);
-    if (runtime_state_->resource_pool()->optional_exceeded()) goto done;
-    key_range = GetNextKeyRange();
-    if (key_range == NULL) goto done;
+    scanner.Close();
   }
 
-done:
-  VLOG(1) << "Thread done: " << name;
-  scanner.Close();
-  runtime_state_->resource_pool()->ReleaseThreadToken(false);
-
-  unique_lock<mutex> l(lock_);
-  if (!status.ok()) {
-    if (status_.ok()) {
-      status_ = status;
+  {
+    unique_lock<mutex> l(lock_);
+    if (!status.ok()) {
+      if (status_.ok()) {
+        status_ = status;
+        done_ = true;
+      }
+    }
+    // Decrement num_active_scanners_ unless handling the case of an early exit when
+    // optional threads have been exceeded, in which case it already was decremented.
+    if (!optional_thread_exiting) --num_active_scanners_;
+    if (num_active_scanners_ == 0) {
       done_ = true;
+      materialized_row_batches_->Shutdown();
     }
   }
-  --num_active_scanners_;
-  if (num_active_scanners_ == 0) {
-    // If we got here and we are the last thread, we're all done.
-    done_ = true;
-    materialized_row_batches_->Shutdown();
-  }
+
+  // lock_ is released before calling ThreadResourceMgr::ReleaseThreadToken() which
+  // invokes ThreadTokenAvailableCb() which attempts to take the same lock.
+  VLOG(1) << "Thread done: " << name;
+  runtime_state_->resource_pool()->ReleaseThreadToken(false);
 }
 
 }  // namespace impala
