@@ -333,6 +333,11 @@ class HdfsParquetScanner : public HdfsScanner {
   virtual Status ProcessSplit();
   virtual void Close(RowBatch* row_batch);
 
+  /// Codegen ProcessScratchBatch(). Stores the resulting function in
+  /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
+  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+      llvm::Function** process_scratch_batch_fn);
+
   /// The repetition level is set to this value to indicate the end of a row group.
   static const int16_t ROW_GROUP_END = numeric_limits<int16_t>::min();
   /// Indicates an invalid definition or repetition level.
@@ -427,6 +432,10 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of row groups that need to be read.
   RuntimeProfile::Counter* num_row_groups_counter_;
 
+  typedef int (*ProcessScratchBatchFn)(HdfsParquetScanner*, RowBatch*);
+  /// The codegen'd version of ProcessScratchBatch() if available, NULL otherwise.
+  ProcessScratchBatchFn codegend_process_scratch_batch_fn_;
+
   const char* filename() const { return metadata_range_->file(); }
 
   virtual Status GetNextInternal(RowBatch* row_batch, bool* eos);
@@ -463,6 +472,11 @@ class HdfsParquetScanner : public HdfsScanner {
   /// scratch batch is exhausted.
   /// Returns the number of rows that should be committed to the given batch.
   int TransferScratchTuples(RowBatch* dst_batch);
+
+  /// Processes a single row batch for TransferScratchTuples, looping over scratch_batch_
+  /// until it is exhausted or the output is full. Called for the case when there are
+  /// materialized tuples. This is a separate function so it can be codegened.
+  int ProcessScratchBatch(RowBatch* dst_batch);
 
   /// Evaluates runtime filters (if any) against the given row. Returns true if
   /// they passed, false otherwise. Maintains the runtime filter stats, determines

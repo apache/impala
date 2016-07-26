@@ -78,14 +78,21 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
   return Status::OK();
 }
 
-Function* HdfsAvroScanner::Codegen(HdfsScanNode* node,
-                                   const vector<ExprContext*>& conjunct_ctxs) {
-  if (!node->runtime_state()->codegen_enabled()) return NULL;
+Status HdfsAvroScanner::Codegen(HdfsScanNode* node,
+    const vector<ExprContext*>& conjunct_ctxs, Function** decode_avro_data_fn) {
+  *decode_avro_data_fn = NULL;
+  if (!node->runtime_state()->codegen_enabled()) {
+    return Status("Disabled by query option.");
+  }
   LlvmCodeGen* codegen;
-  if (!node->runtime_state()->GetCodegen(&codegen).ok()) return NULL;
-  Function* materialize_tuple_fn = CodegenMaterializeTuple(node, codegen);
-  if (materialize_tuple_fn == NULL) return NULL;
-  return CodegenDecodeAvroData(node->runtime_state(), materialize_tuple_fn, conjunct_ctxs);
+  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  Function* materialize_tuple_fn;
+  RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
+  DCHECK(materialize_tuple_fn != NULL);
+  RETURN_IF_ERROR(CodegenDecodeAvroData(node->runtime_state(), materialize_tuple_fn,
+      conjunct_ctxs, decode_avro_data_fn));
+  DCHECK(*decode_avro_data_fn != NULL);
+  return Status::OK();
 }
 
 BaseSequenceScanner::FileHeader* HdfsAvroScanner::AllocateFileHeader() {
@@ -765,8 +772,8 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 // bail_out:           ; preds = %read_field11, %end_field3, %read_field2, %end_field,
 //   ret i1 false      ;         %read_field, %entry
 // }
-Function* HdfsAvroScanner::CodegenMaterializeTuple(
-    HdfsScanNode* node, LlvmCodeGen* codegen) {
+Status HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node, LlvmCodeGen* codegen,
+    Function** materialize_tuple_fn) {
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
 
@@ -776,7 +783,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(
 
   TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc());
   StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
-  if (tuple_type == NULL) return NULL; // Could not generate tuple struct
+  if (tuple_type == NULL) return Status("Could not generate tuple struct.");
   Type* tuple_ptr_type = PointerType::get(tuple_type, 0);
 
   Type* tuple_opaque_type = codegen->GetType(Tuple::LLVM_CLASS_NAME);
@@ -814,7 +821,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(
   if (!status.ok()) {
     VLOG_QUERY << status.GetDetail();
     fn->eraseFromParent();
-    return NULL;
+    return status;
   }
 
   // Returns true on successful decoding.
@@ -824,7 +831,11 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(
   builder.SetInsertPoint(bail_out_block);
   builder.CreateRet(codegen->false_value());
 
-  return codegen->FinalizeFunction(fn);
+  *materialize_tuple_fn = codegen->FinalizeFunction(fn);
+  if (*materialize_tuple_fn == NULL) {
+    return Status("Failed to finalize materialize_tuple_fn.");
+  }
+  return Status::OK();
 }
 
 Status HdfsAvroScanner::CodegenReadRecord(
@@ -1005,32 +1016,30 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
   return Status::OK();
 }
 
-// TODO: return Status
-Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
-    Function* materialize_tuple_fn, const vector<ExprContext*>& conjunct_ctxs) {
+Status HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
+    Function* materialize_tuple_fn, const vector<ExprContext*>& conjunct_ctxs,
+    Function** decode_avro_data_fn) {
   LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(materialize_tuple_fn != NULL);
 
-  Function* decode_avro_data_fn =
-      codegen->GetFunction(IRFunction::DECODE_AVRO_DATA, true);
+  Function* fn = codegen->GetFunction(IRFunction::DECODE_AVRO_DATA, true);
 
-  int replaced = codegen->ReplaceCallSites(decode_avro_data_fn, materialize_tuple_fn,
-      "MaterializeTuple");
+  int replaced = codegen->ReplaceCallSites(fn, materialize_tuple_fn, "MaterializeTuple");
   DCHECK_EQ(replaced, 1);
 
   Function* eval_conjuncts_fn;
-  Status status =
-      ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs, &eval_conjuncts_fn);
-  if (!status.ok()) return NULL;
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs,
+      &eval_conjuncts_fn));
 
-  replaced = codegen->ReplaceCallSites(decode_avro_data_fn, eval_conjuncts_fn,
-      "EvalConjuncts");
+  replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
   DCHECK_EQ(replaced, 1);
 
-  decode_avro_data_fn->setName("DecodeAvroData");
-  decode_avro_data_fn = codegen->FinalizeFunction(decode_avro_data_fn);
-  DCHECK(decode_avro_data_fn != NULL);
-  return decode_avro_data_fn;
+  fn->setName("DecodeAvroData");
+  *decode_avro_data_fn = codegen->FinalizeFunction(fn);
+  if (*decode_avro_data_fn == NULL) {
+    return Status("Failed to finalize decode_avro_data_fn.");
+  }
+  return Status::OK();
 }

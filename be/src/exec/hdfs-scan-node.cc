@@ -672,21 +672,32 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     // Create reusable codegen'd functions for each file type type needed
     // TODO: do this for conjuncts_map_
     Function* fn;
+    Status status;
     switch (format) {
       case THdfsFileFormat::TEXT:
-        fn = HdfsTextScanner::Codegen(this, conjunct_ctxs_);
+        status = HdfsTextScanner::Codegen(this, conjunct_ctxs_, &fn);
         break;
       case THdfsFileFormat::SEQUENCE_FILE:
-        fn = HdfsSequenceScanner::Codegen(this, conjunct_ctxs_);
+        status = HdfsSequenceScanner::Codegen(this, conjunct_ctxs_, &fn);
         break;
       case THdfsFileFormat::AVRO:
-        fn = HdfsAvroScanner::Codegen(this, conjunct_ctxs_);
+        status = HdfsAvroScanner::Codegen(this, conjunct_ctxs_, &fn);
+        break;
+      case THdfsFileFormat::PARQUET:
+        status = HdfsParquetScanner::Codegen(this, conjunct_ctxs_, &fn);
         break;
       default:
         // No codegen for this format
         fn = NULL;
+        status = Status("Not implemented for this format.");
     }
-    if (fn != NULL) {
+    DCHECK(fn != NULL || !status.ok());
+
+    const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(format)->second;
+    if (!status.ok()) {
+      AddCodegenExecOption(false, status, format_name);
+    } else {
+      AddCodegenExecOption(true, status, format_name);
       LlvmCodeGen* codegen;
       RETURN_IF_ERROR(runtime_state_->GetCodegen(&codegen));
       codegen->AddFunctionToJit(

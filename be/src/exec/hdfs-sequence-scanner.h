@@ -170,9 +170,10 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   /// Implementation of HdfsScanner interface.
   virtual Status Open(ScannerContext* context);
 
-  /// Codegen writing tuples and evaluating predicates.
-  static llvm::Function* Codegen(HdfsScanNode*,
-                                 const std::vector<ExprContext*>& conjunct_ctxs);
+  /// Codegen WriteAlignedTuples(). Stores the resulting function in
+  /// 'write_aligned_tuples_fn' if codegen was successful or NULL otherwise.
+  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+      llvm::Function** write_aligned_tuples_fn);
 
  protected:
   /// Implementation of sequence container super class methods.

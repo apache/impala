@@ -687,15 +687,22 @@ Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
 // Codegen for materializing parsed data into tuples.  The function WriteCompleteTuple is
 // codegen'd using the IRBuilder for the specific tuple description.  This function
 // is then injected into the cross-compiled driving function, WriteAlignedTuples().
-Function* HdfsTextScanner::Codegen(HdfsScanNode* node,
-    const vector<ExprContext*>& conjunct_ctxs) {
-  if (!node->runtime_state()->codegen_enabled()) return NULL;
+Status HdfsTextScanner::Codegen(HdfsScanNode* node,
+    const vector<ExprContext*>& conjunct_ctxs, Function** write_aligned_tuples_fn) {
+  *write_aligned_tuples_fn = NULL;
+  if (!node->runtime_state()->codegen_enabled()) {
+    return Status("Disabled by query option.");
+  }
   LlvmCodeGen* codegen;
-  if (!node->runtime_state()->GetCodegen(&codegen).ok()) return NULL;
-  Function* write_complete_tuple_fn =
-      CodegenWriteCompleteTuple(node, codegen, conjunct_ctxs);
-  if (write_complete_tuple_fn == NULL) return NULL;
-  return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
+  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  Function* write_complete_tuple_fn;
+  RETURN_IF_ERROR(CodegenWriteCompleteTuple(node, codegen, conjunct_ctxs,
+      &write_complete_tuple_fn));
+  DCHECK(write_complete_tuple_fn != NULL);
+  RETURN_IF_ERROR(CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn,
+      write_aligned_tuples_fn));
+  DCHECK(*write_aligned_tuples_fn != NULL);
+  return Status::OK();
 }
 
 Status HdfsTextScanner::Open(ScannerContext* context) {

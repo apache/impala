@@ -357,16 +357,21 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 // eval_fail:                                        ; preds = %parse
 //   ret i1 false
 // }
-Function* HdfsScanner::CodegenWriteCompleteTuple(
-    HdfsScanNode* node, LlvmCodeGen* codegen, const vector<ExprContext*>& conjunct_ctxs) {
+Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNode* node, LlvmCodeGen* codegen,
+    const vector<ExprContext*>& conjunct_ctxs, Function** write_complete_tuple_fn) {
+  *write_complete_tuple_fn = NULL;
   SCOPED_TIMER(codegen->codegen_timer());
   RuntimeState* state = node->runtime_state();
 
   // TODO: Timestamp is not yet supported
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
-    if (slot_desc->type().type == TYPE_TIMESTAMP) return NULL;
-    if (slot_desc->type().type == TYPE_DECIMAL) return NULL;
+    if (slot_desc->type().type == TYPE_TIMESTAMP) {
+      return Status("Timestamp not yet supported for codegen.");
+    }
+    if (slot_desc->type().type == TYPE_DECIMAL) {
+      return Status("Decimal not yet supported for codegen.");
+    }
   }
 
   // Cast away const-ness.  The codegen only sets the cached typed llvm struct.
@@ -377,7 +382,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
     Function* fn = TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc,
         node->hdfs_table()->null_column_value().data(),
         node->hdfs_table()->null_column_value().size(), true, state->strict_mode());
-    if (fn == NULL) return NULL;
+    if (fn == NULL) return Status("CodegenWriteSlot failed.");
     slot_fns.push_back(fn);
   }
 
@@ -409,7 +414,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
 
   // Generate the typed llvm struct for the output tuple
   StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
-  if (tuple_type == NULL) return NULL;
+  if (tuple_type == NULL) return Status("Could not generate tuple struct.");
   PointerType* tuple_ptr_type = PointerType::get(tuple_type, 0);
 
   // Initialize the function prototype.  This needs to match
@@ -533,7 +538,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
         ss << "Failed to codegen conjunct: " << status.GetDetail();
         state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         fn->eraseFromParent();
-        return NULL;
+        return status;
       }
 
       Function* get_ctx_fn =
@@ -553,12 +558,16 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   builder.SetInsertPoint(eval_fail_block);
   builder.CreateRet(codegen->false_value());
 
-  codegen->FinalizeFunction(fn);
-  return codegen->FinalizeFunction(fn);
+  *write_complete_tuple_fn = codegen->FinalizeFunction(fn);
+  if (*write_complete_tuple_fn == NULL) {
+    return Status("Failed to finalize write_complete_tuple_fn.");
+  }
+  return Status::OK();
 }
 
-Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node,
-    LlvmCodeGen* codegen, Function* write_complete_tuple_fn) {
+Status HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node, LlvmCodeGen* codegen,
+    Function* write_complete_tuple_fn, Function** write_aligned_tuples_fn) {
+  *write_aligned_tuples_fn = NULL;
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(write_complete_tuple_fn != NULL);
 
@@ -570,7 +579,11 @@ Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node,
       "WriteCompleteTuple");
   DCHECK_EQ(replaced, 1);
 
-  return codegen->FinalizeFunction(write_tuples_fn);
+  *write_aligned_tuples_fn = codegen->FinalizeFunction(write_tuples_fn);
+  if (*write_aligned_tuples_fn == NULL) {
+    return Status("Failed to finalize write_aligned_tuples_fn.");
+  }
+  return Status::OK();
 }
 
 Status HdfsScanner::UpdateDecompressor(const THdfsCompression::type& compression) {

@@ -23,6 +23,7 @@
 #include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/hdfs-scan-node.h"
@@ -45,6 +46,7 @@
 
 #include "common/names.h"
 
+using llvm::Function;
 using strings::Substitute;
 using namespace impala;
 
@@ -151,7 +153,8 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* st
       dictionary_pool_(new MemPool(scan_node->mem_tracker())),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
       num_cols_counter_(NULL),
-      num_row_groups_counter_(NULL) {
+      num_row_groups_counter_(NULL),
+      codegend_process_scratch_batch_fn_(NULL) {
   assemble_rows_timer_.Stop();
 }
 
@@ -164,7 +167,13 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
 
-  scan_node_->IncNumScannersCodegenDisabled();
+  codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
+      scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
+  if (codegend_process_scratch_batch_fn_ == NULL) {
+    scan_node_->IncNumScannersCodegenDisabled();
+  } else {
+    scan_node_->IncNumScannersCodegenEnabled();
+  }
 
   level_cache_pool_.reset(new MemPool(scan_node_->mem_tracker()));
 
@@ -562,33 +571,17 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   // we always call CommitRows() after TransferScratchTuples(), the output batch can
   // never be empty.
   DCHECK_LT(dst_batch->num_rows(), dst_batch->capacity());
-
-  const bool has_filters = !filter_ctxs_.empty();
-  const bool has_conjuncts = !scanner_conjunct_ctxs_->empty();
-  ExprContext* const* conjunct_ctxs = &(*scanner_conjunct_ctxs_)[0];
-  const int num_conjuncts = scanner_conjunct_ctxs_->size();
-
-  // Start/end/current iterators over the output rows.
   DCHECK_EQ(scan_node_->tuple_idx(), 0);
   DCHECK_EQ(dst_batch->row_desc().tuple_descriptors().size(), 1);
-  Tuple** output_row_start =
-      reinterpret_cast<Tuple**>(dst_batch->GetRow(dst_batch->num_rows()));
-  Tuple** output_row_end =
-      output_row_start + (dst_batch->capacity() - dst_batch->num_rows());
-  Tuple** output_row = output_row_start;
 
-  // Start/end/current iterators over the scratch tuples.
-  uint8_t* scratch_tuple_start = scratch_batch_->CurrTuple();
-  uint8_t* scratch_tuple_end = scratch_batch_->TupleEnd();
-  uint8_t* scratch_tuple = scratch_tuple_start;
-  const int tuple_size = scratch_batch_->tuple_byte_size;
-
-  if (tuple_size == 0) {
+  if (scratch_batch_->tuple_byte_size == 0) {
+    Tuple** output_row =
+        reinterpret_cast<Tuple**>(dst_batch->GetRow(dst_batch->num_rows()));
     // We are materializing a collection with empty tuples. Add a NULL tuple to the
     // output batch per remaining scratch tuple and return. No need to evaluate
     // filters/conjuncts.
-    DCHECK(!has_filters);
-    DCHECK(!has_conjuncts);
+    DCHECK(filter_ctxs_.empty());
+    DCHECK(scanner_conjunct_ctxs_->empty());
     int num_tuples = min(dst_batch->capacity() - dst_batch->num_rows(),
         scratch_batch_->num_tuples - scratch_batch_->tuple_idx);
     memset(output_row, 0, num_tuples * sizeof(Tuple*));
@@ -599,26 +592,12 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
     return num_tuples;
   }
 
-  // Loop until the scratch batch is exhausted or the output batch is full.
-  // Do not use batch_->AtCapacity() in this loop because it is not necessary
-  // to perform the memory capacity check.
-  while (scratch_tuple != scratch_tuple_end) {
-    *output_row = reinterpret_cast<Tuple*>(scratch_tuple);
-    scratch_tuple += tuple_size;
-    // Evaluate runtime filters and conjuncts. Short-circuit the evaluation if
-    // the filters/conjuncts are empty to avoid function calls.
-    if (has_filters && !EvalRuntimeFilters(reinterpret_cast<TupleRow*>(output_row))) {
-      continue;
-    }
-    if (has_conjuncts && !ExecNode::EvalConjuncts(
-        conjunct_ctxs, num_conjuncts, reinterpret_cast<TupleRow*>(output_row))) {
-      continue;
-    }
-    // Row survived runtime filters and conjuncts.
-    ++output_row;
-    if (output_row == output_row_end) break;
+  int num_row_to_commit;
+  if (codegend_process_scratch_batch_fn_ != NULL) {
+    num_row_to_commit = codegend_process_scratch_batch_fn_(this, dst_batch);
+  } else {
+    num_row_to_commit = ProcessScratchBatch(dst_batch);
   }
-  scratch_batch_->tuple_idx += (scratch_tuple - scratch_tuple_start) / tuple_size;
 
   // TODO: Consider compacting the output row batch to better handle cases where
   // there are few surviving tuples per scratch batch. In such cases, we could
@@ -627,7 +606,38 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   if (scratch_batch_->AtEnd()) {
     dst_batch->tuple_data_pool()->AcquireData(scratch_batch_->mem_pool(), false);
   }
-  return output_row - output_row_start;
+  return num_row_to_commit;
+}
+
+Status HdfsParquetScanner::Codegen(HdfsScanNode* node,
+    const vector<ExprContext*>& conjunct_ctxs, Function** process_scratch_batch_fn) {
+  *process_scratch_batch_fn = NULL;
+  if (!node->runtime_state()->codegen_enabled()) {
+    return Status("Disabled by query option.");
+  }
+
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  DCHECK(codegen != NULL);
+  SCOPED_TIMER(codegen->codegen_timer());
+
+  Function* fn = codegen->GetFunction(IRFunction::PROCESS_SCRATCH_BATCH, true);
+  DCHECK(fn != NULL);
+
+  Function* eval_conjuncts_fn;
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(node->runtime_state(), conjunct_ctxs,
+      &eval_conjuncts_fn));
+  DCHECK(eval_conjuncts_fn != NULL);
+
+  int replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
+  DCHECK_EQ(replaced, 1);
+
+  fn->setName("ProcessScratchBatch");
+  *process_scratch_batch_fn = codegen->FinalizeFunction(fn);
+  if (*process_scratch_batch_fn == NULL) {
+    return Status("Failed to finalize process_scratch_batch_fn.");
+  }
+  return Status::OK();
 }
 
 bool HdfsParquetScanner::EvalRuntimeFilters(TupleRow* row) {

@@ -60,9 +60,10 @@ class HdfsTextScanner : public HdfsScanner {
   static Status IssueInitialRanges(HdfsScanNode* scan_node,
                                    const std::vector<HdfsFileDesc*>& files);
 
-  /// Codegen writing tuples and evaluating predicates.
-  static llvm::Function* Codegen(HdfsScanNode*,
-                                 const std::vector<ExprContext*>& conjunct_ctxs);
+  /// Codegen WriteAlignedTuples(). Stores the resulting function in
+  /// 'write_aligned_tuples_fn' if codegen was successful or NULL otherwise.
+  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+      llvm::Function** write_aligned_tuples_fn);
 
   /// Suffix for lzo index files.
   const static std::string LZO_INDEX_SUFFIX;

@@ -93,9 +93,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
   virtual Status Open(ScannerContext* context);
 
-  /// Codegen parsing records, writing tuples and evaluating predicates.
-  static llvm::Function* Codegen(HdfsScanNode*,
-                                 const std::vector<ExprContext*>& conjunct_ctxs);
+  /// Codegen DecodeAvroData(). Stores the resulting function in 'decode_avro_data_fn' if
+  /// codegen was successful or NULL otherwise.
+  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+      llvm::Function** decode_avro_data_fn);
 
  protected:
   /// Implementation of BaseSeqeunceScanner super class methods
@@ -193,16 +194,19 @@ class HdfsAvroScanner : public BaseSequenceScanner {
       uint8_t** data, uint8_t* data_end, Tuple* tuple);
 
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
-  /// functions.
-  static llvm::Function* CodegenDecodeAvroData(
-      RuntimeState* state, llvm::Function* materialize_tuple_fn,
-      const std::vector<ExprContext*>& conjunct_ctxs);
+  /// functions. Stores the resulting function in 'decode_avro_data_fn' if codegen was
+  /// successful or returns an error.
+  static Status CodegenDecodeAvroData(RuntimeState* state,
+      llvm::Function* materialize_tuple_fn,
+      const std::vector<ExprContext*>& conjunct_ctxs,
+      llvm::Function** decode_avro_data_fn);
 
   /// Codegens a version of MaterializeTuple() that reads records based on the table
-  /// schema.
+  /// schema. Stores the resulting function in 'materialize_tuple_fn' if codegen was
+  /// successful or returns an error.
   /// TODO: Codegen a function for each unique file schema.
-  static llvm::Function* CodegenMaterializeTuple(HdfsScanNode* node,
-      LlvmCodeGen* codegen);
+  static Status CodegenMaterializeTuple(HdfsScanNode* node, LlvmCodeGen* codegen,
+      llvm::Function** materialize_tuple_fn);
 
   /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
   /// record.

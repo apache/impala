@@ -113,6 +113,7 @@ ir_functions = [
   ["READ_AVRO_DECIMAL", "ReadAvroDecimal"],
   ["HDFS_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
   ["HDFS_SCANNER_GET_CONJUNCT_CTX", "GetConjunctCtx"],
+  ["PROCESS_SCRATCH_BATCH", "ProcessScratchBatch"],
   ["STRING_TO_BOOL", "IrStringToBool"],
   ["STRING_TO_INT8", "IrStringToInt8"],
   ["STRING_TO_INT16", "IrStringToInt16"],

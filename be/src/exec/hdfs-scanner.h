@@ -413,15 +413,18 @@ class HdfsScanner {
       uint8_t* error_in_row);
 
   /// Codegen function to replace WriteCompleteTuple. Should behave identically
-  /// to WriteCompleteTuple.
-  static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*,
-      const std::vector<ExprContext*>& conjunct_ctxs);
+  /// to WriteCompleteTuple. Stores the resulting function in 'write_complete_tuple_fn'
+  /// if codegen was successful or NULL otherwise.
+  static Status CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*,
+      const std::vector<ExprContext*>& conjunct_ctxs,
+      llvm::Function** write_complete_tuple_fn);
 
-  /// Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
-  /// to IR.  This function loads the precompiled IR function, modifies it and returns the
-  /// resulting function.
-  static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*,
-      llvm::Function* write_tuple_fn);
+  /// Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross
+  /// compiled to IR.  This function loads the precompiled IR function, modifies it,
+  /// and stores the resulting function in 'write_aligned_tuples_fn' if codegen was
+  /// successful or NULL otherwise.
+  static Status CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*,
+      llvm::Function* write_tuple_fn, llvm::Function** write_aligned_tuples_fn);
 
   /// Report parse error for column @ desc.   If abort_on_error is true, sets
   /// parse_status_ to the error message.
