@@ -239,16 +239,6 @@ if [[ -z $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" != "hdfs" &&
   exit 1
 fi
 
-echo "Downloading Python dependencies"
-# Download all the Python dependencies we need before doing anything
-# of substance. Does not re-download anything that is already present.
-if ! $IMPALA_HOME/infra/python/deps/download_requirements; then
-  echo "Warning: Unable to download Python requirements."
-  echo "Warning: bootstrap_virtualenv or other Python-based tooling may fail."
-else
-  echo "Finished downloading Python dependencies"
-fi
-
 # option to clean everything first
 if [ $CLEAN_ACTION -eq 1 ]; then
     $IMPALA_HOME/bin/clean.sh
@@ -256,8 +246,19 @@ fi
 
 # Populate necessary thirdparty components unless it's set to be skipped.
 if [ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]; then
+  echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping download of Python dependencies."
   echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
 else
+  echo "Downloading Python dependencies"
+  # Download all the Python dependencies we need before doing anything
+  # of substance. Does not re-download anything that is already present.
+  if ! $IMPALA_HOME/infra/python/deps/download_requirements; then
+    echo "Warning: Unable to download Python requirements."
+    echo "Warning: bootstrap_virtualenv or other Python-based tooling may fail."
+  else
+    echo "Finished downloading Python dependencies"
+  fi
+
   echo "Downloading and extracting toolchain dependencies."
   $IMPALA_HOME/bin/bootstrap_toolchain.py
   echo "Toolchain bootstrap complete."
