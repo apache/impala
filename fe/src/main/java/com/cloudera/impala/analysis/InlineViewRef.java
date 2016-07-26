@@ -138,6 +138,7 @@ public class InlineViewRef extends TableRef {
     // Catalog views refs require special analysis settings for authorization.
     boolean isCatalogView = (view_ != null && !view_.isLocalView());
     if (isCatalogView) {
+      analyzer.registerAuthAndAuditEvent(view_, analyzer);
       if (inlineViewAnalyzer_.isExplain()) {
         // If the user does not have privileges on the view's definition
         // then we report a masked authorization error so as not to reveal

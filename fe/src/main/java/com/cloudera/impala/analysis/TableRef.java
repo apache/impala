@@ -19,19 +19,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import com.cloudera.impala.analysis.Path.PathType;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.planner.PlanNode;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TReplicaPreference;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -50,7 +43,7 @@ import com.google.common.collect.Sets;
  * 1. Resolution: A table ref's path is resolved and then the generic TableRef is
  * replaced by a concrete table ref (a BaseTableRef, CollectionTabeRef or ViewRef)
  * in the originating stmt and that is given the resolved path. This step is driven by
- * Analyzer.resolveTableRef() which calls into TableRef.analyze().
+ * Analyzer.resolveTableRef().
  *
  * 2. Analysis/registration: After resolution, the concrete table ref is analyzed
  * to register a tuple descriptor for its resolved path and register other table-ref
@@ -171,56 +164,10 @@ public class TableRef implements ParseNode {
     desc_ = other.desc_;
   }
 
-  /**
-   * Resolves this table ref's raw path and adds privilege requests and audit events
-   * for the referenced catalog entities.
-   */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    try {
-      resolvedPath_ = analyzer.resolvePath(rawPath_, PathType.TABLE_REF);
-    } catch (AnalysisException e) {
-      if (!analyzer.hasMissingTbls()) {
-        // Register privilege requests to prefer reporting an authorization error over
-        // an analysis error. We should not accidentally reveal the non-existence of a
-        // table/database if the user is not authorized.
-        if (rawPath_.size() > 1) {
-          analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-              .onTable(rawPath_.get(0), rawPath_.get(1))
-              .allOf(getPrivilegeRequirement()).toRequest());
-        }
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-            .onTable(analyzer.getDefaultDb(), rawPath_.get(0))
-            .allOf(getPrivilegeRequirement()).toRequest());
-      }
-      throw e;
-    } catch (TableLoadingException e) {
-      throw new AnalysisException(String.format(
-          "Failed to load metadata for table: '%s'", Joiner.on(".").join(rawPath_)), e);
-    }
-    Preconditions.checkState(resolvedPath_ != null);
-    if (resolvedPath_.isRootedAtTable()) {
-      // Add access event for auditing.
-      Table table = resolvedPath_.getRootTable();
-      if (table instanceof View) {
-        View view = (View) table;
-        if (!view.isLocalView()) {
-          analyzer.addAccessEvent(new TAccessEvent(
-              table.getFullName(), TCatalogObjectType.VIEW,
-              getPrivilegeRequirement().toString()));
-        }
-      } else {
-        analyzer.addAccessEvent(new TAccessEvent(
-            table.getFullName(), TCatalogObjectType.TABLE,
-            getPrivilegeRequirement().toString()));
-      }
-
-      // Add privilege requests for authorization.
-      TableName tableName = table.getTableName();
-      analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-          .onTable(tableName.getDb(), tableName.getTbl())
-          .allOf(getPrivilegeRequirement()).toRequest());
-    }
+    throw new IllegalStateException(
+        "Should not call analyze() on an unresolved TableRef.");
   }
 
   /**
@@ -615,11 +562,6 @@ public class TableRef implements ParseNode {
     }
     return output.toString();
   }
-
-  /**
-   * Gets the privilege requirement. This is always SELECT for TableRefs.
-   */
-  public Privilege getPrivilegeRequirement() { return Privilege.SELECT; }
 
   /**
    * Returns a deep clone of this table ref without also cloning the chain of table refs.

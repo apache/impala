@@ -470,6 +470,15 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
 
+    // Tests authorization after a statement has been rewritten (IMPALA-3915).
+    // User has SELECT privileges on the view which contains a subquery.
+    AuthzOk("select * from functional_seq_snap.subquery_view");
+
+    // User does not have SELECT privileges on the view which contains a subquery.
+    AuthzError("select * from functional_rc.subquery_view",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional_rc.subquery_view");
+
     // Constant select.
     AuthzOk("select 1");
 

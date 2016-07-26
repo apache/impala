@@ -95,6 +95,8 @@ table_name:complex_view, constraint:restrict_to, table_format:text/none/none
 table_name:complex_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:view_view, constraint:restrict_to, table_format:text/none/none
 table_name:view_view, constraint:restrict_to, table_format:seq/snap/block
+table_name:subquery_view, constraint:restrict_to, table_format:seq/snap/block
+table_name:subquery_view, constraint:restrict_to, table_format:rc/none/none
 
 # liketbl and tblwithraggedcolumns all have
 # NULLs in primary key columns. hbase does not support

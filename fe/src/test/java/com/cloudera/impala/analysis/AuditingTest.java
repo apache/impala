@@ -54,7 +54,17 @@ public class AuditingTest extends AnalyzerTest {
         new TAccessEvent("functional.alltypes", TCatalogObjectType.TABLE, "SELECT")
         ));
 
-    // Select from an inline-view.
+    // Tests audit events after a statement has been rewritten (IMPALA-3915).
+    // Select from a view that contains a subquery.
+    accessEvents = AnalyzeAccessEvents("select * from functional_rc.subquery_view");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_rc.alltypessmall", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_rc.alltypes", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_rc.subquery_view", TCatalogObjectType.VIEW, "SELECT"),
+        new TAccessEvent("_impala_builtins", TCatalogObjectType.DATABASE, "VIEW_METADATA")
+        ));
+
+    // Select from an inline view.
     accessEvents = AnalyzeAccessEvents(
         "select a.* from (select * from functional.alltypesagg) a");
     Assert.assertEquals(accessEvents, Sets.newHashSet(

@@ -859,6 +859,16 @@ AS SELECT * FROM {db_name}{db_suffix}.alltypes_view;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+subquery_view
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+AS SELECT COUNT(*) FROM {db_name}{db_suffix}.alltypes
+WHERE id IN (SELECT id FROM {db_name}{db_suffix}.alltypessmall where int_col < 5);
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypes_parens
 ---- CREATE
 CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}

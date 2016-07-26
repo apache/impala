@@ -92,7 +92,7 @@ public class FromClause implements ParseNode, Iterable<TableRef> {
         // Use the fully qualified raw path to preserve the original resolution.
         // Otherwise, non-fully qualified paths might incorrectly match a local view.
         // TODO for 2.3: This full qualification preserves analysis state which is
-        // contraty to the intended semantics of reset(). We could address this issue by
+        // contrary to the intended semantics of reset(). We could address this issue by
         // changing the WITH-clause analysis to register local views that have
         // fully-qualified table refs, and then remove the full qualification here.
         newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();

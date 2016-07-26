@@ -502,8 +502,11 @@ public class Analyzer {
   /**
    * Resolves the given TableRef into a concrete BaseTableRef, ViewRef or
    * CollectionTableRef. Returns the new resolved table ref or the given table
-   * ref if it is already resolved. Adds audit events and privilege requests for
-   * the database and/or table.
+   * ref if it is already resolved.
+   * Registers privilege requests and throws an AnalysisException if the tableRef's
+   * path could not be resolved. The privilege requests are added to ensure that
+   * an AuthorizationException is preferred over an AnalysisException so as not to
+   * accidentally reveal the non-existence of tables/databases.
    */
   public TableRef resolveTableRef(TableRef tableRef) throws AnalysisException {
     // Return the table if it is already resolved.
@@ -523,8 +526,31 @@ public class Analyzer {
 
     // Resolve the table ref's path and determine what resolved table ref
     // to replace it with.
-    tableRef.analyze(this);
-    Path resolvedPath = tableRef.getResolvedPath();
+    List<String> rawPath = tableRef.getPath();
+    Path resolvedPath = null;
+    try {
+      resolvedPath = resolvePath(tableRef.getPath(), PathType.TABLE_REF);
+    } catch (AnalysisException e) {
+      if (!hasMissingTbls()) {
+        // Register privilege requests to prefer reporting an authorization error over
+        // an analysis error. We should not accidentally reveal the non-existence of a
+        // table/database if the user is not authorized.
+        if (rawPath.size() > 1) {
+          registerPrivReq(new PrivilegeRequestBuilder()
+              .onTable(rawPath.get(0), rawPath.get(1))
+              .allOf(Privilege.SELECT).toRequest());
+        }
+        registerPrivReq(new PrivilegeRequestBuilder()
+            .onTable(getDefaultDb(), rawPath.get(0))
+            .allOf(Privilege.SELECT).toRequest());
+      }
+      throw e;
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(String.format(
+          "Failed to load metadata for table: '%s'", Joiner.on(".").join(rawPath)), e);
+    }
+
+    Preconditions.checkNotNull(resolvedPath);
     if (resolvedPath.destTable() != null) {
       Table table = resolvedPath.destTable();
       Preconditions.checkNotNull(table);
@@ -534,9 +560,9 @@ public class Analyzer {
           table instanceof KuduTable ||
           table instanceof HBaseTable ||
           table instanceof DataSourceTable);
-      return new BaseTableRef(tableRef);
+      return new BaseTableRef(tableRef, resolvedPath);
     } else {
-      return new CollectionTableRef(tableRef);
+      return new CollectionTableRef(tableRef, resolvedPath);
     }
   }
 
@@ -2333,10 +2359,9 @@ public class Analyzer {
    * Privilege level. The privilege request is tracked in the analyzer
    * and authorized post-analysis.
    *
-   * If the database does not exist in the catalog an AnalysisError is thrown.
+   * Registers a new access event if the catalog lookup was successful.
    *
-   * If addAccessEvent is true, this call will add a new entry to accessEvents if the
-   * catalog access was successful. If false, no accessEvent will be added.
+   * If the database does not exist in the catalog an AnalysisError is thrown.
    */
   public Db getDb(String dbName, Privilege privilege) throws AnalysisException {
     return getDb(dbName, privilege, true);
@@ -2484,6 +2509,51 @@ public class Analyzer {
     Integer count = globalState_.warnings.get(msg);
     if (count == null) count = 0;
     globalState_.warnings.put(msg, count + 1);
+  }
+
+  /**
+   * Registers a new PrivilegeRequest in the analyzer. If authErrorMsg_ is set,
+   * the privilege request will be added to the list of "masked" privilege requests,
+   * using authErrorMsg_ as the auth failure error message. Otherwise it will get
+   * added as a normal privilege request that will use the standard error message
+   * on authorization failure.
+   * If enablePrivChecks_ is false, the registration request will be ignored. This
+   * is used when analyzing catalog views since users should be able to query a view
+   * even if they do not have privileges on the underlying tables.
+   */
+  public void registerPrivReq(PrivilegeRequest privReq) {
+    if (!enablePrivChecks_) return;
+
+    if (Strings.isNullOrEmpty(authErrorMsg_)) {
+      globalState_.privilegeReqs.add(privReq);
+    } else {
+      globalState_.maskedPrivilegeReqs.add(Pair.create(privReq, authErrorMsg_));
+    }
+  }
+
+  /**
+   * Registers a table-level SELECT privilege request and an access event for auditing
+   * for the given table. The given table must be a base table or a catalog view (not
+   * a local view).
+   */
+  public void registerAuthAndAuditEvent(Table table, Analyzer analyzer) {
+    // Add access event for auditing.
+    if (table instanceof View) {
+      View view = (View) table;
+      Preconditions.checkState(!view.isLocalView());
+      analyzer.addAccessEvent(new TAccessEvent(
+          table.getFullName(), TCatalogObjectType.VIEW,
+          Privilege.SELECT.toString()));
+    } else {
+      analyzer.addAccessEvent(new TAccessEvent(
+          table.getFullName(), TCatalogObjectType.TABLE,
+          Privilege.SELECT.toString()));
+    }
+    // Add privilege request.
+    TableName tableName = table.getTableName();
+    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+        .onTable(tableName.getDb(), tableName.getTbl())
+        .allOf(Privilege.SELECT).toRequest());
   }
 
   /**
@@ -2849,26 +2919,6 @@ public class Analyzer {
       String expectedStr = expected.toString();
       String actualStr = actual.toString();
       return expectedStr.equals(actualStr);
-    }
-  }
-
-  /**
-   * Registers a new PrivilegeRequest in the analyzer. If authErrorMsg_ is set,
-   * the privilege request will be added to the list of "masked" privilege requests,
-   * using authErrorMsg_ as the auth failure error message. Otherwise it will get
-   * added as a normal privilege request that will use the standard error message
-   * on authorization failure.
-   * If enablePrivChecks_ is false, the registration request will be ignored. This
-   * is used when analyzing catalog views since users should be able to query a view
-   * even if they do not have privileges on the underlying tables.
-   */
-  public void registerPrivReq(PrivilegeRequest privReq) {
-    if (!enablePrivChecks_) return;
-
-    if (Strings.isNullOrEmpty(authErrorMsg_)) {
-      globalState_.privilegeReqs.add(privReq);
-    } else {
-      globalState_.maskedPrivilegeReqs.add(Pair.create(privReq, authErrorMsg_));
     }
   }
 }

@@ -42,12 +42,13 @@ public class CollectionTableRef extends TableRef {
   /////////////////////////////////////////
 
   /**
-   * Create a CollectionTableRef for the given collection type from the original
-   * unresolved table ref. Sets the explicit alias and the join-related attributes
-   * of the new collection table ref from the unresolved table ref.
+   * Create a CollectionTableRef from the original unresolved table ref as well as
+   * its resolved path. Sets table aliases and join-related attributes.
    */
-  public CollectionTableRef(TableRef tableRef) {
+  public CollectionTableRef(TableRef tableRef, Path resolvedPath) {
     super(tableRef);
+    Preconditions.checkState(resolvedPath.isResolved());
+    resolvedPath_ = resolvedPath;
     // Use the last path element as an implicit alias if no explicit alias was given.
     if (hasExplicitAlias()) return;
     String implicitAlias = rawPath_.get(rawPath_.size() - 1).toLowerCase();
@@ -76,7 +77,6 @@ public class CollectionTableRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
-    Preconditions.checkNotNull(getPrivilegeRequirement());
     desc_ = analyzer.registerTableRef(this);
     if (isRelative() && !analyzer.isWithClause()) {
       SlotDescriptor parentSlotDesc = analyzer.registerSlotRef(resolvedPath_);
@@ -97,7 +97,10 @@ public class CollectionTableRef extends TableRef {
       }
     }
     if (!isRelative()) {
-      // Register a column-level privilege request for the collection-typed column.
+      // Register a table-level privilege request as well as a column-level privilege request
+      // for the collection-typed column.
+      Preconditions.checkNotNull(resolvedPath_.getRootTable());
+      analyzer.registerAuthAndAuditEvent(resolvedPath_.getRootTable(), analyzer);
       analyzer.registerPrivReq(new PrivilegeRequestBuilder().
           allOf(Privilege.SELECT).onColumn(desc_.getTableName().getDb(),
           desc_.getTableName().getTbl(), desc_.getPath().getRawPath().get(0))
