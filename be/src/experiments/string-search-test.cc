@@ -1,4 +1,19 @@
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 #include <string>
 #include <gtest/gtest.h>
@@ -12,7 +27,7 @@ namespace impala {
 // Test string search for haystack/needle, up to len for each.
 // If the length is -1, use the full string length
 // haystack/needle are null terminated
-void TestSearch(const char* haystack_orig, const char* needle_orig, 
+void TestSearch(const char* haystack_orig, const char* needle_orig,
     int haystack_len = -1, int needle_len = -1) {
 
   string haystack_copy(haystack_orig);
@@ -31,14 +46,14 @@ void TestSearch(const char* haystack_orig, const char* needle_orig,
     haystack_null_terminated = haystack_buffer.c_str();
   } else {
     haystack_len = strlen(haystack);
-  } 
-  
+  }
+
   if (needle_len != -1) {
     needle_buffer = string(needle, needle_len);
     needle_null_terminated = needle_buffer.c_str();
   } else {
     needle_len = strlen(needle);
-  } 
+  }
 
   // Call libc for correct result
   const char* libc_result = strstr(haystack_null_terminated, needle_null_terminated);
@@ -56,7 +71,7 @@ void TestSearch(const char* haystack_orig, const char* needle_orig,
   StringSearchSSE needle2(&needle_str_val);
   int not_null_offset = needle2.Search(haystack_str_val);
   EXPECT_EQ(not_null_offset, libc_offset);
-  
+
   // Ensure haystack/needle are unmodified
   EXPECT_EQ(strlen(needle_null_terminated), needle_len);
   EXPECT_EQ(strlen(haystack_null_terminated), haystack_len);
