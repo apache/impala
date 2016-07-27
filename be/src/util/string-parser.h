@@ -354,6 +354,29 @@ class StringParser {
     return static_cast<T>(negative ? -val : val);
   }
 
+  /// Checks if "inf" or "infinity" matches 's' in a case-insensitive manner. The match
+  /// has to start at the beginning of 's', leading whitespace is considered invalid.
+  /// Trailing whitespace characters are allowed.
+  /// Returns true if a match was found and false otherwise.
+  static inline bool IsInfinity(const char *s, int len) {
+    if (len >= 3 && strncasecmp(s, "inf", 3) == 0) {
+      int i = 3;
+      if (len >= 8 && strncasecmp(s + 3, "inity", 5) == 0) {
+        i = 8;
+      }
+      return IsAllWhitespace(s + i, len - i);
+    }
+    return false;
+  }
+
+  /// Checks if "nan" matches 's' in a case-insensitive manner. The match has to start at
+  /// the beginning of 's', leading whitespace is considered invalid. Trailing whitespace
+  /// characters are allowed.
+  /// Returns true if a match was found and false otherwise.
+  static inline bool IsNaN(const char *s, int len) {
+    return len >= 3 && strncasecmp(s, "nan", 3) == 0 && IsAllWhitespace(s + 3, len - 3);
+  }
+
   /// This is considerably faster than glibc's implementation (>100x why???)
   /// No special case handling needs to be done for overflows, the floating point spec
   /// already does it and will cap the values to -inf/inf
@@ -369,10 +392,27 @@ class StringParser {
       return 0;
     }
 
-    // Use double here to not lose precision while accumulating the result
-    double val = 0;
     bool negative = false;
     int i = 0;
+    switch (*s) {
+      case '-': negative = true;  // Fallthrough is intended.
+      case '+': i = 1;
+    }
+
+    // Check if we have inf or NaN.
+    if (IsInfinity(s + i, len - i)) {
+      *result = PARSE_SUCCESS;
+      return negative ? -std::numeric_limits<T>::infinity()
+          : std::numeric_limits<T>::infinity();
+    }
+    if (IsNaN(s + i, len - i)) {
+      *result = PARSE_SUCCESS;
+      return negative ? -std::numeric_limits<T>::quiet_NaN()
+          : std::numeric_limits<T>::quiet_NaN();
+    }
+
+    // Use double here to not lose precision while accumulating the result
+    double val = 0;
     double divide = 1;
     bool decimal = false;
     int64_t remainder = 0;
@@ -380,11 +420,7 @@ class StringParser {
     // leading 0s). This technically shouldn't count trailing 0s either, but for us it
     // doesn't matter if we count them based on the implementation below.
     int sig_figs = 0;
-    switch (*s) {
-      case '-': negative = true;
-      case '+': i = 1;
-    }
-    int first = i;
+    const int first = i;
     for (; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
         if (s[i] != '0' || sig_figs > 0) ++sig_figs;
@@ -402,36 +438,13 @@ class StringParser {
         } else {
           val = val * 10 + s[i] - '0';
         }
-      } else if (s[i] == '.') {
+      } else if (!decimal && s[i] == '.') {
         decimal = true;
       } else if (s[i] == 'e' || s[i] == 'E') {
         break;
-      } else if (s[i] == 'i' || s[i] == 'I') {
-        if (len > i + 2 && (s[i+1] == 'n' || s[i+1] == 'N') &&
-            (s[i+2] == 'f' || s[i+2] == 'F')) {
-          // Note: Hive writes inf as Infinity, at least for text. We'll be a little loose
-          // here and interpret any column with inf as a prefix as infinity rather than
-          // checking every remaining byte.
-          *result = PARSE_SUCCESS;
-          return negative ? -INFINITY : INFINITY;
-        } else {
-          // Starts with 'i', but isn't inf...
-          *result = PARSE_FAILURE;
-          return 0;
-        }
-      } else if (s[i] == 'n' || s[i] == 'N') {
-        if (len > i + 2 && (s[i+1] == 'a' || s[i+1] == 'A') &&
-            (s[i+2] == 'n' || s[i+2] == 'N')) {
-          *result = PARSE_SUCCESS;
-          return negative ? -NAN : NAN;
-        } else {
-          // Starts with 'n', but isn't NaN...
-          *result = PARSE_FAILURE;
-          return 0;
-        }
       } else {
         if ((UNLIKELY(i == first || !IsAllWhitespace(s + i, len - i)))) {
-          // Reject the string because either the first char was not a digit, "," or "e",
+          // Reject the string because either the first char was not a digit, "." or "e",
           // or the remaining chars are not all whitespace
           *result = PARSE_FAILURE;
           return 0;

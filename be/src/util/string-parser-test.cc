@@ -367,20 +367,18 @@ TEST(StringToFloat, Basic) {
   // Non-finite values
   TestAllFloatVariants("INFinity", StringParser::PARSE_SUCCESS);
   TestAllFloatVariants("infinity", StringParser::PARSE_SUCCESS);
+  TestAllFloatVariants("inFIniTy", StringParser::PARSE_SUCCESS);
   TestAllFloatVariants("inf", StringParser::PARSE_SUCCESS);
+  TestAllFloatVariants("InF", StringParser::PARSE_SUCCESS);
+  TestAllFloatVariants("INF", StringParser::PARSE_SUCCESS);
+  TestAllFloatVariants("iNf", StringParser::PARSE_SUCCESS);
 
   TestFloatValueIsNan<float>("nan", StringParser::PARSE_SUCCESS);
   TestFloatValueIsNan<double>("nan", StringParser::PARSE_SUCCESS);
   TestFloatValueIsNan<float>("NaN", StringParser::PARSE_SUCCESS);
   TestFloatValueIsNan<double>("NaN", StringParser::PARSE_SUCCESS);
-  TestFloatValueIsNan<float>("nana", StringParser::PARSE_SUCCESS);
-  TestFloatValueIsNan<double>("nana", StringParser::PARSE_SUCCESS);
   TestFloatValueIsNan<float>("naN", StringParser::PARSE_SUCCESS);
   TestFloatValueIsNan<double>("naN", StringParser::PARSE_SUCCESS);
-
-  TestFloatValueIsNan<float>("n aN", StringParser::PARSE_FAILURE);
-  TestFloatValueIsNan<float>("nnaN", StringParser::PARSE_FAILURE);
-
 
   // Overflow.
   TestFloatValue<float>(float_max + "11111", StringParser::PARSE_OVERFLOW);
@@ -428,6 +426,26 @@ TEST(StringToFloat, Basic) {
   TestAllFloatVariants("in finity", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("na", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("ThisIsANaN", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("n aN", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("nnaN", StringParser::PARSE_FAILURE);
+
+  // IMPALA-3868: Test that multiple dots are not allowed.
+  TestAllFloatVariants(".1.2", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("..12", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("12..", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1.23.", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1.23.4", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1234.5678.90", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("12.34.5.6", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("0..e", StringParser::PARSE_FAILURE);
+
+  // Test broken strings with null-character in the middle.
+  string s1("in\0f", 4);
+  TestAllFloatVariants(s1, StringParser::PARSE_FAILURE);
+  string s2("n\0an", 4);
+  TestAllFloatVariants(s2, StringParser::PARSE_FAILURE);
+  string s3("1\0.2", 4);
+  TestAllFloatVariants(s3, StringParser::PARSE_FAILURE);
 }
 
 TEST(StringToFloat, InvalidLeadingTrailing) {
@@ -448,6 +466,26 @@ TEST(StringToFloat, InvalidLeadingTrailing) {
   // Test empty string and string with only whitespaces.
   TestFloatValue<double>("", StringParser::PARSE_FAILURE);
   TestFloatValue<double>("   ", StringParser::PARSE_FAILURE);
+
+  // IMPALA-1731: Test that leading/trailing garbage is not allowed when parsing inf.
+  TestAllFloatVariants("1.23inf", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1inf", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("iinf", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1.23inf456", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("info", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("inf123", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("infinity2", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("infinite", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("inf123nan", StringParser::PARSE_FAILURE);
+
+  // IMPALA-1731: Test that leading/trailing garbage is not allowed when parsing NaN.
+  TestAllFloatVariants("1.23nan", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1nan", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("anan", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("1.23nan456", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("nana", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("nan2", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("nan123inf", StringParser::PARSE_FAILURE);
 }
 
 TEST(StringToFloat, BruteForce) {

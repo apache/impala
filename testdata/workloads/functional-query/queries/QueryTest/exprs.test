@@ -2454,3 +2454,31 @@ STRING
 ---- ERRORS
 UDF WARNING: Could not base64 decode input in space 4; actual output length 0
 ====
+---- QUERY
+# IMPALA-1731: test parsing infinity values
+select cast('inf' as double), cast('InFinity' as float),
+    cast('inf ' as float), cast('  infinity ' as double),
+    cast('infinite' as double), cast('1.23inf' as double), cast('1inf' as float)
+---- RESULTS
+Infinity,Infinity,Infinity,Infinity,NULL,NULL,NULL
+---- TYPES
+double,float,float,double,double,double,float
+====
+---- QUERY
+# IMPALA-1731: test parsing NaN values
+select cast('nan' as double), cast('NaN' as float), cast(' nan   ' as double),
+    cast('nana' as double), cast('1.23nan' as double), cast('1nan' as float)
+---- RESULTS
+NaN,NaN,NaN,NULL,NULL,NULL
+---- TYPES
+double,float,double,double,double,float
+====
+---- QUERY
+# IMPALA-3868: test parsing float with multiple dots
+select cast('1.23' as double), cast('.1.23' as float), cast('123.456.' as double),
+    cast('1.23.456' as double), cast('1.23.4.5' as float), cast('0..e' as double)
+---- RESULTS
+1.23,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+double,float,double,double,float,double
+====

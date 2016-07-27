@@ -2788,21 +2788,106 @@ TEST_F(ExprTest, NonFiniteFloats) {
   TestValue("CAST(1/0 AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
   TestValue("CAST(1/0 AS DOUBLE)", TYPE_DOUBLE, numeric_limits<double>::infinity());
   TestValue("CAST(CAST(1/0 as FLOAT) as DOUBLE)", TYPE_DOUBLE,
-            numeric_limits<double>::infinity());
+      numeric_limits<double>::infinity());
+  TestValue("CAST(CAST(1/0 as DOUBLE) as FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
   TestStringValue("CAST(1/0 AS STRING)", "inf");
   TestStringValue("CAST(CAST(1/0 AS FLOAT) AS STRING)", "inf");
 
   TestValue("CAST('inf' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
   TestValue("CAST('inf' AS DOUBLE)", TYPE_DOUBLE, numeric_limits<double>::infinity());
-  TestValue("CAST('Infinity' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
+  TestValue("CAST('  inf  ' AS FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
+  TestValue("CAST('  inf  ' AS DOUBLE)", TYPE_DOUBLE,
+      numeric_limits<double>::infinity());
+  TestValue("CAST('+inf' AS FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
+  TestValue("CAST('+inf' AS DOUBLE)", TYPE_DOUBLE,
+      numeric_limits<double>::infinity());
+  TestValue("CAST('-inf' AS FLOAT)", TYPE_FLOAT,
+      -numeric_limits<float>::infinity());
+  TestValue("CAST('-inf' AS DOUBLE)", TYPE_DOUBLE,
+      -numeric_limits<double>::infinity());
+  TestValue("CAST('Infinity' AS FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
   TestValue("CAST('-Infinity' AS DOUBLE)", TYPE_DOUBLE,
       -numeric_limits<double>::infinity());
+  // Parsing inf values is case-insensitive.
+  TestValue("CAST('iNf' AS FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
+  TestValue("CAST('iNf' AS DOUBLE)", TYPE_DOUBLE,
+      numeric_limits<double>::infinity());
+  TestValue("CAST('INf' AS FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
+  TestValue("CAST('INf' AS DOUBLE)", TYPE_DOUBLE,
+      numeric_limits<double>::infinity());
+  TestValue("CAST('inF' AS FLOAT)", TYPE_FLOAT,
+      numeric_limits<float>::infinity());
+  TestValue("CAST('inF' AS DOUBLE)", TYPE_DOUBLE,
+      numeric_limits<double>::infinity());
 
   // NaN != NaN, so we have to wrap the value in a string
   TestStringValue("CAST(CAST('nan' AS FLOAT) AS STRING)", string("nan"));
   TestStringValue("CAST(CAST('nan' AS DOUBLE) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('  nan  ' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('  nan  ' AS DOUBLE) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('-nan' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('-nan' AS DOUBLE) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('+nan' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('+nan' AS DOUBLE) AS STRING)", string("nan"));
+  // Parsing NaN values is case-insensitive
+  TestStringValue("CAST(CAST('nAn' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('nAn' AS DOUBLE) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('NAn' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('NAn' AS DOUBLE) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('naN' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('naN' AS DOUBLE) AS STRING)", string("nan"));
   // 0/0 evalutes to -nan, test that we return "nan"
   TestStringValue("CAST(0/0 AS STRING)", string("nan"));
+}
+
+TEST_F(ExprTest, InvalidFloats) {
+  // IMPALA-1731: Test that leading/trailing garbage is not allowed when parsing inf.
+  TestIsNull("CAST('1.23inf' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('1.23inf' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('1.23inf456' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('1.23inf456' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('inf123' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('inf123' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('infinity2' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('infinity2' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('infinite' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('infinite' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('inf123nan' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('inf123nan' AS DOUBLE)", TYPE_DOUBLE);
+
+  // IMPALA-1731: Test that leading/trailing garbage is not allowed when parsing NaN.
+  TestIsNull("CAST('1.23nan' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('1.23nan' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('1.23nan456' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('1.23nan456' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('nana' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('nana' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('nan123' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('nan123' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('nan123inf' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('nan123inf' AS DOUBLE)", TYPE_DOUBLE);
+
+  // IMPALA-3868: Test that multiple dots are not allowed in float values
+  TestIsNull("CAST('1.2.3.4.5' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('1.2.3.4.5' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('1..e' AS FLOAT)", TYPE_FLOAT);
+  TestIsNull("CAST('1..e' AS DOUBLE)", TYPE_DOUBLE);
+
+  // Broken string with null-character in the middle
+  string s1("CAST('in\0f' AS DOUBLE)", 22);
+  TestIsNull(s1, TYPE_DOUBLE);
+  string s2("CAST('N\0aN' AS FLOAT)", 21);
+  TestIsNull(s2, TYPE_FLOAT);
+
+  // Empty string
+  TestIsNull("CAST('' AS DOUBLE)", TYPE_DOUBLE);
+  TestIsNull("CAST('' AS FLOAT)", TYPE_FLOAT);
 }
 
 TEST_F(ExprTest, MathTrigonometricFunctions) {
