@@ -432,6 +432,21 @@ class LlvmCodeGen {
   friend class LlvmCodeGenTest;
   friend class SubExprElimination;
 
+  /// Returns true if the function 'fn' is defined in the Impalad native code.
+  static bool IsDefinedInImpalad(const std::string& fn);
+
+  /// Parses the given global constant recursively and adds functions referenced in it
+  /// to the set 'ref_fns' if they are not defined in the Impalad native code. These
+  /// functions need to be materialized to avoid linking error.
+  static void ParseGlobalConstant(llvm::Value* global_const,
+      boost::unordered_set<string>* ref_fns);
+
+  /// Parses all the global variables in 'module' and adds any functions referenced by
+  /// them to the set 'ref_fns' if they are not defined in the Impalad native code.
+  /// These functions need to be materialized to avoid linking error.
+  static void ParseGVForFunctions(llvm::Module* module,
+      boost::unordered_set<string>* ref_fns);
+
   /// Top level codegen object.  'module_id' is used for debugging when outputting the IR.
   LlvmCodeGen(ObjectPool* pool, const std::string& module_id);
 
@@ -498,12 +513,9 @@ class LlvmCodeGen {
   static void FindCallSites(llvm::Function* caller, const std::string& target_name,
       std::vector<llvm::CallInst*>* results);
 
-  /// Whether InitializeLlvm() has been called.
-  static bool llvm_initialized_;
-
-  /// Host CPU name and attributes, filled in by InitializeLlvm().
-  static std::string cpu_name_;
-  static std::vector<std::string> cpu_attrs_;
+  /// This function parses the function body of the given function 'fn' and materializes
+  /// any functions called by it.
+  Status MaterializeCallees(llvm::Function* fn);
 
   /// This is the workhorse for materializing function 'fn'. It's invoked by
   /// MaterializeFunction(). Calls LLVM to materialize 'fn' if it's materializable
@@ -530,6 +542,19 @@ class LlvmCodeGen {
   /// and comdats. DCE may complain if the above are not done. Return error status if
   /// there is error in materializing the module.
   Status FinalizeLazyMaterialization();
+
+  /// Whether InitializeLlvm() has been called.
+  static bool llvm_initialized_;
+
+  /// Host CPU name and attributes, filled in by InitializeLlvm().
+  static std::string cpu_name_;
+  static std::vector<std::string> cpu_attrs_;
+
+  /// This set contains names of functions referenced by global variables which aren't
+  /// defined in the Impalad native code (they may have been inlined by gcc). These
+  /// functions are always materialized each time the module is loaded to ensure that
+  /// LLVM can resolve references to them.
+  static boost::unordered_set<std::string> gv_ref_ir_fns_;
 
   /// ID used for debugging (can be e.g. the fragment instance ID)
   std::string id_;
@@ -586,11 +611,6 @@ class LlvmCodeGen {
 
   /// Execution/Jitting engine.
   std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
-
-  /// Keeps track of the external functions that have been included in this module
-  /// e.g libc functions or non-jitted impala functions.
-  /// TODO: this should probably be FnPrototype->Functions mapping
-  std::map<std::string, llvm::Function*> external_functions_;
 
   /// Functions parsed from pre-compiled module.  Indexed by ImpalaIR::Function enum
   std::vector<llvm::Function*> loaded_functions_;
