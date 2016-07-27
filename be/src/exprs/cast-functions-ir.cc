@@ -17,6 +17,8 @@
 
 #include "exprs/cast-functions.h"
 
+#include <cmath>
+
 #include <boost/lexical_cast.hpp>
 
 #include "exprs/anyval-util.h"
@@ -127,7 +129,7 @@ CAST_TO_STRING(BigIntVal);
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const float_type& val) { \
     if (val.is_null) return StringVal::null(); \
     /* val.val could be -nan, return "nan" instead */ \
-    if (isnan(val.val)) return StringVal("nan"); \
+    if (std::isnan(val.val)) return StringVal("nan"); \
     /* Add 1 to MAX_FLOAT_CHARS since snprintf adds a trailing '\0' */ \
     StringVal sv(ctx, MAX_FLOAT_CHARS + 1); \
     if (UNLIKELY(sv.is_null)) { \

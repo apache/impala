@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/metrics.h"
-#include "util/collection-metrics.h"
-#include "util/memory-metrics.h"
-
+#include <cmath>
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
 #include <limits>
 #include <map>
 
+#include "util/collection-metrics.h"
 #include "util/jni-util.h"
+#include "util/memory-metrics.h"
+#include "util/metrics.h"
 #include "util/thread.h"
 
 #include "common/names.h"
@@ -130,7 +130,7 @@ TEST_F(MetricsTest, NonFiniteValues) {
   AssertValue(gauge, inf, "inf");
   double nan = numeric_limits<double>::quiet_NaN();
   gauge->set_value(nan);
-  EXPECT_TRUE(isnan(gauge->value()));
+  EXPECT_TRUE(std::isnan(gauge->value()));
   EXPECT_TRUE(gauge->ToHumanReadable() == "nan");
 }
 

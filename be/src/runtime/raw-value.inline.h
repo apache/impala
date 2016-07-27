@@ -21,8 +21,9 @@
 
 #include "runtime/raw-value.h"
 
+#include <cmath>
+
 #include <boost/functional/hash.hpp>
-#include <math.h>
 
 #include "common/logging.h"
 #include "runtime/decimal-value.inline.h"
@@ -340,12 +341,12 @@ inline void RawValue::PrintValue(const void* value, const ColumnType& type, int 
         float val = *reinterpret_cast<const float*>(value);
         if (LIKELY(std::isfinite(val))) {
           *stream << val;
-        } else if (isinf(val)) {
+        } else if (std::isinf(val)) {
           // 'Infinity' is Java's text representation of inf. By staying close to Java, we
           // allow Hive to read text tables containing non-finite values produced by
           // Impala. (The same logic applies to 'NaN', below).
           *stream << (val < 0 ? "-Infinity" : "Infinity");
-        } else if (isnan(val)) {
+        } else if (std::isnan(val)) {
           *stream << "NaN";
         }
       }
@@ -355,10 +356,10 @@ inline void RawValue::PrintValue(const void* value, const ColumnType& type, int 
         double val = *reinterpret_cast<const double*>(value);
         if (LIKELY(std::isfinite(val))) {
           *stream << val;
-        } else if (isinf(val)) {
+        } else if (std::isinf(val)) {
           // See TYPE_FLOAT for rationale.
           *stream << (val < 0 ? "-Infinity" : "Infinity");
-        } else if (isnan(val)) {
+        } else if (std::isnan(val)) {
           *stream << "NaN";
         }
       }

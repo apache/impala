@@ -15,9 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/raw-value.inline.h"
+#include "runtime/raw-value.h"
+
+#include <cmath>
 
 #include "runtime/decimal-value.inline.h"
+#include "runtime/string-value.inline.h"
+#include "runtime/timestamp-value.h"
 
 using namespace impala;
 
@@ -52,17 +56,17 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
       // TODO: can this be faster? (just returning the difference has underflow problems)
       f1 = *reinterpret_cast<const float*>(v1);
       f2 = *reinterpret_cast<const float*>(v2);
-      if (UNLIKELY(isnan(f1) && isnan(f2))) return 0;
-      if (UNLIKELY(isnan(f1))) return -1;
-      if (UNLIKELY(isnan(f2))) return 1;
+      if (UNLIKELY(std::isnan(f1) && std::isnan(f2))) return 0;
+      if (UNLIKELY(std::isnan(f1))) return -1;
+      if (UNLIKELY(std::isnan(f2))) return 1;
       return f1 > f2 ? 1 : (f1 < f2 ? -1 : 0);
     case TYPE_DOUBLE:
       // TODO: can this be faster?
       d1 = *reinterpret_cast<const double*>(v1);
       d2 = *reinterpret_cast<const double*>(v2);
-      if (isnan(d1) && isnan(d2)) return 0;
-      if (isnan(d1)) return -1;
-      if (isnan(d2)) return 1;
+      if (std::isnan(d1) && std::isnan(d2)) return 0;
+      if (std::isnan(d1)) return -1;
+      if (std::isnan(d2)) return 1;
       return d1 > d2 ? 1 : (d1 < d2 ? -1 : 0);
     case TYPE_STRING:
     case TYPE_VARCHAR:

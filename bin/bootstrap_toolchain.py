@@ -51,6 +51,7 @@ OS_MAPPING = {
   "ubuntu14.04" : "ec2-package-ubuntu-14-04",
   "ubuntu15.04" : "ec2-package-ubuntu-14-04",
   "ubuntu15.10" : "ec2-package-ubuntu-14-04",
+  "ubuntu16.04" : "ec2-package-ubuntu-16-04",
 }
 
 def try_get_platform_release_label():
@@ -343,8 +344,8 @@ if __name__ == "__main__":
   if not os.path.exists(toolchain_root):
     os.makedirs(toolchain_root)
 
-  packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "gcc", "gflags", "glog",
-      "gperftools", "gtest", "kudu", "llvm", ("llvm", "3.8.0-asserts-p1"), "lz4",
+  packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "cmake", "gcc", "gflags",
+      "glog", "gperftools", "gtest", "kudu", "llvm", ("llvm", "3.8.0-asserts-p1"), "lz4",
       "openldap", "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"]
   bootstrap(toolchain_root, packages)
 

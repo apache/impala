@@ -95,12 +95,12 @@ BigIntVal UdfBuiltins::MinBigInt(FunctionContext* context) {
 
 BooleanVal UdfBuiltins::IsNan(FunctionContext* context, const DoubleVal& val) {
   if (val.is_null) return BooleanVal(false);
-  return BooleanVal(isnan(val.val));
+  return BooleanVal(std::isnan(val.val));
 }
 
 BooleanVal UdfBuiltins::IsInf(FunctionContext* context, const DoubleVal& val) {
   if (val.is_null) return BooleanVal(false);
-  return BooleanVal(isinf(val.val));
+  return BooleanVal(std::isinf(val.val));
 }
 
 // The units which can be used when Truncating a Timestamp
