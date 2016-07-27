@@ -503,6 +503,11 @@ int BufferedTupleStream::ComputeNumNullIndicatorBytes(int block_size) const {
 }
 
 Status BufferedTupleStream::GetRows(scoped_ptr<RowBatch>* batch, bool* got_rows) {
+  if (num_rows() > numeric_limits<int>::max()) {
+    // RowBatch::num_rows_ is a 32-bit int, avoid an overflow.
+    return Status(Substitute("Trying to read $0 rows into in-memory batch failed. Limit "
+        "is $1", num_rows(), numeric_limits<int>::max()));
+  }
   RETURN_IF_ERROR(PinStream(false, got_rows));
   if (!*got_rows) return Status::OK();
   bool got_read_buffer;

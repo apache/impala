@@ -317,9 +317,10 @@ class BufferedTupleStream {
   std::string DebugString() const;
 
  private:
-  friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
   friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
   friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
+  friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
+  friend class SimpleTupleStreamTest_TestGetRowsOverflow_Test;
 
   /// If true, this stream is still using small buffers.
   bool use_small_buffers_;
