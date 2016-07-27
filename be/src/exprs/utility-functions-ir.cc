@@ -16,11 +16,7 @@
 // under the License.
 
 #include "exprs/utility-functions.h"
-
 #include <gutil/strings/substitute.h>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
 #include "exprs/anyval-util.h"
 #include "runtime/runtime-state.h"
@@ -104,6 +100,10 @@ IntVal UtilityFunctions::Pid(FunctionContext* ctx) {
   return IntVal(pid);
 }
 
+StringVal UtilityFunctions::Uuid(FunctionContext* ctx) {
+  return GenUuid(ctx);
+}
+
 BooleanVal UtilityFunctions::Sleep(FunctionContext* ctx, const IntVal& milliseconds ) {
   if (milliseconds.is_null) return BooleanVal::null();
   SleepForMs(milliseconds.val);
@@ -115,39 +115,6 @@ StringVal UtilityFunctions::CurrentDatabase(FunctionContext* ctx) {
       AnyValUtil::FromString(ctx, ctx->impl()->state()->query_ctx().session.database);
   // An empty string indicates the current database wasn't set.
   return (database.len > 0) ? database : StringVal::null();
-}
-
-void UtilityFunctions::UuidPrepare(FunctionContext* ctx,
-    FunctionContext::FunctionStateScope scope) {
-  if (scope == FunctionContext::THREAD_LOCAL) {
-    if (ctx->GetFunctionState(FunctionContext::THREAD_LOCAL) == NULL) {
-      boost::uuids::random_generator* uuid_gen =
-          new boost::uuids::random_generator;
-      ctx->SetFunctionState(scope, uuid_gen);
-    }
-  }
-}
-
-StringVal UtilityFunctions::Uuid(FunctionContext* ctx) {
-  void* uuid_gen = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
-  DCHECK(uuid_gen != NULL);
-  boost::uuids::uuid uuid_value =
-      (*reinterpret_cast<boost::uuids::random_generator*>(uuid_gen))();
-  const std::string cxx_string = boost::uuids::to_string(uuid_value);
-  return StringVal::CopyFrom(ctx,
-      reinterpret_cast<const uint8_t*>(cxx_string.c_str()),
-      cxx_string.length());
-}
-
-void UtilityFunctions::UuidClose(FunctionContext* ctx,
-    FunctionContext::FunctionStateScope scope){
-  if (scope == FunctionContext::THREAD_LOCAL) {
-    boost::uuids::random_generator* uuid_gen =
-        reinterpret_cast<boost::uuids::random_generator*>(
-            ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
-    DCHECK(uuid_gen != NULL);
-    delete uuid_gen;
-  }
 }
 
 template<typename T>

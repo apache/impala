@@ -18,6 +18,7 @@
 #include "service/impala-http-handler.h"
 
 #include <sstream>
+#include <boost/lexical_cast.hpp>
 #include <boost/thread/mutex.hpp>
 #include <gutil/strings/substitute.h>
 

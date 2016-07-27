@@ -24,7 +24,7 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
-#include "exprs/timestamp-functions.h"
+#include "exprs/timezone_db.h"
 #include "gutil/atomicops.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"

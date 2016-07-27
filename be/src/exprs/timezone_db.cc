@@ -15,8 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "timestamp-functions.h"
+#include "exprs/timezone_db.h"
 
+#include <boost/date_time/compiler_config.hpp>
+#include <boost/date_time/local_time/posix_time_zone.hpp>
+
+#include "exprs/timestamp-functions.h"
 #include "gutil/strings/substitute.h"
 
 #include "common/names.h"

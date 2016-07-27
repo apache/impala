@@ -50,11 +50,13 @@ add_library(Exprs
   operators-ir.cc
   slot-ref.cc
   string-functions-ir.cc
+  timestamp-functions.cc
   timestamp-functions-ir.cc
   timezone_db.cc
   tuple-is-null-predicate.cc
   scalar-fn-call.cc
   udf-builtins-ir.cc
+  utility-functions.cc
   utility-functions-ir.cc
 )
 add_dependencies(Exprs thrift-deps gen_ir_descriptions)

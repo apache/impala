@@ -72,6 +72,9 @@ class UtilityFunctions {
   /// expression. input_val is not used and it is kept here in order to let
   /// the compiler generate the corresponding fully-qualified function name.
   template <typename T> static StringVal TypeOf(FunctionContext* ctx, const T& input_val);
+
+ private:
+  static StringVal GenUuid(FunctionContext* ctx);
 };
 
 }

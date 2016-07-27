@@ -511,6 +511,7 @@ void Expr::InitBuiltinsDummy() {
   MathFunctions::Pi(NULL);
   StringFunctions::Length(NULL, StringVal::null());
   TimestampFunctions::Year(NULL, TimestampVal::null());
+  TimestampFunctions::UnixAndFromUnixPrepare(NULL, FunctionContext::FRAGMENT_LOCAL);
   UdfBuiltins::Pi(NULL);
   UtilityFunctions::Pid(NULL);
 }

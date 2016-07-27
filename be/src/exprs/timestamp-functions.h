@@ -19,8 +19,6 @@
 #ifndef IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 #define IMPALA_EXPRS_TIMESTAMP_FUNCTIONS_H
 
-#include <boost/date_time/local_time/local_time.hpp>
-
 #include "common/status.h"
 #include "udf/udf.h"
 
@@ -187,6 +185,8 @@ class TimestampFunctions {
       const StringVal& format, bool is_error);
 
  private:
+  static std::string ToIsoExtendedString(const TimestampValue& ts_value);
+
   /// Static result values for DayName() function.
   static const char* MONDAY;
   static const char* TUESDAY;
@@ -195,27 +195,6 @@ class TimestampFunctions {
   static const char* FRIDAY;
   static const char* SATURDAY;
   static const char* SUNDAY;
-};
-
-/// Functions to load and access the timestamp database.
-class TimezoneDatabase {
- public:
-  /// Set up the static timezone database.
-  static Status Initialize();
-
-  /// Converts the name of a timezone to a boost timezone object.
-  /// Some countries change their timezones, the tiemstamp is required to correctly
-  /// determine the timezone information.
-  static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz,
-      const TimestampValue& tv);
-
-  /// Moscow Timezone No Daylight Savings Time (GMT+4), for use after March 2011
-  static const boost::local_time::time_zone_ptr TIMEZONE_MSK_PRE_2011_DST;
-
- private:
-  static const char* TIMEZONE_DATABASE_STR;
-  static boost::local_time::tz_database tz_database_;
-  static std::vector<std::string> tz_region_list_;
 };
 
 } // namespace impala

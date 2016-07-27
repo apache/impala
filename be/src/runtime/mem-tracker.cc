@@ -18,6 +18,7 @@
 #include "runtime/mem-tracker.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <boost/lexical_cast.hpp>
 #include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 

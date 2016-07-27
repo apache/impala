@@ -15,34 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/time_zone_base.hpp>
-#include <boost/date_time/local_time/local_time.hpp>
-#include <boost/algorithm/string.hpp>
+#include "exprs/timestamp-functions.h"
+
+#include <boost/date_time/compiler_config.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/date_time/gregorian/gregorian_types.hpp>
 #include <ctime>
 #include <gutil/strings/substitute.h>
 
-#include "exprs/timestamp-functions.h"
-#include "exprs/expr.h"
 #include "exprs/anyval-util.h"
-
-#include "runtime/tuple-row.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
-#include "util/path-builder.h"
-#include "runtime/string-value.inline.h"
 #include "udf/udf.h"
 #include "udf/udf-internal.h"
-#include "runtime/runtime-state.h"
 
 #include "common/names.h"
 
-using boost::algorithm::iequals;
 using boost::gregorian::greg_month;
 using boost::gregorian::min_date_time;
-using boost::local_time::local_date_time;
-using boost::local_time::time_zone_ptr;
 using boost::posix_time::not_a_date_time;
 using boost::posix_time::ptime;
 using namespace impala_udf;
@@ -99,42 +90,6 @@ const int64_t TimestampFunctions::MAX_MILLI_INTERVAL =
     TimestampFunctions::MAX_SEC_INTERVAL * 1000;
 const int64_t TimestampFunctions::MAX_MICRO_INTERVAL =
     TimestampFunctions::MAX_MILLI_INTERVAL * 1000;
-
-void TimestampFunctions::UnixAndFromUnixPrepare(FunctionContext* context,
-    FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::THREAD_LOCAL) return;
-  DateTimeFormatContext* dt_ctx = NULL;
-  if (context->IsArgConstant(1)) {
-    StringVal fmt_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
-    const StringValue& fmt_ref = StringValue::FromStringVal(fmt_val);
-    if (fmt_val.is_null || fmt_ref.len == 0) {
-      TimestampFunctions::ReportBadFormat(context, fmt_val, true);
-      return;
-    }
-    dt_ctx = new DateTimeFormatContext(fmt_ref.ptr, fmt_ref.len);
-    bool parse_result = TimestampParser::ParseFormatTokens(dt_ctx);
-    if (!parse_result) {
-      delete dt_ctx;
-      TimestampFunctions::ReportBadFormat(context, fmt_val, true);
-      return;
-    }
-  } else {
-    // If our format string is constant, then we benefit from it only being parsed once in
-    // the code above. If it's not constant, then we can reuse a context by resetting it.
-    // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
-    dt_ctx = new DateTimeFormatContext();
-  }
-  context->SetFunctionState(scope, dt_ctx);
-}
-
-void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
-    FunctionContext::FunctionStateScope scope) {
-  if (scope == FunctionContext::THREAD_LOCAL) {
-    DateTimeFormatContext* dt_ctx =
-        reinterpret_cast<DateTimeFormatContext*>(context->GetFunctionState(scope));
-    delete dt_ctx;
-  }
-}
 
 StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
     const TimestampValue& tv, const StringVal& fmt) {
@@ -370,7 +325,7 @@ StringVal TimestampFunctions::ToDate(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return StringVal::null();
   const TimestampValue ts_value = TimestampValue::FromTimestampVal(ts_val);
-  string result = to_iso_extended_string(ts_value.date());
+  string result = ToIsoExtendedString(ts_value);
   return AnyValUtil::FromString(context, result);
 }
 
@@ -791,100 +746,6 @@ IntVal TimestampFunctions::DateDiff(FunctionContext* context,
     return IntVal::null();
   }
   return IntVal((ts_value1.date() - ts_value2.date()).days());
-}
-
-// This function uses inline asm functions, which we believe to be from the boost library.
-// Inline asm is not currently supported by JIT, so this function should always be run in
-// the interpreted mode. This is handled in ScalarFnCall::GetUdf().
-TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
-    const TimestampVal& ts_val, const StringVal& tz_string_val) {
-  if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
-  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (!ts_value.HasDateOrTime()) return TimestampVal::null();
-
-  const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
-  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.ptr, tz_string_value.len), ts_value);
-  if (timezone == NULL) {
-    // This should return null. Hive just ignores it.
-    stringstream ss;
-    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
-    context->AddWarning(ss.str().c_str());
-    return ts_val;
-  }
-
-  ptime temp;
-  ts_value.ToPtime(&temp);
-  local_date_time lt(temp, timezone);
-  TimestampValue return_value = lt.local_time();
-  TimestampVal return_val;
-  return_value.ToTimestampVal(&return_val);
-  return return_val;
-}
-
-// This function uses inline asm functions, which we believe to be from the boost library.
-// Inline asm is not currently supported by JIT, so this function should always be run in
-// the interpreted mode. This is handled in ScalarFnCall::GetUdf().
-TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
-    const TimestampVal& ts_val, const StringVal& tz_string_val) {
-  if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
-  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (!ts_value.HasDateOrTime()) return TimestampVal::null();
-
-  const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
-  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(
-      string(tz_string_value.ptr, tz_string_value.len), ts_value);
-  // This should raise some sort of error or at least null. Hive Just ignores it.
-  if (timezone == NULL) {
-    stringstream ss;
-    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
-    context->AddWarning(ss.str().c_str());
-    return ts_val;
-  }
-
-  local_date_time lt(ts_value.date(), ts_value.time(),
-      timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
-  TimestampValue return_value(lt.utc_time());
-  TimestampVal return_val;
-  return_value.ToTimestampVal(&return_val);
-  return return_val;
-}
-
-time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz, const TimestampValue& tv) {
-  // The backing database does not capture some subtleties, there are special cases
-  if ((tv.date().year() < 2011 || (tv.date().year() == 2011 && tv.date().month() < 4)) &&
-      (iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz))) {
-    // We transition in pre April 2011 from using the tz_database_ to a custom rule
-    // Russia stopped using daylight savings in 2011, the tz_database_ is
-    // set up assuming Russia uses daylight saving every year.
-    // Sun, Mar 27, 2:00AM Moscow clocks moved forward +1 hour (a total of GMT +4)
-    // Specifically,
-    // UTC Time 26 Mar 2011 22:59:59 +0000 ===> Sun Mar 27 01:59:59 MSK 2011
-    // UTC Time 26 Mar 2011 23:00:00 +0000 ===> Sun Mar 27 03:00:00 MSK 2011
-    // This means in 2011, The database rule will apply DST starting March 26 2011.
-    // This will be a correct +4 offset, and the database rule can apply until
-    // Oct 31 when tz_database_ will incorrectly attempt to turn clocks backwards 1 hour.
-    return TIMEZONE_MSK_PRE_2011_DST;
-  }
-
-  // See if they specified a zone id
-  time_zone_ptr tzp = tz_database_.time_zone_from_region(tz);
-  if (tzp != NULL) return tzp;
-
-  for (vector<string>::const_iterator iter = tz_region_list_.begin();
-       iter != tz_region_list_.end(); ++iter) {
-    time_zone_ptr tzp = tz_database_.time_zone_from_region(*iter);
-    DCHECK(tzp != NULL);
-    if (tzp->dst_zone_abbrev() == tz)
-      return tzp;
-    if (tzp->std_zone_abbrev() == tz)
-      return tzp;
-    if (tzp->dst_zone_name() == tz)
-      return tzp;
-    if (tzp->std_zone_name() == tz)
-      return tzp;
-  }
-  return time_zone_ptr();
 }
 
 // Explicit template instantiation is required for proper linking. These functions

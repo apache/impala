@@ -19,12 +19,12 @@
 #ifndef IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 #define IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 
+#include <boost/date_time/compiler_config.hpp>
+#include <boost/date_time/posix_time/conversion.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <ctime>
-#include <string>
-
-#include <boost/cstdint.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <gflags/gflags.h>
+#include <string>
 
 #include "udf/udf.h"
 #include "util/hash-util.h"
