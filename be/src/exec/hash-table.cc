@@ -386,6 +386,11 @@ bool HashTable::Init() {
     return false;
   }
   buckets_ = reinterpret_cast<Bucket*>(malloc(buckets_byte_size));
+  if (buckets_ == NULL) {
+    state_->block_mgr()->ReleaseMemory(block_mgr_client_, buckets_byte_size);
+    num_buckets_ = 0;
+    return false;
+  }
   memset(buckets_, 0, buckets_byte_size);
   return true;
 }
@@ -438,7 +443,10 @@ bool HashTable::ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx) {
   int64_t new_size = num_buckets * sizeof(Bucket);
   if (!state_->block_mgr()->ConsumeMemory(block_mgr_client_, new_size)) return false;
   Bucket* new_buckets = reinterpret_cast<Bucket*>(malloc(new_size));
-  DCHECK(new_buckets != NULL);
+  if (new_buckets == NULL) {
+    state_->block_mgr()->ReleaseMemory(block_mgr_client_, new_size);
+    return false;
+  }
   memset(new_buckets, 0, new_size);
 
   // Walk the old table and copy all the filled buckets to the new (resized) table.

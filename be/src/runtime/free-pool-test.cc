@@ -187,6 +187,11 @@ TEST(FreePoolTest, ReAlloc) {
   EXPECT_TRUE(ptr3 != ptr4);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8 + (1LL << 32) + 8);
 
+  // Shrink the allocation.
+  uint8_t* ptr5 = pool.Reallocate(ptr4, 1024);
+  EXPECT_TRUE(ptr4 == ptr5);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8 + (1LL << 32) + 8);
+
   mem_pool.FreeAll();
 }
 

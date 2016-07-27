@@ -123,10 +123,10 @@ class FreePool {
       return NULL;
     }
 #endif
+    if (UNLIKELY(ptr == NULL || ptr == mem_pool_->EmptyAllocPtr())) return Allocate(size);
     if (FLAGS_disable_mem_pools) {
       return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
     }
-    if (UNLIKELY(ptr == NULL || ptr == mem_pool_->EmptyAllocPtr())) return Allocate(size);
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG
@@ -135,7 +135,7 @@ class FreePool {
     int bucket_idx = (list - &lists_[0]);
     DCHECK_LT(bucket_idx, NUM_LISTS);
     // This is the actual size of ptr.
-    int allocation_size = 1 << bucket_idx;
+    int64_t allocation_size = 1LL << bucket_idx;
 
     // If it's already big enough, just return the ptr.
     if (allocation_size >= size) return ptr;
