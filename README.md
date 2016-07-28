@@ -19,15 +19,8 @@ you analyze, transform and combine data from a variety of data sources:
 ## More about Impala
 
 To learn more about Impala as a business user, or to try Impala live or in a VM, please
-visit the [Impala homepage](http://impala.io/index.html).
+visit the [Impala homepage](https://impala.apache.org).
 
 If you are interested in contributing to Impala as a developer, or learning more about
 Impala's internals and architecture, visit the
-[Impala wiki](https://github.com/cloudera/Impala/wiki).
-
-## Building Impala
-
-This Apache Incubator repository is currently not buildable but has the complete source
-code for Impala minus some third-party dependences. See https://github.com/cloudera/Impala
-for the buildable Impala source and https://issues.cloudera.org/browse/IMPALA-3223 to
-track progress on making this repository buildable.
+[Impala wiki](https://cwiki.apache.org/confluence/display/IMPALA/Impala+Home).
