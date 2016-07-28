@@ -217,6 +217,16 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "select id from functional.allcomplextypes t where id %s " +
           "(select f1 from t.struct_array_col a where t.int_struct_col.f1 = a.f1)", op));
+      // Test correlated BETWEEN predicates.
+      AnalyzesOk(String.format("select 1 from functional.alltypes t where id %s " +
+          "(select id from functional.alltypesagg a where " +
+          " a.tinyint_col between t.tinyint_col and t.smallint_col and " +
+          " a.smallint_col between 10 and t.int_col and " +
+          " 20 between t.bigint_col and a.int_col and " +
+          " t.float_col between a.float_col and a.double_col and " +
+          " t.string_col between a.string_col and t.date_string_col and " +
+          " a.double_col between round(acos(t.float_col), 2) " +
+          " and cast(t.string_col as int))", op));
 
       // Multiple nesting levels (uncorrelated queries)
       AnalyzesOk(String.format("select * from functional.alltypes t where id %s " +
@@ -605,6 +615,17 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           String.format("Unsupported predicate with subquery: EXISTS (SELECT * FROM " +
           "functional.alltypesagg a WHERE t.id %s a.id)", cmpOp));
     }
+    // Correlated BETWEEN predicate with relative table refs.
+    AnalyzesOk("select 1 from functional.allcomplextypes t where exists " +
+        "(select a.f1 from t.struct_array_col a " +
+        " where a.f1 between t.int_struct_col.f1 and t.int_struct_col.f2)");
+    // Correlated BETWEEN predicate with absolute table refs.
+    AnalysisError("select 1 from functional.alltypes t where EXISTS " +
+        "(select id from functional.alltypessmall a " +
+        " where a.int_col between t.tinyint_col and t.bigint_col)",
+        "Unsupported predicate with subquery: " +
+        "EXISTS (SELECT id FROM functional.alltypessmall a " +
+        "WHERE a.int_col >= t.tinyint_col AND a.int_col <= t.bigint_col)");
 
     // Uncorrelated EXISTS in a query with GROUP BY
     AnalyzesOk("select id, count(*) from functional.alltypes t " +

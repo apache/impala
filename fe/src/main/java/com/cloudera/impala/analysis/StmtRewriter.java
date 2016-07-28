@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
@@ -202,9 +201,8 @@ public class StmtRewriter {
     int numTableRefs = stmt.fromClause_.size();
     ArrayList<Expr> exprsWithSubqueries = Lists.newArrayList();
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
-    // Replace all BetweenPredicates that contain subqueries with their
-    // equivalent compound predicates.
-    stmt.whereClause_ = replaceBetweenPredicates(stmt.whereClause_);
+    // Replace all BetweenPredicates with their equivalent compound predicates.
+    stmt.whereClause_ = rewriteBetweenPredicates(stmt.whereClause_);
     // Check if all the conjuncts in the WHERE clause that contain subqueries
     // can currently be rewritten as a join.
     for (Expr conjunct: stmt.whereClause_.getConjuncts()) {
@@ -275,16 +273,15 @@ public class StmtRewriter {
   }
 
   /**
-   * Replace all BetweenPredicates containing subqueries with their
-   * equivalent compound predicates from the expr tree rooted at 'expr'.
-   * The modified expr tree is returned.
+   * Replace all BetweenPredicates with their equivalent compound predicates from the
+   * expr tree rooted at 'expr'. The modified expr tree is returned.
    */
-  private static Expr replaceBetweenPredicates(Expr expr) {
-    if (expr instanceof BetweenPredicate && expr.contains(Subquery.class)) {
+  private static Expr rewriteBetweenPredicates(Expr expr) {
+    if (expr instanceof BetweenPredicate) {
       return ((BetweenPredicate)expr).getRewrittenPredicate();
     }
     for (int i = 0; i < expr.getChildren().size(); ++i) {
-      expr.setChild(i, replaceBetweenPredicates(expr.getChild(i)));
+      expr.setChild(i, rewriteBetweenPredicates(expr.getChild(i)));
     }
     return expr;
   }

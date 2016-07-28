@@ -1839,3 +1839,28 @@ where t1.int_col = t2.int_col);
    partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> t1.int_col
 ====
+# IMPALA-3861: Test that IN subqueries with correlated BETWEEN predicates work.
+select 1 from functional.alltypes t where id in
+  (select id from functional.alltypesagg a where
+   a.tinyint_col between t.tinyint_col and t.smallint_col and
+   a.smallint_col between 10 and t.int_col and
+   20 between t.bigint_col and a.int_col and
+   t.float_col between a.float_col and a.double_col and
+   t.string_col between a.string_col and t.date_string_col and
+   a.double_col between round(acos(t.float_col), 2)
+                and cast(t.string_col as int))
+---- PLAN
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = id
+|  other join predicates: t.float_col >= a.float_col, a.tinyint_col >= t.tinyint_col, t.float_col <= a.double_col, a.smallint_col <= t.int_col, a.tinyint_col <= t.smallint_col, a.double_col <= CAST(t.string_col AS INT), t.string_col >= a.string_col, a.double_col >= round(acos(t.float_col), 2)
+|  runtime filters: RF000 <- id
+|
+|--01:SCAN HDFS [functional.alltypesagg a]
+|     partitions=11/11 files=11 size=814.73KB
+|     predicates: a.smallint_col >= 10, 20 <= a.int_col
+|
+00:SCAN HDFS [functional.alltypes t]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: 20 >= t.bigint_col, t.string_col <= t.date_string_col
+   runtime filters: RF000 -> id
+====
