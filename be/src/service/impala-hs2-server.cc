@@ -610,46 +610,42 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     state->connected_user = request.username;
   }
 
+  // Process the supplied configuration map.
   state->database = "default";
   state->session_timeout = FLAGS_idle_session_timeout;
-  typedef map<string, string> ConfigurationMap;
-  for (const ConfigurationMap::value_type& v: request.configuration) {
-    if (iequals(v.first, "use:database")) {
-      state->database = v.second;
-    } else if (iequals(v.first, "idle_session_timeout")) {
-      int32_t requested_timeout = atoi(v.second.c_str());
-      if (requested_timeout > 0) {
-        if (FLAGS_idle_session_timeout > 0) {
-          state->session_timeout = min(FLAGS_idle_session_timeout, requested_timeout);
-        } else {
-          state->session_timeout = requested_timeout;
+  state->default_query_options = default_query_options_;
+  if (request.__isset.configuration) {
+    typedef map<string, string> ConfigurationMap;
+    for (const ConfigurationMap::value_type& v: request.configuration) {
+      if (iequals(v.first, "impala.doas.user")) {
+        // If the current user is a valid proxy user, he/she can optionally perform
+        // authorization requests on behalf of another user. This is done by setting
+        // the 'impala.doas.user' Hive Server 2 configuration property.
+        state->do_as_user = v.second;
+        Status status = AuthorizeProxyUser(state->connected_user, state->do_as_user);
+        HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+      } else if (iequals(v.first, "use:database")) {
+        state->database = v.second;
+      } else if (iequals(v.first, "idle_session_timeout")) {
+        int32_t requested_timeout = atoi(v.second.c_str());
+        if (requested_timeout > 0) {
+          if (FLAGS_idle_session_timeout > 0) {
+            state->session_timeout = min(FLAGS_idle_session_timeout, requested_timeout);
+          } else {
+            state->session_timeout = requested_timeout;
+          }
         }
+        VLOG_QUERY << "OpenSession(): idle_session_timeout="
+                   << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
+      } else {
+        // Normal configuration key. Use it to set session default query options.
+        // Ignore failure (failures will be logged in SetQueryOption()).
+        SetQueryOption(v.first, v.second, &state->default_query_options,
+            &state->set_query_options_mask);
       }
-      VLOG_QUERY << "OpenSession(): idle_session_timeout="
-                 << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
     }
   }
   RegisterSessionTimeout(state->session_timeout);
-
-  // Convert request.configuration to session default query options.
-  state->default_query_options = default_query_options_;
-  if (request.__isset.configuration) {
-    map<string, string>::const_iterator conf_itr = request.configuration.begin();
-    for (; conf_itr != request.configuration.end(); ++conf_itr) {
-      // If the current user is a valid proxy user, he/she can optionally perform
-      // authorization requests on behalf of another user. This is done by setting the
-      // 'impala.doas.user' Hive Server 2 configuration property.
-      if (conf_itr->first == "impala.doas.user") {
-        state->do_as_user = conf_itr->second;
-        Status status = AuthorizeProxyUser(state->connected_user, state->do_as_user);
-        HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
-        continue;
-      }
-      // Ignore failure to set query options (will be logged)
-      SetQueryOption(conf_itr->first, conf_itr->second, &state->default_query_options,
-          &state->set_query_options_mask);
-    }
-  }
   TQueryOptionsToMap(state->default_query_options, &return_val.configuration);
 
   // OpenSession() should return the coordinator's HTTP server address.

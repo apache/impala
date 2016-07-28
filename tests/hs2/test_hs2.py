@@ -35,6 +35,16 @@ class TestHS2(HS2TestSuite):
     open_session_req = TCLIService.TOpenSessionReq()
     TestHS2.check_response(self.hs2_client.OpenSession(open_session_req))
 
+  def test_open_sesssion_query_options(self):
+    """Check that OpenSession sets query options"""
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req.configuration = {'MAX_ERRORS': '45678',
+        'NUM_NODES': '1234', 'MAX_NUM_RUNTIME_FILTERS': '333'}
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(open_session_resp)
+    for k, v in open_session_req.configuration.items():
+      assert open_session_resp.configuration[k] == v
+
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""
     open_session_req = TCLIService.TOpenSessionReq()
