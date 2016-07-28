@@ -820,12 +820,13 @@ Status BufferedBlockMgr::AllocateScratchSpace(int64_t block_size,
     if (status.ok()) return Status::OK();
     // Log error and try other files if there was a problem. Problematic files will be
     // blacklisted so we will not repeatedly log the same error.
-    LOG(WARNING) << "Error while allocating temporary file range: "
-                 << status.msg().msg() << ". Will try another temporary file.";
+    LOG(WARNING) << "Error while allocating range in scratch file '"
+                 << (*tmp_file)->path() << "': " << status.msg().msg()
+                 << ". Will try another scratch file.";
     errs.push_back(status);
   }
-  Status err_status("No usable temporary files: space could not be allocated on any "
-      "temporary device.");
+  Status err_status("No usable scratch files: space could not be allocated in any "
+      "of the configured scratch directories (--scratch_dirs).");
   for (int i = 0; i < errs.size(); ++i) {
     err_status.MergeStatus(errs[i]);
   }
@@ -1100,7 +1101,7 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
     if (disable_spill_) {
       if (block_write_threshold_ == 0) {
         return Status("Spilling has been disabled due to no usable scratch space. "
-            "Please specify a usable scratch space location via the scratch_dirs "
+            "Please specify a usable scratch space location via the --scratch_dirs "
             "impalad flag.");
       } else {
         return Status("Spilling has been disabled for plans that do not have stats and "
