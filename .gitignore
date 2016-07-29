@@ -28,6 +28,10 @@ CMakeFiles
 cmake_install.cmake
 CTestTestfile.cmake
 !CMakeLists.txt
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
 
 Testing/
 llvm-ir/
@@ -43,3 +47,8 @@ logs/
 
 # Impala toolchain directory
 toolchain/
+
+# Core dumps and crash reports
+core
+core.*
+hs_err_pid*.log

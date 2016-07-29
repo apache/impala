@@ -1,0 +1,5 @@
+# Ignore downloaded python packages
+*.tar.bz2
+*.tar.gz
+*.whl
+*.zip
