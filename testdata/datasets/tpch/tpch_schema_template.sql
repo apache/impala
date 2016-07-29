@@ -25,7 +25,7 @@ L_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   L_ORDERKEY BIGINT,
   L_PARTKEY BIGINT,
   L_SUPPKEY BIGINT,
@@ -73,7 +73,7 @@ P_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   P_PARTKEY BIGINT,
   P_NAME STRING,
   P_MFGR STRING,
@@ -110,7 +110,7 @@ PS_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   PS_PARTKEY BIGINT,
   PS_SUPPKEY BIGINT,
   PS_AVAILQTY BIGINT,
@@ -145,7 +145,7 @@ S_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   S_SUPPKEY BIGINT,
   S_NAME STRING,
   S_ADDRESS STRING,
@@ -179,7 +179,7 @@ N_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   N_NATIONKEY SMALLINT,
   N_NAME STRING,
   N_REGIONKEY SMALLINT,
@@ -209,7 +209,7 @@ R_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   R_REGIONKEY SMALLINT,
   R_NAME STRING,
   R_COMMENT STRING
@@ -244,7 +244,7 @@ O_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   O_ORDERKEY BIGINT,
   O_CUSTKEY BIGINT,
   O_ORDERSTATUS STRING,
@@ -284,7 +284,7 @@ C_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   C_CUSTKEY BIGINT,
   C_NAME STRING,
   C_ADDRESS STRING,
@@ -315,7 +315,7 @@ revenue
 supplier_no bigint
 total_revenue Decimal(38,4)
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   supplier_no bigint,
   total_revevue double
 )
@@ -334,7 +334,7 @@ max_revenue
 ---- COLUMNS
 max_revenue Decimal(38, 4)
 ---- CREATE_KUDU
-create table {db_name}{db_suffix}.{table_name} (
+create table if not exists {db_name}{db_suffix}.{table_name} (
   max_revenue bigint
 )
 distribute by hash (max_revenue) into 9 buckets
