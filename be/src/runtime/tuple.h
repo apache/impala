@@ -19,7 +19,6 @@
 #ifndef IMPALA_RUNTIME_TUPLE_H
 #define IMPALA_RUNTIME_TUPLE_H
 
-#include <cstring>
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "gutil/macros.h"
@@ -70,9 +69,7 @@ class Tuple {
     return result;
   }
 
-  void Init(int size) {
-    bzero(this, size);
-  }
+  void Init(int size) { memset(this, 0, size); }
 
   /// The total size of all data represented in this tuple (tuple data and referenced
   /// string and collection data).

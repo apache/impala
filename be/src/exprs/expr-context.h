@@ -110,8 +110,9 @@ class ExprContext {
     return fn_contexts_[i];
   }
 
-  Expr* root() { return root_; }
-  bool closed() { return closed_; }
+  Expr* root() const { return root_; }
+  bool closed() const { return closed_; }
+  bool is_clone() const { return is_clone_; }
 
   /// Calls Get*Val on root_
   BooleanVal GetBooleanVal(TupleRow* row);

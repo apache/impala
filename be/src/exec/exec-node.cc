@@ -35,6 +35,7 @@
 #include "exec/hash-join-node.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/hdfs-scan-node-mt.h"
 #include "exec/kudu-scan-node.h"
 #include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
@@ -264,6 +265,11 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
+      if (state->query_options().mt_num_cores > 0) {
+        *node = pool->Add(new HdfsScanNodeMt(pool, tnode, descs));
+      } else {
+        *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
+      }
       // If true, this node requests codegen over interpretation for conjuncts
       // evaluation whenever possible. Turn codegen on for expr evaluation for
       // the entire fragment.

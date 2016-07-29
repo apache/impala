@@ -41,9 +41,9 @@ const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
-    bool add_batches_to_queue)
-    : BaseSequenceScanner(scan_node, state, add_batches_to_queue),
+HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNodeBase* scan_node,
+    RuntimeState* state)
+    : BaseSequenceScanner(scan_node, state),
       unparsed_data_buffer_(NULL),
       num_buffered_records_in_compressed_block_(0) {
 }
@@ -52,7 +52,7 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 }
 
 // Codegen for materialized parsed data into tuples.
-Status HdfsSequenceScanner::Codegen(HdfsScanNode* node,
+Status HdfsSequenceScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
   if (!node->runtime_state()->codegen_enabled()) {

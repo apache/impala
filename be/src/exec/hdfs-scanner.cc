@@ -26,6 +26,7 @@
 #include "common/object-pool.h"
 #include "exec/text-converter.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr-context.h"
@@ -56,20 +57,20 @@ using namespace strings;
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 
-HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state,
-    bool add_batches_to_queue)
+HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
-      add_batches_to_queue_(add_batches_to_queue),
       context_(NULL),
       stream_(NULL),
+      eos_(false),
       scanner_conjunct_ctxs_(NULL),
+      template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       template_tuple_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
+      num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
       tuple_(NULL),
       batch_(NULL),
       tuple_mem_(NULL),
-      num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
       parse_status_(Status::OK()),
       decompression_type_(THdfsCompression::NONE),
       data_buffer_pool_(new MemPool(scan_node->mem_tracker())),
@@ -80,16 +81,17 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state,
 HdfsScanner::HdfsScanner()
     : scan_node_(NULL),
       state_(NULL),
-      add_batches_to_queue_(true),
       context_(NULL),
       stream_(NULL),
+      eos_(false),
       scanner_conjunct_ctxs_(NULL),
+      template_tuple_pool_(NULL),
       template_tuple_(NULL),
       tuple_byte_size_(-1),
+      num_null_bytes_(-1),
       tuple_(NULL),
       batch_(NULL),
       tuple_mem_(NULL),
-      num_null_bytes_(-1),
       parse_status_(Status::OK()),
       decompression_type_(THdfsCompression::NONE),
       data_buffer_pool_(NULL),
@@ -107,19 +109,23 @@ Status HdfsScanner::Open(ScannerContext* context) {
 
   // Clone the scan node's conjuncts map. The cloned contexts must be closed by the
   // caller.
-  HdfsScanNode::ConjunctsMap::const_iterator iter = scan_node_->conjuncts_map().begin();
-  for (; iter != scan_node_->conjuncts_map().end(); ++iter) {
-    RETURN_IF_ERROR(Expr::CloneIfNotExists(iter->second,
-        scan_node_->runtime_state(), &scanner_conjuncts_map_[iter->first]));
+  for (const auto& entry: scan_node_->conjuncts_map()) {
+    RETURN_IF_ERROR(Expr::CloneIfNotExists(entry.second,
+        scan_node_->runtime_state(), &scanner_conjuncts_map_[entry.first]));
   }
   DCHECK(scanner_conjuncts_map_.find(scan_node_->tuple_desc()->id()) !=
          scanner_conjuncts_map_.end());
   scanner_conjunct_ctxs_ = &scanner_conjuncts_map_[scan_node_->tuple_desc()->id()];
 
   // Initialize the template_tuple_.
-  template_tuple_ = scan_node_->InitTemplateTuple(
-      state_, context_->partition_descriptor()->partition_key_value_ctxs());
+  vector<ExprContext*> partition_key_value_ctxs;
+  RETURN_IF_ERROR(Expr::CloneIfNotExists(
+      context_->partition_descriptor()->partition_key_value_ctxs(), state_,
+      &partition_key_value_ctxs));
+  template_tuple_ = scan_node_->InitTemplateTuple(partition_key_value_ctxs,
+      template_tuple_pool_.get(), state_);
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
+  Expr::Close(partition_key_value_ctxs, state_);
 
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   return Status::OK();
@@ -127,10 +133,7 @@ Status HdfsScanner::Open(ScannerContext* context) {
 
 void HdfsScanner::Close(RowBatch* row_batch) {
   if (decompressor_.get() != NULL) decompressor_->Close();
-  HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();
-  for (; iter != scanner_conjuncts_map_.end(); ++iter) {
-    Expr::Close(iter->second, state_);
-  }
+  for (const auto& entry: scanner_conjuncts_map_) Expr::Close(entry.second, state_);
   obj_pool_.Clear();
   stream_ = NULL;
   context_->ClearStreams();
@@ -158,7 +161,7 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
 }
 
 Status HdfsScanner::StartNewRowBatch() {
-  DCHECK(add_batches_to_queue_);
+  DCHECK(scan_node_->HasRowBatchQueue());
   batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
       scan_node_->mem_tracker());
   int64_t tuple_buffer_size;
@@ -168,7 +171,7 @@ Status HdfsScanner::StartNewRowBatch() {
 }
 
 int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem) {
-  DCHECK(add_batches_to_queue_);
+  DCHECK(scan_node_->HasRowBatchQueue());
   DCHECK(batch_ != NULL);
   DCHECK_GT(batch_->capacity(), batch_->num_rows());
   *pool = batch_->tuple_data_pool();
@@ -190,7 +193,7 @@ Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool
 
 // TODO(skye): have this check scan_node_->ReachedLimit() and get rid of manual check?
 Status HdfsScanner::CommitRows(int num_rows) {
-  DCHECK(add_batches_to_queue_);
+  DCHECK(scan_node_->HasRowBatchQueue());
   DCHECK(batch_ != NULL);
   DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
   batch_->CommitRows(num_rows);
@@ -201,16 +204,15 @@ Status HdfsScanner::CommitRows(int num_rows) {
   // if no rows passed predicates.
   if (batch_->AtCapacity() || context_->num_completed_io_buffers() > 0) {
     context_->ReleaseCompletedResources(batch_, /* done */ false);
-    scan_node_->AddMaterializedRowBatch(batch_);
+    static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(batch_);
     RETURN_IF_ERROR(StartNewRowBatch());
   }
   if (context_->cancelled()) return Status::CANCELLED;
   // Check for UDF errors.
   RETURN_IF_ERROR(state_->GetQueryStatus());
   // Free local expr allocations for this thread
-  HdfsScanNode::ConjunctsMap::const_iterator iter = scanner_conjuncts_map_.begin();
-  for (; iter != scanner_conjuncts_map_.end(); ++iter) {
-    ExprContext::FreeLocalAllocations(iter->second);
+  for (const auto& entry: scanner_conjuncts_map_) {
+    ExprContext::FreeLocalAllocations(entry.second);
   }
   return Status::OK();
 }
@@ -357,8 +359,9 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 // eval_fail:                                        ; preds = %parse
 //   ret i1 false
 // }
-Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNode* node, LlvmCodeGen* codegen,
-    const vector<ExprContext*>& conjunct_ctxs, Function** write_complete_tuple_fn) {
+Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
+    LlvmCodeGen* codegen, const vector<ExprContext*>& conjunct_ctxs,
+    Function** write_complete_tuple_fn) {
   *write_complete_tuple_fn = NULL;
   SCOPED_TIMER(codegen->codegen_timer());
   RuntimeState* state = node->runtime_state();
@@ -565,8 +568,9 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNode* node, LlvmCodeGen* c
   return Status::OK();
 }
 
-Status HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node, LlvmCodeGen* codegen,
-    Function* write_complete_tuple_fn, Function** write_aligned_tuples_fn) {
+Status HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNodeBase* node,
+    LlvmCodeGen* codegen, Function* write_complete_tuple_fn,
+    Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(write_complete_tuple_fn != NULL);

@@ -41,7 +41,7 @@ static const int MIN_SYNC_READ_SIZE = 64 * 1024; // bytes
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
+Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   // Issue just the header range for each file.  When the header is complete,
   // we'll issue the splits for that file.  Splits cannot be processed until the
@@ -49,7 +49,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   vector<DiskIoMgr::ScanRange*> header_ranges;
   for (int i = 0; i < files.size(); ++i) {
     ScanRangeMetadata* metadata =
-        reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
+        static_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
     int64_t header_size = min<int64_t>(HEADER_SIZE, files[i]->file_length);
     // The header is almost always a remote read. Set the disk id to -1 and indicate
     // it is not cached.
@@ -66,9 +66,8 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   return Status::OK();
 }
 
-BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state,
-    bool add_batches_to_queue)
-  : HdfsScanner(node, state, add_batches_to_queue),
+BaseSequenceScanner::BaseSequenceScanner(HdfsScanNodeBase* node, RuntimeState* state)
+  : HdfsScanner(node, state),
     header_(NULL),
     block_start_(0),
     total_block_size_(0),
@@ -110,12 +109,23 @@ void BaseSequenceScanner::Close(RowBatch* row_batch) {
   if (row_batch != NULL) {
     row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
     context_->ReleaseCompletedResources(row_batch, true);
-    if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
+    if (scan_node_->HasRowBatchQueue()) {
+      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
+    }
   }
+  // Transfer template tuple pool to scan node pool. The scanner may be closed and
+  // subsequently re-used for another range, so we need to ensure that the template
+  // tuples are backed by live memory.
+  if (template_tuple_pool_.get() != NULL) {
+    static_cast<HdfsScanNode*>(scan_node_)->TransferToScanNodePool(
+        template_tuple_pool_.get());
+  }
+
   // Verify all resources (if any) have been transferred.
+  DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
-  // 'header_' can be NULL if HdfsScanNode::CreateAndPrepareScanner() failed.
+  // 'header_' can be NULL if HdfsScanNodeBase::CreateAndOpenScanner() failed.
   if (!only_parsing_header_ && header_ != NULL) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
@@ -123,9 +133,9 @@ void BaseSequenceScanner::Close(RowBatch* row_batch) {
 }
 
 Status BaseSequenceScanner::ProcessSplit() {
-  DCHECK(add_batches_to_queue_);
+  DCHECK(scan_node_->HasRowBatchQueue());
   header_ = reinterpret_cast<FileHeader*>(
-      scan_node_->GetFileMetadata(stream_->filename()));
+      static_cast<HdfsScanNode*>(scan_node_)->GetFileMetadata(stream_->filename()));
   if (header_ == NULL) {
     // This is the initial scan range just to parse the header
     only_parsing_header_ = true;
@@ -139,7 +149,8 @@ Status BaseSequenceScanner::ProcessSplit() {
     }
 
     // Header is parsed, set the metadata in the scan node and issue more ranges
-    scan_node_->SetFileMetadata(stream_->filename(), header_);
+    static_cast<HdfsScanNode*>(scan_node_)->SetFileMetadata(
+        stream_->filename(), header_);
     HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
     scan_node_->AddDiskIoRanges(desc);
     return Status::OK();

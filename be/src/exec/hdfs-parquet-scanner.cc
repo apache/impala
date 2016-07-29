@@ -71,7 +71,7 @@ const int16_t HdfsParquetScanner::ROW_GROUP_END;
 const int16_t HdfsParquetScanner::INVALID_LEVEL;
 const int16_t HdfsParquetScanner::INVALID_POS;
 
-Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
+Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
   vector<DiskIoMgr::ScanRange*> footer_ranges;
   for (int i = 0; i < files.size(); ++i) {
@@ -99,7 +99,7 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       // footer range for the split always.
       if (!scan_node->IsZeroSlotTableScan() || footer_split == split) {
         ScanRangeMetadata* split_metadata =
-            reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
+            static_cast<ScanRangeMetadata*>(split->meta_data());
         // Each split is processed by first issuing a scan range for the file footer, which
         // is done here, followed by scan ranges for the columns of each row group within
         // the actual split (in InitColumns()). The original split is stored in the
@@ -141,9 +141,8 @@ DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
 
 namespace impala {
 
-HdfsParquetScanner::HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state,
-    bool add_batches_to_queue)
-    : HdfsScanner(scan_node, state, add_batches_to_queue),
+HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
+    : HdfsScanner(scan_node, state),
       row_group_idx_(-1),
       row_group_rows_read_(0),
       advance_row_group_(true),
@@ -215,14 +214,22 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 void HdfsParquetScanner::Close(RowBatch* row_batch) {
   if (row_batch != NULL) {
     FlushRowGroupResources(row_batch);
-    if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
-  } else if (!FLAGS_enable_partitioned_hash_join ||
-      !FLAGS_enable_partitioned_aggregation) {
-    // With the legacy aggs/joins the tuple ptrs of the scratch batch are allocated
-    // from the scratch batch's mem pool. We can get into this case if Open() fails.
-    scratch_batch_->mem_pool()->FreeAll();
+    row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
+    if (scan_node_->HasRowBatchQueue()) {
+      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
+    }
+  } else {
+    if (template_tuple_pool_.get() != NULL) template_tuple_pool_->FreeAll();
+    if (!FLAGS_enable_partitioned_hash_join ||
+        !FLAGS_enable_partitioned_aggregation) {
+      // With the legacy aggs/joins the tuple ptrs of the scratch batch are allocated
+      // from the scratch batch's mem pool. We can get into this case if Open() fails.
+      scratch_batch_->mem_pool()->FreeAll();
+    }
   }
+
   // Verify all resources (if any) have been transferred.
+  DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(dictionary_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
@@ -307,25 +314,25 @@ int HdfsParquetScanner::CountScalarColumns(const vector<ParquetColumnReader*>& c
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
-  DCHECK(add_batches_to_queue_);
-  bool scanner_eos = false;
+  DCHECK(scan_node_->HasRowBatchQueue());
+  HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
   do {
     StartNewParquetRowBatch();
-    RETURN_IF_ERROR(GetNextInternal(batch_, &scanner_eos));
-    scan_node_->AddMaterializedRowBatch(batch_);
-  } while (!scanner_eos && !scan_node_->ReachedLimit());
+    RETURN_IF_ERROR(GetNextInternal(batch_));
+    scan_node->AddMaterializedRowBatch(batch_);
+  } while (!eos_ && !scan_node_->ReachedLimit());
 
   // Transfer the remaining resources to this new batch in Close().
   StartNewParquetRowBatch();
   return Status::OK();
 }
 
-Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch, bool* eos) {
+Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   if (scan_node_->IsZeroSlotTableScan()) {
     // There are no materialized slots, e.g. count(*) over the table.  We can serve
     // this query from just the file metadata. We don't need to read the column data.
     if (row_group_rows_read_ == file_metadata_.num_rows) {
-      *eos = true;
+      eos_ = true;
       return Status::OK();
     }
     assemble_rows_timer_.Start();
@@ -363,7 +370,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch, bool* eos) {
     }
     RETURN_IF_ERROR(NextRowGroup());
     if (row_group_idx_ >= file_metadata_.row_groups.size()) {
-      *eos = true;
+      eos_ = true;
       DCHECK(parse_status_.ok());
       return Status::OK();
     }
@@ -374,7 +381,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch, bool* eos) {
   // scan range.
   if (!scan_node_->PartitionPassesFilters(context_->partition_descriptor()->id(),
       FilterStats::ROW_GROUPS_KEY, context_->filter_ctxs())) {
-    *eos = true;
+    eos_ = true;
     DCHECK(parse_status_.ok());
     return Status::OK();
   }
@@ -406,7 +413,7 @@ Status HdfsParquetScanner::NextRowGroup() {
     const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
     if (row_group.num_rows == 0) continue;
 
-    const DiskIoMgr::ScanRange* split_range = reinterpret_cast<ScanRangeMetadata*>(
+    const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
         metadata_range_->meta_data())->original_split;
     HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename());
     RETURN_IF_ERROR(ParquetMetadataUtils::ValidateColumnOffsets(
@@ -539,7 +546,7 @@ Status HdfsParquetScanner::AssembleRows(
 }
 
 void HdfsParquetScanner::StartNewParquetRowBatch() {
-  DCHECK(add_batches_to_queue_);
+  DCHECK(scan_node_->HasRowBatchQueue());
   batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
       scan_node_->mem_tracker());
 }
@@ -609,7 +616,7 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   return num_row_to_commit;
 }
 
-Status HdfsParquetScanner::Codegen(HdfsScanNode* node,
+Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** process_scratch_batch_fn) {
   *process_scratch_batch_fn = NULL;
   if (!node->runtime_state()->codegen_enabled()) {
@@ -929,7 +936,8 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
       // Update the template tuple to put a NULL in this slot.
       Tuple** template_tuple = &template_tuple_map_[&tuple_desc];
       if (*template_tuple == NULL) {
-        *template_tuple = scan_node_->InitEmptyTemplateTuple(tuple_desc);
+        *template_tuple =
+            Tuple::Create(tuple_desc.byte_size(), template_tuple_pool_.get());
       }
       (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
       continue;
@@ -1110,7 +1118,7 @@ Status HdfsParquetScanner::InitColumns(
     }
 
     const DiskIoMgr::ScanRange* split_range =
-        reinterpret_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
+        static_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
 
     // Determine if the column is completely contained within a local split.
     bool column_range_local = split_range->expected_local() &&

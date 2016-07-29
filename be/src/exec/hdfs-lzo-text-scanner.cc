@@ -45,13 +45,13 @@ SpinLock HdfsLzoTextScanner::lzo_load_lock_;
 const char* (*GetImpalaLzoBuildVersion)();
 
 HdfsScanner* (*HdfsLzoTextScanner::CreateLzoTextScanner)(
-    HdfsScanNode* scan_node, RuntimeState* state);
+    HdfsScanNodeBase* scan_node, RuntimeState* state);
 
 Status (*HdfsLzoTextScanner::LzoIssueInitialRanges)(
-    HdfsScanNode* scan_node, const std::vector<HdfsFileDesc*>& files);
+    HdfsScanNodeBase* scan_node, const std::vector<HdfsFileDesc*>& files);
 
 HdfsScanner* HdfsLzoTextScanner::GetHdfsLzoTextScanner(
-    HdfsScanNode* scan_node, RuntimeState* state) {
+    HdfsScanNodeBase* scan_node, RuntimeState* state) {
 
   // If the scanner was not loaded then no scans could be issued so we should
   // never get here without having loaded the scanner.
@@ -60,7 +60,7 @@ HdfsScanner* HdfsLzoTextScanner::GetHdfsLzoTextScanner(
   return (*CreateLzoTextScanner)(scan_node, state);
 }
 
-Status HdfsLzoTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
+Status HdfsLzoTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   if (LzoIssueInitialRanges == NULL) {
     lock_guard<SpinLock> l(lzo_load_lock_);

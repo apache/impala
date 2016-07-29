@@ -50,9 +50,8 @@ const string HdfsTextScanner::LZO_INDEX_SUFFIX = ".index";
 // progress.
 const int64_t COMPRESSED_DATA_FIXED_READ_SIZE = 1 * 1024 * 1024;
 
-HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
-    bool add_batches_to_queue)
-    : HdfsScanner(scan_node, state, add_batches_to_queue),
+HdfsTextScanner::HdfsTextScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
+    : HdfsScanner(scan_node, state),
       byte_buffer_ptr_(NULL),
       byte_buffer_end_(NULL),
       byte_buffer_read_size_(0),
@@ -67,7 +66,7 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
 HdfsTextScanner::~HdfsTextScanner() {
 }
 
-Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
+Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   vector<DiskIoMgr::ScanRange*> compressed_text_scan_ranges;
   int compressed_text_files = 0;
@@ -108,7 +107,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
           // Populate the list of compressed text scan ranges.
           DCHECK_GT(files[i]->file_length, 0);
           ScanRangeMetadata* metadata =
-              reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
+              static_cast<ScanRangeMetadata*>(split->meta_data());
           DiskIoMgr::ScanRange* file_range = scan_node->AllocateScanRange(
               files[i]->fs, files[i]->filename.c_str(), files[i]->file_length, 0,
               metadata->partition_id, split->disk_id(), split->try_cache(),
@@ -149,7 +148,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 }
 
 Status HdfsTextScanner::ProcessSplit() {
-  DCHECK(add_batches_to_queue_);
+  DCHECK(scan_node_->HasRowBatchQueue());
 
   // Reset state for new scan range
   RETURN_IF_ERROR(InitNewRange());
@@ -187,12 +186,19 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
     decompressor_.reset(NULL);
   }
   if (row_batch != NULL) {
+    row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(boundary_pool_.get(), false);
     context_->ReleaseCompletedResources(row_batch, true);
-    if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
+    if (scan_node_->HasRowBatchQueue()) {
+      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
+    }
+  } else {
+    if (template_tuple_pool_.get() != NULL) template_tuple_pool_->FreeAll();
   }
+
   // Verify all resources (if any) have been transferred.
+  DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(boundary_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
@@ -687,7 +693,7 @@ Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
 // Codegen for materializing parsed data into tuples.  The function WriteCompleteTuple is
 // codegen'd using the IRBuilder for the specific tuple description.  This function
 // is then injected into the cross-compiled driving function, WriteAlignedTuples().
-Status HdfsTextScanner::Codegen(HdfsScanNode* node,
+Status HdfsTextScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
   if (!node->runtime_state()->codegen_enabled()) {

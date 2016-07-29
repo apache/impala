@@ -320,13 +320,12 @@ class BoolColumnReader;
 /// the ScannerContext.
 class HdfsParquetScanner : public HdfsScanner {
  public:
-  HdfsParquetScanner(HdfsScanNode* scan_node, RuntimeState* state,
-      bool add_batches_to_queue);
+  HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
   virtual ~HdfsParquetScanner() {};
 
   /// Issue just the footer range for each file.  We'll then parse the footer and pick
   /// out the columns we want.
-  static Status IssueInitialRanges(HdfsScanNode* scan_node,
+  static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
                                    const std::vector<HdfsFileDesc*>& files);
 
   virtual Status Open(ScannerContext* context);
@@ -335,7 +334,8 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Codegen ProcessScratchBatch(). Stores the resulting function in
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+  static Status Codegen(HdfsScanNodeBase* node,
+      const std::vector<ExprContext*>& conjunct_ctxs,
       llvm::Function** process_scratch_batch_fn);
 
   /// The repetition level is set to this value to indicate the end of a row group.
@@ -438,7 +438,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   const char* filename() const { return metadata_range_->file(); }
 
-  virtual Status GetNextInternal(RowBatch* row_batch, bool* eos);
+  virtual Status GetNextInternal(RowBatch* row_batch);
 
   /// Advances 'row_group_idx_' to the next non-empty row group and initializes
   /// the column readers to scan it. Recoverable errors are logged to the runtime

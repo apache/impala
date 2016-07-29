@@ -89,13 +89,14 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Avro file: {'O', 'b', 'j', 1}
   static const uint8_t AVRO_VERSION_HEADER[4];
 
-  HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state, bool add_batches_to_queue);
+  HdfsAvroScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
 
   virtual Status Open(ScannerContext* context);
 
   /// Codegen DecodeAvroData(). Stores the resulting function in 'decode_avro_data_fn' if
   /// codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+  static Status Codegen(HdfsScanNodeBase* node,
+      const std::vector<ExprContext*>& conjunct_ctxs,
       llvm::Function** decode_avro_data_fn);
 
  protected:
@@ -205,7 +206,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// schema. Stores the resulting function in 'materialize_tuple_fn' if codegen was
   /// successful or returns an error.
   /// TODO: Codegen a function for each unique file schema.
-  static Status CodegenMaterializeTuple(HdfsScanNode* node, LlvmCodeGen* codegen,
+  static Status CodegenMaterializeTuple(HdfsScanNodeBase* node, LlvmCodeGen* codegen,
       llvm::Function** materialize_tuple_fn);
 
   /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
@@ -223,7 +224,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// - this_val, pool_val, tuple_val, data_val, data_end_val: arguments to
   ///     MaterializeTuple()
   static Status CodegenReadRecord(
-      const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNode* node,
+      const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNodeBase* node,
       LlvmCodeGen* codegen, void* builder, llvm::Function* fn,
       llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out, llvm::Value* this_val,
       llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val,

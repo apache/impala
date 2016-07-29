@@ -19,6 +19,7 @@
 
 #include <gutil/strings/substitute.h>
 
+#include "exec/hdfs-scan-node-base.h"
 #include "exec/hdfs-scan-node.h"
 #include "runtime/row-batch.h"
 #include "runtime/mem-pool.h"
@@ -40,7 +41,7 @@ static const int64_t INIT_READ_PAST_SIZE_BYTES = 64 * 1024;
 // output_buffer_bytes_left_ will be set to something else.
 static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
-ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
+ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range,
     const vector<FilterContext>& filter_ctxs)
   : state_(state),
@@ -311,7 +312,8 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
 }
 
 bool ScannerContext::cancelled() const {
-  return scan_node_->done_;
+  if (!scan_node_->HasRowBatchQueue()) return false;
+  return static_cast<HdfsScanNode*>(scan_node_)->done();
 }
 
 Status ScannerContext::Stream::ReportIncompleteRead(int64_t length, int64_t bytes_read) {

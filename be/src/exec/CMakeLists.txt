@@ -46,6 +46,8 @@ add_library(Exec
   hbase-table-sink.cc
   hbase-table-writer.cc
   hdfs-scan-node.cc
+  hdfs-scan-node-base.cc
+  hdfs-scan-node-mt.cc
   hdfs-scanner.cc
   hdfs-scanner-ir.cc
   hdfs-table-sink.cc

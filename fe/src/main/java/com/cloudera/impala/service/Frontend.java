@@ -956,7 +956,7 @@ public class Frontend {
     LOG.debug("create plan");
     Planner planner = new Planner(analysisResult, queryCtx);
     if (RuntimeEnv.INSTANCE.isTestEnv()
-        && queryCtx.request.query_options.mt_num_cores != 1) {
+        && queryCtx.request.query_options.mt_num_cores > 0) {
       // TODO: this is just to be able to run tests; implement this
       List<PlanFragment> planRoots = planner.createParallelPlans();
       for (PlanFragment planRoot: planRoots) {

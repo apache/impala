@@ -233,8 +233,7 @@ class Tuple;
 /// A scanner for reading RCFiles into tuples.
 class HdfsRCFileScanner : public BaseSequenceScanner {
  public:
-  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
-      bool add_batches_to_queue);
+  HdfsRCFileScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
   virtual ~HdfsRCFileScanner();
 
   virtual Status Open(ScannerContext* context);

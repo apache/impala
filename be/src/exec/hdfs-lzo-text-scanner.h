@@ -21,7 +21,7 @@
 #include "common/status.h"
 #include "exec/scan-node.h"
 #include "exec/hdfs-scanner.h"
-#include "exec/hdfs-scan-node.h"
+#include "exec/hdfs-scan-node-base.h"
 #include "util/spinlock.h"
 
 namespace impala {
@@ -33,8 +33,9 @@ namespace impala {
 /// GetHdfsLzoTextScanner -- returns a pointer to the Scanner object.
 class HdfsLzoTextScanner {
  public:
-  static HdfsScanner* GetHdfsLzoTextScanner(HdfsScanNode* scan_node, RuntimeState* state);
-  static Status IssueInitialRanges(HdfsScanNode* scan_node,
+  static HdfsScanner* GetHdfsLzoTextScanner(HdfsScanNodeBase* scan_node,
+      RuntimeState* state);
+  static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
                                    const std::vector<HdfsFileDesc*>& files);
 
  private:
@@ -49,11 +50,11 @@ class HdfsLzoTextScanner {
 
   /// Dynamically linked function to create the Lzo Scanner Object.
   static HdfsScanner* (*CreateLzoTextScanner)
-      (HdfsScanNode* scan_node, RuntimeState* state);
+      (HdfsScanNodeBase* scan_node, RuntimeState* state);
 
   /// Dynamically linked function to set the initial scan ranges.
   static Status (*LzoIssueInitialRanges)(
-      HdfsScanNode* scan_node, const std::vector<HdfsFileDesc*>& files);
+      HdfsScanNodeBase* scan_node, const std::vector<HdfsFileDesc*>& files);
 
   /// Dynamically loads CreateLzoTextScanner and LzoIssueInitialRanges.
   /// lzo_load_lock_ should be taken before calling this method.

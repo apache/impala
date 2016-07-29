@@ -47,8 +47,7 @@ struct HdfsFileDesc;
 /// scanner for the tuple directly after it.
 class HdfsTextScanner : public HdfsScanner {
  public:
-  HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
-      bool add_batches_to_queue);
+  HdfsTextScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
   virtual ~HdfsTextScanner();
 
   /// Implementation of HdfsScanner interface.
@@ -57,12 +56,13 @@ class HdfsTextScanner : public HdfsScanner {
   virtual void Close(RowBatch* row_batch);
 
   /// Issue io manager byte ranges for 'files'.
-  static Status IssueInitialRanges(HdfsScanNode* scan_node,
+  static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
                                    const std::vector<HdfsFileDesc*>& files);
 
   /// Codegen WriteAlignedTuples(). Stores the resulting function in
   /// 'write_aligned_tuples_fn' if codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+  static Status Codegen(HdfsScanNodeBase* node,
+      const std::vector<ExprContext*>& conjunct_ctxs,
       llvm::Function** write_aligned_tuples_fn);
 
   /// Suffix for lzo index files.

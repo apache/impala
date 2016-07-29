@@ -55,9 +55,8 @@ const string AVRO_MEM_LIMIT_EXCEEDED = "HdfsAvroScanner::$0() failed to allocate
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state,
-    bool add_batches_to_queue)
-  : BaseSequenceScanner(scan_node, state, add_batches_to_queue),
+HdfsAvroScanner::HdfsAvroScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
+  : BaseSequenceScanner(scan_node, state),
     avro_header_(NULL),
     codegend_decode_avro_data_(NULL) {
 }
@@ -78,7 +77,7 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
   return Status::OK();
 }
 
-Status HdfsAvroScanner::Codegen(HdfsScanNode* node,
+Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** decode_avro_data_fn) {
   *decode_avro_data_fn = NULL;
   if (!node->runtime_state()->codegen_enabled()) {
@@ -291,8 +290,12 @@ Status HdfsAvroScanner::ResolveSchemas(const AvroSchemaElement& table_root,
 Status HdfsAvroScanner::WriteDefaultValue(
     SlotDescriptor* slot_desc, avro_datum_t default_value, const char* field_name) {
   if (avro_header_->template_tuple == NULL) {
-    avro_header_->template_tuple = template_tuple_ != NULL ?
-        template_tuple_ : scan_node_->InitEmptyTemplateTuple(*scan_node_->tuple_desc());
+    if (template_tuple_ != NULL) {
+      avro_header_->template_tuple = template_tuple_;
+    } else {
+      avro_header_->template_tuple =
+          Tuple::Create(tuple_byte_size_, template_tuple_pool_.get());
+    }
   }
   switch (default_value->type) {
     case AVRO_BOOLEAN: {
@@ -336,14 +339,11 @@ Status HdfsAvroScanner::WriteDefaultValue(
     case AVRO_STRING:
     case AVRO_BYTES: {
       RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, default_value));
-      // Mempools aren't thread safe so make a local one and transfer it
-      // to the scan node pool.
-      MemPool pool(scan_node_->mem_tracker());
       char* v;
       if (avro_string_get(default_value, &v)) DCHECK(false);
       StringValue sv(v);
-      RawValue::Write(&sv, avro_header_->template_tuple, slot_desc, &pool);
-      scan_node_->TransferToScanNodePool(&pool);
+      RawValue::Write(&sv, avro_header_->template_tuple, slot_desc,
+          template_tuple_pool_.get());
       break;
     }
     case AVRO_NULL:
@@ -772,8 +772,8 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 // bail_out:           ; preds = %read_field11, %end_field3, %read_field2, %end_field,
 //   ret i1 false      ;         %read_field, %entry
 // }
-Status HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node, LlvmCodeGen* codegen,
-    Function** materialize_tuple_fn) {
+Status HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNodeBase* node,
+    LlvmCodeGen* codegen, Function** materialize_tuple_fn) {
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
 
@@ -839,7 +839,7 @@ Status HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node, LlvmCodeGen*
 }
 
 Status HdfsAvroScanner::CodegenReadRecord(
-    const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNode* node,
+    const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNodeBase* node,
     LlvmCodeGen* codegen, void* void_builder, Function* fn, BasicBlock* insert_before,
     BasicBlock* bail_out, Value* this_val, Value* pool_val, Value* tuple_val,
     Value* data_val, Value* data_end_val) {

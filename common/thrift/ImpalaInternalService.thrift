@@ -183,10 +183,9 @@ struct TQueryOptions {
   43: optional TParquetFallbackSchemaResolution parquet_fallback_schema_resolution = 0
 
   // Multi-threaded execution: number of cores per query per node.
-  // > 1: multi-threaded execution mode, with given number of cores
-  // 1: single-threaded execution mode
-  // 0: multi-threaded execution mode, number of cores is the pool default
-  44: optional i32 mt_num_cores = 1
+  // > 0: multi-threaded execution mode, with given number of cores
+  // 0: single-threaded execution mode
+  44: optional i32 mt_num_cores = 0
 
   // If true, INSERT writes to S3 go directly to their final location rather than being
   // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for

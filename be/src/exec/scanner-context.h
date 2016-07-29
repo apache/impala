@@ -31,7 +31,7 @@ namespace impala {
 
 struct HdfsFileDesc;
 class HdfsPartitionDescriptor;
-class HdfsScanNode;
+class HdfsScanNodeBase;
 class MemPool;
 class RowBatch;
 class RuntimeState;
@@ -55,12 +55,14 @@ class TupleRow;
 ///      from processing the bytes. This is the consumer.
 ///   3. The scan node/main thread which calls into the context to trigger cancellation
 ///      or other end of stream conditions.
+/// TODO: Some of the synchronization mechanisms such as cancelled() can be removed
+/// once the legacy hdfs scan node has been removed.
 class ScannerContext {
  public:
   /// Create a scanner context with the parent scan_node (where materialized row batches
   /// get pushed to) and the scan range to process.
   /// This context starts with 1 stream.
-  ScannerContext(RuntimeState*, HdfsScanNode*, HdfsPartitionDescriptor*,
+  ScannerContext(RuntimeState*, HdfsScanNodeBase*, HdfsPartitionDescriptor*,
       DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs);
 
   /// Destructor verifies that all stream objects have been released.
@@ -295,7 +297,8 @@ class ScannerContext {
   /// The stream is created in the runtime state's object pool
   Stream* AddStream(DiskIoMgr::ScanRange* range);
 
-  /// If true, the ScanNode has been cancelled and the scanner thread should finish up
+  /// Returns false it scan_node_ is multi-threaded and has been cancelled.
+  /// Always returns false if the scan_node_ is not multi-threaded.
   bool cancelled() const;
 
   int num_completed_io_buffers() const { return num_completed_io_buffers_; }
@@ -306,7 +309,7 @@ class ScannerContext {
   friend class Stream;
 
   RuntimeState* state_;
-  HdfsScanNode* scan_node_;
+  HdfsScanNodeBase* scan_node_;
 
   HdfsPartitionDescriptor* partition_desc_;
 

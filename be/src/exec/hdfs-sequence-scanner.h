@@ -162,8 +162,7 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   /// SeqFile file: {'S', 'E', 'Q', 6}
   static const uint8_t SEQFILE_VERSION_HEADER[4];
 
-  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
-      bool add_batches_to_queue);
+  HdfsSequenceScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
 
   virtual ~HdfsSequenceScanner();
 
@@ -172,7 +171,8 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
 
   /// Codegen WriteAlignedTuples(). Stores the resulting function in
   /// 'write_aligned_tuples_fn' if codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanNode*, const std::vector<ExprContext*>& conjunct_ctxs,
+  static Status Codegen(HdfsScanNodeBase* node,
+      const std::vector<ExprContext*>& conjunct_ctxs,
       llvm::Function** write_aligned_tuples_fn);
 
  protected:
