@@ -224,7 +224,8 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr
     is_cancelled_(false),
     writes_issued_(0),
     encryption_(FLAGS_disk_spill_encryption),
-    check_integrity_(FLAGS_disk_spill_encryption) {
+    check_integrity_(FLAGS_disk_spill_encryption),
+    debug_write_delay_ms_(0) {
 }
 
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
@@ -490,14 +491,17 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   DCHECK(src != NULL);
   unique_lock<mutex> lock(lock_);
 
-  // First write out the src block.
   DCHECK(src->is_pinned_);
   DCHECK(!dst->is_pinned_);
   DCHECK(dst->buffer_desc_ == NULL);
   DCHECK_EQ(src->buffer_desc_->len, max_block_size_);
+
+  // Ensure that there aren't any writes in flight for 'src'.
+  WaitForWrite(lock, src);
   src->is_pinned_ = false;
 
   if (unpin) {
+    // First write out the src block so we can grab its buffer.
     src->client_local_ = true;
     status = WriteUnpinnedBlock(src);
     if (!status.ok()) {
@@ -506,9 +510,7 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
       return status;
     }
     // Wait for the write to complete.
-    while (src->in_write_ && !is_cancelled_) {
-      src->write_complete_cv_.wait(lock);
-    }
+    WaitForWrite(lock, src);
     if (is_cancelled_) {
       // We can't be sure the write succeeded, so return the buffer to src.
       src->is_pinned_ = true;
@@ -810,6 +812,13 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
   return Status::OK();
 }
 
+void BufferedBlockMgr::WaitForWrite(unique_lock<mutex>& lock, Block* block) {
+  DCHECK(!block->is_deleted_);
+  while (block->in_write_ && !is_cancelled_) {
+    block->write_complete_cv_.wait(lock);
+  }
+}
+
 Status BufferedBlockMgr::AllocateScratchSpace(int64_t block_size,
     TmpFileMgr::File** tmp_file, int64_t* file_offset) {
   // Assumes block manager lock is already taken.
@@ -837,12 +846,18 @@ Status BufferedBlockMgr::AllocateScratchSpace(int64_t block_size,
 }
 
 void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
+#ifndef NDEBUG
+  if (debug_write_delay_ms_ > 0) {
+    usleep(static_cast<int64_t>(debug_write_delay_ms_) * 1000);
+  }
+#endif
   Status status = Status::OK();
   lock_guard<mutex> lock(lock_);
   outstanding_writes_counter_->Add(-1);
   DCHECK(Validate()) << endl << DebugInternal();
   DCHECK(is_cancelled_ || block->in_write_) << "WriteComplete() for block not in write."
                                             << endl << block->DebugString();
+  DCHECK(block->buffer_desc_ != NULL);
   if (!block->client_local_) {
     DCHECK_GT(non_local_outstanding_writes_, 0) << block->DebugString();
     --non_local_outstanding_writes_;
@@ -872,24 +887,11 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   } else if (block->client_local_) {
     DCHECK(!block->is_deleted_)
         << "Client should be waiting. No one should have deleted this block.";
-    block->write_complete_cv_.notify_one();
   } else {
     DCHECK_EQ(block->buffer_desc_->len, max_block_size_)
         << "Only io sized buffers should spill";
     free_io_buffers_.Enqueue(block->buffer_desc_);
-    // Finish the DeleteBlock() work.
-    if (block->is_deleted_) {
-      block->buffer_desc_->block = NULL;
-      block->buffer_desc_ = NULL;
-      ReturnUnusedBlock(block);
-      block = NULL;
-    }
-    // Multiple threads may be waiting for the same block in FindBuffer().  Wake them
-    // all up.  One thread will get this block, and the others will re-evaluate whether
-    // they should continue waiting and if another write needs to be initiated.
-    buffer_available_cv_.notify_all();
   }
-  DCHECK(Validate()) << endl << DebugInternal();
 
   if (!write_status.ok() || !status.ok() || is_cancelled_) {
     VLOG_FILE << "Query: " << query_id_ << ". Write did not complete successfully: "
@@ -908,11 +910,29 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
       VLOG_QUERY << "Query: " << query_id_ << " error while writing unpinned blocks.";
       if (state != NULL) state->LogError(status.msg());
     }
-    // Set cancelled and wake up waiting threads if an error occurred.  Note that in
-    // the case of client_local_, that thread was woken up above.
+    // Set cancelled. Threads waiting for a write will be woken up in the normal way when
+    // one of the writes they are waiting for completes.
     is_cancelled_ = true;
-    buffer_available_cv_.notify_all();
   }
+
+  // Notify any threads that may have been expecting to get block's buffer based on
+  // the value of 'non_local_outstanding_writes_'. Wake them all up. If we added
+  // a buffer to 'free_io_buffers_', one thread will get a buffer. All the others
+  // will re-evaluate whether they should continue waiting and if another write needs
+  // to be initiated.
+  if (!block->client_local_) buffer_available_cv_.notify_all();
+  if (block->is_deleted_) {
+    // Finish the DeleteBlock() work.
+    block->buffer_desc_->block = NULL;
+    block->buffer_desc_ = NULL;
+    ReturnUnusedBlock(block);
+    block = NULL;
+  } else {
+    // Wake up the thread waiting on this block (if any).
+    block->write_complete_cv_.notify_one();
+  }
+
+  DCHECK(Validate()) << endl << DebugInternal();
 }
 
 void BufferedBlockMgr::DeleteBlock(Block* block) {
@@ -956,6 +976,7 @@ void BufferedBlockMgr::DeleteBlockLocked(const unique_lock<mutex>& lock, Block* 
     } else {
       if (!free_io_buffers_.Contains(block->buffer_desc_)) {
         free_io_buffers_.Enqueue(block->buffer_desc_);
+        // Wake up one of the waiting threads, which will grab the buffer.
         buffer_available_cv_.notify_one();
       }
       block->buffer_desc_->block = NULL;

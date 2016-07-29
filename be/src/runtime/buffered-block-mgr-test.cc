@@ -774,6 +774,62 @@ TEST_F(BufferedBlockMgrTest, DeleteSingleBlocks) {
   TearDownMgrs();
 }
 
+// This exercises a code path where:
+// 1. A block A is unpinned.
+// 2. A block B is unpinned.
+// 3. A write for block A is initiated.
+// 4. Block A is pinned.
+// 5. Block B is pinned, with block A passed in to be deleted.
+//    Block A's buffer will be transferred to block B.
+// 6. The write for block A completes.
+// Previously there was a bug (IMPALA-3936) where the buffer transfer happened before the
+// write completed. There were also various hangs related to missing condition variable
+// notifications.
+TEST_F(BufferedBlockMgrTest, TransferBufferDuringWrite) {
+  const int trials = 5;
+  const int max_num_buffers = 2;
+  BufferedBlockMgr::Client* client;
+  RuntimeState* query_state;
+  BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
+      1, false, client_tracker_.get(), &client, &query_state);
+
+  for (int trial = 0; trial < trials; ++trial) {
+    for (int delay_ms = 0; delay_ms <= 10; delay_ms += 5) {
+      // Force writes to be delayed to enlarge window of opportunity for bug.
+      block_mgr->set_debug_write_delay_ms(delay_ms);
+      vector<BufferedBlockMgr::Block*> blocks;
+      AllocateBlocks(block_mgr, client, 2, &blocks);
+
+      // Force the second block to be written and have its buffer freed.
+      // We only have one buffer to share between the first and second blocks now.
+      ASSERT_OK(blocks[1]->Unpin());
+
+      // Create another client. Reserving different numbers of buffers can send it
+      // down different code paths because the original client is entitled to different
+      // number of buffers.
+      int reserved_buffers = trial % max_num_buffers;
+      BufferedBlockMgr::Client* tmp_client;
+      EXPECT_TRUE(block_mgr->RegisterClient("tmp_client", reserved_buffers, false,
+          client_tracker_.get(), query_state, &tmp_client).ok());
+      BufferedBlockMgr::Block* tmp_block;
+      ASSERT_OK(block_mgr->GetNewBlock(tmp_client, NULL, &tmp_block));
+
+      // Initiate the write, repin the block, then immediately try to swap the buffer to
+      // the second block while the write is still in flight.
+      ASSERT_OK(blocks[0]->Unpin());
+      bool pinned;
+      ASSERT_OK(blocks[0]->Pin(&pinned));
+      ASSERT_TRUE(pinned);
+      ASSERT_OK(blocks[1]->Pin(&pinned, blocks[0], false));
+      ASSERT_TRUE(pinned);
+
+      blocks[1]->Delete();
+      tmp_block->Delete();
+      block_mgr->ClearReservations(tmp_client);
+    }
+  }
+}
+
 // Test that all APIs return cancelled after close.
 TEST_F(BufferedBlockMgrTest, Close) {
   int max_num_buffers = 5;

@@ -288,8 +288,9 @@ class BufferedBlockMgr {
     /// True if the block is deleted by the client.
     bool is_deleted_;
 
-    /// Condition variable for when there is a specific client waiting for this block.
-    /// Only used if client_local_ is true.
+    /// Condition variable to wait for the write to this block to finish. If 'in_write_'
+    /// is true, notify_one() will eventually be called on this condition variable. Only
+    /// on thread should wait on this cv at a time.
     /// TODO: Currently we use block_mgr_->lock_ for this condvar. There is no reason to
     /// use that lock_ that is already overloaded, see IMPALA-1883.
     boost::condition_variable write_complete_cv_;
@@ -398,6 +399,8 @@ class BufferedBlockMgr {
   RuntimeProfile* profile() { return profile_.get(); }
   int writes_issued() const { return writes_issued_; }
 
+  void set_debug_write_delay_ms(int val) { debug_write_delay_ms_ = val; }
+
  private:
   friend struct Client;
 
@@ -443,11 +446,12 @@ class BufferedBlockMgr {
   /// cancellation. It should be called without the lock_ acquired.
   Status DeleteOrUnpinBlock(Block* block, bool unpin);
 
-  /// Transfers the buffer from 'src' to 'dst'. 'src' must be pinned.
+  /// Transfers the buffer from 'src' to 'dst'. 'src' must be pinned. If a write is
+  /// already in flight for 'src', this may block until that write completes.
   /// If unpin == false, 'src' is simply deleted.
   /// If unpin == true, 'src' is unpinned and it may block until the write of 'src' is
-  /// completed. In that case it will use the lock_ for the condvar. Thus, the lock_
-  /// needs to not have been taken when this function is called.
+  /// completed.
+  /// The caller should not hold 'lock_'.
   Status TransferBuffer(Block* dst, Block* src, bool unpin);
 
   /// Returns the total number of unreserved buffers. This is the sum of unpinned,
@@ -482,6 +486,10 @@ class BufferedBlockMgr {
 
   /// Issues the write for this block to the DiskIoMgr.
   Status WriteUnpinnedBlock(Block* block);
+
+  /// Wait until either the write for 'block' completes or the block mgr is cancelled.
+  /// 'lock_' must be held with 'lock'.
+  void WaitForWrite(boost::unique_lock<boost::mutex>& lock, Block* block);
 
   /// Allocate block_size bytes in a temporary file. Try multiple disks if error occurs.
   /// Returns an error only if no temporary files are usable.
@@ -549,7 +557,12 @@ class BufferedBlockMgr {
   /// This does not include client-local writes.
   int non_local_outstanding_writes_;
 
-  /// Signal availability of free buffers.
+  /// Signal availability of free buffers. Also signalled when a write completes for a
+  /// pinned block, in case another thread was expecting to obtain its buffer. If
+  /// 'non_local_outstanding_writes_' > 0, notify_all() will eventually be called on
+  /// this condition variable. To avoid free buffers accumulating while threads wait
+  /// on the cv, a woken thread must grab an available buffer (unless is_cancelled_ is
+  /// true at that time).
   boost::condition_variable buffer_available_cv_;
 
   /// All used or unused blocks allocated by the BufferedBlockMgr.
@@ -667,6 +680,10 @@ class BufferedBlockMgr {
   /// and hence no real reason to keep this separate from encryption.  When true, blocks
   /// will have an integrity check (SHA-256) performed after being read from disk.
   const bool check_integrity_;
+
+  /// Debug option to delay write completion.
+  int debug_write_delay_ms_;
+
 }; // class BufferedBlockMgr
 
 } // namespace impala.
