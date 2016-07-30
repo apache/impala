@@ -62,7 +62,7 @@ public class UnionNode extends PlanNode {
   protected final TupleId tupleId_;
 
   protected UnionNode(PlanNodeId id, TupleId tupleId) {
-    super(id, Lists.newArrayList(tupleId), "UNION");
+    super(id, tupleId.asList(), "UNION");
     tupleId_ = tupleId;
   }
 

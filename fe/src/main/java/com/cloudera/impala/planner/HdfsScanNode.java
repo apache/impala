@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
@@ -42,7 +41,6 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.THdfsFileBlock;
@@ -391,7 +389,6 @@ public class HdfsScanNode extends ScanNode {
         totalFiles_ += p.getFileDescriptors().size();
         totalBytes_ += p.getSize();
       }
-
       if (!partitions_.isEmpty() && !hasValidPartitionCardinality) {
         // if none of the partitions knew its number of rows, we fall back on
         // the table stats

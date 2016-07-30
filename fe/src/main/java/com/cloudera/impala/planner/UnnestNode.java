@@ -27,7 +27,6 @@ import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TUnnestNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * An UnnestNode scans over a collection materialized in memory, and returns
@@ -41,7 +40,7 @@ public class UnnestNode extends PlanNode {
 
   public UnnestNode(PlanNodeId id, SubplanNode containingSubplanNode,
       CollectionTableRef tblRef) {
-    super(id, Lists.newArrayList(tblRef.getDesc().getId()), "UNNEST");
+    super(id, tblRef.getDesc().getId().asList(), "UNNEST");
     containingSubplanNode_ = containingSubplanNode;
     tblRef_ = tblRef;
     collectionExpr_ = tblRef_.getCollectionExpr();

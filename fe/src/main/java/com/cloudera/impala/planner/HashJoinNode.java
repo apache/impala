@@ -49,15 +49,16 @@ import com.google.common.collect.Lists;
 public class HashJoinNode extends JoinNode {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
 
-  public HashJoinNode(
-      PlanNode outer, PlanNode inner, DistributionMode distrMode, JoinOperator joinOp,
+  public HashJoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,
+      DistributionMode distrMode, JoinOperator joinOp,
       List<BinaryPredicate> eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
-    super(outer, inner, distrMode, joinOp, eqJoinConjuncts, otherJoinConjuncts,
-        "HASH JOIN");
+    super(outer, inner, isStraightJoin, distrMode, joinOp, eqJoinConjuncts,
+        otherJoinConjuncts, "HASH JOIN");
     Preconditions.checkNotNull(eqJoinConjuncts);
     Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
   }
 
+  @Override
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
 
   @Override
@@ -103,6 +104,7 @@ public class HashJoinNode extends JoinNode {
     }
     eqJoinConjuncts_ = newEqJoinConjuncts;
     orderJoinConjunctsByCost();
+    computeStats(analyzer);
   }
 
   @Override

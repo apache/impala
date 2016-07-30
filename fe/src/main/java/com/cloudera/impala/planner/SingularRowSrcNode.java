@@ -23,7 +23,6 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * A SingularRowSrcNode returns the current row that is being processed by its
@@ -36,10 +35,16 @@ public class SingularRowSrcNode extends PlanNode {
 
   protected SingularRowSrcNode(PlanNodeId id, SubplanNode containingSubplanNode) {
     super(id, "SINGULAR ROW SRC");
-    tupleIds_ = Lists.newArrayList(containingSubplanNode.getChild(0).tupleIds_);
-    tblRefIds_ = Lists.newArrayList(containingSubplanNode.getChild(0).tblRefIds_);
-    nullableTupleIds_.addAll(containingSubplanNode.getChild(0).getNullableTupleIds());
     containingSubplanNode_ = containingSubplanNode;
+    computeTupleIds();
+  }
+
+  @Override
+  public void computeTupleIds() {
+    clearTupleIds();
+    tupleIds_.addAll(containingSubplanNode_.getChild(0).getTupleIds());
+    tblRefIds_.addAll(containingSubplanNode_.getChild(0).getTblRefIds());
+    nullableTupleIds_.addAll(containingSubplanNode_.getChild(0).getNullableTupleIds());
   }
 
   @Override

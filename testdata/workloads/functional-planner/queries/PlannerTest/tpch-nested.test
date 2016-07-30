@@ -156,7 +156,7 @@ limit 100
 |  hash predicates: ps_partkey = p_partkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_size = 15, p_type LIKE '%BRASS'
 |     runtime filters: RF001 -> p_partkey
 |
@@ -251,7 +251,7 @@ limit 100
 |--27:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_size = 15, p_type LIKE '%BRASS'
 |     runtime filters: RF001 -> p_partkey
 |
@@ -854,7 +854,7 @@ order by
 |  hash predicates: l_partkey = p_partkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_type = 'ECONOMY ANODIZED STEEL'
 |
 17:HASH JOIN [INNER JOIN]
@@ -935,7 +935,7 @@ order by
 |--24:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_type = 'ECONOMY ANODIZED STEEL'
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1019,11 +1019,11 @@ order by
 |  hash predicates: l_partkey = p_partkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_name LIKE '%green%'
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
+|  hash predicates: l_suppkey = s_suppkey, l_partkey = ps_partkey
 |
 |--06:SUBPLAN
 |  |
@@ -1081,11 +1081,11 @@ order by
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_name LIKE '%green%'
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
+|  hash predicates: l_suppkey = s_suppkey, l_partkey = ps_partkey
 |
 |--17:EXCHANGE [BROADCAST]
 |  |
@@ -1584,7 +1584,7 @@ where
 |  runtime filters: RF000 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
    partitions=1/1 files=4 size=577.87MB
@@ -1606,7 +1606,7 @@ where
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
    partitions=1/1 files=4 size=577.87MB
@@ -1777,7 +1777,7 @@ order by
 |  hash predicates: ps_partkey = p_partkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |
 01:SUBPLAN
@@ -1816,7 +1816,7 @@ order by
 |--10:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |
 01:SUBPLAN
@@ -1871,7 +1871,7 @@ where
 |  runtime filters: RF001 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
 |     runtime filters: RF000 -> p_partkey
 |
@@ -1914,7 +1914,7 @@ where
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |     predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
 |     runtime filters: RF000 -> p_partkey
 |
@@ -2047,7 +2047,7 @@ where
 |  runtime filters: RF000 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
    partitions=1/1 files=4 size=577.87MB
@@ -2069,7 +2069,7 @@ where
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.30MB
+|     partitions=1/1 files=1 size=6.20MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
    partitions=1/1 files=4 size=577.87MB
@@ -2125,7 +2125,7 @@ order by
 |  |  hash predicates: ps_partkey = p_partkey
 |  |
 |  |--06:SCAN HDFS [tpch_nested_parquet.part p]
-|  |     partitions=1/1 files=1 size=6.30MB
+|  |     partitions=1/1 files=1 size=6.20MB
 |  |     predicates: p_name LIKE 'forest%'
 |  |
 |  09:HASH JOIN [INNER JOIN]
@@ -2185,7 +2185,7 @@ order by
 |  |--17:EXCHANGE [BROADCAST]
 |  |  |
 |  |  06:SCAN HDFS [tpch_nested_parquet.part p]
-|  |     partitions=1/1 files=1 size=6.30MB
+|  |     partitions=1/1 files=1 size=6.20MB
 |  |     predicates: p_name LIKE 'forest%'
 |  |
 |  09:HASH JOIN [INNER JOIN, BROADCAST]

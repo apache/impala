@@ -74,10 +74,8 @@ public class AnalyticEvalNode extends PlanNode {
       AnalyticWindow analyticWindow, TupleDescriptor intermediateTupleDesc,
       TupleDescriptor outputTupleDesc, ExprSubstitutionMap logicalToPhysicalSmap,
       Expr partitionByEq, Expr orderByEq, TupleDescriptor bufferedTupleDesc) {
-    super(id, input.getTupleIds(), "ANALYTIC");
+    super(id, "ANALYTIC");
     Preconditions.checkState(!tupleIds_.contains(outputTupleDesc.getId()));
-    // we're materializing the input row augmented with the analytic output tuple
-    tupleIds_.add(outputTupleDesc.getId());
     analyticFnCalls_ = analyticFnCalls;
     partitionExprs_ = partitionExprs;
     orderByElements_ = orderByElements;
@@ -89,7 +87,16 @@ public class AnalyticEvalNode extends PlanNode {
     orderByEq_ = orderByEq;
     bufferedTupleDesc_ = bufferedTupleDesc;
     children_.add(input);
-    nullableTupleIds_.addAll(input.getNullableTupleIds());
+    computeTupleIds();
+  }
+
+  @Override
+  public void computeTupleIds() {
+    clearTupleIds();
+    tupleIds_.addAll(getChild(0).getTupleIds());
+    // we're materializing the input row augmented with the analytic output tuple
+    tupleIds_.add(outputTupleDesc_.getId());
+    nullableTupleIds_.addAll(getChild(0).getNullableTupleIds());
   }
 
   @Override

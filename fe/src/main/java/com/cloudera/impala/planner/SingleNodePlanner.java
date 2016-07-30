@@ -150,9 +150,7 @@ public class SingleNodePlanner {
   /**
    * Validates a single-node plan by checking that it does not contain right or
    * full outer joins with no equi-join conjuncts that are not inside the right child
-   * of a SubplanNode. Throws an InternalException if plan validation fails.
-   *
-   * TODO for 2.3: Temporary solution; the planner should avoid generating invalid plans.
+   * of a SubplanNode. Throws a NotImplementedException if plan validation fails.
    */
   public void validatePlan(PlanNode planNode) throws NotImplementedException {
     if (planNode instanceof NestedLoopJoinNode) {
@@ -343,18 +341,10 @@ public class SingleNodePlanner {
       TableRef ref = entry.first;
       JoinOperator joinOp = ref.getJoinOp();
 
-      // The rhs table of an outer/semi join can appear as the left-most input if we
-      // invert the lhs/rhs and the join op. However, we may only consider this inversion
-      // for the very first join in refPlans, otherwise we could reorder tables/joins
-      // across outer/semi joins which is generally incorrect. The null-aware
-      // left anti-join operator is never considered for inversion because we can't
-      // execute the null-aware right anti-join efficiently.
+      // Avoid reordering outer/semi joins which is generally incorrect.
       // TODO: Allow the rhs of any cross join as the leftmost table. This needs careful
       // consideration of the joinOps that result from such a re-ordering (IMPALA-1281).
-      if (((joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) &&
-          ref != parentRefPlans.get(1).first) || joinOp.isNullAwareLeftAntiJoin()) {
-        continue;
-      }
+      if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) continue;
 
       PlanNode plan = entry.second;
       if (plan.getCardinality() == -1) {
@@ -395,7 +385,6 @@ public class SingleNodePlanner {
    * are in decreasing order of selectiveness (percentage of rows they eliminate).
    * Creates and adds subplan nodes as soon as the tuple ids required by at least one
    * subplan ref are materialized by a join node added during plan generation.
-   * The leftmostRef's join will be inverted if it is an outer/semi/cross join.
    */
   private PlanNode createJoinPlan(Analyzer analyzer, TableRef leftmostRef,
       List<Pair<TableRef, PlanNode>> refPlans, List<SubplanRef> subplanRefs)
@@ -413,22 +402,6 @@ public class SingleNodePlanner {
       }
     }
     Preconditions.checkNotNull(root);
-
-    // If the leftmostTblRef is an outer/semi/cross join, we must invert it.
-    boolean planHasInvertedJoin = false;
-    if (leftmostRef.getJoinOp().isOuterJoin()
-        || leftmostRef.getJoinOp().isSemiJoin()
-        || leftmostRef.getJoinOp().isCrossJoin()) {
-      // TODO: Revisit the interaction of join inversion here and the analysis state
-      // that is changed in analyzer.invertOuterJoin(). Changing the analysis state
-      // should not be necessary because the semantics of an inverted outer join do
-      // not change.
-      leftmostRef.invertJoin(refPlans, analyzer);
-      planHasInvertedJoin = true;
-      // Avoid swapping the refPlan elements in-place.
-      refPlans = Lists.newArrayList(refPlans);
-      Collections.swap(refPlans, 0, 1);
-    }
 
     // Maps from a TableRef in refPlans with an outer/semi join op to the set of
     // TableRefs that precede it refPlans (i.e., in FROM-clause order).
@@ -470,37 +443,8 @@ public class SingleNodePlanner {
           if (!requiredRefs.equals(joinedRefs)) break;
         }
 
-        PlanNode rhsPlan = entry.second;
-        boolean invertJoin = false;
-        if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) {
-          // Invert the join if doing so reduces the size of build-side hash table
-          // (may also reduce network costs depending on the join strategy).
-          // Only consider this optimization if both the lhs/rhs cardinalities are known.
-          // The null-aware left anti-join operator is never considered for inversion
-          // because we can't execute the null-aware right anti-join efficiently.
-          long lhsCard = root.getCardinality();
-          long rhsCard = rhsPlan.getCardinality();
-          if (lhsCard != -1 && rhsCard != -1 &&
-              lhsCard * root.getAvgRowSize() < rhsCard * rhsPlan.getAvgRowSize() &&
-              !joinOp.isNullAwareLeftAntiJoin()) {
-            invertJoin = true;
-          }
-        }
-        // Always place singular row src nodes on the build side, unless we need a
-        // null-aware left anti join which cannot be inverted.
-        if (root instanceof SingularRowSrcNode && !joinOp.isNullAwareLeftAntiJoin()) {
-          invertJoin = true;
-        }
-
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
-        PlanNode candidate = null;
-        if (invertJoin) {
-          ref.setJoinOp(ref.getJoinOp().invert());
-          candidate = createJoinNode(analyzer, rhsPlan, root, ref, null);
-          planHasInvertedJoin = true;
-        } else {
-          candidate = createJoinNode(analyzer, root, rhsPlan, null, ref);
-        }
+        PlanNode candidate = createJoinNode(root, entry.second, ref, analyzer);
         if (candidate == null) continue;
         LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
 
@@ -524,14 +468,7 @@ public class SingleNodePlanner {
         }
       }
       if (newRoot == null) {
-        // Currently, it should not be possible to invert a join for a plan that turns
-        // out to be non-executable because (1) the joins we consider for inversion are
-        // barriers in the join order, and (2) the caller of this function only considers
-        // other leftmost table refs if a plan turns out to be non-executable.
-        // TODO: This preconditions check will need to be changed to undo the in-place
-        // modifications made to table refs for join inversion, if the caller decides to
-        // explore more leftmost table refs.
-        Preconditions.checkState(!planHasInvertedJoin);
+        // Could not generate a valid plan.
         return null;
       }
 
@@ -552,7 +489,7 @@ public class SingleNodePlanner {
       // TODO: Once we have stats on nested collections, we should consider the join
       // order in conjunction with the placement of SubplanNodes, i.e., move the creation
       // of SubplanNodes into the join-ordering loop above.
-      root = createSubplan(root, subplanRefs, false, false, analyzer);
+      root = createSubplan(root, subplanRefs, false, analyzer);
       // assign node ids after running through the possible choices in order to end up
       // with a dense sequence of node ids
       if (root instanceof SubplanNode) root.getChild(0).setId(ctx_.getNextNodeId());
@@ -577,8 +514,8 @@ public class SingleNodePlanner {
     for (int i = 1; i < parentRefPlans.size(); ++i) {
       TableRef innerRef = parentRefPlans.get(i).first;
       PlanNode innerPlan = parentRefPlans.get(i).second;
-      root = createJoinNode(analyzer, root, innerPlan, null, innerRef);
-      if (root != null) root = createSubplan(root, subplanRefs, true, false, analyzer);
+      root = createJoinNode(root, innerPlan, innerRef, analyzer);
+      if (root != null) root = createSubplan(root, subplanRefs, false, analyzer);
       if (root instanceof SubplanNode) root.getChild(0).setId(ctx_.getNextNodeId());
       root.setId(ctx_.getNextNodeId());
     }
@@ -641,13 +578,12 @@ public class SingleNodePlanner {
 
     // Separate table refs into parent refs (uncorrelated or absolute) and
     // subplan refs (correlated or relative), and generate their plan.
-    boolean isStraightJoin = selectStmt.getSelectList().isStraightJoin();
     List<TableRef> parentRefs = Lists.newArrayList();
     List<SubplanRef> subplanRefs = Lists.newArrayList();
     computeParentAndSubplanRefs(
-        selectStmt.getTableRefs(), isStraightJoin, parentRefs, subplanRefs);
-    PlanNode root = createTableRefsPlan(parentRefs, subplanRefs, isStraightJoin,
-        fastPartitionKeyScans, analyzer);
+        selectStmt.getTableRefs(), analyzer.isStraightJoin(), parentRefs, subplanRefs);
+    PlanNode root = createTableRefsPlan(parentRefs, subplanRefs, fastPartitionKeyScans,
+        analyzer);
     // add aggregation, if any
     if (aggInfo != null) root = createAggregationPlan(selectStmt, analyzer, root);
 
@@ -799,17 +735,16 @@ public class SingleNodePlanner {
    * metadata instead of table scans.
    */
   private PlanNode createTableRefsPlan(List<TableRef> parentRefs,
-      List<SubplanRef> subplanRefs, boolean isStraightJoin,
-      boolean fastPartitionKeyScans, Analyzer analyzer) throws ImpalaException {
+      List<SubplanRef> subplanRefs, boolean fastPartitionKeyScans,
+      Analyzer analyzer) throws ImpalaException {
     // create plans for our table refs; use a list here instead of a map to
     // maintain a deterministic order of traversing the TableRefs during join
     // plan generation (helps with tests)
     List<Pair<TableRef, PlanNode>> parentRefPlans = Lists.newArrayList();
     for (TableRef ref: parentRefs) {
-      PlanNode root =
-          createTableRefNode(ref, isStraightJoin, fastPartitionKeyScans, analyzer);
+      PlanNode root = createTableRefNode(ref, fastPartitionKeyScans, analyzer);
       Preconditions.checkNotNull(root);
-      root = createSubplan(root, subplanRefs, isStraightJoin, true, analyzer);
+      root = createSubplan(root, subplanRefs, true, analyzer);
       parentRefPlans.add(new Pair<TableRef, PlanNode>(ref, root));
     }
     // save state of conjunct assignment; needed for join plan generation
@@ -818,7 +753,7 @@ public class SingleNodePlanner {
     }
 
     PlanNode root = null;
-    if (!isStraightJoin) {
+    if (!analyzer.isStraightJoin()) {
       Set<ExprId> assignedConjuncts = analyzer.getAssignedConjuncts();
       root = createCheapestJoinPlan(analyzer, parentRefPlans, subplanRefs);
       // If createCheapestJoinPlan() failed to produce an executable plan, then we need
@@ -826,7 +761,7 @@ public class SingleNodePlanner {
       // to not incorrectly miss conjuncts.
       if (root == null) analyzer.setAssignedConjuncts(assignedConjuncts);
     }
-    if (isStraightJoin || root == null) {
+    if (analyzer.isStraightJoin() || root == null) {
       // we didn't have enough stats to do a cost-based join plan, or the STRAIGHT_JOIN
       // keyword was in the select list: use the FROM clause order instead
       root = createFromClauseJoinPlan(analyzer, parentRefPlans, subplanRefs);
@@ -856,8 +791,7 @@ public class SingleNodePlanner {
    *   the SubplanNode generated here
    */
   private PlanNode createSubplan(PlanNode root, List<SubplanRef> subplanRefs,
-      boolean isStraightJoin, boolean assignId, Analyzer analyzer)
-      throws ImpalaException {
+      boolean assignId, Analyzer analyzer) throws ImpalaException {
     Preconditions.checkNotNull(root);
     List<TableRef> applicableRefs = extractApplicableRefs(root, subplanRefs);
     if (applicableRefs.isEmpty()) return root;
@@ -878,8 +812,7 @@ public class SingleNodePlanner {
     // their containing SubplanNode. Also, further plan generation relies on knowing
     // whether we are in a subplan context or not (see computeParentAndSubplanRefs()).
     ctx_.pushSubplan(subplanNode);
-    PlanNode subplan =
-        createTableRefsPlan(applicableRefs, subplanRefs, isStraightJoin, false, analyzer);
+    PlanNode subplan = createTableRefsPlan(applicableRefs, subplanRefs, false, analyzer);
     ctx_.popSubplan();
     subplanNode.setSubplan(subplan);
     subplanNode.init(analyzer);
@@ -1445,55 +1378,31 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Create a node to join outer with inner. Either the outer or the inner may be a plan
-   * created from a table ref (but not both), and the corresponding outer/innerRef
-   * should be non-null.
-   * Throws if the JoinNode.init() failed, or the required physical join implementation
-   * is missing, e.g., an outer/semi join without equi conjuncts.
+   * Creates a new node to join outer with inner. Collects and assigns join conjunct
+   * as well as regular conjuncts. Calls init() on the new join node.
+   * Throws if the JoinNode.init() fails.
    */
-  private PlanNode createJoinNode(
-      Analyzer analyzer, PlanNode outer, PlanNode inner, TableRef outerRef,
-      TableRef innerRef) throws ImpalaException {
-    Preconditions.checkState(innerRef != null ^ outerRef != null);
-    TableRef tblRef = (innerRef != null) ? innerRef : outerRef;
-
+  private PlanNode createJoinNode(PlanNode outer, PlanNode inner,
+      TableRef innerRef, Analyzer analyzer) throws ImpalaException {
     // get eq join predicates for the TableRefs' ids (not the PlanNodes' ids, which
     // are materialized)
-    List<BinaryPredicate> eqJoinConjuncts = Collections.emptyList();
-    if (innerRef != null) {
-      eqJoinConjuncts = getHashLookupJoinConjuncts(
-          outer.getTblRefIds(), inner.getTblRefIds(), analyzer);
-      // Outer joins should only use On-clause predicates as eqJoinConjuncts.
-      if (!innerRef.getJoinOp().isOuterJoin()) {
-        analyzer.createEquivConjuncts(outer.getTblRefIds(), inner.getTblRefIds(),
-            eqJoinConjuncts);
-      }
-    } else {
-      eqJoinConjuncts = getHashLookupJoinConjuncts(
-          inner.getTblRefIds(), outer.getTblRefIds(), analyzer);
-      // Outer joins should only use On-clause predicates as eqJoinConjuncts.
-      if (!outerRef.getJoinOp().isOuterJoin()) {
-        analyzer.createEquivConjuncts(inner.getTblRefIds(), outer.getTblRefIds(),
-            eqJoinConjuncts);
-      }
-      // Reverse the lhs/rhs of the join conjuncts.
-      for (BinaryPredicate eqJoinConjunct: eqJoinConjuncts) {
-        Expr swapTmp = eqJoinConjunct.getChild(0);
-        eqJoinConjunct.setChild(0, eqJoinConjunct.getChild(1));
-        eqJoinConjunct.setChild(1, swapTmp);
-      }
+    List<BinaryPredicate> eqJoinConjuncts = getHashLookupJoinConjuncts(
+        outer.getTblRefIds(), inner.getTblRefIds(), analyzer);
+    // Outer joins should only use On-clause predicates as eqJoinConjuncts.
+    if (!innerRef.getJoinOp().isOuterJoin()) {
+      analyzer.createEquivConjuncts(outer.getTblRefIds(), inner.getTblRefIds(),
+          eqJoinConjuncts);
     }
-
-    if (!eqJoinConjuncts.isEmpty() && tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
-      tblRef.setJoinOp(JoinOperator.INNER_JOIN);
+    if (!eqJoinConjuncts.isEmpty() && innerRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
+      innerRef.setJoinOp(JoinOperator.INNER_JOIN);
     }
 
     List<Expr> otherJoinConjuncts = Lists.newArrayList();
-    if (tblRef.getJoinOp().isOuterJoin()) {
+    if (innerRef.getJoinOp().isOuterJoin()) {
       // Also assign conjuncts from On clause. All remaining unassigned conjuncts
       // that can be evaluated by this join are assigned in createSelectPlan().
-      otherJoinConjuncts = analyzer.getUnassignedOjConjuncts(tblRef);
-    } else if (tblRef.getJoinOp().isSemiJoin()) {
+      otherJoinConjuncts = analyzer.getUnassignedOjConjuncts(innerRef);
+    } else if (innerRef.getJoinOp().isSemiJoin()) {
       // Unassigned conjuncts bound by the invisible tuple id of a semi join must have
       // come from the join's On-clause, and therefore, must be added to the other join
       // conjuncts to produce correct results.
@@ -1502,7 +1411,7 @@ public class SingleNodePlanner {
       List<TupleId> tblRefIds = Lists.newArrayList(outer.getTblRefIds());
       tblRefIds.addAll(inner.getTblRefIds());
       otherJoinConjuncts = analyzer.getUnassignedConjuncts(tblRefIds, false);
-      if (tblRef.getJoinOp().isNullAwareLeftAntiJoin()) {
+      if (innerRef.getJoinOp().isNullAwareLeftAntiJoin()) {
         boolean hasNullMatchingEqOperator = false;
         // Keep only the null-matching eq conjunct in the eqJoinConjuncts and move
         // all the others in otherJoinConjuncts. The BE relies on this
@@ -1528,15 +1437,16 @@ public class SingleNodePlanner {
     // (build side) is a singular row src. A singular row src has a cardinality of 1, so
     // a nested-loop join is certainly cheaper than a hash join.
     JoinNode result = null;
-    Preconditions.checkState(!tblRef.getJoinOp().isNullAwareLeftAntiJoin()
+    Preconditions.checkState(!innerRef.getJoinOp().isNullAwareLeftAntiJoin()
         || !(inner instanceof SingularRowSrcNode));
     if (eqJoinConjuncts.isEmpty() || inner instanceof SingularRowSrcNode) {
       otherJoinConjuncts.addAll(eqJoinConjuncts);
-      result = new NestedLoopJoinNode(outer, inner, tblRef.getDistributionMode(),
-          tblRef.getJoinOp(), otherJoinConjuncts);
+      result = new NestedLoopJoinNode(outer, inner, analyzer.isStraightJoin(),
+          innerRef.getDistributionMode(), innerRef.getJoinOp(), otherJoinConjuncts);
     } else {
-      result = new HashJoinNode(outer, inner, tblRef.getDistributionMode(),
-          tblRef.getJoinOp(), eqJoinConjuncts, otherJoinConjuncts);
+      result = new HashJoinNode(outer, inner, analyzer.isStraightJoin(),
+          innerRef.getDistributionMode(), innerRef.getJoinOp(), eqJoinConjuncts,
+          otherJoinConjuncts);
     }
     result.init(analyzer);
     return result;
@@ -1553,8 +1463,8 @@ public class SingleNodePlanner {
    * Throws if a PlanNode.init() failed or if planning of the given
    * table ref is not implemented.
    */
-  private PlanNode createTableRefNode(TableRef tblRef, boolean isStraightJoin,
-      boolean fastPartitionKeyScans, Analyzer analyzer) throws ImpalaException {
+  private PlanNode createTableRefNode(TableRef tblRef, boolean fastPartitionKeyScans,
+      Analyzer analyzer) throws ImpalaException {
     PlanNode result = null;
     if (tblRef instanceof BaseTableRef) {
       result = createScanNode(tblRef, fastPartitionKeyScans, analyzer);

@@ -31,8 +31,6 @@ import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TSortInfo;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Receiver side of a 1:n data stream. Logically, an ExchangeNode consumes the data
@@ -63,31 +61,27 @@ public class ExchangeNode extends PlanNode {
   // only if mergeInfo_ is non-null, i.e. this is a merging exchange node.
   private long offset_;
 
-  public ExchangeNode(PlanNodeId id) {
+  public ExchangeNode(PlanNodeId id, PlanNode input) {
     super(id, "EXCHANGE");
     offset_ = 0;
+    children_.add(input);
+    // Only apply the limit at the receiver if there are multiple senders.
+    if (input.getFragment().isPartitioned()) limit_ = input.limit_;
+    computeTupleIds();
+  }
+
+  @Override
+  public void computeTupleIds() {
+    clearTupleIds();
+    tupleIds_.addAll(getChild(0).getTupleIds());
+    tblRefIds_.addAll(getChild(0).getTblRefIds());
+    nullableTupleIds_.addAll(getChild(0).getNullableTupleIds());
   }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
     Preconditions.checkState(conjuncts_.isEmpty());
-  }
-
-  public void addChild(PlanNode node) {
-    // This ExchangeNode 'inherits' several parameters from its children.
-    // Ensure that all children agree on them.
-    if (!children_.isEmpty()) {
-      Preconditions.checkState(limit_ == node.limit_);
-      Preconditions.checkState(tupleIds_.equals(node.tupleIds_));
-      Preconditions.checkState(nullableTupleIds_.equals(node.nullableTupleIds_));
-    } else {
-      // Only apply the limit at the receiver if there are multiple senders.
-      if (node.getFragment().isPartitioned()) limit_ = node.limit_;
-      tupleIds_ = Lists.newArrayList(node.tupleIds_);
-      nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
-    }
-    children_.add(node);
   }
 
   @Override
@@ -193,8 +187,6 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    Preconditions.checkState(!children_.isEmpty(),
-        "ExchangeNode must have at least one child");
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
     msg.exchange_node = new TExchangeNode();
     for (TupleId tid: tupleIds_) {

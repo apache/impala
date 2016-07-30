@@ -33,28 +33,22 @@ public class SelectList {
 
   private final List<SelectListItem> items_;
 
-  // Set in analyzePlanHints() based on planHints_.
-  private boolean isStraightJoin_;
-
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
   public SelectList(List<SelectListItem> items) {
     isDistinct_ = false;
     items_ = items;
-    isStraightJoin_ = false;
   }
 
   public SelectList() {
     isDistinct_ = false;
     items_ = Lists.newArrayList();
-    isStraightJoin_ = false;
   }
 
   public SelectList(List<SelectListItem> items, boolean isDistinct,
       List<String> planHints) {
     isDistinct_ = isDistinct;
-    isStraightJoin_ = false;
     items_ = items;
     planHints_ = planHints;
   }
@@ -70,7 +64,6 @@ public class SelectList {
       items_.add(item.clone());
     }
     isDistinct_ = other.isDistinct_;
-    isStraightJoin_ = other.isStraightJoin_;
   }
 
   public List<SelectListItem> getItems() { return items_; }
@@ -78,7 +71,6 @@ public class SelectList {
   public List<String> getPlanHints() { return planHints_; }
   public boolean isDistinct() { return isDistinct_; }
   public void setIsDistinct(boolean value) { isDistinct_ = value; }
-  public boolean isStraightJoin() { return isStraightJoin_; }
   public boolean hasPlanHints() { return planHints_ != null; }
 
   public void analyzePlanHints(Analyzer analyzer) {
@@ -87,8 +79,7 @@ public class SelectList {
       if (!hint.equalsIgnoreCase("straight_join")) {
         analyzer.addWarning("PLAN hint not recognized: " + hint);
       }
-      isStraightJoin_ = true;
-      analyzer.setHasPlanHints();
+      analyzer.setIsStraightJoin();
     }
   }
 
@@ -99,6 +90,5 @@ public class SelectList {
     for (SelectListItem item: items_) {
       if (!item.isStar()) item.getExpr().reset();
     }
-    isStraightJoin_ = false;
   }
 }

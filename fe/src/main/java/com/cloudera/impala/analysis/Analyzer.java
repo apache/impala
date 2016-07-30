@@ -121,6 +121,9 @@ public class Analyzer {
 
   private final User user_;
 
+  // Indicates whether this query block contains a straight join hint.
+  private boolean isStraightJoin_ = false;
+
   // Whether to use Hive's auto-generated column labels.
   private boolean useHiveColLabels_ = false;
 
@@ -2445,6 +2448,8 @@ public class Analyzer {
     enablePrivChecks_ = value;
   }
   public void setAuthErrMsg(String errMsg) { authErrorMsg_ = errMsg; }
+  public void setIsStraightJoin() { isStraightJoin_ = true; }
+  public boolean isStraightJoin() { return isStraightJoin_; }
   public void setIsExplain() { globalState_.isExplain = true; }
   public boolean isExplain() { return globalState_.isExplain; }
   public void setUseHiveColLabels(boolean useHiveColLabels) {

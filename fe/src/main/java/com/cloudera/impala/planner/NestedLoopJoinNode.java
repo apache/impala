@@ -52,10 +52,11 @@ import com.google.common.base.Preconditions;
 public class NestedLoopJoinNode extends JoinNode {
   private final static Logger LOG = LoggerFactory.getLogger(NestedLoopJoinNode.class);
 
-  public NestedLoopJoinNode(PlanNode outer, PlanNode inner, DistributionMode distrMode,
-      JoinOperator joinOp, List<Expr> otherJoinConjuncts) {
-    super(outer, inner, distrMode, joinOp, Collections.<BinaryPredicate>emptyList(),
-        otherJoinConjuncts, "NESTED LOOP JOIN");
+  public NestedLoopJoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,
+      DistributionMode distrMode, JoinOperator joinOp, List<Expr> otherJoinConjuncts) {
+    super(outer, inner, isStraightJoin, distrMode, joinOp,
+        Collections.<BinaryPredicate>emptyList(), otherJoinConjuncts,
+        "NESTED LOOP JOIN");
   }
 
   @Override
@@ -71,6 +72,7 @@ public class NestedLoopJoinNode extends JoinNode {
       joinOp_ = JoinOperator.INNER_JOIN;
     }
     orderJoinConjunctsByCost();
+    computeStats(analyzer);
   }
 
   @Override

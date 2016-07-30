@@ -5133,6 +5133,188 @@ with v1 as (
 14:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 files=120 size=21.31MB
    runtime filters: RF000 -> ss_store_sk, RF001 -> ss_sold_date_sk, RF002 -> ss_item_sk
+---- DISTRIBUTEDPLAN
+54:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: sum_sales - avg_monthly_sales ASC, d_year ASC
+|  limit: 100
+|
+35:TOP-N [LIMIT=100]
+|  order by: sum_sales - avg_monthly_sales ASC, d_year ASC
+|
+34:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: rank() = rank() - 1, s_store_name = s_store_name, i_category = i_category, s_company_name = s_company_name, i_brand = i_brand
+|
+|--53:EXCHANGE [HASH(rank() - 1,s_store_name,i_category,s_company_name,i_brand)]
+|  |
+|  32:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: i_category, i_brand, s_store_name, s_company_name
+|  |  order by: d_year ASC, d_moy ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  31:SORT
+|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |
+|  51:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ss_sales_price)
+|  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
+|  |
+|  50:EXCHANGE [HASH(i_category,i_brand,s_store_name,s_company_name)]
+|  |
+|  30:AGGREGATE [STREAMING]
+|  |  output: sum(ss_sales_price)
+|  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
+|  |
+|  29:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |  runtime filters: RF006 <- s_store_sk
+|  |
+|  |--49:EXCHANGE [BROADCAST]
+|  |  |
+|  |  26:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |
+|  28:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF007 <- d_date_sk
+|  |
+|  |--48:EXCHANGE [BROADCAST]
+|  |  |
+|  |  25:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 files=1 size=9.84MB
+|  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |
+|  27:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_item_sk = i_item_sk
+|  |  runtime filters: RF008 <- i_item_sk
+|  |
+|  |--47:EXCHANGE [BROADCAST]
+|  |  |
+|  |  23:SCAN HDFS [tpcds.item]
+|  |     partitions=1/1 files=1 size=4.82MB
+|  |
+|  24:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=21.31MB
+|     runtime filters: RF006 -> ss_store_sk, RF007 -> ss_sold_date_sk, RF008 -> ss_item_sk
+|
+52:EXCHANGE [HASH(rank(),s_store_name,i_category,s_company_name,i_brand)]
+|
+33:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: rank() + 1 = rank(), s_store_name = s_store_name, i_category = i_category, s_company_name = s_company_name, i_brand = i_brand
+|
+|--46:EXCHANGE [BROADCAST]
+|  |
+|  12:SELECT
+|  |  predicates: d_year = 2000, avg(sum(ss_sales_price)) > 0, CASE WHEN avg(sum(ss_sales_price)) > 0 THEN abs(sum(ss_sales_price) - avg(sum(ss_sales_price))) / avg(sum(ss_sales_price)) ELSE NULL END > 0.1
+|  |
+|  11:ANALYTIC
+|  |  functions: avg(sum(ss_sales_price))
+|  |  partition by: i_category, i_brand, s_store_name, s_company_name, d_year
+|  |
+|  10:SORT
+|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC NULLS FIRST
+|  |
+|  09:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: i_category, i_brand, s_store_name, s_company_name
+|  |  order by: d_year ASC, d_moy ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  08:SORT
+|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |
+|  45:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ss_sales_price)
+|  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
+|  |
+|  44:EXCHANGE [HASH(i_category,i_brand,s_store_name,s_company_name)]
+|  |
+|  07:AGGREGATE [STREAMING]
+|  |  output: sum(ss_sales_price)
+|  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
+|  |
+|  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |  runtime filters: RF003 <- s_store_sk
+|  |
+|  |--43:EXCHANGE [BROADCAST]
+|  |  |
+|  |  03:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |
+|  05:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF004 <- d_date_sk
+|  |
+|  |--42:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 files=1 size=9.84MB
+|  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_item_sk = i_item_sk
+|  |  runtime filters: RF005 <- i_item_sk
+|  |
+|  |--41:EXCHANGE [BROADCAST]
+|  |  |
+|  |  00:SCAN HDFS [tpcds.item]
+|  |     partitions=1/1 files=1 size=4.82MB
+|  |
+|  01:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=21.31MB
+|     runtime filters: RF003 -> ss_store_sk, RF004 -> ss_sold_date_sk, RF005 -> ss_item_sk
+|
+22:ANALYTIC
+|  functions: rank()
+|  partition by: i_category, i_brand, s_store_name, s_company_name
+|  order by: d_year ASC, d_moy ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+21:SORT
+|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|
+40:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_sales_price)
+|  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
+|
+39:EXCHANGE [HASH(i_category,i_brand,s_store_name,s_company_name)]
+|
+20:AGGREGATE [STREAMING]
+|  output: sum(ss_sales_price)
+|  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
+|
+19:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF000 <- s_store_sk
+|
+|--38:EXCHANGE [BROADCAST]
+|  |
+|  16:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|
+18:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF001 <- d_date_sk
+|
+|--37:EXCHANGE [BROADCAST]
+|  |
+|  15:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|
+17:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF002 <- i_item_sk
+|
+|--36:EXCHANGE [BROADCAST]
+|  |
+|  13:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|
+14:SCAN HDFS [tpcds.store_sales]
+   partitions=120/120 files=120 size=21.31MB
+   runtime filters: RF000 -> ss_store_sk, RF001 -> ss_sold_date_sk, RF002 -> ss_item_sk
 ---- PARALLELPLANS
 54:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum_sales - avg_monthly_sales ASC, d_year ASC

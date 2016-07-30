@@ -35,6 +35,8 @@ import com.google.common.base.Preconditions;
  * evaluate any conjuncts.
  */
 public class SubplanNode extends PlanNode {
+  private PlanNode subplan_;
+
   public SubplanNode(PlanNode input) {
     super("SUBPLAN");
     children_.add(input);
@@ -48,10 +50,18 @@ public class SubplanNode extends PlanNode {
    */
   public void setSubplan(PlanNode subplan) {
     Preconditions.checkState(children_.size() == 1);
+    subplan_ = subplan;
     children_.add(subplan);
-    tblRefIds_.addAll(subplan.getTblRefIds());
-    tupleIds_.addAll(subplan.getTupleIds());
-    nullableTupleIds_.addAll(subplan.getNullableTupleIds());
+    computeTupleIds();
+  }
+
+  @Override
+  public void computeTupleIds() {
+    Preconditions.checkNotNull(subplan_);
+    clearTupleIds();
+    tblRefIds_.addAll(subplan_.getTblRefIds());
+    tupleIds_.addAll(subplan_.getTupleIds());
+    nullableTupleIds_.addAll(subplan_.getNullableTupleIds());
   }
 
   @Override

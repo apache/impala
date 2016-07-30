@@ -36,11 +36,18 @@ public class SelectNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SelectNode.class);
 
   protected SelectNode(PlanNodeId id, PlanNode child, List<Expr> conjuncts) {
-    super(id, child.getTupleIds(), "SELECT");
+    super(id, "SELECT");
     addChild(child);
-    this.tblRefIds_ = child.tblRefIds_;
-    this.nullableTupleIds_ = child.nullableTupleIds_;
     conjuncts_.addAll(conjuncts);
+    computeTupleIds();
+  }
+
+  @Override
+  public void computeTupleIds() {
+    clearTupleIds();
+    tblRefIds_.addAll(getChild(0).getTblRefIds());
+    tupleIds_.addAll(getChild(0).getTupleIds());
+    nullableTupleIds_.addAll(getChild(0).getNullableTupleIds());
   }
 
   @Override

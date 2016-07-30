@@ -232,8 +232,8 @@ public class DistributedPlanner {
     }
 
     Preconditions.checkState(partitionHint == null || partitionHint);
-    ExchangeNode exchNode = new ExchangeNode(ctx_.getNextNodeId());
-    exchNode.addChild(inputFragment.getPlanRoot());
+    ExchangeNode exchNode =
+        new ExchangeNode(ctx_.getNextNodeId(), inputFragment.getPlanRoot());
     exchNode.init(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition = DataPartition.hashPartitioned(nonConstPartitionExprs);
@@ -253,8 +253,8 @@ public class DistributedPlanner {
   private PlanFragment createMergeFragment(PlanFragment inputFragment)
       throws ImpalaException {
     Preconditions.checkState(inputFragment.isPartitioned());
-    ExchangeNode mergePlan = new ExchangeNode(ctx_.getNextNodeId());
-    mergePlan.addChild(inputFragment.getPlanRoot());
+    ExchangeNode mergePlan =
+        new ExchangeNode(ctx_.getNextNodeId(), inputFragment.getPlanRoot());
     mergePlan.init(ctx_.getRootAnalyzer());
     Preconditions.checkState(mergePlan.hasValidStats());
     PlanFragment fragment = new PlanFragment(ctx_.getNextFragmentId(), mergePlan,
@@ -381,12 +381,12 @@ public class DistributedPlanner {
     // left- and rightChildFragments, which now partition their output
     // on their respective join exprs.
     // The new fragment is hash-partitioned on the lhs input join exprs.
-    ExchangeNode lhsExchange = new ExchangeNode(ctx_.getNextNodeId());
-    lhsExchange.addChild(leftChildFragment.getPlanRoot());
+    ExchangeNode lhsExchange =
+        new ExchangeNode(ctx_.getNextNodeId(), leftChildFragment.getPlanRoot());
     lhsExchange.computeStats(null);
     node.setChild(0, lhsExchange);
-    ExchangeNode rhsExchange = new ExchangeNode(ctx_.getNextNodeId());
-    rhsExchange.addChild(rightChildFragment.getPlanRoot());
+    ExchangeNode rhsExchange =
+        new ExchangeNode(ctx_.getNextNodeId(), rightChildFragment.getPlanRoot());
     rhsExchange.computeStats(null);
     node.setChild(1, rhsExchange);
 
@@ -694,8 +694,8 @@ public class DistributedPlanner {
    */
   private void connectChildFragment(PlanNode node, int childIdx,
       PlanFragment parentFragment, PlanFragment childFragment) throws ImpalaException {
-    ExchangeNode exchangeNode = new ExchangeNode(ctx_.getNextNodeId());
-    exchangeNode.addChild(childFragment.getPlanRoot());
+    ExchangeNode exchangeNode =
+        new ExchangeNode(ctx_.getNextNodeId(), childFragment.getPlanRoot());
     exchangeNode.init(ctx_.getRootAnalyzer());
     exchangeNode.setFragment(parentFragment);
     node.setChild(childIdx, exchangeNode);
@@ -715,8 +715,8 @@ public class DistributedPlanner {
   private PlanFragment createParentFragment(
       PlanFragment childFragment, DataPartition parentPartition)
       throws ImpalaException {
-    ExchangeNode exchangeNode = new ExchangeNode(ctx_.getNextNodeId());
-    exchangeNode.addChild(childFragment.getPlanRoot());
+    ExchangeNode exchangeNode =
+        new ExchangeNode(ctx_.getNextNodeId(), childFragment.getPlanRoot());
     exchangeNode.init(ctx_.getRootAnalyzer());
     PlanFragment parentFragment = new PlanFragment(ctx_.getNextFragmentId(),
         exchangeNode, parentPartition);

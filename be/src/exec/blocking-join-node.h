@@ -38,6 +38,8 @@ class TupleRow;
 /// Abstract base class for join nodes that block while consuming all rows from their
 /// right child in Open(). There is no implementation of Reset() because the Open()
 /// sufficiently covers setting members into a 'reset' state.
+/// TODO: Remove the restriction that the tuples in the join's output row have to
+/// correspond to the order of its child exec nodes. See the DCHECKs in Init().
 class BlockingJoinNode : public ExecNode {
  public:
   BlockingJoinNode(const std::string& node_name, const TJoinOp::type join_op,

@@ -17,6 +17,7 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.Collections;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -50,6 +51,9 @@ public abstract class JoinNode extends PlanNode {
 
   protected JoinOperator joinOp_;
 
+  // Indicates if this join originates from a query block with a straight join hint.
+  protected final boolean isStraightJoin_;
+
   // User-provided hint for the distribution mode. Set to 'NONE' if no hints were given.
   protected final DistributionMode distrModeHint_;
 
@@ -81,13 +85,28 @@ public abstract class JoinNode extends PlanNode {
     public String toString() { return description_; }
   }
 
-  public JoinNode(PlanNode outer, PlanNode inner, DistributionMode distrMode,
-      JoinOperator joinOp, List<BinaryPredicate> eqJoinConjuncts,
-      List<Expr> otherJoinConjuncts, String displayName) {
+  public JoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,
+      DistributionMode distrMode, JoinOperator joinOp,
+      List<BinaryPredicate> eqJoinConjuncts, List<Expr> otherJoinConjuncts,
+      String displayName) {
     super(displayName);
     Preconditions.checkNotNull(otherJoinConjuncts);
-    joinOp_ = joinOp;
+    isStraightJoin_ = isStraightJoin;
     distrModeHint_ = distrMode;
+    joinOp_ = joinOp;
+    children_.add(outer);
+    children_.add(inner);
+    eqJoinConjuncts_ = eqJoinConjuncts;
+    otherJoinConjuncts_ = otherJoinConjuncts;
+    computeTupleIds();
+  }
+
+  @Override
+  public void computeTupleIds() {
+    Preconditions.checkState(children_.size() == 2);
+    clearTupleIds();
+    PlanNode outer = children_.get(0);
+    PlanNode inner = children_.get(1);
 
     // Only retain the non-semi-joined tuples of the inputs.
     switch (joinOp_) {
@@ -111,11 +130,6 @@ public abstract class JoinNode extends PlanNode {
     tblRefIds_.addAll(outer.getTblRefIds());
     tblRefIds_.addAll(inner.getTblRefIds());
 
-    otherJoinConjuncts_ = otherJoinConjuncts;
-    eqJoinConjuncts_ = eqJoinConjuncts;
-    children_.add(outer);
-    children_.add(inner);
-
     // Inherits all the nullable tuple from the children
     // Mark tuples that form the "nullable" side of the outer join as nullable.
     nullableTupleIds_.addAll(inner.getNullableTupleIds());
@@ -133,6 +147,7 @@ public abstract class JoinNode extends PlanNode {
   public JoinOperator getJoinOp() { return joinOp_; }
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
   public List<Expr> getOtherJoinConjuncts() { return otherJoinConjuncts_; }
+  public boolean isStraightJoin() { return isStraightJoin_; }
   public DistributionMode getDistributionModeHint() { return distrModeHint_; }
   public DistributionMode getDistributionMode() { return distrMode_; }
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
@@ -141,7 +156,10 @@ public abstract class JoinNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
-    super.init(analyzer);
+    // Do not call super.init() to defer computeStats() until all conjuncts
+    // have been collected.
+    assignConjuncts(analyzer);
+    createDefaultSmap(analyzer);
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
     otherJoinConjuncts_ = Expr.substituteList(otherJoinConjuncts_,
         getCombinedChildSmap(), analyzer, false);
@@ -388,6 +406,13 @@ public abstract class JoinNode extends PlanNode {
       cardinality_ = getSemiJoinCardinality();
     } else if (joinOp_.isInnerJoin() || joinOp_.isOuterJoin()){
       cardinality_ = getJoinCardinality(analyzer);
+    } else {
+      Preconditions.checkState(joinOp_.isCrossJoin());
+      long leftCard = getChild(0).cardinality_;
+      long rightCard = getChild(1).cardinality_;
+      if (leftCard != -1 && rightCard != -1) {
+        cardinality_ = multiplyCardinalities(leftCard, rightCard);
+      }
     }
 
     // Impose lower/upper bounds on the cardinality based on the join type.
@@ -451,6 +476,21 @@ public abstract class JoinNode extends PlanNode {
     cardinality_ = capAtLimit(cardinality_);
     Preconditions.checkState(hasValidStats());
     LOG.debug("stats Join: cardinality=" + Long.toString(cardinality_));
+  }
+
+  /**
+   * Inverts the join op, swaps our children, and swaps the children
+   * of all eqJoinConjuncts_. All modifications are in place.
+   */
+  public void invertJoin() {
+    joinOp_ = joinOp_.invert();
+    Collections.swap(children_, 0, 1);
+    for (BinaryPredicate p: eqJoinConjuncts_) p.reverse();
+  }
+
+  public boolean hasConjuncts() {
+    return !eqJoinConjuncts_.isEmpty() || !otherJoinConjuncts_.isEmpty() ||
+        !conjuncts_.isEmpty();
   }
 
   @Override

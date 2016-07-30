@@ -1536,19 +1536,19 @@ where c.id != b.id
 04:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: c.id != b.id
 |
-|--03:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id
-|  |  runtime filters: RF000 <- b.id
-|  |
-|  |--01:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=4/4 files=4 size=460B
-|  |
-|  00:SCAN HDFS [functional.alltypestiny a]
-|     partitions=4/4 files=4 size=460B
-|     runtime filters: RF000 -> a.id
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
 |
-02:SCAN HDFS [functional.alltypes c]
-   partitions=24/24 files=24 size=478.45KB
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> a.id
 ====
 # Tests the generation of a distributed plan in which the input fragments
 # of a join node have compatible but not the same number of partitioning exprs with
@@ -2018,33 +2018,33 @@ left anti join functional.alltypesagg e
   on c.string_col != e.string_col
 where a.id < 10
 ---- PLAN
-08:NESTED LOOP JOIN [LEFT ANTI JOIN]
+08:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  join predicates: c.string_col != e.string_col
 |
-|--04:SCAN HDFS [functional.alltypesagg e]
+|--07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  join predicates: b.bigint_col > d.bigint_col
+|  |
+|  |--06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  join predicates: a.int_col != c.int_col OR a.tinyint_col > c.tinyint_col
+|  |  |
+|  |  |--05:NESTED LOOP JOIN [INNER JOIN]
+|  |  |  |  predicates: a.id < b.id
+|  |  |  |
+|  |  |  |--00:SCAN HDFS [functional.alltypestiny a]
+|  |  |  |     partitions=4/4 files=4 size=460B
+|  |  |  |     predicates: a.id < 10
+|  |  |  |
+|  |  |  01:SCAN HDFS [functional.alltypessmall b]
+|  |  |     partitions=4/4 files=4 size=6.32KB
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypes c]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  03:SCAN HDFS [functional.alltypesagg d]
 |     partitions=11/11 files=11 size=814.73KB
 |
-07:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  join predicates: b.bigint_col > d.bigint_col
-|
-|--03:SCAN HDFS [functional.alltypesagg d]
-|     partitions=11/11 files=11 size=814.73KB
-|
-06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
-|  join predicates: a.int_col != c.int_col OR a.tinyint_col > c.tinyint_col
-|
-|--05:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: a.id < b.id
-|  |
-|  |--00:SCAN HDFS [functional.alltypestiny a]
-|  |     partitions=4/4 files=4 size=460B
-|  |     predicates: a.id < 10
-|  |
-|  01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 files=4 size=6.32KB
-|
-02:SCAN HDFS [functional.alltypes c]
-   partitions=24/24 files=24 size=478.45KB
+04:SCAN HDFS [functional.alltypesagg e]
+   partitions=11/11 files=11 size=814.73KB
 ====
 # Regression test for IMPALA-2495: Crash: impala::InPredicate::SetLookupPrepare
 select count(id) from functional.alltypestiny t1

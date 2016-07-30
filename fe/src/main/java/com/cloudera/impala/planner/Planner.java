@@ -4,24 +4,26 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.QueryStmt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.ColumnLineageGraph;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InsertStmt;
+import com.cloudera.impala.analysis.JoinOperator;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TRuntimeFilterMode;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryExecRequest;
+import com.cloudera.impala.thrift.TRuntimeFilterMode;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.util.MaxRowsProcessedVisitor;
 import com.google.common.base.Joiner;
@@ -76,8 +78,16 @@ public class Planner {
         // Only one scanner thread for small queries
         ctx_.getQueryOptions().setNum_scanner_threads(1);
       }
-    } else if (
-      ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
+      // disable runtime filters
+      ctx_.getQueryOptions().setRuntime_filter_mode(TRuntimeFilterMode.OFF);
+    }
+
+    // Join rewrites.
+    invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
+    singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
+
+    // create runtime filters
+    if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
       // Always compute filters, even if the BE won't always use all of them.
       RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
           singleNodePlan, ctx_.getQueryOptions().getMax_num_runtime_filters());
@@ -327,5 +337,103 @@ public class Planner {
 
     LOG.debug("Estimated per-host peak memory requirement: " + maxPerHostMem);
     LOG.debug("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+  }
+
+  /**
+   * Traverses the plan tree rooted at 'root' and inverts outer and semi joins
+   * in the following situations:
+   * 1. If the left-hand side is a SingularRowSrcNode then we invert the join because
+   *    then the build side is guaranteed to have only a single row.
+   * 2. There is no backend support for distributed non-equi right outer/semi joins,
+   *    so we invert them (any distributed left semi/outer join is ok).
+   * 3. Invert semi/outer joins if the right-hand size is estimated to have a higher
+   *    cardinality*avgSerializedSize. Do not invert if relevant stats are missing.
+   * The first two inversion rules are independent of the presence/absence of stats.
+   * Left Null Aware Anti Joins are never inverted due to lack of backend support.
+   * Joins that originate from query blocks with a straight join hint are not inverted.
+   * The 'isLocalPlan' parameter indicates whether the plan tree rooted at 'root'
+   * will be executed locally within one machine, i.e., without any data exchanges.
+   */
+  private void invertJoins(PlanNode root, boolean isLocalPlan) {
+    if (root instanceof SubplanNode) {
+      invertJoins(root.getChild(0), isLocalPlan);
+      invertJoins(root.getChild(1), true);
+    } else {
+      for (PlanNode child: root.getChildren()) invertJoins(child, isLocalPlan);
+    }
+
+    if (root instanceof JoinNode) {
+      JoinNode joinNode = (JoinNode) root;
+      JoinOperator joinOp = joinNode.getJoinOp();
+
+      // 1. No inversion allowed due to straight join.
+      // 2. The null-aware left anti-join operator is not considered for inversion.
+      //    There is no backend support for a null-aware right anti-join because
+      //    we cannot execute it efficiently.
+      if (joinNode.isStraightJoin() || joinOp.isNullAwareLeftAntiJoin()) {
+        // Re-compute tuple ids since their order must correspond to the order of children.
+        root.computeTupleIds();
+        return;
+      }
+
+      if (joinNode.getChild(0) instanceof SingularRowSrcNode) {
+        // Always place a singular row src on the build side because it
+        // only produces a single row.
+        joinNode.invertJoin();
+      } else if (!isLocalPlan && joinNode instanceof NestedLoopJoinNode &&
+          (joinOp.isRightSemiJoin() || joinOp.isRightOuterJoin())) {
+        // The current join is a distributed non-equi right outer or semi join
+        // which has no backend support. Invert the join to make it executable.
+        joinNode.invertJoin();
+      } else {
+        // Invert the join if doing so reduces the size of the materialized rhs
+        // (may also reduce network costs depending on the join strategy).
+        // Only consider this optimization if both the lhs/rhs cardinalities are known.
+        long lhsCard = joinNode.getChild(0).getCardinality();
+        long rhsCard = joinNode.getChild(1).getCardinality();
+        float lhsAvgRowSize = joinNode.getChild(0).getAvgRowSize();
+        float rhsAvgRowSize = joinNode.getChild(1).getAvgRowSize();
+        if (lhsCard != -1 && rhsCard != -1 &&
+            lhsCard * lhsAvgRowSize < rhsCard * rhsAvgRowSize &&
+            // TODO: Do not invert inner joins. Relax this restriction.
+            !(joinOp.isInnerJoin() && joinNode.hasConjuncts())) {
+          joinNode.invertJoin();
+        }
+      }
+    }
+
+    // Re-compute tuple ids because the backend assumes that their order corresponds to
+    // the order of children.
+    root.computeTupleIds();
+  }
+
+  /**
+   * Converts hash joins to nested-loop joins if the right-side is a SingularRowSrcNode.
+   * Does not convert Null Aware Anti Joins because we only support that join op with
+   * a hash join.
+   * Throws if JoinNode.init() fails on the new nested-loop join node.
+   */
+  private PlanNode useNljForSingularRowBuilds(PlanNode root, Analyzer analyzer)
+      throws ImpalaException {
+    for (int i = 0; i < root.getChildren().size(); ++i) {
+      root.setChild(i, useNljForSingularRowBuilds(root.getChild(i), analyzer));
+    }
+    if (!(root instanceof JoinNode)) return root;
+    if (root instanceof NestedLoopJoinNode) return root;
+    if (!(root.getChild(1) instanceof SingularRowSrcNode)) return root;
+    JoinNode joinNode = (JoinNode) root;
+    if (joinNode.getJoinOp().isNullAwareLeftAntiJoin()) {
+      Preconditions.checkState(joinNode instanceof HashJoinNode);
+      return root;
+    }
+    List<Expr> otherJoinConjuncts = Lists.newArrayList(joinNode.getOtherJoinConjuncts());
+    otherJoinConjuncts.addAll(joinNode.getEqJoinConjuncts());
+    JoinNode newJoinNode = new NestedLoopJoinNode(joinNode.getChild(0), joinNode.getChild(1),
+        joinNode.isStraightJoin(), joinNode.getDistributionModeHint(),
+        joinNode.getJoinOp(), otherJoinConjuncts);
+    newJoinNode.getConjuncts().addAll(joinNode.getConjuncts());
+    newJoinNode.setId(joinNode.getId());
+    newJoinNode.init(analyzer);
+    return newJoinNode;
   }
 }

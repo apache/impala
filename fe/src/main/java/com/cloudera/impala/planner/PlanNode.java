@@ -123,27 +123,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Runtime filters assigned to this node.
   protected List<RuntimeFilter> runtimeFilters_ = Lists.newArrayList();
 
-  protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String displayName) {
-    id_ = id;
-    limit_ = -1;
-    // make a copy, just to be on the safe side
-    tupleIds_ = Lists.newArrayList(tupleIds);
-    tblRefIds_ = Lists.newArrayList(tupleIds);
-    cardinality_ = -1;
-    numNodes_ = -1;
-    displayName_ = displayName;
+  protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
+    this(id, displayName);
+    tupleIds_.addAll(tupleIds);
+    tblRefIds_.addAll(tupleIds);
   }
 
   /**
    * Deferred id_ assignment.
    */
   protected PlanNode(String displayName) {
-    limit_ = -1;
-    tupleIds_ = Lists.newArrayList();
-    tblRefIds_ = Lists.newArrayList();
-    cardinality_ = -1;
-    numNodes_ = -1;
-    displayName_ = displayName;
+    this(null, displayName);
   }
 
   protected PlanNode(PlanNodeId id, String displayName) {
@@ -169,6 +159,23 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     cardinality_ = -1;
     numNodes_ = -1;
     displayName_ = displayName;
+  }
+
+  /**
+   * Sets tblRefIds_, tupleIds_, and nullableTupleIds_.
+   * The default implementation is a no-op.
+   */
+  public void computeTupleIds() {
+    Preconditions.checkState(children_.isEmpty() || !tupleIds_.isEmpty());
+  }
+
+  /**
+   * Clears tblRefIds_, tupleIds_, and nullableTupleIds_.
+   */
+  protected void clearTupleIds() {
+    tblRefIds_.clear();
+    tupleIds_.clear();
+    nullableTupleIds_.clear();
   }
 
   public PlanNodeId getId() { return id_; }

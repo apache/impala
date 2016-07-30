@@ -25,9 +25,7 @@ import java.util.Set;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.JoinNode.DistributionMode;
-import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.thrift.TReplicaPreference;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -509,33 +507,6 @@ public class TableRef implements ParseNode {
       // Indicate that this table ref has an empty ON-clause.
       analyzer.registerOnClauseConjuncts(Collections.<Expr>emptyList(), this);
     }
-  }
-
-  /**
-   * Inverts the join whose rhs is represented by this table ref. If necessary, this
-   * function modifies the registered analysis state associated with this table ref,
-   * as well as the chain of left table references in refPlans as appropriate.
-   * Requires that this is the very first join in a series of joins.
-   */
-  public void invertJoin(List<Pair<TableRef, PlanNode>> refPlans, Analyzer analyzer) {
-    // Assert that this is the first join in a series of joins.
-    Preconditions.checkState(leftTblRef_.leftTblRef_ == null);
-    // Find a table ref that references 'this' as its left table (if any) and change
-    // it to reference 'this.leftTblRef_ 'instead, because 'this.leftTblRef_' will
-    // become the new rhs of the inverted join.
-    for (Pair<TableRef, PlanNode> refPlan: refPlans) {
-      if (refPlan.first.leftTblRef_ == this) {
-        refPlan.first.setLeftTblRef(leftTblRef_);
-        break;
-      }
-    }
-    if (joinOp_.isOuterJoin()) analyzer.invertOuterJoinState(this, leftTblRef_);
-    leftTblRef_.setJoinOp(getJoinOp().invert());
-    leftTblRef_.setLeftTblRef(this);
-    leftTblRef_.setOnClause(onClause_);
-    joinOp_ = null;
-    leftTblRef_ = null;
-    onClause_ = null;
   }
 
   protected String tableRefToSql() {

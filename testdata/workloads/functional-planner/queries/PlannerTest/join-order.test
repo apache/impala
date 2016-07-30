@@ -843,24 +843,24 @@ left semi join functional.alltypesagg t4 on (t3.id = t4.id)
 inner join functional.alltypes t5 on (t3.id = t5.id)
 right join functional.alltypestiny t6 on (t5.id = t6.id)
 ---- PLAN
-11:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-10:HASH JOIN [LEFT OUTER JOIN]
+12:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t6.id = t5.id
 |
-|--09:HASH JOIN [INNER JOIN]
+|--11:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t3.id = t5.id
 |  |  runtime filters: RF000 <- t5.id
 |  |
 |  |--04:SCAN HDFS [functional.alltypes t5]
 |  |     partitions=24/24 files=24 size=478.45KB
 |  |
-|  08:HASH JOIN [RIGHT SEMI JOIN]
+|  10:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: t4.id = t3.id
 |  |  runtime filters: RF001 <- t3.id
 |  |
-|  |--07:HASH JOIN [INNER JOIN]
+|  |--09:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: t2.id = t3.id
 |  |  |  runtime filters: RF002 <- t3.id
 |  |  |
@@ -868,7 +868,7 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |  |  |     partitions=4/4 files=4 size=6.32KB
 |  |  |     runtime filters: RF000 -> t3.id
 |  |  |
-|  |  06:HASH JOIN [RIGHT OUTER JOIN]
+|  |  08:HASH JOIN [RIGHT OUTER JOIN]
 |  |  |  hash predicates: t2.id = t1.id
 |  |  |  runtime filters: RF003 <- t1.id
 |  |  |
@@ -896,21 +896,21 @@ inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left semi join functional.alltypes t5 on (t4.id = t5.id)
 inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
-12:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-11:HASH JOIN [INNER JOIN]
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t6.id
 |  runtime filters: RF000 <- t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 files=4 size=460B
 |
-10:HASH JOIN [RIGHT SEMI JOIN]
+11:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: t5.id = t4.id
 |  runtime filters: RF001 <- t4.id
 |
-|--09:HASH JOIN [INNER JOIN]
+|--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t3.id
 |  |  runtime filters: RF002 <- t3.id
 |  |
@@ -918,7 +918,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |     partitions=11/11 files=11 size=814.73KB
 |  |     runtime filters: RF000 -> t3.id
 |  |
-|  08:HASH JOIN [INNER JOIN]
+|  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t4.id
 |  |  runtime filters: RF003 <- t4.id
 |  |
@@ -926,7 +926,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |     partitions=4/4 files=4 size=6.32KB
 |  |     runtime filters: RF000 -> t4.id, RF002 -> t4.id
 |  |
-|  07:HASH JOIN [RIGHT OUTER JOIN]
+|  08:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.id = t1.id
 |  |  runtime filters: RF004 <- t1.id
 |  |
@@ -950,20 +950,20 @@ inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left anti join functional.alltypes t5 on (t4.id = t5.id)
 inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
-12:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-11:HASH JOIN [INNER JOIN]
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t6.id
 |  runtime filters: RF000 <- t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 files=4 size=460B
 |
-10:HASH JOIN [RIGHT ANTI JOIN]
+11:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: t5.id = t4.id
 |
-|--09:HASH JOIN [INNER JOIN]
+|--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t3.id
 |  |  runtime filters: RF001 <- t3.id
 |  |
@@ -971,7 +971,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |     partitions=11/11 files=11 size=814.73KB
 |  |     runtime filters: RF000 -> t3.id
 |  |
-|  08:HASH JOIN [INNER JOIN]
+|  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.id = t4.id
 |  |  runtime filters: RF002 <- t4.id
 |  |
@@ -979,7 +979,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  |     partitions=4/4 files=4 size=6.32KB
 |  |     runtime filters: RF000 -> t4.id, RF001 -> t4.id
 |  |
-|  07:HASH JOIN [RIGHT OUTER JOIN]
+|  08:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.id = t1.id
 |  |  runtime filters: RF003 <- t1.id
 |  |

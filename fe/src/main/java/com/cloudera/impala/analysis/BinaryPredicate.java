@@ -18,6 +18,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -353,6 +354,15 @@ public class BinaryPredicate extends Predicate {
         throw new IllegalStateException("Not implemented");
     }
     return new BinaryPredicate(newOp, getChild(0), getChild(1));
+  }
+
+  /**
+   * Swaps the first with the second child in-place. Only valid to call for
+   * equivalence and not equal predicates.
+   */
+  public void reverse() {
+    Preconditions.checkState(op_.isEquivalence() || op_ == Operator.NE);
+    Collections.swap(children_, 0, 1);
   }
 
   @Override

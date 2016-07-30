@@ -83,7 +83,7 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |     runtime filters: RF000 -> s.s_nationkey, RF001 -> s_comment
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    runtime filters: RF000 -> c_nationkey, RF001 -> c.c_comment, RF002 -> c.c_nationkey, RF003 -> c_comment
 ====
 # Test subplans: Cross join of parent and relative ref.
@@ -584,17 +584,17 @@ select 1 from functional.allcomplextypes a
 |  |
 |  |--05:UNNEST [a.struct_array_col d]
 |  |
-|  08:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.year = c.value
+|  08:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: (a.id < 1 OR b.item > 2)
 |  |
-|  |--04:UNNEST [a.int_map_col c]
+|  |--03:UNNEST [a.int_array_col b]
 |  |
 |  07:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: (a.id < 1 OR b.item > 2)
+|  |  join predicates: c.value = a.year
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
-|  03:UNNEST [a.int_array_col b]
+|  04:UNNEST [a.int_map_col c]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -1101,8 +1101,8 @@ where b.id = d.value
 |  11:UNNEST [a.struct_array_col x]
 |
 16:HASH JOIN [INNER JOIN]
-|  hash predicates: c.item = d.value
-|  runtime filters: RF000 <- d.value
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
 |
 |--06:SUBPLAN
 |  |
@@ -1209,7 +1209,7 @@ limit 10
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
@@ -1306,7 +1306,7 @@ where c.c_custkey = o.o_orderkey and c.c_custkey = o.o_shippriority
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
    predicates: c.c_custkey = c.c_nationkey, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o.o_orderkey = o.o_shippriority
    predicates on l: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
@@ -1787,5 +1787,5 @@ where o.o_orderkey is null and o.o_orderstatus <=> o_orderpriority
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=554.13MB
+   partitions=1/1 files=4 size=577.87MB
 ====

@@ -67,7 +67,7 @@ public class SortNode extends PlanNode {
 
   public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
       long offset) {
-    super(id, Lists.newArrayList(info.getSortTupleDescriptor().getId()),
+    super(id, info.getSortTupleDescriptor().getId().asList(),
         getDisplayName(useTopN, false));
     info_ = info;
     useTopN_ = useTopN;
