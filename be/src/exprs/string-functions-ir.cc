@@ -24,7 +24,7 @@
 #include "exprs/expr.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple-row.h"
-#include "sasl/saslutil.h"
+#include "util/coding-util.h"
 #include "util/url-parser.h"
 
 #include "common/names.h"
@@ -802,12 +802,8 @@ StringVal StringFunctions::SplitPart(FunctionContext* context,
 StringVal StringFunctions::Base64Encode(FunctionContext* ctx, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   if (str.len == 0) return StringVal(ctx, 0);
-  // Base64 encoding turns every 3 bytes into 4 characters. If the length is not divisible
-  // by 3, it pads the input with extra 0 bytes until it is divisible by 3. One more
-  // character must be allocated to account for sasl_encode64's null-padding of its
-  // output.
-  const unsigned out_max = 1 + 4 * ((static_cast<unsigned>(str.len) + 2) / 3);
-  if (UNLIKELY(out_max > static_cast<unsigned>(std::numeric_limits<int>::max()))) {
+  int64_t out_max = 0;
+  if (UNLIKELY(!Base64EncodeBufLen(str.len, &out_max))) {
     stringstream ss;
     ss << "Could not base64 encode a string of length " << str.len;
     ctx->AddWarning(ss.str().c_str());
@@ -815,10 +811,10 @@ StringVal StringFunctions::Base64Encode(FunctionContext* ctx, const StringVal& s
   }
   StringVal result(ctx, out_max);
   if (UNLIKELY(result.is_null)) return result;
-  unsigned out_len = 0;
-  const int encode_result = sasl_encode64(reinterpret_cast<const char*>(str.ptr), str.len,
-      reinterpret_cast<char*>(result.ptr), out_max, &out_len);
-  if (UNLIKELY(encode_result != SASL_OK || out_len != out_max - 1)) {
+  int64_t out_len = 0;
+  if (UNLIKELY(!impala::Base64Encode(
+          reinterpret_cast<const char*>(str.ptr), str.len,
+          out_max, reinterpret_cast<char*>(result.ptr), &out_len))) {
     stringstream ss;
     ss << "Could not base64 encode input in space " << out_max
        << "; actual output length " << out_len;
@@ -832,32 +828,22 @@ StringVal StringFunctions::Base64Encode(FunctionContext* ctx, const StringVal& s
 StringVal StringFunctions::Base64Decode(FunctionContext* ctx, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   if (0 == str.len) return StringVal(ctx, 0);
-  // Base64 decoding turns every 4 characters into 3 bytes. If the last character of the
-  // encoded string is '=', that character (which represents 6 bits) and the last two bits
-  // of the previous character is ignored, for a total of 8 ignored bits, therefore
-  // producing one fewer byte of output. This is repeated if the second-to-last character
-  // is '='. One more byte must be allocated to account for sasl_decode64's null-padding
-  // of its output.
-  if (UNLIKELY((str.len & 3) != 0)) {
+  int64_t out_max = 0;
+  if (UNLIKELY(!Base64DecodeBufLen(
+          reinterpret_cast<const char*>(str.ptr), static_cast<int64_t>(str.len),
+          &out_max))) {
     stringstream ss;
     ss << "Invalid base64 string; input length is " << str.len
        << ", which is not a multiple of 4.";
     ctx->AddWarning(ss.str().c_str());
     return StringVal::null();
   }
-  unsigned out_max = 1 + 3 * (str.len / 4);
-  if (static_cast<char>(str.ptr[str.len - 1]) == '=') {
-    --out_max;
-    if (static_cast<char>(str.ptr[str.len - 2]) == '=') {
-      --out_max;
-    }
-  }
   StringVal result(ctx, out_max);
   if (UNLIKELY(result.is_null)) return result;
-  unsigned out_len = 0;
-  const int decode_result = sasl_decode64(reinterpret_cast<const char*>(str.ptr), str.len,
-      reinterpret_cast<char*>(result.ptr), out_max, &out_len);
-  if (UNLIKELY(decode_result != SASL_OK || out_len != out_max - 1)) {
+  int64_t out_len = 0;
+  if (UNLIKELY(!impala::Base64Decode(
+          reinterpret_cast<const char*>(str.ptr), static_cast<int64_t>(str.len),
+          out_max, reinterpret_cast<char*>(result.ptr), &out_len))) {
     stringstream ss;
     ss << "Could not base64 decode input in space " << out_max
        << "; actual output length " << out_len;

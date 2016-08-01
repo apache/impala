@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef UTIL_URL_CODING_H
-#define UTIL_URL_CODING_H
+#ifndef UTIL_CODING_UTIL_H
+#define UTIL_CODING_UTIL_H
 
 #include <string>
 #include <vector>
@@ -37,6 +37,16 @@ void UrlEncode(const std::vector<uint8_t>& in, std::string* out,
 /// certain characters like ' '.
 bool UrlDecode(const std::string& in, std::string* out, bool hive_compat = false);
 
+/// Calculate the maximum output buffer size needed for Base64Encode. Returns false if
+/// in_len is negative or too large.
+bool Base64EncodeBufLen(int64_t in_len, int64_t* out_max);
+
+/// Returns true if encoded successfully, otherwise false. out points to the output
+/// data, the space of size out_max should be allocated before calling this function.
+/// out_len saves the actual length of encoded string.
+bool Base64Encode(const char* in, int64_t in_len, int64_t out_max, char* out,
+    int64_t* out_len);
+
 /// Utility method to encode input as base-64 encoded.  This is not
 /// very performant (multiple string copies) and should not be used
 /// in a hot path.
@@ -45,10 +55,16 @@ void Base64Encode(const std::vector<uint8_t>& in, std::stringstream* out);
 void Base64Encode(const std::string& in, std::string* out);
 void Base64Encode(const std::string& in, std::stringstream* out);
 
-/// Utility method to decode base64 encoded strings.  Also not extremely
-/// performant.
-/// Returns true unless the string could not be correctly decoded.
-bool Base64Decode(const std::string& in, std::string* out);
+/// Calculate the maximum output buffer size needed for Base64Decode. Returns false if
+/// in_len is invalid.
+bool Base64DecodeBufLen(const char* in, int64_t in_len, int64_t* out_max);
+
+/// Utility method to decode a base-64 encoded string. Returns true if decoded
+/// successfully, otherwise false. out points to the output data, the space of size
+/// out_max should be allocated before calling this function. out_len saves the actual
+/// length of decoded string.
+bool Base64Decode(const char* in, int64_t in_len, int64_t out_max, char* out,
+    int64_t* out_len);
 
 /// Replaces &, < and > with &amp;, &lt; and &gt; respectively. This is
 /// not the full set of required encodings, but one that should be

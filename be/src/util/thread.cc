@@ -20,12 +20,12 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 
+#include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/cgroups-mgr.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
-#include "util/url-coding.h"
 #include "util/os-util.h"
 
 #include "common/names.h"

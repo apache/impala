@@ -34,6 +34,7 @@ add_library(Util
   bit-util.cc
   bloom-filter.cc
   cgroups-mgr.cc
+  coding-util.cc
   codec.cc
   compress.cc
   cpu-info.cc
@@ -79,7 +80,6 @@ add_library(Util
   time.cc
   tuple-row-compare.cc
   url-parser.cc
-  url-coding.cc
 )
 add_dependencies(Util thrift-deps gen_ir_descriptions)
 
@@ -111,7 +111,7 @@ ADD_BE_TEST(benchmark-test)
 ADD_BE_TEST(decompress-test)
 ADD_BE_TEST(metrics-test)
 ADD_BE_TEST(debug-util-test)
-ADD_BE_TEST(url-coding-test)
+ADD_BE_TEST(coding-util-test)
 ADD_BE_TEST(bit-util-test)
 ADD_BE_TEST(rle-test)
 ADD_BE_TEST(blocking-queue-test)

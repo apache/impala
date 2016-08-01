@@ -24,10 +24,10 @@
 #include "service/impala-server.h"
 #include "service/query-exec-state.h"
 #include "thrift/protocol/TDebugProtocol.h"
+#include "util/coding-util.h"
 #include "util/redactor.h"
 #include "util/summary-util.h"
 #include "util/time.h"
-#include "util/url-coding.h"
 #include "util/webserver.h"
 
 #include "common/names.h"

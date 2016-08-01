@@ -29,7 +29,7 @@
 #include "runtime/string-value.inline.h"
 #include "util/impalad-metrics.h"
 #include "runtime/mem-tracker.h"
-#include "util/url-coding.h"
+#include "util/coding-util.h"
 
 #include <vector>
 #include <sstream>

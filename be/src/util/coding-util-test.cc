@@ -18,7 +18,7 @@
 #include <gtest/gtest.h>
 
 #include "common/logging.h"
-#include "util/url-coding.h"
+#include "util/coding-util.h"
 
 #include "common/names.h"
 
@@ -48,11 +48,16 @@ void TestUrl(const string& input, const string& expected_encoded, bool hive_comp
 void TestBase64(const string& input, const string& expected_encoded) {
   string intermediate;
   Base64Encode(input, &intermediate);
-  string output;
   if (!expected_encoded.empty()) {
     EXPECT_EQ(intermediate, expected_encoded);
   }
-  EXPECT_TRUE(Base64Decode(intermediate, &output));
+  int64_t out_max = 0;
+  EXPECT_TRUE(Base64DecodeBufLen(intermediate.c_str(), intermediate.size(), &out_max));
+  string output(out_max, '\0');
+  int64_t out_len = 0;
+  EXPECT_TRUE(Base64Decode(intermediate.c_str(), intermediate.size(),
+        out_max, const_cast<char*>(output.c_str()), &out_len));
+  output.resize(out_len);
   EXPECT_EQ(input, output);
 
   // Convert string to vector and try that also
@@ -93,6 +98,14 @@ TEST(Base64Test, Basic) {
   TestBase64("abcd", "YWJjZA==");
   TestBase64("abcde", "YWJjZGU=");
   TestBase64("abcdef", "YWJjZGVm");
+  TestBase64(string("a\0", 2), "YQA=");
+  TestBase64(string("ab\0", 3), "YWIA");
+  TestBase64(string("abc\0", 4), "YWJjAA==");
+  TestBase64(string("abcd\0", 5), "YWJjZAA=");
+  TestBase64(string("abcde\0", 6), "YWJjZGUA");
+  TestBase64(string("abcdef\0", 7), "YWJjZGVmAA==");
+  TestBase64(string("a\0b", 3), "YQBi");
+  TestBase64(string("a\0b\0", 4), "YQBiAA==");
 }
 
 TEST(HtmlEscapingTest, Basic) {

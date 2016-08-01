@@ -23,13 +23,13 @@
 
 #include "common/object-pool.h"
 #include "rpc/thrift-util.h"
+#include "util/coding-util.h"
 #include "util/compress.h"
 #include "util/container-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/redactor.h"
-#include "util/url-coding.h"
 
 #include "common/names.h"
 
