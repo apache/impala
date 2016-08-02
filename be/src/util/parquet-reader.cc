@@ -32,6 +32,9 @@
 #include <thrift/transport/TBufferTransports.h>
 #pragma clang diagnostic pop
 
+#include "exec/parquet-common.h"
+#include "runtime/mem-pool.h"
+#include "util/codec.h"
 #include "util/rle-encoding.h"
 
 #include "common/names.h"
@@ -127,6 +130,67 @@ string GetSchema(const FileMetaData& md) {
   return ss.str();
 }
 
+// Inherit from RleDecoder to get access to repeat_count_, which is protected.
+class ParquetLevelReader : public impala::RleDecoder {
+ public:
+  ParquetLevelReader(uint8_t* buffer, int buffer_len, int bit_width) :
+    RleDecoder(buffer, buffer_len, bit_width) {}
+
+  uint32_t repeat_count() const { return repeat_count_; }
+};
+
+// Performs sanity checking on the contents of data pages, to ensure that:
+//   - Compressed pages can be uncompressed successfully.
+//   - The number of def levels matches num_values in the page header when using RLE.
+//     Note that this will not catch every instance of Impala writing the wrong number of
+//     def levels - with our RLE scheme it is not possible to determine how many values
+//     were actually written if the final run is a literal run, only if the final run is
+//     a repeated run (see util/rle-encoding.h for more details).
+void CheckDataPage(const ColumnChunk& col, const PageHeader& header,
+    const uint8_t* page) {
+  const uint8_t* data = page;
+  std::vector<uint8_t> decompressed_buffer;
+  if (col.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED) {
+    decompressed_buffer.resize(header.uncompressed_page_size);
+
+    boost::scoped_ptr<impala::Codec> decompressor;
+    impala::Codec::CreateDecompressor(NULL, false,
+        impala::PARQUET_TO_IMPALA_CODEC[col.meta_data.codec], &decompressor);
+
+    uint8_t* buffer_ptr = decompressed_buffer.data();
+    int uncompressed_page_size = header.uncompressed_page_size;
+    impala::Status s = decompressor->ProcessBlock32(true, header.compressed_page_size,
+        data, &uncompressed_page_size, &buffer_ptr);
+    if (!s.ok()) {
+      cerr << "Error: Decompression failed: " << s.GetDetail() << " \n";
+      exit(1);
+    }
+
+    data = decompressed_buffer.data();
+  }
+
+  if (header.data_page_header.definition_level_encoding == parquet::Encoding::RLE) {
+    // Parquet data pages always start with the encoded definition level data, and
+    // RLE sections in Parquet always start with a 4 byte length followed by the data.
+    int num_def_level_bytes = *reinterpret_cast<const int32_t*>(data);
+    ParquetLevelReader def_levels(const_cast<uint8_t*>(data) + sizeof(int32_t),
+        num_def_level_bytes, sizeof(uint8_t));
+    uint8_t level;
+    for (int i = 0; i < header.data_page_header.num_values; ++i) {
+      if (!def_levels.Get(&level)) {
+        cerr << "Error: Decoding of def levels failed.\n";
+        exit(1);
+      }
+
+      if (i + def_levels.repeat_count() + 1 > header.data_page_header.num_values) {
+        cerr << "Error: More def levels encoded (" << (i + def_levels.repeat_count() + 1)
+             << ") than num_values (" << header.data_page_header.num_values << ").\n";
+        exit(1);
+      }
+    }
+  }
+}
+
 // Simple utility to read parquet files on local disk.  This utility validates the
 // file is correctly formed and can output values from each data page.  The
 // entire file is buffered in memory so this is not suitable for very large files.
@@ -183,9 +247,6 @@ int main(int argc, char** argv) {
   int total_uncompressed_data_size = 0;
   vector<int> column_sizes;
 
-  // Buffer to decompress data into.  Reused across pages.
-  vector<char> decompression_buffer;
-
   for (int i = 0; i < file_metadata.row_groups.size(); ++i) {
     cerr << "Reading row group " << i << endl;
     RowGroup& rg = file_metadata.row_groups[i];
@@ -214,6 +275,8 @@ int main(int argc, char** argv) {
         }
 
         data += header_size;
+        if (header.__isset.data_page_header) CheckDataPage(col, header, data);
+
         total_page_header_size += header_size;
         column_sizes[c] += header.compressed_page_size;
         total_compressed_data_size += header.compressed_page_size;

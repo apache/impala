@@ -1,8 +1,14 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted Impala insert tests
 
+import os
 import pytest
 
+from shutil import rmtree
+from subprocess import check_call
+from tempfile import mkdtemp as make_tmp_dir
+
+from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -138,3 +144,41 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
       if size < BLOCK_SIZE * 0.80:
         assert found_small_file == False
         found_small_file = True
+
+class TestHdfsParquetTableWriter(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHdfsParquetTableWriter, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_def_level_encoding(self, vector, unique_database):
+    """IMPALA-3376: Tests that parquet files are written to HDFS correctly by generating a
+    parquet table and running the parquet-reader tool on it, which performs sanity
+    checking, such as that the correct number of definition levels were encoded.
+    """
+    table_name = "test_hdfs_parquet_table_writer"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    self.execute_query("drop table if exists %s" % qualified_table_name)
+    self.execute_query("create table %s stored as parquet as select l_linenumber from "
+        "tpch_parquet.lineitem limit 180000" % qualified_table_name)
+
+    tmp_dir = make_tmp_dir()
+    try:
+      hdfs_file = get_fs_path('/test-warehouse/%s.db/%s/*.parq'
+          % (unique_database, table_name))
+      check_call(['hdfs', 'dfs', '-copyToLocal', hdfs_file, tmp_dir])
+
+      for root, subdirs, files in os.walk(tmp_dir):
+        for f in files:
+          if not f.endswith('parq'):
+            continue
+          check_call([os.path.join(impalad_basedir, 'util/parquet-reader'), '--file',
+              os.path.join(tmp_dir, str(f))])
+    finally:
+      self.execute_query("drop table %s" % qualified_table_name)
+      rmtree(tmp_dir)

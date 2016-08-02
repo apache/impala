@@ -176,6 +176,7 @@ class RleEncoder {
   /// Returns pointer to underlying buffer
   uint8_t* buffer() { return bit_writer_.buffer(); }
   int32_t len() { return bit_writer_.bytes_written(); }
+  bool buffer_full() const { return buffer_full_; }
 
  private:
   /// Flushes any buffered values.  If this is part of a repeated run, this is largely

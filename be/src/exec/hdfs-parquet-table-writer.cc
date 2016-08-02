@@ -369,30 +369,35 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
   void* value = expr_ctx_->GetValue(row);
   if (current_page_ == NULL) NewPage();
 
-  // We might need to try again if this current page is not big enough
-  while (true) {
-    if (!def_levels_->Put(value != NULL)) {
-      FinalizeCurrentPage();
-      NewPage();
-      bool ret = def_levels_->Put(value != NULL);
-      DCHECK(ret);
-    }
+  // Ensure that we have enough space for the definition level, but don't write it yet in
+  // case we don't have enough space for the value.
+  if (def_levels_->buffer_full()) {
+    FinalizeCurrentPage();
+    NewPage();
+  }
 
+  // Encoding may fail for several reasons - because the current page is not big enough,
+  // because we've encoded the maximum number of unique dictionary values and need to
+  // switch to plain encoding, etc. so we may need to try again more than once.
+  // TODO: Have a clearer set of state transitions here, to make it easier to see that
+  // this won't loop forever.
+  while (true) {
     // Nulls don't get encoded.
     if (value == NULL) break;
-    ++current_page_->num_non_null;
 
     int64_t bytes_needed = 0;
-    if (EncodeValue(value, &bytes_needed)) break;
+    if (EncodeValue(value, &bytes_needed)) {
+      ++current_page_->num_non_null;
+      break;
+    }
 
     // Value didn't fit on page, try again on a new page.
     FinalizeCurrentPage();
 
-    // Check how much space it is needed to write this value. If that is larger than the
+    // Check how much space is needed to write this value. If that is larger than the
     // page size then increase page size and try again.
     if (UNLIKELY(bytes_needed > page_size_)) {
-      page_size_ = bytes_needed;
-      if (page_size_ > MAX_DATA_PAGE_SIZE) {
+      if (bytes_needed > MAX_DATA_PAGE_SIZE) {
         stringstream ss;
         ss << "Cannot write value of size "
            << PrettyPrinter::Print(bytes_needed, TUnit::BYTES) << " bytes to a Parquet "
@@ -400,11 +405,19 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
            << PrettyPrinter::Print(MAX_DATA_PAGE_SIZE , TUnit::BYTES) << ".";
         return Status(ss.str());
       }
+      page_size_ = bytes_needed;
       values_buffer_len_ = page_size_;
       values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
     }
     NewPage();
   }
+
+  // Now that the value has been successfully written, write the definition level.
+  bool ret = def_levels_->Put(value != NULL);
+  // Writing the def level will succeed because we ensured there was enough space for it
+  // above, and new pages will always have space for at least a single def level.
+  DCHECK(ret);
+
   ++current_page_->header.data_page_header.num_values;
   return Status::OK();
 }
