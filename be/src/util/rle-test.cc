@@ -31,7 +31,7 @@
 
 namespace impala {
 
-const int MAX_WIDTH = 32;
+const int MAX_WIDTH = BitReader::MAX_BITWIDTH;
 
 TEST(BitArray, TestBool) {
   const int len = 8;

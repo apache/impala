@@ -35,6 +35,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
+#include "runtime/scoped-buffer.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
@@ -78,6 +79,7 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     // Compute the offset of the file footer.
     int64_t footer_size = min(FOOTER_SIZE, files[i]->file_length);
     int64_t footer_start = files[i]->file_length - footer_size;
+    DCHECK_GE(footer_start, 0);
 
     // Try to find the split with the footer.
     DiskIoMgr::ScanRange* footer_split = FindFooterSplit(files[i]);
@@ -311,6 +313,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch, bool* eos) {
       return Status::OK();
     }
     assemble_rows_timer_.Start();
+    DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
     int rows_remaining = file_metadata_.num_rows - row_group_rows_read_;
     int max_tuples = min(row_batch->capacity(), rows_remaining);
     TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
@@ -496,7 +499,14 @@ Status HdfsParquetScanner::AssembleRows(
         return Status::OK();
       }
       // Check that all column readers populated the same number of values.
-      if (c != 0) DCHECK_EQ(last_num_tuples, scratch_batch_->num_tuples);
+      if (c != 0 && UNLIKELY(last_num_tuples != scratch_batch_->num_tuples)) {
+        parse_status_.MergeStatus(Substitute("Corrupt Parquet file '$0': column '$1' "
+            "had $2 remaining values but expected $3", filename(),
+            col_reader->schema_element().name, last_num_tuples,
+            scratch_batch_->num_tuples));
+        *skip_row_group = true;
+        return Status::OK();
+      }
       last_num_tuples = scratch_batch_->num_tuples;
     }
     row_group_rows_read_ += scratch_batch_->num_tuples;
@@ -788,7 +798,7 @@ Status HdfsParquetScanner::ProcessFooter() {
   uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
   // If the metadata was too big, we need to stitch it before deserializing it.
   // In that case, we stitch the data in this buffer.
-  vector<uint8_t> metadata_buffer;
+  ScopedBuffer metadata_buffer(scan_node_->mem_tracker());
 
   DCHECK(metadata_range_ != NULL);
   if (UNLIKELY(metadata_size > remaining_bytes_buffered)) {
@@ -803,7 +813,7 @@ Status HdfsParquetScanner::ProcessFooter() {
       sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
     int64_t metadata_bytes_to_read = metadata_size;
     if (metadata_start < 0) {
-      return Status(Substitute("File $0 is invalid. Invalid metadata size in file "
+      return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
           "footer: $1 bytes. File size: $2 bytes.", filename(), metadata_size,
           file_desc->file_length));
     }
@@ -812,8 +822,12 @@ Status HdfsParquetScanner::ProcessFooter() {
     // TODO: consider moving this stitching into the scanner context. The scanner
     // context usually handles the stitching but no other scanner need this logic
     // now.
-    metadata_buffer.resize(metadata_size);
-    metadata_ptr = &metadata_buffer[0];
+
+    if (!metadata_buffer.TryAllocate(metadata_size)) {
+      return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
+          "metadata for file '$1'.", metadata_size, filename()));
+    }
+    metadata_ptr = metadata_buffer.buffer();
     int64_t copy_offset = 0;
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
@@ -855,6 +869,10 @@ Status HdfsParquetScanner::ProcessFooter() {
   if (file_metadata_.row_groups.empty()) {
     return Status(
         Substitute("Invalid file. This file: $0 has no row groups", filename()));
+  }
+  if (file_metadata_.num_rows < 0) {
+    return Status(Substitute("Corrupt Parquet file '$0': negative row count $1 in "
+        "file metadata", filename(), file_metadata_.num_rows));
   }
   return Status::OK();
 }

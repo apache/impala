@@ -88,14 +88,14 @@ class RleDecoder {
       repeat_count_(0),
       literal_count_(0) {
     DCHECK_GE(bit_width_, 0);
-    DCHECK_LE(bit_width_, 64);
+    DCHECK_LE(bit_width_, BitReader::MAX_BITWIDTH);
   }
 
   RleDecoder() : bit_width_(-1) {}
 
   void Reset(uint8_t* buffer, int buffer_len, int bit_width) {
     DCHECK_GE(bit_width, 0);
-    DCHECK_LE(bit_width, 64);
+    DCHECK_LE(bit_width, BitReader::MAX_BITWIDTH);
     bit_reader_.Reset(buffer, buffer_len);
     bit_width_ = bit_width;
     current_value_ = 0;
@@ -262,8 +262,7 @@ inline bool RleDecoder::Get(T* val) {
     --repeat_count_;
   } else {
     DCHECK_GT(literal_count_, 0);
-    bool result = bit_reader_.GetValue(bit_width_, val);
-    DCHECK(result);
+    if (UNLIKELY(!bit_reader_.GetValue(bit_width_, val))) return false;
     --literal_count_;
   }
 
@@ -275,8 +274,7 @@ bool RleDecoder::NextCounts() {
   // Read the next run's indicator int, it could be a literal or repeated run.
   // The int is encoded as a vlq-encoded value.
   int32_t indicator_value = 0;
-  bool result = bit_reader_.GetVlqInt(&indicator_value);
-  if (!result) return false;
+  if (UNLIKELY(!bit_reader_.GetVlqInt(&indicator_value))) return false;
 
   // lsb indicates if it is a literal run or repeated run
   bool is_literal = indicator_value & 1;

@@ -114,6 +114,7 @@ Status GzipCompressor::Compress(int64_t input_length, const uint8_t* input,
 Status GzipCompressor::ProcessBlock(bool output_preallocated,
     int64_t input_length, const uint8_t* input, int64_t* output_length,
     uint8_t** output) {
+  DCHECK_GE(input_length, 0);
   DCHECK(!output_preallocated || (output_preallocated && *output_length > 0));
   int64_t max_compressed_len = MaxOutputLen(input_length);
   if (!output_preallocated) {
@@ -146,6 +147,7 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated, int64_t input_leng
   // The bz2 library does not allow input to be NULL, even when input_length is 0. This
   // should be OK because we do not write any file formats that support bzip compression.
   DCHECK(input != NULL);
+  DCHECK_GE(input_length, 0);
 
   if (output_preallocated) {
     buffer_length_ = *output_length;
@@ -201,6 +203,7 @@ int64_t SnappyBlockCompressor::MaxOutputLen(int64_t input_len, const uint8_t* in
 Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
     int64_t input_length, const uint8_t* input, int64_t *output_length,
     uint8_t** output) {
+  DCHECK_GE(input_length, 0);
   // Hadoop uses a block compression scheme on top of snappy.  First there is
   // an integer which is the size of the decompressed data followed by a
   // sequence of compressed blocks each preceded with an integer size.
@@ -252,6 +255,7 @@ int64_t SnappyCompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) 
 
 Status SnappyCompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
+  DCHECK_GE(input_length, 0);
   int64_t max_compressed_len = MaxOutputLen(input_length);
   if (output_preallocated && *output_length < max_compressed_len) {
     return Status("SnappyCompressor::ProcessBlock: output length too small");
@@ -292,6 +296,7 @@ int64_t Lz4Compressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
 
 Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_length,
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
+  DCHECK_GE(input_length, 0);
   CHECK(output_preallocated) << "Output was not allocated for Lz4 Codec";
   if (input_length == 0) return Status::OK();
   *output_length = LZ4_compress(reinterpret_cast<const char*>(input),

@@ -62,6 +62,7 @@ const string PARQUET_MEM_LIMIT_EXCEEDED = "HdfsParquetScanner::$0() failed to al
 Status ParquetLevelDecoder::Init(const string& filename,
     parquet::Encoding::type encoding, MemPool* cache_pool, int cache_size,
     int max_level, int num_buffered_values, uint8_t** data, int* data_size) {
+  DCHECK_GE(num_buffered_values, 0);
   encoding_ = encoding;
   max_level_ = max_level;
   num_buffered_values_ = num_buffered_values;
@@ -95,7 +96,10 @@ Status ParquetLevelDecoder::Init(const string& filename,
       return Status(ss.str());
     }
   }
-  DCHECK_GT(num_bytes, 0);
+  if (UNLIKELY(num_bytes < 0 || num_bytes > *data_size)) {
+    return Status(Substitute("Corrupt Parquet file '$0': $1 bytes of encoded levels but "
+        "only $2 bytes left in page", filename, num_bytes, data_size));
+  }
   *data += num_bytes;
   *data_size -= num_bytes;
   return Status::OK();
@@ -404,6 +408,8 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   }
 
   virtual Status InitDataPage(uint8_t* data, int size) {
+    // Data can be empty if the column contains all NULLs
+    DCHECK_GE(size, 0);
     page_encoding_ = current_page_header_.data_page_header.encoding;
     if (page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY &&
         page_encoding_ != parquet::Encoding::PLAIN) {
@@ -419,7 +425,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       if (!dict_decoder_init_) {
         return Status("File corrupt. Missing dictionary page.");
       }
-      dict_decoder_.SetData(data, size);
+      RETURN_IF_ERROR(dict_decoder_.SetData(data, size));
     }
 
     // TODO: Perform filter selectivity checks here.
@@ -757,6 +763,15 @@ Status BaseScalarColumnReader::ReadDataPage() {
 
     int data_size = current_page_header_.compressed_page_size;
     int uncompressed_size = current_page_header_.uncompressed_page_size;
+    if (UNLIKELY(data_size < 0)) {
+      return Status(Substitute("Corrupt Parquet file '$0': negative page size $1 for "
+          "column '$2'", filename(), data_size, schema_element().name));
+    }
+    if (UNLIKELY(uncompressed_size < 0)) {
+      return Status(Substitute("Corrupt Parquet file '$0': negative uncompressed page "
+          "size $1 for column '$2'", filename(), uncompressed_size,
+          schema_element().name));
+    }
 
     if (current_page_header_.type == parquet::PageType::DICTIONARY_PAGE) {
       if (slot_desc_ == NULL) {
@@ -853,7 +868,12 @@ Status BaseScalarColumnReader::ReadDataPage() {
     // statistics. See IMPALA-2208 and PARQUET-251.
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
     data_end_ = data_ + data_size;
-    num_buffered_values_ = current_page_header_.data_page_header.num_values;
+    int num_values = current_page_header_.data_page_header.num_values;
+    if (num_values < 0) {
+      return Status(Substitute("Error reading data page in Parquet file '$0'. "
+          "Invalid number of values in metadata: $1", filename(), num_values));
+    }
+    num_buffered_values_ = num_values;
     num_values_read_ += num_buffered_values_;
 
     if (decompressor_.get() != NULL) {
@@ -902,7 +922,7 @@ Status BaseScalarColumnReader::ReadDataPage() {
         max_def_level(), num_buffered_values_, &data_, &data_size));
 
     // Data can be empty if the column contains all NULLs
-    if (data_size != 0) RETURN_IF_ERROR(InitDataPage(data_, data_size));
+    RETURN_IF_ERROR(InitDataPage(data_, data_size));
     break;
   }
 
@@ -920,6 +940,14 @@ bool BaseScalarColumnReader::NextLevels() {
 
   // Definition level is not present if column and any containing structs are required.
   def_level_ = max_def_level() == 0 ? 0 : def_levels_.ReadLevel();
+  // The compiler can optimize these two conditions into a single branch by treating
+  // def_level_ as unsigned.
+  if (UNLIKELY(def_level_ < 0 || def_level_ > max_def_level())) {
+    parent_->parse_status_.MergeStatus(Status(Substitute("Corrupt Parquet file '$0': "
+        "invalid def level $1 > max def level $2 for column '$3'", filename(),
+        def_level_, max_def_level(), schema_element().name)));
+    return false;
+  }
 
   if (ADVANCE_REP_LEVEL && max_rep_level() > 0) {
     // Repetition level is only present if this column is nested in any collection type.

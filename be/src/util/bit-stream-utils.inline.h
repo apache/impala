@@ -25,7 +25,7 @@ namespace impala {
 
 inline bool BitWriter::PutValue(uint64_t v, int num_bits) {
   // TODO: revisit this limit if necessary (can be raised to 64 by fixing some edge cases)
-  DCHECK_LE(num_bits, 32);
+  DCHECK_LE(num_bits, MAX_BITWIDTH);
   DCHECK_EQ(v >> num_bits, 0) << "v = " << v << ", num_bits = " << num_bits;
 
   if (UNLIKELY(byte_offset_ * 8 + bit_offset_ + num_bits > max_bytes_ * 8)) return false;
@@ -88,7 +88,7 @@ template<typename T>
 inline bool BitReader::GetValue(int num_bits, T* v) {
   DCHECK(buffer_ != NULL);
   // TODO: revisit this limit if necessary
-  DCHECK_LE(num_bits, 32);
+  DCHECK_LE(num_bits, MAX_BITWIDTH);
   DCHECK_LE(num_bits, sizeof(T) * 8);
 
   if (UNLIKELY(byte_offset_ * 8 + bit_offset_ + num_bits > max_bytes_ * 8)) return false;
@@ -140,13 +140,12 @@ inline bool BitReader::GetAligned(int num_bytes, T* v) {
 inline bool BitReader::GetVlqInt(int32_t* v) {
   *v = 0;
   int shift = 0;
-  int num_bytes = 0;
   uint8_t byte = 0;
   do {
+    if (UNLIKELY(shift >= MAX_VLQ_BYTE_LEN * 7)) return false;
     if (!GetAligned<uint8_t>(1, &byte)) return false;
     *v |= (byte & 0x7F) << shift;
     shift += 7;
-    DCHECK_LE(++num_bytes, MAX_VLQ_BYTE_LEN);
   } while ((byte & 0x80) != 0);
   return true;
 }

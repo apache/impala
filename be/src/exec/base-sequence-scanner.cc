@@ -200,7 +200,10 @@ Status BaseSequenceScanner::ReadSync() {
   uint8_t* hash;
   int64_t out_len;
   RETURN_IF_FALSE(stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_));
-  if (out_len != SYNC_HASH_SIZE || memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
+  if (out_len != SYNC_HASH_SIZE) {
+    return Status(Substitute("Hit end of stream after reading $0 bytes of $1-byte "
+        "synchronization marker", out_len, SYNC_HASH_SIZE));
+  } else if (memcmp(hash, header_->sync, SYNC_HASH_SIZE) != 0) {
     stringstream ss;
     ss  << "Bad synchronization marker" << endl
         << "  Expected: '"

@@ -56,30 +56,39 @@ Status ParquetMetadataUtils::ValidateColumnOffsets(const string& filename,
     int64_t file_length, const parquet::RowGroup& row_group) {
   for (int i = 0; i < row_group.columns.size(); ++i) {
     const parquet::ColumnChunk& col_chunk = row_group.columns[i];
+    RETURN_IF_ERROR(ValidateOffsetInFile(filename, i, file_length,
+        col_chunk.meta_data.data_page_offset, "data page offset"));
     int64_t col_start = col_chunk.meta_data.data_page_offset;
     // The file format requires that if a dictionary page exists, it be before data pages.
     if (col_chunk.meta_data.__isset.dictionary_page_offset) {
+      RETURN_IF_ERROR(ValidateOffsetInFile(filename, i, file_length,
+            col_chunk.meta_data.dictionary_page_offset, "dictionary page offset"));
       if (col_chunk.meta_data.dictionary_page_offset >= col_start) {
-        stringstream ss;
-        ss << "File " << filename << ": metadata is corrupt. "
-            << "Dictionary page (offset=" << col_chunk.meta_data.dictionary_page_offset
-            << ") must come before any data pages (offset=" << col_start << ").";
-        return Status(ss.str());
+        return Status(Substitute("Parquet file '$0': metadata is corrupt. Dictionary "
+            "page (offset=$1) must come before any data pages (offset=$2).",
+            filename, col_chunk.meta_data.dictionary_page_offset, col_start));
       }
       col_start = col_chunk.meta_data.dictionary_page_offset;
     }
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
     int64_t col_end = col_start + col_len;
     if (col_end <= 0 || col_end > file_length) {
-      stringstream ss;
-      ss << "File " << filename << ": metadata is corrupt. "
-          << "Column " << i << " has invalid column offsets "
-          << "(offset=" << col_start << ", size=" << col_len << ", "
-          << "file_size=" << file_length << ").";
-      return Status(ss.str());
+      return Status(Substitute("Parquet file '$0': metadata is corrupt. Column $1 has "
+          "invalid column offsets (offset=$2, size=$3, file_size=$4).", filename, i,
+          col_start, col_len, file_length));
     }
   }
   return Status::OK();
+}
+
+Status ParquetMetadataUtils::ValidateOffsetInFile(const string& filename, int col_idx,
+    int64_t file_length, int64_t offset, const string& offset_name) {
+  if (offset < 0 || offset >= file_length) {
+    return Status(Substitute("File '$0': metadata is corrupt. Column $1 has invalid "
+        "$2 (offset=$3 file_size=$4).", filename, col_idx, offset_name, offset,
+        file_length));
+  }
+  return Status::OK();;
 }
 
 static bool IsEncodingSupported(parquet::Encoding::type e) {
@@ -128,8 +137,10 @@ Status ParquetMetadataUtils::ValidateColumn(const parquet::FileMetaData& file_me
   if (slot_desc == NULL) return Status::OK();
 
   parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
-  DCHECK_EQ(type, file_data.meta_data.type)
-      << "Should have been validated in ResolvePath()";
+  if (UNLIKELY(type != file_data.meta_data.type)) {
+    return Status(Substitute("Unexpected Parquet type in file '$0' metadata expected $1 "
+        "actual $2: file may be corrupt", filename, type, file_data.meta_data.type));
+  }
 
   // Check the decimal scale in the file matches the metastore scale and precision.
   // We fail the query if the metadata makes it impossible for us to safely read
@@ -318,7 +329,7 @@ Status ParquetSchemaResolver::CreateSchemaTree(
     int ira_def_level, int* idx, int* col_idx, SchemaNode* node)
     const {
   if (*idx >= schema.size()) {
-    return Status(Substitute("File $0 corrupt: could not reconstruct schema tree from "
+    return Status(Substitute("File '$0' corrupt: could not reconstruct schema tree from "
             "flattened schema in file metadata", filename_));
   }
   node->element = &schema[*idx];
@@ -329,6 +340,14 @@ Status ParquetSchemaResolver::CreateSchemaTree(
     // file_metadata_.row_groups.columns
     node->col_idx = *col_idx;
     ++(*col_idx);
+  } else if (node->element->num_children > SCHEMA_NODE_CHILDREN_SANITY_LIMIT) {
+    // Sanity-check the schema to avoid allocating absurdly large buffers below.
+    return Status(Substitute("Schema in Parquet file '$0' has $1 children, more than limit of "
+        "$2. File is likely corrupt", filename_, node->element->num_children,
+        SCHEMA_NODE_CHILDREN_SANITY_LIMIT));
+  } else if (node->element->num_children < 0) {
+    return Status(Substitute("Corrupt Parquet file '$0': schema element has $1 children.",
+        filename_, node->element->num_children));
   }
 
   // def_level_of_immediate_repeated_ancestor does not include this node, so set before

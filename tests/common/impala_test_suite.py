@@ -512,6 +512,16 @@ class ImpalaTestSuite(BaseTestSuite):
     self.hive_client.drop_table(db_name, table_name, True)
     self.hive_client.create_table(table)
 
+  def _get_table_location(self, table_name, vector):
+    """ Returns the HDFS location of the table """
+    result = self.execute_query_using_client(self.client,
+        "describe formatted %s" % table_name, vector)
+    for row in result.data:
+      if 'Location:' in row:
+        return row.split('\t')[1]
+    # This should never happen.
+    assert 0, 'Unable to get location for table: ' + table_name
+
   def run_stmt_in_hive(self, stmt):
     """
     Run a statement in Hive, returning stdout if successful and throwing

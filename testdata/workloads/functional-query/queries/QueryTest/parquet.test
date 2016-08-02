@@ -28,7 +28,7 @@ Invalid metadata size in file footer
 # Parquet file with invalid column dict_page_offset.
 SELECT * from bad_dict_page_offset
 ---- CATCH
-Column 0 has invalid column offsets (offset=10000, size=47, file_size=249)
+Column 0 has invalid data page offset (offset=100001 file_size=249)
 ====
 ---- QUERY
 # Parquet file with invalid column total_compressed_size.

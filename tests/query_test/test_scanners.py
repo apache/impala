@@ -117,15 +117,6 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(\
         lambda v: v.get_value('table_format').file_format != 'avro')
 
-  def _get_table_location(self, table_name, vector):
-    result = self.execute_query_using_client(self.client,
-        "describe formatted %s" % table_name, vector)
-    for row in result.data:
-      if 'Location:' in row:
-        return row.split('\t')[1]
-    # This should never happen.
-    assert 0, 'Unable to get location for table: ' + table_name
-
   def _create_test_table(self, vector):
     """
     Creates the test table

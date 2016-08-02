@@ -25,6 +25,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
+#include "testutil/test-macros.h"
 #include "util/dict-encoding.h"
 
 #include "common/names.h"
@@ -53,7 +54,7 @@ void ValidateDict(const vector<T>& values, int fixed_buffer_byte_size) {
   DictDecoder<T> decoder;
   ASSERT_TRUE(
       decoder.Reset(dict_buffer, encoder.dict_encoded_size(), fixed_buffer_byte_size));
-  decoder.SetData(data_buffer, data_len);
+  ASSERT_OK(decoder.SetData(data_buffer, data_len));
   for (T i: values) {
     T j;
     decoder.GetValue(&j);

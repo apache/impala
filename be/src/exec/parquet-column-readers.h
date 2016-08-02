@@ -428,7 +428,9 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   virtual void ClearDictionaryDecoder() = 0;
 
   /// Initializes the reader with the data contents. This is the content for the entire
-  /// decompressed data page. Decoders can initialize state from here.
+  /// decompressed data page. Decoders can initialize state from here. The caller must
+  /// validate the input such that 'size' is non-negative and that 'data' has at least
+  /// 'size' bytes remaining.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
  private:

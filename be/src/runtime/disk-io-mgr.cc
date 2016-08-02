@@ -519,10 +519,13 @@ int64_t DiskIoMgr::GetReadThroughput() {
 Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
   int disk_id = range->disk_id_;
   if (disk_id < 0 || disk_id >= disk_queues_.size()) {
-    stringstream ss;
-    ss << "Invalid scan range.  Bad disk id: " << disk_id;
-    DCHECK(false) << ss.str();
-    return Status(ss.str());
+    return Status(Substitute("Invalid scan range.  Bad disk id: $0", disk_id));
+  }
+  if (range->offset_ < 0) {
+    return Status(Substitute("Invalid scan range. Negative offset $0", range->offset_));
+  }
+  if (range->len_ < 0) {
+    return Status(Substitute("Invalid scan range. Negative length $0", range->len_));
   }
   return Status::OK();
 }

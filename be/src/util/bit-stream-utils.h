@@ -77,6 +77,9 @@ class BitWriter {
   /// to the next byte boundary.
   void Flush(bool align=false);
 
+  /// Maximum supported bitwidth for writer.
+  static const int MAX_BITWIDTH = 32;
+
  private:
   uint8_t* buffer_;
   int max_bytes_;
@@ -123,7 +126,8 @@ class BitReader {
   bool GetAligned(int num_bytes, T* v);
 
   /// Reads a vlq encoded int from the stream.  The encoded int must start at the
-  /// beginning of a byte. Return false if there were not enough bytes in the buffer.
+  /// beginning of a byte. Return false if there were not enough bytes in the buffer or
+  /// the int is invalid.
   bool GetVlqInt(int32_t* v);
 
   /// Returns the number of bytes left in the stream, not including the current byte (i.e.,
@@ -132,6 +136,9 @@ class BitReader {
 
   /// Maximum byte length of a vlq encoded int
   static const int MAX_VLQ_BYTE_LEN = 5;
+
+  /// Maximum supported bitwidth for reader.
+  static const int MAX_BITWIDTH = 32;
 
  private:
   uint8_t* buffer_;

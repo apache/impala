@@ -23,6 +23,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "gutil/bits.h"
+#include "gutil/strings/substitute.h"
 #include "exec/parquet-common.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
@@ -166,14 +167,20 @@ class DictEncoder : public DictEncoderBase {
 /// by the caller and valid as long as this object is.
 class DictDecoderBase {
  public:
-  /// The rle encoded indices into the dictionary.
-  void SetData(uint8_t* buffer, int buffer_len) {
-    DCHECK_GT(buffer_len, 0);
+  /// The rle encoded indices into the dictionary. Returns an error status if the buffer
+  /// is too short or the bit_width metadata in the buffer is invalid.
+  Status SetData(uint8_t* buffer, int buffer_len) {
+    DCHECK_GE(buffer_len, 0);
+    if (UNLIKELY(buffer_len == 0)) return Status("Dictionary cannot be 0 bytes");
     uint8_t bit_width = *buffer;
-    DCHECK_GE(bit_width, 0);
+    if (UNLIKELY(bit_width < 0 || bit_width > BitReader::MAX_BITWIDTH)) {
+      return Status(strings::Substitute("Dictionary has invalid or unsupported bit "
+          "width: $0", bit_width));
+    }
     ++buffer;
     --buffer_len;
     data_decoder_.Reset(buffer, buffer_len, bit_width);
+    return Status::OK();
   }
 
   virtual ~DictDecoderBase() {}

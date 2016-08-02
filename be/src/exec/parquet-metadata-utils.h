@@ -39,6 +39,11 @@ class ParquetMetadataUtils {
   static Status ValidateColumnOffsets(const string& filename, int64_t file_length,
       const parquet::RowGroup& row_group);
 
+  /// Check that a file offset is in the file. Return an error status with a detailed
+  /// error message if it is not.
+  static Status ValidateOffsetInFile(const std::string& filename, int col_idx,
+      int64_t file_length, int64_t offset, const std::string& offset_name);
+
   /// Validates the column metadata to make sure this column is supported (e.g. encoding,
   /// type, etc) and matches the type of given slot_desc.
   static Status ValidateColumn(const parquet::FileMetaData& file_metadata,
@@ -144,6 +149,10 @@ class ParquetSchemaResolver {
       bool* missing_field) const;
 
  private:
+  /// An arbitrary limit on the number of children per schema node we support.
+  /// Used to sanity-check Parquet schemas.
+  static const int SCHEMA_NODE_CHILDREN_SANITY_LIMIT = 64 * 1024;
+
   /// Unflattens the schema metadata from a Parquet file metadata and converts it to our
   /// SchemaNode representation. Returns the result in 'node' unless an error status is
   /// returned. Does not set the slot_desc field of any SchemaNode.
