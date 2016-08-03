@@ -137,8 +137,8 @@ void CpuInfo::Init() {
 
 void CpuInfo::VerifyCpuRequirements() {
   if (!CpuInfo::IsSupported(CpuInfo::SSSE3)) {
-    LOG(ERROR) << "CPU does not support the Supplemental SSE3 (SSSE3) instruction set, "
-               << "which is required. Exiting if Supplemental SSE3 is not functional...";
+    LOG(ERROR) << "CPU does not support the Supplemental SSE3 (SSSE3) instruction set. "
+               << "This setup is generally unsupported and Impala might be unstable.";
   }
 }
 
