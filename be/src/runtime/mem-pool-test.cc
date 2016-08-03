@@ -420,6 +420,73 @@ TEST(MemPoolTest, FragmentationOverhead) {
   p.FreeAll();
 }
 
+/// Test interaction between returning a full allocation and transferring chunks.
+TEST(MemPoolTest, ReturnAllocationThenTransfer) {
+  MemTracker tracker;
+  MemPool src(&tracker);
+  MemPool dst(&tracker);
+
+  const int64_t alloc_size = 1L * 1024 * 1024;
+  uint8_t* mem = src.Allocate(alloc_size);
+  ASSERT_TRUE(mem != NULL);
+
+  src.ReturnPartialAllocation(alloc_size);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(&src, true));
+
+  // IMPALA-3946: this would hit a DCHECK because the current chunk was empty.
+  dst.AcquireData(&src, true);
+  ASSERT_EQ(0, dst.GetTotalChunkSizes()); // Src chunk shouldn't be transferred.
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(&dst, true));
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(&src, true));
+  src.FreeAll();
+  dst.FreeAll();
+}
+
+/// Test that making a large allocation that doesn't fit in the current chunk after
+/// returning a full allocation works correctly.
+TEST(MemPoolTest, ReturnAllocationThenLargeAllocation) {
+  MemTracker tracker;
+  MemPool src(&tracker);
+
+  const int64_t alloc_size = 1L * 1024 * 1024;
+  uint8_t* mem = src.Allocate(alloc_size);
+  ASSERT_TRUE(mem != NULL);
+
+  src.ReturnPartialAllocation(alloc_size);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(&src, true));
+
+  // IMPALA-3946: chunks ended in invalid order because the first chunk was empty.
+  // This resulted in the the integrity check failing.
+  mem = src.Allocate(alloc_size + 1);
+  ASSERT_TRUE(mem != NULL);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(&src, false));
+  src.FreeAll();
+}
+
+/// Test that making a large allocation that fails after returning a full allocation works
+/// correctly.
+TEST(MemPoolTest, ReturnAllocationThenFailedAllocation) {
+  const int64_t alloc_size = 1L * 1024 * 1024;
+  const int64_t mem_limit = alloc_size * 10;
+  MemTracker tracker(mem_limit);
+  MemPool src(&tracker);
+
+  uint8_t* mem;
+  // Allocate two chunks then clear them so they are empty.
+  for (int i = 0; i < 2; ++i) {
+    mem = src.Allocate(alloc_size);
+    ASSERT_TRUE(mem != NULL);
+  }
+  src.Clear();
+
+  // IMPALA-3946: chunk index wasn't reset correctly to before the empty chunks when an
+  // allocation failed. This resulted in the the integrity check failing.
+  mem = src.TryAllocate(mem_limit);
+  ASSERT_TRUE(mem == NULL);
+  ASSERT_TRUE(MemPoolTest::CheckIntegrity(&src, false));
+  src.FreeAll();
+}
+
 }
 
 int main(int argc, char **argv) {

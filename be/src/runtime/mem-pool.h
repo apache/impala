@@ -45,10 +45,17 @@ class MemTracker;
 /// recently added; if that chunk doesn't have enough memory to
 /// satisfy the allocation request, the free chunks are searched for one that is
 /// big enough otherwise a new chunk is added to the list.
-/// The current_chunk_idx_ always points to the last chunk with allocated memory.
 /// In order to keep allocation overhead low, chunk sizes double with each new one
 /// added, until they hit a maximum size.
-//
+///
+/// Allocated chunks can be reused for new allocations if Clear() is called to free
+/// all allocations or ReturnPartialAllocation() is called to return part of the last
+/// allocation.
+///
+/// All chunks before 'current_chunk_idx_' have allocated memory, while all chunks
+/// after 'current_chunk_idx_' are free. The chunk at 'current_chunk_idx_' may or may
+/// not have allocated memory.
+///
 ///     Example:
 ///     MemPool* p = new MemPool();
 ///     for (int i = 0; i < 1024; ++i) {
@@ -173,8 +180,9 @@ class MemPool {
 
   /// chunk from which we served the last Allocate() call;
   /// always points to the last chunk that contains allocated data;
-  /// chunks 0..current_chunk_idx_ are guaranteed to contain data
-  /// (chunks_[i].allocated_bytes > 0 for i: 0..current_chunk_idx_);
+  /// chunks 0..current_chunk_idx_ - 1 are guaranteed to contain data
+  /// (chunks_[i].allocated_bytes > 0 for i: 0..current_chunk_idx_ - 1);
+  /// chunks after 'current_chunk_idx_' are "free chunks" that contain no data.
   /// -1 if no chunks present
   int current_chunk_idx_;
 
@@ -205,8 +213,9 @@ class MemPool {
 
   /// Check integrity of the supporting data structures; always returns true but DCHECKs
   /// all invariants.
-  /// If 'current_chunk_empty' is false, checks that the current chunk contains data.
-  bool CheckIntegrity(bool current_chunk_empty);
+  /// If 'check_current_chunk_empty' is true, checks that the current chunk contains no
+  /// data. Otherwise the current chunk can be either empty or full.
+  bool CheckIntegrity(bool check_current_chunk_empty);
 
   /// Return offset to unoccupied space in current chunk.
   int64_t GetFreeOffset() const {
