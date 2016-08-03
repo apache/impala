@@ -24,6 +24,7 @@
 #include "common/init.h"
 #include "runtime/tmp-file-mgr.h"
 #include "service/fe-support.h"
+#include "testutil/test-macros.h"
 #include "util/filesystem-util.h"
 #include "util/metrics.h"
 
@@ -62,6 +63,12 @@ class TmpFileMgrTest : public ::testing::Test {
     }
   }
 
+  void RemoveAndCreateDirs(const vector<string>& dirs) {
+    for (const string& dir: dirs) {
+      ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(dir));
+    }
+  }
+
   scoped_ptr<MetricGroup> metrics_;
 };
 
@@ -69,15 +76,15 @@ class TmpFileMgrTest : public ::testing::Test {
 /// at the expected file offsets and expands the temporary file to the correct size.
 TEST_F(TmpFileMgrTest, TestFileAllocation) {
   TmpFileMgr tmp_file_mgr;
-  EXPECT_TRUE(tmp_file_mgr.Init(metrics_.get()).ok());
+  ASSERT_OK(tmp_file_mgr.Init(metrics_.get()));
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr);
   // Default configuration should give us one temporary device.
   EXPECT_EQ(1, tmp_file_mgr.num_active_tmp_devices());
   vector<TmpFileMgr::DeviceId> tmp_devices = tmp_file_mgr.active_tmp_devices();
   EXPECT_EQ(1, tmp_devices.size());
   TUniqueId id;
   TmpFileMgr::File *file;
-  Status status = tmp_file_mgr.GetFile(tmp_devices[0], id, &file);
-  EXPECT_TRUE(status.ok());
+  ASSERT_OK(file_group.NewFile(tmp_devices[0], id, &file));
   EXPECT_TRUE(file != NULL);
   // Apply writes of variable sizes and check space was allocated correctly.
   int64_t write_sizes[] = {
@@ -87,15 +94,13 @@ TEST_F(TmpFileMgrTest, TestFileAllocation) {
   int64_t next_offset = 0;
   for (int i = 0; i < num_write_sizes; ++i) {
     int64_t offset;
-    status = file->AllocateSpace(write_sizes[i], &offset);
-    EXPECT_TRUE(status.ok());
+    ASSERT_OK(file->AllocateSpace(write_sizes[i], &offset));
     EXPECT_EQ(next_offset, offset);
     next_offset = offset + write_sizes[i];
     EXPECT_EQ(next_offset, boost::filesystem::file_size(file->path()));
   }
   // Check that cleanup is correct.
-  status = file->Remove();
-  EXPECT_TRUE(status.ok());
+  file_group.Close();
   EXPECT_FALSE(boost::filesystem::exists(file->path()));
   CheckMetrics(&tmp_file_mgr);
 }
@@ -103,14 +108,11 @@ TEST_F(TmpFileMgrTest, TestFileAllocation) {
 /// Test that we can do initialization with two directories on same device and
 /// that validations prevents duplication of directories.
 TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
-  vector<string> tmp_dirs;
-  tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
-  tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
-  for (int i = 0; i < tmp_dirs.size(); ++i) {
-    EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dirs[i]).ok());
-  }
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
+  RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get());
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr);
 
   // Only the first directory should be used.
   EXPECT_EQ(1, tmp_file_mgr.num_active_tmp_devices());
@@ -118,23 +120,21 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   EXPECT_EQ(1, devices.size());
   TUniqueId id;
   TmpFileMgr::File *file;
-  EXPECT_TRUE(tmp_file_mgr.GetFile(devices[0], id, &file).ok());
+  ASSERT_OK(file_group.NewFile(devices[0], id, &file));
   // Check the prefix is the expected temporary directory.
   EXPECT_EQ(0, file->path().find(tmp_dirs[0]));
   FileSystemUtil::RemovePaths(tmp_dirs);
+  file_group.Close();
   CheckMetrics(&tmp_file_mgr);
 }
 
 /// Test that we can do custom initialization with two dirs on same device.
 TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
-  vector<string> tmp_dirs;
-  tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
-  tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
-  for (int i = 0; i < tmp_dirs.size(); ++i) {
-    EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dirs[i]).ok());
-  }
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
+  RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr);
 
   // Both directories should be used.
   EXPECT_EQ(2, tmp_file_mgr.num_active_tmp_devices());
@@ -144,25 +144,23 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
     EXPECT_EQ(0, tmp_file_mgr.GetTmpDirPath(devices[i]).find(tmp_dirs[i]));
     TUniqueId id;
     TmpFileMgr::File *file;
-    EXPECT_TRUE(tmp_file_mgr.GetFile(devices[i], id, &file).ok());
+    ASSERT_OK(file_group.NewFile(devices[i], id, &file));
     // Check the prefix is the expected temporary directory.
     EXPECT_EQ(0, file->path().find(tmp_dirs[i]));
   }
   FileSystemUtil::RemovePaths(tmp_dirs);
+  file_group.Close();
   CheckMetrics(&tmp_file_mgr);
 }
 
 /// Test that reporting a write error is possible but does not result in
 /// blacklisting, which is disabled.
 TEST_F(TmpFileMgrTest, TestReportError) {
-  vector<string> tmp_dirs;
-  tmp_dirs.push_back("/tmp/tmp-file-mgr-test.1");
-  tmp_dirs.push_back("/tmp/tmp-file-mgr-test.2");
-  for (int i = 0; i < tmp_dirs.size(); ++i) {
-    EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dirs[i]).ok());
-  }
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
+  RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr);
 
   // Both directories should be used.
   vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.active_tmp_devices();
@@ -173,7 +171,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   TUniqueId id;
   int good_device = 0, bad_device = 1;
   TmpFileMgr::File* bad_file;
-  EXPECT_TRUE(tmp_file_mgr.GetFile(devices[bad_device], id, &bad_file).ok());
+  ASSERT_OK(file_group.NewFile(devices[bad_device], id, &bad_file));
   ErrorMsg errmsg(TErrorCode::GENERAL, "A fake error");
   bad_file->ReportIOError(errmsg);
 
@@ -187,34 +185,35 @@ TEST_F(TmpFileMgrTest, TestReportError) {
 
   // Attempts to expand bad file should succeed.
   int64_t offset;
-  EXPECT_TRUE(bad_file->AllocateSpace(128, &offset).ok());
-  EXPECT_TRUE(bad_file->Remove().ok());
+  ASSERT_OK(bad_file->AllocateSpace(128, &offset));
   // The good device should still be usable.
   TmpFileMgr::File* good_file;
-  EXPECT_TRUE(tmp_file_mgr.GetFile(devices[good_device], id, &good_file).ok());
+  ASSERT_OK(file_group.NewFile(devices[good_device], id, &good_file));
   EXPECT_TRUE(good_file != NULL);
-  EXPECT_TRUE(good_file->AllocateSpace(128, &offset).ok());
+  ASSERT_OK(good_file->AllocateSpace(128, &offset));
   // Attempts to allocate new files on bad device should succeed.
-  EXPECT_TRUE(tmp_file_mgr.GetFile(devices[bad_device], id, &bad_file).ok());
+  ASSERT_OK(file_group.NewFile(devices[bad_device], id, &bad_file));
   FileSystemUtil::RemovePaths(tmp_dirs);
+  file_group.Close();
   CheckMetrics(&tmp_file_mgr);
 }
 
 TEST_F(TmpFileMgrTest, TestAllocateFails) {
   string tmp_dir("/tmp/tmp-file-mgr-test.1");
   string scratch_subdir = tmp_dir + "/impala-scratch";
-  vector<string> tmp_dirs(1, tmp_dir);
-  EXPECT_TRUE(FileSystemUtil::RemoveAndCreateDirectory(tmp_dir).ok());
+  vector<string> tmp_dirs({tmp_dir});
+  RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr);
 
   TUniqueId id;
   TmpFileMgr::File* allocated_file1;
   TmpFileMgr::File* allocated_file2;
   int64_t offset;
-  EXPECT_TRUE(tmp_file_mgr.GetFile(0, id, &allocated_file1).ok());
-  EXPECT_TRUE(tmp_file_mgr.GetFile(0, id, &allocated_file2).ok());
-  EXPECT_TRUE(allocated_file1->AllocateSpace(1, &offset).ok());
+  ASSERT_OK(file_group.NewFile(0, id, &allocated_file1));
+  ASSERT_OK(file_group.NewFile(0, id, &allocated_file2));
+  ASSERT_OK(allocated_file1->AllocateSpace(1, &offset));
 
   // Make scratch non-writable and test for allocation errors at different stages:
   // new file creation, files with no allocated blocks. files with allocated space.
@@ -225,10 +224,50 @@ TEST_F(TmpFileMgrTest, TestAllocateFails) {
   EXPECT_FALSE(allocated_file2->AllocateSpace(1, &offset).ok());
   // Creating a new File object can succeed because it is not immediately created on disk.
   TmpFileMgr::File* unallocated_file;
-  EXPECT_TRUE(tmp_file_mgr.GetFile(0, id, &unallocated_file).ok());
+  ASSERT_OK(file_group.NewFile(0, id, &unallocated_file));
 
   chmod(scratch_subdir.c_str(), S_IRWXU);
   FileSystemUtil::RemovePaths(tmp_dirs);
+  file_group.Close();
+}
+
+// Test scratch limit is applied correctly to group of files.
+TEST_F(TmpFileMgrTest, TestScratchLimit) {
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
+  RemoveAndCreateDirs(tmp_dirs);
+  TmpFileMgr tmp_file_mgr;
+  tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+
+  const int64_t LIMIT = 100;
+  const int64_t FILE1_ALLOC = 25;
+  const int64_t FILE2_ALLOC = LIMIT - FILE1_ALLOC;
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, LIMIT);
+  TmpFileMgr::File* file1;
+  TmpFileMgr::File* file2;
+  TUniqueId id;
+  ASSERT_OK(file_group.NewFile(0, id, &file1));
+  ASSERT_OK(file_group.NewFile(1, id, &file2));
+
+  // Test individual limit is enforced.
+  Status status;
+  int64_t offset;
+  status = file1->AllocateSpace(LIMIT + 1, &offset);
+  ASSERT_FALSE(status.ok());
+  ASSERT_EQ(status.code(), TErrorCode::SCRATCH_LIMIT_EXCEEDED);
+  ASSERT_OK(file1->AllocateSpace(FILE1_ALLOC, &offset));
+  ASSERT_EQ(0, offset);
+
+  // Test aggregate limit is enforced.
+  status = file2->AllocateSpace(FILE2_ALLOC + 1, &offset);
+  ASSERT_FALSE(status.ok());
+  ASSERT_EQ(status.code(), TErrorCode::SCRATCH_LIMIT_EXCEEDED);
+  ASSERT_OK(file2->AllocateSpace(FILE2_ALLOC, &offset));
+  ASSERT_EQ(0, offset);
+  status = file2->AllocateSpace(1, &offset);
+  ASSERT_FALSE(status.ok());
+  ASSERT_EQ(status.code(), TErrorCode::SCRATCH_LIMIT_EXCEEDED);
+
+  file_group.Close();
 }
 
 }

@@ -203,6 +203,9 @@ struct TQueryOptions {
 
   // Additional strict handling of invalid data parsing and type conversions.
   49: optional bool strict_mode = false
+
+  // A limit on the amount of scratch directory space that can be used;
+  50: optional i64 scratch_limit = -1
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

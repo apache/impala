@@ -66,16 +66,18 @@ TestEnv::~TestEnv() {
   metrics_.reset();
 }
 
-RuntimeState* TestEnv::CreateRuntimeState(int64_t query_id) {
+RuntimeState* TestEnv::CreateRuntimeState(int64_t query_id,
+    TQueryOptions* query_options) {
   TExecPlanFragmentParams plan_params = TExecPlanFragmentParams();
+  if (query_options != NULL) plan_params.query_ctx.request.query_options = *query_options;
   plan_params.query_ctx.query_id.hi = 0;
   plan_params.query_ctx.query_id.lo = query_id;
   return new RuntimeState(plan_params, exec_env_.get());
 }
 
 Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_size,
-    RuntimeState** runtime_state) {
-  *runtime_state = CreateRuntimeState(query_id);
+    RuntimeState** runtime_state, TQueryOptions* query_options) {
+  *runtime_state = CreateRuntimeState(query_id, query_options);
   if (*runtime_state == NULL) {
     return Status("Unexpected error creating RuntimeState");
   }

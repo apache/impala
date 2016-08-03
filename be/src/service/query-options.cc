@@ -428,6 +428,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
             iequals(value, "true") || iequals(value, "1"));
         break;
       }
+      case TImpalaQueryOptions::SCRATCH_LIMIT: {
+        // Parse the scratch limit spec and validate it.
+        if (iequals(value, "-1")) {
+          query_options->__set_scratch_limit(-1);
+        } else {
+          int64_t bytes_limit;
+          RETURN_IF_ERROR(ParseMemValue(value, "Scratch space memory limit",
+              &bytes_limit));
+          query_options->__set_scratch_limit(bytes_limit);
+        }
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

@@ -423,7 +423,8 @@ class BufferedBlockMgr {
     }
   };
 
-  BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr, int64_t block_size);
+  BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr,
+      int64_t block_size, int64_t scratch_limit);
 
   /// Initializes the block mgr. Idempotent and thread-safe.
   void Init(DiskIoMgr* io_mgr, RuntimeProfile* profile,
@@ -492,7 +493,8 @@ class BufferedBlockMgr {
   void WaitForWrite(boost::unique_lock<boost::mutex>& lock, Block* block);
 
   /// Allocate block_size bytes in a temporary file. Try multiple disks if error occurs.
-  /// Returns an error only if no temporary files are usable.
+  /// Returns an error only if no temporary files are usable or the scratch limit is
+  /// exceeded.
   Status AllocateScratchSpace(int64_t block_size, TmpFileMgr::File** tmp_file,
       int64_t* file_offset);
 
@@ -590,12 +592,12 @@ class BufferedBlockMgr {
   /// All allocated io-sized buffers.
   std::list<BufferDescriptor*> all_io_buffers_;
 
-  /// Temporary physical file handle, (one per tmp device) to which blocks may be written.
-  /// Blocks are round-robined across these files.
-  boost::ptr_vector<TmpFileMgr::File> tmp_files_;
+  /// Group of temporary physical files, (one per tmp device) to which
+  /// blocks may be written. Blocks are round-robined across these files.
+  boost::scoped_ptr<TmpFileMgr::FileGroup> tmp_file_group;
 
-  /// Index into tmp_files_ denoting the file to which the next block to be persisted will
-  /// be written.
+  /// Index into 'tmp_file_group_' denoting the file to which the next block will be
+  /// written.
   int next_block_index_;
 
   /// DiskIoMgr handles to read and write blocks.
@@ -640,6 +642,9 @@ class BufferedBlockMgr {
 
   /// Time spent in disk spill integrity generation and checking.
   RuntimeProfile::Counter* integrity_check_timer_;
+
+  /// Amount of scratch space allocated in bytes.
+  RuntimeProfile::Counter* scratch_space_bytes_used_counter_;
 
   /// Number of writes issued.
   int writes_issued_;

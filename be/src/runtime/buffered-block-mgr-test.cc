@@ -141,19 +141,21 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   /// Helper to create a simple block manager.
   BufferedBlockMgr* CreateMgr(int64_t query_id, int max_buffers, int block_size,
-      RuntimeState** query_state = NULL) {
+      RuntimeState** query_state = NULL, TQueryOptions* query_options = NULL) {
     RuntimeState* state;
     EXPECT_TRUE(test_env_->CreateQueryState(query_id, max_buffers, block_size,
-        &state).ok());
+        &state, query_options).ok());
     if (query_state != NULL) *query_state = state;
     return state->block_mgr();
   }
 
   BufferedBlockMgr* CreateMgrAndClient(int64_t query_id, int max_buffers, int block_size,
       int reserved_blocks, bool tolerates_oversubscription, MemTracker* tracker,
-      BufferedBlockMgr::Client** client, RuntimeState** query_state = NULL) {
+      BufferedBlockMgr::Client** client, RuntimeState** query_state = NULL,
+      TQueryOptions* query_options = NULL) {
     RuntimeState* state;
-    BufferedBlockMgr* mgr = CreateMgr(query_id, max_buffers, block_size, &state);
+    BufferedBlockMgr* mgr = CreateMgr(query_id, max_buffers, block_size, &state,
+        query_options);
     EXPECT_TRUE(mgr->RegisterClient(Substitute("Client for query $0", query_id),
         reserved_blocks, tolerates_oversubscription, tracker, state, client).ok());
     EXPECT_TRUE(client != NULL);
@@ -1183,6 +1185,20 @@ TEST_F(BufferedBlockMgrTest, NoTmpDirs) {
   BufferedBlockMgr::Client* client;
   BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
       0, false, client_tracker_.get(), &client);
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
+  DeleteBlocks(blocks);
+}
+
+// Test that block manager can still allocate buffers when spilling is disabled by
+// setting scratch_limit = 0.
+TEST_F(BufferedBlockMgrTest, ScratchLimitZero) {
+  int max_num_buffers = 3;
+  BufferedBlockMgr::Client* client;
+  TQueryOptions query_options;
+  query_options.scratch_limit = 0;
+  BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
+      0, false, client_tracker_.get(), &client, NULL, &query_options);
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   DeleteBlocks(blocks);

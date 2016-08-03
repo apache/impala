@@ -136,11 +136,12 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
   return Status::OK();
 }
 
-Status TmpFileMgr::GetFile(const DeviceId& device_id, const TUniqueId& query_id,
-    File** new_file) {
+Status TmpFileMgr::NewFile(FileGroup* file_group, const DeviceId& device_id,
+    const TUniqueId& query_id, File** new_file) {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
   DCHECK_LT(device_id, tmp_dirs_.size());
+  DCHECK(file_group != NULL);
   if (IsBlacklisted(device_id)) {
     return Status(TErrorCode::TMP_DEVICE_BLACKLISTED, tmp_dirs_[device_id].path());
   }
@@ -152,7 +153,7 @@ Status TmpFileMgr::GetFile(const DeviceId& device_id, const TUniqueId& query_id,
   path new_file_path(tmp_dirs_[device_id].path());
   new_file_path /= file_name.str();
 
-  *new_file = new File(this, device_id, new_file_path.string());
+  *new_file = new File(this, file_group, device_id, new_file_path.string());
   return Status::OK();
 }
 
@@ -209,16 +210,24 @@ vector<TmpFileMgr::DeviceId> TmpFileMgr::active_tmp_devices() {
   return devices;
 }
 
-TmpFileMgr::File::File(TmpFileMgr* mgr, DeviceId device_id, const string& path)
+TmpFileMgr::File::File(TmpFileMgr* mgr, FileGroup* file_group, DeviceId device_id,
+    const string& path)
   : mgr_(mgr),
+    file_group_(file_group),
     path_(path),
     device_id_(device_id),
     current_size_(0),
     blacklisted_(false) {
+  DCHECK(file_group != NULL);
 }
 
 Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
   DCHECK_GT(write_size, 0);
+  if (file_group_->bytes_limit_ != -1 &&
+      file_group_->current_bytes_allocated_ + write_size
+      > file_group_->bytes_limit_) {
+    return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, file_group_->bytes_limit_);
+  }
   Status status;
   if (mgr_->IsBlacklisted(device_id_)) {
     blacklisted_ = true;
@@ -240,6 +249,7 @@ Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
     return status;
   }
   *offset = current_size_;
+  file_group_->current_bytes_allocated_ += write_size;
   current_size_ = new_size;
   return Status::OK();
 }
@@ -254,6 +264,33 @@ void TmpFileMgr::File::ReportIOError(const ErrorMsg& msg) {
 Status TmpFileMgr::File::Remove() {
   if (current_size_ > 0) FileSystemUtil::RemovePaths(vector<string>(1, path_));
   return Status::OK();
+}
+
+TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, int64_t bytes_limit)
+  : tmp_file_mgr_(tmp_file_mgr),
+    current_bytes_allocated_(0),
+    bytes_limit_(bytes_limit) {
+  DCHECK(tmp_file_mgr != NULL);
+}
+
+Status TmpFileMgr::FileGroup::NewFile(const DeviceId& device_id,
+    const TUniqueId& query_id, File** new_file) {
+  TmpFileMgr::File* tmp_file;
+  RETURN_IF_ERROR(tmp_file_mgr_->NewFile(this, device_id, query_id, &tmp_file));
+  tmp_files_.emplace_back(tmp_file);
+  if (new_file != NULL) *new_file = tmp_file;
+  return Status::OK();
+}
+
+void TmpFileMgr::FileGroup::Close() {
+  for (std::unique_ptr<TmpFileMgr::File>& file: tmp_files_) {
+    Status status = file->Remove();
+    if (!status.ok()) {
+      LOG(WARNING) << "Error removing scratch file '" << file->path() << "': "
+                   << status.msg().msg();
+    }
+  }
+  tmp_files_.clear();
 }
 
 } //namespace impala

@@ -280,7 +280,10 @@ error_codes = (
    "data of type $1: $2"),
 
   ("TEXT_PARSER_TRUNCATED_COLUMN", 90, "Length of column is $0 which exceeds maximum "
-   "supported length of 2147483647 bytes.")
+   "supported length of 2147483647 bytes."),
+
+  ("SCRATCH_LIMIT_EXCEEDED", 91, "Scratch space limit of $0 bytes exceeded for query "
+   "while spilling data to disk.")
 )
 
 import sys

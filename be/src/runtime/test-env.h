@@ -37,10 +37,10 @@ class TestEnv {
   /// query states have been created.
   void InitTmpFileMgr(const std::vector<std::string>& tmp_dirs, bool one_dir_per_device);
 
-  /// Create a RuntimeState for a query with a new block manager. The RuntimeState is
-  /// owned by the TestEnv.
+  /// Create a RuntimeState for a query with a new block manager and the given query
+  /// options. The RuntimeState is owned by the TestEnv.
   Status CreateQueryState(int64_t query_id, int max_buffers, int block_size,
-      RuntimeState** runtime_state);
+      RuntimeState** runtime_state, TQueryOptions* query_options = NULL);
 
   /// Create multiple separate RuntimeStates with associated block managers, e.g. as if
   /// multiple queries were executing. The RuntimeStates are owned by TestEnv.
@@ -65,8 +65,9 @@ class TestEnv {
   /// Recreate global metric groups.
   void InitMetrics();
 
-  /// Create a new RuntimeState sharing global environment.
-  RuntimeState* CreateRuntimeState(int64_t query_id);
+  /// Create a new RuntimeState sharing global environment with given query options
+  RuntimeState* CreateRuntimeState(int64_t query_id,
+      TQueryOptions* query_options = NULL);
 
   /// Global state for test environment.
   static boost::scoped_ptr<MetricGroup> static_metrics_;

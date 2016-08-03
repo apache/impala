@@ -233,7 +233,12 @@ enum TImpalaQueryOptions {
   PREFETCH_MODE,
 
   // Additional strict handling of invalid data parsing and type conversions.
-  STRICT_MODE
+  STRICT_MODE,
+
+  // A limit on the amount of scratch directory space that can be used;
+  // Unspecified or a limit of -1 means no limit;
+  // Otherwise specified in the same way as MEM_LIMIT.
+  SCRATCH_LIMIT
 }
 
 // The summary of an insert.
