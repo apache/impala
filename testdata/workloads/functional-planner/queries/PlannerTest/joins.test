@@ -727,8 +727,15 @@ inner join [shuffle]
 on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 ---- PLAN
 05:HASH JOIN [INNER JOIN]
-|  hash predicates: b.int_col = int_col, b.bool_col = bool_col
-|  runtime filters: RF000 <- int_col, RF001 <- bool_col
+|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
+|  runtime filters: RF000 <- b.int_col, RF001 <- b.bool_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = int_col, a.bool_col = bool_col
+|  runtime filters: RF002 <- int_col, RF003 <- bool_col
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -736,14 +743,7 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |  |
 |  02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
-|
-04:HASH JOIN [INNER JOIN]
-|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
-|  runtime filters: RF002 <- b.int_col, RF003 <- b.bool_col
-|
-|--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF000 -> b.int_col, RF001 -> b.bool_col
+|     runtime filters: RF000 -> functional.alltypes.int_col, RF001 -> functional.alltypes.bool_col
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
@@ -752,14 +752,23 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 10:EXCHANGE [UNPARTITIONED]
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: b.int_col = int_col, b.bool_col = bool_col
-|  runtime filters: RF000 <- int_col, RF001 <- bool_col
+|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
+|  runtime filters: RF000 <- b.int_col, RF001 <- b.bool_col
 |
-|--09:AGGREGATE [FINALIZE]
+|--09:EXCHANGE [HASH(b.int_col,b.bool_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.int_col = int_col, a.bool_col = bool_col
+|  runtime filters: RF002 <- int_col, RF003 <- bool_col
+|
+|--07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: int_col, bool_col
 |  |
-|  08:EXCHANGE [HASH(int_col,bool_col)]
+|  06:EXCHANGE [HASH(int_col,bool_col)]
 |  |
 |  03:AGGREGATE [STREAMING]
 |  |  output: count(*)
@@ -767,18 +776,9 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |  |
 |  02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.int_col, RF001 -> functional.alltypes.bool_col
 |
-04:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
-|  runtime filters: RF002 <- b.int_col, RF003 <- b.bool_col
-|
-|--07:EXCHANGE [HASH(b.int_col,b.bool_col)]
-|  |
-|  01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF000 -> b.int_col, RF001 -> b.bool_col
-|
-06:EXCHANGE [HASH(a.int_col,a.bool_col)]
+08:EXCHANGE [HASH(a.int_col,a.bool_col)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB

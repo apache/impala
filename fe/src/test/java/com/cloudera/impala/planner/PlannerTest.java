@@ -19,6 +19,7 @@ package com.cloudera.impala.planner;
 
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TRuntimeFilterMode;
 
@@ -174,7 +175,20 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testTpch() {
-    runPlannerTestFile("tpch-all");
+    runPlannerTestFile("tpch-all", "tpch");
+  }
+
+  @Test
+  public void testTpchViews() {
+    // Re-create TPCH with views on the base tables. Used for testing
+    // that plan generation works as expected through views.
+    addTestDb("tpch_views", "Test DB for TPCH with views.");
+    Db tpchDb = catalog_.getDb("tpch");
+    for (String tblName: tpchDb.getAllTableNames()) {
+      addTestView(String.format(
+          "create view tpch_views.%s as select * from tpch.%s", tblName, tblName));
+    }
+    runPlannerTestFile("tpch-views", "tpch_views");
   }
 
   @Test

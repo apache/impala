@@ -30,8 +30,7 @@ import com.cloudera.impala.thrift.TQueryCtx;
 
 public class AnalyzeAuthStmtsTest extends AnalyzerTest {
   public AnalyzeAuthStmtsTest() throws AnalysisException {
-    analyzer_ = createAnalyzer(Catalog.DEFAULT_DB);
-    analyzer_.getCatalog().getAuthPolicy().addRole(
+    catalog_.getAuthPolicy().addRole(
         new Role("myRole", new HashSet<String>()));
   }
 

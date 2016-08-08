@@ -17,55 +17,27 @@
 
 package com.cloudera.impala.analysis;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-
-import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.testutil.ImpaladTestCatalog;
-import com.cloudera.impala.testutil.TestUtils;
+import com.cloudera.impala.common.FrontendTestBase;
 import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TQueryOptions;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
-public class AnalyzerTest {
+public class AnalyzerTest extends FrontendTestBase {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
-  protected static ImpaladCatalog catalog_ = new ImpaladTestCatalog();
-
-  // Test-local list of test databases and tables. These are cleaned up in @After.
-  protected final List<Db> testDbs_ = Lists.newArrayList();
-  protected final List<Table> testTables_ = Lists.newArrayList();
-
-  protected Analyzer analyzer_;
 
   // maps from type to string that will result in literal of that type
   protected static Map<ScalarType, String> typeToLiteralValue_ =
@@ -84,117 +56,6 @@ public class AnalyzerTest {
         "cast('2012-12-21 00:00:00.000' as timestamp)");
     typeToLiteralValue_.put(Type.STRING, "'Hello, World!'");
     typeToLiteralValue_.put(Type.NULL, "NULL");
-  }
-
-  protected Analyzer createAnalyzer(String defaultDb) {
-    TQueryCtx queryCtx =
-        TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
-    return new Analyzer(catalog_, queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig());
-  }
-
-  protected Analyzer createAnalyzer(TQueryOptions queryOptions) {
-    TQueryCtx queryCtx = TestUtils.createQueryContext();
-    queryCtx.request.query_options = queryOptions;
-    return new Analyzer(catalog_, queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig());
-  }
-
-  protected Analyzer createAnalyzerUsingHiveColLabels() {
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    analyzer.setUseHiveColLabels(true);
-    return analyzer;
-  }
-
-  // Adds a Udf: default.name(args) to the catalog.
-  // TODO: we could consider having this be the sql to run instead but that requires
-  // connecting to the BE.
-  protected Function addTestFunction(String name,
-      ArrayList<ScalarType> args, boolean varArgs) {
-    return addTestFunction("default", name, args, varArgs);
-  }
-
-  protected Function addTestFunction(String name,
-      ScalarType arg, boolean varArgs) {
-    return addTestFunction("default", name, Lists.newArrayList(arg), varArgs);
-  }
-
-  protected Function addTestFunction(String db, String fnName,
-      ArrayList<ScalarType> args, boolean varArgs) {
-    ArrayList<Type> argTypes = Lists.newArrayList();
-    argTypes.addAll(args);
-    Function fn = ScalarFunction.createForTesting(
-        db, fnName, argTypes, Type.INT, "/Foo", "Foo.class", null,
-        null, TFunctionBinaryType.NATIVE);
-    fn.setHasVarArgs(varArgs);
-    catalog_.addFunction(fn);
-    return fn;
-  }
-
-  protected void addTestUda(String name, Type retType, Type... argTypes) {
-    FunctionName fnName = new FunctionName("default", name);
-    catalog_.addFunction(
-        AggregateFunction.createForTesting(
-            fnName, Lists.newArrayList(argTypes), retType, retType,
-            null, "init_fn_symbol", "update_fn_symbol", null, null,
-            null, null, null, TFunctionBinaryType.NATIVE));
-  }
-
-  /**
-   * Add a new dummy database with the given name to the catalog.
-   * Returns the new dummy database.
-   * The database is registered in testDbs_ and removed in the @After method.
-   */
-  protected Db addTestDb(String dbName, String comment) {
-    Db db = catalog_.getDb(dbName);
-    Preconditions.checkState(db == null, "Test db must not already exist.");
-    db = new Db(dbName, catalog_, new org.apache.hadoop.hive.metastore.api.Database(
-        dbName, comment, "", Collections.<String, String>emptyMap()));
-    catalog_.addDb(db);
-    testDbs_.add(db);
-    return db;
-  }
-
-  protected void clearTestDbs() {
-    for (Db testDb: testDbs_) {
-      catalog_.removeDb(testDb.getName());
-    }
-  }
-
-  /**
-   * Add a new dummy table to the catalog based on the given CREATE TABLE sql.
-   * The dummy table only has the column definitions and no other metadata.
-   * Returns the new dummy table.
-   * The test tables are registered in testTables_ and removed in the @After method.
-   */
-  protected Table addTestTable(String createTableSql) {
-    CreateTableStmt createTableStmt = (CreateTableStmt) AnalyzesOk(createTableSql);
-    // Currently does not support partitioned tables.
-    Preconditions.checkState(createTableStmt.getPartitionColumnDefs().isEmpty());
-    Db db = catalog_.getDb(createTableStmt.getDb());
-    Preconditions.checkNotNull(db, "Test tables must be created in an existing db.");
-    HdfsTable dummyTable = new HdfsTable(null, null, db, createTableStmt.getTbl(),
-        createTableStmt.getOwner());
-    List<ColumnDef> columnDefs = createTableStmt.getColumnDefs();
-    for (int i = 0; i < columnDefs.size(); ++i) {
-      ColumnDef colDef = columnDefs.get(i);
-      dummyTable.addColumn(new Column(colDef.getColName(), colDef.getType(), i));
-    }
-    db.addTable(dummyTable);
-    testTables_.add(dummyTable);
-    return dummyTable;
-  }
-
-  protected void clearTestTables() {
-    for (Table testTable: testTables_) {
-      testTable.getDb().removeTable(testTable.getName());
-    }
-  }
-
-  @After
-  public void tearDown() {
-    clearTestTables();
-    clearTestDbs();
   }
 
   /**
@@ -236,123 +97,6 @@ public class AnalyzerTest {
         checkBinaryExprs(node.getHavingPred());
       }
     }
-  }
-
-  /**
-   * Parse 'stmt' and return the root ParseNode.
-   */
-  public ParseNode ParsesOk(String stmt) {
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    ParseNode node = null;
-    try {
-      node = (ParseNode) parser.parse().value;
-    } catch (Exception e) {
-      e.printStackTrace();
-      fail("\nParser error:\n" + parser.getErrorMsg(stmt));
-    }
-    assertNotNull(node);
-    return node;
-  }
-
-  /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   */
-  public ParseNode AnalyzesOk(String stmt) {
-    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB), null);
-  }
-
-  /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   * If 'expectedWarning' is not null, asserts that a warning is produced.
-   */
-  public ParseNode AnalyzesOk(String stmt, String expectedWarning) {
-    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB), expectedWarning);
-  }
-
-  /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   * If 'expectedWarning' is not null, asserts that a warning is produced.
-   */
-  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer, String expectedWarning) {
-    try {
-      analyzer_ = analyzer;
-      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(Catalog.DEFAULT_DB,
-              System.getProperty("user.name")),
-              AuthorizationConfig.createAuthDisabledConfig());
-      analysisCtx.analyze(stmt, analyzer);
-      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
-      if (expectedWarning != null) {
-        List<String> actualWarnings = analysisResult.getAnalyzer().getWarnings();
-        boolean matchedWarning = false;
-        for (String actualWarning: actualWarnings) {
-          if (actualWarning.startsWith(expectedWarning)) {
-            matchedWarning = true;
-            break;
-          }
-        }
-        if (!matchedWarning) {
-          fail(String.format("Did not produce expected warning.\n" +
-              "Expected warning:\n%s.\nActual warnings:\n%s",
-              expectedWarning, Joiner.on("\n").join(actualWarnings)));
-        }
-      }
-      Preconditions.checkNotNull(analysisResult.getStmt());
-      return analysisResult.getStmt();
-    } catch (Exception e) {
-      e.printStackTrace();
-      fail("Error:\n" + e.toString());
-    }
-    return null;
-  }
-
-  /**
-   * Asserts if stmt passes analysis.
-   */
-  public void AnalysisError(String stmt) {
-    AnalysisError(stmt, null);
-  }
-
-  /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   */
-  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
-    return AnalyzesOk(stmt, analyzer, null);
-  }
-
-  /**
-   * Asserts if stmt passes analysis or the error string doesn't match and it
-   * is non-null.
-   */
-  public void AnalysisError(String stmt, String expectedErrorString) {
-    AnalysisError(stmt, createAnalyzer(Catalog.DEFAULT_DB), expectedErrorString);
-  }
-
-  /**
-   * Asserts if stmt passes analysis or the error string doesn't match and it
-   * is non-null.
-   */
-  public void AnalysisError(String stmt, Analyzer analyzer, String expectedErrorString) {
-    Preconditions.checkNotNull(expectedErrorString, "No expected error message given.");
-    LOG.info("processing " + stmt);
-    try {
-      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(Catalog.DEFAULT_DB,
-              System.getProperty("user.name")),
-              AuthorizationConfig.createAuthDisabledConfig());
-      analysisCtx.analyze(stmt, analyzer);
-      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
-      Preconditions.checkNotNull(analysisResult.getStmt());
-    } catch (Exception e) {
-      String errorString = e.getMessage();
-      Preconditions.checkNotNull(errorString, "Stack trace lost during exception.");
-      Assert.assertTrue(
-          "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
-          errorString.startsWith(expectedErrorString));
-      return;
-    }
-    fail("Stmt didn't result in analysis error: " + stmt);
   }
 
   /**
@@ -426,28 +170,30 @@ public class AnalyzerTest {
   }
 
   private void testSelectStar() throws AnalysisException {
-    AnalyzesOk("select * from functional.AllTypes");
-    DescriptorTable descTbl = analyzer_.getDescTbl();
+    SelectStmt stmt = (SelectStmt) AnalyzesOk("select * from functional.AllTypes");
+    Analyzer analyzer = stmt.getAnalyzer();
+    DescriptorTable descTbl = analyzer.getDescTbl();
     TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
     for (SlotDescriptor slotD: tupleD.getSlots()) {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
     Assert.assertEquals(97.0f, tupleD.getAvgSerializedSize(), 0.0);
-    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2);
-    checkLayoutParams("functional.alltypes.id", 4, 8, 0, 3);
-    checkLayoutParams("functional.alltypes.int_col", 4, 12, 0, 4);
-    checkLayoutParams("functional.alltypes.float_col", 4, 16, 0, 5);
-    checkLayoutParams("functional.alltypes.year", 4, 20, 0, 6);
-    checkLayoutParams("functional.alltypes.month", 4, 24, 0, 7);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 32, 1, 0);
-    checkLayoutParams("functional.alltypes.double_col", 8, 40, 1, 1);
+    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0, analyzer);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1, analyzer);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2, analyzer);
+    checkLayoutParams("functional.alltypes.id", 4, 8, 0, 3, analyzer);
+    checkLayoutParams("functional.alltypes.int_col", 4, 12, 0, 4, analyzer);
+    checkLayoutParams("functional.alltypes.float_col", 4, 16, 0, 5, analyzer);
+    checkLayoutParams("functional.alltypes.year", 4, 20, 0, 6, analyzer);
+    checkLayoutParams("functional.alltypes.month", 4, 24, 0, 7, analyzer);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 32, 1, 0, analyzer);
+    checkLayoutParams("functional.alltypes.double_col", 8, 40, 1, 1, analyzer);
     int strSlotSize = PrimitiveType.STRING.getSlotSize();
-    checkLayoutParams("functional.alltypes.date_string_col", strSlotSize, 48, 1, 2);
+    checkLayoutParams("functional.alltypes.date_string_col",
+        strSlotSize, 48, 1, 2, analyzer);
     checkLayoutParams("functional.alltypes.string_col",
-        strSlotSize, 48 + strSlotSize, 1, 3);
+        strSlotSize, 48 + strSlotSize, 1, 3, analyzer);
   }
 
   private void testNonNullable() throws AnalysisException {
@@ -455,8 +201,9 @@ public class AnalyzerTest {
     // (byte range : data)
     // 0 - 7: count(int_col)
     // 8 - 15: count(*)
-    AnalyzesOk("select count(int_col), count(*) from functional.AllTypes");
-    DescriptorTable descTbl = analyzer_.getDescTbl();
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(
+        "select count(int_col), count(*) from functional.AllTypes");
+    DescriptorTable descTbl = stmt.getAnalyzer().getDescTbl();
     TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
       slotD.setIsMaterialized(true);
@@ -475,8 +222,9 @@ public class AnalyzerTest {
     // 1 - 7: padded bytes
     // 8 - 15: sum(int_col)
     // 16 - 23: count(*)
-    AnalyzesOk("select sum(int_col), count(*) from functional.AllTypes");
-    DescriptorTable descTbl = analyzer_.getDescTbl();
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(
+        "select sum(int_col), count(*) from functional.AllTypes");
+    DescriptorTable descTbl = stmt.getAnalyzer().getDescTbl();
     TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
       slotD.setIsMaterialized(true);
@@ -492,8 +240,9 @@ public class AnalyzerTest {
    * Tests that computeMemLayout() ignores non-materialized slots.
    */
   private void testNonMaterializedSlots() throws AnalysisException {
-    AnalyzesOk("select * from functional.alltypes");
-    DescriptorTable descTbl = analyzer_.getDescTbl();
+    SelectStmt stmt = (SelectStmt) AnalyzesOk("select * from functional.alltypes");
+    Analyzer analyzer = stmt.getAnalyzer();
+    DescriptorTable descTbl = analyzer.getDescTbl();
     TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
     ArrayList<SlotDescriptor> slots = tupleD.getSlots();
     for (SlotDescriptor slotD: slots) {
@@ -507,20 +256,21 @@ public class AnalyzerTest {
     descTbl.computeMemLayout();
     Assert.assertEquals(68.0f, tupleD.getAvgSerializedSize(), 0.0);
     // Check non-materialized slots.
-    checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0);
-    checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0);
-    checkLayoutParams("functional.alltypes.string_col", 0, -1, 0, 0);
+    checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0, analyzer);
+    checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0, analyzer);
+    checkLayoutParams("functional.alltypes.string_col", 0, -1, 0, 0, analyzer);
     // Check materialized slots.
-    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2);
-    checkLayoutParams("functional.alltypes.int_col", 4, 8, 0, 3);
-    checkLayoutParams("functional.alltypes.float_col", 4, 12, 0, 4);
-    checkLayoutParams("functional.alltypes.year", 4, 16, 0, 5);
-    checkLayoutParams("functional.alltypes.month", 4, 20, 0, 6);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 24, 0, 7);
+    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0, analyzer);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1, analyzer);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2, analyzer);
+    checkLayoutParams("functional.alltypes.int_col", 4, 8, 0, 3, analyzer);
+    checkLayoutParams("functional.alltypes.float_col", 4, 12, 0, 4, analyzer);
+    checkLayoutParams("functional.alltypes.year", 4, 16, 0, 5, analyzer);
+    checkLayoutParams("functional.alltypes.month", 4, 20, 0, 6, analyzer);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 24, 0, 7, analyzer);
     int strSlotSize = PrimitiveType.STRING.getSlotSize();
-    checkLayoutParams("functional.alltypes.date_string_col", strSlotSize, 32, 1, 0);
+    checkLayoutParams("functional.alltypes.date_string_col",
+        strSlotSize, 32, 1, 0, analyzer);
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,
@@ -532,8 +282,8 @@ public class AnalyzerTest {
   }
 
   private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
-      int nullIndicatorByte, int nullIndicatorBit) {
-    SlotDescriptor d = analyzer_.getSlotDescriptor(colAlias);
+      int nullIndicatorByte, int nullIndicatorBit, Analyzer analyzer) {
+    SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
     checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 

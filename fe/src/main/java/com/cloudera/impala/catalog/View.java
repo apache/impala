@@ -18,7 +18,6 @@
 package com.cloudera.impala.catalog;
 
 import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -87,6 +86,16 @@ public class View extends Table {
     isLocalView_ = true;
     queryStmt_ = queryStmt;
     colLabels_ = colLabels;
+  }
+
+  /**
+   * Creates a view for testig purposes.
+   */
+  private View(Db db, String name, QueryStmt queryStmt) {
+    super(null, null, db, name, null);
+    isLocalView_ = false;
+    queryStmt_ = queryStmt;
+    colLabels_ = null;
   }
 
   @Override
@@ -190,5 +199,9 @@ public class View extends Table {
     TTable view = super.toThrift();
     view.setTable_type(TTableType.VIEW);
     return view;
+  }
+
+  public static View createTestView(Db db, String name, QueryStmt viewDefStmt) {
+    return new View(db, name, viewDefStmt);
   }
 }

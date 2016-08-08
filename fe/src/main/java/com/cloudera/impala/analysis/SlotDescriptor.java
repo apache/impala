@@ -141,7 +141,7 @@ public class SlotDescriptor {
 
   public Path getPath() { return path_; }
 
-  public boolean isScanSlot() { return path_ != null; }
+  public boolean isScanSlot() { return path_ != null && path_.isRootedAtTable(); }
 
   public Column getColumn() { return !isScanSlot() ? null : path_.destColumn(); }
 
