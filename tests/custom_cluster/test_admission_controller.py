@@ -11,7 +11,7 @@ from time import sleep, time
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import specific_build_type_timeout
+from tests.common.environ import specific_build_type_timeout, IMPALAD_BUILD
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
@@ -329,14 +329,22 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     cls.TestMatrix.add_dimension(TestDimension('num_queries', *NUM_QUERIES))
     cls.TestMatrix.add_dimension(
         TestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
-
     cls.TestMatrix.add_dimension(
         TestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))
-    if cls.exploration_strategy() == 'core':
+
+    # Additional constraints for code coverage jobs and core.
+    num_queries = None
+    if IMPALAD_BUILD.has_code_coverage():
+      # Code coverage builds can't handle the increased concurrency.
+      num_queries = 15
+    elif cls.exploration_strategy() == 'core':
+      num_queries = 30
       cls.TestMatrix.add_constraint(lambda v: v.get_value('submission_delay_ms') == 0)
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('num_queries') == 30)
       cls.TestMatrix.add_constraint(\
           lambda v: v.get_value('round_robin_submission') == True)
+
+    if num_queries is not None:
+      cls.TestMatrix.add_constraint(lambda v: v.get_value('num_queries') == num_queries)
 
   def setup(self):
     # All threads are stored in this list and it's used just to make sure we clean up
