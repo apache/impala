@@ -112,6 +112,7 @@ cp ${SHELL_HOME}/thrift_sasl.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/option_parser.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala_shell_config_defaults.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala_client.py ${TARBALL_ROOT}/lib
+cp ${SHELL_HOME}/TSSLSocketWithWildcardSAN.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/shell_output.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/pkg_resources.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
