@@ -499,6 +499,7 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
   ASSERT_OK(scanner.GetNext(runtime_state_.get(), NULL, &eos));
   ASSERT_TRUE(eos);
   ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
+  scanner.Close(runtime_state_.get());
 }
 
 // Test that scan limits are enforced.

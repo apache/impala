@@ -82,6 +82,7 @@ KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
 }
 
 KuduScanNode::~KuduScanNode() {
+  DCHECK(is_closed());
   STLDeleteElements(&kudu_predicates_);
 }
 
@@ -184,6 +185,8 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       num_rows_returned_ -= num_rows_over;
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
       *eos = true;
+
+      unique_lock<mutex> l(lock_);
       done_ = true;
       materialized_row_batches_->Shutdown();
     }
