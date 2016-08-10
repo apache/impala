@@ -578,14 +578,16 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   if (tuple_size == 0) {
     // We are materializing a collection with empty tuples. Add a NULL tuple to the
     // output batch per remaining scratch tuple and return. No need to evaluate
-    // filters/conjuncts or transfer memory ownership.
+    // filters/conjuncts.
     DCHECK(!has_filters);
     DCHECK(!has_conjuncts);
-    DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
     int num_tuples = min(dst_batch->capacity() - dst_batch->num_rows(),
         scratch_batch_->num_tuples - scratch_batch_->tuple_idx);
     memset(output_row, 0, num_tuples * sizeof(Tuple*));
     scratch_batch_->tuple_idx += num_tuples;
+    // If compressed Parquet was read then there may be data left to free from the
+    // scratch batch (originating from the decompressed data pool).
+    if (scratch_batch_->AtEnd()) scratch_batch_->mem_pool()->FreeAll();
     return num_tuples;
   }
 
