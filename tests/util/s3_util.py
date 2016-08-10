@@ -45,6 +45,8 @@ class S3Client(BaseFilesystem):
   def copy(self, src, dst):
     self.s3client.copy_object(Bucket=self.bucketname,
                               CopySource={'Bucket':self.bucketname, 'Key':src}, Key=dst)
+    assert self.exists(dst), \
+        'S3 copy failed: Destination file {dst} does not exist'.format(dst=dst)
 
   # Since S3 is a key-value store, it does not have a command like 'ls' for a directory
   # structured filesystem. It lists everything under a path recursively.
