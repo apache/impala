@@ -1,0 +1,13 @@
+BasedOnStyle: Google
+AlignAfterOpenBracket: 'false'
+AlignOperands: 'false'
+AllowShortFunctionsOnASingleLine: 'Inline'
+AllowShortIfStatementsOnASingleLine: 'true'
+BreakBeforeBinaryOperators: 'NonAssignment'
+BreakBeforeTernaryOperators: 'false'
+ColumnLimit: '90'
+ConstructorInitializerIndentWidth: '2'
+ContinuationIndentWidth: '4'
+PenaltyBreakBeforeFirstCallParameter: '99999999'
+SpacesBeforeTrailingComments: '1'
+Standard: 'Cpp11'
