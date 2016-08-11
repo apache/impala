@@ -72,13 +72,48 @@ void LogsHandler(const Webserver::ArgumentMap& args, Document* document) {
   }
 }
 
-// Registered to handle "/flags", and produces Json with 'title" and 'contents' members
-// where the latter is a string with all the command-line flags and their values.
+// Registered to handle "/flags", and produces json containing an array of flag metadata
+// objects:
+//
+// "title": "Command-line Flags",
+// "flags": [
+//     {
+//       "name": "catalog_service_port",
+//       "type": "int32",
+//       "description": "port where the CatalogService is running",
+//       "default": "26000",
+//       "current": "26000"
+//     },
+// .. etc
 void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
+  vector<CommandLineFlagInfo> flag_info;
+  GetAllFlags(&flag_info);
+  Value flag_arr(kArrayType);
+  for (const CommandLineFlagInfo& flag: flag_info) {
+    Value flag_val(kObjectType);
+    Value name(flag.name.c_str(), document->GetAllocator());
+    flag_val.AddMember("name", name, document->GetAllocator());
+
+    Value type(flag.type.c_str(), document->GetAllocator());
+    flag_val.AddMember("type", type, document->GetAllocator());
+
+    Value description(flag.description.c_str(), document->GetAllocator());
+    flag_val.AddMember("description", description, document->GetAllocator());
+
+    Value default_value(flag.default_value.c_str(), document->GetAllocator());
+    flag_val.AddMember("default", default_value, document->GetAllocator());
+
+    Value current_value(flag.current_value.c_str(), document->GetAllocator());
+    flag_val.AddMember("current", current_value, document->GetAllocator());
+
+    if (!flag.is_default) {
+      flag_val.AddMember("value_changed", 1, document->GetAllocator());
+    }
+    flag_arr.PushBack(flag_val, document->GetAllocator());
+  }
   Value title("Command-line Flags", document->GetAllocator());
   document->AddMember("title", title, document->GetAllocator());
-  Value flags(CommandlineFlagsIntoString().c_str(), document->GetAllocator());
-  document->AddMember("contents", flags, document->GetAllocator());
+  document->AddMember("flags", flag_arr, document->GetAllocator());
 }
 
 // Registered to handle "/memz"
@@ -124,7 +159,7 @@ void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args
 void impala::AddDefaultUrlCallbacks(
     Webserver* webserver, MemTracker* process_mem_tracker) {
   webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler);
-  webserver->RegisterUrlCallback("/varz", "common-pre.tmpl", FlagsHandler);
+  webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler);
   if (process_mem_tracker != NULL) {
     webserver->RegisterUrlCallback("/memz","memz.tmpl",
         bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
