@@ -234,8 +234,9 @@ class DecompressorTest : public ::testing::Test {
 
     // Test case 2. multistream that is truncated. We should get stream_end == false
     // but with no error.
-    int truncated = rand() % 512;
+    int truncated = rand() % 512 + 1;
     int64_t bytes_decompressed = 0;
+    ASSERT_LE(truncated, compressed_len);
     EXPECT_OK(StreamingDecompress(decompressor.get(), compressed_len - truncated,
         compressed, uncompressed_len, uncompressed, false, &bytes_decompressed));
     // Decompress the remaining.
