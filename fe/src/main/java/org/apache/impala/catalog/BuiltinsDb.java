@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,15 +23,15 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 
-import com.cloudera.impala.analysis.ArithmeticExpr;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.CaseExpr;
-import com.cloudera.impala.analysis.CastExpr;
-import com.cloudera.impala.analysis.CompoundPredicate;
-import com.cloudera.impala.analysis.InPredicate;
-import com.cloudera.impala.analysis.IsNullPredicate;
-import com.cloudera.impala.analysis.LikePredicate;
-import com.cloudera.impala.builtins.ScalarBuiltins;
+import org.apache.impala.analysis.ArithmeticExpr;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.CaseExpr;
+import org.apache.impala.analysis.CastExpr;
+import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.InPredicate;
+import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.LikePredicate;
+import org.apache.impala.builtins.ScalarBuiltins;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 

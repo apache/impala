@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.service;
+package org.apache.impala.service;
 
 import java.util.List;
 import java.util.Map;
@@ -26,15 +26,15 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TDescribeOutputStyle;
-import com.cloudera.impala.thrift.TDescribeResult;
-import com.cloudera.impala.thrift.TResultRow;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TDescribeOutputStyle;
+import org.apache.impala.thrift.TDescribeResult;
+import org.apache.impala.thrift.TResultRow;
 import com.google.common.collect.Lists;
 
 /*

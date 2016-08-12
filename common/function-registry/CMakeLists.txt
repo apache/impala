@@ -19,7 +19,7 @@
 cmake_minimum_required(VERSION 2.6)
 
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
-set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources/gen-java/com/cloudera/impala/)
+set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources/gen-java/org/apache/impala/)
 
 # Set output files for dependency tracking
 set(CODE_GEN_OUTPUT

@@ -18,7 +18,7 @@
 include "ErrorCodes.thrift"
 
 namespace cpp impala
-namespace java com.cloudera.impala.thrift
+namespace java org.apache.impala.thrift
 
 struct TStatus {
   1: required ErrorCodes.TErrorCode status_code

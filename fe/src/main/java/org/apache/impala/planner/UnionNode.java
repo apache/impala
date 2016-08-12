@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,16 +25,16 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TUnionNode;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TUnionNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

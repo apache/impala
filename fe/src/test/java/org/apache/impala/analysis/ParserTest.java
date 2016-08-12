@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -30,9 +30,9 @@ import java.util.List;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.testutil.TestUtils;
+import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

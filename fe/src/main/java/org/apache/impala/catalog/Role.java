@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TRole;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TRole;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;

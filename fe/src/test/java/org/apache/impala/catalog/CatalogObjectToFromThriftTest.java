@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import static org.junit.Assert.fail;
 
@@ -26,17 +26,17 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
-import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
-import com.cloudera.impala.thrift.TAccessLevel;
-import com.cloudera.impala.thrift.THBaseTable;
-import com.cloudera.impala.thrift.THdfsPartition;
-import com.cloudera.impala.thrift.THdfsTable;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableType;
+import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.THBaseTable;
+import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsTable;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**

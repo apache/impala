@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,43 +30,43 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.AggregateInfo;
-import com.cloudera.impala.analysis.AnalyticInfo;
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BaseTableRef;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
-import com.cloudera.impala.analysis.CollectionTableRef;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.ExprId;
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.InlineViewRef;
-import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.NullLiteral;
-import com.cloudera.impala.analysis.QueryStmt;
-import com.cloudera.impala.analysis.SelectStmt;
-import com.cloudera.impala.analysis.SingularRowSrcTableRef;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.TableRef;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.analysis.TupleIsNullPredicate;
-import com.cloudera.impala.analysis.UnionStmt;
-import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
-import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.DataSourceTable;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.common.Pair;
+import org.apache.impala.analysis.AggregateInfo;
+import org.apache.impala.analysis.AnalyticInfo;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BaseTableRef;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.analysis.CollectionTableRef;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprId;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.InlineViewRef;
+import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.analysis.SelectStmt;
+import org.apache.impala.analysis.SingularRowSrcTableRef;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TableRef;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.analysis.TupleIsNullPredicate;
+import org.apache.impala.analysis.UnionStmt;
+import org.apache.impala.analysis.UnionStmt.UnionOperand;
+import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.Pair;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -1126,7 +1126,7 @@ public class SingleNodePlanner {
     Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
       @Override
       public boolean apply(Expr expr) {
-        return com.cloudera.impala.analysis.Predicate.isEquivalencePredicate(expr)
+        return org.apache.impala.analysis.Predicate.isEquivalencePredicate(expr)
             && ((BinaryPredicate) expr).isInferred()
             && expr.getChild(0).equals(expr.getChild(1));
       }

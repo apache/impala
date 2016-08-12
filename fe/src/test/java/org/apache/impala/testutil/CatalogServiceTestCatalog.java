@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.testutil;
+package org.apache.impala.testutil;
 
-import com.cloudera.impala.authorization.SentryConfig;
-import com.cloudera.impala.catalog.AuthorizationPolicy;
-import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.CatalogServiceCatalog;
-import com.cloudera.impala.thrift.TUniqueId;
+import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.thrift.TUniqueId;
 
 /**
  * Test class of the Catalog Server's catalog that exposes internal state that is useful

@@ -15,25 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 
-import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsUri;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TAggregateFunction;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumnType;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TFunctionCategory;
-import com.cloudera.impala.thrift.TScalarFunction;
-import com.cloudera.impala.thrift.TSymbolLookupParams;
-import com.cloudera.impala.thrift.TSymbolLookupResult;
-import com.cloudera.impala.thrift.TSymbolType;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.HdfsUri;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TAggregateFunction;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TColumnType;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TScalarFunction;
+import org.apache.impala.thrift.TSymbolLookupParams;
+import org.apache.impala.thrift.TSymbolLookupResult;
+import org.apache.impala.thrift.TSymbolType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

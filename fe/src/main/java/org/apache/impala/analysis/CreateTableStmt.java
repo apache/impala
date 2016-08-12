@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,22 +26,22 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.fs.permission.FsAction;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.HdfsStorageDescriptor;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TCreateTableParams;
-import com.cloudera.impala.thrift.THdfsFileFormat;
-import com.cloudera.impala.thrift.TTableName;
-import com.cloudera.impala.util.AvroSchemaConverter;
-import com.cloudera.impala.util.AvroSchemaParser;
-import com.cloudera.impala.util.AvroSchemaUtils;
-import com.cloudera.impala.util.KuduUtil;
-import com.cloudera.impala.util.MetaStoreUtil;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCreateTableParams;
+import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.AvroSchemaConverter;
+import org.apache.impala.util.AvroSchemaParser;
+import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;

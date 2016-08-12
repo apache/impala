@@ -56,7 +56,7 @@ using namespace apache::thrift::server;
 // This is not called when we first start up the BE.
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
+Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
     JNIEnv* env, jclass caller_class) {
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
   char* name = const_cast<char*>("FeSupport");
@@ -72,7 +72,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
 // called.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
+Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_expr_batch,
     jbyteArray thrift_query_ctx_bytes) {
   jbyteArray result_bytes = NULL;
@@ -256,7 +256,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
 
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeCacheJar(
+Java_org_apache_impala_service_FeSupport_NativeCacheJar(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TCacheJarParams params;
   DeserializeThriftMsg(env, thrift_struct, &params);
@@ -276,7 +276,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeCacheJar(
 
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol(
+Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TSymbolLookupParams lookup;
   DeserializeThriftMsg(env, thrift_struct, &lookup);
@@ -299,7 +299,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol(
 // specific catalog objects.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad(
+Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TPrioritizeLoadRequest request;
   DeserializeThriftMsg(env, thrift_struct, &request);
@@ -323,7 +323,7 @@ Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad(
 
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeGetStartupOptions(JNIEnv* env,
+Java_org_apache_impala_service_FeSupport_NativeGetStartupOptions(JNIEnv* env,
     jclass caller_class) {
   TStartupOptions options;
   ExecEnv* exec_env = ExecEnv::GetInstance();
@@ -340,33 +340,33 @@ namespace impala {
 static JNINativeMethod native_methods[] = {
   {
     (char*)"NativeFeTestInit", (char*)"()V",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
   },
   {
     (char*)"NativeEvalConstExprs", (char*)"([B[B)[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs
   },
   {
     (char*)"NativeCacheJar", (char*)"([B)[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeCacheJar
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeCacheJar
   },
   {
     (char*)"NativeLookupSymbol", (char*)"([B)[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeLookupSymbol
   },
   {
     (char*)"NativePrioritizeLoad", (char*)"([B)[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad
+    (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
   },
   {
     (char*)"NativeGetStartupOptions", (char*)"()[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeGetStartupOptions
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeGetStartupOptions
   },
 };
 
 void InitFeSupport() {
   JNIEnv* env = getJNIEnv();
-  jclass native_backend_cl = env->FindClass("com/cloudera/impala/service/FeSupport");
+  jclass native_backend_cl = env->FindClass("org/apache/impala/service/FeSupport");
   env->RegisterNatives(native_backend_cl, native_methods,
       sizeof(native_methods) / sizeof(native_methods[0]));
   EXIT_IF_EXC(env);

@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.List;
 
-import com.cloudera.impala.thrift.TEventSequence;
+import org.apache.impala.thrift.TEventSequence;
 
 import com.google.common.collect.Lists;
 

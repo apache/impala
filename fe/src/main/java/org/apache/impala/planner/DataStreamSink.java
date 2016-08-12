@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
-import com.cloudera.impala.thrift.TDataSink;
-import com.cloudera.impala.thrift.TDataSinkType;
-import com.cloudera.impala.thrift.TDataStreamSink;
-import com.cloudera.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TDataSink;
+import org.apache.impala.thrift.TDataSinkType;
+import org.apache.impala.thrift.TDataStreamSink;
+import org.apache.impala.thrift.TExplainLevel;
 import com.google.common.base.Preconditions;
 
 /**

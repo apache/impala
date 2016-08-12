@@ -33,7 +33,7 @@ DEFINE_int32(non_impala_java_vlog, 0, "(Advanced) The log level (equivalent to -
 // service to log messages to Glog.
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_cloudera_impala_util_NativeLogger_Log(
+Java_org_apache_impala_util_NativeLogger_Log(
     JNIEnv* env, jclass caller_class, int severity, jstring msg, jstring file,
     int line_number) {
 
@@ -79,10 +79,10 @@ namespace impala {
 void InitJvmLoggingSupport() {
   JNIEnv* env = getJNIEnv();
   JNINativeMethod nm;
-  jclass native_backend_cl = env->FindClass("com/cloudera/impala/util/NativeLogger");
+  jclass native_backend_cl = env->FindClass("org/apache/impala/util/NativeLogger");
   nm.name = const_cast<char*>("Log");
   nm.signature = const_cast<char*>("(ILjava/lang/String;Ljava/lang/String;I)V");
-  nm.fnPtr = reinterpret_cast<void*>(::Java_com_cloudera_impala_util_NativeLogger_Log);
+  nm.fnPtr = reinterpret_cast<void*>(::Java_org_apache_impala_util_NativeLogger_Log);
   env->RegisterNatives(native_backend_cl, &nm, 1);
   EXIT_IF_EXC(env);
 }

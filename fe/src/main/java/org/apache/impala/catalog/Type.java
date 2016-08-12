@@ -15,23 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.analysis.CreateTableStmt;
-import com.cloudera.impala.analysis.SqlParser;
-import com.cloudera.impala.analysis.SqlScanner;
-import com.cloudera.impala.analysis.TypeDef;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.thrift.TColumnType;
-import com.cloudera.impala.thrift.TPrimitiveType;
-import com.cloudera.impala.thrift.TScalarType;
-import com.cloudera.impala.thrift.TStructField;
-import com.cloudera.impala.thrift.TTypeNode;
-import com.cloudera.impala.thrift.TTypeNodeType;
+import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.impala.analysis.SqlParser;
+import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.analysis.TypeDef;
+import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TColumnType;
+import org.apache.impala.thrift.TPrimitiveType;
+import org.apache.impala.thrift.TScalarType;
+import org.apache.impala.thrift.TStructField;
+import org.apache.impala.thrift.TTypeNode;
+import org.apache.impala.thrift.TTypeNodeType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

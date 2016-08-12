@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 
 import jline.internal.Preconditions;
 
-import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.MapType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Type;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
 import com.google.common.collect.Lists;
 
 /**

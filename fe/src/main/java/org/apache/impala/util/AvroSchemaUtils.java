@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,10 +28,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 
-import com.cloudera.impala.analysis.ColumnDef;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;

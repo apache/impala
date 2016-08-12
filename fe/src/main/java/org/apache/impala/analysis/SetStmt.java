@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.thrift.TSetQueryOptionRequest;
+import org.apache.impala.thrift.TSetQueryOptionRequest;
 import com.google.common.base.Preconditions;
 
 /**

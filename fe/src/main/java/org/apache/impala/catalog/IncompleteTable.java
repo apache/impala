@@ -15,20 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TErrorCode;
-import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableDescriptor;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TStatus;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TTableDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 

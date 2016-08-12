@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.thrift.TJoinOp;
+import org.apache.impala.thrift.TJoinOp;
 
 public enum JoinOperator {
   INNER_JOIN("INNER JOIN", TJoinOp.INNER_JOIN),

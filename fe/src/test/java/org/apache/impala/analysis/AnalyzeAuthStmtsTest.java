@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.HashSet;
 
 import org.junit.Test;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Role;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.thrift.TQueryCtx;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.Role;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TQueryCtx;
 
 public class AnalyzeAuthStmtsTest extends AnalyzerTest {
   public AnalyzeAuthStmtsTest() throws AnalysisException {

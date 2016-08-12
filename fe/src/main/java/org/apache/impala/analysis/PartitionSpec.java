@@ -15,20 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TPartitionKeyValue;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;

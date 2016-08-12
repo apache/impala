@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TPrivilegeLevel;
-import com.cloudera.impala.thrift.TPrivilegeScope;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TPrivilegeScope;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

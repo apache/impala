@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -25,19 +25,19 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TDataSource;
-import com.cloudera.impala.thrift.TDatabase;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TRole;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TUniqueId;
-import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
-import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDataSource;
+import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TRole;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
+import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 
 /**
  * Thread safe Catalog for an Impalad.  The Impalad catalog can be updated either via

@@ -15,23 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarFunction;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.hive.executor.UdfExecutor.JavaUdfDataType;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TFunctionCategory;
-import com.cloudera.impala.thrift.TSymbolType;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.hive.executor.UdfExecutor.JavaUdfDataType;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TSymbolType;
 import com.google.common.base.Preconditions;
 
 /**

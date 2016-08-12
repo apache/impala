@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 /**
  *  This is a utility class to incrementally calculate average, variance

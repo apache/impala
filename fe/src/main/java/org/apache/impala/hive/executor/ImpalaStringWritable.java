@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.hive.executor;
+package org.apache.impala.hive.executor;
 
 import java.nio.ByteBuffer;
 
-import com.cloudera.impala.util.UnsafeUtil;
+import org.apache.impala.util.UnsafeUtil;
 
 @SuppressWarnings("restriction")
 /**

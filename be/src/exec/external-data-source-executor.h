@@ -66,7 +66,7 @@ class ExternalDataSourceExecutor {
 
   bool is_initialized_; // Set true in Init() to ensure the class is initialized.
 
-  /// Instance of com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
+  /// Instance of org.apache.impala.extdatasource.ExternalDataSourceExecutor
   jobject executor_;
 };
 

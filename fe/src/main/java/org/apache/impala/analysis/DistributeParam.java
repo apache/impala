@@ -15,19 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TDistributeByHashParam;
-import com.cloudera.impala.thrift.TDistributeByRangeParam;
-import com.cloudera.impala.thrift.TDistributeParam;
-import com.cloudera.impala.thrift.TDistributeType;
-import com.cloudera.impala.thrift.TRangeLiteral;
-import com.cloudera.impala.thrift.TRangeLiteralList;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TDistributeByHashParam;
+import org.apache.impala.thrift.TDistributeByRangeParam;
+import org.apache.impala.thrift.TDistributeParam;
+import org.apache.impala.thrift.TDistributeType;
+import org.apache.impala.thrift.TRangeLiteral;
+import org.apache.impala.thrift.TRangeLiteralList;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

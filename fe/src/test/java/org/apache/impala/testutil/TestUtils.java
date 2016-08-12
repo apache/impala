@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.testutil;
+package org.apache.impala.testutil;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
@@ -36,15 +36,15 @@ import org.junit.Assume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.thrift.TClientRequest;
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TQueryOptions;
-import com.cloudera.impala.thrift.TSessionState;
-import com.cloudera.impala.thrift.TSessionType;
-import com.cloudera.impala.thrift.TUniqueId;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.thrift.TClientRequest;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.thrift.TSessionType;
+import org.apache.impala.thrift.TUniqueId;
 import com.google.common.collect.Maps;
 
 public class TestUtils {

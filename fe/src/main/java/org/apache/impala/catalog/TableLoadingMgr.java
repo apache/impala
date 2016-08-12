@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -33,8 +33,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.thrift.TTableName;
-import com.cloudera.impala.util.HdfsCachingUtil;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.HdfsCachingUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 

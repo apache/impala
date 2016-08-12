@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,25 +24,25 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.AnalysisContext;
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.ColumnLineageGraph;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.InsertStmt;
-import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.QueryStmt;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.PrintUtils;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TRuntimeFilterMode;
-import com.cloudera.impala.thrift.TTableName;
-import com.cloudera.impala.util.MaxRowsProcessedVisitor;
+import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.ColumnLineageGraph;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.InsertStmt;
+import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryExecRequest;
+import org.apache.impala.thrift.TRuntimeFilterMode;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.MaxRowsProcessedVisitor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

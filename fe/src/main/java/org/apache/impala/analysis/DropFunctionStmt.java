@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.authorization.AuthorizeableFn;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TDropFunctionParams;
-import com.cloudera.impala.thrift.TFunctionCategory;
+import org.apache.impala.authorization.AuthorizeableFn;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TDropFunctionParams;
+import org.apache.impala.thrift.TFunctionCategory;
 
 import java.util.ArrayList;
 

@@ -14,7 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.Arrays;
 import java.util.List;
@@ -25,15 +25,15 @@ import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.node.IntNode;
 import org.codehaus.jackson.node.JsonNodeFactory;
 
-import com.cloudera.impala.analysis.ColumnDef;
-import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.MapType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
 import com.google.common.collect.Lists;
 
 /**

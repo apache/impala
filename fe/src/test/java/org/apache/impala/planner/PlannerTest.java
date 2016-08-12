@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import org.junit.Assume;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TQueryOptions;
-import com.cloudera.impala.thrift.TRuntimeFilterMode;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TRuntimeFilterMode;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {

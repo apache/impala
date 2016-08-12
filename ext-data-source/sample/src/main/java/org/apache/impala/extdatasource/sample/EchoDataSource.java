@@ -15,21 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.extdatasource.sample;
+package org.apache.impala.extdatasource.sample;
 
-import com.cloudera.impala.extdatasource.thrift.TCloseParams;
-import com.cloudera.impala.extdatasource.thrift.TCloseResult;
-import com.cloudera.impala.extdatasource.thrift.TGetNextParams;
-import com.cloudera.impala.extdatasource.thrift.TGetNextResult;
-import com.cloudera.impala.extdatasource.thrift.TOpenParams;
-import com.cloudera.impala.extdatasource.thrift.TOpenResult;
-import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
-import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
-import com.cloudera.impala.extdatasource.thrift.TRowBatch;
-import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
-import com.cloudera.impala.thrift.TColumnData;
-import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TErrorCode;
+import org.apache.impala.extdatasource.thrift.TCloseParams;
+import org.apache.impala.extdatasource.thrift.TCloseResult;
+import org.apache.impala.extdatasource.thrift.TGetNextParams;
+import org.apache.impala.extdatasource.thrift.TGetNextResult;
+import org.apache.impala.extdatasource.thrift.TOpenParams;
+import org.apache.impala.extdatasource.thrift.TOpenResult;
+import org.apache.impala.extdatasource.thrift.TPrepareParams;
+import org.apache.impala.extdatasource.thrift.TPrepareResult;
+import org.apache.impala.extdatasource.thrift.TRowBatch;
+import org.apache.impala.extdatasource.v1.ExternalDataSource;
+import org.apache.impala.thrift.TColumnData;
+import org.apache.impala.thrift.TStatus;
+import org.apache.impala.thrift.TErrorCode;
 import com.google.common.collect.Lists;
 
 /**

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,25 +29,25 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.analysis.NullLiteral;
-import com.cloudera.impala.analysis.PartitionKeyValue;
-import com.cloudera.impala.analysis.ToSqlUtils;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
-import com.cloudera.impala.thrift.TAccessLevel;
-import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.THdfsCompression;
-import com.cloudera.impala.thrift.THdfsFileBlock;
-import com.cloudera.impala.thrift.THdfsFileDesc;
-import com.cloudera.impala.thrift.THdfsPartition;
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TPartitionStats;
-import com.cloudera.impala.thrift.TTableStats;
-import com.cloudera.impala.util.HdfsCachingUtil;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.THdfsCompression;
+import org.apache.impala.thrift.THdfsFileBlock;
+import org.apache.impala.thrift.THdfsFileDesc;
+import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.HdfsCachingUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;

@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.common.Reference;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.common.Reference;
 
 public abstract class Predicate extends Expr {
   protected boolean isEqJoinConjunct_;

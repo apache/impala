@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.math.BigDecimal;
 
-import com.cloudera.impala.catalog.HdfsCachePool;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.THdfsCachingOp;
+import org.apache.impala.catalog.HdfsCachePool;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.THdfsCachingOp;
 import com.google.common.base.Preconditions;
 
 /**

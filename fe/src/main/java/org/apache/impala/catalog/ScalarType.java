@@ -15,15 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.cloudera.impala.analysis.TypesUtil;
-import com.cloudera.impala.thrift.TColumnType;
-import com.cloudera.impala.thrift.TScalarType;
-import com.cloudera.impala.thrift.TTypeNode;
-import com.cloudera.impala.thrift.TTypeNodeType;
+import org.apache.impala.analysis.TypesUtil;
+import org.apache.impala.thrift.TColumnType;
+import org.apache.impala.thrift.TScalarType;
+import org.apache.impala.thrift.TTypeNode;
+import org.apache.impala.thrift.TTypeNodeType;
 import com.google.common.base.Preconditions;
 
 /**

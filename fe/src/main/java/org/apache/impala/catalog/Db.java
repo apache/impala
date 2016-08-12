@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,16 +30,16 @@ import org.apache.thrift.TSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TDatabase;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TFunctionCategory;
-import com.cloudera.impala.util.PatternMatcher;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

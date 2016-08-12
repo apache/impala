@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.List;
 
@@ -30,16 +30,16 @@ import org.apache.sentry.service.thrift.SentryServiceClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.PrivilegeSpec;
-import com.cloudera.impala.authorization.SentryConfig;
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.RolePrivilege;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TPrivilegeLevel;
-import com.cloudera.impala.thrift.TPrivilegeScope;
+import org.apache.impala.analysis.PrivilegeSpec;
+import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.RolePrivilege;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TPrivilegeScope;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

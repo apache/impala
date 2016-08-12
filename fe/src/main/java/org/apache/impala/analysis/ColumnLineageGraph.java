@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.text.SimpleDateFormat;
 import java.util.Collection;
@@ -34,14 +34,14 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.Id;
-import com.cloudera.impala.common.IdGenerator;
-import com.cloudera.impala.thrift.TEdgeType;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TLineageGraph;
-import com.cloudera.impala.thrift.TMultiEdge;
-import com.cloudera.impala.thrift.TVertex;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.Id;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.thrift.TEdgeType;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TLineageGraph;
+import org.apache.impala.thrift.TMultiEdge;
+import org.apache.impala.thrift.TVertex;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;

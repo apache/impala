@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog.delegates;
+package org.apache.impala.catalog.delegates;
 
-import static com.cloudera.impala.util.KuduUtil.compareSchema;
-import static com.cloudera.impala.util.KuduUtil.fromImpalaType;
-import static com.cloudera.impala.util.KuduUtil.parseKeyColumns;
+import static org.apache.impala.util.KuduUtil.compareSchema;
+import static org.apache.impala.util.KuduUtil.fromImpalaType;
+import static org.apache.impala.util.KuduUtil.parseKeyColumns;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,10 +38,10 @@ import org.apache.kudu.client.PartialRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TDistributeParam;
-import com.cloudera.impala.util.KuduUtil;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TDistributeParam;
+import org.apache.impala.util.KuduUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -100,7 +100,7 @@ public class KuduDdlDelegate extends DdlDelegate {
       // Create a new Schema and map the types accordingly
       ArrayList<ColumnSchema> columns = Lists.newArrayList();
       for (FieldSchema fieldSchema: msTbl_.getSd().getCols()) {
-        com.cloudera.impala.catalog.Type catalogType = com.cloudera.impala.catalog.Type
+        org.apache.impala.catalog.Type catalogType = org.apache.impala.catalog.Type
             .parseColumnType(fieldSchema.getType());
         if (catalogType == null) {
           throw new ImpalaRuntimeException(String.format(

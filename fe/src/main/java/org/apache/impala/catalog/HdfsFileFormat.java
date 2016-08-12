@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 import java.util.Map;
 
-import com.cloudera.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;

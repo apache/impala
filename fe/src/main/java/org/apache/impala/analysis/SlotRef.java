@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,14 +24,14 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Path.PathType;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TSlotRef;
+import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
+import org.apache.impala.thrift.TSlotRef;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.Collections;
 import java.util.List;
 
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.KuduColumn;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.thrift.TSlotDescriptor;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

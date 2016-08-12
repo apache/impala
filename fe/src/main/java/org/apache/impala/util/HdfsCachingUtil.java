@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.io.IOException;
 import java.util.Map;
@@ -30,13 +30,13 @@ import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo.Expiration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.JniCatalogConstants;
-import com.cloudera.impala.thrift.THdfsCachingOp;
+import org.apache.impala.analysis.TableName;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.JniCatalogConstants;
+import org.apache.impala.thrift.THdfsCachingOp;
 import com.google.common.base.Preconditions;
 
 /**

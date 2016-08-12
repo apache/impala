@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.apache.commons.lang.NotImplementedException;
 
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 
 /**
  * Base class for all Impala SQL statements.

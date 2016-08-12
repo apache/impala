@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -29,8 +29,8 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
-import com.cloudera.impala.thrift.THdfsFileFormat;
+import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
+import org.apache.impala.thrift.THdfsFileFormat;
 import com.google.common.collect.ImmutableList;
 
 public class HdfsStorageDescriptorTest {
@@ -60,7 +60,7 @@ public class HdfsStorageDescriptorTest {
         "parquet.hive.MapredParquetInputFormat",
         "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"};
     String [] outputFormats = new String [] {
-        "com.cloudera.impala.hive.serde.ParquetOutputFormat",
+        "org.apache.impala.hive.serde.ParquetOutputFormat",
         "parquet.hive.DeprecatedParquetOutputFormat",
         "parquet.hive.MapredParquetOutputFormat",
         "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"};

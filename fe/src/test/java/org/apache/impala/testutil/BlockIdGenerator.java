@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.testutil;
+package org.apache.impala.testutil;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -27,14 +27,14 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
-import com.cloudera.impala.util.PatternMatcher;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.util.PatternMatcher;
 
 /**
  * Utility to generate an output file with all the block ids for each table

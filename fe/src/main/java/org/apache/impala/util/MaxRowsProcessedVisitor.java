@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
-import com.cloudera.impala.planner.NestedLoopJoinNode;
-import com.cloudera.impala.planner.HashJoinNode;
-import com.cloudera.impala.planner.PlanNode;
-import com.cloudera.impala.planner.ScanNode;
+import org.apache.impala.planner.NestedLoopJoinNode;
+import org.apache.impala.planner.HashJoinNode;
+import org.apache.impala.planner.PlanNode;
+import org.apache.impala.planner.ScanNode;
 
 /**
  * Returns the maximum number of rows processed by any node in a given plan tree

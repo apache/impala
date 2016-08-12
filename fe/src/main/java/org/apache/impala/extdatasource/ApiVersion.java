@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.extdatasource;
+package org.apache.impala.extdatasource;
 
-import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
+import org.apache.impala.extdatasource.v1.ExternalDataSource;
 import com.google.common.base.Strings;
 
 /**
  * Enumerates the valid versions of the {@link ExternalDataSource} API.
  */
 public enum ApiVersion {
-  V1(com.cloudera.impala.extdatasource.v1.ExternalDataSource.class);
+  V1(org.apache.impala.extdatasource.v1.ExternalDataSource.class);
 
   private final Class<?> apiInterface_;
 

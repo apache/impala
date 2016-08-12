@@ -19,7 +19,7 @@
 // This file contains structures produced by the planner.
 
 namespace cpp impala
-namespace java com.cloudera.impala.thrift
+namespace java org.apache.impala.thrift
 
 include "Types.thrift"
 include "Exprs.thrift"

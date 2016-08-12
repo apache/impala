@@ -58,7 +58,7 @@ class Planner {
   Planner() {
     JNIEnv* jni_env = getJNIEnv();
     // create instance of java class JniFrontend
-    jclass fe_class = jni_env->FindClass("com/cloudera/impala/service/JniFrontend");
+    jclass fe_class = jni_env->FindClass("org/apache/impala/service/JniFrontend");
     jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>", "(Z)V");
     EXIT_IF_EXC(jni_env);
     create_exec_request_id_ =
@@ -91,7 +91,7 @@ class Planner {
   }
 
  private:
-  jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
+  jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
 
   TQueryOptions query_options_;

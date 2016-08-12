@@ -21,14 +21,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.cloudera.impala</groupId>
+    <groupId>org.apache.impala</groupId>
     <artifactId>impala-data-source</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.cloudera.impala</groupId>
+  <groupId>org.apache.impala</groupId>
   <artifactId>impala-data-source-api</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>Cloudera Impala External Data Source API</name>
+  <name>Apache Impala (Incubating) External Data Source API</name>
   <description>External Data Source API interface definition</description>
   <packaging>jar</packaging>
   <url>.</url>

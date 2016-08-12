@@ -15,22 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 import java.util.EnumSet;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableId;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.service.CatalogOpExecutor;
-import com.cloudera.impala.thrift.THdfsFileFormat;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableId;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

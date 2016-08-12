@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -30,19 +30,19 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.thrift.TAccessLevel;
-import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumn;
-import com.cloudera.impala.thrift.TColumnDescriptor;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableDescriptor;
-import com.cloudera.impala.thrift.TTableStats;
-import com.cloudera.impala.util.HdfsCachingUtil;
+import org.apache.impala.analysis.TableName;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnDescriptor;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.HdfsCachingUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

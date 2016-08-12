@@ -59,7 +59,7 @@ Catalog::Catalog() {
 
   JNIEnv* jni_env = getJNIEnv();
   // Create an instance of the java class JniCatalog
-  catalog_class_ = jni_env->FindClass("com/cloudera/impala/service/JniCatalog");
+  catalog_class_ = jni_env->FindClass("org/apache/impala/service/JniCatalog");
   EXIT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);

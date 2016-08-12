@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.hive.executor;
+package org.apache.impala.hive.executor;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -63,14 +63,14 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarFunction;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.THiveUdfExecutorCtorParams;
-import com.cloudera.impala.util.UnsafeUtil;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
+import org.apache.impala.util.UnsafeUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;

@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 
-import com.cloudera.impala.thrift.TPrimitiveType;
+import org.apache.impala.thrift.TPrimitiveType;
 import com.google.common.collect.Lists;
 
 public enum PrimitiveType {

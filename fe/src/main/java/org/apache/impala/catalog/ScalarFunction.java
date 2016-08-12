@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,14 +25,14 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.ResourceType;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
 
-import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsUri;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.hive.executor.UdfExecutor.JavaUdfDataType;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TScalarFunction;
-import com.cloudera.impala.thrift.TSymbolType;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.HdfsUri;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.hive.executor.UdfExecutor.JavaUdfDataType;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TScalarFunction;
+import org.apache.impala.thrift.TSymbolType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.common;
+package org.apache.impala.common;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -33,9 +33,9 @@ import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 
-import com.cloudera.impala.thrift.TGetJvmMetricsRequest;
-import com.cloudera.impala.thrift.TGetJvmMetricsResponse;
-import com.cloudera.impala.thrift.TJvmMemoryPool;
+import org.apache.impala.thrift.TGetJvmMetricsRequest;
+import org.apache.impala.thrift.TGetJvmMetricsResponse;
+import org.apache.impala.thrift.TJvmMemoryPool;
 
 /**
  * Utility class with methods intended for JNI clients

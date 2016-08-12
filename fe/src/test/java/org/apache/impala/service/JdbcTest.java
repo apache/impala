@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.service;
+package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -39,10 +39,10 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.CreateTableStmt;
-import com.cloudera.impala.analysis.SqlParser;
-import com.cloudera.impala.analysis.SqlScanner;
-import com.cloudera.impala.testutil.ImpalaJdbcClient;
+import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.impala.analysis.SqlParser;
+import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.testutil.ImpalaJdbcClient;
 import com.google.common.collect.Lists;
 
 /**

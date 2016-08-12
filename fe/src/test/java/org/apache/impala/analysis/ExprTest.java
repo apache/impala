@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
 
 
 public class ExprTest {

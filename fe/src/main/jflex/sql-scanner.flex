@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java_cup.runtime.Symbol;
 import java.lang.Integer;
@@ -28,7 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 
-import com.cloudera.impala.analysis.SqlParserSymbols;
+import org.apache.impala.analysis.SqlParserSymbols;
 
 %%
 

@@ -1,5 +1,5 @@
 {"type": "record",
-"namespace": "com.cloudera.impala",
+"namespace": "org.apache.impala",
 "name": "nested",
 "fields": [
   {"name": "t_long", "type": "long"},

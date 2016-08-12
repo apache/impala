@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import static org.junit.Assert.assertTrue;
 
@@ -23,11 +23,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.lang.*;
 
-import com.cloudera.impala.analysis.*;
+import org.apache.impala.analysis.*;
 import com.google.common.collect.Lists;
 import org.junit.Test;
 
-import static com.cloudera.impala.catalog.HdfsPartition.comparePartitionKeyValues;
+import static org.apache.impala.catalog.HdfsPartition.comparePartitionKeyValues;
 
 public class HdfsPartitionTest {
 

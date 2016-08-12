@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -26,10 +26,10 @@ import java.util.List;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;

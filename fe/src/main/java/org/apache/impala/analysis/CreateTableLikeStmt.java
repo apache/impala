@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.apache.hadoop.fs.permission.FsAction;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TCreateTableLikeParams;
-import com.cloudera.impala.thrift.THdfsFileFormat;
-import com.cloudera.impala.thrift.TTableName;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCreateTableLikeParams;
+import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 /**

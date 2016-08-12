@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,16 +24,16 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Function.CompareMode;
-import com.cloudera.impala.catalog.ScalarFunction;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.common.Reference;
-import com.cloudera.impala.extdatasource.thrift.TComparisonOp;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.common.Reference;
+import org.apache.impala.extdatasource.thrift.TComparisonOp;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,17 +31,17 @@ import org.apache.log4j.Logger;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.LocatedTablet;
 
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TColumn;
-import com.cloudera.impala.thrift.TKuduTable;
-import com.cloudera.impala.thrift.TResultSet;
-import com.cloudera.impala.thrift.TResultSetMetadata;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableDescriptor;
-import com.cloudera.impala.thrift.TTableType;
-import com.cloudera.impala.util.KuduUtil;
-import com.cloudera.impala.util.TResultRowBuilder;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TKuduTable;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -146,7 +146,7 @@ public class KuduTable extends Table {
     Set<String> columnNames = Sets.newHashSet();
     int pos = 0;
     for (FieldSchema field: schema) {
-      com.cloudera.impala.catalog.Type type = parseColumnType(field);
+      org.apache.impala.catalog.Type type = parseColumnType(field);
       // TODO(kudu-merge): Check for decimal types?
       boolean isKey = keyColumns.contains(field.getName());
       KuduColumn col = new KuduColumn(field.getName(), isKey, !isKey, type,

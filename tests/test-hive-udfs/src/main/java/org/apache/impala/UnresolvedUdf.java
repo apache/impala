@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.cloudera.impala;
+package org.apache.impala;
 
 // Import a class that is not shaded in the UDF jar.
 import com.google.i18n.phonenumbers.NumberParseException;

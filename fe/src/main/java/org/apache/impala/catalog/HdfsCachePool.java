@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.THdfsCachePool;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.THdfsCachePool;
 import com.google.common.base.Preconditions;
 
 /**

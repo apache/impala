@@ -15,21 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.planner.DataSink;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.planner.DataSink;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

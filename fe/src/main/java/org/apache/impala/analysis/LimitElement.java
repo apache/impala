@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TColumnValue;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TColumnValue;
 import com.google.common.base.Preconditions;
 
 /**

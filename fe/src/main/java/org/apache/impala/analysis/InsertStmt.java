@@ -15,30 +15,30 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import com.cloudera.impala.planner.TableSink;
+import org.apache.impala.planner.TableSink;
 import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.planner.DataSink;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.planner.DataSink;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

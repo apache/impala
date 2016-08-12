@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.List;
 
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.thrift.TDataSink;
-import com.cloudera.impala.thrift.TExplainLevel;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.thrift.TDataSink;
+import org.apache.impala.thrift.TExplainLevel;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.

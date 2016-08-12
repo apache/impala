@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.List;
 import java.util.Set;
@@ -28,16 +28,16 @@ import org.apache.sentry.provider.db.service.thrift.TSentryGroup;
 import org.apache.sentry.provider.db.service.thrift.TSentryPrivilege;
 import org.apache.sentry.provider.db.service.thrift.TSentryRole;
 
-import com.cloudera.impala.authorization.SentryConfig;
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.CatalogServiceCatalog;
-import com.cloudera.impala.catalog.Role;
-import com.cloudera.impala.catalog.RolePrivilege;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TPrivilege;
+import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.Role;
+import org.apache.impala.catalog.RolePrivilege;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TPrivilege;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;

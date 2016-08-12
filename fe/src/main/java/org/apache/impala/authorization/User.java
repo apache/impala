@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.authorization;
+package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.service.BackendConfig;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 
 import java.io.IOException;
 

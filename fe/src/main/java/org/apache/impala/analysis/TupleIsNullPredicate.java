@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 import java.util.Set;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TTupleIsNullPredicate;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
+import org.apache.impala.thrift.TTupleIsNullPredicate;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;

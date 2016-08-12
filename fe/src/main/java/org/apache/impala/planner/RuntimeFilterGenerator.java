@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -24,22 +24,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.Predicate;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.analysis.TupleIsNullPredicate;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.IdGenerator;
-import com.cloudera.impala.planner.PlanNode;
-import com.cloudera.impala.thrift.TRuntimeFilterDesc;
-import com.cloudera.impala.thrift.TRuntimeFilterTargetDesc;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.Predicate;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.analysis.TupleIsNullPredicate;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.planner.PlanNode;
+import org.apache.impala.thrift.TRuntimeFilterDesc;
+import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

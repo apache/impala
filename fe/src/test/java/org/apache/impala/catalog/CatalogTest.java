@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
-import static com.cloudera.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
+import static org.apache.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -35,13 +35,13 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsUri;
-import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.analysis.NumericLiteral;
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.HdfsUri;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

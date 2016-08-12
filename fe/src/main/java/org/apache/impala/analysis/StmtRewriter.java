@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +23,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
-import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
+import org.apache.impala.analysis.UnionStmt.UnionOperand;
+import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;

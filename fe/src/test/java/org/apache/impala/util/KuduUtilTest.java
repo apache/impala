@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.List;
 
-import com.cloudera.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.apache.kudu.ColumnSchema;

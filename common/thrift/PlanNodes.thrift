@@ -22,7 +22,7 @@
 // (those are recorded in TPlanFragmentInstanceCtx).
 
 namespace cpp impala
-namespace java com.cloudera.impala.thrift
+namespace java org.apache.impala.thrift
 
 include "CatalogObjects.thrift"
 include "ExecStats.thrift"

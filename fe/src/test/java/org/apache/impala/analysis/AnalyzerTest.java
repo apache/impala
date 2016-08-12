@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,13 +27,13 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FrontendTestBase;
-import com.cloudera.impala.thrift.TExpr;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
 
 public class AnalyzerTest extends FrontendTestBase {

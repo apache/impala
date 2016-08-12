@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.List;
 import java.util.Map;
@@ -27,8 +27,8 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

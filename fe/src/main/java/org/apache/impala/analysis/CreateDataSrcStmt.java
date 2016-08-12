@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.extdatasource.ApiVersion;
-import com.cloudera.impala.thrift.TCreateDataSourceParams;
-import com.cloudera.impala.thrift.TDataSource;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.extdatasource.ApiVersion;
+import org.apache.impala.thrift.TCreateDataSourceParams;
+import org.apache.impala.thrift.TDataSource;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -24,27 +24,27 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.AggregateInfoBase;
-import com.cloudera.impala.analysis.AnalyticExpr;
-import com.cloudera.impala.analysis.AnalyticInfo;
-import com.cloudera.impala.analysis.AnalyticWindow;
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.BoolLiteral;
-import com.cloudera.impala.analysis.CompoundPredicate;
-import com.cloudera.impala.analysis.CompoundPredicate.Operator;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.IsNullPredicate;
-import com.cloudera.impala.analysis.OrderByElement;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.SortInfo;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.analysis.TupleIsNullPredicate;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.TPartitionType;
+import org.apache.impala.analysis.AggregateInfoBase;
+import org.apache.impala.analysis.AnalyticExpr;
+import org.apache.impala.analysis.AnalyticInfo;
+import org.apache.impala.analysis.AnalyticWindow;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.CompoundPredicate.Operator;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.OrderByElement;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.SortInfo;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.analysis.TupleIsNullPredicate;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

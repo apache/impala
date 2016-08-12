@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.common;
+package org.apache.impala.common;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import com.cloudera.impala.util.Visitor;
+import org.apache.impala.util.Visitor;
 import com.google.common.base.Predicate;
 
 /**

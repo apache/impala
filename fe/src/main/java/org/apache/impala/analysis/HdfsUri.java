@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.io.IOException;
 
@@ -23,12 +23,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 
-import com.cloudera.impala.authorization.AuthorizeableUri;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.util.FsPermissionChecker;
+import org.apache.impala.authorization.AuthorizeableUri;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.util.FsPermissionChecker;
 import com.google.common.base.Preconditions;
 
 /**

@@ -15,24 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.Frontend;
-import com.cloudera.impala.testutil.ImpaladTestCatalog;
-import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TCatalogObjectType;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.Frontend;
+import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TCatalogObjectType;
 import com.google.common.collect.Sets;
 
 /**

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 
@@ -23,14 +23,14 @@ import org.apache.commons.lang3.StringUtils;
 
 import parquet.Strings;
 
-import com.cloudera.impala.analysis.Path.PathType;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TDescribeOutputStyle;
-import com.cloudera.impala.thrift.TDescribeTableParams;
+import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TDescribeOutputStyle;
+import org.apache.impala.thrift.TDescribeTableParams;
 import com.google.common.base.Preconditions;
 
 /**

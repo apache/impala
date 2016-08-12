@@ -33,7 +33,7 @@
 
 #include "common/names.h"
 
-const char* EXECUTOR_CLASS = "com/cloudera/impala/hive/executor/UdfExecutor";
+const char* EXECUTOR_CLASS = "org/apache/impala/hive/executor/UdfExecutor";
 const char* EXECUTOR_CTOR_SIGNATURE ="([B)V";
 const char* EXECUTOR_EVALUATE_SIGNATURE = "()V";
 const char* EXECUTOR_CLOSE_SIGNATURE = "()V";

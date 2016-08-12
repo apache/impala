@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -27,18 +27,18 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.HdfsFileFormat;
-import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
-import com.cloudera.impala.thrift.TLoadDataReq;
-import com.cloudera.impala.thrift.TTableName;
-import com.cloudera.impala.util.TAccessLevelUtil;
-import com.cloudera.impala.util.FsPermissionChecker;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.TLoadDataReq;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.TAccessLevelUtil;
+import org.apache.impala.util.FsPermissionChecker;
 import com.google.common.base.Preconditions;
 
 /*
@@ -85,7 +85,7 @@ public class LoadDataStmt extends StatementBase {
 
   /*
    * Print SQL syntax corresponding to this node.
-   * @see com.cloudera.impala.parser.ParseNode#toSql()
+   * @see org.apache.impala.parser.ParseNode#toSql()
    */
   @Override
   public String toSql() {

@@ -15,20 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.thrift.TDecimalLiteral;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TFloatLiteral;
-import com.cloudera.impala.thrift.TIntLiteral;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.thrift.TDecimalLiteral;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
+import org.apache.impala.thrift.TFloatLiteral;
+import org.apache.impala.thrift.TIntLiteral;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 

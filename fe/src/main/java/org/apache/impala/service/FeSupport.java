@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.service;
+package org.apache.impala.service;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,28 +28,28 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.BoolLiteral;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.NullLiteral;
-import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TCacheJarParams;
-import com.cloudera.impala.thrift.TCacheJarResult;
-import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TCatalogServiceRequestHeader;
-import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TExprBatch;
-import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
-import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TResultRow;
-import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStartupOptions;
-import com.cloudera.impala.thrift.TSymbolLookupParams;
-import com.cloudera.impala.thrift.TSymbolLookupResult;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.util.NativeLibUtil;
+import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.TableName;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TCacheJarParams;
+import org.apache.impala.thrift.TCacheJarResult;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TExprBatch;
+import org.apache.impala.thrift.TPrioritizeLoadRequest;
+import org.apache.impala.thrift.TPrioritizeLoadResponse;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TResultRow;
+import org.apache.impala.thrift.TStatus;
+import org.apache.impala.thrift.TStartupOptions;
+import org.apache.impala.thrift.TSymbolLookupParams;
+import org.apache.impala.thrift.TSymbolLookupResult;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.util.NativeLibUtil;
 import com.google.common.base.Preconditions;
 
 /**

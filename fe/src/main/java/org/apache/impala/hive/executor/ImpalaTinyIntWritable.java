@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.hive.executor;
+package org.apache.impala.hive.executor;
 
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 
-import com.cloudera.impala.util.UnsafeUtil;
+import org.apache.impala.util.UnsafeUtil;
 
 @SuppressWarnings("restriction")
 public class ImpalaTinyIntWritable extends ByteWritable {

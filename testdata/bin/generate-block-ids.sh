@@ -18,5 +18,5 @@
 # under the License.
 
 cd $IMPALA_FE_DIR
-mvn -e exec:java -Dexec.mainClass=com.cloudera.impala.testutil.BlockIdGenerator \
+mvn -e exec:java -Dexec.mainClass=org.apache.impala.testutil.BlockIdGenerator \
               -Dexec.classpathScope=test -Dexec.args="../testdata/block-ids"

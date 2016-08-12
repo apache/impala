@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import static org.apache.avro.Schema.Type.BOOLEAN;
 import static org.apache.avro.Schema.Type.DOUBLE;
@@ -33,15 +33,15 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.codehaus.jackson.JsonNode;
 
-import com.cloudera.impala.analysis.ColumnDef;
-import com.cloudera.impala.analysis.TypeDef;
-import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.MapType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.analysis.TypeDef;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

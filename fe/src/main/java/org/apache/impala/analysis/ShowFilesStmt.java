@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TShowFilesParams;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.thrift.TTableName;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TShowFilesParams;
+import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;

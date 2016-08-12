@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TResetMetadataRequest;
-import com.cloudera.impala.thrift.TTableName;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TResetMetadataRequest;
+import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 

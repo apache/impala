@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.extdatasource.v1;
+package org.apache.impala.extdatasource.v1;
 
-import com.cloudera.impala.extdatasource.thrift.TCloseParams;
-import com.cloudera.impala.extdatasource.thrift.TCloseResult;
-import com.cloudera.impala.extdatasource.thrift.TGetNextParams;
-import com.cloudera.impala.extdatasource.thrift.TGetNextResult;
-import com.cloudera.impala.extdatasource.thrift.TOpenParams;
-import com.cloudera.impala.extdatasource.thrift.TOpenResult;
-import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
-import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
+import org.apache.impala.extdatasource.thrift.TCloseParams;
+import org.apache.impala.extdatasource.thrift.TCloseResult;
+import org.apache.impala.extdatasource.thrift.TGetNextParams;
+import org.apache.impala.extdatasource.thrift.TGetNextResult;
+import org.apache.impala.extdatasource.thrift.TOpenParams;
+import org.apache.impala.extdatasource.thrift.TOpenResult;
+import org.apache.impala.extdatasource.thrift.TPrepareParams;
+import org.apache.impala.extdatasource.thrift.TPrepareResult;
 
 /**
  * Defines an external data source. Called by Impala during planning (prepare() only)

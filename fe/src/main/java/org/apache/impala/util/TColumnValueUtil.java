@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
-import com.cloudera.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TColumnValue;
 
 /**
  * Utility functions for working with TColumnValue objects.

@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TAlterTableUpdateStatsParams;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 

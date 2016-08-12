@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
-import com.cloudera.impala.common.Id;
-import com.cloudera.impala.common.IdGenerator;
+import org.apache.impala.common.Id;
+import org.apache.impala.common.IdGenerator;
 
 public class TableId extends Id<TableId> {
   // Construction only allowed via an IdGenerator.

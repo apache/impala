@@ -104,7 +104,7 @@ class Catalog {
   /// Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
 
-  jobject catalog_;  // instance of com.cloudera.impala.service.JniCatalog
+  jobject catalog_;  // instance of org.apache.impala.service.JniCatalog
   jmethodID update_metastore_id_;  // JniCatalog.updateMetaastore()
   jmethodID exec_ddl_id_;  // JniCatalog.execDdl()
   jmethodID reset_metadata_id_;  // JniCatalog.resetMetdata()

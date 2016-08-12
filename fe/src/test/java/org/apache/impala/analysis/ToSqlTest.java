@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.fail;
 
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FrontendTestBase;
-import com.cloudera.impala.testutil.TestUtils;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 
 // TODO: Expand this test, in particular, because view creation relies

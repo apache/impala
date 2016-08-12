@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
-import com.cloudera.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCatalogObjectType;
 
 /**
  * Interface that all catalog objects implement.

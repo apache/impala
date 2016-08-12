@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.List;
 import java.util.Map;
@@ -26,12 +26,12 @@ import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.provider.cache.PrivilegeCache;
 
-import com.cloudera.impala.thrift.TColumn;
-import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TResultRow;
-import com.cloudera.impala.thrift.TResultSet;
-import com.cloudera.impala.thrift.TResultSetMetadata;
-import com.cloudera.impala.util.TResultRowBuilder;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TResultRow;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

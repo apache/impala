@@ -40,7 +40,7 @@ export CLASSPATH=$IMPALA_HOME/testdata/target/impala-testdata-0.1-SNAPSHOT.jar:$
 : ${JAVA_KERBEROS_MAGIC=}
 for ATTEMPT in {1..10}; do
   if "$JAVA" ${JAVA_KERBEROS_MAGIC} \
-      com.cloudera.impala.datagenerator.HBaseTestDataRegionAssigment \
+      org.apache.impala.datagenerator.HBaseTestDataRegionAssigment \
       functional_hbase.alltypesagg functional_hbase.alltypessmall; then
     break
   fi

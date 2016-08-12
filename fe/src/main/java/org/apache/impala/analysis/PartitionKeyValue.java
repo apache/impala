@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 /**

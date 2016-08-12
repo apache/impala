@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,16 +25,16 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Path.PathType;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ColumnAliasGenerator;
-import com.cloudera.impala.common.TableAliasGenerator;
-import com.cloudera.impala.common.TreeNode;
+import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ColumnAliasGenerator;
+import org.apache.impala.common.TableAliasGenerator;
+import org.apache.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;

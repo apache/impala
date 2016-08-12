@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.authorization;
+package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 

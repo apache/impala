@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -25,12 +25,12 @@ import java_cup.runtime.Symbol;
 
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TStringLiteral;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
+import org.apache.impala.thrift.TStringLiteral;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 

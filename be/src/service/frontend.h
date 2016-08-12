@@ -172,7 +172,7 @@ class Frontend {
   /// Descriptor of Java Frontend class itself, used to create a new instance.
   jclass fe_class_;
 
-  jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
+  jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig(byte[])

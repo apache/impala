@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.CollectionTableRef;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TUnnestNode;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.CollectionTableRef;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TUnnestNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 

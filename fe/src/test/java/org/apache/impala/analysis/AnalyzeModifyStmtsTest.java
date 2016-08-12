@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.junit.Test;
 
-import com.cloudera.impala.testutil.TestUtils;
+import org.apache.impala.testutil.TestUtils;
 
 /**
  * Tests analysis phase of the ModifyStmt and its sub-classes.

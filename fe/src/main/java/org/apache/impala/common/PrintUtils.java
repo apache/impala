@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.common;
+package org.apache.impala.common;
 
-import static com.cloudera.impala.common.ByteUnits.GIGABYTE;
-import static com.cloudera.impala.common.ByteUnits.KILOBYTE;
-import static com.cloudera.impala.common.ByteUnits.MEGABYTE;
-import static com.cloudera.impala.common.ByteUnits.PETABYTE;
-import static com.cloudera.impala.common.ByteUnits.TERABYTE;
+import static org.apache.impala.common.ByteUnits.GIGABYTE;
+import static org.apache.impala.common.ByteUnits.KILOBYTE;
+import static org.apache.impala.common.ByteUnits.MEGABYTE;
+import static org.apache.impala.common.ByteUnits.PETABYTE;
+import static org.apache.impala.common.ByteUnits.TERABYTE;
 
 import java.text.DecimalFormat;
 

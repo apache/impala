@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.Properties;
 
@@ -25,8 +25,8 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.spi.LoggingEvent;
 
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TLogLevel;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TLogLevel;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -96,7 +96,7 @@ public class GlogAppender extends AppenderSkeleton {
    * Manually override Log4j root logger configuration. Any values in log4j.properties
    * not overridden (that is, anything but the root logger and its default level) will
    * continue to have effect.
-   *  - impalaLogLevel - the maximum log level for com.cloudera.impala.* classes
+   *  - impalaLogLevel - the maximum log level for org.apache.impala.* classes
    *  - otherLogLevel - the maximum log level for all other classes
    */
   public static void Install(TLogLevel impalaLogLevel, TLogLevel otherLogLevel)
@@ -116,11 +116,11 @@ public class GlogAppender extends AppenderSkeleton {
     //
     // Finally we can configure per-package logging which overrides the rootLogger
     // setting. In order to control Impala's logging independently of the rest of the
-    // world, we set the log level for com.cloudera.impala.
+    // world, we set the log level for org.apache.impala.
     properties.setProperty("log4j.rootLogger",
         log4jLevelForTLogLevel(otherLogLevel) + ",glog");
     properties.setProperty("log4j.appender.glog.Threshold", "TRACE");
-    properties.setProperty("log4j.logger.com.cloudera.impala",
+    properties.setProperty("log4j.logger.org.apache.impala",
         log4jLevelForTLogLevel(impalaLogLevel));
     PropertyConfigurator.configure(properties);
     Logger.getLogger(GlogAppender.class).info(String.format("Logging initialized. " +

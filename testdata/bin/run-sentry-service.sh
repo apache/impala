@@ -33,5 +33,5 @@ export HADOOP_CLASSPATH=${POSTGRES_JDBC_DRIVER}
 ${SENTRY_HOME}/bin/sentry --command service -c ${SENTRY_SERVICE_CONFIG} &
 
 # Wait for the service to come online
-"$JAVA" -cp $CLASSPATH com.cloudera.impala.testutil.SentryServicePinger \
+"$JAVA" -cp $CLASSPATH org.apache.impala.testutil.SentryServicePinger \
     --config_file "${SENTRY_SERVICE_CONFIG}" -n 30 -s 2

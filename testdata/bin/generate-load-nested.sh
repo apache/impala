@@ -75,12 +75,12 @@ do
     FILE_NAME=$(basename ${AVRO_SCHEMA_PATH})
     TABLE_NAME="${FILE_NAME%.*}"
     mvn -f "${IMPALA_HOME}/testdata/pom.xml" exec:java \
-      -Dexec.mainClass="com.cloudera.impala.datagenerator.RandomNestedDataGenerator" \
+      -Dexec.mainClass="org.apache.impala.datagenerator.RandomNestedDataGenerator" \
       -Dexec.args="${AVRO_SCHEMA_PATH} ${NUM_ELEMENTS} ${NUM_FIELDS} ${DB_DIR}/${TABLE_NAME}/${TABLE_NAME}.parquet";
 
     if $FLATTEN; then
       mvn -f "${IMPALA_HOME}/testdata/TableFlattener/pom.xml" \
-        exec:java -Dexec.mainClass=com.cloudera.impala.infra.tableflattener.Main \
+        exec:java -Dexec.mainClass=org.apache.impala.infra.tableflattener.Main \
         -Dexec.arguments="file://${DB_DIR}/${TABLE_NAME}/${TABLE_NAME}.parquet,file://${DB_DIR}/${TABLE_NAME}_flat,-sfile://${AVRO_SCHEMA_PATH}";
     fi
   done

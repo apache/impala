@@ -44,10 +44,10 @@ java_registry_preamble = '\
 // common/function-registry/gen_builtins_catalog.py or the function list at\n\
 // common/function-registry/impala_functions.py.\n\
 \n\
-package com.cloudera.impala.builtins;\n\
+package org.apache.impala.builtins;\n\
 \n\
-import com.cloudera.impala.catalog.Type;\n\
-import com.cloudera.impala.catalog.Db;\n\
+import org.apache.impala.catalog.Type;\n\
+import org.apache.impala.catalog.Db;\n\
 \n\
 public class ScalarBuiltins { \n\
   public static void initBuiltins(Db db) { \
@@ -58,7 +58,7 @@ java_registry_epilogue = '\
 }\n'
 
 FE_PATH = os.path.expandvars(
-  "$IMPALA_HOME/fe/generated-sources/gen-java/com/cloudera/impala/builtins/")
+  "$IMPALA_HOME/fe/generated-sources/gen-java/org/apache/impala/builtins/")
 
 # This contains all the metadata to describe all the builtins.
 # Each meta data entry is itself a map to store all the meta data

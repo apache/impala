@@ -123,7 +123,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
 
   JNIEnv* jni_env = getJNIEnv();
   request_pool_service_class_ =
-    jni_env->FindClass("com/cloudera/impala/util/RequestPoolService");
+    jni_env->FindClass("org/apache/impala/util/RequestPoolService");
   EXIT_IF_EXC(jni_env);
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {

@@ -108,7 +108,7 @@ class AvroGenerator(object):
     tree_root = self._schema_tree_generator.create_tree()
     result = {}
     result['type'] = 'record'
-    result['namespace'] = 'com.cloudera.impala'
+    result['namespace'] = 'org.apache.impala'
     result['name'] = table_name
     result['fields'] = self._convert_struct_fields(tree_root.fields)
     return result

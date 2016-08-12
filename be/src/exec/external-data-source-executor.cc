@@ -62,7 +62,7 @@ class ExternalDataSourceExecutor::JniState {
     RETURN_IF_ERROR(jni_frame.push(env));
 
     RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env,
-        "com/cloudera/impala/extdatasource/ExternalDataSourceExecutor",
+        "org/apache/impala/extdatasource/ExternalDataSourceExecutor",
         &executor_class_));
     uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
     for (int i = 0; i < num_methods; ++i) {
@@ -100,7 +100,7 @@ class ExternalDataSourceExecutor::JniState {
     return Status::OK();
   }
 
-  /// Class reference for com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
+  /// Class reference for org.apache.impala.extdatasource.ExternalDataSourceExecutor
   jclass executor_class_;
 
   jmethodID ctor_;

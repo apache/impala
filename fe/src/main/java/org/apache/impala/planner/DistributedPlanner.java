@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,17 +23,17 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.AggregateInfo;
-import com.cloudera.impala.analysis.AnalysisContext;
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.InsertStmt;
-import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.QueryStmt;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.planner.JoinNode.DistributionMode;
-import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.analysis.AggregateInfo;
+import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.InsertStmt;
+import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

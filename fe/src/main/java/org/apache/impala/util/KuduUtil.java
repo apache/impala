@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.io.StringReader;
 import java.util.HashMap;
@@ -25,11 +25,11 @@ import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonReader;
 
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TDistributeByRangeParam;
-import com.cloudera.impala.thrift.TRangeLiteral;
-import com.cloudera.impala.thrift.TRangeLiteralList;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TDistributeByRangeParam;
+import org.apache.impala.thrift.TRangeLiteral;
+import org.apache.impala.thrift.TRangeLiteralList;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -43,7 +43,7 @@ import org.apache.kudu.Type;
 import org.apache.kudu.client.KuduTable;
 import org.apache.kudu.client.PartialRow;
 
-import static com.cloudera.impala.catalog.Type.parseColumnType;
+import static org.apache.impala.catalog.Type.parseColumnType;
 import static java.lang.String.format;
 
 public class KuduUtil {
@@ -224,7 +224,7 @@ public class KuduUtil {
    * Converts a given Impala catalog type to the Kudu type. Throws an exception if the
    * type cannot be converted.
    */
-  public static Type fromImpalaType(com.cloudera.impala.catalog.Type t)
+  public static Type fromImpalaType(org.apache.impala.catalog.Type t)
       throws ImpalaRuntimeException {
     if (!t.isScalarType()) {
       throw new ImpalaRuntimeException(format(

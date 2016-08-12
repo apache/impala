@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,18 +37,18 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.common.ByteUnits;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.thrift.TErrorCode;
-import com.cloudera.impala.thrift.TPoolConfigParams;
-import com.cloudera.impala.thrift.TPoolConfig;
-import com.cloudera.impala.thrift.TResolveRequestPoolParams;
-import com.cloudera.impala.thrift.TResolveRequestPoolResult;
-import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.util.FileWatchService.FileChangeListener;
+import org.apache.impala.authorization.User;
+import org.apache.impala.common.ByteUnits;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TPoolConfigParams;
+import org.apache.impala.thrift.TPoolConfig;
+import org.apache.impala.thrift.TResolveRequestPoolParams;
+import org.apache.impala.thrift.TResolveRequestPoolResult;
+import org.apache.impala.thrift.TStatus;
+import org.apache.impala.util.FileWatchService.FileChangeListener;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;

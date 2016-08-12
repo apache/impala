@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
-import com.cloudera.impala.common.Id;
-import com.cloudera.impala.common.IdGenerator;
+import org.apache.impala.common.Id;
+import org.apache.impala.common.IdGenerator;
 
 public class PlanId extends Id<PlanId> {
   // Construction only allowed via an IdGenerator.

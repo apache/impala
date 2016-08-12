@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.hive.executor;
+package org.apache.impala.hive.executor;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -40,14 +40,14 @@ import org.apache.hadoop.io.Writable;
 import org.apache.log4j.Logger;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.thrift.THiveUdfExecutorCtorParams;
-import com.cloudera.impala.thrift.TPrimitiveType;
-import com.cloudera.impala.util.UnsafeUtil;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
+import org.apache.impala.thrift.TPrimitiveType;
+import org.apache.impala.util.UnsafeUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

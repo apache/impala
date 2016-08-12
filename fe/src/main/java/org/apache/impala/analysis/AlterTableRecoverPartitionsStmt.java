@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableType;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableType;
 
 /**
  * Represents an ALTER TABLE RECOVER PARTITIONS statement.

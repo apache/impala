@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.hive.executor;
+package org.apache.impala.hive.executor;
 
 import org.apache.hadoop.io.BytesWritable;
 

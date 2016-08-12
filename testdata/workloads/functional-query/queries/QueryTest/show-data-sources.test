@@ -3,8 +3,8 @@
 # Test show data sources
 show data sources
 ---- RESULTS: VERIFY_IS_SUBSET
-'show_test_ds1','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
-'show_test_ds2','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
+'show_test_ds1','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
+'show_test_ds2','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
 ---- LABELS
 NAME, LOCATION, CLASS NAME, API VERSION
 ---- TYPES
@@ -13,8 +13,8 @@ STRING, STRING, STRING, STRING
 ---- QUERY
 show data sources like 'show_test_ds*'
 ---- RESULTS
-'show_test_ds1','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
-'show_test_ds2','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
+'show_test_ds1','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
+'show_test_ds2','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
 ---- LABELS
 NAME, LOCATION, CLASS NAME, API VERSION
 ---- TYPES
@@ -23,7 +23,7 @@ STRING, STRING, STRING, STRING
 ---- QUERY
 show data sources like 'show_test_ds1'
 ---- RESULTS
-'show_test_ds1','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
+'show_test_ds1','$NAMENODE/test-warehouse/data-sources/test-data-source.jar','org.apache.impala.extdatasource.AllTypesDataSource','V1'
 ---- LABELS
 NAME, LOCATION, CLASS NAME, API VERSION
 ---- TYPES

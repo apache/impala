@@ -27,7 +27,7 @@ under the License.
     <artifactId>parent</artifactId>
     <version>1.0</version>
   </parent>
-  <groupId>com.cloudera.impala</groupId>
+  <groupId>org.apache.impala</groupId>
   <artifactId>impala-testdata</artifactId>
   <version>0.1-SNAPSHOT</version>
   <packaging>jar</packaging>

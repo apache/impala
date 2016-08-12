@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
-import com.cloudera.impala.thrift.TPartitionStats;
-import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.util.MetaStoreUtil;
+import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.util.MetaStoreUtil;
 
 import java.util.Iterator;
 import java.util.List;

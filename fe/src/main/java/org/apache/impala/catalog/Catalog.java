@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -25,13 +25,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.cloudera.impala.thrift.TTableName;
-import com.cloudera.impala.util.PatternMatcher;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.PatternMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

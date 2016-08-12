@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TSymbolType;
+import org.apache.impala.catalog.AggregateFunction;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TSymbolType;
 import com.google.common.base.Preconditions;
 
 /**

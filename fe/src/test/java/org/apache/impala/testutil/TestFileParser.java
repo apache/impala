@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.testutil;
+package org.apache.impala.testutil;
 
 import static org.junit.Assert.fail;
 

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.io.StringReader;
 import java.util.List;
@@ -24,14 +24,14 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-import com.cloudera.impala.analysis.ParseNode;
-import com.cloudera.impala.analysis.QueryStmt;
-import com.cloudera.impala.analysis.SqlParser;
-import com.cloudera.impala.analysis.SqlScanner;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableDescriptor;
-import com.cloudera.impala.thrift.TTableType;
+import org.apache.impala.analysis.ParseNode;
+import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.analysis.SqlParser;
+import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**

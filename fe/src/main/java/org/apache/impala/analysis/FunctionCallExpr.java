@@ -15,24 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.ScalarFunction;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.TreeNode;
-import com.cloudera.impala.thrift.TAggregateExpr;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.AggregateFunction;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.TreeNode;
+import org.apache.impala.thrift.TAggregateExpr;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
+import org.apache.impala.thrift.TFunctionBinaryType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

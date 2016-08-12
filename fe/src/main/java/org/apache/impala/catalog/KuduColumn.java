@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
-import com.cloudera.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumn;
 
 /**
  *  Describes a Kudu column mapped to a Hive column (as described in the metastore).

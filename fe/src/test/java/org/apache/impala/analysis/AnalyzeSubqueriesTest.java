@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 
 public class AnalyzeSubqueriesTest extends AnalyzerTest {
   private static String cmpOperators[] = {"=", "!=", "<=", ">=", ">", "<"};

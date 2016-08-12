@@ -15,19 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.math.BigDecimal;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TAnalyticWindow;
-import com.cloudera.impala.thrift.TAnalyticWindowBoundary;
-import com.cloudera.impala.thrift.TAnalyticWindowBoundaryType;
-import com.cloudera.impala.thrift.TAnalyticWindowType;
-import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.util.TColumnValueUtil;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TAnalyticWindow;
+import org.apache.impala.thrift.TAnalyticWindowBoundary;
+import org.apache.impala.thrift.TAnalyticWindowBoundaryType;
+import org.apache.impala.thrift.TAnalyticWindowType;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.util.TColumnValueUtil;
 import com.google.common.base.Preconditions;
 
 

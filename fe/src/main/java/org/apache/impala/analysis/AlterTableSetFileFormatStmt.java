@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableSetFileFormatParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.THdfsFileFormat;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
+import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.THdfsFileFormat;
 
 /**
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET FILEFORMAT statement.

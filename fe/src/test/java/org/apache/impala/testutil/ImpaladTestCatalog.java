@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.testutil;
+package org.apache.impala.testutil;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.CatalogServiceCatalog;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.HdfsCachePool;
-import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.util.PatternMatcher;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.HdfsCachePool;
+import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 
 /**

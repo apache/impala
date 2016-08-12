@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -29,24 +29,24 @@ import java.util.List;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.Function.CompareMode;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarFunction;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TestSchemaUtils;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TQueryOptions;
+import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TestSchemaUtils;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

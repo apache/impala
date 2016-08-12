@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,32 +34,32 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.StringLiteral;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.HBaseColumn;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.THBaseFilter;
-import com.cloudera.impala.thrift.THBaseKeyRange;
-import com.cloudera.impala.thrift.THBaseScanNode;
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TQueryOptions;
-import com.cloudera.impala.thrift.TScanRange;
-import com.cloudera.impala.thrift.TScanRangeLocation;
-import com.cloudera.impala.thrift.TScanRangeLocations;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.HBaseColumn;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.THBaseFilter;
+import org.apache.impala.thrift.THBaseKeyRange;
+import org.apache.impala.thrift.THBaseScanNode;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TScanRange;
+import org.apache.impala.thrift.TScanRangeLocation;
+import org.apache.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

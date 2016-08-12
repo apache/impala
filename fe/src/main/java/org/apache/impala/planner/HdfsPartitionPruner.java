@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,24 +29,24 @@ import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BetweenPredicate;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
-import com.cloudera.impala.analysis.CompoundPredicate;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.InPredicate;
-import com.cloudera.impala.analysis.IsNullPredicate;
-import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.analysis.NullLiteral;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BetweenPredicate;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.InPredicate;
+import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;

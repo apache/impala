@@ -16,7 +16,7 @@
 // under the License.
 
 namespace cpp impala
-namespace java com.cloudera.impala.thrift
+namespace java org.apache.impala.thrift
 
 include "Metrics.thrift"
 

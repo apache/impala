@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.common;
+package org.apache.impala.common;
 
 /**
  * The equivalent of C++'s std::pair<>.

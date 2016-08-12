@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TAlterTableOrViewRenameParams;
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TTableName;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TAlterTableOrViewRenameParams;
+import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 /**

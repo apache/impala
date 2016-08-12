@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.AnalysisException;
+import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

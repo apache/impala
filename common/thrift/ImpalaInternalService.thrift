@@ -19,7 +19,7 @@
 // This file contains the details of the protocol between coordinators and backends.
 
 namespace cpp impala
-namespace java com.cloudera.impala.thrift
+namespace java org.apache.impala.thrift
 
 include "Status.thrift"
 include "ErrorCodes.thrift"

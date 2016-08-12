@@ -21,12 +21,12 @@ under the License.
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.cloudera.impala</groupId>
+  <groupId>org.apache.impala</groupId>
   <artifactId>impala-frontend</artifactId>
   <version>0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>Cloudera Impala Query Engine Frontend</name>
+  <name>Apache Impala (Incubating) Query Engine Frontend</name>
 
   <properties>
     <surefire.reports.dir>${env.IMPALA_LOGS_DIR}/fe_tests</surefire.reports.dir>
@@ -55,7 +55,7 @@ under the License.
       <version>3.0.4</version>
     </dependency>
     <dependency>
-      <groupId>com.cloudera.impala</groupId>
+      <groupId>org.apache.impala</groupId>
       <artifactId>impala-data-source-api</artifactId>
       <version>${impala.extdatasrc.api.version}</version>
     </dependency>

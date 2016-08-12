@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertTrue;
 
@@ -34,22 +34,22 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.DataSource;
-import com.cloudera.impala.catalog.DataSourceTable;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.common.FrontendTestBase;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.util.MetaStoreUtil;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.DataSource;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.util.MetaStoreUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -2143,7 +2143,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "SYMBOL=" + symbol;
     final String hdfsPath = "hdfs://localhost:20500/test-warehouse/libTestUdfs.so";
     final String javaFnSuffix = " LOCATION '/test-warehouse/impala-hive-udfs.jar' " +
-        "SYMBOL='com.cloudera.impala.TestUdf'";
+        "SYMBOL='org.apache.impala.TestUdf'";
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
     AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);

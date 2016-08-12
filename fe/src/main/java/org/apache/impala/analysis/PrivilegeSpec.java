@@ -15,20 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.DataSourceTable;
-import com.cloudera.impala.catalog.RolePrivilege;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TPrivilegeLevel;
-import com.cloudera.impala.thrift.TPrivilegeScope;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.RolePrivilege;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TPrivilegeScope;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;

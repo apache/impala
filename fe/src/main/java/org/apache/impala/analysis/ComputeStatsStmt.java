@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.Iterator;
 import java.util.List;
@@ -23,19 +23,19 @@ import java.util.List;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.PrintUtils;
-import com.cloudera.impala.thrift.TComputeStatsParams;
-import com.cloudera.impala.thrift.TPartitionStats;
-import com.cloudera.impala.thrift.TTableName;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.PrintUtils;
+import org.apache.impala.thrift.TComputeStatsParams;
+import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

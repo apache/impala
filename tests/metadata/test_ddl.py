@@ -427,7 +427,7 @@ class TestLibCache(TestDdlBase):
     data_src_name = unique_database + "_datasrc"
     create_ds_stmt = ("CREATE DATA SOURCE {0} "
         "LOCATION '{1}/data-sources/test-data-source.jar' "
-        "CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource' "
+        "CLASS 'org.apache.impala.extdatasource.AllTypesDataSource' "
         "API_VERSION 'V1'".format(data_src_name, WAREHOUSE))
     create_tbl_stmt = ("CREATE TABLE {0}.data_src_tbl (x int) "
         "PRODUCED BY DATA SOURCE {1}('dummy_init_string')")\

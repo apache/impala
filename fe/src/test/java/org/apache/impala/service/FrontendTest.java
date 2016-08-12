@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.service;
+package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -33,19 +33,19 @@ import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.AuthorizationTest;
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.testutil.ImpaladTestCatalog;
-import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.thrift.TMetadataOpRequest;
-import com.cloudera.impala.thrift.TMetadataOpcode;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TResultRow;
-import com.cloudera.impala.thrift.TResultSet;
+import org.apache.impala.analysis.AuthorizationTest;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TMetadataOpcode;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TResultRow;
+import org.apache.impala.thrift.TResultSet;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;

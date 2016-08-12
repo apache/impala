@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import static org.junit.Assume.assumeTrue;
 
@@ -28,7 +28,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.cloudera.impala.planner.PlannerTestBase;
+import org.apache.impala.planner.PlannerTestBase;
 
 // S3 specific planner tests go here, and will run against tables in S3.  These tests
 // are run only when test.fs.s3a.name is set in the configuration.

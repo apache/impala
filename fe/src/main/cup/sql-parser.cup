@@ -15,27 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.MapType;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.analysis.ColumnDef;
-import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
-import com.cloudera.impala.analysis.UnionStmt.Qualifier;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TFunctionCategory;
-import com.cloudera.impala.thrift.TDescribeOutputStyle;
-import com.cloudera.impala.thrift.THdfsFileFormat;
-import com.cloudera.impala.thrift.TPrivilegeLevel;
-import com.cloudera.impala.thrift.TTablePropertyType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.analysis.UnionStmt.UnionOperand;
+import org.apache.impala.analysis.UnionStmt.Qualifier;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TDescribeOutputStyle;
+import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TTablePropertyType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;

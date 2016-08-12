@@ -15,23 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import static com.cloudera.impala.catalog.DataSourceTable.TBL_PROP_API_VER;
-import static com.cloudera.impala.catalog.DataSourceTable.TBL_PROP_CLASS;
-import static com.cloudera.impala.catalog.DataSourceTable.TBL_PROP_DATA_SRC_NAME;
-import static com.cloudera.impala.catalog.DataSourceTable.TBL_PROP_INIT_STRING;
-import static com.cloudera.impala.catalog.DataSourceTable.TBL_PROP_LOCATION;
+import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_API_VER;
+import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_CLASS;
+import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_DATA_SRC_NAME;
+import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_INIT_STRING;
+import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_LOCATION;
 
 import java.util.List;
 import java.util.Map;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.DataSource;
-import com.cloudera.impala.catalog.DataSourceTable;
-import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.THdfsFileFormat;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.DataSource;
+import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;

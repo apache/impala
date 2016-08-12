@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.service;
+package org.apache.impala.service;
 
 /**
  * This class is meant to provide the FE with impalad backend configuration parameters,

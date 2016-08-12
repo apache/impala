@@ -15,30 +15,30 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.cloudera.impala.catalog.KuduTable;
+import org.apache.impala.catalog.KuduTable;
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.Token;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 
-import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsCompression;
-import com.cloudera.impala.catalog.HdfsFileFormat;
-import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.PrintUtils;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.HdfsCompression;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.PrintUtils;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;

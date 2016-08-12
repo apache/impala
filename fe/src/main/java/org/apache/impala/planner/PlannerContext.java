@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.LinkedList;
 
-import com.cloudera.impala.analysis.AnalysisContext;
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.QueryStmt;
-import com.cloudera.impala.common.IdGenerator;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TQueryOptions;
+import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
 import com.google.common.collect.Lists;
 
 /**

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.HashMap;
 import java.util.List;
@@ -24,14 +24,14 @@ import java.util.Map;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 
-import com.cloudera.impala.catalog.HdfsFileFormat;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.*;
-import com.cloudera.impala.util.AvroSchemaParser;
-import com.cloudera.impala.util.AvroSchemaUtils;
-import com.cloudera.impala.util.MetaStoreUtil;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.*;
+import org.apache.impala.util.AvroSchemaParser;
+import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.service;
+package org.apache.impala.service;
 
 import java.sql.DatabaseMetaData;
 import java.util.HashSet;
@@ -25,24 +25,24 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TableLoadingException;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.thrift.TColumn;
-import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TResultRow;
-import com.cloudera.impala.thrift.TResultSet;
-import com.cloudera.impala.thrift.TResultSetMetadata;
-import com.cloudera.impala.util.PatternMatcher;
+import org.apache.impala.analysis.TableName;
+import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TResultRow;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.util.PatternMatcher;
 import com.google.common.collect.Lists;
 
 /**

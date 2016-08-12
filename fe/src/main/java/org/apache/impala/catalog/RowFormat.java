@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
-import com.cloudera.impala.analysis.StringLiteral;
-import com.cloudera.impala.thrift.TTableRowFormat;
+import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.thrift.TTableRowFormat;
 import com.google.common.base.Preconditions;
 
 /**

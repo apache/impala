@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,21 +26,21 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.ExprId;
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.PrintUtils;
-import com.cloudera.impala.common.TreeNode;
-import com.cloudera.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
-import com.cloudera.impala.thrift.TExecStats;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TPlan;
-import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TQueryOptions;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprId;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.thrift.TExecStats;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TPlan;
+import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

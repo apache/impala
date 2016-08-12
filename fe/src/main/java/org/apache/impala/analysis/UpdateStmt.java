@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.KuduTableSink;
-import com.cloudera.impala.planner.TableSink;
+import org.apache.impala.common.Pair;
+import org.apache.impala.planner.DataSink;
+import org.apache.impala.planner.KuduTableSink;
+import org.apache.impala.planner.TableSink;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;

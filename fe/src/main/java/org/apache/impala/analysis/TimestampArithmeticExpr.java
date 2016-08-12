@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import com.cloudera.impala.analysis.ArithmeticExpr.Operator;
-import com.cloudera.impala.catalog.Function.CompareMode;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprNodeType;
+import org.apache.impala.analysis.ArithmeticExpr.Operator;
+import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 /**

@@ -16,7 +16,7 @@
 // under the License.
 
 namespace cpp impala.extdatasource
-namespace java com.cloudera.impala.extdatasource.thrift
+namespace java org.apache.impala.extdatasource.thrift
 
 include "Status.thrift"
 include "Data.thrift"

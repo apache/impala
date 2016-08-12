@@ -33,7 +33,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   CREATE_DATA_SRC_STMT = ("CREATE DATA SOURCE %s LOCATION '" +
       get_fs_path("/test-warehouse/data-sources/test-data-source.jar") +
-      "' CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource' API_VERSION 'V1'")
+      "' CLASS 'org.apache.impala.extdatasource.AllTypesDataSource' API_VERSION 'V1'")
   DROP_DATA_SRC_STMT = "DROP DATA SOURCE IF EXISTS %s"
   TEST_DATA_SRC_NAMES = ["show_test_ds1", "show_test_ds2"]
   AVRO_SCHEMA_LOC = get_fs_path("/test-warehouse/avro_schemas/functional/alltypes.json")

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.io.IOException;
 import java.util.List;
@@ -34,27 +34,27 @@ import org.apache.kudu.client.LocatedTablet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.BoolLiteral;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.analysis.NullLiteral;
-import com.cloudera.impala.analysis.NumericLiteral;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.StringLiteral;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.KuduTable;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TKuduScanNode;
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TScanRange;
-import com.cloudera.impala.thrift.TScanRangeLocation;
-import com.cloudera.impala.thrift.TScanRangeLocations;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TKuduScanNode;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TScanRange;
+import org.apache.impala.thrift.TScanRangeLocation;
+import org.apache.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;

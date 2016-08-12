@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TExprNode;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TExprNode;
 import com.google.common.base.Preconditions;
 
 /**

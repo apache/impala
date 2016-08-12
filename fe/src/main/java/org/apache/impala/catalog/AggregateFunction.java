@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsUri;
-import com.cloudera.impala.thrift.TAggregateFunction;
-import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.HdfsUri;
+import org.apache.impala.thrift.TAggregateFunction;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionBinaryType;
 
 /**
  * Internal representation of an aggregate function.

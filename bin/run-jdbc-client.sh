@@ -18,4 +18,4 @@
 # under the License.
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
-"$JAVA" -cp $CLASSPATH com.cloudera.impala.testutil.ImpalaJdbcClient "$@"
+"$JAVA" -cp $CLASSPATH org.apache.impala.testutil.ImpalaJdbcClient "$@"

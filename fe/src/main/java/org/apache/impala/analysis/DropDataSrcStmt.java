@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TDropDataSourceParams;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TDropDataSourceParams;
 import com.google.common.base.Preconditions;
 
 /**

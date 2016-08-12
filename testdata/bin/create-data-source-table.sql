@@ -23,7 +23,7 @@ USE functional;
 DROP DATA SOURCE IF EXISTS AllTypesDataSource;
 CREATE DATA SOURCE AllTypesDataSource
 LOCATION '/test-warehouse/data-sources/test-data-source.jar'
-CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource'
+CLASS 'org.apache.impala.extdatasource.AllTypesDataSource'
 API_VERSION 'V1';
 
 DROP TABLE IF EXISTS alltypes_datasource;

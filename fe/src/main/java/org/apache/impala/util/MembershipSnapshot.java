@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TUpdateMembershipRequest;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TUpdateMembershipRequest;
 import com.google.common.collect.Sets;
 
 /**

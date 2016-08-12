@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog.delegates;
+package org.apache.impala.catalog.delegates;
 
-import com.cloudera.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.ImpalaRuntimeException;
 
 /**
  * Empty implementation for the DdlDelegate interface that does nothing.

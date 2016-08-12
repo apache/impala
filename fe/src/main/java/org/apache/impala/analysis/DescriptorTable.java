@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -24,10 +24,10 @@ import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
 
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.View;
-import com.cloudera.impala.common.IdGenerator;
-import com.cloudera.impala.thrift.TDescriptorTable;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.thrift.TDescriptorTable;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

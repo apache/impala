@@ -16,19 +16,19 @@
 // under the License.
 
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.PrintUtils;
-import com.cloudera.impala.thrift.TDataSink;
-import com.cloudera.impala.thrift.TDataSinkType;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TKuduTableSink;
-import com.cloudera.impala.thrift.TTableSink;
-import com.cloudera.impala.thrift.TTableSinkType;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.PrintUtils;
+import org.apache.impala.thrift.TDataSink;
+import org.apache.impala.thrift.TDataSinkType;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TKuduTableSink;
+import org.apache.impala.thrift.TTableSink;
+import org.apache.impala.thrift.TTableSinkType;
 import com.google.common.collect.Lists;
 
 /**

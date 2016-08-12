@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.extdatasource;
+package org.apache.impala.extdatasource;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -30,21 +30,21 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.JniUtil;
-import com.cloudera.impala.extdatasource.thrift.TCloseParams;
-import com.cloudera.impala.extdatasource.thrift.TCloseResult;
-import com.cloudera.impala.extdatasource.thrift.TGetNextParams;
-import com.cloudera.impala.extdatasource.thrift.TGetNextResult;
-import com.cloudera.impala.extdatasource.thrift.TOpenParams;
-import com.cloudera.impala.extdatasource.thrift.TOpenResult;
-import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
-import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
-import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
-import com.cloudera.impala.thrift.TErrorCode;
-import com.cloudera.impala.thrift.TStatus;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.extdatasource.thrift.TCloseParams;
+import org.apache.impala.extdatasource.thrift.TCloseResult;
+import org.apache.impala.extdatasource.thrift.TGetNextParams;
+import org.apache.impala.extdatasource.thrift.TGetNextResult;
+import org.apache.impala.extdatasource.thrift.TOpenParams;
+import org.apache.impala.extdatasource.thrift.TOpenResult;
+import org.apache.impala.extdatasource.thrift.TPrepareParams;
+import org.apache.impala.extdatasource.thrift.TPrepareResult;
+import org.apache.impala.extdatasource.v1.ExternalDataSource;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TStatus;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

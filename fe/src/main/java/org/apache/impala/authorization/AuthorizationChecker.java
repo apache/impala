@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.authorization;
+package org.apache.impala.authorization;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -33,9 +33,9 @@ import org.apache.sentry.provider.common.ProviderBackendContext;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.AuthorizationPolicy;
-import com.cloudera.impala.common.InternalException;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

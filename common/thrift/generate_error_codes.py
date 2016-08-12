@@ -332,7 +332,7 @@ preamble = """
 //
 
 namespace cpp impala
-namespace java com.cloudera.impala.thrift
+namespace java org.apache.impala.thrift
 
 """
 # The script will always generate the file, CMake will take care of running it only if

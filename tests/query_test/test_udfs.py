@@ -169,7 +169,7 @@ class TestUdfs(ImpalaTestSuite):
         'drop function if exists `{0}`.`udf_update_test_drop`()'.format(unique_database))
     create_fn_stmt = (
         "create function `{0}`.`udf_update_test_drop`() returns string LOCATION '{1}' "
-        "SYMBOL='com.cloudera.impala.TestUpdateUdf'".format(unique_database, udf_dst))
+        "SYMBOL='org.apache.impala.TestUpdateUdf'".format(unique_database, udf_dst))
     query_stmt = "select `{0}`.`udf_update_test_drop`()".format(unique_database)
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
@@ -207,7 +207,7 @@ class TestUdfs(ImpalaTestSuite):
 
     create_fn_template = (
         "create function `{0}`.`{{0}}`() returns string LOCATION '{1}' "
-        "SYMBOL='com.cloudera.impala.TestUpdateUdf'".format(unique_database, udf_dst))
+        "SYMBOL='org.apache.impala.TestUpdateUdf'".format(unique_database, udf_dst))
 
     query_template = "select `{0}`.`{{0}}`()".format(unique_database)
 

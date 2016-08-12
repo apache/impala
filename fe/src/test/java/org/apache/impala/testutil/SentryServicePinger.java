@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.testutil;
+package org.apache.impala.testutil;
 
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
@@ -24,9 +24,9 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.authorization.SentryConfig;
-import com.cloudera.impala.util.SentryPolicyService;
+import org.apache.impala.authorization.User;
+import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.util.SentryPolicyService;
 
 /**
  * Simple class that issues a read-only RPC to the Sentry Service to check if it

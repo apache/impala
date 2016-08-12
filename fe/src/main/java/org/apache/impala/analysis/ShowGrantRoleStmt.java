@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.catalog.Role;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TShowGrantRoleParams;
+import org.apache.impala.catalog.Role;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TShowGrantRoleParams;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 

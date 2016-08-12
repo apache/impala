@@ -82,7 +82,7 @@ Status JniUtil::Init() {
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
   // Find JniUtil class and create a global ref.
-  jclass local_jni_util_cl = env->FindClass("com/cloudera/impala/common/JniUtil");
+  jclass local_jni_util_cl = env->FindClass("org/apache/impala/common/JniUtil");
   if (local_jni_util_cl == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
     return Status("Failed to find JniUtil class.");
@@ -99,7 +99,7 @@ Status JniUtil::Init() {
 
   // Find InternalException class and create a global ref.
   jclass local_internal_exc_cl =
-      env->FindClass("com/cloudera/impala/common/InternalException");
+      env->FindClass("org/apache/impala/common/InternalException");
   if (local_internal_exc_cl == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
     return Status("Failed to find JniUtil class.");

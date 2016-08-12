@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.common;
+package org.apache.impala.common;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TStartupOptions;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TStartupOptions;
 
 /**
  * Contains runtime-specific parameters such as the number of CPU cores. Currently only

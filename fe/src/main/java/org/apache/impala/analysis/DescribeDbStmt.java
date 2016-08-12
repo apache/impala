@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TDescribeDbParams;
-import com.cloudera.impala.thrift.TDescribeOutputStyle;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TDescribeDbParams;
+import org.apache.impala.thrift.TDescribeOutputStyle;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 

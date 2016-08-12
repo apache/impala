@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.authorization;
+package org.apache.impala.authorization;
 
 import java.io.File;
 import java.net.MalformedURLException;
 
 import org.apache.hadoop.conf.Configuration;
 
-import com.cloudera.impala.common.FileSystemUtil;
+import org.apache.impala.common.FileSystemUtil;
 import com.google.common.base.Strings;
 
 /**

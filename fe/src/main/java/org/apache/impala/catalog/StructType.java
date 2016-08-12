@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.cloudera.impala.thrift.TColumnType;
-import com.cloudera.impala.thrift.TStructField;
-import com.cloudera.impala.thrift.TTypeNode;
-import com.cloudera.impala.thrift.TTypeNodeType;
+import org.apache.impala.thrift.TColumnType;
+import org.apache.impala.thrift.TStructField;
+import org.apache.impala.thrift.TTypeNode;
+import org.apache.impala.thrift.TTypeNodeType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

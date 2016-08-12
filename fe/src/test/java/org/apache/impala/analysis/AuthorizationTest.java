@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -46,34 +46,34 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.AuthorizeableTable;
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.ScalarFunction;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.service.Frontend;
-import com.cloudera.impala.testutil.ImpaladTestCatalog;
-import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TMetadataOpRequest;
-import com.cloudera.impala.thrift.TMetadataOpcode;
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TPrivilegeLevel;
-import com.cloudera.impala.thrift.TPrivilegeScope;
-import com.cloudera.impala.thrift.TQueryCtx;
-import com.cloudera.impala.thrift.TResultSet;
-import com.cloudera.impala.thrift.TSessionState;
-import com.cloudera.impala.util.PatternMatcher;
-import com.cloudera.impala.util.SentryPolicyService;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizeableTable;
+import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.Frontend;
+import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TMetadataOpcode;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TPrivilegeScope;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.util.PatternMatcher;
+import org.apache.impala.util.SentryPolicyService;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -435,7 +435,7 @@ public class AuthorizationTest {
   @After
   public void TestTPCHCleanup() throws AuthorizationException, AnalysisException {
     // Failure to cleanup TPCH can cause:
-    // TestDropDatabase(com.cloudera.impala.analysis.AuthorizationTest):
+    // TestDropDatabase(org.apache.impala.analysis.AuthorizationTest):
     // Cannot drop non-empty database: tpch
     if (ctx_.catalog.getDb("tpch").numFunctions() != 0) {
       fail("Failed to clean up functions in tpch.");

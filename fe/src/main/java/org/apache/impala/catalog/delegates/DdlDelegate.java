@@ -15,15 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog.delegates;
+package org.apache.impala.catalog.delegates;
 
 import java.util.List;
 
-import com.cloudera.impala.thrift.TDistributeParam;
+import org.apache.impala.thrift.TDistributeParam;
 import org.apache.hadoop.hive.metastore.api.Table;
 
-import com.cloudera.impala.common.ImpalaRuntimeException;
-import com.cloudera.impala.thrift.TAlterTableParams;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TAlterTableParams;
 
 /**
  * Abstract class to implement the storage specific portion of DDL requests.

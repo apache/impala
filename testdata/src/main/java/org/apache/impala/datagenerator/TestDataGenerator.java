@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.datagenerator;
+package org.apache.impala.datagenerator;
 
 import java.io.File;
 import java.io.FileWriter;

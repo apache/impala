@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import java.util.Set;
 
@@ -29,9 +29,9 @@ import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.thrift.TColumnStats;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.thrift.TColumnStats;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;

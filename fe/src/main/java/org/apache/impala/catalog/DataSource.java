@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.catalog;
+package org.apache.impala.catalog;
 
 import org.apache.hadoop.fs.Path;
 
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TDataSource;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDataSource;
 import com.google.common.base.Objects;
 
 /**

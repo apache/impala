@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.util;
+package org.apache.impala.util;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,12 +29,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import com.cloudera.impala.common.ByteUnits;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TErrorCode;
-import com.cloudera.impala.thrift.TPoolConfig;
-import com.cloudera.impala.thrift.TResolveRequestPoolParams;
-import com.cloudera.impala.thrift.TResolveRequestPoolResult;
+import org.apache.impala.common.ByteUnits;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TPoolConfig;
+import org.apache.impala.thrift.TResolveRequestPoolParams;
+import org.apache.impala.thrift.TResolveRequestPoolResult;
 import com.google.common.collect.Iterables;
 import com.google.common.io.Files;
 

@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.List;
 
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.HdfsFileFormat;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TScanRangeLocations;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -32,19 +32,19 @@ import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.OriginalType;
 import parquet.schema.PrimitiveType;
 
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.HdfsCompression;
-import com.cloudera.impala.catalog.HdfsFileFormat;
-import com.cloudera.impala.catalog.MapType;
-import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.catalog.ScalarType;
-import com.cloudera.impala.catalog.StructField;
-import com.cloudera.impala.catalog.StructType;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.thrift.THdfsFileFormat;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.HdfsCompression;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

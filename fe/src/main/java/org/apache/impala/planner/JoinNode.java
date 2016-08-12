@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.planner;
+package org.apache.impala.planner;
 
 import java.util.Collections;
 import java.util.List;
@@ -23,15 +23,15 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.ImpalaException;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.ImpalaException;
 import com.google.common.base.Preconditions;
 
 /**

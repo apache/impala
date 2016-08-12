@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.io.StringReader;
 import java.util.List;
@@ -25,21 +25,21 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.AuthorizationChecker;
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.AuthorizeableColumn;
-import com.cloudera.impala.authorization.AuthorizeableTable;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TLineageGraph;
-import com.cloudera.impala.thrift.TQueryCtx;
+import org.apache.impala.authorization.AuthorizationChecker;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizeableColumn;
+import org.apache.impala.authorization.AuthorizeableTable;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TLineageGraph;
+import org.apache.impala.thrift.TQueryCtx;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

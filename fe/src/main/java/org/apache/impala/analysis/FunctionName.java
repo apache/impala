@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package com.cloudera.impala.analysis;
+package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Db;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TFunctionName;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.Db;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TFunctionName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
