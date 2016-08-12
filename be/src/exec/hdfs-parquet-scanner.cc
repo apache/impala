@@ -50,6 +50,8 @@ using namespace impala;
 
 DEFINE_double(parquet_min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
     "rows rejected by a runtime filter drops below this value, the filter is disabled.");
+DECLARE_bool(enable_partitioned_aggregation);
+DECLARE_bool(enable_partitioned_hash_join);
 
 // The number of rows between checks to see if a filter is not effective, and should be
 // disabled. Must be a power of two.
@@ -205,6 +207,11 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   if (row_batch != NULL) {
     FlushRowGroupResources(row_batch);
     if (add_batches_to_queue_) scan_node_->AddMaterializedRowBatch(row_batch);
+  } else if (!FLAGS_enable_partitioned_hash_join ||
+      !FLAGS_enable_partitioned_aggregation) {
+    // With the legacy aggs/joins the tuple ptrs of the scratch batch are allocated
+    // from the scratch batch's mem pool. We can get into this case if Open() fails.
+    scratch_batch_->mem_pool()->FreeAll();
   }
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(dictionary_pool_.get()->total_allocated_bytes(), 0);
