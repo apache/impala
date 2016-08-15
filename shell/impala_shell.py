@@ -1175,7 +1175,7 @@ def _format_tip(tip):
 
 WELCOME_STRING = """\
 ***********************************************************************************
-Welcome to the Impala shell. Copyright (c) 2015 Cloudera, Inc. All rights reserved.
+Welcome to the Impala shell.
 (%s)
 
 %s
