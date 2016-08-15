@@ -219,8 +219,14 @@ bool Webserver::IsSecure() const {
 }
 
 string Webserver::Url() {
+  string hostname = http_address_.hostname;
+  if (IsWildcardAddress(http_address_.hostname)) {
+    if (!GetHostname(&hostname).ok()) {
+      hostname = http_address_.hostname;
+    }
+  }
   return Substitute("$0://$1:$2", IsSecure() ? "https" : "http",
-      http_address_.hostname, http_address_.port);
+      hostname, http_address_.port);
 }
 
 Status Webserver::Start() {

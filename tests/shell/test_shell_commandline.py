@@ -420,14 +420,47 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(args, expect_success=True)
     assert_var_substitution(result)
 
-  def test_query_start_time_message(self):
-    results = run_impala_shell_cmd('--query="select 1"')
-    assert "Query submitted at: " in results.stderr
+  # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
+  # 'should_exist'
+  def _validate_shell_messages(self, result_stderr, messages, should_exist=True):
+    for msg in messages:
+      if should_exist:
+        assert msg in result_stderr
+      else:
+        assert msg not in result_stderr
 
-  def test_query_coordinator_link_message(self):
-    results = run_impala_shell_cmd('--query="select 1"')
-    assert "(Coordinator: " in results.stderr
-    assert "Query progress can be monitored at: " in results.stderr
+  def test_query_time_and_link_message(self, unique_database):
+    shell_messages = ["Query submitted at: ", "(Coordinator: ",
+        "Query progress can be monitored at: "]
+    # CREATE statements should not print query time and webserver address.
+    results = run_impala_shell_cmd('--query="create table %s.shell_msg_test (id int)"' %
+        unique_database)
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
+
+    # SELECT, INSERT and CTAS queries should print the query time message and webserver
+    # address.
+    results = run_impala_shell_cmd('--query="insert into %s.shell_msg_test values (1)"' %
+        unique_database)
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=True)
+    results = run_impala_shell_cmd('--query="select * from %s.shell_msg_test"' %
+        unique_database)
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=True)
+    results = run_impala_shell_cmd('--query="create table %s.shell_msg_ctas_test as \
+        select * from %s.shell_msg_test"' % (unique_database, unique_database))
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=True)
+
+    # DROP statements should not print query time and webserver address.
+    results = run_impala_shell_cmd('--query="drop table %s.shell_msg_test"' %
+        unique_database)
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
+    run_impala_shell_cmd('--query="drop table %s.shell_msg_ctas_test"' %
+        unique_database)
+
+    # Simple queries should not print query time and webserver address.
+    results = run_impala_shell_cmd('--query="use default"')
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
+    results = run_impala_shell_cmd('--query="show tables"')
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
 
   def test_missing_query_file(self):
     result = run_impala_shell_cmd('-f nonexistent.sql', expect_success=False)

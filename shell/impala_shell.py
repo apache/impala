@@ -91,6 +91,7 @@ class ImpalaShell(cmd.Cmd):
   # If not connected to an impalad, the server version is unknown.
   UNKNOWN_SERVER_VERSION = "Not Connected"
   DISCONNECTED_PROMPT = "[Not connected] > "
+  UNKNOWN_WEBSERVER = "0.0.0.0"
   # Message to display in shell when cancelling a query
   CANCELLATION_MESSAGE = ' Cancelling Query'
   # Number of times to attempt cancellation before giving up.
@@ -134,6 +135,7 @@ class ImpalaShell(cmd.Cmd):
     self.verbose = options.verbose
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
+    self.webserver_address = ImpalaShell.UNKNOWN_WEBSERVER
 
     self.refresh_after_connect = options.refresh_after_connect
     self.current_db = options.default_db
@@ -680,7 +682,9 @@ class ImpalaShell(cmd.Cmd):
 
   def _connect(self):
     try:
-      self.server_version = self.imp_client.connect()
+      result = self.imp_client.connect()
+      self.server_version = result.version
+      self.webserver_address = result.webserver_address
     except TApplicationException:
       # We get a TApplicationException if the transport is valid,
       # but the RPC does not exist.
@@ -751,9 +755,11 @@ class ImpalaShell(cmd.Cmd):
     return self._execute_stmt(query)
 
   def do_create(self, args):
+    # We want to print the webserver link only for CTAS queries.
+    print_web_link = "select" in args
     query = self.imp_client.create_beeswax_query("create %s" % args,
                                                  self.set_query_options)
-    return self._execute_stmt(query)
+    return self._execute_stmt(query, print_web_link=print_web_link)
 
   def do_drop(self, args):
     query = self.imp_client.create_beeswax_query("drop %s" % args,
@@ -780,7 +786,7 @@ class ImpalaShell(cmd.Cmd):
     """Executes a SELECT... query, fetching all rows"""
     query = self.imp_client.create_beeswax_query("select %s" % args,
                                                  self.set_query_options)
-    return self._execute_stmt(query)
+    return self._execute_stmt(query, print_web_link=True)
 
   def do_compute(self, args):
     """Executes a COMPUTE STATS query.
@@ -850,7 +856,7 @@ class ImpalaShell(cmd.Cmd):
                                              "#Rows", "Est. #Rows", "Peak Mem",
                                              "Est. Peak Mem", "Detail"])
 
-  def _execute_stmt(self, query, is_insert=False):
+  def _execute_stmt(self, query, is_insert=False, print_web_link=False):
     """ The logic of executing any query statement
 
     The client executes the query and the query_handle is returned immediately,
@@ -862,26 +868,24 @@ class ImpalaShell(cmd.Cmd):
     The execution time is printed and the query is closed if it hasn't been already
     """
 
-    self._print_if_verbose("Query: %s" % (query.query,))
+    self._print_if_verbose("Query: %s" % query.query)
     # TODO: Clean up this try block and refactor it (IMPALA-3814)
     try:
-      # Get the hostname, webserver port and the current coordinator time.
-      coordinator = self.imp_client.ping_impala_service()
-      # If the coordinator is on a different time zone, the epoch time returned will be
-      # different than from this system, so time.localtime(coordinator.epoch_time) will
-      # return the timestamp of the server.
-      self._print_if_verbose("Query submitted at: %s (Coordinator: %s)" % (time.strftime(
-          "%Y-%m-%d %H:%M:%S", time.localtime(coordinator.epoch_time)),
-          coordinator.webserver_address))
+      if self.webserver_address == ImpalaShell.UNKNOWN_WEBSERVER:
+        print_web_link = False
+      if print_web_link:
+        self._print_if_verbose("Query submitted at: %s (Coordinator: %s)" %
+            (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            self.webserver_address))
 
       start_time = time.time()
       self.last_query_handle = self.imp_client.execute_query(query)
       self.query_handle_closed = False
       self.last_summary = time.time()
-      if coordinator.webserver_address:
+      if print_web_link:
         self._print_if_verbose(
             "Query progress can be monitored at: %s/query_plan?query_id=%s" %
-            (coordinator.webserver_address, self.last_query_handle.id))
+            (self.webserver_address, self.last_query_handle.id))
 
       wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,
           self._periodic_wait_callback)
@@ -1020,7 +1024,7 @@ class ImpalaShell(cmd.Cmd):
     """Executes an INSERT query"""
     query = self.imp_client.create_beeswax_query("insert %s" % args,
                                                  self.set_query_options)
-    return self._execute_stmt(query, is_insert=True)
+    return self._execute_stmt(query, is_insert=True, print_web_link=True)
 
   def do_explain(self, args):
     """Explain the query execution plan"""
@@ -1103,7 +1107,7 @@ class ImpalaShell(cmd.Cmd):
 
   def default(self, args):
     query = self.imp_client.create_beeswax_query(args, self.set_query_options)
-    return self._execute_stmt(query)
+    return self._execute_stmt(query, print_web_link=True)
 
   def emptyline(self):
     """If an empty line is entered, do nothing"""

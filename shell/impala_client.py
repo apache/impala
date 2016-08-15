@@ -235,7 +235,7 @@ class ImpalaClient(object):
     self.imp_service = ImpalaService.Client(protocol)
     result = self.ping_impala_service()
     self.connected = True
-    return result.version
+    return result
 
   def ping_impala_service(self):
     return self.imp_service.PingImpalaService()
