@@ -122,7 +122,6 @@ struct DebugOptions {
 /// Execution state of a particular fragment instance.
 ///
 /// Concurrent accesses:
-/// - GetNodeThroughput() called when coordinator's profile is printed
 /// - updates through UpdateFragmentExecStatus()
 class Coordinator::FragmentInstanceState {
  public:
@@ -155,14 +154,6 @@ class Coordinator::FragmentInstanceState {
 
   /// Computes sum of split sizes of leftmost scan.
   void ComputeTotalSplitSize(const PerNodeScanRanges& per_node_scan_ranges);
-
-  /// Return value of throughput counter for given plan_node_id, or 0 if that node doesn't
-  /// exist. Thread-safe, and takes lock() internally.
-  int64_t GetNodeThroughput(int plan_node_id);
-
-  /// Return number of completed scan ranges for plan_node_id, or 0 if that node doesn't
-  /// exist. Thread-safe, and takes lock() internally.
-  int64_t GetNumScanRangesCompleted(int plan_node_id);
 
   /// Updates the total number of scan ranges complete for this fragment. Returns the
   /// delta since the last time this was called. Not thread-safe without lock() being
@@ -269,34 +260,6 @@ void Coordinator::FragmentInstanceState::ComputeTotalSplitSize(
       total_split_size_ += scan_range_params.scan_range.hdfs_file_split.length;
     }
   }
-}
-
-int64_t Coordinator::FragmentInstanceState::GetNodeThroughput(int plan_node_id) {
-  RuntimeProfile::Counter* counter = NULL;
-  {
-    lock_guard<mutex> l(lock_);
-    CounterMap& throughput_counters = aggregate_counters_.throughput_counters;
-    CounterMap::iterator i = throughput_counters.find(plan_node_id);
-    if (i == throughput_counters.end()) return 0;
-    counter = i->second;
-  }
-  DCHECK(counter != NULL);
-  // make sure not to hold lock when calling value() to avoid potential deadlocks
-  return counter->value();
-}
-
-int64_t Coordinator::FragmentInstanceState::GetNumScanRangesCompleted(int plan_node_id) {
-  RuntimeProfile::Counter* counter = NULL;
-  {
-    lock_guard<mutex> l(lock_);
-    CounterMap& ranges_complete = aggregate_counters_.scan_ranges_complete_counters;
-    CounterMap::iterator i = ranges_complete.find(plan_node_id);
-    if (i == ranges_complete.end()) return 0;
-    counter = i->second;
-  }
-  DCHECK(counter != NULL);
-  // make sure not to hold lock when calling value() to avoid potential deadlocks
-  return counter->value();
 }
 
 int64_t Coordinator::FragmentInstanceState::UpdateNumScanRangesCompleted() {
@@ -1302,63 +1265,6 @@ void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
       counters->scan_ranges_complete_counters[id] = scan_ranges_counter;
     }
   }
-}
-
-void Coordinator::CreateAggregateCounters(
-    const vector<TPlanFragment>& fragments) {
-  for (const TPlanFragment& fragment: fragments) {
-    if (!fragment.__isset.plan) continue;
-    const vector<TPlanNode>& nodes = fragment.plan.nodes;
-    for (const TPlanNode& node: nodes) {
-      if (node.node_type != TPlanNodeType::HDFS_SCAN_NODE
-          && node.node_type != TPlanNodeType::HBASE_SCAN_NODE) {
-        continue;
-      }
-
-      stringstream s;
-      s << PrintPlanNodeType(node.node_type) << " (id="
-        << node.node_id << ") Throughput";
-      query_profile_->AddDerivedCounter(s.str(), TUnit::BYTES_PER_SECOND,
-          bind<int64_t>(mem_fn(&Coordinator::ComputeTotalThroughput),
-                        this, node.node_id));
-      s.str("");
-      s << PrintPlanNodeType(node.node_type) << " (id="
-        << node.node_id << ") Completed scan ranges";
-      query_profile_->AddDerivedCounter(s.str(), TUnit::UNIT,
-          bind<int64_t>(mem_fn(&Coordinator::ComputeTotalScanRangesComplete),
-                        this, node.node_id));
-    }
-  }
-}
-
-int64_t Coordinator::ComputeTotalThroughput(int node_id) {
-  int64_t value = 0;
-  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
-    FragmentInstanceState* exec_state = fragment_instance_states_[i];
-    value += exec_state->GetNodeThroughput(node_id);
-  }
-  // Add up the local fragment throughput counter
-  CounterMap& throughput_counters = coordinator_counters_.throughput_counters;
-  CounterMap::iterator it = throughput_counters.find(node_id);
-  if (it != throughput_counters.end()) {
-    value += it->second->value();
-  }
-  return value;
-}
-
-int64_t Coordinator::ComputeTotalScanRangesComplete(int node_id) {
-  int64_t value = 0;
-  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
-    FragmentInstanceState* exec_state = fragment_instance_states_[i];
-    value += exec_state->GetNumScanRangesCompleted(node_id);
-  }
-  // Add up the local fragment throughput counter
-  CounterMap& scan_ranges_complete = coordinator_counters_.scan_ranges_complete_counters;
-  CounterMap::iterator it = scan_ranges_complete.find(node_id);
-  if (it != scan_ranges_complete.end()) {
-    value += it->second->value();
-  }
-  return value;
 }
 
 void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_params,

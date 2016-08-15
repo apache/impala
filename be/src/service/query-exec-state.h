@@ -256,8 +256,6 @@ class ImpalaServer::QueryExecState {
   /// Max size of the result_cache_ in number of rows. A value <= 0 means no caching.
   int64_t result_cache_max_size_;
 
-  /// local runtime_state_ in case we don't have a coord_
-  boost::scoped_ptr<RuntimeState> local_runtime_state_;
   ObjectPool profile_pool_;
 
   /// The QueryExecState builds three separate profiles.

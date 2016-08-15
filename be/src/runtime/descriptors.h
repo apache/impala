@@ -133,10 +133,6 @@ class SlotDescriptor {
 
   std::string DebugString() const;
 
-  /// Codegen for: bool IsNull(Tuple* tuple)
-  /// The codegen'd IR function is cached.
-  llvm::Function* GetIsNullFn(LlvmCodeGen*) const;
-
   /// Codegen for: void SetNull(Tuple* tuple) / void SetNotNull(Tuple* tuple)
   /// The codegen'd IR function is cached.
   llvm::Function* GetUpdateNullFn(LlvmCodeGen*, bool set_null) const;
@@ -481,9 +477,6 @@ class RowDescriptor {
 
   /// c'tor for a row assembled from two rows
   RowDescriptor(const RowDescriptor& lhs_row_desc, const RowDescriptor& rhs_row_desc);
-
-  RowDescriptor(const std::vector<TupleDescriptor*>& tuple_descs,
-      const std::vector<bool>& nullable_tuples);
 
   RowDescriptor(TupleDescriptor* tuple_desc, bool is_nullable);
 

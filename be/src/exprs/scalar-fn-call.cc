@@ -121,9 +121,8 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     if (!status.ok()) {
       if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
         // Builtins symbols should exist unless there is a version mismatch.
-        status.SetErrorMsg(ErrorMsg(TErrorCode::MISSING_BUILTIN,
-            fn_.name.function_name, fn_.scalar_fn.symbol));
-        return status;
+        return Status(TErrorCode::MISSING_BUILTIN, fn_.name.function_name,
+            fn_.scalar_fn.symbol);
       } else {
         DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::NATIVE);
         return Status(Substitute("Problem loading UDF '$0':\n$1",

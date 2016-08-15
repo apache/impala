@@ -92,11 +92,6 @@ class RawValue {
   /// src must be non-NULL.
   static void Write(const void* src, void* dst, const ColumnType& type, MemPool* pool);
 
-  /// Writes 'src' into 'dst' for type.
-  /// String values are copied into *buffer and *buffer is updated by the length. *buf
-  /// must be preallocated to be large enough.
-  static void Write(const void* src, const ColumnType& type, void* dst, uint8_t** buf);
-
   /// Returns true if v1 == v2.
   /// This is more performant than Compare() == 0 for string equality, mostly because of
   /// the length comparison check.

@@ -393,16 +393,6 @@ RowDescriptor::RowDescriptor(const RowDescriptor& lhs_row_desc,
   InitHasVarlenSlots();
 }
 
-RowDescriptor::RowDescriptor(const vector<TupleDescriptor*>& tuple_descs,
-                             const vector<bool>& nullable_tuples)
-  : tuple_desc_map_(tuple_descs),
-    tuple_idx_nullable_map_(nullable_tuples) {
-  DCHECK_EQ(nullable_tuples.size(), tuple_descs.size());
-  DCHECK_GT(tuple_descs.size(), 0);
-  InitTupleIdxMap();
-  InitHasVarlenSlots();
-}
-
 RowDescriptor::RowDescriptor(TupleDescriptor* tuple_desc, bool is_nullable)
   : tuple_desc_map_(1, tuple_desc),
     tuple_idx_nullable_map_(1, is_nullable) {
@@ -579,41 +569,6 @@ void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
        i != tuple_desc_map_.end(); ++i) {
     descs->push_back(i->second);
   }
-}
-
-// Generate function to check if a slot is null.  The resulting IR looks like:
-// (in this case the tuple contains only a nullable double)
-// define i1 @IsNull({ i8, double }* %tuple) {
-// entry:
-//   %null_byte_ptr = getelementptr inbounds { i8, double }* %tuple, i32 0, i32 0
-//   %null_byte = load i8* %null_byte_ptr
-//   %null_mask = and i8 %null_byte, 1
-//   %is_null = icmp ne i8 %null_mask, 0
-//   ret i1 %is_null
-// }
-Function* SlotDescriptor::GetIsNullFn(LlvmCodeGen* codegen) const {
-  if (is_null_fn_ != NULL) return is_null_fn_;
-  StructType* tuple_type = parent()->GetLlvmStruct(codegen);
-  PointerType* tuple_ptr_type = tuple_type->getPointerTo();
-  LlvmCodeGen::FnPrototype prototype(codegen, "IsNull", codegen->GetType(TYPE_BOOLEAN));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
-
-  Value* mask = codegen->GetIntConstant(TYPE_TINYINT, null_indicator_offset_.bit_mask);
-  Value* zero = codegen->GetIntConstant(TYPE_TINYINT, 0);
-  int byte_offset = null_indicator_offset_.byte_offset;
-
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
-  Value* tuple_ptr;
-  Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
-
-  Value* null_byte_ptr = builder.CreateStructGEP(NULL, tuple_ptr, byte_offset,
-      "null_byte_ptr");
-  Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
-  Value* null_mask = builder.CreateAnd(null_byte, mask, "null_mask");
-  Value* is_null = builder.CreateICmpNE(null_mask, zero, "is_null");
-  builder.CreateRet(is_null);
-
-  return is_null_fn_ = codegen->FinalizeFunction(fn);
 }
 
 // Generate function to set a slot to be null or not-null.  The resulting IR

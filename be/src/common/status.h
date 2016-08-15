@@ -199,15 +199,6 @@ class Status {
     return *msg_;
   }
 
-  /// Sets the ErrorMessage on the detail of the status. Calling this method is only valid
-  /// if an error was reported.
-  /// TODO: deprecate, error should be immutable
-  void SetErrorMsg(const ErrorMsg& m) {
-    DCHECK(msg_ != NULL);
-    delete msg_;
-    msg_ = new ErrorMsg(m);
-  }
-
   /// Add a detail string. Calling this method is only defined on a non-OK message
   void AddDetail(const std::string& msg);
 
