@@ -451,6 +451,10 @@ void HdfsScanNode::TransferToScanNodePool(MemPool* pool) {
   scan_node_pool_->AcquireData(pool, false);
 }
 
+Status HdfsScanNode::TriggerDebugAction() {
+  return ExecDebugAction(TExecNodePhase::GETNEXT, runtime_state_);
+}
+
 Status HdfsScanNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   runtime_state_ = state;

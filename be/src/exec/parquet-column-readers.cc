@@ -54,6 +54,15 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
 // Also, this limit is in place to prevent impala from reading corrupt parquet files.
 DEFINE_int32(max_page_header_size, 8*1024*1024, "max parquet page header size in bytes");
 
+// Trigger debug action on every 128 tuples produced. This is useful in exercising the
+// failure or cancellation path.
+#ifndef NDEBUG
+#define DEBUG_ACTION_TRIGGER (127)
+#define SHOULD_TRIGGER_DEBUG_ACTION(x) ((x & DEBUG_ACTION_TRIGGER) == 0)
+#else
+#define SHOULD_TRIGGER_DEBUG_ACTION(x) (false)
+#endif
+
 namespace impala {
 
 const string PARQUET_MEM_LIMIT_EXCEEDED = "HdfsParquetScanner::$0() failed to allocate "
@@ -330,6 +339,9 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       }
       val_count += ret_val_count;
       num_buffered_values_ -= (def_levels_.CacheCurrIdx() - cache_start_idx);
+      if (SHOULD_TRIGGER_DEBUG_ACTION(val_count)) {
+        continue_execution &= TriggerDebugAction();
+      }
     }
     *num_values = val_count;
     return continue_execution;
@@ -630,6 +642,15 @@ class BoolColumnReader : public BaseScalarColumnReader {
   BitReader bool_values_;
 };
 
+bool ParquetColumnReader::TriggerDebugAction() {
+  Status status = parent_->TriggerDebugAction();
+  if (!status.ok()) {
+    if (!status.IsCancelled()) parent_->parse_status_.MergeStatus(status);
+    return false;
+  }
+  return true;
+}
+
 bool ParquetColumnReader::ReadValueBatch(MemPool* pool, int max_values,
     int tuple_size, uint8_t* tuple_mem, int* num_values) {
   int val_count = 0;
@@ -645,6 +666,9 @@ bool ParquetColumnReader::ReadValueBatch(MemPool* pool, int max_values,
     if (pos_slot_desc_ != NULL) ReadPosition(tuple);
     continue_execution = ReadValue(pool, tuple);
     ++val_count;
+    if (SHOULD_TRIGGER_DEBUG_ACTION(val_count)) {
+      continue_execution &= TriggerDebugAction();
+    }
   }
   *num_values = val_count;
   return continue_execution;
@@ -658,6 +682,9 @@ bool ParquetColumnReader::ReadNonRepeatedValueBatch(MemPool* pool,
     Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
     continue_execution = ReadNonRepeatedValue(pool, tuple);
     ++val_count;
+    if (SHOULD_TRIGGER_DEBUG_ACTION(val_count)) {
+      continue_execution &= TriggerDebugAction();
+    }
   }
   *num_values = val_count;
   return continue_execution;

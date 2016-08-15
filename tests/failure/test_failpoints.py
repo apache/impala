@@ -29,20 +29,25 @@ from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import TestDimension
 
-FAILPOINT_ACTION = ['FAIL', 'CANCEL']
+FAILPOINT_ACTION = ['FAIL', 'CANCEL', 'MEM_LIMIT_EXCEEDED']
 FAILPOINT_LOCATION = ['PREPARE', 'PREPARE_SCANNER', 'OPEN', 'GETNEXT', 'CLOSE']
+# Map debug actions to their corresponding query options' values.
+FAILPOINT_ACTION_MAP = {'FAIL': 'FAIL', 'CANCEL': 'WAIT',
+                        'MEM_LIMIT_EXCEEDED': 'MEM_LIMIT_EXCEEDED'}
 
 # The goal of this query is to use all of the node types.
 # TODO: This query could be simplified a bit...
 QUERY = """
-select a.int_col, count(b.int_col) int_sum from functional_hbase.alltypesagg a
+select a.int_col, count(b.int_col) int_sum, count(l.l_shipdate)
+from functional_hbase.alltypesagg a, tpch_nested_parquet.customer c, c.c_orders.o_lineitems l
 join
   (select * from alltypes
    where year=2009 and month=1 order by int_col limit 2500
    union all
    select * from alltypes
    where year=2009 and month=2 limit 3000) b
-on (a.int_col = b.int_col)
+on (a.int_col = b.int_col) and (a.int_col = c.c_custkey)
+where c.c_mktsegment = 'BUILDING'
 group by a.int_col
 order by int_sum
 """
@@ -109,7 +114,6 @@ class TestFailpoints(ImpalaTestSuite):
         lambda v: (v.get_value('location') != 'PREPARE_SCANNER' or
             v.get_value('target_node')[0] == 'SCAN HDFS'))
 
-
   def test_failpoints(self, vector):
     query = QUERY
     node_type, node_ids = vector.get_value('target_node')
@@ -117,14 +121,13 @@ class TestFailpoints(ImpalaTestSuite):
     location = vector.get_value('location')
 
     for node_id in node_ids:
-      debug_action = '%d:%s:%s' % (node_id, location,
-                                   'WAIT' if action == 'CANCEL' else 'FAIL')
+      debug_action = '%d:%s:%s' % (node_id, location, FAILPOINT_ACTION_MAP[action])
       LOG.info('Current dubug action: SET DEBUG_ACTION=%s' % debug_action)
       vector.get_value('exec_option')['debug_action'] = debug_action
 
       if action == 'CANCEL':
         self.__execute_cancel_action(query, vector)
-      elif action == 'FAIL':
+      elif action == 'FAIL' or action == 'MEM_LIMIT_EXCEEDED':
         self.__execute_fail_action(query, vector)
       else:
         assert 0, 'Unknown action: %s' % action

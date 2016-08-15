@@ -437,6 +437,9 @@ Status ExecNode::ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state
         ErrorMsg(TErrorCode::INTERNAL_ERROR, "Debug Action: INJECT_ERROR_LOG"));
     return Status::OK();
   }
+  if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
+    mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
+  }
   return Status::OK();
 }
 

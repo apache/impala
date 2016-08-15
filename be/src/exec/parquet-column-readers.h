@@ -287,6 +287,11 @@ class ParquetColumnReader {
     // rep_level_ is always valid and equal to 0 if col not in collection.
     if (max_rep_level() == 0) rep_level_ = 0;
   }
+
+  /// Trigger debug action. Returns false if the debug action deems that the
+  /// parquet column reader should halt execution. In which case, 'parse_status_'
+  /// is also updated.
+  bool TriggerDebugAction();
 };
 
 /// Reader for a single column from the parquet file.  It's associated with a

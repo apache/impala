@@ -378,6 +378,11 @@ class HdfsScanner {
   /// This is called from WriteAlignedTuples.
   bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, int row_idx);
 
+  /// Triggers debug action of the scan node. This is currently used by parquet column
+  /// readers to exercise various failure paths in parquet scanner. Returns the status
+  /// returned by the scan node's TriggerDebugAction().
+  Status TriggerDebugAction() { return scan_node_->TriggerDebugAction(); }
+
   /// Utility function to append an error message for an invalid row.  This is called
   /// from ReportTupleParseError()
   /// row_idx is the index of the row in the current batch.  Subclasses should override

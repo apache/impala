@@ -64,7 +64,8 @@ enum TExecNodePhase {
 enum TDebugAction {
   WAIT,
   FAIL,
-  INJECT_ERROR_LOG
+  INJECT_ERROR_LOG,
+  MEM_LIMIT_EXCEEDED,
 }
 
 // Preference for replica selection

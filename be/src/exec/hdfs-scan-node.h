@@ -317,6 +317,7 @@ class HdfsScanNode : public ScanNode {
 
  protected:
   friend class ScannerContext;
+  friend class HdfsScanner;
 
   RuntimeState* runtime_state_;
 
@@ -571,6 +572,10 @@ class HdfsScanNode : public ScanNode {
   /// true if all filters arrived within the time limit (as measured from the time of
   /// RuntimeFilterBank::RegisterFilter()), false otherwise.
   bool WaitForRuntimeFilters(int32_t time_ms);
+
+  /// Calls ExecDebugAction(). Returns the status based on the debug action specified
+  /// for the query.
+  Status TriggerDebugAction();
 };
 
 }

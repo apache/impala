@@ -343,11 +343,11 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch, bool* eos) {
   }
 
   while (advance_row_group_ || column_readers_[0]->RowGroupAtEnd()) {
+    // Transfer resources and clear streams if there is any leftover from the previous
+    // row group. We will create new streams for the next row group.
+    FlushRowGroupResources(row_batch);
+    context_->ClearStreams();
     if (!advance_row_group_) {
-      // End of the previous row group. Transfer resources and clear streams because
-      // we will create new streams for the next row group.
-      FlushRowGroupResources(row_batch);
-      context_->ClearStreams();
       Status status =
           ValidateEndOfRowGroup(column_readers_, row_group_idx_, row_group_rows_read_);
       if (!status.ok()) RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
@@ -501,17 +501,19 @@ Status HdfsParquetScanner::AssembleRows(
             scratch_batch_->mem_pool(), scratch_capacity, tuple_byte_size_,
             scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
       }
-      if (UNLIKELY(!continue_execution)) {
-        *skip_row_group = true;
-        return Status::OK();
-      }
       // Check that all column readers populated the same number of values.
-      if (c != 0 && UNLIKELY(last_num_tuples != scratch_batch_->num_tuples)) {
-        parse_status_.MergeStatus(Substitute("Corrupt Parquet file '$0': column '$1' "
-            "had $2 remaining values but expected $3", filename(),
-            col_reader->schema_element().name, last_num_tuples,
-            scratch_batch_->num_tuples));
+      bool num_tuples_mismatch = c != 0 && last_num_tuples != scratch_batch_->num_tuples;
+      if (UNLIKELY(!continue_execution || num_tuples_mismatch)) {
+        // Skipping this row group. Free up all the resources with this row group.
+        scratch_batch_->mem_pool()->FreeAll();
+        scratch_batch_->num_tuples = 0;
         *skip_row_group = true;
+        if (num_tuples_mismatch) {
+          parse_status_.MergeStatus(Substitute("Corrupt Parquet file '$0': column '$1' "
+              "had $2 remaining values but expected $3", filename(),
+              col_reader->schema_element().name, last_num_tuples,
+              scratch_batch_->num_tuples));
+        }
         return Status::OK();
       }
       last_num_tuples = scratch_batch_->num_tuples;
