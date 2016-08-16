@@ -789,11 +789,28 @@ class ImpalaConnection(DbConnection):
         auth_mechanism=('GSSAPI' if self._use_kerberos else self._NON_KERBEROS_AUTH_MECH))
 
 
+class HiveCursor(ImpalaCursor):
+
+  def invalidate_metadata(self, table_name=None):
+    # There is no equivalent of "INVALIDATE METADATA" in Hive
+    pass
+
+  def compute_stats(self, table_name=None):
+    if table_name:
+      self.execute("ANALYZE TABLE %s COMPUTE STATISTICS" % table_name)
+      self.execute("ANALYZE TABLE %s COMPUTE STATISTICS FOR COLUMNS" % table_name)
+    else:
+      for table_name in self.list_table_names():
+        self.execute("ANALYZE TABLE %s COMPUTE STATISTICS" % table_name)
+        self.execute("ANALYZE TABLE %s COMPUTE STATISTICS FOR COLUMNS" % table_name)
+
+
 class HiveConnection(ImpalaConnection):
 
   PORT = 11050
 
   _DB_TYPE = HIVE
+  _CURSOR_CLASS = HiveCursor
   _NON_KERBEROS_AUTH_MECH = 'PLAIN'
 
 

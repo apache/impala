@@ -49,6 +49,7 @@ from db_types import (
     Timestamp,
     TYPES,
     VarChar)
+from tests.comparison import db_connection
 
 LOG = getLogger(__name__)
 
@@ -87,9 +88,10 @@ class DbPopulator(object):
 
   '''
 
-  def __init__(self):
+  def __init__(self, db_engine=db_connection.IMPALA):
     self.cluster = None
     self.db_name = None
+    self.db_engine = db_engine
 
     self.min_col_count = None
     self.max_col_count = None
@@ -147,9 +149,17 @@ class DbPopulator(object):
           cursor.execute('INSERT INTO %s SELECT * FROM %s'
               % (table.name, text_table.name))
           cursor.drop_table(text_table.name)
-    with self.cluster.impala.cursor(db_name=self.db_name) as cursor:
-      cursor.invalidate_metadata()
-      cursor.compute_stats()
+    if self.db_engine is db_connection.IMPALA:
+      with self.cluster.impala.cursor(db_name=self.db_name) as cursor:
+        cursor.invalidate_metadata()
+        cursor.compute_stats()
+    elif self.db_engine is db_connection.HIVE:
+      with self.cluster.hive.cursor(db_name=self.db_name) as cursor:
+        cursor.invalidate_metadata()
+        cursor.compute_stats()
+    else:
+      raise ValueError("db_engine must be of type %s or %s", db_connection.IMPALA,
+                       db_connection.HIVE)
     if postgresql_conn:
       with postgresql_conn.cursor() as postgresql_cursor:
         index_tables_in_db_if_possible(postgresql_cursor)
@@ -298,7 +308,7 @@ if __name__ == '__main__':
 
   cluster = cli_options.create_cluster(args)
 
-  populator = DbPopulator()
+  populator = DbPopulator(db_connection.HIVE if args.use_hive else db_connection.IMPALA)
   if command == 'populate':
     populator.randomization_seed = args.randomization_seed
     populator.cluster = cluster
@@ -308,10 +318,17 @@ if __name__ == '__main__':
     populator.min_row_count = args.min_row_count
     populator.max_row_count = args.max_row_count
     populator.allowed_storage_formats = args.storage_file_formats.split(',')
-    with cluster.impala.connect() as conn:
-      with conn.cursor() as cursor:
-        cursor.invalidate_metadata()
-        cursor.ensure_empty_db(args.db_name)
+
+    if args.use_hive:
+      with cluster.hive.connect() as conn:
+        with conn.cursor() as cursor:
+          cursor.ensure_empty_db(args.db_name)
+    else:
+      with cluster.impala.connect() as conn:
+        with conn.cursor() as cursor:
+          cursor.invalidate_metadata()
+          cursor.ensure_empty_db(args.db_name)
+
     if args.use_postgresql:
       with cli_options.create_connection(args) as postgresql_conn:
         with postgresql_conn.cursor() as cursor:

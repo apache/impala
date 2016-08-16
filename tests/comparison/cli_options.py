@@ -24,7 +24,8 @@ from getpass import getuser
 from tempfile import gettempdir
 
 import db_connection
-from cluster import CmCluster, MiniCluster
+from cluster import CmCluster, DEFAULT_HIVE_HOST, DEFAULT_HIVE_PORT, MiniCluster, \
+  MiniHiveCluster
 from db_types import TYPES
 
 def add_logging_options(section, default_debug_log_file=None):
@@ -119,8 +120,10 @@ def create_cluster(args):
     cluster = CmCluster(args.cm_host, user=args.cm_user, password=args.cm_password,
         cluster_name=args.cm_cluster_name, ssh_user=args.ssh_user, ssh_port=args.ssh_port,
         ssh_key_file=args.ssh_key_file)
+  elif args.use_hive:
+    cluster = MiniHiveCluster(args.hive_host, args.hive_port)
   else:
-    cluster = MiniCluster(args.minicluster_num_impalads)
+    cluster = MiniCluster(args.hive_host, args.hive_port, args.minicluster_num_impalads)
   cluster.hadoop_user_name = args.hadoop_user_name
   return cluster
 
@@ -143,6 +146,20 @@ def add_timeout_option(section):
 
 
 def add_connection_option_groups(parser):
+
+  group = parser.add_argument_group("Hive Options")
+  group.add_argument('--use-hive', action='store_true', default=False,
+      help='Use Hive (Impala will be skipped)')
+  group.add_argument('--hive-host', default=DEFAULT_HIVE_HOST,
+      help="The name of the host running the HS2")
+  group.add_argument("--hive-port", default=DEFAULT_HIVE_PORT, type=int,
+      help="The port of HiveServer2")
+  group.add_argument('--hive-user', default='hive',
+      help="The user name to use when connecting to HiveServer2")
+  group.add_argument('--hive-password', default='hive',
+      help="The password to use when connecting to HiveServer2")
+  parser.add_argument_group(group)
+
   group = parser.add_argument_group('MySQL Options')
   group.add_argument('--use-mysql', action='store_true',
       help='Use MySQL')
@@ -208,6 +225,8 @@ def create_connection(args, db_type=None, db_name=None):
     conn_class = db_connection.MySQLConnection
   elif db_type == db_connection.ORACLE:
     conn_class = db_connection.OracleConnection
+  elif db_type == db_connection.HIVE:
+    conn_class = db_connection.HiveConnection
   else:
     raise Exception('Unexpected db_type: %s; expected one of %s.'
         % (db_type, ', '.join([db_connection.POSTGRESQL, db_connection.MYSQL,
