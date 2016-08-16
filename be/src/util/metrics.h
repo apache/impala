@@ -299,7 +299,10 @@ class MetricGroup {
       rapidjson::Value* out_val);
 
   /// Creates or returns an already existing child metric group.
-  MetricGroup* GetChildGroup(const std::string& name);
+  MetricGroup* GetOrCreateChildGroup(const std::string& name);
+
+  /// Returns a child metric group with name 'name', or NULL if that group doesn't exist
+  MetricGroup* FindChildGroup(const std::string& name);
 
   /// Useful for debuggers, returns the output of CMCompatibleCallback().
   std::string DebugString();

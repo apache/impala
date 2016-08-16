@@ -54,15 +54,15 @@ int StatestoredMain(int argc, char** argv) {
 
   MemTracker mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
 
   if (FLAGS_enable_webserver) {
-    AddDefaultUrlCallbacks(webserver.get(), &mem_tracker);
+    AddDefaultUrlCallbacks(webserver.get(), &mem_tracker, metrics.get());
     ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
 
-  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
   ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false));
   StartThreadInstrumentation(metrics.get(), webserver.get());

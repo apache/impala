@@ -55,7 +55,7 @@ const int32_t STREAM_EXPIRATION_TIME_MS = 300 * 1000;
 namespace impala {
 
 DataStreamMgr::DataStreamMgr(MetricGroup* metrics) {
-  metrics_ = metrics->GetChildGroup("datastream-manager");
+  metrics_ = metrics->GetOrCreateChildGroup("datastream-manager");
   num_senders_waiting_ =
       metrics_->AddGauge<int64_t>("senders-blocked-on-recvr-creation", 0L);
   total_senders_waited_ =

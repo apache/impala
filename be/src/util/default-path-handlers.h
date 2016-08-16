@@ -24,10 +24,12 @@ namespace impala {
 
 class MemTracker;
 class Webserver;
+class MetricGroup;
 
 /// Adds a set of default path handlers to the webserver to display
 /// logs and configuration flags
-void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker = NULL);
+void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker = NULL,
+    MetricGroup* metric_group = NULL);
 }
 
 #endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H

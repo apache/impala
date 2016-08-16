@@ -194,13 +194,20 @@ void MetricGroup::ToJson(bool include_children, Document* document, Value* out_v
   *out_val = container;
 }
 
-MetricGroup* MetricGroup::GetChildGroup(const string& name) {
+MetricGroup* MetricGroup::GetOrCreateChildGroup(const string& name) {
   lock_guard<SpinLock> l(lock_);
   ChildGroupMap::iterator it = children_.find(name);
   if (it != children_.end()) return it->second;
   MetricGroup* group = obj_pool_->Add(new MetricGroup(name));
   children_[name] = group;
   return group;
+}
+
+MetricGroup* MetricGroup::FindChildGroup(const string& name) {
+  lock_guard<SpinLock> l(lock_);
+  ChildGroupMap::iterator it = children_.find(name);
+  if (it != children_.end()) return it->second;
+  return NULL;
 }
 
 string MetricGroup::DebugString() {

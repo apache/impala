@@ -323,7 +323,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   http_handler_->RegisterHandlers(exec_env->webserver());
 
   // Initialize impalad metrics
-  ImpaladMetrics::CreateMetrics(exec_env->metrics()->GetChildGroup("impala-server"));
+  ImpaladMetrics::CreateMetrics(
+      exec_env->metrics()->GetOrCreateChildGroup("impala-server"));
   ImpaladMetrics::IMPALA_SERVER_START_TIME->set_value(
       TimestampValue::LocalTime().DebugString());
 

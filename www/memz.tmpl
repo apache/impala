@@ -28,8 +28,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
 <h3>Breakdown</h3>
 <pre>{{detailed}}</pre>
 
+{{?jvm}}
 <h3>JVM memory total usage</h3>
-
 <table class='table table-bordered table-hover'>
   <tr>
     <th>Name</th>
@@ -56,5 +56,6 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
   </tr>
   {{/jvm}}
 </table>
+{{/jvm}}
 
 {{> www/common-footer.tmpl }}

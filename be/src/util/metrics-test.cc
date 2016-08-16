@@ -230,12 +230,12 @@ TEST_F(MetricsTest, JvmMetrics) {
   MetricGroup metrics("JvmMetrics");
   RegisterMemoryMetrics(&metrics, true);
   UIntGauge* jvm_total_used =
-      metrics.GetChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
+      metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
           "jvm.total.current-usage-bytes");
   ASSERT_TRUE(jvm_total_used != NULL);
   EXPECT_GT(jvm_total_used->value(), 0);
   UIntGauge* jvm_peak_total_used =
-      metrics.GetChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
+      metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
           "jvm.total.peak-current-usage-bytes");
   ASSERT_TRUE(jvm_peak_total_used != NULL);
   EXPECT_GT(jvm_peak_total_used->value(), 0);
@@ -346,9 +346,12 @@ TEST_F(MetricsTest, MetricGroupJson) {
   metrics.AddCounter("counter1", 2048);
   metrics.AddCounter("counter2", 2048);
 
-  metrics.GetChildGroup("child1");
+  MetricGroup* find_result = metrics.FindChildGroup("child1");
+  EXPECT_EQ(find_result, reinterpret_cast<MetricGroup*>(NULL));
+
+  metrics.GetOrCreateChildGroup("child1");
   AddMetricDef("child_counter", TMetricKind::COUNTER, TUnit::BYTES, "description");
-  metrics.GetChildGroup("child2")->AddCounter("child_counter", 0);
+  metrics.GetOrCreateChildGroup("child2")->AddCounter("child_counter", 0);
 
   IntCounter* counter = metrics.FindMetricForTesting<IntCounter>(string("child_counter"));
   ASSERT_NE(counter, reinterpret_cast<IntCounter*>(NULL));
@@ -364,6 +367,14 @@ TEST_F(MetricsTest, MetricGroupJson) {
   EXPECT_EQ(val["child_groups"][0u]["metrics"].Size(), 0);
   EXPECT_EQ(val["child_groups"][1]["name"].GetString(), string("child2"));
   EXPECT_EQ(val["child_groups"][1]["metrics"].Size(), 1);
+
+  find_result = metrics.FindChildGroup("child1");
+  ASSERT_NE(find_result, reinterpret_cast<MetricGroup*>(NULL));
+  Value val2;
+  find_result->ToJson(true, &document, &val2);
+
+  EXPECT_EQ(val2["metrics"].Size(), 0);
+  EXPECT_EQ(val2["name"].GetString(), string("child1"));
 }
 
 }

@@ -60,14 +60,15 @@ int CatalogdMain(int argc, char** argv) {
 
   MemTracker process_mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
+
   if (FLAGS_enable_webserver) {
-    AddDefaultUrlCallbacks(webserver.get(), &process_mem_tracker);
+    AddDefaultUrlCallbacks(webserver.get(), &process_mem_tracker, metrics.get());
     ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
 
-  scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
   ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
   StartThreadInstrumentation(metrics.get(), webserver.get());

@@ -26,7 +26,6 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
-#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
 #include "util/pprof-path-handlers.h"
@@ -117,8 +116,8 @@ void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
 }
 
 // Registered to handle "/memz"
-void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args,
-    Document* document) {
+void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
+    const Webserver::ArgumentMap& args, Document* document) {
   DCHECK(mem_tracker != NULL);
   Value mem_limit(PrettyPrinter::Print(mem_tracker->limit(), TUnit::BYTES).c_str(),
       document->GetAllocator());
@@ -144,25 +143,35 @@ void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args
   Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
   document->AddMember("detailed", detailed, document->GetAllocator());
 
-  Value jvm(kObjectType);
-  ExecEnv::GetInstance()->metrics()->GetChildGroup("jvm")->ToJson(false, document, &jvm);
+  if (metric_group != NULL) {
+    MetricGroup* jvm_group = metric_group->FindChildGroup("jvm");
+    if (jvm_group != NULL) {
+      Value jvm(kObjectType);
+      jvm_group->ToJson(false, document, &jvm);
+      Value total(kArrayType);
+      for (SizeType i = 0; i < jvm["metrics"].Size(); ++i) {
+        if (strstr(jvm["metrics"][i]["name"].GetString(), "total") != nullptr) {
+          total.PushBack(jvm["metrics"][i], document->GetAllocator());
+        }
+      }
+      document->AddMember("jvm", total, document->GetAllocator());
 
-  Value total(kArrayType);
-  for(SizeType i = 0; i < jvm["metrics"].Size(); ++i){
-    if (strstr(jvm["metrics"][i]["name"].GetString(), "total") != nullptr){
-      total.PushBack(jvm["metrics"][i], document->GetAllocator());
     }
   }
-  document->AddMember("jvm", total, document->GetAllocator());
+
 }
 
+
 void impala::AddDefaultUrlCallbacks(
-    Webserver* webserver, MemTracker* process_mem_tracker) {
+    Webserver* webserver, MemTracker* process_mem_tracker, MetricGroup* metric_group) {
   webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler);
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler);
   if (process_mem_tracker != NULL) {
-    webserver->RegisterUrlCallback("/memz","memz.tmpl",
-        bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
+    auto callback = [process_mem_tracker, metric_group]
+        (const Webserver::ArgumentMap& args, Document* doc) {
+      MemUsageHandler(process_mem_tracker, metric_group, args, doc);
+    };
+    webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback);
   }
 
 #ifndef ADDRESS_SANITIZER

@@ -102,7 +102,7 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
       client_cache_(new StatestoreClientCache(FLAGS_statestore_subscriber_cnxn_attempts,
           FLAGS_statestore_subscriber_cnxn_retry_interval_ms, 0, 0, "",
           !FLAGS_ssl_client_ca_certificate.empty())),
-      metrics_(metrics->GetChildGroup("statestore-subscriber")) {
+      metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")) {
   connected_to_statestore_metric_ =
       metrics_->AddProperty("statestore-subscriber.connected", false);
   last_recovery_duration_metric_ = metrics_->AddGauge(

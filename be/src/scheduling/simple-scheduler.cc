@@ -82,7 +82,7 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
     RequestPoolService* request_pool_service)
   : backend_config_(std::make_shared<const BackendConfig>()),
-    metrics_(metrics->GetChildGroup("scheduler")),
+    metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
     local_backend_id_(backend_id),
