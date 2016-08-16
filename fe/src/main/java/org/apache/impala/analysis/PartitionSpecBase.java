@@ -40,6 +40,7 @@ public abstract class PartitionSpecBase implements ParseNode {
   public String getTbl() { return tableName_.getTbl(); }
 
   public void setTableName(TableName tableName) {this.tableName_ = tableName; }
+  public TableName getTableName() { return tableName_; }
 
   // The value Hive is configured to use for NULL partition key values.
   // Set during analysis.

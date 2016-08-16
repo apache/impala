@@ -1048,6 +1048,48 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   @Test
+  public void alterTableAddPartitionTest() {
+    // Add partition
+    testToSql(
+        "alter table functional.alltypes add partition (year=2050, month=1)",
+        "ALTER TABLE functional.alltypes ADD PARTITION (year=2050, month=1)");
+    // Add multiple partitions
+    testToSql(
+        "alter table functional.alltypes add partition (year=2050, month=1) " +
+        "partition (year=2050, month=2)",
+        "ALTER TABLE functional.alltypes ADD PARTITION (year=2050, month=1) " +
+        "PARTITION (year=2050, month=2)");
+    // with IF NOT EXISTS
+    testToSql(
+        "alter table functional.alltypes add if not exists " +
+        "partition (year=2050, month=1) " +
+        "partition (year=2050, month=2)",
+        "ALTER TABLE functional.alltypes ADD IF NOT EXISTS " +
+        "PARTITION (year=2050, month=1) " +
+        "PARTITION (year=2050, month=2)");
+    // with location
+    testToSql(
+        "alter table functional.alltypes add if not exists " +
+        "partition (year=2050, month=1) location 'hdfs://localhost:20500/y2050m1' " +
+        "partition (year=2050, month=2) location '/y2050m2'",
+        "ALTER TABLE functional.alltypes ADD IF NOT EXISTS "+
+        "PARTITION (year=2050, month=1) LOCATION 'hdfs://localhost:20500/y2050m1' " +
+        "PARTITION (year=2050, month=2) LOCATION 'hdfs://localhost:20500/y2050m2'");
+    // and caching
+    testToSql(
+        "alter table functional.alltypes add if not exists " +
+        "partition (year=2050, month=1) location 'hdfs://localhost:20500/y2050m1' " +
+        "cached in 'testPool' with replication=3 " +
+        "partition (year=2050, month=2) location '/y2050m2' " +
+        "uncached",
+        "ALTER TABLE functional.alltypes ADD IF NOT EXISTS "+
+        "PARTITION (year=2050, month=1) LOCATION 'hdfs://localhost:20500/y2050m1' " +
+        "CACHED IN 'testPool' WITH REPLICATION = 3 " +
+        "PARTITION (year=2050, month=2) LOCATION 'hdfs://localhost:20500/y2050m2' " +
+        "UNCACHED");
+  }
+
+  @Test
   public void testAnalyticExprs() {
     testToSql(
         "select sum(int_col) over (partition by id order by tinyint_col "

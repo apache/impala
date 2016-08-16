@@ -197,6 +197,41 @@ class ImpalaTestSuite(BaseTestSuite):
       except Exception as e:
         LOG.info('Unexpected exception when executing ' + query_str + ' : ' + str(e))
 
+  def get_impala_partition_info(self, table_name, *include_fields):
+    """
+    Find information about partitions of a table, as returned by a SHOW PARTITION
+    statement. Return a list that contains one tuple for each partition.
+
+    If 'include_fields' is not specified, the tuples will contain all the fields returned
+    by SHOW PARTITION. Otherwise, return only those fields whose names are listed in
+    'include_fields'. Field names are compared case-insensitively.
+    """
+    exec_result = self.client.execute('show partitions %s' % table_name)
+    fieldSchemas = exec_result.schema.fieldSchemas
+    fields_dict = {}
+    for idx, fs in enumerate(fieldSchemas):
+      fields_dict[fs.name.lower()] = idx
+
+    rows = exec_result.get_data().split('\n')
+    rows.pop()
+    fields_idx = []
+    for fn in include_fields:
+      fn = fn.lower()
+      assert fn in fields_dict, 'Invalid field: %s' % fn
+      fields_idx.append(fields_dict[fn])
+
+    result = []
+    for row in rows:
+      fields = row.split('\t')
+      if not fields_idx:
+        result_fields = fields
+      else:
+        result_fields = []
+        for i in fields_idx:
+          result_fields.append(fields[i])
+      result.append(tuple(result_fields))
+    return result
+
   def __verify_exceptions(self, expected_strs, actual_str, use_db):
     """
     Verifies that at least one of the strings in 'expected_str' is a substring of the
@@ -573,6 +608,15 @@ class ImpalaTestSuite(BaseTestSuite):
     if call.returncode != 0:
       raise RuntimeError(stderr)
     return stdout
+
+  def hive_partition_names(self, table_name):
+    """Find the names of the partitions of a table, as Hive sees them.
+
+    The return format is a list of strings. Each string represents a partition
+    value of a given column in a format like 'column1=7/column2=8'.
+    """
+    return self.run_stmt_in_hive(
+        'show partitions %s' % table_name).split('\n')[1:-1]
 
   @classmethod
   def create_table_info_dimension(cls, exploration_strategy):

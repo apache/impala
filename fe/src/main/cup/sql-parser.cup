@@ -392,6 +392,8 @@ nonterminal PartitionKeyValue partition_key_value;
 nonterminal PartitionKeyValue static_partition_key_value;
 nonterminal Qualifier union_op;
 
+nonterminal PartitionDef partition_def;
+nonterminal List<PartitionDef> partition_def_list;
 nonterminal AlterTableStmt alter_tbl_stmt;
 nonterminal StatementBase alter_view_stmt;
 nonterminal ComputeStatsStmt compute_stats_stmt;
@@ -914,16 +916,31 @@ opt_kw_role ::=
   | /* empty */
   ;
 
+partition_def ::=
+  partition_spec:partition location_val:location cache_op_val:cache_op
+  {: RESULT = new PartitionDef(partition, location, cache_op); :}
+  ;
+
+partition_def_list ::=
+  partition_def:item
+  {:
+    List<PartitionDef> list = Lists.newArrayList(item);
+    RESULT = list;
+  :}
+  | partition_def_list:list partition_def:item
+  {:
+    list.add(item);
+    RESULT = list;
+  :}
+  ;
+
 alter_tbl_stmt ::=
   KW_ALTER KW_TABLE table_name:table replace_existing_cols_val:replace KW_COLUMNS
   LPAREN column_def_list:col_defs RPAREN
   {: RESULT = new AlterTableAddReplaceColsStmt(table, col_defs, replace); :}
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
-    partition_spec:partition location_val:location cache_op_val:cache_op
-  {:
-    RESULT = new AlterTableAddPartitionStmt(table, partition,
-        location, if_not_exists, cache_op);
-  :}
+    partition_def_list:partitions
+  {: RESULT = new AlterTableAddPartitionStmt(table, if_not_exists, partitions); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP opt_kw_column ident_or_default:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists

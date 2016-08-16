@@ -17,8 +17,11 @@
 
 package org.apache.impala.analysis;
 
-import java.util.List;
-import java.util.Set;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
@@ -26,11 +29,9 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPartitionKeyValue;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Represents a partition spec - a collection of partition key/values.
@@ -46,9 +47,7 @@ public class PartitionSpec extends PartitionSpecBase {
     this.partitionSpec_ = ImmutableList.copyOf(partitionSpec);
   }
 
-  public List<PartitionKeyValue> getPartitionSpecKeyValues() {
-    return partitionSpec_;
-  }
+  public List<PartitionKeyValue> getPartitionSpecKeyValues() { return partitionSpec_; }
 
   public boolean partitionExists() {
     Preconditions.checkNotNull(partitionExists_);
@@ -148,5 +147,16 @@ public class PartitionSpec extends PartitionSpecBase {
       partitionSpecStr.add(kv.getColName() + "=" + kv.getValue().toSql());
     }
     return String.format("PARTITION (%s)", Joiner.on(", ").join(partitionSpecStr));
+  }
+
+  /**
+   * Utility method that returns the concatenated string of key=value pairs ordered by
+   * key. Since analyze() ensures that there are no duplicate keys in partition specs,
+   * this method provides a uniquely comparable string representation for this object.
+   */
+  public String toCanonicalString() {
+    List<PartitionKeyValue> sortedPartitionSpec = Lists.newArrayList(partitionSpec_);
+    Collections.sort(sortedPartitionSpec, PartitionKeyValue.getColNameComparator());
+    return Joiner.on(",").join(sortedPartitionSpec);
   }
 }

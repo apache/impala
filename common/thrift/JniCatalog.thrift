@@ -171,20 +171,28 @@ struct TAlterTableAddReplaceColsParams {
   2: required bool replace_existing_cols
 }
 
-// Parameters for ALTER TABLE ADD PARTITION commands
-struct TAlterTableAddPartitionParams {
+// Parameters for specifying a single partition in ALTER TABLE ADD PARTITION
+struct TPartitionDef {
   // The partition spec (list of keys and values) to add.
   1: required list<CatalogObjects.TPartitionKeyValue> partition_spec
 
-  // If true, no error is raised if a partition with the same spec already exists.
-  2: required bool if_not_exists
-
   // Optional HDFS storage location for the Partition. If not specified the
   // default storage location is used.
-  3: optional string location
+  2: optional string location
 
   // Optional caching operation to perform on the newly added partition.
-  4: optional THdfsCachingOp cache_op
+  3: optional THdfsCachingOp cache_op
+}
+
+// Parameters for ALTER TABLE ADD PARTITION commands
+struct TAlterTableAddPartitionParams {
+  // If 'if_not_exists' is true, no error is raised when a partition with the same spec
+  // already exists. If multiple partitions are specified, the statement will ignore
+  // those that exist and add the rest.
+  1: required bool if_not_exists
+
+  // The list of partitions to add
+  2: required list<TPartitionDef> partitions
 }
 
 enum TRangePartitionOperationType {

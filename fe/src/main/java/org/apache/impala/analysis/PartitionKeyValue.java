@@ -17,8 +17,9 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
+import org.apache.impala.common.AnalysisException;
+import java.util.Comparator;
 
 /**
  * Representation of a single column:value element in the PARTITION (...) clause of an
@@ -84,5 +85,14 @@ public class PartitionKeyValue {
       return nullPartitionKeyValue;
     }
     return literalValue.getStringValue();
+  }
+
+  public static Comparator<PartitionKeyValue> getColNameComparator() {
+    return new Comparator<PartitionKeyValue>() {
+      @Override
+      public int compare(PartitionKeyValue t, PartitionKeyValue o) {
+        return t.colName_.compareTo(o.colName_);
+      }
+    };
   }
 }

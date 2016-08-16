@@ -233,31 +233,6 @@ class TestHmsIntegration(ImpalaTestSuite):
       result[stat_names[i]] = stat_values[i]
     return result
 
-  def impala_partition_names(self, table_name):
-    """Find the names of the partitions of a table, as Impala sees them.
-
-    The return format is a list of lists of strings. Each string represents
-    a partition value of a given column.
-    """
-    rows = self.client.execute('show partitions %s' %
-                               table_name).get_data().split('\n')
-    rows.pop()
-    result = []
-    for row in rows:
-      fields = row.split('\t')
-      name = fields[0:-8]
-      result.append(name)
-    return result
-
-  def hive_partition_names(self, table_name):
-    """Find the names of the partitions of a table, as Hive sees them.
-
-    The return format is a list of strings. Each string represents a partition
-    value of a given column in a format like 'column1=7/column2=8'.
-    """
-    return self.run_stmt_in_hive(
-        'show partitions %s' % table_name).split('\n')[1:-1]
-
   def impala_columns(self, table_name):
     """
     Returns a dict with column names as the keys and dicts of type and comments
@@ -290,14 +265,22 @@ class TestHmsIntegration(ImpalaTestSuite):
                     for i in range(0, 16)])
 
   def assert_sql_error(self, engine, command, *strs_in_error):
-    reached_unreachable = False
+    """
+    Passes 'command' to 'engine' callable (e.g. execute method of a BeeswaxConnection
+    object) and makes sure that it raises an exception.
+    It also verifies that the string representation of the exception contains all the
+    strings listed in 'strs_in_error'.
+
+    If the call doesn't raise an exception or the exception doesn't contain one of the
+    strings in 'strs_in_error', it throws AssertError exception.
+    """
+
     try:
       engine(command)
-      reached_unreachable = True
     except Exception as e:
       for str_in_error in strs_in_error:
         assert str_in_error in str(e)
-    if reached_unreachable:
+    else:
       assert False, '%s should have triggered an error containing %s' % (
           command, strs_in_error)
 
@@ -352,7 +335,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             table_name)
         self.client.execute('compute incremental stats %s' % table_name)
         # Impala can see the partition's name
-        assert [['333', '5309']] == self.impala_partition_names(table_name)
+        assert [('333', '5309')] == self.get_impala_partition_info(table_name, 'y', 'z')
         # Impala's compute stats didn't alter Hive's knowledge of the partition
         assert ['y=333/z=5309'] == self.hive_partition_names(table_name)
     self.add_hive_partition_table_stats_helper(vector, DbWrapper, TableWrapper)
@@ -393,7 +376,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         self.client.execute(
             'insert into table %s partition (y=42, z=867) values (2)'
             % table_name)
-        assert [['42', '867']] == self.impala_partition_names(table_name)
+        assert [('42', '867')] == self.get_impala_partition_info(table_name, 'y', 'z')
         assert ['y=42/z=867'] == self.hive_partition_names(table_name)
 
   @pytest.mark.execute_serially
@@ -447,7 +430,7 @@ class TestHmsIntegration(ImpalaTestSuite):
 
       with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
                                    '(x int) partitioned by (y int)') as table_name:
-        assert [] == self.impala_partition_names(table_name)
+        assert [] == self.get_impala_partition_info(table_name, 'y')
         self.run_stmt_in_hive(
             'insert into table %s partition (y=33) values (44)'
             % table_name)
@@ -691,3 +674,127 @@ class TestHmsIntegration(ImpalaTestSuite):
         self.assert_sql_error(self.client.execute,
                               'describe %s' % table_name,
                               'Could not resolve path')
+
+  @pytest.mark.execute_serially
+  def test_add_overlapping_partitions(self, vector):
+    """
+    IMPALA-1670, IMPALA-4141: Test interoperability with Hive when adding overlapping
+    partitions to a table
+    """
+    with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
+      # Create a table in Impala.
+      with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
+                                   '(a int) partitioned by (x int)') as table_name:
+        # Trigger metadata load. No partitions exist yet in Impala.
+        assert [] == self.get_impala_partition_info(table_name, 'x')
+
+        # Add partition in Hive.
+        self.run_stmt_in_hive("alter table %s add partition (x=2)" % table_name)
+        # Impala is not aware of the new partition.
+        assert [] == self.get_impala_partition_info(table_name, 'x')
+
+        # Try to add partitions with caching in Impala, one of them (x=2) exists in HMS.
+        self.assert_sql_error(self.client.execute,
+            "alter table %s add partition (x=1) uncached "
+            "partition (x=2) cached in 'testPool' with replication=2 "
+            "partition (x=3) cached in 'testPool' with replication=3" % table_name,
+            "Partition already exists")
+        # No partitions were added in Impala.
+        assert [] == self.get_impala_partition_info(table_name, 'x')
+
+        # It should succeed with IF NOT EXISTS.
+        self.client.execute("alter table %s add if not exists partition (x=1) uncached "
+            "partition (x=2) cached in 'testPool' with replication=2 "
+            "partition (x=3) cached in 'testPool' with replication=3" % table_name)
+
+        # Hive sees all the partitions.
+        assert ['x=1', 'x=2', 'x=3'] == self.hive_partition_names(table_name)
+
+        # Impala sees the partition that has already existed in HMS (x=2) and the newly
+        # added partitions (x=1) and (x=3).
+        # Caching has been applied only to newly added partitions (x=1) and (x=3), the
+        # preexisting partition (x=2) was not modified.
+        partitions = self.get_impala_partition_info(table_name, 'x', 'Bytes Cached',
+            'Cache Replication')
+        assert [('1', 'NOT CACHED', 'NOT CACHED'),
+            ('2', 'NOT CACHED', 'NOT CACHED'),
+            ('3', '0B', '3')] == partitions
+
+        # Try to add location to a partition that is already in catalog cache (x=1).
+        self.client.execute("alter table %s add if not exists "\
+            "partition (x=1) location '/_X_1'" % table_name)
+        # (x=1) partition's location hasn't changed
+        (x1_value, x1_location) = self.get_impala_partition_info(table_name, 'x',
+            'Location')[0]
+        assert '1' == x1_value
+        assert x1_location.endswith("/x=1");
+
+  @pytest.mark.execute_serially
+  def test_add_preexisting_partitions_with_data(self, vector):
+    """
+    IMPALA-1670, IMPALA-4141: After addding partitions that already exist in HMS, Impala
+    can access the partition data.
+    """
+    with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
+      # Create a table in Impala.
+      with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
+                                   '(a int) partitioned by (x int)') as table_name:
+        # Trigger metadata load. No partitions exist yet in Impala.
+        assert [] == self.get_impala_partition_info(table_name, 'x')
+
+        # Add partitions in Hive.
+        self.run_stmt_in_hive("alter table %s add partition (x=1) "
+            "partition (x=2) "
+            "partition (x=3)" % table_name)
+        # Insert rows in Hive
+        self.run_stmt_in_hive("insert into %s partition(x=1) values (1), (2), (3)"
+            % table_name)
+        self.run_stmt_in_hive("insert into %s partition(x=2) values (1), (2), (3), (4)"
+            % table_name)
+        self.run_stmt_in_hive("insert into %s partition(x=3) values (1)"
+            % table_name)
+        # No partitions exist yet in Impala.
+        assert [] == self.get_impala_partition_info(table_name, 'x')
+
+        # Add the same partitions in Impala with IF NOT EXISTS.
+        self.client.execute("alter table %s add if not exists partition (x=1) "\
+            "partition (x=2) "
+            "partition (x=3)" % table_name)
+        # Impala sees the partitions
+        assert [('1',), ('2',), ('3',)] == self.get_impala_partition_info(table_name, 'x')
+        # Data exists in Impala
+        assert ['1\t1', '1\t2', '1\t3',
+            '2\t1', '2\t2', '2\t3', '2\t4',
+            '3\t1'] ==\
+            self.client.execute('select x, a from %s order by x, a' %
+            table_name).get_data().split('\n')
+
+  @pytest.mark.execute_serially
+  def test_impala_partitions_accessible_in_hive(self, vector):
+    """
+    IMPALA-1670, IMPALA-4141: Partitions added in Impala are accessible through Hive
+    """
+    with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
+      # Create a table in Impala.
+      with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
+                                   '(a int) partitioned by (x int)') as table_name:
+        # Add partitions in Impala.
+        self.client.execute("alter table %s add partition (x=1) "
+            "partition (x=2) "
+            "partition (x=3)" % table_name)
+        # Insert rows in Impala
+        self.client.execute("insert into %s partition(x=1) values (1), (2), (3)"
+            % table_name)
+        self.client.execute("insert into %s partition(x=2) values (1), (2), (3), (4)"
+            % table_name)
+        self.client.execute("insert into %s partition(x=3) values (1)"
+            % table_name)
+
+        # Hive sees the partitions
+        assert ['x=1', 'x=2', 'x=3'] == self.hive_partition_names(table_name)
+        # Data exists in Hive
+        data = self.run_stmt_in_hive('select x, a from %s order by x, a' % table_name)
+        assert ['x,a',
+            '1,1', '1,2', '1,3',
+            '2,1', '2,2', '2,3', '2,4',
+            '3,1'] == data.strip().split('\n')

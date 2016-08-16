@@ -17,7 +17,14 @@
 
 package org.apache.impala.service;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -27,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
@@ -129,6 +137,7 @@ import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResetMetadataRequest;
@@ -146,12 +155,6 @@ import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Class used to execute Catalog Operations, including DDL and refresh/invalidate
@@ -234,7 +237,9 @@ public class CatalogOpExecutor {
 
   // The maximum number of partitions to update in one Hive Metastore RPC.
   // Used when persisting the results of COMPUTE STATS statements.
-  private final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
+  // It is also used as an upper limit for the number of partitions allowed in one ADD
+  // PARTITION statement.
+  public final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
 
   public CatalogOpExecutor(CatalogServiceCatalog catalog) {
     catalog_ = catalog;
@@ -378,6 +383,8 @@ public class CatalogOpExecutor {
           catalog_.getLock().writeLock().unlock();
         }
       }
+
+      Table refreshedTable = null;
       // Get a new catalog version to assign to the table being altered.
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       boolean reloadMetadata = true;
@@ -396,15 +403,10 @@ public class CatalogOpExecutor {
           reloadTableSchema = true;
           break;
         case ADD_PARTITION:
-          TAlterTableAddPartitionParams addPartParams =
-              params.getAdd_partition_params();
-          // Create and add HdfsPartition object to the corresponding HdfsTable and
-          // load its block metadata. Get the new table object with an updated catalog
-          // version. If the partition already exists in Hive and "IfNotExists" is
-          // true, then return without populating the response object.
-          Table refreshedTable = alterTableAddPartition(tbl,
-              addPartParams.getPartition_spec(), addPartParams.isIf_not_exists(),
-              addPartParams.getLocation(), addPartParams.getCache_op());
+          // Create and add HdfsPartition objects to the corresponding HdfsTable and load
+          // their block metadata. Get the new table object with an updated catalog
+          // version.
+          refreshedTable = alterTableAddPartitions(tbl, params.getAdd_partition_params());
           if (refreshedTable != null) {
             refreshedTable.setCatalogVersion(newCatalogVersion);
             addTableToCatalogUpdate(refreshedTable, response.result);
@@ -1905,38 +1907,145 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Adds a new partition to the given table in Hive. Also creates and adds
-   * a new HdfsPartition to the corresponding HdfsTable.
-   * If cacheOp is not null, the partition's location will be cached according
-   * to the cacheOp. If cacheOp is null, the new partition will inherit the
-   * the caching properties of the parent table.
-   * Returns null if the partition already exists in Hive and "IfNotExists"
-   * is true. Otherwise, returns the table object with an updated catalog version.
+   * Adds new partitions to the given table in HMS. Also creates and adds new
+   * HdfsPartitions to the corresponding HdfsTable. Returns the table object with an
+   * updated catalog version or null if the table is not altered because all the
+   * partitions already exist and IF NOT EXISTS is specified.
+   * If IF NOT EXISTS is not used and there is a conflict with the partitions that already
+   * exist in HMS or catalog cache, then:
+   * - HMS and catalog cache are left intact, and
+   * - ImpalaRuntimeException is thrown.
+   * If IF NOT EXISTS is used, conflicts are handled as follows:
+   * 1. If a partition exists in catalog cache, ignore it.
+   * 2. If a partition exists in HMS but not in catalog cache, reload partition from HMS.
+   * Caching directives are only applied to new partitions that were absent from both the
+   * catalog cache and the HMS.
    */
-  private Table alterTableAddPartition(Table tbl, List<TPartitionKeyValue> partitionSpec,
-      boolean ifNotExists, String location, THdfsCachingOp cacheOp)
-      throws ImpalaException {
+  private Table alterTableAddPartitions(Table tbl,
+      TAlterTableAddPartitionParams addPartParams) throws ImpalaException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+
     TableName tableName = tbl.getTableName();
-    if (ifNotExists && catalog_.containsHdfsPartition(tableName.getDb(),
-        tableName.getTbl(), partitionSpec)) {
-      LOG.trace(String.format("Skipping partition creation because (%s) already exists" +
-          " and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
-      return null;
+    org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
+    boolean ifNotExists = addPartParams.isIf_not_exists();
+    List<Partition> hmsPartitionsToAdd = Lists.newArrayList();
+    Map<List<String>, THdfsCachingOp> partitionCachingOpMap = Maps.newHashMap();
+    for (TPartitionDef partParams: addPartParams.getPartitions()) {
+      List<TPartitionKeyValue> partitionSpec = partParams.getPartition_spec();
+      if (catalog_.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
+          partitionSpec)) {
+        String partitionSpecStr = Joiner.on(", ").join(partitionSpec);
+        if (!ifNotExists) {
+          throw new ImpalaRuntimeException(String.format("Partition already " +
+              "exists: (%s)", partitionSpecStr));
+        }
+        LOG.trace(String.format("Skipping partition creation because (%s) already " +
+            "exists and IF NOT EXISTS was specified.", partitionSpecStr));
+        continue;
+      }
+
+      Partition hmsPartition = createHmsPartition(partitionSpec, msTbl, tableName,
+          partParams.getLocation());
+      hmsPartitionsToAdd.add(hmsPartition);
+
+      THdfsCachingOp cacheOp = partParams.getCache_op();
+      if (cacheOp != null) partitionCachingOpMap.put(hmsPartition.getValues(), cacheOp);
     }
 
-    org.apache.hadoop.hive.metastore.api.Partition partition = null;
-    Table result = null;
-    List<Long> cacheIds = null;
-    org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
-    Long parentTblCacheDirId =
-        HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
-
-    partition = createHmsPartition(partitionSpec, msTbl, tableName, location);
+    if (hmsPartitionsToAdd.isEmpty()) return null;
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      // Add the new partition.
-      partition = msClient.getHiveClient().add_partition(partition);
+      // Add partitions in bulk
+      List<Partition> addedHmsPartitions = null;
+      try {
+        addedHmsPartitions = msClient.getHiveClient().add_partitions(hmsPartitionsToAdd,
+            ifNotExists, true);
+      } catch (TException e) {
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partitions"), e);
+      }
+
+      // Handle HDFS cache. This is done in a separate round bacause we have to apply
+      // caching only to newly added partitions.
+      alterTableCachePartitions(msTbl, msClient, tableName, addedHmsPartitions,
+          partitionCachingOpMap);
+
+      // If 'ifNotExists' is true, add_partitions() may fail to add all the partitions to
+      // HMS because some of them may already exist there. In that case, we load in the
+      // catalog the partitions that already exist in HMS but aren't in the catalog yet.
+      if (hmsPartitionsToAdd.size() != addedHmsPartitions.size()) {
+        List<Partition> difference = computeDifference(hmsPartitionsToAdd,
+            addedHmsPartitions);
+        addedHmsPartitions.addAll(
+            getPartitionsFromHms(msTbl, msClient, tableName, difference));
+      }
+
+      for (Partition partition: addedHmsPartitions) {
+        // Create and add the HdfsPartition to catalog. Return the table object with an
+        // updated catalog version.
+        addHdfsPartition(tbl, partition);
+      }
+      return tbl;
+    }
+  }
+
+  /**
+   * Returns the list of Partition objects from 'aList' that cannot be found in 'bList'.
+   * Partition objects are distinguished by partition values only.
+   */
+  private List<Partition> computeDifference(List<Partition> aList,
+      List<Partition> bList) {
+    Set<List<String>> bSet = Sets.newHashSet();
+    for (Partition b: bList) bSet.add(b.getValues());
+
+    List<Partition> diffList = Lists.newArrayList();
+    for (Partition a: aList) {
+      if (!bSet.contains(a.getValues())) diffList.add(a);
+    }
+    return diffList;
+  }
+
+  /**
+   * Returns a list of partitions retrieved from HMS for each 'hmsPartitions' element.
+   */
+  private List<Partition> getPartitionsFromHms(
+      org.apache.hadoop.hive.metastore.api.Table msTbl, MetaStoreClient msClient,
+      TableName tableName, List<Partition> hmsPartitions)
+      throws ImpalaException {
+    List<String> partitionCols = Lists.newArrayList();
+    for (FieldSchema fs: msTbl.getPartitionKeys()) partitionCols.add(fs.getName());
+
+    List<String> partitionNames = Lists.newArrayListWithCapacity(hmsPartitions.size());
+    for (Partition part: hmsPartitions) {
+      String partName = org.apache.hadoop.hive.common.FileUtils.makePartName(
+          partitionCols, part.getValues());
+      partitionNames.add(partName);
+    }
+    try {
+      return msClient.getHiveClient().getPartitionsByNames(tableName.getDb(),
+          tableName.getTbl(), partitionNames);
+    } catch (TException e) {
+      throw new ImpalaRuntimeException("Metadata inconsistency has occured. Please run "
+          + "'invalidate metadata <tablename>' to resolve the problem.", e);
+    }
+  }
+
+  /**
+   * Applies HDFS caching ops on 'hmsPartitions' and updates their metadata in Hive
+   * Metastore.
+   * 'partitionCachingOpMap' maps partitions (identified by their partition values) to
+   * their corresponding HDFS caching ops.
+   */
+  private void alterTableCachePartitions(org.apache.hadoop.hive.metastore.api.Table msTbl,
+      MetaStoreClient msClient, TableName tableName, List<Partition> hmsPartitions,
+      Map<List<String>, THdfsCachingOp> partitionCachingOpMap)
+      throws ImpalaException {
+    // Handle HDFS cache
+    List<Long> cacheIds = Lists.newArrayList();
+    List<Partition> hmsPartitionsToCache = Lists.newArrayList();
+    Long parentTblCacheDirId = HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
+    for (Partition partition: hmsPartitions) {
+      THdfsCachingOp cacheOp = partitionCachingOpMap.get(partition.getValues());
       String cachePoolName = null;
       Short replication = null;
       if (cacheOp == null && parentTblCacheDirId != null) {
@@ -1964,28 +2073,16 @@ public class CatalogOpExecutor {
       if (cachePoolName != null) {
         long id = HdfsCachingUtil.submitCachePartitionDirective(partition,
             cachePoolName, replication);
-        cacheIds = Lists.<Long>newArrayList(id);
-        // Update the partition metadata to include the cache directive id.
-        msClient.getHiveClient().alter_partition(partition.getDbName(),
-            partition.getTableName(), partition);
+        cacheIds.add(id);
+        hmsPartitionsToCache.add(partition);
       }
-      updateLastDdlTime(msTbl, msClient);
-    } catch (AlreadyExistsException e) {
-      if (!ifNotExists) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
-      }
-      LOG.trace(String.format("Ignoring '%s' when adding partition to %s because" +
-          " ifNotExists is true.", e, tableName));
-    } catch (TException e) {
-      throw new ImpalaRuntimeException(
-          String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
     }
-    if (cacheIds != null) catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
-    // Return the table object with an updated catalog version after creating the
-    // partition.
-    result = addHdfsPartition(tbl, partition);
-    return result;
+
+    // Update the partition metadata to include the cache directive id.
+    if (!cacheIds.isEmpty()) {
+      applyAlterHmsPartitions(msTbl, msClient, tableName, hmsPartitionsToCache);
+      catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
+    }
   }
 
   /**
@@ -2699,15 +2796,21 @@ public class CatalogOpExecutor {
   private void applyAlterPartition(Table tbl, HdfsPartition partition)
       throws ImpalaException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      TableName tableName = tbl.getTableName();
-      msClient.getHiveClient().alter_partition(
-          tableName.getDb(), tableName.getTbl(), partition.toHmsPartition());
-      org.apache.hadoop.hive.metastore.api.Table msTbl =
-          tbl.getMetaStoreTable().deepCopy();
+      applyAlterHmsPartitions(tbl.getMetaStoreTable().deepCopy(), msClient,
+          tbl.getTableName(), Arrays.asList(partition.toHmsPartition()));
+    }
+  }
+
+  private void applyAlterHmsPartitions(org.apache.hadoop.hive.metastore.api.Table msTbl,
+      MetaStoreClient msClient, TableName tableName, List<Partition> hmsPartitions)
+      throws ImpalaException {
+    try {
+      msClient.getHiveClient().alter_partitions(tableName.getDb(), tableName.getTbl(),
+          hmsPartitions);
       updateLastDdlTime(msTbl, msClient);
     } catch (TException e) {
       throw new ImpalaRuntimeException(
-          String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partition"), e);
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
     }
   }
 
