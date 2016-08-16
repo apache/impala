@@ -39,10 +39,11 @@ class TestScannersFuzzing(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestScannersFuzzing, cls).add_test_dimensions()
     # TODO: enable for more table formats once they consistently pass the fuzz test.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.TestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('avro', 'parquet') or
-        (v.get_value('table_format').file_format == 'text'
-            and v.get_value('table_format').compression_type == 'none'))
+        (v.get_value('table_format').file_format == 'text' and
+          v.get_value('table_format').compression_codec in ('none', 'lzo')))
+
 
   def test_fuzz_alltypes(self, vector, unique_database):
     self.run_fuzz_test(vector, unique_database, "alltypes")
@@ -50,11 +51,15 @@ class TestScannersFuzzing(ImpalaTestSuite):
   def test_fuzz_decimal_tbl(self, vector, unique_database):
     table_format = vector.get_value('table_format')
     table_name = "decimal_tbl"
-    if table_format.file_format in ('avro'):
+    if table_format.file_format == 'avro':
       table_name = "avro_decimal_tbl"
-      if table_format.compression_codec != 'block' or \
-          table_format.compression_type != 'snap':
+      if table_format.compression_codec != 'snap' or \
+          table_format.compression_type != 'block':
         pytest.skip()
+    elif table_format.file_format == 'text' and \
+        table_format.compression_codec != 'none':
+      # decimal_tbl is not present for these file formats
+      pytest.skip()
 
     self.run_fuzz_test(vector, unique_database, table_name, 10)
 
@@ -134,8 +139,12 @@ class TestScannersFuzzing(ImpalaTestSuite):
             continue
           msg = "Should not throw error when abort_on_error=0: '{0}'".format(e)
           LOG.error(msg)
-          # Parquet fails the query for some parse errors.
-          if table_format.file_format == 'parquet':
+          # Parquet and compressed text can fail the query for some parse errors.
+          # E.g. corrupt Parquet footer (IMPALA-3773) or a corrupt LZO index file
+          # (IMPALA-4013).
+          if table_format.file_format == 'parquet' or \
+              (table_format.file_format == 'text' and
+              table_format.compression_codec != 'none'):
             xfail_msgs.append(msg)
           else:
             raise
