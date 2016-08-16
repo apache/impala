@@ -575,24 +575,48 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testTableRefPath("select 1 from d.t7, t7.c5, c5.m2.m3",
         path(4, 1, 1, 1, 2), path(4, 1, 1));
 
-    // Tests that an attempted implicit match must be succeeded by an explicit match.
-    addTestTable("create table d.t8 (" +
-        "s1 struct<" +
-        "  s2:struct<" +
-        "    a:array<" +
-        "      array<struct<" +
-        "        e:int,f:string>>>>>)");
-    // Explanation of test:
-    // - d.t8.s1.s2.a resolves to a CollectionStructType with fields 'item' and 'pos'
-    // - we are allowed to implicitly skip the 'item' field
-    // - d.t8.s1.s2.a.item again resolves to a CollectionStructType with 'item' and 'pos'
-    // - however, we are not allowed to implicitly skip 'item' again, since we have
-    //   already skipped 'item' previously
-    // - the rule is: an implicit match must be followed by an explicit one
-    AnalysisError("select f from d.t8.s1.s2.a",
-        "Could not resolve column/field reference: 'f'");
-    AnalysisError("select 1 from d.t8.s1.s2.a, a.f",
-        "Could not resolve table reference: 'a.f'");
+    // Tests that implicit references are not allowed through collection types.
+    addTestTable("create table d.t8 ("
+        + "c1 array<map<string, string>>,"
+        + "c2 map<string, array<struct<a:int>>>,"
+        + "c3 struct<s1:struct<a:array<array<struct<e:int, f:string>>>>>)");
+    testImplicitPathFailure("d.t8", true, "c1", "key", "value");
+    testImplicitPathFailure("d.t8", true, "c2", "pos");
+    testImplicitPathFailure("d.t8.c3.s1", false, "a", "f");
+  }
+
+  private void testImplicitPathFailure(String parent, boolean parentIsCollection,
+      String collection, String...fields) {
+    String[] parentElements = parent.split("\\.");
+    String implicitAlias = parentElements[parentElements.length - 1];
+    String explicitAlias = "x";
+    for (String field : fields) {
+      // Tests that the path in the select list item does not resolve.
+      AnalysisError(String.format("select %s from %s.%s", field, parent, collection),
+          String.format("Could not resolve column/field reference: '%s'", field));
+      AnalysisError(String.format("select %s.%s from %s.%s %s",
+          explicitAlias, field, parent, collection, explicitAlias),
+          String.format("Could not resolve column/field reference: '%s.%s'",
+          explicitAlias, field));
+      if (parentIsCollection) {
+        AnalysisError(String.format("select %s from %s join %s.%s",
+            field, parent, implicitAlias, collection),
+            String.format("Could not resolve column/field reference: '%s'", field));
+        AnalysisError(String.format("select %s.%s from %s %s join %s.%s",
+            explicitAlias, field, parent, explicitAlias, explicitAlias, collection),
+            String.format("Could not resolve column/field reference: '%s.%s'",
+            explicitAlias, field));
+      }
+      // Tests that the path in the last table reference does not resolve.
+      AnalysisError(String.format("select 1 from %s.%s join %s.%s",
+          parent, collection, collection, field),
+          String.format("Could not resolve table reference: '%s.%s'",
+          collection, field));
+      AnalysisError(String.format("select 1 from %s.%s %s join %s.%s",
+          parent, collection, explicitAlias, explicitAlias, field),
+          String.format("Could not resolve table reference: '%s.%s'",
+          explicitAlias, field));
+    }
   }
 
   @Test

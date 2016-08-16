@@ -215,8 +215,6 @@ public class Path {
       currentType = rootTable_.getType().getItemType();
     }
 
-    // True if the next raw-path element must match explicitly.
-    boolean expectExplicitMatch = false;
     // Map all remaining raw-path elements to field types and positions.
     while (rawPathIdx < rawPath_.size()) {
       if (!currentType.isComplexType()) return false;
@@ -225,8 +223,10 @@ public class Path {
       StructField field = structType.getField(rawPath_.get(rawPathIdx));
       if (field == null) {
         // Resolve implicit path.
-        if (!expectExplicitMatch && structType instanceof CollectionStructType) {
+        if (structType instanceof CollectionStructType) {
           field = ((CollectionStructType) structType).getOptionalField();
+          // Collections must be matched explicitly.
+          if (field.getType().isCollectionType()) return false;
         } else {
           // Failed to resolve implicit or explicit path.
           return false;
@@ -235,13 +235,9 @@ public class Path {
         matchedTypes_.add(field.getType());
         matchedPositions_.add(field.getPosition());
         currentType = field.getType();
-        // After an implicit match there must be an explicit match.
-        expectExplicitMatch = true;
         // Do not consume a raw-path element.
         continue;
       }
-      // After an explicit match we could have an implicit match again.
-      expectExplicitMatch = false;
       matchedTypes_.add(field.getType());
       matchedPositions_.add(field.getPosition());
       if (field.getType().isCollectionType() && firstCollectionPathIdx_ == -1) {
