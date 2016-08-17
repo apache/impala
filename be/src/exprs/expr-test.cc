@@ -2697,8 +2697,11 @@ TEST_F(ExprTest, StringParseUrlFunction) {
 
 TEST_F(ExprTest, UtilityFunctions) {
   TestStringValue("current_database()", "default");
+  TestStringValue("current_catalog()", "default");
   TestStringValue("user()", "impala_test_user");
+  TestStringValue("current_user()", "impala_test_user");
   TestStringValue("effective_user()",  "impala_test_user");
+  TestStringValue("session_user()",  "impala_test_user");
   TestStringValue("version()", GetVersionString());
   TestValue("sleep(100)", TYPE_BOOLEAN, true);
   TestIsNull("sleep(NULL)", TYPE_BOOLEAN);
@@ -2771,6 +2774,24 @@ TEST_F(ExprTest, UtilityFunctions) {
 
   // Test NULL input returns NULL
   TestIsNull("fnv_hash(NULL)", TYPE_BIGINT);
+}
+
+TEST_F(ExprTest, SessionFunctions) {
+  enum Session {S1, S2};
+  enum Query {Q1, Q2};
+
+  map<Session, map<Query, string>> results;
+  for (Session session: {S1, S2}) {
+    executor_->Setup(); // Starts new session
+    results[session][Q1] = GetValue("current_session()", TYPE_STRING);
+    results[session][Q2] = GetValue("current_sid()", TYPE_STRING);
+  }
+
+  // The sessions IDs from the same session must be the same.
+  EXPECT_EQ(results[S1][Q1], results[S1][Q2]);
+  EXPECT_EQ(results[S2][Q1], results[S2][Q2]);
+  // The sessions IDs from different sessions must be different.
+  EXPECT_NE(results[S1][Q1], results[S2][Q1]);
 }
 
 TEST_F(ExprTest, NonFiniteFloats) {

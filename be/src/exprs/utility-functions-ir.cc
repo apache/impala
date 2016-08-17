@@ -117,6 +117,10 @@ StringVal UtilityFunctions::CurrentDatabase(FunctionContext* ctx) {
   return (database.len > 0) ? database : StringVal::null();
 }
 
+StringVal UtilityFunctions::CurrentSession(FunctionContext* ctx) {
+  return AnyValUtil::FromString(ctx, PrintId(ctx->impl()->state()->session_id()));
+}
+
 template<typename T>
 StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const T& /*input_val*/) {
   FunctionContext::TypeDesc type_desc = *(ctx->GetArgType(0));

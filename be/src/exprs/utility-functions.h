@@ -61,6 +61,10 @@ class UtilityFunctions {
   /// database from the parent session of this query.
   static StringVal CurrentDatabase(FunctionContext* ctx);
 
+  /// Implementation of the current_session() function. Returns the ID of the
+  /// parent session of this query.
+  static StringVal CurrentSession(FunctionContext* ctx);
+
   /// Implementation of the Uuid() function.
   static StringVal Uuid(FunctionContext* ctx);
   static void UuidPrepare(FunctionContext* ctx,

@@ -33,7 +33,8 @@ class TestDelegation(CustomClusterTestSuite, HS2TestSuite):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.confOverlay = dict()
-    execute_statement_req.statement = "SELECT effective_user(), user()";
+    execute_statement_req.statement = \
+      "SELECT effective_user(), current_user(), user(), session_user()";
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
 
@@ -42,8 +43,9 @@ class TestDelegation(CustomClusterTestSuite, HS2TestSuite):
     fetch_results_req.maxRows = 1
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
     HS2TestSuite.check_response(fetch_results_resp)
-    assert self.column_results_to_string(
-      fetch_results_resp.results.columns) == (1, "%s, %s\n" % (proxy_user, USER_NAME))
+    assert (self.column_results_to_string(fetch_results_resp.results.columns) ==
+            (1, "%s, %s, %s, %s\n" % (proxy_user, proxy_user,
+                                      USER_NAME, USER_NAME)))
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
