@@ -1,0 +1,192 @@
+====
+---- QUERY
+# Inner equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+  inner join functional.alltypestiny att on at.id = att.id
+where att.int_col = 999
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Right equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+  right join functional.alltypestiny att on at.id = att.id
+where att.int_col = 999
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Left equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+  left join (
+    select * from functional.alltypestiny where int_col = 999) att on at.id = att.id
+order by at.id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====
+---- QUERY
+# Full outer equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+  full outer join (
+    select * from functional.alltypestiny where int_col = 999) att on at.id = att.id
+order by at.id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====
+---- QUERY
+# Left semi equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+where id in (
+  select id from functional.alltypestiny
+  where id = 999)
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Right semi equi-join - executes with hash join.
+select straight_join at.id
+from (select * from functional.alltypestiny att where int_col = 999) att
+  right semi join alltypes at on at.id = att.id
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Left NAAJ equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+where id not in (
+  select id from functional.alltypestiny
+  where id = 999)
+order by id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====
+---- QUERY
+# Left anti equi-join - executes with hash join.
+select straight_join at.id
+from alltypes at
+where not exists (
+  select id from functional.alltypestiny att
+    where id = 999 and att.id = at.id)
+order by id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====
+---- QUERY
+# Right anti equi-join - executes with hash join.
+select straight_join at.id
+from (select * from functional.alltypestiny att where int_col = 999) att
+  right anti join alltypes at on at.id = att.id
+order by at.id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====
+---- QUERY
+# Inner non-equi-join - executes with nested loop join.
+select straight_join at.id
+from alltypes at
+  inner join functional.alltypestiny att on at.id < att.id
+where att.int_col = 999
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Cross join - executes with nested loop join.
+select straight_join at.id
+from alltypes at, functional.alltypestiny att
+where att.int_col = 999
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Left non-equi-join - executes with nested loop join.
+select straight_join at.id
+from alltypes at
+  left join (
+    select * from functional.alltypestiny where int_col = 999) att on at.id < att.id
+order by at.id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====
+---- QUERY
+# Left semi non-equi-join - executes with nested loop join.
+select straight_join at.id
+from alltypes at
+   left semi join (
+     select * from functional.alltypestiny att where int_col = 999) att on at.id < att.id
+order by at.id desc
+limit 5
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Left anti non-equi-join - executes with nested loop join.
+select straight_join at.id
+from alltypes at left anti join (
+  select * from functional.alltypestiny att
+  where id = 999) att on at.id < att.id
+order by id desc
+limit 5
+---- RESULTS
+7299
+7298
+7297
+7296
+7295
+---- TYPES
+INT
+====

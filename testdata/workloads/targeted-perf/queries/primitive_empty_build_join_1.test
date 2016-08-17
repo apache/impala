@@ -1,0 +1,13 @@
+====
+---- QUERY: primitive_empty_build_join_1
+-- Description : Join with empty build side and large probe side.
+-- Target test case : Analytic query with selective filters where evaluation of
+--   the join can be short-circuited for a dramatic speedup.
+SELECT /* +straight_join */ *
+FROM lineitem
+INNER JOIN orders ON l_orderkey = o_orderkey
+WHERE o_comment = 'no matching comments'
+---- RESULTS
+---- TYPES
+====
+

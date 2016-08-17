@@ -86,6 +86,11 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-nlj-exhaustive', new_vector)
 
+  def test_empty_build_joins(self, vector):
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    self.run_test_case('QueryTest/empty-build-joins', new_vector)
+
 class TestTPCHJoinQueries(ImpalaTestSuite):
   # Uses the TPC-H dataset in order to have larger joins. Needed for example to test
   # the repartitioning codepaths.
