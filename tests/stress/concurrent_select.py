@@ -677,7 +677,6 @@ class Query(object):
     self.required_mem_mb_without_spilling = None
     self.solo_runtime_secs_with_spilling = None
     self.solo_runtime_secs_without_spilling = None
-    self.common_query_options = {}
 
   def __repr__(self):
     return dedent("""
@@ -702,6 +701,7 @@ class QueryRunner(object):
     self.use_kerberos = False
     self.result_hash_log_dir = gettempdir()
     self.check_if_mem_was_spilled = False
+    self.common_query_options = {}
 
   def connect(self):
     self.impalad_conn = self.impalad.impala.connect(impalad=self.impalad)
