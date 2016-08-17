@@ -17,20 +17,17 @@
 
 package com.cloudera.impala.catalog.delegates;
 
+import static com.cloudera.impala.util.KuduUtil.compareSchema;
+import static com.cloudera.impala.util.KuduUtil.fromImpalaType;
+import static com.cloudera.impala.util.KuduUtil.parseKeyColumns;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import com.cloudera.impala.thrift.TDistributeParam;
-import com.cloudera.impala.thrift.TDistributeType;
-import com.cloudera.impala.util.KuduUtil;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.kududb.ColumnSchema;
 import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
@@ -38,14 +35,16 @@ import org.kududb.Type;
 import org.kududb.client.CreateTableOptions;
 import org.kududb.client.KuduClient;
 import org.kududb.client.PartialRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.common.ImpalaRuntimeException;
+import com.cloudera.impala.thrift.TDistributeParam;
+import com.cloudera.impala.util.KuduUtil;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-
-import static com.cloudera.impala.util.KuduUtil.compareSchema;
-import static com.cloudera.impala.util.KuduUtil.fromImpalaType;
-import static com.cloudera.impala.util.KuduUtil.parseKeyColumns;
 
 
 /**
@@ -174,8 +173,6 @@ public class KuduDdlDelegate extends DdlDelegate {
       }
       client.deleteTable(kuduTableName);
       return;
-    } catch (ImpalaRuntimeException e) {
-      throw e;
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Error dropping Kudu table", e);
     }

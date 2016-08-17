@@ -130,6 +130,7 @@ class TestKuduMemLimits(ImpalaTestSuite):
     l_shipmode STRING,
     l_comment STRING
   )
+  DISTRIBUTE BY HASH (l_orderkey) INTO 9 BUCKETS
   TBLPROPERTIES(
     'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
     'kudu.table_name' = 'tpch_lineitem',

@@ -3,7 +3,9 @@ select * from functional_kudu.testtbl
 00:SCAN KUDU [functional_kudu.testtbl]
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE []:[]
+  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
+  KUDU KEYRANGE [0, 0, 0, 2]:[]
+  KUDU KEYRANGE []:[0, 0, 0, 1]
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -15,7 +17,9 @@ select * from functional_kudu.testtbl where name = '10'
    kudu predicates: name = '10'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE []:[]
+  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
+  KUDU KEYRANGE [0, 0, 0, 2]:[]
+  KUDU KEYRANGE []:[0, 0, 0, 1]
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -90,7 +94,9 @@ and zip > 1 and zip < 50
    kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip >= 2, zip <= 49, name = 'foo'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE []:[]
+  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
+  KUDU KEYRANGE [0, 0, 0, 2]:[]
+  KUDU KEYRANGE []:[0, 0, 0, 1]
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -106,7 +112,9 @@ where id < 10 + 30  and cast(sin(id) as boolean) = true and 20 * 3 >= id and 10 
    kudu predicates: id <= 39, id <= 60, id <= 102
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE []:[]
+  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
+  KUDU KEYRANGE [0, 0, 0, 2]:[]
+  KUDU KEYRANGE []:[0, 0, 0, 1]
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -123,7 +131,9 @@ where cast(sin(id) as boolean) = true and name = 'a'
    kudu predicates: name = 'a'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE []:[]
+  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
+  KUDU KEYRANGE [0, 0, 0, 2]:[]
+  KUDU KEYRANGE []:[0, 0, 0, 1]
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -140,7 +150,9 @@ where cast(sin(id) as boolean) = true and name is null
    predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE []:[]
+  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
+  KUDU KEYRANGE [0, 0, 0, 2]:[]
+  KUDU KEYRANGE []:[0, 0, 0, 1]
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |

@@ -259,7 +259,7 @@ export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2-p2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
-export IMPALA_KUDU_VERSION=0.8.0-RC1
+export IMPALA_KUDU_VERSION=0.10.0-RC1
 export IMPALA_LLVM_VERSION=3.8.0-p1
 export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
 # Debug builds should use the release+asserts build to get additional coverage.
@@ -285,7 +285,7 @@ export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
 # TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
 #       to nightly changes from Kudu. The version below is the last released version but
 #       before release this needs to be updated to the version about to be released.
-export KUDU_JAVA_VERSION=0.6.0
+export KUDU_JAVA_VERSION=0.10.0-SNAPSHOT
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26

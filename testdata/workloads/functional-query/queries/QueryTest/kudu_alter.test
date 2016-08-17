@@ -1,6 +1,7 @@
 ====
 ---- QUERY
 create table simple (id int, name string, valf float, vali bigint)
+distribute by hash into 3 buckets
 TBLPROPERTIES(
  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
  'kudu.table_name' = 'query_test_simple',

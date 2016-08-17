@@ -104,6 +104,7 @@ class KuduTestHelper {
                              .schema(&test_schema_)
                              .num_replicas(3)
                              .split_rows(splits)
+                             .set_range_partition_columns(boost::assign::list_of("key"))
                              .Create();
       if (s.IsAlreadyPresent()) {
         LOG(INFO) << "Table existed, deleting. " << table_name_;

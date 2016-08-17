@@ -22,6 +22,7 @@ INT, BIGINT
 # carry over into the next unfiltered row (the result below would incorrectly be 2,NULL).
 USE kududb_test;
 CREATE TABLE impala_2740 (key INT, value INT)
+    DISTRIBUTE BY HASH INTO 3 BUCKETS
     TBLPROPERTIES(
         'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
         'kudu.table_name' = 'impala_2740',
@@ -40,6 +41,7 @@ INT, INT
 # is run on all impalads. However, for the t1 table there is only as single scan range,
 # so two of the scan instances get empty scan ranges.
 CREATE TABLE impala_2635_t1 (id BIGINT, name STRING)
+    DISTRIBUTE BY RANGE SPLIT ROWS ((0))
     TBLPROPERTIES(
         'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
         'kudu.table_name' = 'impala_2635_t1',

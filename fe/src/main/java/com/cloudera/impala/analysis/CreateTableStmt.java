@@ -24,13 +24,10 @@ import java.util.Set;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
-import com.cloudera.impala.util.KuduUtil;
 import org.apache.hadoop.fs.permission.FsAction;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor;
-import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.common.AnalysisException;
@@ -43,6 +40,7 @@ import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.util.AvroSchemaConverter;
 import com.cloudera.impala.util.AvroSchemaParser;
 import com.cloudera.impala.util.AvroSchemaUtils;
+import com.cloudera.impala.util.KuduUtil;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -376,6 +374,11 @@ public class CreateTableStmt extends StatementBase {
     }
 
     if (distributeParams_ != null) {
+      if (isExternal_) {
+        throw new AnalysisException(
+            "The DISTRIBUTE BY clause may not be specified for external tables.");
+      }
+
       List<String> keyColumns = KuduUtil.parseKeyColumnsAsList(
           getTblProperties().get(KuduTable.KEY_KEY_COLUMNS));
       for (DistributeParam d : distributeParams_) {
@@ -383,6 +386,9 @@ public class CreateTableStmt extends StatementBase {
         if (d.getColumns() == null) d.setColumns(keyColumns);
         d.analyze(analyzer);
       }
+    } else if (!isExternal_) {
+      throw new AnalysisException(
+          "A data distribution must be specified using the DISTRIBUTE BY clause.");
     }
   }
 

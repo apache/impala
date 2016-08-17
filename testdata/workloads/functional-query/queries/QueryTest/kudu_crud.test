@@ -261,6 +261,7 @@ delete ignore a from tdata a, tdata b where a.id = 666
 # if the Kudu columns are of different types.
 create table impala_3454
 (key_1 tinyint, key_2 bigint)
+DISTRIBUTE BY HASH INTO 3 BUCKETS
 TBLPROPERTIES(
 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
 'kudu.table_name' = 'impala_3454',
