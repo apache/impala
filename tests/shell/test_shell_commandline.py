@@ -429,3 +429,6 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "(Coordinator: " in results.stderr
     assert "Query progress can be monitored at: " in results.stderr
 
+  def test_missing_query_file(self):
+    result = run_impala_shell_cmd('-f nonexistent.sql', expect_success=False)
+    assert "Could not open file 'nonexistent.sql'" in result.stderr

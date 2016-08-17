@@ -1232,7 +1232,8 @@ def execute_queries_non_interactive_mode(options):
       else:
         query_file_handle = open(options.query_file, 'r')
     except Exception, e:
-      print_to_stderr("Could not open file '%s': %s", options.query_file, e)
+      print_to_stderr("Could not open file '%s': %s" % (options.query_file, e))
+      sys.exit(1)
 
     query_text = query_file_handle.read()
   elif options.query:
