@@ -59,16 +59,18 @@ Status GetHostname(string* hostname) {
   return Status::OK();
 }
 
-Status HostnameToIpAddrs(const string& name, vector<string>* addresses) {
+Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip){
+  // Try to resolve via the operating system.
+  vector<IpAddr> addresses;
   addrinfo hints;
   memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_family = AF_INET; // IPv4 addresses only
   hints.ai_socktype = SOCK_STREAM;
 
   struct addrinfo* addr_info;
-  if (getaddrinfo(name.c_str(), NULL, &hints, &addr_info) != 0) {
+  if (getaddrinfo(hostname.c_str(), NULL, &hints, &addr_info) != 0) {
     stringstream ss;
-    ss << "Could not find IPv4 address for: " << name;
+    ss << "Could not find IPv4 address for: " << hostname;
     return Status(ss.str());
   }
 
@@ -79,15 +81,32 @@ Status HostnameToIpAddrs(const string& name, vector<string>* addresses) {
         inet_ntop(AF_INET, &((sockaddr_in*)it->ai_addr)->sin_addr, addr_buf, 64);
     if (result == NULL) {
       stringstream ss;
-      ss << "Could not convert IPv4 address for: " << name;
+      ss << "Could not convert IPv4 address for: " << hostname;
       freeaddrinfo(addr_info);
       return Status(ss.str());
     }
-    addresses->push_back(string(addr_buf));
+    addresses.push_back(string(addr_buf));
     it = it->ai_next;
   }
 
   freeaddrinfo(addr_info);
+
+  if (addresses.empty()) {
+    stringstream ss;
+    ss << "Could not convert IPv4 address for: " << hostname;
+    return Status(ss.str());
+  }
+
+  // RFC 3484 only specifies a partial order for the result of getaddrinfo() so we need to
+  // sort the addresses before picking the first non-localhost one.
+  sort(addresses.begin(), addresses.end());
+
+  // Try to find a non-localhost address, otherwise just use the first IP address
+  // returned.
+  *ip = addresses[0];
+  if (!FindFirstNonLocalhost(addresses, ip)) {
+    VLOG(3) << "Only localhost addresses found for " << hostname;
+  }
   return Status::OK();
 }
 
@@ -126,6 +145,15 @@ TNetworkAddress MakeNetworkAddress(const string& address) {
   if (parse_result != StringParser::PARSE_SUCCESS) return ret;
   ret.__set_port(port);
   return ret;
+}
+
+/// Utility method because Thrift does not supply useful constructors
+TBackendDescriptor MakeBackendDescriptor(const Hostname& hostname, const IpAddr& ip,
+    int port) {
+  TBackendDescriptor be_desc;
+  be_desc.address = MakeNetworkAddress(hostname, port);
+  be_desc.ip_address = ip;
+  return be_desc;
 }
 
 bool IsWildcardAddress(const string& ipaddress) {

@@ -185,7 +185,7 @@ Status SimpleScheduler::Init() {
   if (metrics_ != NULL) {
     // This is after registering with the statestored, so we already have to synchronize
     // access to the backend_config_ shared_ptr.
-    int num_backends = GetBackendConfig()->backend_map().size();
+    int num_backends = GetBackendConfig()->NumBackends();
     total_assignments_ = metrics_->AddCounter<int64_t>(ASSIGNMENTS_KEY, 0);
     total_local_assignments_ = metrics_->AddCounter<int64_t>(LOCAL_ASSIGNMENTS_KEY, 0);
     initialized_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
@@ -210,10 +210,11 @@ Status SimpleScheduler::Init() {
 
 void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
-  BackendList backends;
-  GetAllKnownBackends(&backends);
+  BackendConfig::BackendList backends;
+  BackendConfigPtr backend_config = GetBackendConfig();
+  backend_config->GetAllBackends(&backends);
   Value backends_list(kArrayType);
-  for (const BackendList::value_type& backend: backends) {
+  for (const TBackendDescriptor& backend: backends) {
     Value str(TNetworkAddressToString(backend.address).c_str(), document->GetAllocator());
     backends_list.PushBack(str, document->GetAllocator());
   }
@@ -332,16 +333,6 @@ void SimpleScheduler::SetBackendConfig(const BackendConfigPtr& backend_config)
 {
   lock_guard<mutex> l(backend_config_lock_);
   backend_config_ = backend_config;
-}
-
-
-void SimpleScheduler::GetAllKnownBackends(BackendList* backends) {
-  backends->clear();
-  BackendConfigPtr backend_config = GetBackendConfig();
-  for (const BackendMap::value_type& backend_list: backend_config->backend_map()) {
-    backends->insert(backends->end(), backend_list.second.begin(),
-                     backend_list.second.end());
-  }
 }
 
 Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
@@ -871,109 +862,21 @@ void SimpleScheduler::HandleLostResource(const TUniqueId& client_resource_id) {
   }
 }
 
-Status SimpleScheduler::HostnameToIpAddr(const Hostname& hostname, IpAddr* ip) {
-  // Try to resolve via the operating system.
-  vector<IpAddr> ipaddrs;
-  Status status = HostnameToIpAddrs(hostname, &ipaddrs);
-  if (!status.ok() || ipaddrs.empty()) {
-    stringstream ss;
-    ss << "Failed to resolve " << hostname << ": " << status.GetDetail();
-    return Status(ss.str());
-  }
-
-  // HostnameToIpAddrs() calls getaddrinfo() from glibc and will preserve the order of the
-  // result. RFC 3484 only specifies a partial order so we need to sort the addresses
-  // before picking the first non-localhost one.
-  sort(ipaddrs.begin(), ipaddrs.end());
-
-  // Try to find a non-localhost address, otherwise just use the first IP address
-  // returned.
-  *ip = ipaddrs[0];
-  if (!FindFirstNonLocalhost(ipaddrs, ip)) {
-    VLOG(3) << "Only localhost addresses found for " << hostname;
-  }
-  return Status::OK();
-}
-
-SimpleScheduler::BackendConfig::BackendConfig(
-    const std::vector<TNetworkAddress>& backends) {
-  // Construct backend_map and backend_ip_map.
-  for (int i = 0; i < backends.size(); ++i) {
-    IpAddr ip;
-    Status status = HostnameToIpAddr(backends[i].hostname, &ip);
-    if (!status.ok()) {
-      VLOG(1) << status.GetDetail();
-      continue;
-    }
-
-    BackendMap::iterator it = backend_map_.find(ip);
-    if (it == backend_map_.end()) {
-      it = backend_map_.insert(
-          make_pair(ip, BackendList())).first;
-      backend_ip_map_[backends[i].hostname] = ip;
-    }
-
-    TBackendDescriptor descriptor;
-    descriptor.address = MakeNetworkAddress(ip, backends[i].port);
-    descriptor.ip_address = ip;
-    it->second.push_back(descriptor);
-  }
-}
-
-void SimpleScheduler::BackendConfig::AddBackend(const TBackendDescriptor& be_desc) {
-  DCHECK(!be_desc.ip_address.empty());
-  BackendList* be_descs = &backend_map_[be_desc.ip_address];
-  if (find(be_descs->begin(), be_descs->end(), be_desc) == be_descs->end()) {
-    be_descs->push_back(be_desc);
-  }
-  backend_ip_map_[be_desc.address.hostname] = be_desc.ip_address;
-}
-
-void SimpleScheduler::BackendConfig::RemoveBackend(const TBackendDescriptor& be_desc) {
-  auto be_descs_it = backend_map_.find(be_desc.ip_address);
-  if (be_descs_it != backend_map_.end()) {
-    BackendList* be_descs = &be_descs_it->second;
-    be_descs->erase(remove(be_descs->begin(), be_descs->end(), be_desc), be_descs->end());
-    if (be_descs->empty()) {
-      backend_map_.erase(be_descs_it);
-      backend_ip_map_.erase(be_desc.address.hostname);
-    }
-  }
-}
-
-bool SimpleScheduler::BackendConfig::LookUpBackendIp(const Hostname& hostname,
-    IpAddr* ip) const {
-  // Check if hostname is already a valid IP address.
-  if (backend_map_.find(hostname) != backend_map_.end()) {
-    if (ip) *ip = hostname;
-    return true;
-  }
-  auto it = backend_ip_map_.find(hostname);
-  if (it != backend_ip_map_.end()) {
-    if (ip) *ip = it->second;
-    return true;
-  }
-  return false;
-}
-
 SimpleScheduler::AssignmentCtx::AssignmentCtx(
     const BackendConfig& backend_config,
     IntCounter* total_assignments, IntCounter* total_local_assignments)
   : backend_config_(backend_config), first_unused_backend_idx_(0),
     total_assignments_(total_assignments),
     total_local_assignments_(total_local_assignments) {
-  random_backend_order_.reserve(backend_map().size());
-  for (auto& v: backend_map()) random_backend_order_.push_back(&v);
+  backend_config.GetAllBackendIps(&random_backend_order_);
   std::mt19937 g(rand());
   std::shuffle(random_backend_order_.begin(), random_backend_order_.end(), g);
   // Initialize inverted map for backend rank lookups
   int i = 0;
-  for (const BackendMap::value_type* v: random_backend_order_) {
-    random_backend_rank_[v->first] = i++;
-  }
+  for (const IpAddr& ip: random_backend_order_) random_backend_rank_[ip] = i++;
 }
 
-const SimpleScheduler::IpAddr* SimpleScheduler::AssignmentCtx::SelectLocalBackendHost(
+const IpAddr* SimpleScheduler::AssignmentCtx::SelectLocalBackendHost(
     const std::vector<IpAddr>& data_locations, bool break_ties_by_rank) {
   DCHECK(!data_locations.empty());
   // List of candidate indexes into 'data_locations'.
@@ -1005,7 +908,7 @@ const SimpleScheduler::IpAddr* SimpleScheduler::AssignmentCtx::SelectLocalBacken
   return &data_locations[*min_rank_idx];
 }
 
-const SimpleScheduler::IpAddr* SimpleScheduler::AssignmentCtx::SelectRemoteBackendHost() {
+const IpAddr* SimpleScheduler::AssignmentCtx::SelectRemoteBackendHost() {
   const IpAddr* candidate_ip;
   if (HasUnusedBackends()) {
     // Pick next unused backend.
@@ -1024,11 +927,9 @@ bool SimpleScheduler::AssignmentCtx::HasUnusedBackends() const {
   return first_unused_backend_idx_ < random_backend_order_.size();
 }
 
-const SimpleScheduler::IpAddr*
-    SimpleScheduler::AssignmentCtx::GetNextUnusedBackendAndIncrement() {
+const IpAddr* SimpleScheduler::AssignmentCtx::GetNextUnusedBackendAndIncrement() {
   DCHECK(HasUnusedBackends());
-  const IpAddr* ip = &(random_backend_order_[first_unused_backend_idx_++])->first;
-  DCHECK(backend_map().find(*ip) != backend_map().end());
+  const IpAddr* ip = &random_backend_order_[first_unused_backend_idx_++];
   return ip;
 }
 
@@ -1040,14 +941,14 @@ int SimpleScheduler::AssignmentCtx::GetBackendRank(const IpAddr& ip) const {
 
 void SimpleScheduler::AssignmentCtx::SelectBackendOnHost(const IpAddr& backend_ip,
     TBackendDescriptor* backend) {
-  BackendMap::const_iterator backend_it = backend_map().find(backend_ip);
-  DCHECK(backend_it != backend_map().end());
-  const BackendList& backends_on_host = backend_it->second;
+  DCHECK(backend_config_.LookUpBackendIp(backend_ip, NULL));
+  const BackendConfig::BackendList& backends_on_host =
+      backend_config_.GetBackendListForHost(backend_ip);
   DCHECK(backends_on_host.size() > 0);
   if (backends_on_host.size() == 1) {
     *backend = *backends_on_host.begin();
   } else {
-    BackendList::const_iterator* next_backend_on_host;
+    BackendConfig::BackendList::const_iterator* next_backend_on_host;
     next_backend_on_host = FindOrInsert(&next_backend_per_host_, backend_ip,
         backends_on_host.begin());
     DCHECK(find(backends_on_host.begin(), backends_on_host.end(), **next_backend_on_host)
@@ -1078,7 +979,6 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   IpAddr backend_ip;
   backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip);
   DCHECK(!backend_ip.empty());
-  DCHECK(backend_map().find(backend_ip) != backend_map().end());
   assignment_heap_.InsertOrUpdate(backend_ip, scan_range_length,
       GetBackendRank(backend_ip));
 

@@ -34,6 +34,7 @@
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
 #include "scheduling/admission-controller.h"
+#include "scheduling/backend-config.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 #include "gen-cpp/ResourceBrokerService_types.h"
 #include "rapidjson/rapidjson.h"
@@ -95,55 +96,10 @@ class SimpleScheduler : public Scheduler {
   virtual void HandleLostResource(const TUniqueId& client_resource_id);
 
  private:
-  /// Type to store hostnames, which can be rfc1123 hostnames or IPv4 addresses.
-  typedef std::string Hostname;
-
-  /// Type to store IPv4 addresses.
-  typedef std::string IpAddr;
-
-  typedef std::list<TBackendDescriptor> BackendList;
-
-  /// Map from a host's IP address to a list of backends running on that node.
-  typedef boost::unordered_map<IpAddr, BackendList> BackendMap;
-
   /// Map from a host's IP address to the next backend to be round-robin scheduled for
   /// that host (needed for setups with multiple backends on a single host)
-  typedef boost::unordered_map<IpAddr, BackendList::const_iterator> NextBackendPerHost;
-
-  /// Map from a hostname to its IP address to support hostname based backend lookup.
-  typedef boost::unordered_map<Hostname, IpAddr> BackendIpAddressMap;
-
-  /// Configuration class to store a list of backends per IP address and a mapping from
-  /// hostnames to IP addresses. backend_ip_map contains entries for all backends in
-  /// backend_map and needs to be updated whenever backend_map changes. Each plan node
-  /// creates a read-only copy of the scheduler's current backend_config_ to use during
-  /// scheduling.
-  class BackendConfig {
-   public:
-    BackendConfig() {}
-
-    /// Construct config from list of backends.
-    BackendConfig(const std::vector<TNetworkAddress>& backends);
-
-    void AddBackend(const TBackendDescriptor& be_desc);
-    void RemoveBackend(const TBackendDescriptor& be_desc);
-
-    /// Look up the IP address of 'hostname' in the internal backend maps and return
-    /// whether the lookup was successful. If 'hostname' itself is a valid IP address then
-    /// it is copied to 'ip' and true is returned. 'ip' can be NULL if the caller only
-    /// wants to check whether the lookup succeeds. Use this method to resolve datanode
-    /// hostnames to IP addresses during scheduling, to prevent blocking on the OS.
-    bool LookUpBackendIp(const Hostname& hostname, IpAddr* ip) const;
-
-    int NumBackends() const { return backend_map().size(); }
-
-    const BackendMap& backend_map() const { return backend_map_; }
-    const BackendIpAddressMap& backend_ip_map() const { return backend_ip_map_; }
-
-   private:
-    BackendMap backend_map_;
-    BackendIpAddressMap backend_ip_map_;
-  };
+  typedef boost::unordered_map<IpAddr, BackendConfig::BackendList::const_iterator>
+      NextBackendPerHost;
 
   typedef std::shared_ptr<const BackendConfig> BackendConfigPtr;
 
@@ -250,7 +206,6 @@ class SimpleScheduler : public Scheduler {
         FragmentScanRangeAssignment* assignment);
 
     const BackendConfig& backend_config() const { return backend_config_; }
-    const BackendMap& backend_map() const { return backend_config_.backend_map(); }
 
     /// Print the assignment and statistics to VLOG_FILE.
     void PrintAssignment(const FragmentScanRangeAssignment& assignment);
@@ -279,7 +234,7 @@ class SimpleScheduler : public Scheduler {
     int first_unused_backend_idx_;
 
     /// Store a random permutation of backend hosts to select backends from.
-    std::vector<const BackendMap::value_type*> random_backend_order_;
+    std::vector<IpAddr> random_backend_order_;
 
     /// Track round robin information per backend host.
     NextBackendPerHost next_backend_per_host_;
@@ -301,7 +256,9 @@ class SimpleScheduler : public Scheduler {
 
   /// The scheduler's backend configuration. When receiving changes to the backend
   /// configuration from the statestore we will make a copy of the stored object, apply
-  /// the updates to the copy and atomically swap the contents of this pointer.
+  /// the updates to the copy and atomically swap the contents of this pointer. Each plan
+  /// node creates a read-only copy of the scheduler's current backend_config_ to use
+  /// during scheduling.
   BackendConfigPtr backend_config_;
 
   /// Protect access to backend_config_ which might otherwise be updated asynchronously
@@ -381,9 +338,6 @@ class SimpleScheduler : public Scheduler {
   /// protecting the access with backend_config_lock_.
   BackendConfigPtr GetBackendConfig() const;
   void SetBackendConfig(const BackendConfigPtr& backend_config);
-
-  /// Return a list of all backends registered with the scheduler.
-  void GetAllKnownBackends(BackendList* backends);
 
   /// Add the granted reservation and resources to the active_reservations_ and
   /// active_client_resources_ maps, respectively.
@@ -516,11 +470,6 @@ class SimpleScheduler : public Scheduler {
   /// to the given exchange in the given fragment index.
   int FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
       const TQueryExecRequest& exec_request);
-
-  /// Deterministically resolve a host to one of its IP addresses. This method will call
-  /// into the OS, so it can take a long time to return. Use this method to resolve
-  /// hostnames during initialization and while processing statestore updates.
-  static Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip);
 
   friend class impala::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);
