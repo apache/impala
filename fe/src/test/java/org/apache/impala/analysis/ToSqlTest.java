@@ -655,6 +655,8 @@ public class ToSqlTest extends FrontendTestBase {
         "values(1, true, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', cast (0 as timestamp))",
         "INSERT INTO TABLE functional.alltypessmall PARTITION (year=2009, month=4) " +
         "VALUES(1, TRUE, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', CAST(0 AS TIMESTAMP))");
+    testToSql("upsert into table functional_kudu.testtbl values(1, 'a', 1)",
+        "UPSERT INTO TABLE functional_kudu.testtbl VALUES(1, 'a', 1)");
   }
 
   /**
@@ -903,6 +905,11 @@ public class ToSqlTest extends FrontendTestBase {
         "WITH t1 AS (SELECT * FROM functional.alltypes) " +
         "INSERT INTO TABLE functional.alltypes PARTITION (year, month) " +
             "SELECT * FROM t1");
+    // WITH clause in upsert stmt.
+    testToSql("with t1 as (select * from functional.alltypes) upsert into " +
+        "functional_kudu.testtbl select bigint_col, string_col, int_col from t1",
+        "WITH t1 AS (SELECT * FROM functional.alltypes) UPSERT INTO TABLE " +
+        "functional_kudu.testtbl SELECT bigint_col, string_col, int_col FROM t1");
     // Test joins in WITH-clause view.
     testToSql("with t as (select a.* from functional.alltypes a, " +
             "functional.alltypes b where a.id = b.id) select * from t",
@@ -1013,6 +1020,29 @@ public class ToSqlTest extends FrontendTestBase {
         " partition (year=2009, month) values(1, 12)",
         "INSERT INTO TABLE functional.alltypes(id) " +
         "PARTITION (year=2009, month) VALUES(1, 12)");
+  }
+
+  @Test
+  public void upsertTest() {
+    // VALUES clause
+    testToSql("upsert into functional_kudu.testtbl values (1, 'a', 1)",
+        "UPSERT INTO TABLE functional_kudu.testtbl VALUES(1, 'a', 1)");
+
+    // SELECT clause
+    testToSql("upsert into functional_kudu.testtbl select bigint_col, string_col, " +
+        "int_col from functional.alltypes", "UPSERT INTO TABLE functional_kudu.testtbl " +
+        "SELECT bigint_col, string_col, int_col FROM functional.alltypes");
+
+    // WITH clause
+    testToSql("with x as (select bigint_col, string_col, int_col from " +
+        "functional.alltypes) upsert into table functional_kudu.testtbl select * from x",
+        "WITH x AS (SELECT bigint_col, string_col, int_col FROM functional.alltypes) " +
+        "UPSERT INTO TABLE functional_kudu.testtbl SELECT * FROM x");
+
+    // Permutation
+    testToSql("upsert into table functional_kudu.testtbl (zip, id, name) values " +
+        "(1, 1, 'a')", "UPSERT INTO TABLE functional_kudu.testtbl(zip, id, name) " +
+        "VALUES(1, 1, 'a')");
   }
 
   @Test

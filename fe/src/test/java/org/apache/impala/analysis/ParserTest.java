@@ -393,6 +393,12 @@ public class ParserTest {
           "insert overwrite t(a, b) partition(x, y) %sfoo,bar,baz%s select * from t",
           prefix, suffix), "foo", "bar", "baz");
 
+      // Test upsert hints.
+      ParsesOk(String.format("upsert into t %sshuffle%s select * from t", prefix,
+          suffix));
+      ParsesOk(String.format("upsert into t (x, y) %sshuffle%s select * from t", prefix,
+          suffix));
+
       // Test TableRef hints.
       TestTableHints(String.format(
           "select * from functional.alltypes %sschedule_disk_local%s", prefix, suffix),
@@ -761,6 +767,11 @@ public class ParserTest {
     ParsesOk("insert overwrite table t select a from test union select a from test " +
         "union select a from test union select a from test");
 
+    // Union in upsert query.
+    ParsesOk("upsert into table t select a from test union select a from test");
+    ParsesOk("upsert into table t select a from test union select a from test " +
+        "union select a from test union select a from test");
+
     // No complete select statement on lhs.
     ParserError("a from test union select a from test");
     // No complete select statement on rhs.
@@ -777,12 +788,14 @@ public class ParserTest {
     ParsesOk("select * from (values(1, 'a', abc, 1.0, *)) as t");
     ParsesOk("values(1, 'a', abc, 1.0, *) union all values(1, 'a', abc, 1.0, *)");
     ParsesOk("insert into t values(1, 'a', abc, 1.0, *)");
+    ParsesOk("upsert into t values(1, 'a', abc, 1.0, *)");
     // Values stmt with multiple rows.
     ParsesOk("values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
     ParsesOk("select * from (values(1, abc), ('x', cde), (2), (efg, fgh, ghi)) as t");
     ParsesOk("values(1, abc), ('x', cde), (2), (efg, fgh, ghi) " +
         "union all values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
     ParsesOk("insert into t values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
+    ParsesOk("upsert into t values(1, abc), ('x', cde), (2), (efg, fgh, ghi)");
     // Test additional parenthesis.
     ParsesOk("(values(1, abc), ('x', cde), (2), (efg, fgh, ghi))");
     ParsesOk("values((1, abc), ('x', cde), (2), (efg, fgh, ghi))");
@@ -838,6 +851,14 @@ public class ParserTest {
     // With clause before insert statement.
     ParsesOk("with t as (select 1) insert into x select * from t");
     ParsesOk("with t(x) as (select 1) insert into x select * from t");
+    // With clause in query statement of upsert statement.
+    ParsesOk("upsert into x with t as (select * from tab) select * from t");
+    ParsesOk("upsert into x with t(x, y) as (select * from tab) select * from t");
+    ParsesOk("upsert into x with t as (values(1, 2, 3)) select * from t");
+    ParsesOk("upsert into x with t(x, y) as (values(1, 2, 3)) select * from t");
+    // With clause before upsert statement.
+    ParsesOk("with t as (select 1) upsert into x select * from t");
+    ParsesOk("with t(x) as (select 1) upsert into x select * from t");
 
     // Test quoted identifier or string literal as table alias.
     ParsesOk("with `t1` as (select 1 a), 't2' as (select 2 a), \"t3\" as (select 3 a)" +
@@ -854,6 +875,10 @@ public class ParserTest {
     ParsesOk("with t as (select 1) insert into x with t as (select 2) select * from t");
     ParsesOk("with t(c1) as (select 1) " +
         "insert into x with t(c2) as (select 2) select * from t");
+    // Multiple with clauses. One before the upsert and one inside the query statement.
+    ParsesOk("with t as (select 1) upsert into x with t as (select 2) select * from t");
+    ParsesOk("with t(c1) as (select 1) " +
+        "upsert into x with t(c2) as (select 2) select * from t");
 
     // Empty with clause.
     ParserError("with t as () select 1");
@@ -873,6 +898,9 @@ public class ParserTest {
     // Insert in with clause is not valid.
     ParserError("with t as (insert into x select * from tab) select * from t");
     ParserError("with t(c1) as (insert into x select * from tab) select * from t");
+    // Upsert in with clause is not valid.
+    ParserError("with t as (upsert into x select * from tab) select * from t");
+    ParserError("with t(c1) as (upsert into x select * from tab) select * from t");
     // Union operands need to be parenthesized to have their own with clause.
     ParserError("select * from t union all with t as (select 2) select * from t");
   }
@@ -966,7 +994,7 @@ public class ParserTest {
     ParsesOk("select a from `abc\u007fabc`");
 
     // Quoted identifiers can contain keywords.
-    ParsesOk("select `select`, `insert` from `table` where `where` = 10");
+    ParsesOk("select `select`, `insert`, `upsert` from `table` where `where` = 10");
 
     // Quoted identifiers cannot contain "`"
     ParserError("select a from `abcde`abcde`");
@@ -1607,6 +1635,47 @@ public class ParserTest {
         "select a from src where b > 5");
 
     ParsesOk("insert ignore into table t values (1,2,3)");
+  }
+
+  @Test
+  public void TestUpsert() {
+    for (String optTbl: new String[] {"", "table"}) {
+      // SELECT clause
+      ParsesOk(String.format("upsert into %s t select a from src", optTbl));
+      // VALUES clause
+      ParsesOk(String.format("upsert into %s t values (1, 2, 3)", optTbl));
+      // Permutation
+      ParsesOk(String.format("upsert into %s t (a,b,c) values(1,2,3)", optTbl));
+      // Permutation with mismatched select list (should parse fine)
+      ParsesOk(String.format("upsert into %s t (a,b,c) values(1,2,3,4,5,6)", optTbl));
+      // Empty permutation list
+      ParsesOk(String.format("upsert into %s t () select 1 from a", optTbl));
+      // Permutation with optional query statement
+      ParsesOk(String.format("upsert into %s t () ", optTbl));
+      // WITH clause
+      ParsesOk(String.format("with x as (select a from src where b > 5) upsert into %s " +
+          "t select * from x", optTbl));
+
+      // Missing query statement
+      ParserError(String.format("upsert into %s t", optTbl));
+      // Missing 'into'.
+      ParserError(String.format("upsert %s t select a from src where b > 5", optTbl));
+      // Missing target table identifier.
+      ParserError(String.format("upsert into %s select a from src where b > 5", optTbl));
+      // No comma in permutation list
+      ParserError(String.format("upsert %s t(a b c) select 1 from a", optTbl));
+      // Can't use strings as identifiers in permutation list
+      ParserError(String.format("upsert %s t('a') select 1 from a", optTbl));
+      // Expressions not allowed in permutation list
+      ParserError(String.format("upsert %s t(a=1, b) select 1 from a", optTbl));
+      // Upsert doesn't support ignore.
+      ParserError(String.format("upsert ignore into %s t select a from src", optTbl));
+      // Upsert doesn't support partition clauses.
+      ParserError(String.format(
+          "upsert into %s t partition (pk1=10) select a from src", optTbl));
+      // Upsert doesn't support overwrite.
+      ParserError(String.format("upsert overwrite %s t select 1 from src", optTbl));
+    }
   }
 
   @Test
@@ -2512,6 +2581,7 @@ public class ParserTest {
     ParserError("CREATE VIEW Foo.Bar (x) AS");
     // Invalid view definitions. A view definition must be a query statement.
     ParserError("CREATE VIEW Foo.Bar (x) AS INSERT INTO t select * from t");
+    ParserError("CREATE VIEW Foo.Bar (x) AS UPSERT INTO t select * from t");
     ParserError("CREATE VIEW Foo.Bar (x) AS CREATE TABLE Wrong (i int)");
     ParserError("CREATE VIEW Foo.Bar (x) AS ALTER TABLE Foo COLUMNS (i int, s string)");
     ParserError("CREATE VIEW Foo.Bar (x) AS CREATE VIEW Foo.Bar AS SELECT 1");
@@ -2541,6 +2611,7 @@ public class ParserTest {
     ParserError("ALTER VIEW Foo.Bar AS");
     // Invalid view definitions. A view definition must be a query statement.
     ParserError("ALTER VIEW Foo.Bar AS INSERT INTO t select * from t");
+    ParserError("ALTER VIEW Foo.Bar AS UPSERT INTO t select * from t");
     ParserError("ALTER VIEW Foo.Bar AS CREATE TABLE Wrong (i int)");
     ParserError("ALTER VIEW Foo.Bar AS ALTER TABLE Foo COLUMNS (i int, s string)");
     ParserError("ALTER VIEW Foo.Bar AS CREATE VIEW Foo.Bar AS SELECT 1, 2, 3");
@@ -2571,8 +2642,9 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUET AS WITH");
     ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUET AS");
 
-    // INSERT statements are not allowed
+    // INSERT/UPSERT statements are not allowed
     ParserError("CREATE TABLE Foo AS INSERT INTO Foo SELECT 1");
+    ParserError("CREATE TABLE Foo AS UPSERT INTO Foo SELECT 1");
 
     // Column and partition definitions not allowed
     ParserError("CREATE TABLE Foo(i int) AS SELECT 1");
@@ -2840,7 +2912,7 @@ public class ParserTest {
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMPUTE, CREATE, DELETE, DESCRIBE, DROP, EXPLAIN, GRANT, " +
         "INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, TRUNCATE, " +
-        "UPDATE, USE, VALUES, WITH\n");
+        "UPDATE, UPSERT, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -2981,6 +3053,7 @@ public class ParserTest {
   public void TestExplain() {
     ParsesOk("explain select a from tbl");
     ParsesOk("explain insert into tbl select a, b, c, d from tbl");
+    ParsesOk("explain upsert into tbl select a, b, c, d from tbl");
     ParserError("explain");
     // cannot EXPLAIN an explain stmt
     ParserError("explain explain select a from tbl");

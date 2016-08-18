@@ -80,8 +80,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
         pkvs.add(new PartitionKeyValue(key, null));
       }
     }
-    insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false, pkvs,
-        null, queryStmt, null, false);
+    insertStmt_ = InsertStmt.createInsert(
+        null, createStmt.getTblName(), false, pkvs, null, queryStmt, null, false);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }

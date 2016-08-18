@@ -261,6 +261,75 @@ delete ignore a from tdata a, tdata b where a.id = 666
 row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
+select * from tdata
+---- RESULTS
+40,'he',0,43,'e',false
+120,'she',0,99,'f',true
+320,'',2,932,'',false
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1,43,'b',false
+3,'todd',1,43,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata values (40, 'they', 1, 43, cast('e' as VARCHAR(20)), false),
+(1, NULL, 1, 0, cast('a' as VARCHAR(20)), true)
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'they',1,43,'e',false
+120,'she',0,99,'f',true
+320,'',2,932,'',false
+1,'NULL',1,0,'a',true
+2,'david',1,43,'b',false
+3,'todd',1,43,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata (id, valf) values (2, NULL), (120, 20), (0, 0)
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'they',1,43,'e',false
+120,'she',20,99,'f',true
+320,'',2,932,'',false
+1,'NULL',1,0,'a',true
+2,'david',NULL,43,'b',false
+3,'todd',1,43,'c',true
+0,'NULL',0,NULL,'NULL',NULL
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata (valb, name, id)
+select false as valb, 'he' as name, id from tdata where id < 2
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'they',1,43,'e',false
+120,'she',20,99,'f',true
+320,'',2,932,'',false
+1,'he',1,0,'a',false
+2,'david',NULL,43,'b',false
+3,'todd',1,43,'c',true
+0,'he',0,NULL,'NULL',false
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata (id, name) values (null, '')
+---- CATCH
+Could not add Kudu WriteOp.: Invalid argument: column not nullable: id[int32 NOT NULL]
+====
+---- QUERY
 # IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
 # if the Kudu columns are of different types.
 create table impala_3454 (key_1 tinyint, key_2 bigint, PRIMARY KEY (key_1, key_2))

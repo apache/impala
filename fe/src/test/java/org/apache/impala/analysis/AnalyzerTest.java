@@ -428,6 +428,10 @@ public class AnalyzerTest extends FrontendTestBase {
         "select id from (select id+2 from functional_hbase.alltypessmall) a",
         "Could not resolve column/field reference: 'id'");
 
+    // Analysis error from explain upsert
+    AnalysisError("explain upsert into table functional.alltypes select * from " +
+        "functional.alltypes", "UPSERT is only supported for Kudu tables");
+
     // Positive test for explain query
     AnalyzesOk("explain select * from functional.AllTypes");
 
@@ -437,6 +441,10 @@ public class AnalyzerTest extends FrontendTestBase {
         "select id, bool_col, tinyint_col, smallint_col, int_col, int_col, " +
         "float_col, float_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+
+    // Positive test for explain upsert
+    AnalyzesOk("explain upsert into table functional_kudu.testtbl select * from " +
+        "functional_kudu.testtbl");
   }
 
   @Test

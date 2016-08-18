@@ -262,8 +262,8 @@ terminal
   KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
   KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
   KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UPDATE,
-  KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE,
-  KW_WITH;
+  KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN,
+  KW_WHERE, KW_WITH;
 
 terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
   RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
@@ -361,7 +361,7 @@ nonterminal ArrayList<String> opt_plan_hints;
 nonterminal TypeDef type_def;
 nonterminal Type type;
 nonterminal Expr sign_chain_expr;
-nonterminal InsertStmt insert_stmt;
+nonterminal InsertStmt insert_stmt, upsert_stmt;
 nonterminal UpdateStmt update_stmt;
 nonterminal DeleteStmt delete_stmt;
 nonterminal ArrayList<Pair<SlotRef, Expr>> update_set_expr_list;
@@ -521,6 +521,8 @@ stmt ::=
   {: RESULT = insert; :}
   | update_stmt:update
   {: RESULT = update; :}
+  | upsert_stmt:upsert
+  {: RESULT = upsert; :}
   | delete_stmt:delete
   {: RESULT = delete; :}
   | use_stmt:use
@@ -659,6 +661,11 @@ explain_stmt ::=
      update.setIsExplain();
      RESULT = update;
   :}
+  | KW_EXPLAIN upsert_stmt:upsert
+  {:
+     upsert.setIsExplain();
+     RESULT = upsert;
+  :}
   | KW_EXPLAIN delete_stmt:delete
   {:
      delete.setIsExplain();
@@ -673,19 +680,29 @@ insert_stmt ::=
   opt_with_clause:w KW_INSERT KW_OVERWRITE opt_ignore:ignore opt_kw_table table_name:table
   LPAREN opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
   opt_query_stmt:query
-  {: RESULT = new InsertStmt(w, table, true, list, hints, query, col_perm, ignore); :}
+  {:
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, col_perm,
+        ignore);
+  :}
   | opt_with_clause:w KW_INSERT KW_OVERWRITE
   opt_ignore:ignore opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
-  {: RESULT = new InsertStmt(w, table, true, list, hints, query, null, ignore); :}
+  {:
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, null, ignore);
+  :}
   | opt_with_clause:w KW_INSERT opt_ignore:ignore KW_INTO
   opt_kw_table table_name:table LPAREN opt_ident_list:col_perm RPAREN
   partition_clause:list opt_plan_hints:hints opt_query_stmt:query
-  {: RESULT = new InsertStmt(w, table, false, list, hints, query, col_perm, ignore); :}
+  {:
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, col_perm,
+        ignore);
+  :}
   | opt_with_clause:w KW_INSERT
   opt_ignore:ignore KW_INTO opt_kw_table table_name:table partition_clause:list
   opt_plan_hints:hints query_stmt:query
-  {: RESULT = new InsertStmt(w, table, false, list, hints, query, null, ignore); :}
+  {:
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, null, ignore);
+  :}
   ;
 
 // Update statements have an optional WHERE and optional FROM clause.
@@ -715,6 +732,17 @@ update_set_expr_list ::=
     list.add(new Pair(slot, e));
     RESULT = list;
   :}
+  ;
+
+// Upsert statements have an optional column permutation clause. If the column permutation
+// is present, the query statement clause is optional as well.
+upsert_stmt ::=
+  opt_with_clause:w KW_UPSERT KW_INTO opt_kw_table table_name:table
+    LPAREN opt_ident_list:col_perm RPAREN opt_plan_hints:hints opt_query_stmt:query
+  {: RESULT = InsertStmt.createUpsert(w, table, hints, query, col_perm); :}
+  | opt_with_clause:w KW_UPSERT KW_INTO opt_kw_table table_name:table
+    opt_plan_hints:hints query_stmt:query
+  {: RESULT = InsertStmt.createUpsert(w, table, hints, query, null); :}
   ;
 
 // A DELETE statement comes in two main representations, the DELETE keyword with a path
@@ -3216,6 +3244,8 @@ ident_or_keyword ::=
   | KW_UPDATE:r
   {: RESULT = r.toString(); :}
   | KW_UPDATE_FN:r
+  {: RESULT = r.toString(); :}
+  | KW_UPSERT:r
   {: RESULT = r.toString(); :}
   | KW_USE:r
   {: RESULT = r.toString(); :}

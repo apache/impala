@@ -33,6 +33,7 @@ enum TDataSinkType {
 enum TSinkAction {
   INSERT,
   UPDATE,
+  UPSERT,
   DELETE
 }
 

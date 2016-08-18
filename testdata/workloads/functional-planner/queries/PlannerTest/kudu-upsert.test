@@ -1,0 +1,92 @@
+# simple upsert with select
+upsert into table functional_kudu.testtbl
+select bigint_col, string_col, int_col from functional.alltypes
+where year=2009 and month=05
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 files=1 size=20.36KB
+====
+# simple upsert with values clause
+upsert into table functional_kudu.testtbl
+values (1, 'a', 1), (2, 'b', 2)
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+00:UNION
+   constant-operands=2
+====
+# upsert with 'with' clause and limit
+with x as (select string_col, count(*) from functional.alltypes group by string_col)
+upsert into table functional_kudu.testtbl
+select a.bigint_col, a.string_col, a.int_col from functional.alltypes a, x
+where x.string_col = a.string_col
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.string_col = string_col
+|  runtime filters: RF000 <- string_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: string_col
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.string_col
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.string_col = string_col
+|  runtime filters: RF000 <- string_col
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: string_col
+|  |
+|  04:EXCHANGE [HASH(string_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: string_col
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.string_col
+====
+# upsert with inline view
+upsert into functional_kudu.testtbl
+select v.id, v.string_col, v.cnt from (
+  select id, string_col, cast(count(*) as int) cnt from
+  functional.alltypes
+  group by 1, 2) v
+where cnt < 10
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: id, string_col
+|  having: CAST(count(*) AS INT) < 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+upsert into functional_kudu.testtbl /*+ clustered */
+select * from functional_kudu.testtbl
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+01:SORT
+|  order by: id DESC NULLS LAST
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+====

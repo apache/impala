@@ -167,6 +167,8 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
     return table_->NewInsert();
   } else if (sink_action_ == TSinkAction::UPDATE) {
     return table_->NewUpdate();
+  } else if (sink_action_ == TSinkAction::UPSERT) {
+    return table_->NewUpsert();
   } else {
     DCHECK(sink_action_ == TSinkAction::DELETE) << "Sink type not supported: "
         << sink_action_;
@@ -190,17 +192,24 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
     unique_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
 
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
+      // For INSERT, output_expr_ctxs_ will contain all columns of the table in order.
+      // For UPDATE and UPSERT, output_expr_ctxs_ only contains the columns that the op
+      // applies to, i.e. columns explicitly mentioned in the query, and
+      // referenced_columns is then used to map to actual column positions.
       int col = kudu_table_sink_.referenced_columns.empty() ?
           j : kudu_table_sink_.referenced_columns[j];
 
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
 
-      // If the value is NULL and no explicit column references are provided, the column
-      // should be ignored, else it's explicitly set to NULL.
+      // If the value is NULL, we only need to explicitly set it for UPDATE and UPSERT.
+      // For INSERT, it can be ignored as unspecified cols will be implicitly set to NULL.
       if (value == NULL) {
-        if (!kudu_table_sink_.referenced_columns.empty()) {
+        if (sink_action_ == TSinkAction::UPDATE || sink_action_ == TSinkAction::UPSERT) {
+          DCHECK(!kudu_table_sink_.referenced_columns.empty());
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
               "Could not add Kudu WriteOp.");
+        } else {
+          DCHECK(kudu_table_sink_.referenced_columns.empty());
         }
         continue;
       }

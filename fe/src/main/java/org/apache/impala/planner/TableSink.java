@@ -51,6 +51,13 @@ public abstract class TableSink extends DataSink {
       @Override
       public TSinkAction toThrift() { return TSinkAction.UPDATE; }
     },
+    UPSERT {
+      @Override
+      public String toExplainString() { return "UPSERT INTO"; }
+
+      @Override
+      public TSinkAction toThrift() { return TSinkAction.UPSERT; }
+    },
     DELETE {
       @Override
       public String toExplainString() { return "DELETE FROM"; }
@@ -105,6 +112,8 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(overwrite == false);
       // Partition clauses don't make sense for Kudu inserts.
       Preconditions.checkState(partitionKeyExprs.isEmpty());
+      // UPSERT is incompatible with ignoreDuplicates.
+      Preconditions.checkState(sinkAction != Op.UPSERT || !ignoreDuplicates);
       return new KuduTableSink(table, sinkAction, referencedColumns, ignoreDuplicates);
     } else {
       throw new UnsupportedOperationException(

@@ -30,6 +30,8 @@ import org.apache.impala.common.AnalysisException;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -2462,6 +2464,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(1, true, 1, 1, 1, 1, 1.0, 1.0, 'a', 'a', cast(0 as timestamp), 2009, 10)," +
         "(2, false, 2, 2, NULL, 2, 2.0, 2.0, 'b', 'b', cast(0 as timestamp), 2009, 2)," +
         "(3, true, 3, 3, 3, 3, 3.0, 3.0, 'c', 'c', cast(0 as timestamp), 2009, 3))");
+
     // Test multiple aliases. Values() is like union, the column labels are 'x' and 'y'.
     AnalyzesOk("values((1 as x, 'a' as y), (2 as k, 'b' as j))");
     // Test order by, offset and limit.
@@ -2820,7 +2823,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Cannot insert into a view.
     AnalysisError("insert into functional.alltypes_view partition(year, month) " +
         "select * from functional.alltypes",
-        "Impala does not support inserting into views: functional.alltypes_view");
+        "Impala does not support INSERTing into views: functional.alltypes_view");
     // Cannot load into a view.
     AnalysisError("load data inpath '/test-warehouse/tpch.lineitem/lineitem.tbl' " +
         "into table functional.alltypes_view",
@@ -2978,6 +2981,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'b.int_array_col' correlated with an outer block as well as an " +
         "uncorrelated one 'functional.alltypestiny':\n" +
         "SELECT item FROM b.int_array_col, functional.alltypestiny");
+
+    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
+      // Key columns missing from permutation
+      AnalysisError("insert into functional_kudu.testtbl(zip) values(1)",
+          "All primary key columns must be specified for INSERTing into Kudu tables. " +
+          "Missing columns are: id");
+    }
   }
 
   /**

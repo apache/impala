@@ -1163,6 +1163,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "select * from functional.alltypestiny where id = (select 1) " +
         "union select * from functional.alltypestiny where id = (select 2)");
 
+    // UPSERT
+    AnalyzesOk("upsert into functional_kudu.testtbl select * from " +
+        "functional_kudu.testtbl where id in (select id from functional_kudu.testtbl " +
+        "where zip = 0)");
+    AnalyzesOk("upsert into functional_kudu.testtbl select * from " +
+        "functional_kudu.testtbl union select bigint_col, string_col, int_col from " +
+        "functional.alltypes");
+
     // CTAS with correlated subqueries
     AnalyzesOk("create table functional.test_tbl as select * from " +
         "functional.alltypes t where t.id in (select id from functional.alltypesagg " +
