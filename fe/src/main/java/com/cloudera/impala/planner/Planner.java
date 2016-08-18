@@ -394,9 +394,7 @@ public class Planner {
         float lhsAvgRowSize = joinNode.getChild(0).getAvgRowSize();
         float rhsAvgRowSize = joinNode.getChild(1).getAvgRowSize();
         if (lhsCard != -1 && rhsCard != -1 &&
-            lhsCard * lhsAvgRowSize < rhsCard * rhsAvgRowSize &&
-            // TODO: Do not invert inner joins. Relax this restriction.
-            !(joinOp.isInnerJoin() && joinNode.hasConjuncts())) {
+            lhsCard * lhsAvgRowSize < rhsCard * rhsAvgRowSize) {
           joinNode.invertJoin();
         }
       }
@@ -428,9 +426,9 @@ public class Planner {
     }
     List<Expr> otherJoinConjuncts = Lists.newArrayList(joinNode.getOtherJoinConjuncts());
     otherJoinConjuncts.addAll(joinNode.getEqJoinConjuncts());
-    JoinNode newJoinNode = new NestedLoopJoinNode(joinNode.getChild(0), joinNode.getChild(1),
-        joinNode.isStraightJoin(), joinNode.getDistributionModeHint(),
-        joinNode.getJoinOp(), otherJoinConjuncts);
+    JoinNode newJoinNode = new NestedLoopJoinNode(joinNode.getChild(0),
+        joinNode.getChild(1), joinNode.isStraightJoin(),
+        joinNode.getDistributionModeHint(), joinNode.getJoinOp(), otherJoinConjuncts);
     newJoinNode.getConjuncts().addAll(joinNode.getConjuncts());
     newJoinNode.setId(joinNode.getId());
     newJoinNode.init(analyzer);

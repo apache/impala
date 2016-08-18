@@ -170,28 +170,28 @@ functional.alltypes d
 where a.id = d.id and b.id = c.id
 ---- PLAN
 06:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = d.id
-|  runtime filters: RF000 <- d.id
+|  hash predicates: d.id = a.id
+|  runtime filters: RF000 <- a.id
 |
-|--03:SCAN HDFS [functional.alltypes d]
-|     partitions=24/24 files=24 size=478.45KB
-|
-05:NESTED LOOP JOIN [CROSS JOIN]
-|
-|--04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: b.id = c.id
-|  |  runtime filters: RF001 <- c.id
+|--05:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--02:SCAN HDFS [functional.alltypestiny c]
-|  |     partitions=4/4 files=4 size=460B
+|  |--04:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: b.id = c.id
+|  |  |  runtime filters: RF001 <- c.id
+|  |  |
+|  |  |--02:SCAN HDFS [functional.alltypestiny c]
+|  |  |     partitions=4/4 files=4 size=460B
+|  |  |
+|  |  01:SCAN HDFS [functional.alltypes b]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |     runtime filters: RF001 -> b.id
 |  |
-|  01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF001 -> b.id
+|  00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
 |
-00:SCAN HDFS [functional.alltypestiny a]
-   partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> a.id
+03:SCAN HDFS [functional.alltypes d]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> d.id
 ====
 # Do not allow a non-equi outer join
 select count(*)

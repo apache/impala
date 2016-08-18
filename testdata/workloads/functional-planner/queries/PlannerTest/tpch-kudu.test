@@ -95,18 +95,18 @@ limit 100
 |  |--03:SCAN KUDU [tpch_kudu.nation]
 |  |
 |  14:HASH JOIN [INNER JOIN]
-|  |  hash predicates: ps_suppkey = s_suppkey
+|  |  hash predicates: s_suppkey = ps_suppkey
 |  |
-|  |--01:SCAN KUDU [tpch_kudu.supplier]
+|  |--13:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ps_partkey = p_partkey
+|  |  |
+|  |  |--00:SCAN KUDU [tpch_kudu.part]
+|  |  |     predicates: p_type LIKE '%BRASS'
+|  |  |     kudu predicates: p_size = 15
+|  |  |
+|  |  02:SCAN KUDU [tpch_kudu.partsupp]
 |  |
-|  13:HASH JOIN [INNER JOIN]
-|  |  hash predicates: ps_partkey = p_partkey
-|  |
-|  |--00:SCAN KUDU [tpch_kudu.part]
-|  |     predicates: p_type LIKE '%BRASS'
-|  |     kudu predicates: p_size = 15
-|  |
-|  02:SCAN KUDU [tpch_kudu.partsupp]
+|  01:SCAN KUDU [tpch_kudu.supplier]
 |
 12:AGGREGATE [FINALIZE]
 |  output: min(ps_supplycost)
@@ -437,28 +437,28 @@ order by
 |--05:SCAN KUDU [tpch_kudu.nation n1]
 |
 11:HASH JOIN [INNER JOIN]
-|  hash predicates: o_custkey = c_custkey
+|  hash predicates: c_custkey = o_custkey
 |
-|--04:SCAN KUDU [tpch_kudu.customer]
-|
-10:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey
-|
-|--01:SCAN KUDU [tpch_kudu.supplier]
-|
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: l_orderkey = o_orderkey
-|
-|--03:SCAN KUDU [tpch_kudu.orders]
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: l_suppkey = s_suppkey
+|  |
+|  |--01:SCAN KUDU [tpch_kudu.supplier]
+|  |
+|  09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o_orderkey = l_orderkey
+|  |
+|  |--08:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: l_partkey = p_partkey
+|  |  |
+|  |  |--00:SCAN KUDU [tpch_kudu.part]
+|  |  |     kudu predicates: p_type = 'ECONOMY ANODIZED STEEL'
+|  |  |
+|  |  02:SCAN KUDU [tpch_kudu.lineitem]
+|  |
+|  03:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
 |
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: l_partkey = p_partkey
-|
-|--00:SCAN KUDU [tpch_kudu.part]
-|     kudu predicates: p_type = 'ECONOMY ANODIZED STEEL'
-|
-02:SCAN KUDU [tpch_kudu.lineitem]
+04:SCAN KUDU [tpch_kudu.customer]
 ====
 # Q9 - Product Type Measure Query
 select
@@ -576,19 +576,19 @@ limit 20
 |--03:SCAN KUDU [tpch_kudu.nation]
 |
 05:HASH JOIN [INNER JOIN]
-|  hash predicates: o_custkey = c_custkey
+|  hash predicates: c_custkey = o_custkey
 |
-|--00:SCAN KUDU [tpch_kudu.customer]
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |
+|  |--01:SCAN KUDU [tpch_kudu.orders]
+|  |     predicates: o_orderdate < '1994-01-01'
+|  |     kudu predicates: o_orderdate >= '1993-10-01'
+|  |
+|  02:SCAN KUDU [tpch_kudu.lineitem]
+|     kudu predicates: l_returnflag = 'R'
 |
-04:HASH JOIN [INNER JOIN]
-|  hash predicates: l_orderkey = o_orderkey
-|
-|--01:SCAN KUDU [tpch_kudu.orders]
-|     predicates: o_orderdate < '1994-01-01'
-|     kudu predicates: o_orderdate >= '1993-10-01'
-|
-02:SCAN KUDU [tpch_kudu.lineitem]
-   kudu predicates: l_returnflag = 'R'
+00:SCAN KUDU [tpch_kudu.customer]
 ====
 # Q11 - Important Stock Identification
 # Modifications: query was rewritten to not have a subquery in the having clause
