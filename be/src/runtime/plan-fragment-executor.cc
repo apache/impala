@@ -523,9 +523,6 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
   {
     lock_guard<mutex> l(status_lock_);
     if (status_.ok()) {
-      // TODO: remove this once all locations which exceed query or process memory limit
-      // will log query memory usages with MemTracker::MemLimitExceeded().
-      if (status.IsMemLimitExceeded()) runtime_state_->LogMemLimitExceeded(NULL, 0);
       status_ = status;
     }
   }

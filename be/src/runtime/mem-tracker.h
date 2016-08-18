@@ -344,8 +344,10 @@ class MemTracker {
 
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
+  /// If 'failed_allocation_size' is greater than zero, logs the allocation size. If
+  /// 'failed_allocation_size' is zero, nothing about the allocation size is logged.
   Status MemLimitExceeded(RuntimeState* state, const std::string& details,
-      int64_t failed_allocation);
+      int64_t failed_allocation = 0);
 
   static const std::string COUNTER_NAME;
 

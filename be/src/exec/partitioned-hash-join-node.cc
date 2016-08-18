@@ -659,9 +659,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     RETURN_IF_ERROR(
         input_partition_->build_rows()->PrepareForRead(true, &got_read_buffer));
     if (!got_read_buffer) {
-      Status status = Status::MemLimitExceeded();
-      status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
-      return status;
+      return mem_tracker()->MemLimitExceeded(
+          state, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
     }
   }
 
@@ -829,9 +828,8 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   bool got_read_buffer;
   RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead(true, &got_read_buffer));
   if (!got_read_buffer) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
-    return status;
+    return mem_tracker()->MemLimitExceeded(
+        state, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
   }
   ht_ctx_->set_level(input_partition_->level_);
 
@@ -1130,9 +1128,8 @@ Status PartitionedHashJoinNode::PrepareNullAwareNullProbe() {
   bool got_read_buffer;
   RETURN_IF_ERROR(null_probe_rows_->PrepareForRead(true, &got_read_buffer));
   if (!got_read_buffer) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
-    return status;
+    return mem_tracker()->MemLimitExceeded(
+        runtime_state_, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
   }
   DCHECK_EQ(probe_batch_->num_rows(), 0);
   probe_batch_pos_ = 0;
@@ -1211,9 +1208,8 @@ Status PartitionedHashJoinNode::PrepareNullAwarePartition() {
   bool got_read_buffer;
   RETURN_IF_ERROR(probe_stream->PrepareForRead(true, &got_read_buffer));
   if (!got_read_buffer) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
-    return status;
+    return mem_tracker()->MemLimitExceeded(
+        runtime_state_, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
   }
   probe_batch_pos_ = 0;
   return Status::OK();

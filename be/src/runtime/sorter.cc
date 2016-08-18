@@ -22,6 +22,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
@@ -493,18 +494,16 @@ Status Sorter::Run::Init() {
   RETURN_IF_ERROR(
       sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
   if (block == NULL) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail(Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "fixed"));
-    return status;
+    return sorter_->mem_tracker_->MemLimitExceeded(
+        sorter_->state_, Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "fixed"));
   }
   fixed_len_blocks_.push_back(block);
   if (has_var_len_slots_) {
     RETURN_IF_ERROR(
         sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
     if (block == NULL) {
-      Status status = Status::MemLimitExceeded();
-      status.AddDetail(Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "variable"));
-      return status;
+      return sorter_->mem_tracker_->MemLimitExceeded(
+          sorter_->state_, Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "variable"));
     }
     var_len_blocks_.push_back(block);
     if (initial_run_) {
@@ -512,9 +511,8 @@ Status Sorter::Run::Init() {
       RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(
           sorter_->block_mgr_client_, NULL, &var_len_copy_block_));
       if (var_len_copy_block_ == NULL) {
-        Status status = Status::MemLimitExceeded();
-        status.AddDetail(Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "variable"));
-        return status;
+        return sorter_->mem_tracker_->MemLimitExceeded(
+            sorter_->state_, Substitute(MEM_ALLOC_FAILED_ERROR_MSG, "variable"));
       }
     }
   }
@@ -1549,9 +1547,8 @@ Status Sorter::CreateMerger(int max_num_runs) {
       // TODO: IMPALA-3200: we should not need this logic once we have reliable
       // reservations (IMPALA-3200).
       if (merging_runs_.size() < 2) {
-        Status status = Status::MemLimitExceeded();
-        status.AddDetail(Substitute(MERGE_FAILED_ERROR_MSG, merging_runs_.size()));
-        return status;
+        return mem_tracker_->MemLimitExceeded(
+            state_, Substitute(MERGE_FAILED_ERROR_MSG, merging_runs_.size()));
       }
       // Merge the runs that we were able to prepare.
       break;

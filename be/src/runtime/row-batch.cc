@@ -448,7 +448,6 @@ Status RowBatch::ResizeAndAllocateTupleBuffer(RuntimeState* state,
   *tuple_buffer_size = static_cast<int64_t>(row_size) * capacity_;
   *buffer = tuple_data_pool_.TryAllocate(*tuple_buffer_size);
   if (*buffer == NULL) {
-    Status status = Status::MemLimitExceeded();
     return mem_tracker_->MemLimitExceeded(state, "Failed to allocate tuple buffer",
         *tuple_buffer_size);
   }

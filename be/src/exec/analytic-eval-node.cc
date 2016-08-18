@@ -22,6 +22,7 @@
 #include "exprs/agg-fn-evaluator.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
@@ -30,6 +31,11 @@
 #include "common/names.h"
 
 static const int MAX_TUPLE_POOL_SIZE = 8 * 1024 * 1024; // 8MB
+
+const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
+    "Failed to acquire initial read buffer for analytic function evaluation. Reducing "
+    "query concurrency or increasing the memory limit may help this query to complete "
+    "successfully.";
 
 using namespace strings;
 
@@ -197,11 +203,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   bool got_read_buffer;
   RETURN_IF_ERROR(input_stream_->PrepareForRead(true, &got_read_buffer));
   if (!got_read_buffer) {
-    Status status = Status::MemLimitExceeded();
-    status.AddDetail("Failed to acquire initial read buffer for analytic function "
-        "evaluation. Reducing query concurrency or increasing the memory limit may "
-        "help this query to complete successfully.");
-    return status;
+    return mem_tracker()->MemLimitExceeded(state, PREPARE_FOR_READ_FAILED_ERROR_MSG);
   }
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
