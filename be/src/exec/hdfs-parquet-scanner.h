@@ -446,6 +446,11 @@ class HdfsParquetScanner : public HdfsScanner {
   Status AssembleRows(const std::vector<ParquetColumnReader*>& column_readers,
       RowBatch* row_batch, bool* skip_row_group);
 
+  /// Set 'batch_' to a new row batch. Unlike the similarly named function in
+  /// HdfsScanner, this function will not allocate the tuple buffer. Only valid
+  /// to call if 'add_batches_to_queue_' is true.
+  void StartNewParquetRowBatch();
+
   /// Commit num_rows to the given row batch.
   /// Returns OK if the query is not cancelled and hasn't exceeded any mem limits.
   /// Scanner can call this with 0 rows to flush any pending resources (attached pools

@@ -282,7 +282,7 @@ class HdfsScanner {
   Status InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
       THdfsFileFormat::type type, const std::string& scanner_name);
 
-  /// Set batch_ to a new row batch and update tuple_mem_ accordingly.
+  /// Set 'batch_' to a new row batch and update 'tuple_mem_' accordingly.
   /// Only valid to call if 'add_batches_to_queue_' is true.
   Status StartNewRowBatch();
 
