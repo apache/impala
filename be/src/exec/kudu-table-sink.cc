@@ -173,7 +173,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
         case TYPE_STRING: {
           StringValue* sv = reinterpret_cast<StringValue*>(value);
           kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
-          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetString(col, slice),
+          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetStringNoCopy(col, slice),
               "Could not add Kudu WriteOp.");
           break;
         }
