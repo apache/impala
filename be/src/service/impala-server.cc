@@ -856,7 +856,7 @@ void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   // thread-safe).
   random_generator uuid_generator;
   uuid query_uuid = uuid_generator();
-  UUIDToTUniqueId(query_uuid, &query_ctx->query_id);
+  query_ctx->query_id = UuidToQueryId(query_uuid);
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,

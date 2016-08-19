@@ -254,6 +254,7 @@ struct TQueryCtx {
   1: required TClientRequest request
 
   // A globally unique id assigned to the entire query in the BE.
+  // The bottom 4 bytes are 0 (for details see be/src/util/uid-util.h).
   2: required Types.TUniqueId query_id
 
   // Session state including user.
@@ -326,7 +327,11 @@ struct TPlanFragmentDestination {
 // of fragment instances, the query context, the coordinator address, etc.
 // TODO: for range partitioning, we also need to specify the range boundaries
 struct TPlanFragmentInstanceCtx {
-  // the globally unique fragment instance id
+  // The globally unique fragment instance id.
+  // Format: query id + query-wide fragment index
+  // The query-wide fragment index starts at 0, so that the query id
+  // and the id of the first fragment instance (the coordinator instance)
+  // are identical.
   1: required Types.TUniqueId fragment_instance_id
 
   // Index of this fragment instance accross all instances of its parent fragment,
@@ -334,6 +339,8 @@ struct TPlanFragmentInstanceCtx {
   2: required i32 fragment_instance_idx
 
   // Index of this fragment instance in Coordinator::fragment_instance_states_.
+  // TODO: remove; this is subsumed by the query-wide instance idx embedded
+  // in the fragment_instance_id
   3: required i32 instance_state_idx
 
   // Initial scan ranges for each scan node in TPlanFragment.plan_tree

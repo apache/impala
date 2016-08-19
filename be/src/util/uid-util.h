@@ -19,6 +19,7 @@
 #ifndef IMPALA_UTIL_UID_UTIL_H
 #define IMPALA_UTIL_UID_UTIL_H
 
+#include <boost/functional/hash.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
@@ -27,6 +28,7 @@
 #include "common/names.h"
 
 namespace impala {
+
 /// This function must be called 'hash_value' to be picked up by boost.
 inline std::size_t hash_value(const impala::TUniqueId& id) {
   std::size_t seed = 0;
@@ -41,6 +43,38 @@ template <typename T>
 inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, T* unique_id) {
   memcpy(&(unique_id->hi), &uuid.data[0], 8);
   memcpy(&(unique_id->lo), &uuid.data[8], 8);
+}
+
+/// Query id: uuid with bottom 4 bytes set to 0
+/// Fragment instance id: query id with instance index stored in the bottom 4 bytes
+
+const int64_t FRAGMENT_IDX_MASK = (1L << 32) - 1;
+
+inline TUniqueId UuidToQueryId(const boost::uuids::uuid& uuid) {
+  TUniqueId result;
+  memcpy(&result.hi, &uuid.data[0], 8);
+  memcpy(&result.lo, &uuid.data[8], 8);
+  result.lo &= ~FRAGMENT_IDX_MASK;  // zero out bottom 4 bytes
+  return result;
+}
+
+inline TUniqueId GetQueryId(const TUniqueId& fragment_instance_id) {
+  TUniqueId result = fragment_instance_id;
+  result.lo &= ~FRAGMENT_IDX_MASK;  // zero out bottom 4 bytes
+  return result;
+}
+
+inline int32_t GetInstanceIdx(const TUniqueId& fragment_instance_id) {
+  return fragment_instance_id.lo & FRAGMENT_IDX_MASK;
+}
+
+inline TUniqueId CreateInstanceId(
+    const TUniqueId& query_id, int32_t instance_idx) {
+  DCHECK_EQ(GetInstanceIdx(query_id), 0);  // well-formed query id
+  DCHECK_GE(instance_idx, 0);
+  TUniqueId result = query_id;
+  result.lo += instance_idx;
+  return result;
 }
 
 template <typename F, typename T>

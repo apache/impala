@@ -502,14 +502,9 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
   int64_t num_fragment_instances = 0;
   for (FragmentExecParams& params: *fragment_exec_params) {
     for (int j = 0; j < params.hosts.size(); ++j) {
-      int instance_num = num_fragment_instances + j;
-      // we add instance_num to query_id.lo to create a globally-unique instance id
-      TUniqueId instance_id;
-      instance_id.hi = schedule->query_id().hi;
-      DCHECK_LT(
-          schedule->query_id().lo, numeric_limits<int64_t>::max() - instance_num - 1);
-      instance_id.lo = schedule->query_id().lo + instance_num + 1;
-      params.instance_ids.push_back(instance_id);
+      int instance_idx = num_fragment_instances + j;
+      params.instance_ids.push_back(
+          CreateInstanceId(schedule->query_id(), instance_idx));
     }
     num_fragment_instances += params.hosts.size();
   }
