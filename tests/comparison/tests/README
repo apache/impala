@@ -1,0 +1,11 @@
+Purpose
+
+This directory contains tests for the Random Query Generator.
+
+How-to
+
+To run the tests we assume you have an impala-python environment already
+set up. Then:
+
+$ cd "${IMPALA_HOME}"/tests/comparison/tests
+$ impala-py.test
