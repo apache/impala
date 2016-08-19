@@ -20,6 +20,7 @@ package com.cloudera.impala.planner;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TRuntimeFilterMode;
 
@@ -244,4 +245,23 @@ public class PlannerTest extends PlannerTestBase {
   public void testConjunctOrdering() {
     runPlannerTestFile("conjunct-ordering");
   }
+
+  @Test
+  public void testKudu() { runPlannerTestFile("kudu"); }
+
+  @Test
+  public void testKuduUpdate() { runPlannerTestFile("kudu-update"); }
+
+  @Test
+  public void testKuduDelete() { runPlannerTestFile("kudu-delete"); }
+
+  @Test
+  public void testKuduSelectivity() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.VERBOSE);
+    runPlannerTestFile("kudu-selectivity", options);
+  }
+
+  @Test
+  public void testKuduTpch() { runPlannerTestFile("tpch-kudu"); }
 }

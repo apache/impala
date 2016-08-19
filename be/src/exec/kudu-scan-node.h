@@ -31,50 +31,30 @@
 namespace impala {
 
 class KuduScanner;
-class Tuple;
 
-/// A scan node that scans Kudu TabletServers.
+/// A scan node that scans a Kudu table.
 ///
-/// This scan node takes a set of ranges and uses a Kudu client to retrieve the data
-/// belonging to those ranges from Kudu. The client's schema is rebuilt from the
-/// TupleDescriptors forwarded by the frontend so that we're sure all the scan nodes
-/// use the same schema, for the same scan.
+/// This takes a set of serialized Kudu scan tokens which encode the information needed
+/// for this scan. A Kudu client deserializes the tokens into kudu scanners, and those
+/// are used to retrieve the rows for this scan.
 class KuduScanNode : public ScanNode {
  public:
   KuduScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   ~KuduScanNode();
 
-  /// Create Kudu schema and columns to slots mapping.
   virtual Status Prepare(RuntimeState* state);
-
-  /// Start Kudu scan.
   virtual Status Open(RuntimeState* state);
-
-  /// Fill the next row batch by fetching more data from the KuduScanner.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-
-  /// Close connections to Kudu.
   virtual void Close(RuntimeState* state);
 
  protected:
-  /// Write debug string of this into out.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  FRIEND_TEST(KuduScanNodeTest, TestPushIntGEPredicateOnKey);
-  FRIEND_TEST(KuduScanNodeTest, TestPushIntEQPredicateOn2ndColumn);
-  FRIEND_TEST(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn);
-  FRIEND_TEST(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn);
   friend class KuduScanner;
 
-  kudu::client::KuduClient* kudu_client() {
-    return client_.get();
-  }
-
-  kudu::client::KuduTable* kudu_table() {
-    return table_.get();
-  }
+  kudu::client::KuduClient* kudu_client() { return client_.get(); }
 
   /// Tuple id resolved in Prepare() to set tuple_desc_.
   const TupleId tuple_id_;
@@ -84,19 +64,15 @@ class KuduScanNode : public ScanNode {
   /// Descriptor of tuples read from Kudu table.
   const TupleDescriptor* tuple_desc_;
 
-  /// The list of Kudu columns to project for the scan, extracted from the TupleDescriptor
-  /// and translated into Kudu format, i.e. matching the case of the Kudu schema.
-  std::vector<std::string> projected_columns_;
-
   /// The Kudu client and table. Scanners share these instances.
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;
   std::tr1::shared_ptr<kudu::client::KuduTable> table_;
 
-  /// Set of ranges to be scanned.
-  std::vector<TKuduKeyRange> key_ranges_;
+  /// Set of scan tokens to be deserialized into Kudu scanners.
+  std::vector<std::string> scan_tokens_;
 
-  /// The next index in 'key_ranges_' to be assigned to a scanner.
-  int next_scan_range_idx_;
+  /// The next index in 'scan_tokens_' to be assigned. Protected by lock_.
+  int next_scan_token_idx_;
 
   // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
   // threads and consumed by the main thread.
@@ -106,8 +82,8 @@ class KuduScanNode : public ScanNode {
   /// 'num_active_scanners_'.
   boost::mutex lock_;
 
-  /// The current status of the scan, set to non-OK if any problems occur, e.g. if an error
-  /// occurs in a scanner.
+  /// The current status of the scan, set to non-OK if any problems occur, e.g. if an
+  /// error occurs in a scanner.
   /// Protected by lock_
   Status status_;
 
@@ -115,13 +91,10 @@ class KuduScanNode : public ScanNode {
   /// Protected by lock_
   int num_active_scanners_;
 
-  /// Set to true when the scan is complete (either because all ranges were scanned, the limit
-  /// was reached or some error occurred).
+  /// Set to true when the scan is complete (either because all scan tokens have been
+  /// processed, the limit was reached or some error occurred).
   /// Protected by lock_
   volatile bool done_;
-
-  /// Maximum size of materialized_row_batches_.
-  int max_materialized_row_batches_;
 
   /// Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;
@@ -131,64 +104,35 @@ class KuduScanNode : public ScanNode {
   static const std::string KUDU_READ_TIMER;
   static const std::string KUDU_ROUND_TRIPS;
 
-  /// The function names of the supported predicates.
-  static const std::string GE_FN;
-  static const std::string LE_FN;
-  static const std::string EQ_FN;
-
-  /// The set of conjuncts, in TExpr form, to be pushed to Kudu.
-  /// Received in TPlanNode::kudu_scan_node.
-  const std::vector<TExpr> pushable_conjuncts_;
-
-  /// The id of the callback added to the thread resource manager when thread token
+  /// The id of the callback added to the thread resource manager when a thread
   /// is available. Used to remove the callback before this scan node is destroyed.
   /// -1 if no callback is registered.
   int thread_avail_cb_id_;
 
-  /// The set of conjuncts, in KuduPredicate form, to be pushed to Kudu.
-  /// Derived from 'pushable_conjuncts_'.
-  std::vector<kudu::client::KuduPredicate*> kudu_predicates_;
-
-  /// Returns a KuduValue with 'type' built from a literal in 'node'.
-  /// Expects that 'node' is a literal value.
-  Status GetExprLiteralBound(const TExprNode& node,
-      kudu::client::KuduColumnSchema::DataType type, kudu::client::KuduValue** value);
-
-  /// Returns a string with the name of the column that 'node' refers to.
-  void GetSlotRefColumnName(const TExprNode& node, string* col_name);
-
-  /// Transforms 'pushable_conjuncts_' received from the frontend into 'kudu_predicates_' that will
-  /// be set in all scanners.
-  Status TransformPushableConjunctsToRangePredicates();
-
   /// Called when scanner threads are available for this scan node. This will
   /// try to spin up as many scanner threads as the quota allows.
-  void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
+  void ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool);
 
   /// Main function for scanner thread which executes a KuduScanner. Begins by processing
-  /// 'initial_range', and continues processing ranges returned by 'GetNextKeyRange()'
-  /// until there are no more ranges, an error occurs, or the limit is reached.
-  void ScannerThread(const string& name, const TKuduKeyRange* initial_range);
+  /// 'initial_token', and continues processing scan tokens returned by
+  /// 'GetNextScanToken()' until there are none left, an error occurs, or the limit is
+  /// reached.
+  void RunScannerThread(const std::string& name, const std::string* initial_token);
 
-  /// Processes a single scan range. Row batches are fetched using 'scanner' and enqueued
-  /// in 'materialized_row_batches_' until the scanner reports eos for 'key_range', an
-  /// error occurs, or the limit is reached.
-  Status ProcessRange(KuduScanner* scanner, const TKuduKeyRange* key_range);
+  /// Processes a single scan token. Row batches are fetched using 'scanner' and enqueued
+  /// in 'materialized_row_batches_' until the scanner reports eos, an error occurs, or
+  /// the limit is reached.
+  Status ProcessScanToken(KuduScanner* scanner, const std::string& scan_token);
 
-  /// Returns the next partition key range to read. Thread safe. Returns NULL if there are
-  /// no more ranges.
-  TKuduKeyRange* GetNextKeyRange();
-
-  const std::vector<std::string>& projected_columns() const { return projected_columns_; }
+  /// Returns the next scan token. Thread safe. Returns NULL if there are no more scan
+  /// tokens.
+  const std::string* GetNextScanToken();
 
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
 
   // Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
   // have been open previously.
   Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
-
-  // Clones the set of predicates to be set on scanners.
-  void ClonePredicates(vector<kudu::client::KuduPredicate*>* predicates);
 
   RuntimeProfile::Counter* kudu_read_timer() const { return kudu_read_timer_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }

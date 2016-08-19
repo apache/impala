@@ -285,7 +285,7 @@ export KUDU_MASTER_PORT="${KUDU_MASTER_PORT:-7051}"
 # TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
 #       to nightly changes from Kudu. The version below is the last released version but
 #       before release this needs to be updated to the version about to be released.
-export KUDU_JAVA_VERSION=0.10.0-SNAPSHOT
+export KUDU_JAVA_VERSION=1.0.0-SNAPSHOT
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26

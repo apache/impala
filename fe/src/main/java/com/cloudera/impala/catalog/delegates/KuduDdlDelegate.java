@@ -28,13 +28,13 @@ import java.util.List;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.kududb.ColumnSchema;
-import org.kududb.ColumnSchema.ColumnSchemaBuilder;
-import org.kududb.Schema;
-import org.kududb.Type;
-import org.kududb.client.CreateTableOptions;
-import org.kududb.client.KuduClient;
-import org.kududb.client.PartialRow;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder;
+import org.apache.kudu.Schema;
+import org.apache.kudu.Type;
+import org.apache.kudu.client.CreateTableOptions;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.PartialRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +85,7 @@ public class KuduDdlDelegate extends DdlDelegate {
         }
 
         // Check if the external table matches the schema
-        org.kududb.client.KuduTable kuduTable = client.openTable(kuduTableName);
+        org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName);
         if (!compareSchema(msTbl_, kuduTable)) {
           throw new ImpalaRuntimeException(String.format(
               "Table %s (%s) has a different schema in Kudu than in Hive.",

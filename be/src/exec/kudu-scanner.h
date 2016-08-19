@@ -31,7 +31,9 @@ class RowBatch;
 class RuntimeState;
 class Tuple;
 
-/// Executes scans in Kudu based on the provided set of scan ranges.
+/// Wraps a Kudu client scanner to fetch row batches from Kudu. The Kudu client scanner
+/// is created from a scan token in OpenNextScanToken(), which then provides rows fetched
+/// by GetNext() until it reaches eos, and the caller may open another scan token.
 class KuduScanner {
  public:
   KuduScanner(KuduScanNode* scan_node, RuntimeState* state);
@@ -40,17 +42,17 @@ class KuduScanner {
   /// Does not actually open a kudu::client::KuduScanner.
   Status Open();
 
-  /// Opens a new kudu::client::KuduScanner to scan 'range'.
-  Status OpenNextRange(const TKuduKeyRange& range);
+  /// Opens a new kudu::client::KuduScanner using 'scan_token'.
+  Status OpenNextScanToken(const std::string& scan_token);
 
   /// Fetches the next batch from the current kudu::client::KuduScanner.
   Status GetNext(RowBatch* row_batch, bool* eos);
 
-  /// Sends a "Ping" to the Kudu TabletServer servicing the current scan, if there is one.
-  /// This serves the purpose of making the TabletServer keep the server side scanner alive
-  /// if the batch queue is full and no batches can be queued. If there are any errors,
-  /// they are ignored here, since we assume that we will just fail the next time we
-  /// try to read a batch.
+  /// Sends a "Ping" to the Kudu TabletServer servicing the current scan, if there is
+  /// one. This serves the purpose of making the TabletServer keep the server side
+  /// scanner alive if the batch queue is full and no batches can be queued. If there are
+  /// any errors, they are ignored here, since we assume that we will just fail the next
+  /// time we try to read a batch.
   void KeepKuduScannerAlive();
 
   /// Closes this scanner.
@@ -67,32 +69,22 @@ class KuduScanner {
   /// Returns true if 'slot' is Null in 'tuple'.
   bool IsSlotNull(Tuple* tuple, const SlotDescriptor& slot);
 
-  /// Returns true if the current block hasn't been fully scanned.
-  bool CurrentBlockHasMoreRows() {
-    return rows_scanned_current_block_ < cur_kudu_batch_.NumRows();
-  }
-
   /// Decodes rows previously fetched from kudu, now in 'cur_rows_' into a RowBatch.
   ///  - 'batch' is the batch that will point to the new tuples.
   ///  - *tuple_mem should be the location to output tuples.
-  ///  - Sets 'batch_done' to true to indicate that the batch was filled to capacity or the limit
-  ///    was reached.
+  ///  - Sets 'batch_done' to true to indicate that the batch was filled to capacity or
+  ///    the limit was reached.
   Status DecodeRowsIntoRowBatch(RowBatch* batch, Tuple** tuple_mem, bool* batch_done);
 
-  /// Returns true of the current kudu::client::KuduScanner has more rows.
-  bool CurrentRangeHasMoreBlocks() {
-    return scanner_->HasMoreRows();
-  }
-
-  /// Fetches the next block of the current kudu::client::KuduScanner.
-  Status GetNextBlock();
+  /// Fetches the next batch of rows from the current kudu::client::KuduScanner.
+  Status GetNextScannerBatch();
 
   /// Closes the current kudu::client::KuduScanner.
-  void CloseCurrentRange();
+  void CloseCurrentClientScanner();
 
-  /// Given a tuple, copies the values of those columns that require additional memory from memory
-  /// owned by the kudu::client::KuduScanner into memory owned by the RowBatch. Assumes that the
-  /// other columns are already materialized.
+  /// Given a tuple, copies the values of those columns that require additional memory
+  /// from memory owned by the kudu::client::KuduScanner into memory owned by the
+  /// RowBatch. Assumes that the other columns are already materialized.
   Status RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool);
 
   /// Transforms a kudu row into an Impala row. Columns that don't require auxiliary
@@ -113,27 +105,21 @@ class KuduScanner {
   KuduScanNode* scan_node_;
   RuntimeState* state_;
 
-  /// The set of key ranges being serviced by this scanner.
-  const vector<TKuduKeyRange> scan_ranges_;
-
-  /// The kudu::client::KuduScanner for the current range.
-  /// One such scanner is required per range as per-range start/stop keys can only be set once.
+  /// The kudu::client::KuduScanner for the current scan token. A new KuduScanner is
+  /// created for each scan token using KuduScanToken::DeserializeIntoScanner().
   boost::scoped_ptr<kudu::client::KuduScanner> scanner_;
 
   /// The current batch of retrieved rows.
   kudu::client::KuduScanBatch cur_kudu_batch_;
-  int rows_scanned_current_block_;
+
+  /// The number of rows already read from cur_kudu_batch_.
+  int cur_kudu_batch_num_read_;
 
   /// The last time a keepalive request or successful RPC was sent.
   int64_t last_alive_time_micros_;
 
   /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
-
-  std::vector<std::string> projected_columns_;
-
-  /// Size of the materialized tuple in the row batch.
-  int tuple_byte_size_;
 
   /// Number of bytes needed to represent the null bits in the tuple.
   int tuple_num_null_bytes_;

@@ -65,25 +65,29 @@ namespace impala {
 const string KuduScanNode::KUDU_READ_TIMER = "TotalKuduReadTime";
 const string KuduScanNode::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
 
-const std::string KuduScanNode::GE_FN = "ge";
-const std::string KuduScanNode::LE_FN = "le";
-const std::string KuduScanNode::EQ_FN = "eq";
-
 KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
       tuple_id_(tnode.kudu_scan_node.tuple_id),
-      next_scan_range_idx_(0),
+      next_scan_token_idx_(0),
       num_active_scanners_(0),
       done_(false),
-      pushable_conjuncts_(tnode.kudu_scan_node.kudu_conjuncts),
       thread_avail_cb_id_(-1) {
   DCHECK(KuduIsAvailable());
+
+  int max_row_batches = FLAGS_kudu_max_row_batches;
+  if (max_row_batches <= 0) {
+    // TODO: See comment on hdfs-scan-node.
+    // This value is built the same way as it assumes that the scan node runs co-located
+    // with a Kudu tablet server and that the tablet server is using disks similarly as
+    // a datanode would.
+    max_row_batches = 10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
+  }
+  materialized_row_batches_.reset(new RowBatchQueue(max_row_batches));
 }
 
 KuduScanNode::~KuduScanNode() {
   DCHECK(is_closed());
-  STLDeleteElements(&kudu_predicates_);
 }
 
 Status KuduScanNode::Prepare(RuntimeState* state) {
@@ -100,24 +104,11 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
 
-  // Convert TScanRangeParams to ScanRanges.
-  CHECK(scan_range_params_ != NULL)
-      << "Must call SetScanRanges() before calling Prepare()";
+  // Initialize the list of scan tokens to process from the TScanRangeParams.
+  DCHECK(scan_range_params_ != NULL);
   for (const TScanRangeParams& params: *scan_range_params_) {
-    const TKuduKeyRange& key_range = params.scan_range.kudu_key_range;
-    key_ranges_.push_back(key_range);
+    scan_tokens_.push_back(params.scan_range.kudu_scan_token);
   }
-  max_materialized_row_batches_ = FLAGS_kudu_max_row_batches;
-
-  if (max_materialized_row_batches_ <= 0) {
-    // TODO: See comment on hdfs-scan-node.
-    // This value is built the same way as it assumes that the scan node runs co-located
-    // with a Kudu tablet server and that the tablet server is using disks similarly as
-    // a datanode would.
-    max_materialized_row_batches_ =
-        10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
-  }
-  materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
   return Status::OK();
 }
 
@@ -139,15 +130,11 @@ Status KuduScanNode::Open(RuntimeState* state) {
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");
-  RETURN_IF_ERROR(ProjectedColumnsFromTupleDescriptor(*tuple_desc_, &projected_columns_,
-      table_->schema()));
-  // Must happen after table_ is opened.
-  RETURN_IF_ERROR(TransformPushableConjunctsToRangePredicates());
 
   num_scanner_threads_started_counter_ =
       ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
 
-  // Reserve one thread token.
+  // Reserve one thread.
   state->resource_pool()->ReserveOptionalTokens(1);
   if (state->query_options().num_scanner_threads > 0) {
     state->resource_pool()->set_max_quota(
@@ -155,8 +142,8 @@ Status KuduScanNode::Open(RuntimeState* state) {
   }
 
   thread_avail_cb_id_ = state->resource_pool()->AddThreadAvailableCb(
-      bind<void>(mem_fn(&KuduScanNode::ThreadTokenAvailableCb), this, _1));
-  ThreadTokenAvailableCb(state->resource_pool());
+      bind<void>(mem_fn(&KuduScanNode::ThreadAvailableCb), this, _1));
+  ThreadAvailableCb(state->resource_pool());
   return Status::OK();
 }
 
@@ -167,7 +154,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_TIMER(materialize_tuple_timer());
 
-  if (ReachedLimit() || key_ranges_.empty()) {
+  if (ReachedLimit() || scan_tokens_.empty()) {
     *eos = true;
     return Status::OK();
   }
@@ -203,145 +190,6 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   return status;
 }
 
-Status KuduScanNode::TransformPushableConjunctsToRangePredicates() {
-  // The only supported pushable predicates are binary operators with a SlotRef and a
-  // literal as the left and right operands respectively.
-  for (const TExpr& predicate: pushable_conjuncts_) {
-    DCHECK_EQ(predicate.nodes.size(), 3);
-    const TExprNode& function_call = predicate.nodes[0];
-
-    DCHECK_EQ(function_call.node_type, TExprNodeType::FUNCTION_CALL);
-
-    IdxByLowerCaseColName idx_by_lc_name;
-    RETURN_IF_ERROR(MapLowercaseKuduColumnNamesToIndexes(table_->schema(),
-        &idx_by_lc_name));
-
-    string impala_col_name;
-    GetSlotRefColumnName(predicate.nodes[1], &impala_col_name);
-
-    IdxByLowerCaseColName::const_iterator iter;
-    if ((iter = idx_by_lc_name.find(impala_col_name)) ==
-        idx_by_lc_name.end()) {
-      return Status(Substitute("Could not find col: '$0' in the table schema",
-                               impala_col_name));
-    }
-
-    KuduColumnSchema column = table_->schema().Column(iter->second);
-
-    KuduValue* bound;
-    RETURN_IF_ERROR(GetExprLiteralBound(predicate.nodes[2], column.type(), &bound));
-    DCHECK(bound != NULL);
-
-    const string& function_name = function_call.fn.name.function_name;
-    if (function_name == GE_FN) {
-      kudu_predicates_.push_back(table_->NewComparisonPredicate(column.name(),
-          KuduPredicate::GREATER_EQUAL, bound));
-    } else if (function_name == LE_FN) {
-      kudu_predicates_.push_back(table_->NewComparisonPredicate(column.name(),
-          KuduPredicate::LESS_EQUAL, bound));
-    } else if (function_name == EQ_FN) {
-      kudu_predicates_.push_back(table_->NewComparisonPredicate(column.name(),
-          KuduPredicate::EQUAL, bound));
-    } else {
-      DCHECK(false) << "Received unpushable operator to push down: " << function_name;
-    }
-  }
-  return Status::OK();
-}
-
-void KuduScanNode::GetSlotRefColumnName(const TExprNode& node, string* col_name) {
-  const KuduTableDescriptor* table_desc =
-      static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
-  TSlotId slot_id = node.slot_ref.slot_id;
-  for (SlotDescriptor* slot: tuple_desc_->slots()) {
-    if (slot->id() == slot_id) {
-      int col_idx = slot->col_pos();
-      *col_name = table_desc->col_descs()[col_idx].name();
-      return;
-    }
-  }
-
-  DCHECK(false) << "Could not find a slot with slot id: " << slot_id;
-}
-
-namespace {
-
-typedef std::map<int, const char*> TypeNamesMap;
-
-// Gets the name of an Expr node type.
-string NodeTypeToString(TExprNodeType::type type) {
-  const TypeNamesMap& type_names_map =
-      impala::_TExprNodeType_VALUES_TO_NAMES;
-  TypeNamesMap::const_iterator iter = type_names_map.find(type);
-
-  if (iter == type_names_map.end()) {
-    return Substitute("Unknown type: $0", type);
-  }
-
-  return (*iter).second;
-}
-
-} // anonymous namespace
-
-Status KuduScanNode::GetExprLiteralBound(const TExprNode& node,
-    KuduColumnSchema::DataType type, KuduValue** value) {
-
-  // Build the Kudu values based on the type of the Kudu column.
-  // We're restrictive regarding which types we accept as the planner does all casting
-  // in the frontend and predicates only get pushed down if the types match.
-  switch (type) {
-    // For types BOOL and STRING we expect the expression literal to match perfectly.
-    case kudu::client::KuduColumnSchema::BOOL: {
-      if (node.node_type != TExprNodeType::BOOL_LITERAL) {
-        return Status(Substitute("Cannot create predicate over column of type BOOL with "
-            "value of type: $0", NodeTypeToString(node.node_type)));
-      }
-      *value = KuduValue::FromBool(node.bool_literal.value);
-      return Status::OK();
-    }
-    case kudu::client::KuduColumnSchema::STRING: {
-      if (node.node_type != TExprNodeType::STRING_LITERAL) {
-        return Status(Substitute("Cannot create predicate over column of type STRING"
-            " with value of type: $0", NodeTypeToString(node.node_type)));
-      }
-      *value = KuduValue::CopyString(node.string_literal.value);
-      return Status::OK();
-    }
-    case kudu::client::KuduColumnSchema::INT8:
-    case kudu::client::KuduColumnSchema::INT16:
-    case kudu::client::KuduColumnSchema::INT32:
-    case kudu::client::KuduColumnSchema::INT64: {
-      if (node.node_type != TExprNodeType::INT_LITERAL) {
-        return Status(Substitute("Cannot create predicate over column of type INT with "
-            "value of type: $0", NodeTypeToString(node.node_type)));
-      }
-      *value = KuduValue::FromInt(node.int_literal.value);
-      return Status::OK();
-    }
-    case kudu::client::KuduColumnSchema::FLOAT: {
-      if (node.node_type != TExprNodeType::FLOAT_LITERAL) {
-        return Status(Substitute("Cannot create predicate over column of type FLOAT with "
-            "value of type: $0", NodeTypeToString(node.node_type)));
-      }
-      *value = KuduValue::FromFloat(node.float_literal.value);
-      return Status::OK();
-    }
-    case kudu::client::KuduColumnSchema::DOUBLE: {
-      if (node.node_type != TExprNodeType::FLOAT_LITERAL) {
-        return Status(Substitute("Cannot create predicate over column of type DOUBLE with "
-            "value of type: $0", NodeTypeToString(node.node_type)));
-      }
-      *value = KuduValue::FromDouble(node.float_literal.value);
-      return Status::OK();
-    }
-    default:
-      // Should be unreachable.
-      LOG(DFATAL) << "Unsupported node type: " << node.node_type;
-  }
-  // Avoid compiler warning.
-  return Status("Unreachable");
-}
-
 void KuduScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -368,30 +216,22 @@ void KuduScanNode::DebugString(int indentation_level, stringstream* out) const {
   *out << indent << "KuduScanNode(tupleid=" << tuple_id_ << ")";
 }
 
-TKuduKeyRange* KuduScanNode::GetNextKeyRange() {
+const string* KuduScanNode::GetNextScanToken() {
   unique_lock<mutex> lock(lock_);
-  if (next_scan_range_idx_ >= key_ranges_.size()) return NULL;
-  TKuduKeyRange* range = &key_ranges_[next_scan_range_idx_++];
-  return range;
+  if (next_scan_token_idx_ >= scan_tokens_.size()) return NULL;
+  const string* token = &scan_tokens_[next_scan_token_idx_++];
+  return token;
 }
 
 Status KuduScanNode::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
   return Expr::CloneIfNotExists(conjunct_ctxs_, runtime_state_, ctxs);
 }
 
-void KuduScanNode::ClonePredicates(vector<KuduPredicate*>* predicates) {
-  unique_lock<mutex> l(lock_);
-  for (KuduPredicate* predicate: kudu_predicates_) {
-    predicates->push_back(predicate->Clone());
-  }
-}
-
-void KuduScanNode::ThreadTokenAvailableCb(
-    ThreadResourceMgr::ResourcePool* pool) {
+void KuduScanNode::ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
   while (true) {
     unique_lock<mutex> lock(lock_);
-    // All done or all ranges are assigned.
-    if (done_ || next_scan_range_idx_ >= key_ranges_.size()) break;
+    // All done or all tokens are assigned.
+    if (done_ || next_scan_token_idx_ >= scan_tokens_.size()) break;
 
     // Check if we can get a token.
     if (!pool->TryAcquireThreadToken()) break;
@@ -399,14 +239,14 @@ void KuduScanNode::ThreadTokenAvailableCb(
     ++num_active_scanners_;
     COUNTER_ADD(num_scanner_threads_started_counter_, 1);
 
-    // Reserve the first range so no other thread picks it up.
-    TKuduKeyRange* range = &key_ranges_[next_scan_range_idx_++];
+    // Reserve the first token so no other thread picks it up.
+    const string* token = &scan_tokens_[next_scan_token_idx_++];
     string name = Substitute("scanner-thread($0)",
         num_scanner_threads_started_counter_->value());
 
-    VLOG(1) << "Thread started: " << name;
+    VLOG_RPC << "Thread started: " << name;
     scanner_threads_.AddThread(new Thread("kudu-scan-node", name,
-        &KuduScanNode::ScannerThread, this, name, range));
+        &KuduScanNode::RunScannerThread, this, name, token));
 
     if (runtime_state_->query_resource_mgr() != NULL) {
       runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
@@ -414,12 +254,12 @@ void KuduScanNode::ThreadTokenAvailableCb(
   }
 }
 
-Status KuduScanNode::ProcessRange(KuduScanner* scanner, const TKuduKeyRange* key_range) {
-  RETURN_IF_ERROR(scanner->OpenNextRange(*key_range));
+Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_token) {
+  RETURN_IF_ERROR(scanner->OpenNextScanToken(scan_token));
   bool eos = false;
   while (!eos) {
     gscoped_ptr<RowBatch> row_batch(new RowBatch(
-          row_desc(), runtime_state_->batch_size(), mem_tracker()));
+        row_desc(), runtime_state_->batch_size(), mem_tracker()));
     RETURN_IF_ERROR(scanner->GetNext(row_batch.get(), &eos));
     while (!done_) {
       scanner->KeepKuduScannerAlive();
@@ -429,13 +269,12 @@ Status KuduScanNode::ProcessRange(KuduScanner* scanner, const TKuduKeyRange* key
       }
     }
   }
-  // Mark the current scan range as complete.
   if (eos) scan_ranges_complete_counter()->Add(1);
   return Status::OK();
 }
 
-void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* initial_range) {
-  DCHECK(initial_range != NULL);
+void KuduScanNode::RunScannerThread(const string& name, const string* initial_token) {
+  DCHECK(initial_token != NULL);
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   SCOPED_TIMER(runtime_state_->total_cpu_timer());
 
@@ -443,29 +282,29 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* initia
   // exceeded and is exiting early.
   bool optional_thread_exiting = false;
   KuduScanner scanner(this, runtime_state_);
-  Status status = scanner.Open();
 
+  const string* scan_token = initial_token;
+  Status status = scanner.Open();
   if (status.ok()) {
-    const TKuduKeyRange* key_range = initial_range;
-    while (!done_ && key_range != NULL) {
-      status = ProcessRange(&scanner, key_range);
+    while (!done_ && scan_token != NULL) {
+      status = ProcessScanToken(&scanner, *scan_token);
       if (!status.ok()) break;
 
       // Check if the number of optional threads has been exceeded.
       if (runtime_state_->resource_pool()->optional_exceeded()) {
         unique_lock<mutex> l(lock_);
         // Don't exit if this is the last thread. Otherwise, the scan will indicate it's
-        // done before all ranges have been processed.
+        // done before all scan tokens have been processed.
         if (num_active_scanners_ > 1) {
           --num_active_scanners_;
           optional_thread_exiting = true;
           break;
         }
       }
-      key_range = GetNextKeyRange();
+      scan_token = GetNextScanToken();
     }
-    scanner.Close();
   }
+  scanner.Close();
 
   {
     unique_lock<mutex> l(lock_);
@@ -485,8 +324,8 @@ void KuduScanNode::ScannerThread(const string& name, const TKuduKeyRange* initia
   }
 
   // lock_ is released before calling ThreadResourceMgr::ReleaseThreadToken() which
-  // invokes ThreadTokenAvailableCb() which attempts to take the same lock.
-  VLOG(1) << "Thread done: " << name;
+  // invokes ThreadAvailableCb() which attempts to take the same lock.
+  VLOG_RPC << "Thread done: " << name;
   runtime_state_->resource_pool()->ReleaseThreadToken(false);
 }
 

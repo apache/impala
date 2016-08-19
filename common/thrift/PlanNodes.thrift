@@ -173,19 +173,13 @@ struct THBaseKeyRange {
   2: optional string stopKey
 }
 
-// Key range to query a Kudu table
-struct TKuduKeyRange {
-  1: optional binary range_start_key
-  2: optional binary range_stop_key
-}
-
 // Specification of an individual data range which is held in its entirety
 // by a storage server
 struct TScanRange {
-  // one of these must be set for every TScanRange2
+  // one of these must be set for every TScanRange
   1: optional THdfsFileSplit hdfs_file_split
   2: optional THBaseKeyRange hbase_key_range
-  3: optional TKuduKeyRange kudu_key_range
+  3: optional binary kudu_scan_token
 }
 
 struct THdfsScanNode {
@@ -247,9 +241,6 @@ struct THBaseScanNode {
 
 struct TKuduScanNode {
   1: required Types.TTupleId tuple_id
-
-  // List of conjuncts that can be pushed down to Kudu.
-  2: optional list<Exprs.TExpr> kudu_conjuncts
 }
 
 struct TEqJoinCondition {

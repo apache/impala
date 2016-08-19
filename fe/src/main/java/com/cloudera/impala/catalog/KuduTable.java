@@ -28,8 +28,8 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.log4j.Logger;
-import org.kududb.client.KuduClient;
-import org.kududb.client.LocatedTablet;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.LocatedTablet;
 
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -248,7 +248,7 @@ public class KuduTable extends Table {
 
     try (KuduClient client = new KuduClient.KuduClientBuilder(
         getKuduMasterAddresses()).build()) {
-      org.kududb.client.KuduTable kuduTable = client.openTable(kuduTableName_);
+      org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName_);
       List<LocatedTablet> tablets =
           kuduTable.getTabletsLocations(KUDU_RPC_TIMEOUT_MS);
       for (LocatedTablet tab: tablets) {

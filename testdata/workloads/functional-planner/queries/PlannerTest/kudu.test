@@ -3,9 +3,9 @@ select * from functional_kudu.testtbl
 00:SCAN KUDU [functional_kudu.testtbl]
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
-  KUDU KEYRANGE [0, 0, 0, 2]:[]
-  KUDU KEYRANGE []:[0, 0, 0, 1]
+  ScanToken{table=testtbl, hash-partition-buckets: [0], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [1], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [2], range-partition: [<start>, <end>)}
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -17,14 +17,19 @@ select * from functional_kudu.testtbl where name = '10'
    kudu predicates: name = '10'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
-  KUDU KEYRANGE [0, 0, 0, 2]:[]
-  KUDU KEYRANGE []:[0, 0, 0, 1]
+  ScanToken{table=testtbl, hash-partition-buckets: [0], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [1], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [2], range-partition: [<start>, <end>)}
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: name = '10'
+====
+select * from functional_kudu.testtbl where name = NULL
+---- PLAN
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: name = NULL
 ====
 insert into functional_kudu.testtbl(id) values (10)
 ---- PLAN
@@ -91,17 +96,17 @@ where id >= 10 and zip <= 5 and 20 >= id and 'foo' = name and zip >= 0 and 30 >=
 and zip > 1 and zip < 50
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip >= 2, zip <= 49, name = 'foo'
+   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip > 1, zip < 50, name = 'foo'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
-  KUDU KEYRANGE [0, 0, 0, 2]:[]
-  KUDU KEYRANGE []:[0, 0, 0, 1]
+  ScanToken{table=testtbl, hash-partition-buckets: [0], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [1], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [2], range-partition: [<start>, <end>)}
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip >= 2, zip <= 49, name = 'foo'
+   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip > 1, zip < 50, name = 'foo'
 ====
 # Test constant folding.
 select * from functional_kudu.testtbl
@@ -109,18 +114,18 @@ where id < 10 + 30  and cast(sin(id) as boolean) = true and 20 * 3 >= id and 10 
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id <= 39, id <= 60, id <= 102
+   kudu predicates: id < 40, id <= 60, id < 103
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
-  KUDU KEYRANGE [0, 0, 0, 2]:[]
-  KUDU KEYRANGE []:[0, 0, 0, 1]
+  ScanToken{table=testtbl, hash-partition-buckets: [0], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [1], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [2], range-partition: [<start>, <end>)}
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id <= 39, id <= 60, id <= 102
+   kudu predicates: id < 40, id <= 60, id < 103
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
@@ -131,9 +136,9 @@ where cast(sin(id) as boolean) = true and name = 'a'
    kudu predicates: name = 'a'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
-  KUDU KEYRANGE [0, 0, 0, 2]:[]
-  KUDU KEYRANGE []:[0, 0, 0, 1]
+  ScanToken{table=testtbl, hash-partition-buckets: [0], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [1], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [2], range-partition: [<start>, <end>)}
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -150,9 +155,9 @@ where cast(sin(id) as boolean) = true and name is null
    predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
-  KUDU KEYRANGE [0, 0, 0, 1]:[0, 0, 0, 2]
-  KUDU KEYRANGE [0, 0, 0, 2]:[]
-  KUDU KEYRANGE []:[0, 0, 0, 1]
+  ScanToken{table=testtbl, hash-partition-buckets: [0], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [1], range-partition: [<start>, <end>)}
+  ScanToken{table=testtbl, hash-partition-buckets: [2], range-partition: [<start>, <end>)}
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -178,5 +183,5 @@ where t.c <= cast('1995-01-01 00:00:00' as timestamp) order by c
 |
 00:SCAN KUDU [tpch_kudu.orders]
    predicates: CAST(o_orderdate AS TIMESTAMP) <= CAST('1995-01-01 00:00:00' AS TIMESTAMP)
-   kudu predicates: o_orderkey <= 9
+   kudu predicates: o_orderkey < 10
 ====

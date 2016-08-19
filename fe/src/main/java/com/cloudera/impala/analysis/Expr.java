@@ -1190,8 +1190,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * For children of 'this' that are constant expressions capable of being expressed
-   * as LiteralExprs, evaluate them in the BE and substitute the child with the
+   * For children of 'this' that are constant expressions and the type of which has a
+   * LiteralExpr subclass, evaluate them in the BE and substitute the child with the
    * resulting LiteralExpr. Modifies 'this' in place and does not re-analyze it. Hence,
    * it is not safe to evaluate the modified expr in the BE as the resolved fn_ may be
    * incorrect given the new arguments.

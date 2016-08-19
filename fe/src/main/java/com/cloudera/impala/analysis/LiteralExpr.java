@@ -49,8 +49,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   }
 
   /**
-   * Returns an analyzed literal of 'type'. Returns null for types that cannot be
-   * expressed as literals, e.g. TIMESTAMP.
+   * Returns an analyzed literal of 'type'. Returns null for types that do not have a
+   * LiteralExpr subclass, e.g. TIMESTAMP.
    */
   public static LiteralExpr create(String value, Type type) throws AnalysisException {
     Preconditions.checkArgument(type.isValid());
@@ -151,7 +151,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
-   * Returns null for types that cannot be expressed as literals, e.g. TIMESTAMP.
+   * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP.
    * TODO: Support non-scalar types.
    */
   public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)

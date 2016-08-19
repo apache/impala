@@ -21,15 +21,9 @@
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 
-#include <boost/unordered_map.hpp>
-
 namespace impala {
 
-class TExpr;
-class KuduTableDescriptor;
 class Status;
-class TupleDescriptor;
-struct ColumnType;
 
 /// Returns false when running on an operating system that Kudu doesn't support. If this
 /// check fails, there is no way Kudu should be expected to work. Exposed for testing.
@@ -43,25 +37,8 @@ Status CheckKuduAvailability();
 /// Convenience function for the bool equivalent of CheckKuduAvailability().
 bool KuduIsAvailable();
 
-Status ImpalaToKuduType(const ColumnType& impala_type,
-    kudu::client::KuduColumnSchema::DataType* kudu_type);
-
-Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_type,
-    ColumnType* impala_type);
-
-typedef boost::unordered_map<std::string, int> IdxByLowerCaseColName;
-
-/// Returns a map of lower case column names to column indexes in 'map'.
-/// Returns an error Status if 'schema' had more than one column with the same lower
-/// case name.
-Status MapLowercaseKuduColumnNamesToIndexes(const kudu::client::KuduSchema& schema,
-    IdxByLowerCaseColName* map);
-
-/// Gets the projected columns from the TupleDescriptor.
-/// Translates Impala's lower case column names to the version used by Kudu.
-/// 'projected_columns' is expected to be not NULL and will be cleared.
-Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-    std::vector<std::string>* projected_columns, const kudu::client::KuduSchema& schema);
+/// Returns a debug string for the KuduSchema.
+std::string KuduSchemaDebugString(const kudu::client::KuduSchema& schema);
 
 /// Initializes Kudu's logging by binding a callback that logs back to Impala's glog. This
 /// also sets Kudu's verbose logging to whatever level is set in Impala.

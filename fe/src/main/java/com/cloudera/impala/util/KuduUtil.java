@@ -37,11 +37,11 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.kududb.ColumnSchema;
-import org.kududb.Schema;
-import org.kududb.Type;
-import org.kududb.client.KuduTable;
-import org.kududb.client.PartialRow;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.Type;
+import org.apache.kudu.client.KuduTable;
+import org.apache.kudu.client.PartialRow;
 
 import static com.cloudera.impala.catalog.Type.parseColumnType;
 import static java.lang.String.format;

@@ -172,10 +172,10 @@ limit 10
 |  hash predicates: l_orderkey = o_orderkey
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
-|     predicates: o_orderdate < '1995-03-15'
+|     kudu predicates: o_orderdate < '1995-03-15'
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
-   predicates: l_shipdate > '1995-03-15'
+   kudu predicates: l_shipdate > '1995-03-15'
 ====
 # Q4 - Order Priority Checking Query
 select
@@ -211,8 +211,7 @@ order by
 |  hash predicates: l_orderkey = o_orderkey
 |
 |--00:SCAN KUDU [tpch_kudu.orders]
-|     predicates: o_orderdate < '1993-10-01'
-|     kudu predicates: o_orderdate >= '1993-07-01'
+|     kudu predicates: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
 |
 01:SCAN KUDU [tpch_kudu.lineitem]
    predicates: l_commitdate < l_receiptdate
@@ -275,8 +274,7 @@ order by
 |  hash predicates: l_orderkey = o_orderkey
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
-|     predicates: o_orderdate < '1995-01-01'
-|     kudu predicates: o_orderdate >= '1994-01-01'
+|     kudu predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
 ====
@@ -295,8 +293,7 @@ where
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
-   predicates: l_quantity < 24, l_shipdate < '1995-01-01'
-   kudu predicates: l_discount >= 0.05, l_discount <= 0.07, l_shipdate >= '1994-01-01'
+   kudu predicates: l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ====
 # Q7 - Volume Shipping Query
 select
@@ -582,8 +579,7 @@ limit 20
 |  |  hash predicates: l_orderkey = o_orderkey
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.orders]
-|  |     predicates: o_orderdate < '1994-01-01'
-|  |     kudu predicates: o_orderdate >= '1993-10-01'
+|  |     kudu predicates: o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
 |  |
 |  02:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_returnflag = 'R'
@@ -705,8 +701,8 @@ order by
 |  hash predicates: o_orderkey = l_orderkey
 |
 |--01:SCAN KUDU [tpch_kudu.lineitem]
-|     predicates: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate < '1995-01-01'
-|     kudu predicates: l_receiptdate >= '1994-01-01'
+|     predicates: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate
+|     kudu predicates: l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
 |
 00:SCAN KUDU [tpch_kudu.orders]
 ====
@@ -775,8 +771,7 @@ where
 |--01:SCAN KUDU [tpch_kudu.part]
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
-   predicates: l_shipdate < '1995-10-01'
-   kudu predicates: l_shipdate >= '1995-09-01'
+   kudu predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
 ====
 # Q15 - Top Supplier Query
 with revenue_view as (
@@ -824,8 +819,7 @@ order by
 |  |  group by: l_suppkey
 |  |
 |  03:SCAN KUDU [tpch_kudu.lineitem]
-|     predicates: l_shipdate < '1996-04-01'
-|     kudu predicates: l_shipdate >= '1996-01-01'
+|     kudu predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: s_suppkey = l_suppkey
@@ -835,8 +829,7 @@ order by
 |  |  group by: l_suppkey
 |  |
 |  01:SCAN KUDU [tpch_kudu.lineitem]
-|     predicates: l_shipdate < '1996-04-01'
-|     kudu predicates: l_shipdate >= '1996-01-01'
+|     kudu predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
 |
 00:SCAN KUDU [tpch_kudu.supplier]
 ====
@@ -1118,8 +1111,7 @@ order by
 |  group by: l_partkey, l_suppkey
 |
 04:SCAN KUDU [tpch_kudu.lineitem]
-   predicates: l_shipdate < '1995-01-01'
-   kudu predicates: l_shipdate >= '1994-01-01'
+   kudu predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
 ====
 # Q21 - Suppliers Who Kept Orders Waiting Query
 select
@@ -1256,7 +1248,8 @@ order by
 |  |  |  output: avg(c_acctbal)
 |  |  |
 |  |  01:SCAN KUDU [tpch_kudu.customer]
-|  |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|  |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|  |     kudu predicates: c_acctbal > 0.00
 |  |
 |  00:SCAN KUDU [tpch_kudu.customer]
 |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')

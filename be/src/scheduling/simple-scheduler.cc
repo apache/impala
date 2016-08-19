@@ -970,7 +970,7 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   int64_t scan_range_length = 0;
   if (scan_range_locations.scan_range.__isset.hdfs_file_split) {
     scan_range_length = scan_range_locations.scan_range.hdfs_file_split.length;
-  } else if (scan_range_locations.scan_range.__isset.kudu_key_range) {
+  } else if (scan_range_locations.scan_range.__isset.kudu_scan_token) {
     // Hack so that kudu ranges are well distributed.
     // TODO: KUDU-1133 Use the tablet size instead.
     scan_range_length = 1000;

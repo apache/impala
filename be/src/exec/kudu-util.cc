@@ -17,19 +17,16 @@
 
 #include "exec/kudu-util.h"
 
-#include <algorithm>
+#include <string>
+#include <sstream>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/unordered_set.hpp>
 #include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
 
-#include "runtime/descriptors.h"
-#include "gutil/strings/substitute.h"
-
+#include "common/logging.h"
 #include "common/names.h"
+#include "common/status.h"
 
-using boost::algorithm::to_lower_copy;
 using kudu::client::KuduSchema;
 using kudu::client::KuduColumnSchema;
 
@@ -57,122 +54,13 @@ Status CheckKuduAvailability() {
   return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
 }
 
-Status ImpalaToKuduType(const ColumnType& impala_type,
-    kudu::client::KuduColumnSchema::DataType* kudu_type) {
-  using kudu::client::KuduColumnSchema;
-
-  switch (impala_type.type) {
-    case TYPE_VARCHAR:
-    case TYPE_STRING:
-      *kudu_type = KuduColumnSchema::STRING;
-      break;
-    case TYPE_TINYINT:
-      *kudu_type = KuduColumnSchema::INT8;
-      break;
-    case TYPE_SMALLINT:
-      *kudu_type = KuduColumnSchema::INT16;
-      break;
-    case TYPE_INT:
-      *kudu_type = KuduColumnSchema::INT32;
-      break;
-    case TYPE_BIGINT:
-      *kudu_type = KuduColumnSchema::INT64;
-      break;
-    case TYPE_FLOAT:
-      *kudu_type = KuduColumnSchema::FLOAT;
-      break;
-    case TYPE_DOUBLE:
-      *kudu_type = KuduColumnSchema::DOUBLE;
-      break;
-    case TYPE_BOOLEAN:
-      *kudu_type = KuduColumnSchema::BOOL;
-      break;
-    default:
-      return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(impala_type.type));
+string KuduSchemaDebugString(const KuduSchema& schema) {
+  stringstream ss;
+  for (int i = 0; i < schema.num_columns(); ++i) {
+    const KuduColumnSchema& col = schema.Column(i);
+    ss << col.name() << " " << KuduColumnSchema::DataTypeToString(col.type()) << "\n";
   }
-  return Status::OK();
-}
-
-Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_type,
-    ColumnType* impala_type) {
-  using kudu::client::KuduColumnSchema;
-
-  switch (kudu_type) {
-    case KuduColumnSchema::STRING:
-      *impala_type = TYPE_STRING;
-      break;
-    case KuduColumnSchema::INT8:
-      *impala_type = TYPE_TINYINT;
-      break;
-    case KuduColumnSchema::INT16:
-      *impala_type = TYPE_SMALLINT;
-      break;
-    case KuduColumnSchema::INT32:
-      *impala_type = TYPE_INT;
-      break;
-    case KuduColumnSchema::INT64:
-      *impala_type = TYPE_BIGINT;
-      break;
-    case KuduColumnSchema::FLOAT:
-      *impala_type = TYPE_FLOAT;
-      break;
-    case KuduColumnSchema::DOUBLE:
-      *impala_type = TYPE_DOUBLE;
-      break;
-    default:
-      return Status(TErrorCode::KUDU_IMPALA_TYPE_MISSING,
-                    KuduColumnSchema::DataTypeToString(kudu_type));
-  }
-  return Status::OK();
-}
-
-/// Returns a map of lower case column names to column indexes in 'map'.
-/// Returns an error Status if 'schema' had more than one column with the same lower
-/// case name.
-Status MapLowercaseKuduColumnNamesToIndexes(const kudu::client::KuduSchema& schema,
-    IdxByLowerCaseColName* map) {
-  DCHECK(map != NULL);
-  for(size_t i = 0; i < schema.num_columns(); ++i) {
-    string lower_case_col_name = to_lower_copy(schema.Column(i).name());
-    if (map->find(lower_case_col_name) != map->end()) {
-      return Status(strings::Substitute("There was already a column with name: '$0' "
-          "in the schema", lower_case_col_name));
-    }
-    (*map)[lower_case_col_name] = i;
-  }
-  return Status::OK();
-}
-
-Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-    vector<string>* projected_columns, const KuduSchema& schema) {
-  DCHECK(projected_columns != NULL);
-  projected_columns->clear();
-
-  IdxByLowerCaseColName idx_by_lc_name;
-  RETURN_IF_ERROR(MapLowercaseKuduColumnNamesToIndexes(schema, &idx_by_lc_name));
-
-  // In debug mode try a dynamic cast. If it fails it means that the
-  // TableDescriptor is not an instance of KuduTableDescriptor.
-  DCHECK(dynamic_cast<const KuduTableDescriptor*>(tuple_desc.table_desc()) != NULL)
-      << "TableDescriptor must be an instance KuduTableDescriptor.";
-
-  const KuduTableDescriptor* table_desc =
-      static_cast<const KuduTableDescriptor*>(tuple_desc.table_desc());
-  LOG(INFO) << "Table desc for schema: " << table_desc->DebugString();
-
-  const std::vector<SlotDescriptor*>& slots = tuple_desc.slots();
-  for (int i = 0; i < slots.size(); ++i) {
-    int col_idx = slots[i]->col_pos();
-    string impala_col_name = to_lower_copy(table_desc->col_descs()[col_idx].name());
-    IdxByLowerCaseColName::const_iterator iter = idx_by_lc_name.find(impala_col_name);
-    if (iter == idx_by_lc_name.end()) {
-      return Status(strings::Substitute("Could not find column: $0 in the Kudu schema.",
-         impala_col_name));
-    }
-    projected_columns->push_back(schema.Column((*iter).second).name());
-  }
-
-  return Status::OK();
+  return ss.str();
 }
 
 void LogKuduMessage(void* unused, kudu::client::KuduLogSeverity severity,

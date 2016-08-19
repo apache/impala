@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanToken;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
@@ -58,7 +60,6 @@ import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsPartitionLocation;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.THdfsTable;
-import com.cloudera.impala.thrift.TKuduKeyRange;
 import com.cloudera.impala.thrift.TLineageGraph;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanFragment;
@@ -82,6 +83,7 @@ public class PlannerTestBase extends FrontendTestBase {
   private final static boolean GENERATE_OUTPUT_FILE = true;
   private final String testDir_ = "functional-planner/queries/PlannerTest";
   private final String outDir_ = "/tmp/PlannerTest/";
+  private static KuduClient kuduClient_;
 
   // Map from plan ID (TPlanNodeId) to the plan node with that ID.
   private final Map<Integer, TPlanNode> planMap_ = Maps.newHashMap();
@@ -102,11 +104,20 @@ public class PlannerTestBase extends FrontendTestBase {
     updateReq.setHostnames(Sets.newHashSet("localhost"));
     updateReq.setNum_nodes(3);
     MembershipSnapshot.update(updateReq);
+
+    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
+      kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();
+    }
   }
 
   @AfterClass
-  public static void cleanUp() {
+  public static void cleanUp() throws Exception {
     RuntimeEnv.INSTANCE.reset();
+
+    if (kuduClient_ != null) {
+      kuduClient_.close();
+      kuduClient_ = null;
+    }
   }
 
   /**
@@ -274,20 +285,16 @@ public class PlannerTestBase extends FrontendTestBase {
           }
         }
 
-        if (locations.scan_range.isSetKudu_key_range()) {
-          TKuduKeyRange kr = locations.scan_range.getKudu_key_range();
-          Integer hostIdx = locations.locations.get(0).host_idx;
-          TNetworkAddress networkAddress = execRequest.getHost_list().get(hostIdx);
-          result.append("KUDU KEYRANGE ");
-          // TODO Enable the lines below once we have better testing for
-          //      non-local key-ranges
-          //result.append("host=" + networkAddress.hostname + ":" +
-          //    networkAddress.port + " ");
-          result.append(Arrays.toString(kr.getRange_start_key()));
-          result.append(":");
-          result.append(Arrays.toString(kr.getRange_stop_key()));
+        if (locations.scan_range.isSetKudu_scan_token()) {
+          Preconditions.checkNotNull(kuduClient_,
+              "Test should not be invoked on platforms that do not support Kudu.");
+          try {
+            result.append(KuduScanToken.stringifySerializedToken(
+                locations.scan_range.kudu_scan_token.array(), kuduClient_));
+          } catch (IOException e) {
+            throw new IllegalStateException("Unable to parse Kudu scan token", e);
+          }
         }
-
         result.append("\n");
       }
     }
