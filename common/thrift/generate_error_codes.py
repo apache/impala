@@ -283,7 +283,9 @@ error_codes = (
    "supported length of 2147483647 bytes."),
 
   ("SCRATCH_LIMIT_EXCEEDED", 91, "Scratch space limit of $0 bytes exceeded for query "
-   "while spilling data to disk.")
+   "while spilling data to disk."),
+
+  ("BUFFER_ALLOCATION_FAILED", 92, "Unexpected error allocating $0 byte buffer."),
 )
 
 import sys

@@ -18,10 +18,12 @@
 #ifndef IMPALA_BUFFER_POOL_H
 #define IMPALA_BUFFER_POOL_H
 
+#include <stdint.h>
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 #include <string>
-#include <stdint.h>
 
+#include "bufferpool/buffer-allocator.h"
 #include "common/atomic.h"
 #include "common/status.h"
 #include "gutil/macros.h"
@@ -30,6 +32,7 @@
 
 namespace impala {
 
+class BufferAllocator;
 class ReservationTracker;
 
 /// A buffer pool that manages memory buffers for all queries in an Impala daemon.
@@ -69,7 +72,7 @@ class ReservationTracker;
 /// Buffer/Page Sizes
 /// =================
 /// The buffer pool has a minimum buffer size, which must be a power-of-two. Page and
-/// buffer sizes must be an exact multiple of the minimum buffer size.
+/// buffer sizes must be an exact power-of-two multiple of the minimum buffer size.
 ///
 /// Reservations
 /// ============
@@ -140,11 +143,18 @@ class ReservationTracker;
 /// +========================+
 /// | IMPLEMENTATION DETAILS |
 /// +========================+
-/// ... TODO ...
+///
+/// Lock Ordering
+/// =============
+/// The lock ordering is:
+/// * pages_::lock_ -> Page::lock_
+///
+/// If a reference to a page is acquired via the pages_ list, pages_::lock_ must be held
+/// until done with the page to ensure the page isn't concurrently deleted.
 class BufferPool {
  public:
-  class Client;
   class BufferHandle;
+  class Client;
   class PageHandle;
 
   /// Constructs a new buffer pool.
@@ -198,9 +208,10 @@ class BufferPool {
 
   /// Extracts buffer from a pinned page. After this returns, the page referenced by
   /// 'page_handle' will be destroyed and 'buffer_handle' will reference the buffer from
-  /// 'page_handle'. This may decrease reservation usage if the page was pinned multiple
-  /// times via 'page_handle'.
-  void ExtractBuffer(PageHandle* page_handle, BufferHandle* buffer_handle);
+  /// 'page_handle'. This may decrease reservation usage of 'client' if the page was
+  /// pinned multiple times via 'page_handle'.
+  void ExtractBuffer(
+      Client* client, PageHandle* page_handle, BufferHandle* buffer_handle);
 
   /// Allocates a new buffer of 'len' bytes. Uses reservation from 'client'. The caller
   /// is responsible for ensuring it has enough unused reservation before calling
@@ -214,9 +225,9 @@ class BufferPool {
 
   /// Transfer ownership of buffer from 'src_client' to 'dst_client' and move the
   /// handle from 'src' to 'dst'. Increases reservation usage in 'dst_client' and
-  /// decreases reservation usage in 'src_client'. 'src' must be open and 'dst' must
-  /// be closed
-  /// before calling. After a successful call, 'src' is closed and 'dst' is open.
+  /// decreases reservation usage in 'src_client'. 'src' must be open and 'dst' must be
+  /// closed before calling. 'src'/'dst' and 'src_client'/'dst_client' must be different.
+  /// After a successful call, 'src' is closed and 'dst' is open.
   Status TransferBuffer(Client* src_client, BufferHandle* src, Client* dst_client,
       BufferHandle* dst);
 
@@ -228,13 +239,49 @@ class BufferPool {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferPool);
+  struct Page;
 
-  /// The minimum length of a buffer in bytes. All buffers and pages are a multiple of
-  /// this length. This is always a power of two.
+  /// Same as Unpin(), except the lock for the page referenced by 'handle' must be held
+  /// by the caller.
+  void UnpinLocked(Client* client, PageHandle* handle);
+
+  /// Perform the cleanup of the page object and handle when the page is destroyed.
+  /// Reset 'handle', free the Page object and remove the 'pages_' entry.
+  /// The 'handle->page_' lock should *not* be held by the caller.
+  void CleanUpPage(PageHandle* handle);
+
+  /// Allocate a buffer of length 'len'. Assumes that the client's reservation has already
+  /// been consumed for the buffer. Returns an error if the pool is unable to fulfill the
+  /// reservation.
+  Status AllocateBufferInternal(Client* client, int64_t len, BufferHandle* buffer);
+
+  /// Frees 'buffer', which must be open before calling. Closes 'buffer' and updates
+  /// internal state but does not release to any reservation.
+  void FreeBufferInternal(BufferHandle* buffer);
+
+  /// Check if we can allocate another buffer of size 'len' bytes without
+  /// 'buffer_bytes_remaining_' going negative.
+  /// Returns true and decrease 'buffer_bytes_remaining_' by 'len' if successful.
+  bool TryDecreaseBufferBytesRemaining(int64_t len);
+
+  /// Allocator for allocating and freeing all buffer memory.
+  boost::scoped_ptr<BufferAllocator> allocator_;
+
+  /// The minimum length of a buffer in bytes. All buffers and pages are a power-of-two
+  /// multiple of this length. This is always a power of two.
   const int64_t min_buffer_len_;
 
   /// The maximum physical memory in bytes that can be used for buffers.
   const int64_t buffer_bytes_limit_;
+
+  /// The remaining number of bytes of 'buffer_bytes_limit_' that can be used for
+  /// allocating new buffers. Must be updated atomically before a new buffer is
+  /// allocated or after an existing buffer is freed.
+  AtomicInt64 buffer_bytes_remaining_;
+
+  /// List containing all pages. Protected by the list's internal lock.
+  typedef InternalQueue<Page> PageList;
+  PageList pages_;
 };
 
 /// External representation of a client of the BufferPool. Clients are used for
@@ -266,6 +313,54 @@ class BufferPool::Client {
   ReservationTracker* reservation_;
 };
 
+/// A handle to a buffer allocated from the buffer pool. Each BufferHandle should only
+/// be used by a single thread at a time: concurrently calling BufferHandle methods or
+/// BufferPool methods with the BufferHandle as an argument is not supported.
+class BufferPool::BufferHandle {
+ public:
+  BufferHandle();
+  ~BufferHandle() { DCHECK(!is_open()); }
+
+  /// Allow move construction of handles, to support std::move().
+  BufferHandle(BufferHandle&& src);
+
+  /// Allow move assignment of handles, to support STL classes like std::vector.
+  /// Destination must be uninitialized.
+  BufferHandle& operator=(BufferHandle&& src);
+
+  bool is_open() const { return data_ != NULL; }
+  int64_t len() const {
+    DCHECK(is_open());
+    return len_;
+  }
+  /// Get a pointer to the start of the buffer.
+  uint8_t* data() const {
+    DCHECK(is_open());
+    return data_;
+  }
+
+  std::string DebugString() const;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(BufferHandle);
+  friend class BufferPool;
+
+  /// Internal helper to set the handle to an opened state.
+  void Open(const Client* client, uint8_t* data, int64_t len);
+
+  /// Internal helper to reset the handle to an unopened state.
+  void Reset();
+
+  /// The client the buffer handle belongs to, used to validate that the correct client
+  /// is provided in BufferPool method calls.
+  const Client* client_;
+
+  /// Pointer to the start of the buffer. Non-NULL if open, NULL if closed.
+  uint8_t* data_;
+
+  /// Length of the buffer in bytes.
+  int64_t len_;
+};
 
 /// The handle for a page used by clients of the BufferPool. Each PageHandle should
 /// only be used by a single thread at a time: concurrently calling PageHandle methods
@@ -282,12 +377,13 @@ class BufferPool::PageHandle {
   // Destination must be closed.
   PageHandle& operator=(PageHandle&& src);
 
-  bool is_open() const;
-  bool is_pinned() const;
+  bool is_open() const { return page_ != NULL; }
+  bool is_pinned() const { return pin_count() > 0; }
+  int pin_count() const;
   int64_t len() const;
   /// Get a pointer to the start of the page's buffer. Only valid to call if the page
   /// is pinned via this handle.
-  uint8_t* data() const;
+  uint8_t* data() const { return buffer_handle()->data(); }
 
   /// Return a pointer to the page's buffer handle. Only valid to call if the page is
   /// pinned via this handle. Only const accessors of the returned handle can be used:
@@ -299,32 +395,21 @@ class BufferPool::PageHandle {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PageHandle);
-};
+  friend class BufferPool;
+  friend class Page;
 
-/// A handle to a buffer allocated from the buffer pool. Each BufferHandle should only
-/// be used by a single thread at a time: concurrently calling BufferHandle methods or
-/// BufferPool methods with the BufferHandle as an argument is not supported.
-class BufferPool::BufferHandle {
- public:
-  BufferHandle();
-  ~BufferHandle() { DCHECK(!is_open()); }
+  /// Internal helper to open the handle for the given page.
+  void Open(Page* page, Client* client);
 
-  /// Allow move construction of handles, to support std::move().
-  BufferHandle(BufferHandle&& src);
+  /// Internal helper to reset the handle to an unopened state.
+  void Reset();
 
-  /// Allow move assignment of handles, to support STL classes like std::vector.
-  /// Destination must be uninitialized.
-  BufferHandle& operator=(BufferHandle&& src);
+  /// The internal page structure. NULL if the handle is not open.
+  Page* page_;
 
-  bool is_open() const;
-  int64_t len() const;
-  /// Get a pointer to the start of the buffer.
-  uint8_t* data() const;
-
-  std::string DebugString() const;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(BufferHandle);
+  /// The client the page handle belongs to, used to validate that the correct client
+  /// is being used.
+  const Client* client_;
 };
 
 }

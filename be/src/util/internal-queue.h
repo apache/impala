@@ -19,6 +19,7 @@
 #ifndef IMPALA_UTIL_INTERNAL_QUEUE_H
 #define IMPALA_UTIL_INTERNAL_QUEUE_H
 
+#include <boost/function.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "util/spinlock.h"
@@ -229,6 +230,16 @@ class InternalQueue {
     }
     if (num_elements_found != size()) return false;
     return true;
+  }
+
+  // Iterate over elements of queue, calling 'fn' for each element. If 'fn' returns
+  // false, terminate iteration. It is invalid to call other InternalQueue methods
+  // from 'fn'.
+  void Iterate(boost::function<bool(T*)> fn) {
+    boost::lock_guard<SpinLock> lock(lock_);
+    for (Node* current = head_; current != NULL; current = current->next) {
+      if (!fn(reinterpret_cast<T*>(current))) return;
+    }
   }
 
   /// Prints the queue ptrs to a string.

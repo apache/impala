@@ -22,6 +22,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/bufferpool")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/bufferpool")
 
 add_library(BufferPool
+  buffer-allocator.cc
   buffer-pool.cc
   reservation-tracker.cc
 )
