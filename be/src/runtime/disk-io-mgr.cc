@@ -1219,7 +1219,6 @@ int DiskIoMgr::free_buffers_idx(int64_t buffer_size) {
 }
 
 Status DiskIoMgr::AddWriteRange(DiskIoRequestContext* writer, WriteRange* write_range) {
-  DCHECK_LE(write_range->len(), max_buffer_size_);
   unique_lock<mutex> writer_lock(writer->lock_);
 
   if (writer->state_ == DiskIoRequestContext::Cancelled) {

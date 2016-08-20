@@ -34,7 +34,7 @@ constexpr int64_t Suballocator::MIN_ALLOCATION_BYTES;
 const int Suballocator::NUM_FREE_LISTS;
 
 Suballocator::Suballocator(
-    BufferPool* pool, BufferPool::Client* client, int64_t min_buffer_len)
+    BufferPool* pool, BufferPool::ClientHandle* client, int64_t min_buffer_len)
   : pool_(pool), client_(client), min_buffer_len_(min_buffer_len), allocated_(0) {}
 
 Suballocator::~Suballocator() {

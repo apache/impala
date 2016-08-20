@@ -556,13 +556,16 @@ void TmpFileMgr::WriteHandle::WriteComplete(const Status& write_status) {
     lock_guard<mutex> lock(write_state_lock_);
     DCHECK(write_in_flight_);
     write_in_flight_ = false;
-    // Need to extract 'cb_' because once 'write_in_flight_' is false, the WriteHandle
-    // may be destroyed.
+    // Need to extract 'cb_' because once 'write_in_flight_' is false and we release
+    // 'write_state_lock_', 'this' may be destroyed.
     cb = move(cb_);
+
+    // Notify before releasing the lock - after the lock is released 'this' may be
+    // destroyed.
+    write_complete_cv_.NotifyAll();
   }
-  write_complete_cv_.NotifyAll();
-  // Call 'cb' once we've updated the state. We must do this last because once 'cb' is
-  // called, it is valid to call Read() on the handle.
+  // Call 'cb' last - once 'cb' is called client code may call Read() or destroy this
+  // handle.
   cb(write_status);
 }
 

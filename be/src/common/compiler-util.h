@@ -43,4 +43,10 @@
 /// decision, e.g. not inlining a small function on a hot path.
 #define ALWAYS_INLINE __attribute__((always_inline))
 
+namespace impala {
+
+/// The size of an L1 cache line in bytes on x86-64.
+constexpr int CACHE_LINE_SIZE = 64;
+
+}
 #endif

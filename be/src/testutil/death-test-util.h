@@ -28,7 +28,7 @@
 #define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)    \
   do {                                        \
     ScopedCoredumpDisabler disable_coredumps; \
-    ASSERT_DEBUG_DEATH(fn, msg);              \
+    ASSERT_DEBUG_DEATH((void)fn, msg);              \
   } while (false);
 #else
 // Gtest's ASSERT_DEBUG_DEATH macro has peculiar semantics where in debug builds it

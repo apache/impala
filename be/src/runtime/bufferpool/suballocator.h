@@ -67,7 +67,8 @@ class Suballocator {
   /// Constructs a suballocator that allocates memory from 'pool' with 'client'.
   /// Suballocations smaller than 'min_buffer_len' are handled by allocating a
   /// buffer of 'min_buffer_len' and recursively splitting it.
-  Suballocator(BufferPool* pool, BufferPool::Client* client, int64_t min_buffer_len);
+  Suballocator(
+      BufferPool* pool, BufferPool::ClientHandle* client, int64_t min_buffer_len);
 
   ~Suballocator();
 
@@ -134,7 +135,7 @@ class Suballocator {
 
   /// The pool and corresponding client to allocate buffers from.
   BufferPool* pool_;
-  BufferPool::Client* client_;
+  BufferPool::ClientHandle* client_;
 
   /// The minimum length of buffer to allocate. To serve allocations below this threshold,
   /// a larger buffer is allocated and split into multiple allocations.

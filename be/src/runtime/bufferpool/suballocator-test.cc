@@ -47,7 +47,7 @@ class SuballocatorTest : public ::testing::Test {
   }
 
   virtual void TearDown() override {
-    for (unique_ptr<BufferPool::Client>& client : clients_) {
+    for (unique_ptr<BufferPool::ClientHandle>& client : clients_) {
       buffer_pool_->DeregisterClient(client.get());
     }
     clients_.clear();
@@ -84,11 +84,12 @@ class SuballocatorTest : public ::testing::Test {
 
   /// Register a client with 'buffer_pool_'. The client is automatically deregistered
   /// and freed at the end of the test.
-  void RegisterClient(ReservationTracker* reservation, BufferPool::Client** client) {
-    clients_.push_back(make_unique<BufferPool::Client>());
+  void RegisterClient(
+      ReservationTracker* reservation, BufferPool::ClientHandle** client) {
+    clients_.push_back(make_unique<BufferPool::ClientHandle>());
     *client = clients_.back().get();
-    ASSERT_OK(
-        buffer_pool_->RegisterClient("test client", reservation, profile(), *client));
+    ASSERT_OK(buffer_pool_->RegisterClient(
+        "test client", reservation, NULL, profile(), *client));
   }
 
   /// Assert that the memory for all of the suballocations is writable and disjoint by
@@ -121,7 +122,7 @@ class SuballocatorTest : public ::testing::Test {
   scoped_ptr<BufferPool> buffer_pool_;
 
   /// Clients for the buffer pool. Deregistered and freed after every test.
-  vector<unique_ptr<BufferPool::Client>> clients_;
+  vector<unique_ptr<BufferPool::ClientHandle>> clients_;
 
   /// Global profile - recreated for every test.
   scoped_ptr<RuntimeProfile> profile_;
@@ -137,7 +138,7 @@ const int64_t SuballocatorTest::TEST_BUFFER_LEN;
 TEST_F(SuballocatorTest, SameSizeAllocations) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 100;
   InitPool(TEST_BUFFER_LEN, TOTAL_MEM);
-  BufferPool::Client* client;
+  BufferPool::ClientHandle* client;
   RegisterClient(&global_reservation_, &client);
   Suballocator allocator(buffer_pool(), client, TEST_BUFFER_LEN);
   vector<unique_ptr<Suballocation>> allocs;
@@ -174,7 +175,7 @@ TEST_F(SuballocatorTest, SameSizeAllocations) {
 TEST_F(SuballocatorTest, ZeroLengthAllocation) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 100;
   InitPool(TEST_BUFFER_LEN, TOTAL_MEM);
-  BufferPool::Client* client;
+  BufferPool::ClientHandle* client;
   RegisterClient(&global_reservation_, &client);
   Suballocator allocator(buffer_pool(), client, TEST_BUFFER_LEN);
   unique_ptr<Suballocation> alloc;
@@ -191,7 +192,7 @@ TEST_F(SuballocatorTest, ZeroLengthAllocation) {
 TEST_F(SuballocatorTest, OutOfRangeAllocations) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 100;
   InitPool(TEST_BUFFER_LEN, TOTAL_MEM);
-  BufferPool::Client* client;
+  BufferPool::ClientHandle* client;
   RegisterClient(&global_reservation_, &client);
   Suballocator allocator(buffer_pool(), client, TEST_BUFFER_LEN);
   unique_ptr<Suballocation> alloc;
@@ -210,7 +211,7 @@ TEST_F(SuballocatorTest, OutOfRangeAllocations) {
 TEST_F(SuballocatorTest, NonPowerOfTwoAllocations) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 128;
   InitPool(TEST_BUFFER_LEN, TOTAL_MEM);
-  BufferPool::Client* client;
+  BufferPool::ClientHandle* client;
   RegisterClient(&global_reservation_, &client);
   Suballocator allocator(buffer_pool(), client, TEST_BUFFER_LEN);
 
@@ -249,7 +250,7 @@ TEST_F(SuballocatorTest, NonPowerOfTwoAllocations) {
 TEST_F(SuballocatorTest, DoublingAllocations) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 100;
   InitPool(TEST_BUFFER_LEN, TOTAL_MEM);
-  BufferPool::Client* client;
+  BufferPool::ClientHandle* client;
   RegisterClient(&global_reservation_, &client);
   Suballocator allocator(buffer_pool(), client, TEST_BUFFER_LEN);
 
@@ -306,7 +307,7 @@ TEST_F(SuballocatorTest, DoublingAllocations) {
 TEST_F(SuballocatorTest, RandomAllocations) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 1000;
   InitPool(TEST_BUFFER_LEN, TOTAL_MEM);
-  BufferPool::Client* client;
+  BufferPool::ClientHandle* client;
   RegisterClient(&global_reservation_, &client);
   Suballocator allocator(buffer_pool(), client, TEST_BUFFER_LEN);
 

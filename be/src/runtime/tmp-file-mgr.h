@@ -145,6 +145,8 @@ class TmpFileMgr {
 
     const TUniqueId& unique_id() const { return unique_id_; }
 
+    TmpFileMgr* tmp_file_mgr() const { return tmp_file_mgr_; }
+
    private:
     friend class File;
     friend class TmpFileMgrTest;

@@ -22,55 +22,64 @@
 #include <boost/function.hpp>
 #include <boost/thread/locks.hpp>
 
+#include "util/fake-lock.h"
 #include "util/spinlock.h"
 
 namespace impala {
 
-/// Thread safe fifo-queue. This is an internal queue, meaning the links to nodes
-/// are maintained in the object itself. This is in contrast to the stl list which
-/// allocates a wrapper Node object around the data. Since it's an internal queue,
-/// the list pointers are maintained in the Nodes which is memory owned by the user.
-/// The nodes cannot be deallocated while the queue has elements.
-/// To use: subclass InternalQueue::Node.
+/// FIFO queue implemented as a doubly-linked lists with internal pointers. This is in
+/// contrast to the STL list which allocates a wrapper Node object around the data. Since
+/// it's an internal queue, the list pointers are maintained in the Nodes which is memory
+/// owned by the user. The nodes cannot be deallocated while the queue has elements.
 /// The internal structure is a doubly-linked list.
 ///  NULL <-- N1 <--> N2 <--> N3 --> NULL
 ///          (head)          (tail)
+///
+/// InternalQueue<T> instantiates a thread-safe queue where the queue is protected by an
+/// internal Spinlock. InternalList<T> instantiates a list with no thread safety.
+///
+/// To use these data structures, the element to be added to the queue or list must
+/// subclass ::Node.
+///
 /// TODO: this is an ideal candidate to be made lock free.
 
-/// T must be a subclass of InternalQueue::Node
-template<typename T>
-class InternalQueue {
+/// T must be a subclass of InternalQueueBase::Node.
+template <typename LockType, typename T>
+class InternalQueueBase {
  public:
   struct Node {
    public:
     Node() : parent_queue(NULL), next(NULL), prev(NULL) {}
     virtual ~Node() {}
 
+    /// Returns true if the node is in a queue.
+    bool in_queue() const { return parent_queue != NULL; }
+
     /// Returns the Next/Prev node or NULL if this is the end/front.
     T* Next() const {
-      boost::lock_guard<SpinLock> lock(parent_queue->lock_);
+      boost::lock_guard<LockType> lock(parent_queue->lock_);
       return reinterpret_cast<T*>(next);
     }
     T* Prev() const {
-      boost::lock_guard<SpinLock> lock(parent_queue->lock_);
+      boost::lock_guard<LockType> lock(parent_queue->lock_);
       return reinterpret_cast<T*>(prev);
     }
 
    private:
-    friend class InternalQueue;
+    friend class InternalQueueBase<LockType, T>;
 
     /// Pointer to the queue this Node is on. NULL if not on any queue.
-    InternalQueue* parent_queue;
+    InternalQueueBase<LockType, T>* parent_queue;
     Node* next;
     Node* prev;
   };
 
-  InternalQueue() : head_(NULL), tail_(NULL), size_(0) {}
+  InternalQueueBase() : head_(NULL), tail_(NULL), size_(0) {}
 
   /// Returns the element at the head of the list without dequeuing or NULL
   /// if the queue is empty. This is O(1).
   T* head() const {
-    boost::lock_guard<SpinLock> lock(lock_);
+    boost::lock_guard<LockType> lock(lock_);
     if (empty()) return NULL;
     return reinterpret_cast<T*>(head_);
   }
@@ -78,7 +87,7 @@ class InternalQueue {
   /// Returns the element at the end of the list without dequeuing or NULL
   /// if the queue is empty. This is O(1).
   T* tail() {
-    boost::lock_guard<SpinLock> lock(lock_);
+    boost::lock_guard<LockType> lock(lock_);
     if (empty()) return NULL;
     return reinterpret_cast<T*>(tail_);
   }
@@ -91,7 +100,7 @@ class InternalQueue {
     DCHECK(node->parent_queue == NULL);
     node->parent_queue = this;
     {
-      boost::lock_guard<SpinLock> lock(lock_);
+      boost::lock_guard<LockType> lock(lock_);
       if (tail_ != NULL) tail_->next = node;
       node->prev = tail_;
       tail_ = node;
@@ -105,7 +114,7 @@ class InternalQueue {
   T* Dequeue() {
     Node* result = NULL;
     {
-      boost::lock_guard<SpinLock> lock(lock_);
+      boost::lock_guard<LockType> lock(lock_);
       if (empty()) return NULL;
       --size_;
       result = head_;
@@ -127,7 +136,7 @@ class InternalQueue {
   T* PopBack() {
     Node* result = NULL;
     {
-      boost::lock_guard<SpinLock> lock(lock_);
+      boost::lock_guard<LockType> lock(lock_);
       if (empty()) return NULL;
       --size_;
       result = tail_;
@@ -151,7 +160,7 @@ class InternalQueue {
     if (node->parent_queue == NULL) return;
     DCHECK(node->parent_queue == this);
     {
-      boost::lock_guard<SpinLock> lock(lock_);
+      boost::lock_guard<LockType> lock(lock_);
       if (node->next == NULL && node->prev == NULL) {
         // Removing only node
         DCHECK(node == head_);
@@ -184,7 +193,7 @@ class InternalQueue {
 
   /// Clears all elements in the list.
   void Clear() {
-    boost::lock_guard<SpinLock> lock(lock_);
+    boost::lock_guard<LockType> lock(lock_);
     Node* cur = head_;
     while (cur != NULL) {
       Node* tmp = cur;
@@ -199,8 +208,7 @@ class InternalQueue {
   int size() const { return size_; }
   bool empty() const { return head_ == NULL; }
 
-  /// Returns if the target is on the queue. This is O(1) and intended to
-  /// be used for debugging.
+  /// Returns if the target is on the queue. This is O(1) and does not acquire any locks.
   bool Contains(const T* target) const {
     return target->parent_queue == this;
   }
@@ -208,7 +216,7 @@ class InternalQueue {
   /// Validates the internal structure of the list
   bool Validate() {
     int num_elements_found = 0;
-    boost::lock_guard<SpinLock> lock(lock_);
+    boost::lock_guard<LockType> lock(lock_);
     if (head_ == NULL) {
       if (tail_ != NULL) return false;
       if (size() != 0) return false;
@@ -236,7 +244,7 @@ class InternalQueue {
   // false, terminate iteration. It is invalid to call other InternalQueue methods
   // from 'fn'.
   void Iterate(boost::function<bool(T*)> fn) {
-    boost::lock_guard<SpinLock> lock(lock_);
+    boost::lock_guard<LockType> lock(lock_);
     for (Node* current = head_; current != NULL; current = current->next) {
       if (!fn(reinterpret_cast<T*>(current))) return;
     }
@@ -247,7 +255,7 @@ class InternalQueue {
     std::stringstream ss;
     ss << "(";
     {
-      boost::lock_guard<SpinLock> lock(lock_);
+      boost::lock_guard<LockType> lock(lock_);
       Node* curr = head_;
       while (curr != NULL) {
         ss << (void*)curr;
@@ -260,11 +268,17 @@ class InternalQueue {
 
  private:
   friend struct Node;
-  mutable SpinLock lock_;
-  Node* head_, *tail_;
+  mutable LockType lock_;
+  Node *head_, *tail_;
   int size_;
 };
 
-}
+// The default LockType is SpinLock.
+template <typename T>
+class InternalQueue : public InternalQueueBase<SpinLock, T> {};
 
+// InternalList is a non-threadsafe implementation.
+template <typename T>
+class InternalList : public InternalQueueBase<FakeLock, T> {};
+}
 #endif
