@@ -1790,3 +1790,56 @@ where o.o_orderkey is null and o.o_orderstatus <=> o_orderpriority
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=577.87MB
 ====
+# IMPALA-2540: Complex query mixing joins on base tables and nested collections.
+select 1
+from tpch_nested_parquet.region.r_nations t1
+inner join tpch_nested_parquet.customer t2 on t2.c_nationkey = t1.pos
+inner join tpch_nested_parquet.region t3 on t3.r_comment = t2.c_address
+left join t2.c_orders t4
+inner join tpch_nested_parquet.region t5 on t5.r_regionkey = t2.c_custkey
+left join t4.item.o_lineitems t6 on t6.item.l_returnflag = t4.item.o_orderpriority
+---- PLAN
+14:SUBPLAN
+|
+|--12:SUBPLAN
+|  |
+|  |--10:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  join predicates: t6.item.l_returnflag = t4.item.o_orderpriority
+|  |  |
+|  |  |--08:SINGULAR ROW SRC
+|  |  |
+|  |  09:UNNEST [t4.item.o_lineitems t6]
+|  |
+|  11:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |
+|  |--06:SINGULAR ROW SRC
+|  |
+|  07:UNNEST [t2.c_orders t4]
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.pos = t2.c_nationkey
+|  runtime filters: RF000 <- t2.c_nationkey
+|
+|--05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t3.r_comment = t2.c_address
+|  |  runtime filters: RF001 <- t2.c_address
+|  |
+|  |--04:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: t2.c_custkey = t5.r_regionkey
+|  |  |  runtime filters: RF002 <- t5.r_regionkey
+|  |  |
+|  |  |--03:SCAN HDFS [tpch_nested_parquet.region t5]
+|  |  |     partitions=1/1 files=1 size=4.18KB
+|  |  |
+|  |  01:SCAN HDFS [tpch_nested_parquet.customer t2]
+|  |     partitions=1/1 files=4 size=577.87MB
+|  |     runtime filters: RF002 -> t2.c_custkey
+|  |
+|  02:SCAN HDFS [tpch_nested_parquet.region t3]
+|     partitions=1/1 files=1 size=4.18KB
+|     runtime filters: RF001 -> t3.r_comment
+|
+00:SCAN HDFS [tpch_nested_parquet.region.r_nations t1]
+   partitions=1/1 files=1 size=4.18KB
+   runtime filters: RF000 -> t1.pos
+====
