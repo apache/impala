@@ -38,8 +38,8 @@ FAILPOINT_ACTION_MAP = {'FAIL': 'FAIL', 'CANCEL': 'WAIT',
 # The goal of this query is to use all of the node types.
 # TODO: This query could be simplified a bit...
 QUERY = """
-select a.int_col, count(b.int_col) int_sum, count(l.l_shipdate)
-from functional_hbase.alltypesagg a, tpch_nested_parquet.customer c, c.c_orders.o_lineitems l
+select a.int_col, count(b.int_col) int_sum, count(c.c_name)
+from functional_hbase.alltypesagg a, tpch_parquet.customer c
 join
   (select * from alltypes
    where year=2009 and month=1 order by int_col limit 2500
