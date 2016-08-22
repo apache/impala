@@ -78,7 +78,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=1")
+      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=1"
+      " --datastream_sender_timeout_ms=30000")
   def test_execplanfragment_timeout(self, vector):
     for i in range(3):
       ex= self.execute_query_expect_failure(self.client, self.TEST_QUERY)
@@ -91,7 +92,8 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=2")
+      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=2"
+      " --datastream_sender_timeout_ms=30000")
   def test_cancelplanfragment_timeout(self, vector):
     query = "select * from tpch.lineitem limit 5000"
     self.execute_query_then_cancel(query, vector)
@@ -117,12 +119,13 @@ class TestRPCTimeout(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
       " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=6"
-      " --status_report_interval=1 ")
+      " --status_report_interval=1")
   def test_reportexecstatus_timeout(self, vector):
     self.execute_query_verify_metrics(self.TEST_QUERY)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=7")
+      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=7"
+      " --datastream_sender_timeout_ms=30000")
   def test_random_rpc_timeout(self, vector):
     self.execute_query_verify_metrics(self.TEST_QUERY, 10)

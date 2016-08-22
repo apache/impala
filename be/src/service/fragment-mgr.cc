@@ -100,6 +100,8 @@ void FragmentMgr::FragmentThread(TUniqueId fragment_instance_id) {
   // the fragment exec state.
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(-1L);
 
+  VLOG_QUERY << "PlanFragment completed. instance_id=" << fragment_instance_id;
+
 #ifndef ADDRESS_SANITIZER
   // tcmalloc and address sanitizer can not be used together
   if (FLAGS_log_mem_usage_interval > 0) {
