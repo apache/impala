@@ -29,8 +29,8 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 make clean || :
 
 # Stop the minikdc if needed.
-if ${CLUSTER_DIR}/admin is_kerberized; then
-    ${IMPALA_HOME}/testdata/bin/minikdc.sh stop
+if "${CLUSTER_DIR}/admin" is_kerberized; then
+    "${IMPALA_HOME}/testdata/bin/minikdc.sh" stop
 fi
 
 # clean the external data source project
@@ -45,35 +45,35 @@ pushd $IMPALA_FE_DIR
 rm -rf target
 rm -f src/test/resources/{core,hbase,hive}-site.xml
 rm -rf generated-sources/*
-rm -rf ${IMPALA_LOGS_DIR}/*
+[ -z "$IMPALA_LOGS_DIR" ] || rm -rf "${IMPALA_LOGS_DIR}"/*
 mkdir -p $IMPALA_ALL_LOGS_DIRS
 popd
 
 # clean be
-pushd $IMPALA_HOME/be
+pushd "$IMPALA_HOME/be"
 # remove everything listed in .gitignore
 git clean -Xdfq
 popd
 
 # clean shell build artifacts
-pushd $IMPALA_HOME/shell
+pushd "$IMPALA_HOME/shell"
 # remove everything listed in .gitignore
 git clean -Xdfq
 popd
 
 # Clean stale .pyc, .pyo files and __pycache__ directories.
-pushd ${IMPALA_HOME}
+pushd "${IMPALA_HOME}"
 find . -type f -name "*.py[co]" -delete
 find . -type d -name "__pycache__" -delete
 popd
 
 # clean llvm
-rm -f $IMPALA_HOME/llvm-ir/impala*.ll
-rm -f $IMPALA_HOME/be/generated-sources/impala-ir/*
+rm -f "$IMPALA_HOME/llvm-ir/"impala*.ll
+rm -f "$IMPALA_HOME/be/generated-sources/impala-ir/"*
 
 # Cleanup Impala-lzo
-if [ -e $IMPALA_LZO ]; then
-  pushd $IMPALA_LZO; git clean -fdx .; popd
+if [ -e "$IMPALA_LZO" ]; then
+  pushd "$IMPALA_LZO"; git clean -fdx .; popd
 fi
 
 # When switching to and from toolchain, make sure to remove all CMake generated files

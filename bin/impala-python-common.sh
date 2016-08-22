@@ -21,8 +21,8 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
-LD_LIBRARY_PATH+=":$(python $IMPALA_HOME/infra/python/bootstrap_virtualenv.py \
+LD_LIBRARY_PATH+=":$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
-PY_DIR=$(dirname "$0")/../infra/python
+PY_DIR="$(dirname "$0")/../infra/python"
 python "$PY_DIR/bootstrap_virtualenv.py"

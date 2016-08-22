@@ -23,20 +23,24 @@
 # explicitly to the CLASSPATH.
 
 CLASSPATH=\
-$IMPALA_HOME/fe/src/test/resources:\
-$IMPALA_HOME/fe/target/classes:\
-$IMPALA_HOME/fe/target/dependency:\
-$IMPALA_HOME/fe/target/test-classes:\
-${HIVE_HOME}/lib/datanucleus-api-jdo-3.2.1.jar:\
-${HIVE_HOME}/lib/datanucleus-core-3.2.2.jar:\
-${HIVE_HOME}/lib/datanucleus-rdbms-3.2.1.jar:
+"$IMPALA_HOME"/fe/src/test/resources:\
+"$IMPALA_HOME"/fe/target/classes:\
+"$IMPALA_HOME"/fe/target/dependency:\
+"$IMPALA_HOME"/fe/target/test-classes:\
+"${HIVE_HOME}"/lib/datanucleus-api-jdo-3.2.1.jar:\
+"${HIVE_HOME}"/lib/datanucleus-core-3.2.2.jar:\
+"${HIVE_HOME}"/lib/datanucleus-rdbms-3.2.1.jar:
 
-for jar in `ls ${IMPALA_HOME}/fe/target/dependency/*.jar`; do
-  CLASSPATH=${CLASSPATH}:$jar
+for jar in "${IMPALA_HOME}"/fe/target/dependency/*.jar; do
+  if [ -e "$jar" ] ; then
+    CLASSPATH="${CLASSPATH}:$jar"
+  fi
 done
 
-for jar in `ls ${IMPALA_HOME}/testdata/target/dependency/*.jar`; do
-  CLASSPATH=${CLASSPATH}:$jar
+for jar in "${IMPALA_HOME}"/testdata/target/dependency/*.jar; do
+  if [ -e "$jar" ] ; then
+    CLASSPATH="${CLASSPATH}:$jar"
+  fi
 done
 
 export CLASSPATH

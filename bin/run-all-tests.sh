@@ -24,7 +24,7 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
-. $IMPALA_HOME/bin/set-pythonpath.sh
+. "$IMPALA_HOME/bin/set-pythonpath.sh"
 
 # Allow picking up strategy from environment
 : ${EXPLORATION_STRATEGY:=core}
@@ -32,9 +32,9 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 : ${MAX_PYTEST_FAILURES:=10}
 KERB_ARGS=""
 
-. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
-. ${IMPALA_HOME}/testdata/bin/run-step.sh
-if ${CLUSTER_DIR}/admin is_kerberized; then
+. "${IMPALA_HOME}/bin/impala-config.sh" > /dev/null 2>&1
+. "${IMPALA_HOME}/testdata/bin/run-step.sh"
+if "${CLUSTER_DIR}/admin" is_kerberized; then
   KERB_ARGS="--use_kerberos"
 fi
 
@@ -69,10 +69,10 @@ while getopts "e:n:c" OPTION
 do
   case "$OPTION" in
     e)
-      EXPLORATION_STRATEGY=$OPTARG
+      EXPLORATION_STRATEGY="$OPTARG"
       ;;
     n)
-      NUM_TEST_ITERATIONS=$OPTARG
+      NUM_TEST_ITERATIONS="$OPTARG"
       ;;
     c)
       CODE_COVERAGE=true
@@ -98,7 +98,7 @@ if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
 fi
 
 # For logging when using run-step.
-LOG_DIR=${IMPALA_EE_TEST_LOGS_DIR}
+LOG_DIR="${IMPALA_EE_TEST_LOGS_DIR}"
 
 # Enable core dumps
 ulimit -c unlimited
@@ -108,7 +108,7 @@ if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
   # script. Restarting HBase will change the region server assignment. Run split-hbase.sh
   # before running any test.
   run-step "Split and assign HBase regions" split-hbase.log \
-      ${IMPALA_HOME}/testdata/bin/split-hbase.sh
+      "${IMPALA_HOME}/testdata/bin/split-hbase.sh"
 fi
 
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
@@ -116,7 +116,7 @@ do
   TEST_RET_CODE=0
 
   run-step "Starting Impala cluster" start-impala-cluster.log \
-      ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_EE_TEST_LOGS_DIR} \
+      "${IMPALA_HOME}/bin/start-impala-cluster.py" --log_dir="${IMPALA_EE_TEST_LOGS_DIR}" \
       ${TEST_START_CLUSTER_ARGS}
 
   if [[ "$BE_TEST" == true ]]; then
@@ -127,14 +127,14 @@ do
       export SKIP_BE_TEST_PATTERN="session*"
     fi
     # Run backend tests.
-    if ! ${IMPALA_HOME}/bin/run-backend-tests.sh; then
+    if ! "${IMPALA_HOME}/bin/run-backend-tests.sh"; then
       TEST_RET_CODE=1
     fi
   fi
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   if ! run-step "Run test run-workload" test-run-workload.log \
-      ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1 \
+      "${IMPALA_HOME}/bin/run-workload.py" -w tpch --num_clients=2 --query_names=TPCH-Q1 \
       --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}; then
     TEST_RET_CODE=1
   fi
@@ -143,7 +143,7 @@ do
     # Run JUnit frontend tests
     # Requires a running impalad cluster because some tests (such as DataErrorTest and
     # JdbcTest) queries against an impala cluster.
-    pushd ${IMPALA_FE_DIR}
+    pushd "${IMPALA_FE_DIR}"
     MVN_ARGS=""
     if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
       # When running against S3, only run the S3 frontend tests.
@@ -152,7 +152,7 @@ do
     if [[ "$CODE_COVERAGE" == true ]]; then
       MVN_ARGS+="-DcodeCoverage"
     fi
-    if ! ${IMPALA_HOME}/bin/mvn-quiet.sh -fae test ${MVN_ARGS}; then
+    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ${MVN_ARGS}; then
       TEST_RET_CODE=1
     fi
     popd
@@ -161,7 +161,7 @@ do
   if [[ "$EE_TEST" == true ]]; then
     # Run end-to-end tests.
     # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-    if ! ${IMPALA_HOME}/tests/run-tests.py ${COMMON_PYTEST_ARGS} ${EE_TEST_FILES}; then
+    if ! "${IMPALA_HOME}/tests/run-tests.py" ${COMMON_PYTEST_ARGS} ${EE_TEST_FILES}; then
       #${KERB_ARGS};
       TEST_RET_CODE=1
     fi
@@ -170,11 +170,11 @@ do
   if [[ "$JDBC_TEST" == true ]]; then
     # Run the JDBC tests with background loading disabled. This is interesting because
     # it requires loading missing table metadata.
-    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_EE_TEST_LOGS_DIR} \
+    "${IMPALA_HOME}/bin/start-impala-cluster.py" --log_dir="${IMPALA_EE_TEST_LOGS_DIR}" \
         --catalogd_args=--load_catalog_in_background=false \
         ${TEST_START_CLUSTER_ARGS}
-    pushd ${IMPALA_FE_DIR}
-    if ! ${IMPALA_HOME}/bin/mvn-quiet.sh test -Dtest=JdbcTest; then
+    pushd "${IMPALA_FE_DIR}"
+    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" test -Dtest=JdbcTest; then
       TEST_RET_CODE=1
     fi
     popd
@@ -186,17 +186,17 @@ do
     # pollute the directory with too many files, remove what was there
     # before. Also, save the IMPALA_MAX_LOG_FILES value for re-set
     # later.
-    rm -rf ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}
-    mkdir -p ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}
-    IMPALA_MAX_LOG_FILES_SAVE=${IMPALA_MAX_LOG_FILES:-10}
+    rm -rf "${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
+    mkdir -p "${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
+    IMPALA_MAX_LOG_FILES_SAVE="${IMPALA_MAX_LOG_FILES:-10}"
     export IMPALA_MAX_LOG_FILES=0
     # Run the custom-cluster tests after all other tests, since they will restart the
     # cluster repeatedly and lose state.
     # TODO: Consider moving in to run-tests.py.
-    if ! ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh ${COMMON_PYTEST_ARGS}; then
+    if ! "${IMPALA_HOME}/tests/run-custom-cluster-tests.sh" ${COMMON_PYTEST_ARGS}; then
       TEST_RET_CODE=1
     fi
-    export IMPALA_MAX_LOG_FILES=${IMPALA_MAX_LOG_FILES_SAVE}
+    export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
   fi
 
   # Finally, run the process failure tests.

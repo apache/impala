@@ -23,7 +23,7 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 # run buildall.sh -help to see options
 
 ROOT=`dirname "$0"`
-ROOT=`cd "$ROOT"; pwd`
+ROOT=`cd "$ROOT" >/dev/null; pwd`
 
 # Grab this *before* we source impala-config.sh to see if the caller has
 # kerberized environment variables already or not.
@@ -33,7 +33,7 @@ if [ ! -z "${MINIKDC_REALM}" ]; then
   NEEDS_RE_SOURCE_NOTE=0
 fi
 
-export IMPALA_HOME=$ROOT
+export IMPALA_HOME="$ROOT"
 if ! . "$ROOT"/bin/impala-config.sh; then
   echo "Bad configuration, aborting buildall."
   exit 1
@@ -112,25 +112,25 @@ do
       EXPLORATION_STRATEGY=exhaustive
       ;;
     -snapshot_file)
-      SNAPSHOT_FILE=${2-}
-      if [ ! -f $SNAPSHOT_FILE ]; then
+      SNAPSHOT_FILE="${2-}"
+      if [ ! -f "$SNAPSHOT_FILE" ]; then
         echo "-snapshot_file does not exist: $SNAPSHOT_FILE"
         exit 1;
       fi
       TESTDATA_ACTION=1
       # Get the full path.
-      SNAPSHOT_FILE=$(readlink -f $SNAPSHOT_FILE)
+      SNAPSHOT_FILE="$(readlink -f "$SNAPSHOT_FILE")"
       shift;
       ;;
     -metastore_snapshot_file)
-      METASTORE_SNAPSHOT_FILE=${2-}
-      if [ ! -f $METASTORE_SNAPSHOT_FILE ]; then
+      METASTORE_SNAPSHOT_FILE="${2-}"
+      if [ ! -f "$METASTORE_SNAPSHOT_FILE" ]; then
         echo "-metastore_snapshot_file does not exist: $METASTORE_SNAPSHOT_FILE"
         exit 1;
       fi
       TESTDATA_ACTION=1
       # Get the full path.
-      METASTORE_SNAPSHOT_FILE=$(readlink -f $METASTORE_SNAPSHOT_FILE)
+      METASTORE_SNAPSHOT_FILE="$(readlink -f "$METASTORE_SNAPSHOT_FILE")"
       shift;
       ;;
     -k|-kerberize|-kerberos|-kerb)
@@ -236,16 +236,16 @@ if [ ${IMPALA_KERBERIZE} -eq 0 ]; then
 fi
 
 # Loading data on a filesystem other than fs.defaultFS is not supported.
-if [[ -z $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" != "hdfs" &&
-      $TESTDATA_ACTION -eq 1 ]]; then
+if [[ -z "$METASTORE_SNAPSHOT_FILE" && "${TARGET_FILESYSTEM}" != "hdfs" &&
+      "$TESTDATA_ACTION" -eq 1 ]]; then
   echo "The metastore snapshot is required for loading data into ${TARGET_FILESYSTEM}"
   echo "Use the -metastore_snapshot_file command line paramater."
   exit 1
 fi
 
 # option to clean everything first
-if [ $CLEAN_ACTION -eq 1 ]; then
-    $IMPALA_HOME/bin/clean.sh
+if [ "$CLEAN_ACTION" -eq 1 ]; then
+    "$IMPALA_HOME/bin/clean.sh"
 fi
 
 # Populate necessary thirdparty components unless it's set to be skipped.
@@ -256,7 +256,7 @@ else
   echo "Downloading Python dependencies"
   # Download all the Python dependencies we need before doing anything
   # of substance. Does not re-download anything that is already present.
-  if ! $IMPALA_HOME/infra/python/deps/download_requirements; then
+  if ! "$IMPALA_HOME/infra/python/deps/download_requirements"; then
     echo "Warning: Unable to download Python requirements."
     echo "Warning: bootstrap_virtualenv or other Python-based tooling may fail."
   else
@@ -264,88 +264,88 @@ else
   fi
 
   echo "Downloading and extracting toolchain dependencies."
-  $IMPALA_HOME/bin/bootstrap_toolchain.py
+  "$IMPALA_HOME/bin/bootstrap_toolchain.py"
   echo "Toolchain bootstrap complete."
 fi
 
 MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${CMAKE_BUILD_TYPE}"
 
-if [ $BUILD_FE_ONLY -eq 1 ]; then
-  $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS} -cmake_only
-  ${MAKE_CMD} fe
+if [ "$BUILD_FE_ONLY" -eq 1 ]; then
+  "$IMPALA_HOME/bin/make_impala.sh" ${MAKE_IMPALA_ARGS} -cmake_only
+  "${MAKE_CMD}" fe
   exit 0
 fi
 
-if [ -e $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.so ]
+if [ -e "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.so ]
 then
-  cp $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.* $HADOOP_HOME/lib/native
+  cp "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.* "$HADOOP_HOME/lib/native"
 else
   echo "No hadoop-lzo found"
 fi
 
 # Stop any running Impala services.
-${IMPALA_HOME}/bin/start-impala-cluster.py --kill --force
+"${IMPALA_HOME}/bin/start-impala-cluster.py" --kill --force
 
-if [[ $CLEAN_ACTION -eq 1 || $FORMAT_METASTORE -eq 1 || $FORMAT_CLUSTER -eq 1 ||
-       $FORMAT_SENTRY_POLICY_DB -eq 1 || -n $METASTORE_SNAPSHOT_FILE ]]
+if [[ "$CLEAN_ACTION" -eq 1 || "$FORMAT_METASTORE" -eq 1 || "$FORMAT_CLUSTER" -eq 1 ||
+       "$FORMAT_SENTRY_POLICY_DB" -eq 1 || -n "$METASTORE_SNAPSHOT_FILE" ]]
 then
   # Kill any processes that may be accessing postgres metastore. To be safe, this is done
   # before we make any changes to the config files.
   set +e
-  ${IMPALA_HOME}/testdata/bin/kill-all.sh
+  "${IMPALA_HOME}/testdata/bin/kill-all.sh"
   set -e
 fi
 
 CREATE_TEST_CONFIG_ARGS=""
-if [[ $FORMAT_SENTRY_POLICY_DB -eq 1 ]]; then
+if [[ "$FORMAT_SENTRY_POLICY_DB" -eq 1 ]]; then
   CREATE_TEST_CONFIG_ARGS+=" -create_sentry_policy_db"
 fi
 
-if [[ $FORMAT_METASTORE -eq 1 && -z $METASTORE_SNAPSHOT_FILE ]]; then
+if [[ "$FORMAT_METASTORE" -eq 1 && -z "$METASTORE_SNAPSHOT_FILE" ]]; then
   CREATE_TEST_CONFIG_ARGS+=" -create_metastore"
 fi
 
 # Generate the Hadoop configs needed by Impala
-${IMPALA_HOME}/bin/create-test-configuration.sh ${CREATE_TEST_CONFIG_ARGS}
+"${IMPALA_HOME}/bin/create-test-configuration.sh" ${CREATE_TEST_CONFIG_ARGS}
 
 # If a metastore snapshot exists, load it.
-if [ $METASTORE_SNAPSHOT_FILE ]; then
+if [ "$METASTORE_SNAPSHOT_FILE" ]; then
   echo "Loading metastore snapshot"
-  ${IMPALA_HOME}/testdata/bin/load-metastore-snapshot.sh $METASTORE_SNAPSHOT_FILE
+  "${IMPALA_HOME}/testdata/bin/load-metastore-snapshot.sh" "$METASTORE_SNAPSHOT_FILE"
 fi
 
 # build common and backend
 echo "Calling make_impala.sh ${MAKE_IMPALA_ARGS}"
-$IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
+"$IMPALA_HOME/bin/make_impala.sh" ${MAKE_IMPALA_ARGS}
 
-if [ -e $IMPALA_LZO ]
+if [ -e "$IMPALA_LZO" ]
 then
-  pushd $IMPALA_LZO
+  pushd "$IMPALA_LZO"
   LZO_CMAKE_ARGS+=" -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake"
   rm -f CMakeCache.txt
   cmake ${LZO_CMAKE_ARGS}
-  ${MAKE_CMD}
+  "${MAKE_CMD}"
   popd
 fi
 
 # build the external data source API
-pushd ${IMPALA_HOME}/ext-data-source
-${IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
+pushd "${IMPALA_HOME}/ext-data-source"
+"${IMPALA_HOME}/bin/mvn-quiet.sh" install -DskipTests
 popd
 
 # build frontend and copy dependencies
-pushd ${IMPALA_FE_DIR}
-${IMPALA_HOME}/bin/mvn-quiet.sh package -DskipTests
+pushd "${IMPALA_FE_DIR}"
+"${IMPALA_HOME}/bin/mvn-quiet.sh" package -DskipTests
 popd
 
 # Build the shell tarball
 echo "Creating shell tarball"
-${IMPALA_HOME}/shell/make_shell_tarball.sh
+"${IMPALA_HOME}/shell/make_shell_tarball.sh"
 
-if [ $FORMAT_CLUSTER -eq 1 ]; then
-  $IMPALA_HOME/testdata/bin/run-all.sh -format
-elif [ $TESTDATA_ACTION -eq 1 ] || [ $TESTS_ACTION -eq 1 ]; then
-  $IMPALA_HOME/testdata/bin/run-all.sh
+if [ "$FORMAT_CLUSTER" -eq 1 ]; then
+  "$IMPALA_HOME/testdata/bin/run-all.sh" -format
+elif [ "$TESTDATA_ACTION" -eq 1 ] || [ "$TESTS_ACTION "-eq 1 ]; then
+  "$IMPALA_HOME/testdata/bin/run-all.sh"
 fi
 
 #
@@ -368,7 +368,7 @@ if [ ${IMPALA_KERBERIZE} -eq 1 ]; then
     echo "won't be run.  The impala daemons will be started."
     TESTDATA_ACTION=0
     TESTS_ACTION=0
-    ${IMPALA_HOME}/bin/start-impala-cluster.py
+    "${IMPALA_HOME}/bin/start-impala-cluster.py"
   fi
 fi
 # END KERBEROS TODO
@@ -389,34 +389,34 @@ fi
 
 if [ $TESTDATA_ACTION -eq 1 ]; then
   # Create testdata.
-  $IMPALA_HOME/bin/create_testdata.sh
-  cd $ROOT
+  "$IMPALA_HOME/bin/create_testdata.sh"
+  cd "$ROOT"
   # We have 4 cases:
   # - test-warehouse and metastore snapshots exists.
   # - Only the test-warehouse snapshot exists.
   # - Only the metastore snapshot exists.
   # - Neither of them exist.
   CREATE_LOAD_DATA_ARGS=""
-  if [[ $SNAPSHOT_FILE  && $METASTORE_SNAPSHOT_FILE ]]; then
+  if [[ "$SNAPSHOT_FILE" && "$METASTORE_SNAPSHOT_FILE" ]]; then
     CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE} -skip_metadata_load"
-  elif [[ $SNAPSHOT_FILE && -z $METASTORE_SNAPSHOT_FILE ]]; then
+  elif [[ "$SNAPSHOT_FILE" && -z "$METASTORE_SNAPSHOT_FILE" ]]; then
     CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE}"
-  elif [[ -z $SNAPSHOT_FILE && $METASTORE_SNAPSHOT_FILE ]]; then
+  elif [[ -z "$SNAPSHOT_FILE" && "$METASTORE_SNAPSHOT_FILE" ]]; then
     CREATE_LOAD_DATA_ARGS="-skip_metadata_load -skip_snapshot_load"
   fi
-  ${IMPALA_HOME}/testdata/bin/create-load-data.sh ${CREATE_LOAD_DATA_ARGS} <<< Y
+  "${IMPALA_HOME}/testdata/bin/create-load-data.sh" ${CREATE_LOAD_DATA_ARGS} <<< Y
 fi
 
 if [ $TESTS_ACTION -eq 1 ]; then
   if [ $CODE_COVERAGE -eq 0 ]; then
-    ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY
+    "${IMPALA_HOME}/bin/run-all-tests.sh" -e $EXPLORATION_STRATEGY
   else
-    ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY -c
+    "${IMPALA_HOME}/bin/run-all-tests.sh" -e $EXPLORATION_STRATEGY -c
   fi
 fi
 
 # Generate list of files for Cscope to index
-$IMPALA_HOME/bin/gen-cscope.sh
+"$IMPALA_HOME/bin/gen-cscope.sh"
 
 if [ ${NEEDS_RE_SOURCE_NOTE} -eq 1 ]; then
   echo
@@ -426,6 +426,6 @@ if [ ${NEEDS_RE_SOURCE_NOTE} -eq 1 ]; then
   echo "environment variables weren't available before the cluster"
   echo "was created.  To pick them up, please source impala-config.sh:"
   echo
-  echo "   . ${IMPALA_HOME}/bin/impala-config.sh"
+  echo "   . \"${IMPALA_HOME}/bin/impala-config.sh\""
   echo
 fi

@@ -34,16 +34,16 @@ if [[ ! -e "$JAVA" ]]; then
   return 1
 fi
 
-if [ -z $IMPALA_HOME ]; then
-  if [[ ! -z $ZSH_NAME ]]; then
-    export IMPALA_HOME=$(dirname $(cd $(dirname ${(%):-%x}) && pwd))
+if [ -z "$IMPALA_HOME" ]; then
+  if [[ ! -z "$ZSH_NAME" ]]; then
+    export IMPALA_HOME=$(dirname "$(cd $(dirname ${(%):-%x}) >/dev/null && pwd)")
   else
-    export IMPALA_HOME=$(dirname $(cd $(dirname "${BASH_SOURCE[0]}") && pwd))
+    export IMPALA_HOME=$(dirname "$(cd $(dirname "${BASH_SOURCE[0]}") >/dev/null && pwd)")
   fi
 fi
 
-: ${IMPALA_TOOLCHAIN=$IMPALA_HOME/toolchain}
-if [ -z $IMPALA_TOOLCHAIN ]; then
+: ${IMPALA_TOOLCHAIN="$IMPALA_HOME/toolchain"}
+if [ -z "$IMPALA_TOOLCHAIN" ]; then
   echo "IMPALA_TOOLCHAIN must be specified. Please set it to a valid directory or"\
        "leave it unset."
   return 1
@@ -69,14 +69,14 @@ fi
 # If enabled, debug symbols are added to cross-compiled IR.
 : ${ENABLE_IMPALA_IR_DEBUG_INFO=false}
 
-if [ -d $IMPALA_HOME/thirdparty ]; then
+if [ -d "$IMPALA_HOME/thirdparty" ]; then
   NO_THIRDPARTY=false
 else
   NO_THIRDPARTY=true
 fi
 # If true, download and use the CDH components from S3 instead of the ones
 # in $IMPALA_HOME/thirdparty.
-: ${DOWNLOAD_CDH_COMPONENTS=$NO_THIRDPARTY}
+: ${DOWNLOAD_CDH_COMPONENTS="$NO_THIRDPARTY"}
 
 export IMPALA_TOOLCHAIN
 export SKIP_TOOLCHAIN_BOOTSTRAP
@@ -85,7 +85,7 @@ export USE_GOLD_LINKER
 export IMPALA_CXX_COMPILER
 export ENABLE_IMPALA_IR_DEBUG_INFO
 export DOWNLOAD_CDH_COMPONENTS
-export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)
+export IS_OSX="$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)"
 
 # To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
 # set KUDU_CLIENT_DIR to the path KUDU was installed in.
@@ -101,11 +101,11 @@ export IS_OSX=$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false
 : ${KUDU_CLIENT_DIR=}
 export KUDU_BUILD_DIR
 export KUDU_CLIENT_DIR
-if [[ -n $KUDU_BUILD_DIR && -z $KUDU_CLIENT_DIR ]]; then
+if [[ -n "$KUDU_BUILD_DIR" && -z "$KUDU_CLIENT_DIR" ]]; then
   echo When KUDU_BUILD_DIR is set KUDU_CLIENT_DIR must also be set. 1>&2
   return 1
 fi
-if [[ -z $KUDU_BUILD_DIR && -n $KUDU_CLIENT_DIR ]]; then
+if [[ -z "$KUDU_BUILD_DIR" && -n "$KUDU_CLIENT_DIR" ]]; then
   echo When KUDU_CLIENT_DIR is set KUDU_BUILD_DIR must also be set. 1>&2
   return 1
 fi
@@ -117,20 +117,20 @@ export USE_KUDU_DEBUG_BUILD
 # into the backend. The frontend build is OS independent since it is Java.
 if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
   KUDU_IS_SUPPORTED=true
-  if [[ -z $KUDU_BUILD_DIR ]]; then
+  if [[ -z "$KUDU_BUILD_DIR" ]]; then
     if ! $IS_OSX; then
       if ! which lsb_release &>/dev/null; then
         echo Unable to find the 'lsb_release' command. \
             Please ensure it is available in your PATH. 1>&2
         return 1
       fi
-      DISTRO_VERSION=$(lsb_release -sir 2>&1)
+      DISTRO_VERSION="$(lsb_release -sir 2>&1)"
       if [[ $? -ne 0 ]]; then
         echo lsb_release cammond failed, output was: "$DISTRO_VERSION" 1>&2
         return 1
       fi
       # Remove spaces, trim minor versions, and convert to lowercase.
-      DISTRO_VERSION=$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")
+      DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
       case "$DISTRO_VERSION" in
         # "enterprise" is Oracle
         centos5 | debian* | enterprise*5 | redhat*5 | suse* | ubuntu*12)
@@ -142,18 +142,18 @@ fi
 export KUDU_IS_SUPPORTED
 
 export CDH_MAJOR_VERSION=5
-export HADOOP_LZO=${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}
-export IMPALA_LZO=${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}
-export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-$IMPALA_HOME/../Impala-auxiliary-tests}
-export TARGET_FILESYSTEM=${TARGET_FILESYSTEM-"hdfs"}
-export FILESYSTEM_PREFIX=${FILESYSTEM_PREFIX-""}
-export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY-"DummySecretAccessKey"}
-export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID-"DummyAccessKeyId"}
-export S3_BUCKET=${S3_BUCKET-""}
-export HDFS_REPLICATION=${HDFS_REPLICATION-3}
-export ISILON_NAMENODE=${ISILON_NAMENODE-""}
-export DEFAULT_FS=${DEFAULT_FS-"hdfs://localhost:20500"}
-export WAREHOUSE_LOCATION_PREFIX=${WAREHOUSE_LOCATION_PREFIX-""}
+export HADOOP_LZO="${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}"
+export IMPALA_LZO="${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}"
+export IMPALA_AUX_TEST_HOME="${IMPALA_AUX_TEST_HOME-$IMPALA_HOME/../Impala-auxiliary-tests}"
+export TARGET_FILESYSTEM="${TARGET_FILESYSTEM-hdfs}"
+export FILESYSTEM_PREFIX="${FILESYSTEM_PREFIX-}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY-DummySecretAccessKey}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID-DummyAccessKeyId}"
+export S3_BUCKET="${S3_BUCKET-}"
+export HDFS_REPLICATION="${HDFS_REPLICATION-3}"
+export ISILON_NAMENODE="${ISILON_NAMENODE-}"
+export DEFAULT_FS="${DEFAULT_FS-hdfs://localhost:20500}"
+export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 export METASTORE_DB="hive_impala"
 
@@ -198,8 +198,8 @@ elif [ "${TARGET_FILESYSTEM}" = "local" ]; then
         "'$WAREHOUSE_LOCATION_PREFIX'"
     return 1
   fi
-  export DEFAULT_FS=${LOCAL_FS}
-  export FILESYSTEM_PREFIX=${LOCAL_FS}
+  export DEFAULT_FS="${LOCAL_FS}"
+  export FILESYSTEM_PREFIX="${LOCAL_FS}"
 elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
   echo "Valid values are: hdfs, isilon, s3, local"
@@ -207,15 +207,15 @@ elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
 fi
 
 # Directories where local cluster logs will go when running tests or loading data
-export IMPALA_LOGS_DIR=${IMPALA_HOME}/logs
-export IMPALA_CLUSTER_LOGS_DIR=${IMPALA_LOGS_DIR}/cluster
-export IMPALA_DATA_LOADING_LOGS_DIR=${IMPALA_LOGS_DIR}/data_loading
-export IMPALA_DATA_LOADING_SQL_DIR=${IMPALA_DATA_LOADING_LOGS_DIR}/sql
-export IMPALA_FE_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/fe_tests
-export IMPALA_FE_TEST_COVERAGE_DIR=${IMPALA_FE_TEST_LOGS_DIR}/coverage
-export IMPALA_BE_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/be_tests
-export IMPALA_EE_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/ee_tests
-export IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR=${IMPALA_LOGS_DIR}/custom_cluster_tests
+export IMPALA_LOGS_DIR="${IMPALA_HOME}/logs"
+export IMPALA_CLUSTER_LOGS_DIR="${IMPALA_LOGS_DIR}/cluster"
+export IMPALA_DATA_LOADING_LOGS_DIR="${IMPALA_LOGS_DIR}/data_loading"
+export IMPALA_DATA_LOADING_SQL_DIR="${IMPALA_DATA_LOADING_LOGS_DIR}/sql"
+export IMPALA_FE_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/fe_tests"
+export IMPALA_FE_TEST_COVERAGE_DIR="${IMPALA_FE_TEST_LOGS_DIR}/coverage"
+export IMPALA_BE_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/be_tests"
+export IMPALA_EE_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/ee_tests"
+export IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/custom_cluster_tests"
 # List of all Impala log dirs and create them.
 export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
   ${IMPALA_DATA_LOADING_LOGS_DIR} ${IMPALA_DATA_LOADING_SQL_DIR}
@@ -229,21 +229,21 @@ mkdir -p $IMPALA_ALL_LOGS_DIRS
 # hardwired in its code, so we cannot change the output dir by configuration.
 # We create two symlinks to capture the logs when running ctest either from
 # ${IMPALA_HOME} or ${IMPALA_HOME}/be.
-rm -rf ${IMPALA_HOME}/Testing
-mkdir -p ${IMPALA_HOME}/Testing
-ln -fs ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_HOME}/Testing/Temporary
-rm -rf ${IMPALA_HOME}/be/Testing
-mkdir -p ${IMPALA_HOME}/be/Testing
-ln -fs ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_HOME}/be/Testing/Temporary
+rm -rf "${IMPALA_HOME}/Testing"
+mkdir -p "${IMPALA_HOME}/Testing"
+ln -fs "${IMPALA_BE_TEST_LOGS_DIR}" "${IMPALA_HOME}/Testing/Temporary"
+rm -rf "${IMPALA_HOME}/be/Testing"
+mkdir -p "${IMPALA_HOME}/be/Testing"
+ln -fs "${IMPALA_BE_TEST_LOGS_DIR}" "${IMPALA_HOME}/be/Testing/Temporary"
 
 # Reduce the concurrency for local tests to half the number of cores in the system.
 # Note than nproc may not be available on older distributions (centos5.5)
 if type nproc >/dev/null 2>&1; then
   CORES=$(($(nproc) / 2))
 else
-  CORES='4'
+  CORES=4
 fi
-export NUM_CONCURRENT_TESTS=${NUM_CONCURRENT_TESTS-${CORES}}
+export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-${CORES}}"
 
 # Versions of toolchain dependencies (or if toolchain is not used of dependencies in
 # thirdparty)
@@ -280,8 +280,8 @@ export IMPALA_THRIFT_VERSION=0.9.0-p8
 export IMPALA_THRIFT_JAVA_VERSION=0.9.0
 export IMPALA_ZLIB_VERSION=1.2.8
 
-export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
-export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
+export KUDU_MASTER="${KUDU_MASTER:-127.0.0.1}"
+export KUDU_MASTER_PORT="${KUDU_MASTER_PORT:-7051}"
 # TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
 #       to nightly changes from Kudu. The version below is the last released version but
 #       before release this needs to be updated to the version about to be released.
@@ -303,83 +303,85 @@ export IMPALA_LLAMA_VERSION=1.0.0-cdh5.10.0-SNAPSHOT
 export IMPALA_PARQUET_VERSION=1.5.0-cdh5.10.0-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 
-export IMPALA_FE_DIR=$IMPALA_HOME/fe
-export IMPALA_BE_DIR=$IMPALA_HOME/be
-export IMPALA_WORKLOAD_DIR=$IMPALA_HOME/testdata/workloads
-export IMPALA_AUX_WORKLOAD_DIR=$IMPALA_AUX_TEST_HOME/testdata/workloads
-export IMPALA_DATASET_DIR=$IMPALA_HOME/testdata/datasets
-export IMPALA_AUX_DATASET_DIR=$IMPALA_AUX_TEST_HOME/testdata/datasets
-export IMPALA_COMMON_DIR=$IMPALA_HOME/common
-export PATH=$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH
+export IMPALA_FE_DIR="$IMPALA_HOME/fe"
+export IMPALA_BE_DIR="$IMPALA_HOME/be"
+export IMPALA_WORKLOAD_DIR="$IMPALA_HOME/testdata/workloads"
+export IMPALA_AUX_WORKLOAD_DIR="$IMPALA_AUX_TEST_HOME/testdata/workloads"
+export IMPALA_DATASET_DIR="$IMPALA_HOME/testdata/datasets"
+export IMPALA_AUX_DATASET_DIR="$IMPALA_AUX_TEST_HOME/testdata/datasets"
+export IMPALA_COMMON_DIR="$IMPALA_HOME/common"
+export PATH="$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
 
 # The directory in which all the thirdparty CDH components live.
 if [ "${DOWNLOAD_CDH_COMPONENTS}" = true ]; then
-  export CDH_COMPONENTS_HOME=$IMPALA_TOOLCHAIN/cdh_components
+  export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components"
 else
-  export CDH_COMPONENTS_HOME=$IMPALA_HOME/thirdparty
+  export CDH_COMPONENTS_HOME="$IMPALA_HOME/thirdparty"
 fi
 
 # Hadoop dependencies are snapshots in the Impala tree
-export HADOOP_HOME=$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/
-export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
+export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
+export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 : ${HADOOP_CLASSPATH=}
-export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:"${HADOOP_HOME}/share/hadoop/tools/lib/*"
+# Please note that the * is inside quotes, thus it won't get exanded by bash but
+# by java, see "Understanding class path wildcards" at http://goo.gl/f0cfft
+export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 # YARN is configured to use LZO so the LZO jar needs to be in the hadoop classpath.
 export LZO_JAR_PATH="$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar"
 HADOOP_CLASSPATH+=":$LZO_JAR_PATH"
 
-export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
-export PATH=$HADOOP_HOME/bin:$PATH
+export MINI_DFS_BASE_DATA_DIR="$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data"
+export PATH="$HADOOP_HOME/bin:$PATH"
 
-export LLAMA_HOME=$CDH_COMPONENTS_HOME/llama-${IMPALA_LLAMA_VERSION}/
-export MINIKDC_HOME=$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_VERSION}
-export SENTRY_HOME=$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}
-export SENTRY_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
+export LLAMA_HOME="$CDH_COMPONENTS_HOME/llama-${IMPALA_LLAMA_VERSION}/"
+export MINIKDC_HOME="$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_VERSION}"
+export SENTRY_HOME="$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}"
+export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
-export HIVE_HOME=$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/
-export PATH=$HIVE_HOME/bin:$PATH
-export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
+export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
+export PATH="$HIVE_HOME/bin:$PATH"
+export HIVE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 # any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
 # The Postgres JDBC driver is downloaded by maven when building the frontend.
 # Export the location of Postgres JDBC driver so Sentry can pick it up.
-export POSTGRES_JDBC_DRIVER=${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jdbc4.jar
+export POSTGRES_JDBC_DRIVER="${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jdbc4.jar"
 
 export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
 export AUX_CLASSPATH="${LZO_JAR_PATH}"
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
-export HBASE_HOME=$CDH_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/
-export PATH=$HBASE_HOME/bin:$PATH
+export HBASE_HOME="$CDH_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
+export PATH="$HBASE_HOME/bin:$PATH"
 
 # Add the jars so hive can create hbase tables.
-export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-common-${IMPALA_HBASE_VERSION}.jar
-export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-client-${IMPALA_HBASE_VERSION}.jar
-export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-server-${IMPALA_HBASE_VERSION}.jar
-export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBASE_VERSION}.jar
-export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar
+export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-common-${IMPALA_HBASE_VERSION}.jar"
+export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-client-${IMPALA_HBASE_VERSION}.jar"
+export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-server-${IMPALA_HBASE_VERSION}.jar"
+export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBASE_VERSION}.jar"
+export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar"
 
-export HBASE_CONF_DIR=$HIVE_CONF_DIR
+export HBASE_CONF_DIR="$HIVE_CONF_DIR"
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
-export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}
+export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"
 
 # ASAN needs a matching version of llvm-symbolizer to symbolize stack traces.
-export ASAN_SYMBOLIZER_PATH=${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer
+export ASAN_SYMBOLIZER_PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer"
 
-export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
+export CLUSTER_DIR="${IMPALA_HOME}/testdata/cluster"
 
-: ${IMPALA_BUILD_THREADS:=$(nproc)}
+: ${IMPALA_BUILD_THREADS:="$(nproc)"}
 export IMPALA_BUILD_THREADS
 
 # Some environments (like the packaging build) might not have $USER set.  Fix that here.
-export USER=${USER-`id -un`}
+export USER="${USER-`id -un`}"
 
 # Configure python path
-. $IMPALA_HOME/bin/set-pythonpath.sh
+. "$IMPALA_HOME/bin/set-pythonpath.sh"
 
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad.
@@ -396,17 +398,17 @@ LIBHDFS_OPTS="${LIBHDFS_OPTS} -Djava.library.path=${HADOOP_HOME}/lib/native/"
 # the build type.
 export LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
 
-export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
+export ARTISTIC_STYLE_OPTIONS="$IMPALA_BE_DIR/.astylerc"
 
-export IMPALA_SNAPPY_PATH=${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib
+export IMPALA_SNAPPY_PATH="${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib"
 
-export JAVA_LIBRARY_PATH=${IMPALA_SNAPPY_PATH}
+export JAVA_LIBRARY_PATH="${IMPALA_SNAPPY_PATH}"
 
 # So that the frontend tests and PlanService can pick up libbackend.so
 # and other required libraries
-LIB_JAVA=`find ${JAVA_HOME}/   -name libjava.so | head -1`
-LIB_JSIG=`find ${JAVA_HOME}/   -name libjsig.so | head -1`
-LIB_JVM=` find ${JAVA_HOME}/   -name libjvm.so  | head -1`
+LIB_JAVA=`find "${JAVA_HOME}/"   -name libjava.so | head -1`
+LIB_JSIG=`find "${JAVA_HOME}/"   -name libjsig.so | head -1`
+LIB_JVM=` find "${JAVA_HOME}/"   -name libjvm.so  | head -1`
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`"
@@ -416,7 +418,7 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
 
 if [ $USE_SYSTEM_GCC -eq 0 ]; then
-  IMPALA_TOOLCHAIN_GCC_LIB=${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64
+  IMPALA_TOOLCHAIN_GCC_LIB="${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64"
   LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_TOOLCHAIN_GCC_LIB}"
 fi
 
@@ -425,10 +427,10 @@ LD_PRELOAD="${LD_PRELOAD-}"
 export LD_PRELOAD="${LD_PRELOAD}:${LIB_JSIG}"
 
 CLASSPATH="${CLASSPATH-}"
-CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
-CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
-CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
-CLASSPATH=$LZO_JAR_PATH:$CLASSPATH
+CLASSPATH="$IMPALA_FE_DIR/target/dependency:$CLASSPATH"
+CLASSPATH="$IMPALA_FE_DIR/target/classes:$CLASSPATH"
+CLASSPATH="$IMPALA_FE_DIR/src/test/resources:$CLASSPATH"
+CLASSPATH="$LZO_JAR_PATH:$CLASSPATH"
 export CLASSPATH
 
 # Setup aliases
@@ -465,9 +467,9 @@ echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
 # work.  Note that if impala-config.sh is sourced before the
 # kerberized cluster is created, it will have to be sourced again
 # *after* the cluster is created in order to pick up these settings.
-export MINIKDC_ENV=${IMPALA_HOME}/testdata/bin/minikdc_env.sh
-if ${CLUSTER_DIR}/admin is_kerberized; then
-  . ${MINIKDC_ENV}
+export MINIKDC_ENV="${IMPALA_HOME}/testdata/bin/minikdc_env.sh"
+if "${CLUSTER_DIR}/admin" is_kerberized; then
+  . "${MINIKDC_ENV}"
   echo " *** This cluster is kerberized ***"
   echo "KRB5_KTNAME            = $KRB5_KTNAME"
   echo "KRB5_CONFIG            = $KRB5_CONFIG"
@@ -478,6 +480,6 @@ else
   # If the cluster *isn't* kerberized, ensure that the environment isn't
   # polluted with kerberos items that might screw us up.  We go through
   # everything set in the minikdc environment and explicitly unset it.
-  unset `grep export ${MINIKDC_ENV} | sed "s/.*export \([^=]*\)=.*/\1/" \
+  unset `grep export "${MINIKDC_ENV}" | sed "s/.*export \([^=]*\)=.*/\1/" \
       | sort | uniq`
 fi
