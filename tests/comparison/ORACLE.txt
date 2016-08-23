@@ -1,0 +1,90 @@
+Contents
+
+I. Note
+II. Oracle Database server setup
+III. Oracle client setup
+IV. Oracle connectivity, cx_Oracle installation
+TODO: config/setup
+TODO: data load/migrate
+
+I. Note
+
+Due to licensing, we cannot distribute Oracle client binaries, and of
+course we will not distribute Oracle Database. Please refer to these
+guidelines if you need to use Oracle as a reference database for the
+Random Query Generator.
+
+
+II. Oracle Database server setup
+
+There are lots of choices for Oracle Database. What follows are two
+suggestions:
+
+http://www.oracle.com/technetwork/database/database-technologies/express-edition/downloads/index.html
+
+https://hub.docker.com/r/wnameless/oracle-xe-11g/
+
+Follow their instructions for installation and setup. If you can use
+sqlplus or some other shell to successfully "select 1 from dual;", then
+you're good to go here.
+
+
+III. Oracle client setup
+
+Use cx_Oracle.
+
+http://cx-oracle.sourceforge.net/
+
+Note: Installing this via pip or similar means won't work until you have
+first installed prerequisites.
+
+1. Install Oracle instant-client
+
+http://www.oracle.com/technetwork/database/features/instant-client/index-097480.html
+
+After you choose your architecture, you need
+
+  1. the basic client
+  2. the SDK
+
+You will likely have to register on the Oracle site to download the
+instant client binaries. As of this writing, install instructions are at
+the bottom of the page once you make your architecture choice.
+
+2. Additional dependent packages in distribution
+
+It's possible either when trying to install cx_Oracle, import it, or use
+it, you will get some linker error. I cannot predict what libraries you
+do and don't have. Here's a list of Linux distributions and known
+package dependencies:
+
+Ubuntu 14.04.2 LTS
+libaio1
+
+3. Ensure impala-python is working. It may be enough to simply run:
+
+   $ impala-python
+
+   Getting it working is out of scope of this document.
+
+4. Run these commands to install cx_Oracle into the impala-python
+   virtual environment:
+
+   $ source "${IMPALA_HOME}"/infra/python/env/bin/activate
+   (env)$ pip install cx_Oracle==5.2.1
+   (env)$ deactivate
+
+If pip install fails, double check the following:
+  * ORACLE_HOME environment variable
+  * LD_LIBRARY_PATH environment variable
+
+BUILD.txt packaged with cx_Oracle has more instructions for installing
+cx_Oracle.
+
+
+IV. Oracle connectivity, cx_Oracle installation
+
+Verify cx_Oracle can connect to your Oracle Database. Edit appopriately
+and then run:
+
+   $ "${IMPALA_HOME}"/tests/comparison/util/verify-oracle-connection.py

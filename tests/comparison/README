@@ -22,6 +22,9 @@ Requirements:
      sudo apt-get install python-mysqldb
      sudo apt-get install python-psycopg2   # Postgresql
 
+Please see the supplemental ORACLE.txt on setting up Oracle as a reference
+database.
+
 
 Usage:
 
@@ -74,7 +77,9 @@ Miscellaneous:
 
 Postgresql:
 
-1) Supports basically all Impala language features
+1) Supports basically all Impala language features. Exceptions include:
+
+   a) IGNORE NULLS clause for analytic functions
 
 2) Has strange sorting of strings, '-1' > '1'. This may be important if ORDER BY is ever
    used. The databases being compared would need to have the same collation, which is
@@ -86,6 +91,13 @@ MySQL:
 
 2) Has poor boolean support.
 
+Oracle:
+
+1) No Boolean support.
+
+2) Better analytic function support, e.g. "IGNORE NULLS" is supported.
+
+3) Strange oddities abound, like no LIMIT clause.
 
 Improvements:
 
