@@ -155,27 +155,27 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
    predicates: functional.alltypes.id > 1
    runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
-15:EXCHANGE [UNPARTITIONED]
+16:EXCHANGE [UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = count(a.bigint_col)
 |  runtime filters: RF000 <- count(a.bigint_col)
 |
-|--14:EXCHANGE [BROADCAST]
+|--15:EXCHANGE [BROADCAST]
 |  |
-|  13:MERGING-EXCHANGE [UNPARTITIONED]
+|  14:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: b.string_col ASC
 |  |  limit: 100
 |  |
 |  06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
 |  |
-|  12:AGGREGATE [FINALIZE]
+|  13:AGGREGATE [FINALIZE]
 |  |  output: count:merge(a.bigint_col)
 |  |  group by: b.string_col
 |  |  having: count(a.bigint_col) > 1
 |  |
-|  11:EXCHANGE [HASH(b.string_col)]
+|  12:EXCHANGE [HASH(b.string_col)]
 |  |
 |  05:AGGREGATE [STREAMING]
 |  |  output: count(a.bigint_col)
@@ -185,7 +185,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |  hash predicates: a.id = b.id
 |  |  runtime filters: RF002 <- b.id
 |  |
-|  |--10:EXCHANGE [BROADCAST]
+|  |--11:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -195,16 +195,18 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |     predicates: a.bigint_col < 50
 |     runtime filters: RF002 -> a.id
 |
-07:HASH JOIN [INNER JOIN, BROADCAST]
+07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = int_col
 |  runtime filters: RF001 <- int_col
 |
-|--09:EXCHANGE [BROADCAST]
+|--10:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col > 1
 |     runtime filters: RF000 -> int_col
+|
+09:EXCHANGE [HASH(functional.alltypes.id)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

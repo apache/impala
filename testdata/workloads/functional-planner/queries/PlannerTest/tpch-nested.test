@@ -1887,14 +1887,12 @@ where
 06:AGGREGATE
 |  output: sum(l_extendedprice)
 |
-05:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+05:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: p_partkey = l_partkey
 |  other join predicates: l_quantity < 0.2 * avg(l_quantity)
 |  runtime filters: RF000 <- l_partkey
 |
-|--10:EXCHANGE [BROADCAST]
-|  |
-|  09:AGGREGATE [FINALIZE]
+|--09:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(l_quantity)
 |  |  group by: l_partkey
 |  |
@@ -1906,6 +1904,8 @@ where
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
 |     partitions=1/1 files=4 size=577.87MB
+|
+10:EXCHANGE [HASH(p_partkey)]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey

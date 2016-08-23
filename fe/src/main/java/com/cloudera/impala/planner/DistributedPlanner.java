@@ -417,17 +417,20 @@ public class DistributedPlanner {
       PlanFragment leftChildFragment, long perNodeMemLimit,
       ArrayList<PlanFragment> fragments)
       throws ImpalaException {
+    // For both join types, the total cost is calculated as the amount of data
+    // sent over the network, plus the amount of data inserted into the hash table.
     // broadcast: send the rightChildFragment's output to each node executing
-    // the leftChildFragment; the cost across all nodes is proportional to the
-    // total amount of data sent
+    // the leftChildFragment, and build a hash table with it on each node.
     Analyzer analyzer = ctx_.getRootAnalyzer();
     PlanNode rhsTree = rightChildFragment.getPlanRoot();
     long rhsDataSize = 0;
     long broadcastCost = Long.MAX_VALUE;
-    if (rhsTree.getCardinality() != -1 && leftChildFragment.getNumNodes() != -1) {
+    if (rhsTree.getCardinality() != -1) {
       rhsDataSize = Math.round(
           rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
-      broadcastCost = rhsDataSize * leftChildFragment.getNumNodes();
+      if (leftChildFragment.getNumNodes() != -1) {
+        broadcastCost = 2 * rhsDataSize * leftChildFragment.getNumNodes();
+      }
     }
     LOG.debug("broadcast: cost=" + Long.toString(broadcastCost));
     LOG.debug("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
@@ -435,7 +438,7 @@ public class DistributedPlanner {
         + Integer.toString(leftChildFragment.getNumNodes()));
 
     // repartition: both left- and rightChildFragment are partitioned on the
-    // join exprs
+    // join exprs, and a hash table is built with the rightChildFragment's output.
     PlanNode lhsTree = leftChildFragment.getPlanRoot();
     long partitionCost = Long.MAX_VALUE;
     List<Expr> lhsJoinExprs = Lists.newArrayList();
@@ -453,13 +456,11 @@ public class DistributedPlanner {
       rhsHasCompatPartition = analyzer.equivSets(rhsJoinExprs,
           rightChildFragment.getDataPartition().getPartitionExprs());
 
-      double lhsCost = (lhsHasCompatPartition) ? 0.0 :
+      double lhsNetworkCost = (lhsHasCompatPartition) ? 0.0 :
         Math.round(
             lhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(lhsTree));
-      double rhsCost = (rhsHasCompatPartition) ? 0.0 :
-        Math.round(
-            rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
-      partitionCost = Math.round(lhsCost + rhsCost);
+      double rhsNetworkCost = (rhsHasCompatPartition) ? 0.0 : rhsDataSize;
+      partitionCost = Math.round(lhsNetworkCost + rhsNetworkCost + rhsDataSize);
     }
     LOG.debug("partition: cost=" + Long.toString(partitionCost));
     LOG.debug("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="

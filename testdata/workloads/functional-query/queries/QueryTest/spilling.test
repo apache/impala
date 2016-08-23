@@ -203,7 +203,7 @@ select
   count(*) as numwait
 from
   supplier,
-  lineitem l1,
+  lineitem l1 join [BROADCAST]
   orders,
   nation
 where

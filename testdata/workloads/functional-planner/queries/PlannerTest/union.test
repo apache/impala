@@ -2469,7 +2469,7 @@ select 1000, 2000
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
-10:EXCHANGE [UNPARTITIONED]
+11:EXCHANGE [UNPARTITIONED]
 |
 00:UNION
 |  constant-operands=1
@@ -2477,14 +2477,16 @@ select 1000, 2000
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
-|--06:HASH JOIN [INNER JOIN, BROADCAST]
+|--06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash predicates: a.id = b.id
 |  |  runtime filters: RF000 <- b.id
 |  |
-|  |--09:EXCHANGE [BROADCAST]
+|  |--10:EXCHANGE [HASH(b.id)]
 |  |  |
 |  |  05:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
+|  |
+|  09:EXCHANGE [HASH(a.id)]
 |  |
 |  04:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
@@ -2602,7 +2604,7 @@ select 1000, 2000
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-19:EXCHANGE [UNPARTITIONED]
+20:EXCHANGE [UNPARTITIONED]
 |
 00:UNION
 |  constant-operands=1
@@ -2610,7 +2612,7 @@ select 1000, 2000
 |--05:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
-|--18:EXCHANGE [RANDOM]
+|--19:EXCHANGE [RANDOM]
 |  |
 |  13:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: id ASC
@@ -2622,7 +2624,7 @@ select 1000, 2000
 |  03:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
 |
-|--17:EXCHANGE [RANDOM]
+|--18:EXCHANGE [RANDOM]
 |  |
 |  12:AGGREGATE [FINALIZE]
 |  |  output: count:merge(id), sum:merge(bigint_col)
@@ -2635,14 +2637,16 @@ select 1000, 2000
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
-|--10:HASH JOIN [INNER JOIN, BROADCAST]
+|--10:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash predicates: a.id = b.id
 |  |  runtime filters: RF000 <- b.id
 |  |
-|  |--16:EXCHANGE [BROADCAST]
+|  |--17:EXCHANGE [HASH(b.id)]
 |  |  |
 |  |  09:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
+|  |
+|  16:EXCHANGE [HASH(a.id)]
 |  |
 |  08:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
