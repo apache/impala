@@ -243,6 +243,33 @@ class BitUtil {
   }
 };
 
+/// An encapsulation class of SIMD byteswap functions
+class SimdByteSwap {
+ public:
+  /// Byteswap an array in the scalar way with some builtin optimization for arrays of
+  /// length <= 16 bytes.
+  ///   const void* src: the source address of the input array;
+  ///   int len: the length of the input array;
+  ///   void* dst: the destination address of the output array;
+  static void ByteSwapScalar(const void* src, int len, void* dst);
+
+  /// SIMD ByteSwap functions:
+  /// ByteSwap128 is to byteswap an array of 16 bytes(128 bits) using SSSE3 intrinsics;
+  /// ByteSwap256 is to byteswap an array of 32 bytes(256 bits) using AVX2 intrinsics;
+  /// Function parameters have the same meaning as ByteSwapScalar.
+  static void ByteSwap128(const uint8_t* src, uint8_t* dst);
+  static void ByteSwap256(const uint8_t* src, uint8_t* dst);
+
+  /// Template function ByteSwapSimd is the entry point function to byteswap an array
+  /// using SIMD approach.
+  /// Template parameter:
+  ///   int TEMPLATE_DATA_WIDTH: only 16 or 32 are valid now;
+  ///   16 means using ByteSwap128 as the internal SIMD implementation;
+  ///   32 means using ByteSwap256 as the internal SIMD implementation;
+  /// Function parameters have the same meaning as ByteSwapScalar.
+  template <int TEMPLATE_DATA_WIDTH>
+  static void ByteSwapSimd(const void* src, const int len, void* dst);
+};
 }
 
 #endif

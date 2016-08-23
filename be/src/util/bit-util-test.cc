@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
+#include <algorithm>
 #include <limits.h>
 
 #include <boost/utility.hpp>
@@ -94,6 +95,80 @@ TEST(BitUtil, TrailingBits) {
   EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 64), 1LL << 63);
 }
 
+// Test different SIMD functionality units with an input/output buffer.
+// CpuFlag parameter indicates SIMD routine to be tested:
+//   CpuInfo::SSSE3 for ByteSwapSSE_Unit;
+//   CpuInfo::AVX2 for ByteSwapAVX2_Unit;
+void TestByteSwapSimd_Unit(const int64_t CpuFlag) {
+  void (*bswap_fptr)(const uint8_t* src, uint8_t* dst) = NULL;
+  int buf_size = 0;
+  if (CpuFlag == CpuInfo::SSSE3) {
+    buf_size = 16;
+    bswap_fptr = SimdByteSwap::ByteSwap128;
+  } else {
+    static const int64_t AVX2_MASK = CpuInfo::AVX2;
+    ASSERT_EQ(CpuFlag, AVX2_MASK);
+    buf_size = 32;
+    bswap_fptr = SimdByteSwap::ByteSwap256;
+  }
+
+  DCHECK(bswap_fptr != NULL);
+  uint8_t src_buf[buf_size];
+  uint8_t dst_buf[buf_size];
+  std::iota(src_buf, src_buf + buf_size, 0);
+  bswap_fptr(src_buf, dst_buf);
+
+  // Validate the swap results.
+  for (int j = 0; j < buf_size; ++j) {
+    EXPECT_EQ(dst_buf[j], buf_size - j - 1);
+    EXPECT_EQ(dst_buf[j], src_buf[buf_size - j - 1]);
+  }
+}
+
+// Test the logic of ByteSwapSimd control flow using specified SIMD routine with an
+// input/output buffer.
+// CpuFlag parameter indicates SIMD routine to be tested:
+//   CpuInfo::SSSE3 for SimdByteSwap::ByteSwapSSE_Unit;
+//   CpuInfo::AVX2 for SimdByteSwap::ByteSwapAVX2_Unit;
+//   CpuFlag == 0 for BitUtil::ByteSwap;
+// buf_size parameter indicates the size of input/output buffer.
+void TestByteSwapSimd(const int64_t CpuFlag, const int buf_size) {
+  uint8_t src_buf[buf_size];
+  uint8_t dst_buf[buf_size];
+  std::iota(src_buf, src_buf + buf_size, 0);
+
+  int start_size = 0;
+  if (CpuFlag == CpuInfo::SSSE3) {
+    start_size = 16;
+  } else if (CpuFlag == CpuInfo::AVX2) {
+    start_size = 32;
+  }
+
+  for (int i = start_size; i < buf_size; ++i) {
+    // Initialize dst buffer and swap i bytes.
+    memset(dst_buf, 0, buf_size);
+    if (CpuFlag == CpuInfo::SSSE3) {
+      SimdByteSwap::ByteSwapSimd<16>(src_buf, i, dst_buf);
+    } else if (CpuFlag == CpuInfo::AVX2) {
+      SimdByteSwap::ByteSwapSimd<32>(src_buf, i, dst_buf);
+    } else {
+      // CpuFlag == 0: test the internal logic of BitUtil::ByteSwap
+      ASSERT_EQ(CpuFlag, 0);
+      BitUtil::ByteSwap(dst_buf, src_buf, i);
+    }
+
+    // Validate the swap results.
+    for (int j = 0; j < i; ++j) {
+      EXPECT_EQ(dst_buf[j], i - j - 1);
+      EXPECT_EQ(dst_buf[j], src_buf[i - j - 1]);
+    }
+    // Check that the dst buffer is otherwise unmodified.
+    for (int j = i; j < buf_size; ++j) {
+      EXPECT_EQ(dst_buf[j], 0);
+    }
+  }
+}
+
 TEST(BitUtil, ByteSwap) {
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint32_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint32_t>(0x11223344)), 0x44332211);
@@ -115,27 +190,23 @@ TEST(BitUtil, ByteSwap) {
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0x1122)), 0x2211);
 
-  // Test ByteSwap() with an input/output buffer, swapping up to 32 bytes.
-  int buf_size = 32;
-  uint8_t src_buf[buf_size];
-  for (int i = 0; i < buf_size; ++i) {
-    src_buf[i] = i;
+  // Tests for ByteSwap SIMD functions
+  if (CpuInfo::IsSupported(CpuInfo::SSSE3)) {
+    // Test SSSE3 functionality unit
+    TestByteSwapSimd_Unit(CpuInfo::SSSE3);
+    // Test ByteSwapSimd() using SSSE3;
+    TestByteSwapSimd(CpuInfo::SSSE3, 64);
   }
-  uint8_t dst_buf[buf_size];
-  for (int i = 0; i < buf_size; ++i) {
-    // Init dst buffer and swap i bytes.
-    memset(dst_buf, 0, buf_size);
-    BitUtil::ByteSwap(dst_buf, src_buf, i);
-    // Validate the swap results.
-    for (int j = 0; j < i; ++j) {
-      EXPECT_EQ(dst_buf[j], i - j - 1);
-      EXPECT_EQ(dst_buf[j], src_buf[i - j - 1]);
-    }
-    // Check that the dst buffer is otherwise unmodified.
-    for (int j = i; j < buf_size; ++j) {
-      EXPECT_EQ(dst_buf[j], 0);
-    }
+
+  if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
+    // Test AVX2 functionality unit
+    TestByteSwapSimd_Unit(CpuInfo::AVX2);
+    // Test ByteSwapSimd() using AVX2;
+    TestByteSwapSimd(CpuInfo::AVX2, 64);
   }
+
+  // Test BitUtil::ByteSwap(Black Box Testing)
+  for (int i = 0; i <= 32; ++i) TestByteSwapSimd(0, i);
 }
 
 TEST(BitUtil, Log2) {

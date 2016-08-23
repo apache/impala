@@ -208,7 +208,7 @@ StringVal StringFunctions::Reverse(FunctionContext* context, const StringVal& st
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
   if (UNLIKELY(result.is_null)) return StringVal::null();
-  std::reverse_copy(str.ptr, str.ptr + str.len, result.ptr);
+  BitUtil::ByteSwap(result.ptr, str.ptr, str.len);
   return result;
 }
 

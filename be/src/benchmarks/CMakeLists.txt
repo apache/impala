@@ -49,5 +49,6 @@ ADD_BE_BENCHMARK(expr-benchmark)
 ADD_BE_BENCHMARK(hash-benchmark)
 ADD_BE_BENCHMARK(in-predicate-benchmark)
 ADD_BE_BENCHMARK(network-perf-benchmark)
+ADD_BE_BENCHMARK(bswap-benchmark)
 
 target_link_libraries(hash-benchmark Experiments)
