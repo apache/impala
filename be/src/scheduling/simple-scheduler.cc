@@ -257,13 +257,21 @@ void SimpleScheduler::UpdateMembership(
         VLOG(2) << "Error deserializing membership topic item with key: " << item.key;
         continue;
       }
+      if (be_desc.ip_address.empty()) {
+        // Each scheduler resolves its hostname locally in SimpleScheduler::Init() and
+        // adds the IP address to local_backend_descriptor_. If it is empty, then either
+        // that code has been changed, or someone else is sending malformed packets.
+        VLOG(1) << "Ignoring subscription request with empty IP address from subscriber: "
+            << be_desc.address;
+        continue;
+      }
       if (item.key == local_backend_id_
           && be_desc.address != local_backend_descriptor_.address) {
         // Someone else has registered this subscriber ID with a different address. We
         // will try to re-register (i.e. overwrite their subscription), but there is
         // likely a configuration problem.
         LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-          << be_desc.address;
+            << be_desc.address;
       }
 
       new_backend_config->AddBackend(be_desc);
@@ -913,6 +921,7 @@ SimpleScheduler::BackendConfig::BackendConfig(
 }
 
 void SimpleScheduler::BackendConfig::AddBackend(const TBackendDescriptor& be_desc) {
+  DCHECK(!be_desc.ip_address.empty());
   BackendList* be_descs = &backend_map_[be_desc.ip_address];
   if (find(be_descs->begin(), be_descs->end(), be_desc) == be_descs->end()) {
     be_descs->push_back(be_desc);
@@ -921,12 +930,14 @@ void SimpleScheduler::BackendConfig::AddBackend(const TBackendDescriptor& be_des
 }
 
 void SimpleScheduler::BackendConfig::RemoveBackend(const TBackendDescriptor& be_desc) {
-  backend_ip_map_.erase(be_desc.address.hostname);
   auto be_descs_it = backend_map_.find(be_desc.ip_address);
   if (be_descs_it != backend_map_.end()) {
     BackendList* be_descs = &be_descs_it->second;
     be_descs->erase(remove(be_descs->begin(), be_descs->end(), be_desc), be_descs->end());
-    if (be_descs->empty()) backend_map_.erase(be_descs_it);
+    if (be_descs->empty()) {
+      backend_map_.erase(be_descs_it);
+      backend_ip_map_.erase(be_desc.address.hostname);
+    }
   }
 }
 
@@ -1066,6 +1077,7 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
 
   IpAddr backend_ip;
   backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip);
+  DCHECK(!backend_ip.empty());
   DCHECK(backend_map().find(backend_ip) != backend_map().end());
   assignment_heap_.InsertOrUpdate(backend_ip, scan_range_length,
       GetBackendRank(backend_ip));
