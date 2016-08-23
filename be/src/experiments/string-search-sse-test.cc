@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <string>
 #include <gtest/gtest.h>
+#include <string>
 
 #include "experiments/string-search-sse.h"
 
@@ -27,9 +27,8 @@ namespace impala {
 // Test string search for haystack/needle, up to len for each.
 // If the length is -1, use the full string length
 // haystack/needle are null terminated
-void TestSearch(const char* haystack_orig, const char* needle_orig,
-    int haystack_len = -1, int needle_len = -1) {
-
+void TestSearch(const char* haystack_orig, const char* needle_orig, int haystack_len = -1,
+    int needle_len = -1) {
   string haystack_copy(haystack_orig);
   string needle_copy(needle_orig);
   const char* haystack = haystack_copy.c_str();
@@ -79,7 +78,6 @@ void TestSearch(const char* haystack_orig, const char* needle_orig,
   EXPECT_EQ(strcmp(needle, needle_orig), 0);
 }
 
-
 TEST(StringSearchTest, Basic) {
   // Basic Tests
   TestSearch("abcd", "a");
@@ -113,11 +111,9 @@ TEST(StringSearchTest, Basic) {
   TestSearch("abcdede", "cde");
   TestSearch("abcdacde", "cde");
 }
-
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

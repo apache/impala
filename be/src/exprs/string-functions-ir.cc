@@ -284,13 +284,68 @@ IntVal StringFunctions::Ascii(FunctionContext* context, const StringVal& str) {
 }
 
 IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
-    const StringVal& substr) {
-  if (str.is_null || substr.is_null) return IntVal::null();
-  StringValue str_sv = StringValue::FromStringVal(str);
-  StringValue substr_sv = StringValue::FromStringVal(substr);
-  StringSearch search(&substr_sv);
-  // Hive returns positions starting from 1.
-  return IntVal(search.Search(&str_sv) + 1);
+    const StringVal& substr, const BigIntVal& start_position,
+    const BigIntVal& occurrence) {
+  if (str.is_null || substr.is_null || start_position.is_null || occurrence.is_null) {
+    return IntVal::null();
+  }
+  if (occurrence.val <= 0) {
+    stringstream ss;
+    ss << "Invalid occurrence parameter to instr function: " << occurrence.val;
+    context->SetError(ss.str().c_str());
+    return IntVal(0);
+  }
+  if (start_position.val == 0) return IntVal(0);
+
+  StringValue haystack = StringValue::FromStringVal(str);
+  StringValue needle = StringValue::FromStringVal(substr);
+  StringSearch search(&needle);
+  if (start_position.val > 0) {
+    // A positive starting position indicates regular searching from the left.
+    int search_start_pos = start_position.val - 1;
+    if (search_start_pos >= haystack.len) return IntVal(0);
+    int match_pos = -1;
+    for (int match_num = 0; match_num < occurrence.val; ++match_num) {
+      DCHECK_LE(search_start_pos, haystack.len);
+      StringValue haystack_substring = haystack.Substring(search_start_pos);
+      int match_pos_in_substring = search.Search(&haystack_substring);
+      if (match_pos_in_substring < 0) return IntVal(0);
+      match_pos = search_start_pos + match_pos_in_substring;
+      search_start_pos = match_pos + 1;
+    }
+    // Return positions starting from 1 at the leftmost position.
+    return IntVal(match_pos + 1);
+  } else {
+    // A negative starting position indicates searching from the right.
+    int search_start_pos = haystack.len + start_position.val;
+    // The needle must fit between search_start_pos and the end of the string
+    if (search_start_pos + needle.len > haystack.len) {
+      search_start_pos = haystack.len - needle.len;
+    }
+    if (search_start_pos < 0) return IntVal(0);
+    int match_pos = -1;
+    for (int match_num = 0; match_num < occurrence.val; ++match_num) {
+      DCHECK_GE(search_start_pos + needle.len, 0);
+      DCHECK_LE(search_start_pos + needle.len, haystack.len);
+      StringValue haystack_substring =
+          haystack.Substring(0, search_start_pos + needle.len);
+      match_pos = search.RSearch(&haystack_substring);
+      if (match_pos < 0) return IntVal(0);
+      search_start_pos = match_pos - 1;
+    }
+    // Return positions starting from 1 at the leftmost position.
+    return IntVal(match_pos + 1);
+  }
+}
+
+IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
+    const StringVal& substr, const BigIntVal& start_position) {
+  return Instr(context, str, substr, start_position, BigIntVal(1));
+}
+
+IntVal StringFunctions::Instr(
+    FunctionContext* context, const StringVal& str, const StringVal& substr) {
+  return Instr(context, str, substr, BigIntVal(1), BigIntVal(1));
 }
 
 IntVal StringFunctions::Locate(FunctionContext* context, const StringVal& substr,

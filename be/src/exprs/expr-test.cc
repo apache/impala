@@ -2064,9 +2064,74 @@ TEST_F(ExprTest, StringFunctions) {
   TestValue("instr('', '')", TYPE_INT, 0);
   TestValue("instr('', 'abc')", TYPE_INT, 0);
   TestValue("instr('abc', '')", TYPE_INT, 0);
+  TestValue("instr('abcdef', 'xyz')", TYPE_INT, 0);
+  TestValue("instr('xyz', 'abcdef')", TYPE_INT, 0);
   TestValue("instr('abc', 'abc')", TYPE_INT, 1);
   TestValue("instr('xyzabc', 'abc')", TYPE_INT, 4);
   TestValue("instr('xyzabcxyz', 'bcx')", TYPE_INT, 5);
+
+  TestValue("instr('', '', -1)", TYPE_INT, 0);
+  TestValue("instr('', 'abc', -1)", TYPE_INT, 0);
+  TestValue("instr('abc', '', -1)", TYPE_INT, 0);
+  TestValue("instr('abc', 'abc', -1)", TYPE_INT, 1);
+  TestValue("instr('xyzabc', 'abc', -1)", TYPE_INT, 4);
+  TestValue("instr('xyzabcxyz', 'bcx', -1)", TYPE_INT, 5);
+
+  TestValue("instr('corporate floor', 'or', 0)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', 14)", TYPE_INT, 14);
+  TestValue("instr('corporate floor', 'or', 15)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', -14)", TYPE_INT, 2);
+  TestValue("instr('corporate floor', 'or', -15)", TYPE_INT, 0);
+
+  TestValue("instr('corporate floor', 'or', 0, 1)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', 14, 1)", TYPE_INT, 14);
+  TestValue("instr('corporate floor', 'or', 15, 1)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', -14, 1)", TYPE_INT, 2);
+  TestValue("instr('corporate floor', 'or', -15, 1)", TYPE_INT, 0);
+
+  TestValue("instr('corporate floor', 'or', 2, 2)", TYPE_INT, 5);
+  TestValue("instr('corporate floor', 'or', 3, 2)", TYPE_INT, 14);
+  TestValue("instr('corporate floor', 'or', -3, 2)", TYPE_INT, 2);
+  TestValue("instr('corporate floor', 'or', -2, 2)", TYPE_INT, 5);
+
+  TestValue("instr('corporate floor', 'or', 3, 3)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', -3, 3)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', '', 3, 3)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', '', -3, 3)", TYPE_INT, 0);
+
+  TestValue("instr('abababa', 'aba', 1, 1)", TYPE_INT, 1);
+  TestValue("instr('abababa', 'aba', 1, 2)", TYPE_INT, 3);
+  TestValue("instr('abababa', 'aba', 1, 3)", TYPE_INT, 5);
+  TestValue("instr('abababa', 'aba', cast(1 as bigint), cast(3 as bigint))", TYPE_INT, 5);
+
+  TestError("instr('corporate floor', 'or', 0, 0)");
+  TestError("instr('corporate floor', 'or', 0, -1)");
+  TestError("instr('corporate floor', 'or', 1, 0)");
+  TestError("instr('corporate floor', 'or', 1, -1)");
+
+  TestIsNull("instr(NULL, 'or', 2)", TYPE_INT);
+  TestIsNull("instr('corporate floor', NULL, 2)", TYPE_INT);
+  TestIsNull("instr('corporate floor', 'or', NULL)", TYPE_INT);
+
+  TestIsNull("instr(NULL, 'or', 2, 2)", TYPE_INT);
+  TestIsNull("instr('corporate floor', NULL, 2, 2)", TYPE_INT);
+  TestIsNull("instr('corporate floor', 'or', NULL, 2)", TYPE_INT);
+  TestIsNull("instr('corporate floor', 'or', 2, NULL)", TYPE_INT);
+
+  TestValue("instr('a', 'a', 1, 1)", TYPE_INT, 1);
+  TestValue("instr('axyz', 'a', 1, 1)", TYPE_INT, 1);
+  TestValue("instr('xyza', 'a', 1, 1)", TYPE_INT, 4);
+  TestValue("instr('a', 'a', 1, 2)", TYPE_INT, 0);
+  TestValue("instr('axyz', 'a', 1, 2)", TYPE_INT, 0);
+  TestValue("instr('xyza', 'a', 1, 2)", TYPE_INT, 0);
+
+  TestValue("instr('a', 'a', -1, 1)", TYPE_INT, 1);
+  TestValue("instr('axyz', 'a', -1, 1)", TYPE_INT, 1);
+  TestValue("instr('xyza', 'a', -1, 1)", TYPE_INT, 4);
+  TestValue("instr('a', 'a', -1, 2)", TYPE_INT, 0);
+  TestValue("instr('axyz', 'a', -1, 2)", TYPE_INT, 0);
+  TestValue("instr('xyza', 'a', -1, 2)", TYPE_INT, 0);
+
   TestIsNull("instr(NULL, 'bcx')", TYPE_INT);
   TestIsNull("instr('xyzabcxyz', NULL)", TYPE_INT);
   TestIsNull("instr(NULL, NULL)", TYPE_INT);

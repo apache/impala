@@ -15,12 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_RUNTIME_STRING_SEARCH_H
 #define IMPALA_RUNTIME_STRING_SEARCH_H
 
-#include <vector>
+#include <algorithm>
 #include <cstring>
+#include <vector>
+
 #include <boost/cstdint.hpp>
 
 #include "common/logging.h"
@@ -44,7 +45,8 @@ class StringSearch {
   StringSearch() : pattern_(NULL), mask_(0) {}
 
   /// Initialize/Precompute a StringSearch object from the pattern
-  StringSearch(const StringValue* pattern) : pattern_(pattern), mask_(0), skip_(0) {
+  StringSearch(const StringValue* pattern)
+    : pattern_(pattern), mask_(0), skip_(0), rskip_(0) {
     // Special cases
     if (pattern_->len <= 1) {
       return;
@@ -53,13 +55,25 @@ class StringSearch {
     // Build compressed lookup table
     int mlast = pattern_->len - 1;
     skip_ = mlast - 1;
+    rskip_ = mlast - 1;
 
+    // In the Python implementation, building the bloom filter happens at the
+    // beginning of the Search operation. We build it during construction
+    // instead, so that the same StringSearch instance can be reused multiple
+    // times without rebuilding the bloom filter every time.
     for (int i = 0; i < mlast; ++i) {
       BloomAdd(pattern_->ptr[i]);
       if (pattern_->ptr[i] == pattern_->ptr[mlast])
         skip_ = mlast - i - 1;
     }
     BloomAdd(pattern_->ptr[mlast]);
+
+    // The order of iteration doesn't have any effect on the bloom filter, but
+    // it does on skip_. For this reason we need to calculate a separate rskip_
+    // for reverse search.
+    for (int i = mlast; i > 0; i--) {
+      if (pattern_->ptr[i] == pattern_->ptr[0]) rskip_ = i - 1;
+    }
   }
 
   /// Search for this pattern in str.
@@ -114,6 +128,54 @@ class StringSearch {
     return -1;
   }
 
+  /// Search for this pattern in str backwards.
+  ///   Returns the offset into str if the pattern exists
+  ///   Returns -1 if the pattern is not found
+  int RSearch(const StringValue* str) const {
+    // Special cases
+    if (str == NULL || pattern_ == NULL || pattern_->len == 0) {
+      return -1;
+    }
+
+    int mlast = pattern_->len - 1;
+    int w = str->len - pattern_->len;
+    int n = str->len;
+    int m = pattern_->len;
+    const char* s = str->ptr;
+    const char* p = pattern_->ptr;
+
+    // Special case if pattern->len == 1
+    if (m == 1) {
+      const char* result = reinterpret_cast<const char*>(memrchr(s, p[0], n));
+      if (result != NULL) return result - s;
+      return -1;
+    }
+
+    // General case.
+    int j;
+    for (int i = w; i >= 0; i--) {
+      if (s[i] == p[0]) {
+        // candidate match
+        for (j = mlast; j > 0; j--)
+          if (s[i + j] != p[j]) break;
+        if (j == 0) {
+          return i;
+        }
+        // miss: check if previous character is part of pattern
+        if (i > 0 && !BloomQuery(s[i - 1]))
+          i = i - m;
+        else
+          i = i - rskip_;
+      } else {
+        // skip: check if previous character is part of pattern
+        if (i > 0 && !BloomQuery(s[i - 1])) {
+          i = i - m;
+        }
+      }
+    }
+    return -1;
+  }
+
  private:
   static const int BLOOM_WIDTH = 64;
 
@@ -127,7 +189,8 @@ class StringSearch {
 
   const StringValue* pattern_;
   int64_t mask_;
-  int64_t skip_;
+  int skip_;
+  int rskip_;
 };
 
 }

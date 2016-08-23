@@ -60,7 +60,12 @@ class StringFunctions {
   static StringVal Ltrim(FunctionContext*, const StringVal& str);
   static StringVal Rtrim(FunctionContext*, const StringVal& str);
   static IntVal Ascii(FunctionContext*, const StringVal& str);
+  static IntVal Instr(FunctionContext*, const StringVal& str, const StringVal& substr,
+      const BigIntVal& start_position, const BigIntVal& occurrence);
+  static IntVal Instr(FunctionContext*, const StringVal& str, const StringVal& substr,
+      const BigIntVal& start_position);
   static IntVal Instr(FunctionContext*, const StringVal& str, const StringVal& substr);
+
   static IntVal Locate(FunctionContext*, const StringVal& substr, const StringVal& str);
   static IntVal LocatePos(FunctionContext*, const StringVal& substr, const StringVal& str,
       const BigIntVal& start_pos);
