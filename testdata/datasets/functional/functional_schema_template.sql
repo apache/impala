@@ -77,6 +77,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101001.txt' OVERW
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=11);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=12);
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
   id INT PRIMARY KEY,
   bool_col BOOLEAN,
@@ -154,6 +155,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090201.txt' 
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
   id INT PRIMARY KEY,
   bool_col BOOLEAN,
@@ -212,6 +214,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090201.txt' O
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
   id INT PRIMARY KEY,
   bool_col BOOLEAN,
@@ -625,6 +628,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100108.
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
   id INT PRIMARY KEY,
   bool_col BOOLEAN,
@@ -756,6 +760,7 @@ zip int
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   id bigint primary key,
   name string,
@@ -778,6 +783,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   id bigint primary key,
   name string,
@@ -801,6 +807,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/JoinTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   test_id bigint,
   test_name string,
@@ -1142,6 +1149,7 @@ f2 int
 ---- COLUMNS
 field string
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
   field STRING PRIMARY KEY,
   f2 INT
@@ -1248,6 +1256,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   a string primary key,
   b string
@@ -1267,6 +1276,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyIntTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   int_col int primary key
 )
@@ -1292,6 +1302,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functiona
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullTable/data.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   a string primary key, b string, c string, d int, e double, f string, g string
 )
@@ -1317,6 +1328,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functiona
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullTable/data.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   a string primary key, b string, c string, d int, e double, f string, g string
 )
@@ -1391,6 +1403,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077_with_ann_noheader.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   id string,
   zip string,

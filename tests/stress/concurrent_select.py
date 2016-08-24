@@ -897,13 +897,16 @@ class QueryRunner(object):
     return hash_thread.result
 
 
-def load_tpc_queries(workload):
-  """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
+def load_tpc_queries(workload, load_in_kudu=False):
+  """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'.
+  If 'load_in_kudu' is True, it loads only queries specified for the Kudu storage
+  engine."""
   LOG.info("Loading %s queries", workload)
   queries = list()
   query_dir = os.path.join(os.path.dirname(__file__), "..", "..",
       "testdata", "workloads", workload, "queries")
-  file_name_pattern = re.compile(r"-(q\d+).test$")
+  engine = 'kudu-' if load_in_kudu else ''
+  file_name_pattern = re.compile(r"%s-%s(q\d+).test$" % (workload, engine))
   for query_file in os.listdir(query_dir):
     match = file_name_pattern.search(query_file)
     if not match:
@@ -1339,6 +1342,10 @@ def main():
   parser.add_argument("--tpch-db", help="If provided, TPC-H queries will be used.")
   parser.add_argument("--tpch-nested-db",
       help="If provided, nested TPC-H queries will be used.")
+  parser.add_argument("--tpch-kudu-db",
+      help="If provided, TPC-H queries for Kudu will be used.")
+  parser.add_argument("--tpcds-kudu-db",
+      help="If provided, TPC-DS queries for Kudu will be used.")
   parser.add_argument("--random-db",
       help="If provided, random queries will be used.")
   parser.add_argument("--random-query-count", type=int, default=50,
@@ -1375,9 +1382,10 @@ def main():
   LOG.debug("CLI args: %s" % (args, ))
 
   if not args.tpcds_db and not args.tpch_db and not args.random_db \
-      and not args.tpch_nested_db and not args.query_file_path:
-    raise Exception("At least one of --tpcds-db, --tpch-db,"
-        "--tpch-nested-db, --random-db, --query-file-path is required")
+      and not args.tpch_nested_db and not args.tpch_kudu_db \
+      and not args.tpcds_kudu_db and not args.query_file_path:
+    raise Exception("At least one of --tpcds-db, --tpch-db, --tpch-kudu-db,"
+        "--tpcds-kudu-db, --tpch-nested-db, --random-db, --query-file-path is required")
 
   # The stress test sets these, so callers cannot override them.
   IGNORE_QUERY_OPTIONS = frozenset([
@@ -1451,6 +1459,16 @@ def main():
     for query in tpch_nested_queries:
       query.db_name = args.tpch_nested_db
     queries.extend(tpch_nested_queries)
+  if args.tpch_kudu_db:
+    tpch_kudu_queries = load_tpc_queries("tpch", load_in_kudu=True)
+    for query in tpch_kudu_queries:
+      query.db_name = args.tpch_kudu_db
+    queries.extend(tpch_kudu_queries)
+  if args.tpcds_kudu_db:
+    tpcds_kudu_queries = load_tpc_queries("tpcds", load_in_kudu=True)
+    for query in tpcds_kudu_queries:
+      query.db_name = args.tpcds_kudu_db
+    queries.extend(tpcds_kudu_queries)
   for idx in xrange(len(queries) - 1, -1, -1):
     query = queries[idx]
     if query.sql in queries_with_runtime_info_by_db_and_sql[query.db_name]:
