@@ -83,14 +83,11 @@ add_library(Util
   time.cc
   tuple-row-compare.cc
   url-parser.cc
-)
-add_dependencies(Util thrift-deps gen_ir_descriptions)
-
-add_library(Webserver STATIC
   ${SQUEASEL_SRC_DIR}/squeasel.c
   webserver.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
 )
+add_dependencies(Util thrift-deps gen_ir_descriptions)
 
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
@@ -100,8 +97,6 @@ SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
 add_library(loggingsupport SHARED
   logging-support.cc
 )
-
-target_link_libraries(Webserver pthread dl Util ${OPENSSL_LIBS})
 
 add_executable(parquet-reader parquet-reader.cc)
 
@@ -132,7 +127,6 @@ ADD_BE_TEST(redactor-config-parser-test)
 ADD_BE_TEST(redactor-test)
 ADD_BE_TEST(redactor-unconfigured-test)
 ADD_BE_TEST(error-util-test)
-target_link_libraries(error-util-test Util)
 ADD_BE_TEST(proc-info-test)
 ADD_BE_TEST(lru-cache-test)
 ADD_BE_TEST(filesystem-util-test)

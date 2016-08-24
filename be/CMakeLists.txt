@@ -275,7 +275,6 @@ set (IMPALA_LINK_LIBS
   ThriftSaslTransport
   Udf
   Util
-  Webserver
   ${WL_END_GROUP}
 )
 
@@ -294,7 +293,6 @@ if (BUILD_SHARED_LIBS)
     Scheduling
     Catalog
     ResourceBroker
-    Webserver
     ImpalaThrift
     GlobalFlags
     Common
@@ -302,8 +300,7 @@ if (BUILD_SHARED_LIBS)
     )
 endif ()
 
-# Add all external dependencies. They should come after the impala libs.
-set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
+set (IMPALA_DEPENDENCIES
   ${SNAPPY_STATIC_LIB}
   ${LZ4_STATIC_LIB}
   ${RE2_STATIC_LIB}
@@ -314,6 +311,7 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LDAP_LIBRARY}
   ${LBER_LIBRARY}
   ThriftSaslTransport
+  ${OPENSSL_LIBS}
   gutil
   glogstatic
   gflagsstatic
@@ -324,7 +322,11 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}
   ${JAVA_JVM_LIBRARY}
-  kudu_client
+  kudu_client)
+
+# Add all external dependencies. They should come after the impala libs.
+set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
+  ${IMPALA_DEPENDENCIES}
   -lrt
   -ldl # Needed for LLVM
 )
