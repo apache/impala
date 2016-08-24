@@ -126,7 +126,6 @@ class MemTracker {
       RefreshConsumptionFromMetric();
       return;
     }
-    if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
       (*tracker)->consumption_->Add(bytes);
@@ -143,7 +142,6 @@ class MemTracker {
   /// the limit recorded in one of its ancestors already happened.
   void ConsumeLocal(int64_t bytes, MemTracker* end_tracker) {
     DCHECK(consumption_metric_ == NULL) << "Should not be called on root.";
-    if (UNLIKELY(enable_logging_)) LogUpdate(bytes > 0, bytes);
     for (int i = 0; i < all_trackers_.size(); ++i) {
       if (all_trackers_[i] == end_tracker) return;
       DCHECK(!all_trackers_[i]->has_limit());
@@ -162,7 +160,6 @@ class MemTracker {
   bool TryConsume(int64_t bytes) {
     if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
     if (UNLIKELY(bytes <= 0)) return true;
-    if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     int i;
     // Walk the tracker tree top-down, to avoid expanding a limit on a child whose parent
     // won't accommodate the change.
@@ -231,7 +228,6 @@ class MemTracker {
       consumption_->Set(consumption_metric_->value());
       return;
     }
-    if (UNLIKELY(enable_logging_)) LogUpdate(false, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
       (*tracker)->consumption_->Add(-bytes);
@@ -337,11 +333,6 @@ class MemTracker {
   /// Logs the usage of this tracker and all of its children (recursively).
   std::string LogUsage(const std::string& prefix = "") const;
 
-  void EnableLogging(bool enable, bool log_stack) {
-    enable_logging_ = enable;
-    log_stack_ = log_stack;
-  }
-
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
   /// If 'failed_allocation_size' is greater than zero, logs the allocation size. If
@@ -376,9 +367,6 @@ class MemTracker {
 
   /// Adds tracker to child_trackers_
   void AddChildTracker(MemTracker* tracker);
-
-  /// Logs the stack of the current consume/release. Used for debugging only.
-  void LogUpdate(bool is_consume, int64_t bytes) const;
 
   static std::string LogUsage(const std::string& prefix,
       const std::list<MemTracker*>& trackers);
@@ -471,11 +459,6 @@ class MemTracker {
   /// The query tracker has lifetime shared by multiple plan fragments so it's hard
   /// to do cleanup another way.
   bool auto_unregister_;
-
-  /// If true, logs to INFO every consume/release called. Used for debugging.
-  bool enable_logging_;
-  /// If true, log the stack as well.
-  bool log_stack_;
 
   /// If false, this tracker (and its children) will not be included in LogUsage() output
   /// if consumption is 0.

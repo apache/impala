@@ -58,8 +58,6 @@ MemTracker::MemTracker(int64_t byte_limit, int64_t rm_reserved_limit, const stri
     local_counter_(TUnit::BYTES),
     consumption_metric_(NULL),
     auto_unregister_(false),
-    enable_logging_(false),
-    log_stack_(false),
     log_usage_if_zero_(log_usage_if_zero),
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
@@ -81,8 +79,6 @@ MemTracker::MemTracker(
     local_counter_(TUnit::BYTES),
     consumption_metric_(NULL),
     auto_unregister_(false),
-    enable_logging_(false),
-    log_stack_(false),
     log_usage_if_zero_(true),
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
@@ -103,8 +99,6 @@ MemTracker::MemTracker(UIntGauge* consumption_metric,
     local_counter_(TUnit::BYTES),
     consumption_metric_(consumption_metric),
     auto_unregister_(false),
-    enable_logging_(false),
-    log_stack_(false),
     log_usage_if_zero_(true),
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
@@ -292,14 +286,6 @@ string MemTracker::LogUsage(const string& prefix, const list<MemTracker*>& track
     if (!usage_string.empty()) usage_strings.push_back(usage_string);
   }
   return join(usage_strings, "\n");
-}
-
-void MemTracker::LogUpdate(bool is_consume, int64_t bytes) const {
-  stringstream ss;
-  ss << this << " " << (is_consume ? "Consume: " : "Release: ") << bytes
-     << " Consumption: " << consumption() << " Limit: " << limit_;
-  if (log_stack_) ss << endl << GetStackTrace();
-  LOG(ERROR) << ss.str();
 }
 
 Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& details,
