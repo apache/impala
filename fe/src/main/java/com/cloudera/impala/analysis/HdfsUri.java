@@ -88,8 +88,15 @@ public class HdfsUri {
     Path parentPath = uriPath_.getParent();
     try {
       FileSystem fs = uriPath_.getFileSystem(FileSystemUtil.getConfiguration());
+      boolean pathExists = false;
       StringBuilder errorMsg = new StringBuilder();
-      if (!FileSystemUtil.isPathReachable(parentPath, fs, errorMsg)) {
+      try {
+        pathExists = fs.exists(parentPath);
+        if (!pathExists) errorMsg.append("Path does not exist.");
+      } catch (Exception e) {
+        errorMsg.append(e.getMessage());
+      }
+      if (!pathExists) {
         analyzer.addWarning(String.format("Path '%s' cannot be reached: %s",
             parentPath, errorMsg.toString()));
       } else if (perm != FsAction.NONE) {

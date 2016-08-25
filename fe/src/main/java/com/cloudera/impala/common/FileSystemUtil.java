@@ -371,34 +371,12 @@ public class FileSystemUtil {
   }
 
   /**
-   * Copies the source file to a destination path on the local filesystem and returns true
-   * if successful.
+   * Copies the source file to a destination path on the local filesystem.
+   * Throws IOException on failure.
    */
-   public static boolean copyToLocal(Path source, Path dest) {
-     try {
-       FileSystem fs = source.getFileSystem(CONF);
-       fs.copyToLocalFile(source, dest);
-     } catch (IOException e) {
-       return false;
-     }
-     return true;
-   }
-
-  /**
-   * Return true if the path can be reached, false for all other cases
-   * File doesn't exist, cannot access the FileSystem, etc.
-   */
-  public static boolean isPathReachable(Path path, FileSystem fs, StringBuilder error_msg) {
-    try {
-      if (fs.exists(path)) {
-        return true;
-      } else {
-        error_msg.append("Path does not exist.");
-      }
-    } catch (Exception e) {
-      error_msg.append(e.getMessage());
-    }
-    return false;
+  public static void copyToLocal(Path source, Path dest) throws IOException {
+    FileSystem fs = source.getFileSystem(CONF);
+    fs.copyToLocalFile(source, dest);
   }
 
   /**

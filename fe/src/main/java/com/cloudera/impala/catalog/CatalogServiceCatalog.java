@@ -458,11 +458,13 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       Path localJarPath = new Path(LOCAL_LIBRARY_PATH,
           UUID.randomUUID().toString() + ".jar");
-      if (!FileSystemUtil.copyToLocal(new Path(jarUri), localJarPath)) {
+      try {
+        FileSystemUtil.copyToLocal(new Path(jarUri), localJarPath);
+      } catch (IOException e) {
         String errorMsg = "Error loading Java function: " + db + "." +
             function.getFunctionName() + ". Couldn't copy " + jarUri +
             " to local path: " + localJarPath.toString();
-        LOG.error(errorMsg);
+        LOG.error(errorMsg, e);
         throw new ImpalaRuntimeException(errorMsg);
       }
       URL[] classLoaderUrls = new URL[] {new URL(localJarPath.toString())};
