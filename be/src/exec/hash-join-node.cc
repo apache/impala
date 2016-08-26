@@ -124,7 +124,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   AddExprCtxsToFree(probe_expr_ctxs_);
   RETURN_IF_ERROR(
       Expr::Prepare(filter_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(probe_expr_ctxs_);
+  AddExprCtxsToFree(filter_expr_ctxs_);
 
   // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
   // build and probe tuples; full_row_desc is not necessarily the same as the output row
