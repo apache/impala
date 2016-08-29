@@ -34,7 +34,7 @@ ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL S
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-alter table corrupted partition(org=1) set tblproperties('numRows'='0');
+alter table corrupted partition(org=1) set tblproperties('numRows'='0', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 ====
 ---- QUERY
 invalidate metadata corrupted;
@@ -53,8 +53,8 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 explain select count(*) from corrupted where org = 1;
 ---- RESULTS: VERIFY_IS_SUBSET
-'WARNING: The following tables have potentially corrupt table'
-'statistics. Drop and re-compute statistics to resolve this problem.'
+'WARNING: The following tables have potentially corrupt table statistics.'
+'Drop and re-compute statistics to resolve this problem.'
 '$DATABASE.corrupted'
 ''
 '03:AGGREGATE [FINALIZE]'
@@ -71,8 +71,8 @@ explain select count(*) from corrupted where org = 1;
 STRING
 ====
 ---- QUERY
-alter table corrupted partition(org=1) set tblproperties('numRows'='3');
-alter table corrupted set tblproperties('numRows'='0');
+alter table corrupted partition(org=1) set tblproperties('numRows'='3', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+alter table corrupted set tblproperties('numRows'='0', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 ====
 ---- QUERY
 show table stats corrupted;
@@ -97,7 +97,7 @@ explain select count(*) from corrupted;
 STRING
 ====
 ---- QUERY
-alter table corrupted set tblproperties('numRows'='6');
+alter table corrupted set tblproperties('numRows'='6', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 ====
 ---- QUERY
 show table stats corrupted;
@@ -118,6 +118,28 @@ explain select count(*) from corrupted;
 '|'
 '00:SCAN HDFS [$DATABASE.corrupted]'
 '   partitions=2/2 files=2 size=48B'
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-3930: Set numRows of a partition to a negative value and check warning,
+alter table corrupted partition(org=2) set tblproperties('numRows'='-1234', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+explain select count(*) from corrupted where org = 2;
+---- RESULTS: VERIFY_IS_SUBSET
+'WARNING: The following tables have potentially corrupt table statistics.'
+'Drop and re-compute statistics to resolve this problem.'
+'$DATABASE.corrupted'
+''
+'03:AGGREGATE [FINALIZE]'
+'|  output: count:merge(*)'
+'|'
+'02:EXCHANGE [UNPARTITIONED]'
+'|'
+'01:AGGREGATE'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [$DATABASE.corrupted]'
+'   partitions=1/2 files=1 size=24B'
 ---- TYPES
 STRING
 ====
@@ -148,22 +170,44 @@ explain select count(*) from corrupted_no_part;
 STRING
 ====
 ---- QUERY
-alter table corrupted_no_part set tblproperties('numRows'='0');
+alter table corrupted_no_part set tblproperties('numRows'='0', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 ====
 ---- QUERY
 show table stats corrupted_no_part;
 ---- LABELS
 #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
 ---- RESULTS
--1,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted_no_part'
+0,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/$DATABASE.db/corrupted_no_part'
 ---- TYPES
 BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
--- After setting num rows to 0, the HMS will set it to -1 and avoids bad behavior.
 explain select count(*) from corrupted_no_part;
 ---- RESULTS: VERIFY_IS_SUBSET
-'WARNING: The following tables are missing relevant table and/or column statistics.'
+'WARNING: The following tables have potentially corrupt table statistics.'
+'Drop and re-compute statistics to resolve this problem.'
+'$DATABASE.corrupted_no_part'
+''
+'03:AGGREGATE [FINALIZE]'
+'|  output: count:merge(*)'
+'|'
+'02:EXCHANGE [UNPARTITIONED]'
+'|'
+'01:AGGREGATE'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [$DATABASE.corrupted_no_part]'
+'   partitions=1/1 files=1 size=6B'
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-3930: Set numRows of the table to a negative value and check warning,
+alter table corrupted_no_part set tblproperties('numRows'='-1234', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+explain select count(*) from corrupted_no_part;
+---- RESULTS: VERIFY_IS_SUBSET
+'WARNING: The following tables have potentially corrupt table statistics.'
+'Drop and re-compute statistics to resolve this problem.'
 '$DATABASE.corrupted_no_part'
 ''
 '03:AGGREGATE [FINALIZE]'

@@ -151,8 +151,8 @@ class TestCorruptTableStats(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_corrupt_stats(self, vector, unique_database):
-    """IMPALA-1983: Test that in the presence of corrupt table statistics a warning is
-    issued and the small query optimization is disabled."""
+    """IMPALA-1983/IMPALA-1657: Test that in the presence of corrupt table statistics a
+    warning is issued and the small query optimization is disabled."""
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
     self.run_test_case('QueryTest/corrupt-stats', vector, unique_database)
 

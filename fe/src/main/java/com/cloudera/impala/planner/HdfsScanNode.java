@@ -356,26 +356,35 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Also computes totalBytes_
+   * Also computes totalBytes_, totalFiles_, numPartitionsMissingStats_,
+   * and sets hasCorruptTableStats_.
    */
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     LOG.debug("collecting partitions for table " + tbl_.getName());
     numPartitionsMissingStats_ = 0;
-    if (tbl_.getPartitions().isEmpty()) {
+    totalFiles_ = 0;
+    totalBytes_ = 0;
+    if (tbl_.getNumClusteringCols() == 0) {
       cardinality_ = tbl_.getNumRows();
-      if ((cardinality_ < -1 || cardinality_ == 0) && tbl_.getTotalHdfsBytes() > 0) {
+      if (cardinality_ < -1 || (cardinality_ == 0 && tbl_.getTotalHdfsBytes() > 0)) {
         hasCorruptTableStats_ = true;
+      }
+      if (partitions_.isEmpty()) {
+        // Nothing to scan. Definitely a cardinality of 0 even if we have no stats.
+        cardinality_ = 0;
+      } else {
+        Preconditions.checkState(partitions_.size() == 1);
+        totalFiles_ += partitions_.get(0).getFileDescriptors().size();
+        totalBytes_ += partitions_.get(0).getSize();
       }
     } else {
       cardinality_ = 0;
-      totalFiles_ = 0;
-      totalBytes_ = 0;
       boolean hasValidPartitionCardinality = false;
       for (HdfsPartition p: partitions_) {
         // Check for corrupt table stats
-        if ((p.getNumRows() == 0 || p.getNumRows() < -1) && p.getSize() > 0)  {
+        if (p.getNumRows() < -1  || (p.getNumRows() == 0 && p.getSize() > 0))  {
           hasCorruptTableStats_ = true;
         }
         // ignore partitions with missing stats in the hope they don't matter
@@ -402,8 +411,13 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     inputCardinality_ = cardinality_;
-    Preconditions.checkState(cardinality_ >= 0 || cardinality_ == -1,
-        "Internal error: invalid scan node cardinality: " + cardinality_);
+
+    // Sanity check scan node cardinality.
+    if (cardinality_ < -1) {
+      hasCorruptTableStats_ = true;
+      cardinality_ = -1;
+    }
+
     if (cardinality_ > 0) {
       LOG.debug("cardinality_=" + Long.toString(cardinality_) +
                 " sel=" + Double.toString(computeSelectivity()));

@@ -209,8 +209,9 @@ public class Planner {
       for (TTableName tableName: request.query_ctx.getTables_with_corrupt_stats()) {
         tableNames.add(tableName.db_name + "." + tableName.table_name);
       }
-      str.append("WARNING: The following tables have potentially corrupt table\n" +
-          "statistics. Drop and re-compute statistics to resolve this problem.\n" +
+      str.append(
+          "WARNING: The following tables have potentially corrupt table statistics.\n" +
+          "Drop and re-compute statistics to resolve this problem.\n" +
           Joiner.on(", ").join(tableNames) + "\n");
       hasHeader = true;
     }
