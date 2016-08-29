@@ -49,26 +49,22 @@ class TestQueries(ImpalaTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
-  def test_hdfs_scan_node(self, vector):
-    self.run_test_case('QueryTest/hdfs-scan-node', vector)
-
   def test_analytic_fns(self, vector):
-    # TODO: Enable some of these tests for Avro if possible
-    # Don't attempt to evaluate timestamp expressions with Avro tables which doesn't
+    # TODO: Enable some of these tests for Avro/Kudu if possible
+    # Don't attempt to evaluate timestamp expressions with Avro/Kudu tables which don't
     # support a timestamp type yet
     table_format = vector.get_value('table_format')
-    if table_format.file_format == 'avro':
-      pytest.skip()
+    if table_format.file_format in ['avro', 'kudu']:
+      pytest.xfail("%s doesn't support TIMESTAMP" % (table_format.file_format))
     if table_format.file_format == 'hbase':
       pytest.xfail("A lot of queries check for NULLs, which hbase does not recognize")
     self.run_test_case('QueryTest/analytic-fns', vector)
 
-  def test_file_partitions(self, vector):
-    self.run_test_case('QueryTest/hdfs-partitions', vector)
-
   def test_limit(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail("IMPALA-283 - select count(*) produces inconsistent results")
+    if vector.get_value('table_format').file_format == 'kudu':
+      pytest.xfail("Limit queries without order by clauses are non-deterministic")
     self.run_test_case('QueryTest/limit', vector)
 
   def test_top_n(self, vector):
@@ -121,9 +117,9 @@ class TestQueries(ImpalaTestSuite):
 
   def test_misc(self, vector):
     table_format = vector.get_value('table_format')
-    if table_format.file_format in ['hbase', 'rc', 'parquet']:
+    if table_format.file_format in ['hbase', 'rc', 'parquet', 'kudu']:
       msg = ("Failing on rc/snap/block despite resolution of IMP-624,IMP-503. "
-             "Failing on parquet because tables do not exist")
+             "Failing on kudu and parquet because tables do not exist")
       pytest.xfail(msg)
     self.run_test_case('QueryTest/misc', vector)
 
@@ -196,3 +192,20 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     vector.get_value('exec_option')['disable_outermost_topn'] = 1
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-large-sorts', vector)
+
+# Tests for queries in HDFS-specific tables, e.g. AllTypesAggMultiFilesNoPart.
+# This is a subclass of TestQueries to get the extra test dimension for
+# exec_single_node_rows_threshold in exhaustive.
+class TestHdfsQueries(TestQueries):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHdfsQueries, cls).add_test_dimensions()
+    # Kudu doesn't support AllTypesAggMultiFilesNoPart (KUDU-1271, KUDU-1570).
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format != 'kudu')
+
+  def test_hdfs_scan_node(self, vector):
+    self.run_test_case('QueryTest/hdfs-scan-node', vector)
+
+  def test_file_partitions(self, vector):
+    self.run_test_case('QueryTest/hdfs-partitions', vector)

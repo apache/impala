@@ -50,6 +50,10 @@ class SkipIfS3:
   qualified_path = pytest.mark.skipif(IS_S3,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
 
+class SkipIfKudu:
+  unsupported_env = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
+      reason="Kudu is not supported in this environment")
+
 class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
       reason="--skip_hbase argument specified")

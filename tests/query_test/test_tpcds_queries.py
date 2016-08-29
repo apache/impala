@@ -33,7 +33,7 @@ class TestTpcdsQuery(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTpcdsQuery, cls).add_test_dimensions()
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format not in ['rc', 'hbase'] and\
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
 

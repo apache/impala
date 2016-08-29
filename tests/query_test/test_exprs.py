@@ -47,6 +47,9 @@ class TestExprs(ImpalaTestSuite):
       pytest.skip()
     if table_format.file_format == 'hbase':
       pytest.xfail("A lot of queries check for NULLs, which hbase does not recognize")
+    if table_format.file_format == 'kudu':
+      # Can't load LikeTbl without KUDU-1570.
+      pytest.xfail("Need support for Kudu tables with nullable PKs (KUDU-1570)")
     self.run_test_case('QueryTest/exprs', vector)
 
     # This will change the current database to matching table format and then execute

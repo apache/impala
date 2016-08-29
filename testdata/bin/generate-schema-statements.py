@@ -529,14 +529,17 @@ def generate_statements(output_name, test_vectors, sections,
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
 
-      if file_format == 'kudu':
-        create_kudu = section["CREATE_KUDU"]
-      else:
-        create_kudu = None
-
       table_properties = section['TABLE_PROPERTIES']
       insert = eval_section(section['DEPENDENT_LOAD'])
       load = eval_section(section['LOAD'])
+
+      if file_format == 'kudu':
+        create_kudu = section["CREATE_KUDU"]
+        if section['DEPENDENT_LOAD_KUDU']:
+          insert = eval_section(section['DEPENDENT_LOAD_KUDU'])
+      else:
+        create_kudu = None
+
       # For some datasets we may want to use a different load strategy when running local
       # tests versus tests against large scale factors. The most common reason is to
       # reduce he number of partitions for the local test environment
@@ -585,9 +588,10 @@ def generate_statements(output_name, test_vectors, sections,
         # Impala CREATE TABLE doesn't allow INPUTFORMAT.
         output = hive_output
 
-      # TODO: Currently, Kudu does not support partitioned tables via Impala
-      if file_format == 'kudu' and partition_columns != '':
-        print "Ignore partitions on Kudu"
+      # TODO: Currently, Kudu does not support partitioned tables via Impala.
+      # If a CREATE_KUDU section was provided, assume it handles the partition columns
+      if file_format == 'kudu' and partition_columns != '' and not create_kudu:
+        print "Ignore partitions on Kudu table: %s.%s" % (db_name, table_name)
         continue
 
       # If a CREATE section is provided, use that. Otherwise a COLUMNS section
@@ -695,7 +699,7 @@ def generate_statements(output_name, test_vectors, sections,
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
-                         'DEPENDENT_LOAD', 'LOAD',
+                         'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'LOAD',
                          'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 

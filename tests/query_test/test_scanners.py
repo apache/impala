@@ -137,6 +137,9 @@ class TestUnmatchedSchema(ImpalaTestSuite):
         "drop table if exists jointbl_test", vector)
 
   def test_unmatched_schema(self, vector):
+    if vector.get_value('table_format').file_format == 'kudu':
+      pytest.xfail("IMPALA-2890: Missing Kudu DDL support")
+
     table_format = vector.get_value('table_format')
     # jointbl has no columns with unique values. When loaded in hbase, the table looks
     # different, as hbase collapses duplicates.
@@ -161,6 +164,9 @@ class TestWideRow(ImpalaTestSuite):
       lambda v: v.get_value('table_format').file_format != 'hbase')
 
   def test_wide_row(self, vector):
+    if vector.get_value('table_format').file_format == 'kudu':
+      pytest.xfail("KUDU-666: Kudu support for large values")
+
     new_vector = deepcopy(vector)
     # Use a 5MB scan range, so we will have to perform 5MB of sync reads
     new_vector.get_value('exec_option')['max_scan_range_length'] = 5 * 1024 * 1024
@@ -190,6 +196,9 @@ class TestWideTable(ImpalaTestSuite):
       cls.TestMatrix.add_constraint(lambda v: False)
 
   def test_wide_table(self, vector):
+    if vector.get_value('table_format').file_format == 'kudu':
+      pytest.xfail("IMPALA-3718: Extend Kudu functional test support")
+
     NUM_COLS = vector.get_value('num_cols')
     # Due to the way HBase handles duplicate row keys, we have different number of
     # rows in HBase tables compared to HDFS tables.

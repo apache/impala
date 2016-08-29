@@ -833,8 +833,7 @@ bigint, boolean, boolean, bigint, double
 ====
 ---- QUERY
 # Test ignored distinct in MIN and MAX with NULLs
-select min(distinct NULL), max(distinct NULL) from alltypesagg
-where day is not null
+select min(distinct NULL), max(distinct NULL) from alltypes
 ---- RESULTS
 NULL,NULL
 ---- TYPES

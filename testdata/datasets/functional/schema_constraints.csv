@@ -169,12 +169,20 @@ table_name:large_multistream_bzip2_tbl, constraint:restrict_to, table_format:tex
 
 # Kudu can't handle certain types such as timestamp so we pick and choose the tables
 # we actually use for Kudu related tests.
+table_name:alltypes, constraint:only, table_format:kudu/none/none
+table_name:alltypessmall, constraint:only, table_format:kudu/none/none
+table_name:alltypestiny, constraint:only, table_format:kudu/none/none
+table_name:alltypesagg, constraint:only, table_format:kudu/none/none
+table_name:alltypesaggnonulls, constraint:only, table_format:kudu/none/none
 table_name:testtbl, constraint:only, table_format:kudu/none/none
+table_name:jointbl, constraint:only, table_format:kudu/none/none
+table_name:emptytable, constraint:only, table_format:kudu/none/none
 table_name:dimtbl, constraint:only, table_format:kudu/none/none
-table_name:text_comma_backslash_newline, constraint:only, table_format:kudu/none/none
 table_name:tinytable, constraint:only, table_format:kudu/none/none
 table_name:tinyinttable, constraint:only, table_format:kudu/none/none
 table_name:zipcode_incomes, constraint:only, table_format:kudu/none/none
+table_name:nulltable, constraint:only, table_format:kudu/none/none
+table_name:nullescapedtable, constraint:only, table_format:kudu/none/none
 
 # Skipping header lines is only effective with text tables
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none

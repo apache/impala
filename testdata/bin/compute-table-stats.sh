@@ -41,7 +41,7 @@ ${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet
 ${COMPUTE_STATS_SCRIPT} --db_names=tpcds
 
 if "$KUDU_IS_SUPPORTED"; then
-  ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu --table_names=zipcode_incomes
+  ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu
   ${COMPUTE_STATS_SCRIPT} --db_names=tpch_kudu
 fi
 

@@ -5,3 +5,4 @@ file_format: rc, dataset: functional, compression_codec: gzip, compression_type:
 file_format: avro, dataset: functional, compression_codec: snap, compression_type: block
 file_format: parquet, dataset: functional, compression_codec: none, compression_type: none
 file_format: hbase, dataset: functional, compression_codec: none, compression_type: none
+file_format: kudu, dataset: functional, compression_codec: none, compression_type: none

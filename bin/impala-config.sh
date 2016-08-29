@@ -126,7 +126,7 @@ if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
       fi
       DISTRO_VERSION="$(lsb_release -sir 2>&1)"
       if [[ $? -ne 0 ]]; then
-        echo lsb_release cammond failed, output was: "$DISTRO_VERSION" 1>&2
+        echo lsb_release command failed, output was: "$DISTRO_VERSION" 1>&2
         return 1
       fi
       # Remove spaces, trim minor versions, and convert to lowercase.

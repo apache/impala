@@ -321,15 +321,18 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     if test_section.get('TYPES'):
       expected_types = [c.strip().upper() for c in test_section['TYPES'].rstrip('\n').split(',')]
 
+    # Avro and Kudu represent TIMESTAMP columns as strings, so tests using TIMESTAMP are
+    # skipped because results will be wrong.
+    if file_format in ('avro', 'kudu') and 'TIMESTAMP' in expected_types:
+        LOG.info("TIMESTAMP columns unsupported in %s, skipping verification." %\
+            file_format)
+        return
+
     # Avro does not support as many types as Hive, so the Avro test tables may
     # have different column types than we expect (e.g., INT instead of
-    # TINYINT). We represent TIMESTAMP columns as strings in Avro, so we bail in
-    # this case since the results will be wrong. Otherwise we bypass the type
-    # checking by ignoring the actual types of the Avro table.
+    # TINYINT). Bypass the type checking by ignoring the actual types of the Avro
+    # table.
     if file_format == 'avro':
-      if 'TIMESTAMP' in expected_types:
-        LOG.info("TIMESTAMP columns unsupported in Avro, skipping verification.")
-        return
       LOG.info("Skipping type verification of Avro-format table.")
       actual_types = expected_types
     else:
