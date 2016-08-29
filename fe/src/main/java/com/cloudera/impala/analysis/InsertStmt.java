@@ -107,10 +107,12 @@ public class InsertStmt extends StatementBase {
   // Set in analyze(). Exprs corresponding to the partitionKeyValues,
   private List<Expr> partitionKeyExprs_ = Lists.newArrayList();
 
-  // True to force re-partitioning before the table sink, false to prevent it. Set in
-  // analyze() based on planHints_. Null if no explicit hint was given (the planner
-  // should decide whether to re-partition or not).
-  private Boolean isRepartition_ = null;
+  // Indicates whether this insert stmt has a shuffle or noshuffle plan hint.
+  // Both flags may be false. Only one of them may be true, not both.
+  // Shuffle forces data repartitioning before then data sink, and noshuffle
+  // prevents it. Set in analyze() based on planHints_.
+  private boolean hasShuffleHint_ = false;
+  private boolean hasNoShuffleHint_ = false;
 
   // Output expressions that produce the final results to write to the target table. May
   // include casts, and NullLiterals where an output column isn't explicitly mentioned.
@@ -166,7 +168,8 @@ public class InsertStmt extends StatementBase {
     queryStmt_.reset();
     table_ = null;
     partitionKeyExprs_.clear();
-    isRepartition_ = null;
+    hasShuffleHint_ = false;
+    hasNoShuffleHint_ = false;
     resultExprs_.clear();
   }
 
@@ -598,28 +601,30 @@ public class InsertStmt extends StatementBase {
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
     if (planHints_ == null) return;
-    if (!planHints_.isEmpty() &&
-        (partitionKeyValues_ == null || table_ instanceof HBaseTable)) {
+    if (!planHints_.isEmpty() && table_ instanceof HBaseTable) {
       throw new AnalysisException("INSERT hints are only supported for inserting into " +
-          "partitioned Hdfs tables.");
+          "Hdfs tables.");
     }
     for (String hint: planHints_) {
       if (hint.equalsIgnoreCase("SHUFFLE")) {
-        if (isRepartition_ != null && !isRepartition_) {
+        if (hasNoShuffleHint_) {
           throw new AnalysisException("Conflicting INSERT hint: " + hint);
         }
-        isRepartition_ = Boolean.TRUE;
+        hasShuffleHint_ = true;
         analyzer.setHasPlanHints();
       } else if (hint.equalsIgnoreCase("NOSHUFFLE")) {
-        if (isRepartition_ != null && isRepartition_) {
+        if (hasShuffleHint_) {
           throw new AnalysisException("Conflicting INSERT hint: " + hint);
         }
-        isRepartition_ = Boolean.FALSE;
+        hasNoShuffleHint_ = true;
         analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("INSERT hint not recognized: " + hint);
       }
     }
+    // Both flags may be false or one of them may be true, but not both.
+    Preconditions.checkState((!hasShuffleHint_ && !hasNoShuffleHint_)
+        || (hasShuffleHint_ ^ hasNoShuffleHint_));
   }
 
   public List<String> getPlanHints() { return planHints_; }
@@ -634,7 +639,8 @@ public class InsertStmt extends StatementBase {
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public void setQueryStmt(QueryStmt stmt) { queryStmt_ = stmt; }
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
-  public Boolean isRepartition() { return isRepartition_; }
+  public boolean hasShuffleHint() { return hasShuffleHint_; }
+  public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
 
   public DataSink createDataSink() {

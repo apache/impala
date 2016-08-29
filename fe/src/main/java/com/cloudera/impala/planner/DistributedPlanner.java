@@ -179,64 +179,67 @@ public class DistributedPlanner {
   }
 
   /**
-   * Makes a cost-based decision on whether to repartition the output of 'inputFragment'
-   * before feeding its data into the table sink of the given 'insertStmt'. Considers
-   * user-supplied plan hints to determine whether to repartition or not.
-   * Returns a plan fragment that partitions the output of 'inputFragment' on the
-   * partition exprs of 'insertStmt', unless the expected number of partitions is less
-   * than the number of nodes on which inputFragment runs.
-   * If it ends up creating a new fragment, appends that to 'fragments'.
+   * Decides whether to repartition the output of 'inputFragment' before feeding its
+   * data into the table sink of the given 'insertStmt'. The decision obeys the
+   * shuffle/noshuffle plan hints if present. Otherwise, returns a plan fragment that
+   * partitions the output of 'inputFragment' on the partition exprs of 'insertStmt',
+   * unless the expected number of partitions is less than the number of nodes on which
+   * inputFragment runs, or the target table is unpartitioned.
+   * For inserts into unpartitioned tables or inserts with only constant partition exprs,
+   * the shuffle hint leads to a plan that merges all rows at the coordinator where
+   * the table sink is executed.
+   * If this functions ends up creating a new fragment, appends that to 'fragments'.
    */
   public PlanFragment createInsertFragment(
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       ArrayList<PlanFragment> fragments)
       throws ImpalaException {
-    List<Expr> partitionExprs = insertStmt.getPartitionKeyExprs();
-    Boolean partitionHint = insertStmt.isRepartition();
-    if (partitionExprs.isEmpty()) return inputFragment;
-    if (partitionHint != null && !partitionHint) return inputFragment;
+    if (insertStmt.hasNoShuffleHint()) return inputFragment;
 
-    // we ignore constants for the sake of partitioning
-    List<Expr> nonConstPartitionExprs = Lists.newArrayList(partitionExprs);
-    Expr.removeConstants(nonConstPartitionExprs);
+    List<Expr> partitionExprs = Lists.newArrayList(insertStmt.getPartitionKeyExprs());
+    // Ignore constants for the sake of partitioning.
+    Expr.removeConstants(partitionExprs);
+
+    // Do nothing if the input fragment is already appropriately partitioned.
     DataPartition inputPartition = inputFragment.getDataPartition();
-
-    // do nothing if the input fragment is already appropriately partitioned
-    if (analyzer.equivSets(inputPartition.getPartitionExprs(),
-        nonConstPartitionExprs)) {
+    if (!partitionExprs.isEmpty() &&
+        analyzer.equivSets(inputPartition.getPartitionExprs(), partitionExprs)) {
       return inputFragment;
     }
 
-    // if the existing partition exprs are a subset of the table partition exprs, check
-    // if it is distributed across all nodes; if so, don't repartition
-    if (Expr.isSubset(inputPartition.getPartitionExprs(), nonConstPartitionExprs)) {
-      long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
-      if (numPartitions >= inputFragment.getNumNodes()) return inputFragment;
+    // Make a cost-based decision only if no user hint was supplied.
+    if (!insertStmt.hasShuffleHint()) {
+      // If the existing partition exprs are a subset of the table partition exprs, check
+      // if it is distributed across all nodes. If so, don't repartition.
+      if (Expr.isSubset(inputPartition.getPartitionExprs(), partitionExprs)) {
+        long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
+        if (numPartitions >= inputFragment.getNumNodes()) return inputFragment;
+      }
+
+      // Don't repartition if we know we have fewer partitions than nodes
+      // (ie, default to repartitioning if col stats are missing).
+      // TODO: We want to repartition if the resulting files would otherwise
+      // be very small (less than some reasonable multiple of the recommended block size).
+      // In order to do that, we need to come up with an estimate of the avg row size
+      // in the particular file format of the output table/partition.
+      // We should always know on how many nodes our input is running.
+      long numPartitions = getNumDistinctValues(partitionExprs);
+      Preconditions.checkState(inputFragment.getNumNodes() != -1);
+      if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
+        return inputFragment;
+      }
     }
 
-    // don't repartition if the resulting number of partitions is too low to get good
-    // parallelism
-    long numPartitions = getNumDistinctValues(nonConstPartitionExprs);
-
-    // don't repartition if we know we have fewer partitions than nodes
-    // (ie, default to repartitioning if col stats are missing)
-    // TODO: we want to repartition if the resulting files would otherwise
-    // be very small (less than some reasonable multiple of the recommended block size);
-    // in order to do that, we need to come up with an estimate of the avg row size
-    // in the particular file format of the output table/partition.
-    // We should always know on how many nodes our input is running.
-    Preconditions.checkState(inputFragment.getNumNodes() != -1);
-    if (partitionHint == null && numPartitions > 0 &&
-        numPartitions <= inputFragment.getNumNodes()) {
-      return inputFragment;
-    }
-
-    Preconditions.checkState(partitionHint == null || partitionHint);
     ExchangeNode exchNode =
         new ExchangeNode(ctx_.getNextNodeId(), inputFragment.getPlanRoot());
     exchNode.init(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
-    DataPartition partition = DataPartition.hashPartitioned(nonConstPartitionExprs);
+    DataPartition partition;
+    if (partitionExprs.isEmpty()) {
+      partition = DataPartition.UNPARTITIONED;
+    } else {
+      partition = DataPartition.hashPartitioned(partitionExprs);
+    }
     PlanFragment fragment =
         new PlanFragment(ctx_.getNextFragmentId(), exchNode, partition);
     inputFragment.setDestination(exchNode);

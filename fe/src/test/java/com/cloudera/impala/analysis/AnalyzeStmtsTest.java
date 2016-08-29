@@ -1734,16 +1734,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "partition (year, month) %sbadhint%s select * from functional.alltypes",
           prefix, suffix),
           "INSERT hint not recognized: badhint");
-      // Plan hints require a partition clause.
-      AnalysisError(String.format(
+      // Insert hints are ok for unpartitioned tables.
+      AnalyzesOk(String.format(
           "insert into table functional.alltypesnopart %sshuffle%s " +
-          "select * from functional.alltypesnopart", prefix, suffix),
-          "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
+          "select * from functional.alltypesnopart", prefix, suffix));
       // Plan hints do not make sense for inserting into HBase tables.
       AnalysisError(String.format(
           "insert into table functional_hbase.alltypes %sshuffle%s " +
           "select * from functional_hbase.alltypes", prefix, suffix),
-          "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
+          "INSERT hints are only supported for inserting into Hdfs tables.");
       // Conflicting plan hints.
       AnalysisError("insert into table functional.alltypessmall " +
           "partition (year, month) /* +shuffle,noshuffle */ " +
@@ -2979,31 +2978,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'b.int_array_col' correlated with an outer block as well as an " +
         "uncorrelated one 'functional.alltypestiny':\n" +
         "SELECT item FROM b.int_array_col, functional.alltypestiny");
-
-    // Test plan hints for partitioned Hdfs tables.
-    AnalyzesOk("insert into functional.alltypessmall " +
-        "partition (year, month) [shuffle] select * from functional.alltypes");
-    AnalyzesOk("insert into table functional.alltypessmall " +
-        "partition (year, month) [noshuffle] select * from functional.alltypes");
-    // Multiple non-conflicting hints and case insensitivity of hints.
-    AnalyzesOk("insert into table functional.alltypessmall " +
-        "partition (year, month) [shuffle, ShUfFlE] select * from functional.alltypes");
-    // Unknown plan hint. Expect a warning but no error.
-    AnalyzesOk("insert into functional.alltypessmall " +
-        "partition (year, month) [badhint] select * from functional.alltypes",
-        "INSERT hint not recognized: badhint");
-    // Conflicting plan hints.
-    AnalysisError("insert into table functional.alltypessmall " +
-        "partition (year, month) [shuffle, noshuffle] select * from functional.alltypes",
-        "Conflicting INSERT hint: noshuffle");
-    // Plan hints require a partition clause.
-    AnalysisError("insert into table functional.alltypesnopart [shuffle] " +
-        "select * from functional.alltypesnopart",
-        "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
-    // Plan hints do not make sense for inserting into HBase tables.
-    AnalysisError("insert into table functional_hbase.alltypes [shuffle] " +
-        "select * from functional_hbase.alltypes",
-        "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
   }
 
   /**

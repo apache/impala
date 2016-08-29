@@ -512,3 +512,61 @@ WRITE TO HDFS [functional.alltypestiny, OVERWRITE=false, PARTITION-KEYS=(2009,1)
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ====
+# IMPALA-3930: Test insert with shuffle hint on constant partition exprs. The table sink
+# is executed at the coordinator.
+insert into table functional.alltypes partition(year=2009, month=1) /* +shuffle */
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2009,1)]
+|  partitions=1
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-3930: Same as above but with a dynamic partition insert.
+insert into table functional.alltypes partition(year, month) /* +shuffle */
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col, 2009, 1
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2009,1)]
+|  partitions=1
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-3930: Same as above but with a mix of static/dynamic partition exprs, and
+# with more complex constant exprs.
+insert into table functional.alltypes partition(year, month=cast(10/2 as int)) /* +shuffle */
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col, cast(concat("2", "010") as smallint) - 1
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(concat('2', '010') AS SMALLINT) - 1,CAST(10 / 2 AS INT))]
+|  partitions=1
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test insert into an unpartitioned table with shuffle hint.
+insert into table functional.alltypesnopart /* +shuffle */
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
