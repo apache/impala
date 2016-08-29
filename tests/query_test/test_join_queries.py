@@ -139,52 +139,33 @@ class TestSemiJoinQueries(ImpalaTestSuite):
       # Cut down on execution time when not running in exhaustive mode.
       cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
-  @classmethod
-  def setup_class(cls):
-    super(TestSemiJoinQueries, cls).setup_class()
-    cls.__cleanup_semi_join_tables()
-    cls.__load_semi_join_tables()
+  def __load_semi_join_tables(self, db_name):
+    # Create and load fresh test tables for semi/anti-join tests
+    fq_tbl_name_a = '%s.SemiJoinTblA' % db_name
+    self.client.execute('create table %s (a int, b int, c int)' % fq_tbl_name_a)
+    self.client.execute('insert into %s values(1,1,1)' % fq_tbl_name_a);
+    self.client.execute('insert into %s values(1,1,10)' % fq_tbl_name_a);
+    self.client.execute('insert into %s values(1,2,10)' % fq_tbl_name_a);
+    self.client.execute('insert into %s values(1,3,10)' % fq_tbl_name_a);
+    self.client.execute('insert into %s values(NULL,NULL,30)'  % fq_tbl_name_a);
+    self.client.execute('insert into %s values(2,4,30)' % fq_tbl_name_a);
+    self.client.execute('insert into %s values(2,NULL,20)' % fq_tbl_name_a);
 
-  @classmethod
-  def teardown_class(cls):
-    cls.__cleanup_semi_join_tables()
-    super(TestSemiJoinQueries, cls).teardown_class()
+    fq_tbl_name_b = '%s.SemiJoinTblB' % db_name
+    self.client.execute('create table %s (a int, b int, c int)' % fq_tbl_name_b)
+    self.client.execute('insert into %s values(1,1,1)' % fq_tbl_name_b);
+    self.client.execute('insert into %s values(1,1,10)' % fq_tbl_name_b);
+    self.client.execute('insert into %s values(1,2,5)' % fq_tbl_name_b);
+    self.client.execute('insert into %s values(1,NULL,10)' % fq_tbl_name_b);
+    self.client.execute('insert into %s values(2,10,NULL)' % fq_tbl_name_b);
+    self.client.execute('insert into %s values(3,NULL,NULL)' % fq_tbl_name_b);
+    self.client.execute('insert into %s values(3,NULL,50)' % fq_tbl_name_b);
 
-  @classmethod
-  def __load_semi_join_tables(cls):
-    SEMIJOIN_TABLES = ['functional.SemiJoinTblA', 'functional.SemiJoinTblB']
-    # Cleanup, create and load fresh test tables for semi/anti-join tests
-    cls.client.execute('create table if not exists '\
-                          'functional.SemiJoinTblA(a int, b int, c int)')
-    cls.client.execute('create table if not exists '\
-                          'functional.SemiJoinTblB(a int, b int, c int)')
-    # loads some values with NULLs in the first table
-    cls.client.execute('insert into %s values(1,1,1)' % SEMIJOIN_TABLES[0]);
-    cls.client.execute('insert into %s values(1,1,10)' % SEMIJOIN_TABLES[0]);
-    cls.client.execute('insert into %s values(1,2,10)' % SEMIJOIN_TABLES[0]);
-    cls.client.execute('insert into %s values(1,3,10)' % SEMIJOIN_TABLES[0]);
-    cls.client.execute('insert into %s values(NULL,NULL,30)'  % SEMIJOIN_TABLES[0]);
-    cls.client.execute('insert into %s values(2,4,30)' % SEMIJOIN_TABLES[0]);
-    cls.client.execute('insert into %s values(2,NULL,20)' % SEMIJOIN_TABLES[0]);
-    # loads some values with NULLs in the second table
-    cls.client.execute('insert into %s values(1,1,1)' % SEMIJOIN_TABLES[1]);
-    cls.client.execute('insert into %s values(1,1,10)' % SEMIJOIN_TABLES[1]);
-    cls.client.execute('insert into %s values(1,2,5)' % SEMIJOIN_TABLES[1]);
-    cls.client.execute('insert into %s values(1,NULL,10)' % SEMIJOIN_TABLES[1]);
-    cls.client.execute('insert into %s values(2,10,NULL)' % SEMIJOIN_TABLES[1]);
-    cls.client.execute('insert into %s values(3,NULL,NULL)' % SEMIJOIN_TABLES[1]);
-    cls.client.execute('insert into %s values(3,NULL,50)' % SEMIJOIN_TABLES[1]);
-
-  @classmethod
-  def __cleanup_semi_join_tables(cls):
-    cls.client.execute('drop table if exists functional.SemiJoinTblA')
-    cls.client.execute('drop table if exists functional.SemiJoinTblB')
-
-  @pytest.mark.execute_serially
-  def test_semi_joins(self, vector):
+  def test_semi_joins(self, vector, unique_database):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
-    self.run_test_case('QueryTest/semi-joins', new_vector)
+    self.__load_semi_join_tables(unique_database)
+    self.run_test_case('QueryTest/semi-joins', new_vector, unique_database)
 
   def test_semi_joins_exhaustive(self, vector):
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
