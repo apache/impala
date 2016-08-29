@@ -72,11 +72,6 @@ class TestCancellation(ImpalaTestSuite):
     # Ignore 'compute stats' queries for the CTAS query type.
     cls.TestMatrix.add_constraint(lambda v: not (v.get_value('query_type') == 'CTAS' and
          v.get_value('query').startswith('compute stats')))
-    # Ignore debug actions for 'compute stats' because cancellation of 'compute stats'
-    # relies on child queries eventually making forward progress, but debug actions
-    # will cause child queries to hang indefinitely.
-    cls.TestMatrix.add_constraint(lambda v: not (v.get_value('action') == 'WAIT' and
-         v.get_value('query').startswith('compute stats')))
     # tpch tables are not generated for hbase as the data loading takes a very long time.
     # TODO: Add cancellation tests for hbase.
     cls.TestMatrix.add_constraint(lambda v:\

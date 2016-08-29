@@ -142,6 +142,72 @@ class ChildQuery {
   bool is_cancelled_;
 };
 
+/// Asynchronously executes a set of child queries in a separate thread.
+///
+/// ExecAsync() is called at most once per executor to execute a set of child queries
+/// asynchronously. After ExecAsync() is called, either WaitForAll() or Cancel() must be
+/// called to ensure that the child queries are no longer executing before destroying the
+/// object.
+class ChildQueryExecutor {
+ public:
+  ChildQueryExecutor();
+  ~ChildQueryExecutor();
+
+  /// Asynchronously executes 'child_queries' one by one in a new thread. 'child_queries'
+  /// must be non-empty. May clear or modify the 'child_queries' arg. Can only be called
+  /// once. Does nothing if Cancel() was already called.
+  void ExecAsync(std::vector<ChildQuery>&& child_queries);
+
+  /// Waits for all child queries to complete successfully or with an error. Returns a
+  /// non-OK status if a child query fails. Returns OK if ExecAsync() was not called,
+  /// Cancel() was called before an error occurred, or if all child queries finished
+  /// successfully. If returning OK, populates 'completed_queries' with the completed
+  /// queries. Any returned ChildQueries remain owned by the executor. Should not be
+  /// called concurrently with ExecAsync(). After WaitForAll() returns, the object can
+  /// safely be destroyed.
+  Status WaitForAll(std::vector<ChildQuery*>* completed_queries);
+
+  /// Cancels all child queries and prevents any more from starting. Returns once all
+  /// child queries are cancelled, after which the object can safely be destroyed. Can
+  /// be safely called concurrently with ExecAsync() or WaitForAll().
+  void Cancel();
+
+ private:
+  /// Serially executes the queries in child_queries_ by calling the child query's
+  /// ExecAndWait(). This function blocks until all queries complete and is run
+  /// in 'child_queries_thread_'.
+  /// Sets 'child_queries_status_'.
+  void ExecChildQueries();
+
+  /// Protects all fields below.
+  /// Should not be held at the same time as 'ChildQuery::lock_'.
+  SpinLock lock_;
+
+  /// True if cancellation of child queries has been initiated and no more child queries
+  /// should be started.
+  bool is_cancelled_;
+
+  /// True if 'child_queries_thread_' is in the process of executing child queries.
+  /// Set to false by 'child_queries_thread_' just before it exits. 'is_running_' must
+  /// be false when ChildQueryExecutor is destroyed: once execution is started,
+  /// WaitForAll() or Cancel() must be called to ensure the thread exits.
+  bool is_running_;
+
+  /// List of child queries to be executed. Not modified after it is initially populated,
+  /// so safe to read without holding 'lock_' if 'is_running_' or 'is_cancelled_' is
+  /// true, or 'child_queries_thread_' is non-NULL.
+  std::vector<ChildQuery> child_queries_;
+
+  /// Thread to execute 'child_queries_' in. Immutable after the first time it is set or
+  /// after 'is_cancelled_' is true.
+  boost::scoped_ptr<Thread> child_queries_thread_;
+
+  /// The status of the child queries. The status is OK iff all child queries complete
+  /// successfully. Otherwise, status contains the error of the first child query that
+  /// failed (child queries are executed serially and abort on the first error).
+  /// Immutable after 'child_queries_thread_' exits
+  Status child_queries_status_;
+};
 }
 
 #endif

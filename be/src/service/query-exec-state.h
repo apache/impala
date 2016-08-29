@@ -124,9 +124,12 @@ class ImpalaServer::QueryExecState {
   /// Cancels the child queries and the coordinator with the given cause.
   /// If cause is NULL, assume this was deliberately cancelled by the user.
   /// Otherwise, sets state to EXCEPTION.
-  /// Caller needs to hold lock_.
   /// Does nothing if the query has reached EOS or already cancelled.
-  void Cancel(const Status* cause = NULL);
+  ///
+  /// Only returns an error if 'check_inflight' is true and the query is not yet
+  /// in-flight. Otherwise, proceed and return Status::OK() even if the query isn't
+  /// in-flight (for cleaning up after an error on the query issuing path).
+  Status Cancel(bool check_inflight, const Status* cause);
 
   /// This is called when the query is done (finished, cancelled, or failed).
   /// Takes lock_: callers must not hold lock() before calling.
@@ -217,7 +220,16 @@ class ImpalaServer::QueryExecState {
   /// increased, and decreased once that work is completed.
   uint32_t ref_count_;
 
-  boost::mutex lock_;  // protects all following fields
+  /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
+  const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;
+
+  // Protects all following fields. Acquirers should be careful not to hold it for too
+  // long, e.g. during RPCs because this lock is required to make progress on various
+  // ImpalaServer requests. If held for too long it can block progress of client
+  // requests for this query, e.g. query status and cancellation. Furthermore, until
+  // IMPALA-3882 is fixed, it can indirectly block progress on all other queries.
+  boost::mutex lock_;
+
   ExecEnv* exec_env_;
 
   /// Thread for asynchronously running Wait().
@@ -282,6 +294,7 @@ class ImpalaServer::QueryExecState {
 
   RuntimeProfile::EventSequence* query_events_;
   std::vector<ExprContext*> output_expr_ctxs_;
+  bool is_cancelled_; // if true, Cancel() was called.
   bool eos_;  // if true, there are no more rows to return
   // We enforce the invariant that query_status_ is not OK iff query_state_
   // is EXCEPTION, given that lock_ is held.
@@ -308,16 +321,6 @@ class ImpalaServer::QueryExecState {
   /// Start/end time of the query
   TimestampValue start_time_, end_time_;
 
-  /// List of child queries to be executed on behalf of this query.
-  std::vector<ChildQuery> child_queries_;
-
-  /// Thread to execute child_queries_ in and the resulting status. The status is OK iff
-  /// all child queries complete successfully. Otherwise, status contains the error of the
-  /// first child query that failed (child queries are executed serially and abort on the
-  /// first error).
-  Status child_queries_status_;
-  boost::scoped_ptr<Thread> child_queries_thread_;
-
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
   Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op);
@@ -333,6 +336,8 @@ class ImpalaServer::QueryExecState {
   /// Core logic of initiating a query or dml execution request.
   /// Initiates execution of plan fragments, if there are any, and sets
   /// up the output exprs for subsequent calls to FetchRows().
+  /// 'coord_' is only valid after this method is called, and may be invalid if it
+  /// returns an error.
   /// Also sets up profile and pre-execution counters.
   /// Non-blocking.
   Status ExecQueryOrDmlRequest(const TQueryExecRequest& query_exec_request);
@@ -386,23 +391,7 @@ class ImpalaServer::QueryExecState {
   /// For example, INSERT queries update partition metadata in UpdateCatalog() using a
   /// TUpdateCatalogRequest, whereas our DDL uses a TCatalogOpRequest for very similar
   /// purposes. Perhaps INSERT should use a TCatalogOpRequest as well.
-  Status UpdateTableAndColumnStats();
-
-  /// Asynchronously executes all child_queries_ one by one. Calls ExecChildQueries()
-  /// in a new child_queries_thread_.
-  void ExecChildQueriesAsync();
-
-  /// Serially executes the queries in child_queries_ by calling the child query's
-  /// ExecAndWait(). This function is blocking and is intended to be run in a separate
-  /// thread to ensure that Exec() remains non-blocking. Sets child_queries_status_.
-  /// Must not be called while holding lock_.
-  void ExecChildQueries();
-
-  /// Waits for all child queries to complete successfully or with an error, by joining
-  /// child_queries_thread_. Returns a non-OK status if a child query fails or if the
-  /// parent query is cancelled (subsequent children will not be executed). Returns OK
-  /// if child_queries_thread_ is not set or if all child queries finished successfully.
-  Status WaitForChildQueries();
+  Status UpdateTableAndColumnStats(const std::vector<ChildQuery*>& child_queries);
 
   /// Sets result_cache_ to NULL and updates its associated metrics and mem consumption.
   /// This function is a no-op if the cache has already been cleared.

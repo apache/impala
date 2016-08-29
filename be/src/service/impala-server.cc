@@ -995,18 +995,9 @@ Status ImpalaServer::UpdateCatalogMetrics() {
 Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflight,
     const Status* cause) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
   if (exec_state == NULL) return Status("Invalid or unknown query handle");
-  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-  if (check_inflight) {
-    lock_guard<mutex> l2(exec_state->session()->lock);
-    if (exec_state->session()->inflight_queries.find(query_id) ==
-        exec_state->session()->inflight_queries.end()) {
-      return Status("Query not yet running");
-    }
-  }
-  // TODO: can we call Coordinator::Cancel() here while holding lock?
-  exec_state->Cancel(cause);
+  exec_state->Cancel(check_inflight, cause);
   return Status::OK();
 }
 

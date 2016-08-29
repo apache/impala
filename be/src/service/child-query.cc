@@ -146,4 +146,73 @@ Status ChildQuery::IsCancelled() {
   return Status::CANCELLED;
 }
 
+ChildQueryExecutor::ChildQueryExecutor() : is_cancelled_(false), is_running_(false) {}
+ChildQueryExecutor::~ChildQueryExecutor() {
+  DCHECK(!is_running_);
+}
+
+void ChildQueryExecutor::ExecAsync(vector<ChildQuery>&& child_queries) {
+  DCHECK(!child_queries.empty());
+  lock_guard<SpinLock> lock(lock_);
+  DCHECK(child_queries_.empty());
+  DCHECK(child_queries_thread_.get() == NULL);
+  if (is_cancelled_) return;
+  child_queries_ = move(child_queries);
+  child_queries_thread_.reset(new Thread("query-exec-state", "async child queries",
+      bind(&ChildQueryExecutor::ExecChildQueries, this)));
+  is_running_ = true;
+}
+
+void ChildQueryExecutor::ExecChildQueries() {
+  for (ChildQuery& child_query : child_queries_) {
+    // Execute without holding 'lock_'.
+    Status status = child_query.ExecAndFetch();
+    if (!status.ok()) {
+      lock_guard<SpinLock> lock(lock_);
+      child_queries_status_ = status;
+      break;
+    }
+  }
+
+  {
+    lock_guard<SpinLock> lock(lock_);
+    is_running_ = false;
+  }
+}
+
+Status ChildQueryExecutor::WaitForAll(vector<ChildQuery*>* completed_queries) {
+  // Safe to read without lock since we don't call this concurrently with ExecAsync().
+  if (child_queries_thread_ == NULL) {
+    DCHECK(!is_running_);
+    return Status::OK();
+  }
+  child_queries_thread_->Join();
+
+  // Safe to read below fields without 'lock_' because they are immutable after the
+  // thread finishes.
+  RETURN_IF_ERROR(child_queries_status_);
+  for (ChildQuery& child_query : child_queries_) {
+    completed_queries->push_back(&child_query);
+  }
+  return Status::OK();
+}
+
+void ChildQueryExecutor::Cancel() {
+  {
+    lock_guard<SpinLock> l(lock_);
+    // Prevent more child queries from starting. After this critical section,
+    // 'child_queries_' will not be modified.
+    is_cancelled_ = true;
+    if (!is_running_) return;
+    DCHECK_EQ(child_queries_thread_ == NULL, child_queries_.empty());
+  }
+
+  // Cancel child queries without holding 'lock_'.
+  // Safe because 'child_queries_' and 'child_queries_thread_' are immutable after
+  // cancellation.
+  for (ChildQuery& child_query : child_queries_) {
+    child_query.Cancel();
+  }
+  child_queries_thread_->Join();
+}
 }

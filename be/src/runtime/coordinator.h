@@ -246,7 +246,9 @@ class Coordinator {
   /// Keeps track of number of completed ranges and total scan ranges.
   ProgressUpdater progress_;
 
-  /// protects all fields below
+  /// Protects all fields below. This is held while making RPCs, so this lock should
+  /// only be acquired if the acquiring thread is prepared to wait for a significant
+  /// time.
   boost::mutex lock_;
 
   /// Overall status of the entire query; set to the first reported fragment error

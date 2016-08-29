@@ -64,6 +64,7 @@ ImpalaServer::QueryExecState::QueryExecState(
   : query_ctx_(query_ctx),
     last_active_time_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
+    child_query_executor_(new ChildQueryExecutor),
     exec_env_(exec_env),
     is_block_on_wait_joining_(false),
     session_(session),
@@ -73,6 +74,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
     server_profile_(&profile_pool_, "ImpalaServer"),
     summary_profile_(&profile_pool_, "Summary"),
+    is_cancelled_(false),
     eos_(false),
     query_state_(beeswax::QueryState::CREATED),
     current_batch_(NULL),
@@ -426,9 +428,14 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
   DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
 
-  schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
-      exec_request_.query_options, &summary_profile_, query_events_));
-  coord_.reset(new Coordinator(exec_request_.query_options, exec_env_, query_events_));
+  {
+    lock_guard<mutex> l(lock_);
+    // Don't start executing the query if Cancel() was called concurrently with Exec().
+    if (is_cancelled_) return Status::CANCELLED;
+    schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
+        exec_request_.query_options, &summary_profile_, query_events_));
+    coord_.reset(new Coordinator(exec_request_.query_options, exec_env_, query_events_));
+  }
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
 
   {
@@ -462,15 +469,17 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     TComputeStatsParams& compute_stats_params =
         exec_request_.catalog_op_request.ddl_params.compute_stats_params;
     // Add child queries for computing table and column stats.
+    vector<ChildQuery> child_queries;
     if (compute_stats_params.__isset.tbl_stats_query) {
-      child_queries_.push_back(
+      child_queries.push_back(
           ChildQuery(compute_stats_params.tbl_stats_query, this, parent_server_));
     }
     if (compute_stats_params.__isset.col_stats_query) {
-      child_queries_.push_back(
+      child_queries.push_back(
           ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
     }
-    if (child_queries_.size() > 0) ExecChildQueriesAsync();
+
+    if (child_queries.size() > 0) child_query_executor_->ExecAsync(move(child_queries));
     return Status::OK();
   }
 
@@ -600,7 +609,15 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
     return Status::OK();
   }
 
-  RETURN_IF_ERROR(WaitForChildQueries());
+  vector<ChildQuery*> child_queries;
+  Status child_queries_status = child_query_executor_->WaitForAll(&child_queries);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(query_status_);
+    RETURN_IF_ERROR(UpdateQueryStatus(child_queries_status));
+  }
+  query_events_->MarkEvent("Child queries finished");
+
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
     RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, coord_->runtime_state()));
@@ -608,8 +625,8 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
   }
 
   if (catalog_op_type() == TCatalogOpType::DDL &&
-      ddl_type() == TDdlType::COMPUTE_STATS && child_queries_.size() > 0) {
-    RETURN_IF_ERROR(UpdateTableAndColumnStats());
+      ddl_type() == TDdlType::COMPUTE_STATS && child_queries.size() > 0) {
+    RETURN_IF_ERROR(UpdateTableAndColumnStats(child_queries));
   }
 
   if (!returns_result_set()) {
@@ -820,22 +837,40 @@ Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* r
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
-  // Cancel and close child queries before cancelling parent.
-  for (ChildQuery& child_query: child_queries_) {
-    child_query.Cancel();
-  }
+Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* cause) {
+  Coordinator* coord;
+  {
+    lock_guard<mutex> lock(lock_);
+    if (check_inflight) {
+      lock_guard<mutex> session_lock(session_->lock);
+      if (session_->inflight_queries.find(query_id()) ==
+          session_->inflight_queries.end()) {
+        return Status("Query not yet running");
+      }
+    }
 
-  // If the query is completed or cancelled, no need to cancel.
-  if (eos_ || query_state_ == QueryState::EXCEPTION) return;
+    // If the query is completed or cancelled, no need to update state.
+    bool already_done = eos_ || query_state_ == QueryState::EXCEPTION;
+    if (!already_done && cause != NULL) {
+      DCHECK(!cause->ok());
+      UpdateQueryStatus(*cause);
+      query_events_->MarkEvent("Cancelled");
+      DCHECK_EQ(query_state_, QueryState::EXCEPTION);
+    }
+    // Get a copy of the coordinator pointer while holding 'lock_'.
+    coord = coord_.get();
+    is_cancelled_ = true;
+  } // Release lock_ before doing cancellation work.
 
-  if (cause != NULL) {
-    DCHECK(!cause->ok());
-    UpdateQueryStatus(*cause);
-    query_events_->MarkEvent("Cancelled");
-    DCHECK_EQ(query_state_, QueryState::EXCEPTION);
-  }
-  if (coord_.get() != NULL) coord_->Cancel(cause);
+  // Cancel and close child queries before cancelling parent. 'lock_' should not be held
+  // because a) ChildQuery::Cancel() calls back into ImpalaServer and b) cancellation
+  // involves RPCs and can take quite some time.
+  child_query_executor_->Cancel();
+
+  // Cancel the parent query. 'lock_' should not be held because cancellation involves
+  // RPCs and can block for a long time.
+  if (coord != NULL) coord->Cancel(cause);
+  return Status::OK();
 }
 
 Status ImpalaServer::QueryExecState::UpdateCatalog() {
@@ -988,9 +1023,10 @@ void ImpalaServer::QueryExecState::MarkActive() {
   ++ref_count_;
 }
 
-Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
-  DCHECK_GE(child_queries_.size(), 1);
-  DCHECK_LE(child_queries_.size(), 2);
+Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats(
+    const vector<ChildQuery*>& child_queries) {
+  DCHECK_GE(child_queries.size(), 1);
+  DCHECK_LE(child_queries.size(), 2);
   catalog_op_executor_.reset(
       new CatalogOpExecutor(exec_env_, frontend_, &server_profile_));
 
@@ -998,15 +1034,15 @@ Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
   // ExecComputeStats(). Otherwise pass in the column stats result.
   TTableSchema col_stats_schema;
   TRowSet col_stats_data;
-  if (child_queries_.size() > 1) {
-    col_stats_schema = child_queries_[1].result_schema();
-    col_stats_data = child_queries_[1].result_data();
+  if (child_queries.size() > 1) {
+    col_stats_schema = child_queries[1]->result_schema();
+    col_stats_data = child_queries[1]->result_data();
   }
 
   Status status = catalog_op_executor_->ExecComputeStats(
       exec_request_.catalog_op_request.ddl_params.compute_stats_params,
-      child_queries_[0].result_schema(),
-      child_queries_[0].result_data(),
+      child_queries[0]->result_schema(),
+      child_queries[0]->result_data(),
       col_stats_schema,
       col_stats_data);
   {
@@ -1027,31 +1063,6 @@ Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
   }
 
   query_events_->MarkEvent("Metastore update finished");
-  return Status::OK();
-}
-
-void ImpalaServer::QueryExecState::ExecChildQueriesAsync() {
-  DCHECK(child_queries_thread_.get() == NULL);
-  child_queries_thread_.reset(new Thread("query-exec-state", "async child queries",
-      bind(&ImpalaServer::QueryExecState::ExecChildQueries, this)));
-}
-
-void ImpalaServer::QueryExecState::ExecChildQueries() {
-  for (int i = 0; i < child_queries_.size(); ++i) {
-    if (!child_queries_status_.ok()) return;
-    child_queries_status_ = child_queries_[i].ExecAndFetch();
-  }
-}
-
-Status ImpalaServer::QueryExecState::WaitForChildQueries() {
-  if (child_queries_thread_.get() == NULL) return Status::OK();
-  child_queries_thread_->Join();
-  {
-    lock_guard<mutex> l(lock_);
-    RETURN_IF_ERROR(query_status_);
-    RETURN_IF_ERROR(UpdateQueryStatus(child_queries_status_));
-  }
-  query_events_->MarkEvent("Child queries finished");
   return Status::OK();
 }
 
