@@ -509,6 +509,12 @@ class HdfsScanNode : public ScanNode {
   /// -1 if no callback is registered.
   int32_t rm_callback_id_;
 
+  /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
+  /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
+  /// are generally cpu bound so there is no benefit in spinning up more threads than
+  /// the number of cores.
+  int max_num_scanner_threads_;
+
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);

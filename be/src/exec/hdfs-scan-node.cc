@@ -123,7 +123,8 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       all_ranges_started_(false),
       counters_running_(false),
       thread_avail_cb_id_(-1),
-      rm_callback_id_(-1) {
+      rm_callback_id_(-1),
+      max_num_scanner_threads_(CpuInfo::num_cores()) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
     // TODO: This parameter has an U-shaped effect on performance: increasing the value
@@ -259,6 +260,8 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     }
 
     // Issue initial ranges for all file types.
+    RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
+        matching_per_type_files[THdfsFileFormat::PARQUET]));
     RETURN_IF_ERROR(HdfsTextScanner::IssueInitialRanges(this,
         matching_per_type_files[THdfsFileFormat::TEXT]));
     RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
@@ -267,8 +270,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
         matching_per_type_files[THdfsFileFormat::RC_FILE]));
     RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
         matching_per_type_files[THdfsFileFormat::AVRO]));
-    RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
-        matching_per_type_files[THdfsFileFormat::PARQUET]));
 
     // Release the scanner threads
     ranges_issued_barrier_.Notify();
@@ -730,9 +731,9 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   // reservation before any ranges are issued.
   runtime_state_->resource_pool()->ReserveOptionalTokens(1);
   if (runtime_state_->query_options().num_scanner_threads > 0) {
-    runtime_state_->resource_pool()->set_max_quota(
-        runtime_state_->query_options().num_scanner_threads);
+    max_num_scanner_threads_ = runtime_state_->query_options().num_scanner_threads;
   }
+  DCHECK_GT(max_num_scanner_threads_, 0);
 
   thread_avail_cb_id_ = runtime_state_->resource_pool()->AddThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
@@ -897,7 +898,7 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges
       runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
-  ThreadTokenAvailableCb(runtime_state_->resource_pool());
+  if (!ranges.empty()) ThreadTokenAvailableCb(runtime_state_->resource_pool());
   return Status::OK();
 }
 
@@ -983,8 +984,9 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  5. Don't start up a ScannerThread if materialized_row_batches_ is full since
   //     we are not scanner bound.
   //  6. Don't start up a thread if there isn't enough memory left to run it.
-  //  7. Don't start up if there are no thread tokens.
-  //  8. Don't start up if we are running too many threads for our vcore allocation
+  //  7. Don't start up more than maximum number of scanner threads configured.
+  //  8. Don't start up if there are no thread tokens.
+  //  9. Don't start up if we are running too many threads for our vcore allocation
   //  (unless the thread is reserved, in which case it has to run).
 
   // Case 4. We have not issued the initial ranges so don't start a scanner thread.
@@ -1000,7 +1002,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     unique_lock<mutex> lock(lock_);
     // Cases 1, 2, 3.
     if (done_ || all_ranges_started_ ||
-      active_scanner_thread_counter_.value() >= progress_.remaining()) {
+        active_scanner_thread_counter_.value() >= progress_.remaining()) {
       break;
     }
 
@@ -1011,11 +1013,14 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
       break;
     }
 
-    // Case 7.
+    // Case 7 and 8.
     bool is_reserved = false;
-    if (!pool->TryAcquireThreadToken(&is_reserved)) break;
+    if (active_scanner_thread_counter_.value() >= max_num_scanner_threads_ ||
+        !pool->TryAcquireThreadToken(&is_reserved)) {
+      break;
+    }
 
-    // Case 8.
+    // Case 9.
     if (!is_reserved) {
       if (runtime_state_->query_resource_mgr() != NULL &&
           runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
