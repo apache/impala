@@ -203,3 +203,33 @@ where c_phone='20-968-632-1388' and l_partkey = 127499
 ---- TYPES
 bigint,string,string,smallint,string,decimal,string,string,bigint,string,decimal,string,string,string,int,string,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,string,string,string,string,string
 ====
+---- QUERY
+# IMPALA-4049: non-grouping aggregation with selective predicate in subplan feeding into
+# build side of a nested loop join. Reproduces a memory transfer bug triggered by empty
+# row batches in the build side of the join.
+select straight_join c_custkey, cnt1
+from tpch_nested_parquet.customer c,
+  (select count(*) cnt1 from c.c_orders) v
+where cnt1 = 1
+order by c_custkey
+---- RESULTS
+1910,1
+2855,1
+9938,1
+14996,1
+17480,1
+25622,1
+42239,1
+43360,1
+48365,1
+52973,1
+67328,1
+86840,1
+87212,1
+131732,1
+138173,1
+140732,1
+148949,1
+---- TYPES
+bigint, bigint
+====
