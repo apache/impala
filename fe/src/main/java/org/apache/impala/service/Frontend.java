@@ -170,9 +170,11 @@ public class Frontend {
   private final AtomicReference<AuthorizationChecker> authzChecker_;
   private final ScheduledExecutorService policyReader_ =
       Executors.newScheduledThreadPool(1);
+  private final String defaultKuduMasterHosts_;
 
-  public Frontend(AuthorizationConfig authorizationConfig) {
-    this(authorizationConfig, new ImpaladCatalog());
+  public Frontend(AuthorizationConfig authorizationConfig,
+      String defaultKuduMasterHosts) {
+    this(authorizationConfig, new ImpaladCatalog(defaultKuduMasterHosts));
   }
 
   /**
@@ -181,6 +183,7 @@ public class Frontend {
   public Frontend(AuthorizationConfig authorizationConfig, ImpaladCatalog catalog) {
     authzConfig_ = authorizationConfig;
     impaladCatalog_ = catalog;
+    defaultKuduMasterHosts_ = catalog.getDefaultKuduMasterHosts();
     authzChecker_ = new AtomicReference<AuthorizationChecker>(
         new AuthorizationChecker(authzConfig_, impaladCatalog_.getAuthPolicy()));
     // If authorization is enabled, reload the policy on a regular basis.
@@ -226,7 +229,7 @@ public class Frontend {
 
     // If this is not a delta, this update should replace the current
     // Catalog contents so create a new catalog and populate it.
-    if (!req.is_delta) catalog = new ImpaladCatalog();
+    if (!req.is_delta) catalog = new ImpaladCatalog(defaultKuduMasterHosts_);
 
     TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
 

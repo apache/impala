@@ -87,12 +87,17 @@ public class ImpaladCatalog extends Catalog {
   // Object that is used to synchronize on and signal when a catalog update is received.
   private final Object catalogUpdateEventNotifier_ = new Object();
 
+  // The addresses of the Kudu masters to use if no Kudu masters were explicitly provided.
+  // Used during table creation.
+  private final String defaultKuduMasterHosts_;
+
   /**
    * C'tor used by tests that need to validate the ImpaladCatalog outside of the
    * CatalogServer.
    */
-  public ImpaladCatalog() {
+  public ImpaladCatalog(String defaultKuduMasterHosts) {
     super(false);
+    defaultKuduMasterHosts_ = defaultKuduMasterHosts;
   }
 
   /**
@@ -445,4 +450,5 @@ public class ImpaladCatalog extends Catalog {
   // Only used for testing.
   public void setIsReady(boolean isReady) { isReady_.set(isReady); }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
+  public String getDefaultKuduMasterHosts() { return defaultKuduMasterHosts_; }
 }

@@ -27,6 +27,7 @@ from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser
 from testdata.common import cgroups
+from tests.common import KUDU_MASTER_HOSTS
 
 
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get('IMPALA_MAX_LOG_FILES', 10)
@@ -57,7 +58,8 @@ parser.add_option("-r", "--restart_impalad_only", dest="restart_impalad_only",
                   help="Restarts only the impalad processes")
 parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,
                   help="Start all Impala backends and state store in a single process.")
-parser.add_option("--log_dir", dest="log_dir", default=os.environ['IMPALA_CLUSTER_LOGS_DIR'],
+parser.add_option("--log_dir", dest="log_dir",
+                  default=os.environ['IMPALA_CLUSTER_LOGS_DIR'],
                   help="Directory to store output logs to.")
 parser.add_option('--max_log_files', default=DEFAULT_IMPALA_MAX_LOG_FILES,
                   help='Max number of log files before rotation occurs.')
@@ -70,6 +72,9 @@ parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
 parser.add_option("--jvm_args", dest="jvm_args", default="",
                   help="Additional arguments to pass to the JVM(s) during startup.")
+parser.add_option("--kudu_masters", default=KUDU_MASTER_HOSTS,
+                  help="The host name or address of the Kudu master. Multiple masters "
+                      "can be specified using a comma separated list.")
 
 options, args = parser.parse_args()
 
@@ -193,7 +198,6 @@ def build_impalad_port_args(instance_num):
                           BASE_WEBSERVER_PORT + instance_num)
 
 def build_impalad_logging_args(instance_num, service_name):
-  log_file_path = os.path.join(options.log_dir, "%s.INFO" % service_name)
   return BE_LOGGING_ARGS % (service_name, options.log_dir, options.log_level,
                             options.max_log_files)
 
@@ -233,6 +237,9 @@ def start_impalad_instances(cluster_size):
           (mem_limit,  # Goes first so --impalad_args will override it.
            build_impalad_logging_args(i, service_name), build_jvm_args(i),
            build_impalad_port_args(i), param_args)
+    if options.kudu_masters:
+      # Must be prepended, otherwise the java options interfere.
+      args = "-kudu_master_hosts %s %s" % (options.kudu_masters, args)
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 

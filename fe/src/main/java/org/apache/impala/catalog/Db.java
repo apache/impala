@@ -152,6 +152,11 @@ public class Db implements CatalogObject {
     return Lists.newArrayList(tableCache_.keySet());
   }
 
+  /**
+   * Returns the tables in the cache.
+   */
+  public List<Table> getTables() { return tableCache_.getValues(); }
+
   public boolean containsTable(String tableName) {
     return tableCache_.contains(tableName.toLowerCase());
   }

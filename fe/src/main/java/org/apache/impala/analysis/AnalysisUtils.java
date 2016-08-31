@@ -15,21 +15,29 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.catalog.delegates;
+package org.apache.impala.analysis;
 
-import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.AnalysisException;
 
-/**
- * Empty implementation for the DdlDelegate interface that does nothing.
- */
-public class UnsupportedOpDelegate extends DdlDelegate {
+import java.util.Collection;
 
-  @Override
-  public void createTable() throws ImpalaRuntimeException { }
+class AnalysisUtils {
 
-  @Override
-  public void dropTable() throws ImpalaRuntimeException { }
+  static <T> void throwIfNotNull(T o, String message) throws AnalysisException {
+    if (o != null) throw new AnalysisException(message);
+  }
 
-  @Override
-  public boolean alterTable() throws ImpalaRuntimeException { return true; }
+  static void throwIfNotEmpty(Collection<?> c, String message)
+      throws AnalysisException {
+    if (c != null && !c.isEmpty()) throw new AnalysisException(message);
+  }
+
+  static <T> void throwIfNull(T o, String message) throws AnalysisException {
+    if (o == null) throw new AnalysisException(message);
+  }
+
+  static void throwIfNullOrEmpty(Collection<?> c, String message)
+      throws AnalysisException {
+    if (c == null || c.isEmpty()) throw new AnalysisException(message);
+  }
 }

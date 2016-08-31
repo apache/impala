@@ -107,7 +107,7 @@ public class KuduScanNode extends ScanNode {
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
     try (KuduClient client =
-         new KuduClientBuilder(kuduTable_.getKuduMasterAddresses()).build()) {
+         new KuduClientBuilder(kuduTable_.getKuduMasterHosts()).build()) {
       org.apache.kudu.client.KuduTable rpcTable =
           client.openTable(kuduTable_.getKuduTableName());
       validateSchema(rpcTable);

@@ -49,7 +49,7 @@ import com.google.common.collect.Lists;
  * JdbcTest
  *
  * Basic JDBC metadata test. It exercises getTables, getCatalogs, getSchemas,
- * getTableTypes, getColumns.
+ * getTableTypes, getColumnNames.
  *
  */
 public class JdbcTest {
@@ -204,7 +204,7 @@ public class JdbcTest {
     ResultSet rs = con_.getMetaData().getColumns(null,
         "functional", "alltypessmall", "s%rin%");
 
-    // validate the metadata for the getColumns result set
+    // validate the metadata for the getColumnNames result set
     ResultSetMetaData rsmd = rs.getMetaData();
     assertEquals("TABLE_CAT", rsmd.getColumnName(1));
     assertTrue(rs.next());
@@ -477,7 +477,7 @@ public class JdbcTest {
   }
 
   /**
-   * Validate the Metadata for the result set of a metadata getColumns call.
+   * Validate the Metadata for the result set of a metadata getColumnNames call.
    */
   @Test
   public void testMetaDataGetColumnsMetaData() throws SQLException {

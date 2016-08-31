@@ -57,15 +57,10 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   L_RECEIPTDATE STRING,
   L_SHIPINSTRUCT STRING,
   L_SHIPMODE STRING,
-  L_COMMENT STRING
+  L_COMMENT STRING,
+  PRIMARY KEY(L_ORDERKEY, L_PARTKEY, L_SUPPKEY, L_LINENUMBER)
 )
-distribute by hash (l_orderkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'l_orderkey, l_partkey, l_suppkey, l_linenumber'
-);
+distribute by hash (l_orderkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -90,7 +85,7 @@ P_COMMENT STRING
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
 create table if not exists {db_name}{db_suffix}.{table_name} (
-  P_PARTKEY BIGINT,
+  P_PARTKEY BIGINT PRIMARY KEY,
   P_NAME STRING,
   P_MFGR STRING,
   P_BRAND STRING,
@@ -100,13 +95,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   P_RETAILPRICE DOUBLE,
   P_COMMENT STRING
 )
-distribute by hash (p_partkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'p_partkey'
-);
+distribute by hash (p_partkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -131,15 +120,10 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   PS_SUPPKEY BIGINT,
   PS_AVAILQTY BIGINT,
   PS_SUPPLYCOST DOUBLE,
-  PS_COMMENT STRING
+  PS_COMMENT STRING,
+  PRIMARY KEY(PS_PARTKEY, PS_SUPPKEY)
 )
-distribute by hash (ps_partkey, ps_suppkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'ps_partkey, ps_suppkey'
-);
+distribute by hash (ps_partkey, ps_suppkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -162,7 +146,7 @@ S_COMMENT STRING
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
 create table if not exists {db_name}{db_suffix}.{table_name} (
-  S_SUPPKEY BIGINT,
+  S_SUPPKEY BIGINT PRIMARY KEY,
   S_NAME STRING,
   S_ADDRESS STRING,
   S_NATIONKEY SMALLINT,
@@ -170,13 +154,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   S_ACCTBAL DOUBLE,
   S_COMMENT STRING
 )
-distribute by hash (s_suppkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 's_suppkey'
-);
+distribute by hash (s_suppkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -196,18 +174,12 @@ N_COMMENT STRING
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
 create table if not exists {db_name}{db_suffix}.{table_name} (
-  N_NATIONKEY SMALLINT,
+  N_NATIONKEY SMALLINT PRIMARY KEY,
   N_NAME STRING,
   N_REGIONKEY SMALLINT,
   N_COMMENT STRING
 )
-distribute by hash (n_nationkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'n_nationkey'
-);
+distribute by hash (n_nationkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -226,17 +198,11 @@ R_COMMENT STRING
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
 create table if not exists {db_name}{db_suffix}.{table_name} (
-  R_REGIONKEY SMALLINT,
+  R_REGIONKEY SMALLINT PRIMARY KEY,
   R_NAME STRING,
   R_COMMENT STRING
 )
-distribute by hash (r_regionkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'r_regionkey'
-);
+distribute by hash (r_regionkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -261,7 +227,7 @@ O_COMMENT STRING
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
 create table if not exists {db_name}{db_suffix}.{table_name} (
-  O_ORDERKEY BIGINT,
+  O_ORDERKEY BIGINT PRIMARY KEY,
   O_CUSTKEY BIGINT,
   O_ORDERSTATUS STRING,
   O_TOTALPRICE DOUBLE,
@@ -271,13 +237,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   O_SHIPPRIORITY INT,
   O_COMMENT STRING
 )
-distribute by hash (o_orderkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'o_orderkey'
-);
+distribute by hash (o_orderkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -301,7 +261,7 @@ C_COMMENT STRING
 DELIMITED FIELDS TERMINATED BY '|'
 ---- CREATE_KUDU
 create table if not exists {db_name}{db_suffix}.{table_name} (
-  C_CUSTKEY BIGINT,
+  C_CUSTKEY BIGINT PRIMARY KEY,
   C_NAME STRING,
   C_ADDRESS STRING,
   C_NATIONKEY SMALLINT,
@@ -310,54 +270,10 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   C_MKTSEGMENT STRING,
   C_COMMENT STRING
 )
-distribute by hash (c_custkey) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'c_custkey'
-);
+distribute by hash (c_custkey) into 9 buckets stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-tpch
----- BASE_TABLE_NAME
-revenue
----- COLUMNS
-supplier_no bigint
-total_revenue Decimal(38,4)
----- CREATE_KUDU
-create table if not exists {db_name}{db_suffix}.{table_name} (
-  supplier_no bigint,
-  total_revevue double
-)
-distribute by hash (supplier_no) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'supplier_no'
-);
-====
----- DATASET
-tpch
----- BASE_TABLE_NAME
-max_revenue
----- COLUMNS
-max_revenue Decimal(38, 4)
----- CREATE_KUDU
-create table if not exists {db_name}{db_suffix}.{table_name} (
-  max_revenue bigint
-)
-distribute by hash (max_revenue) into 9 buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'max_revenue'
-);
 ====

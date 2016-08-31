@@ -78,7 +78,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101101.txt' OVERW
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=12);
 ---- CREATE_KUDU
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
-  id INT,
+  id INT PRIMARY KEY,
   bool_col BOOLEAN,
   tinyint_col TINYINT,
   smallint_col SMALLINT,
@@ -92,13 +92,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{table_name}',
-'kudu.master_addresses' = '127.0.0.1:7051',
-'kudu.key_columns' = 'id'
-);
+DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -161,7 +155,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090301.txt' 
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
 ---- CREATE_KUDU
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
-  id INT,
+  id INT PRIMARY KEY,
   bool_col BOOLEAN,
   tinyint_col TINYINT,
   smallint_col SMALLINT,
@@ -175,13 +169,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{table_name}',
-'kudu.master_addresses' = '127.0.0.1:7051',
-'kudu.key_columns' = 'id'
-);
+DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -225,7 +213,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090301.txt' O
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
 ---- CREATE_KUDU
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
-  id INT,
+  id INT PRIMARY KEY,
   bool_col BOOLEAN,
   tinyint_col TINYINT,
   smallint_col SMALLINT,
@@ -239,13 +227,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{table_name}',
-'kudu.master_addresses' = '127.0.0.1:7051',
-'kudu.key_columns' = 'id'
-);
+DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -565,7 +547,7 @@ DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_idx;
 
 CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
-  kudu_idx BIGINT,
+  kudu_idx BIGINT PRIMARY KEY,
   id INT,
   bool_col BOOLEAN,
   tinyint_col TINYINT,
@@ -581,14 +563,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
   month INT,
   day INT
 )
-DISTRIBUTE BY HASH (kudu_idx) INTO 3 BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{table_name}',
-'kudu.master_addresses' = '127.0.0.1:7051',
-'kudu.key_columns' = 'kudu_idx'
-);
-
+DISTRIBUTE BY HASH (kudu_idx) INTO 3 BUCKETS STORED AS KUDU;
 CREATE VIEW {db_name}{db_suffix}.{table_name} AS
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
        double_col, date_string_col, string_col, timestamp_col, year, month, day
@@ -651,7 +626,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100109.
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
 ---- CREATE_KUDU
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
-  id INT,
+  id INT PRIMARY KEY,
   bool_col BOOLEAN,
   tinyint_col TINYINT,
   smallint_col SMALLINT,
@@ -666,13 +641,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   month INT,
   day INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{table_name}',
-'kudu.master_addresses' = '127.0.0.1:7051',
-'kudu.key_columns' = 'id'
-);
+DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -788,17 +757,11 @@ zip int
 delimited fields terminated by ','  escaped by '\\'
 ---- CREATE_KUDU
 create table {db_name}{db_suffix}.{table_name} (
-  id bigint,
+  id bigint primary key,
   name string,
   zip int
 )
-distribute by range(id) split rows ((1003), (1007))
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'id'
-);
+distribute by range(id) split rows ((1003), (1007)) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -816,17 +779,11 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 create table {db_name}{db_suffix}.{table_name} (
-  id bigint,
+  id bigint primary key,
   name string,
   zip int
 )
-distribute by range(id) split rows ((1003), (1007))
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'id'
-);
+distribute by range(id) split rows ((1003), (1007)) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -848,15 +805,10 @@ create table {db_name}{db_suffix}.{table_name} (
   test_id bigint,
   test_name string,
   test_zip int,
-  alltypes_id int
+  alltypes_id int,
+  primary key (test_id, test_name, test_zip, alltypes_id)
 )
-distribute by range(test_id) split rows ((1003), (1007))
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'test_id, test_name, test_zip, alltypes_id'
-);
+distribute by range(test_id) split rows ((1003), (1007)) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1191,16 +1143,10 @@ f2 int
 field string
 ---- CREATE_KUDU
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
-  field STRING,
+  field STRING PRIMARY KEY,
   f2 INT
 )
-DISTRIBUTE BY HASH (field) INTO 3 BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{table_name}',
-'kudu.master_addresses' = '127.0.0.1:7051',
-'kudu.key_columns' = 'field'
-);
+DISTRIBUTE BY HASH (field) INTO 3 BUCKETS STORED AS KUDU;
 ====
 ---- DATASET
 functional
@@ -1303,16 +1249,10 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 create table {db_name}{db_suffix}.{table_name} (
-  a string,
+  a string primary key,
   b string
 )
-distribute by range(a) split rows (('b'), ('d'))
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'a'
-);
+distribute by range(a) split rows (('b'), ('d')) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1328,15 +1268,9 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyIntTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 create table {db_name}{db_suffix}.{table_name} (
-  int_col int
+  int_col int primary key
 )
-distribute by range(int_col) split rows ((2), (4), (6), (8))
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'int_col'
-);
+distribute by range(int_col) split rows ((2), (4), (6), (8)) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1359,15 +1293,9 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullTable/data.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 create table {db_name}{db_suffix}.{table_name} (
-  a string, b string, c string, d int, e double, f string, g string
+  a string primary key, b string, c string, d int, e double, f string, g string
 )
-distribute by hash(a) into 3 buckets
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'a'
-);
+distribute by hash(a) into 3 buckets stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1390,15 +1318,9 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullTable/data.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 create table {db_name}{db_suffix}.{table_name} (
-  a string, b string, c string, d int, e double, f string, g string
+  a string primary key, b string, c string, d int, e double, f string, g string
 )
-distribute by hash(a) into 3 buckets
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'a'
-);
+distribute by hash(a) into 3 buckets stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1474,15 +1396,10 @@ create table {db_name}{db_suffix}.{table_name} (
   zip string,
   description1 string,
   description2 string,
-  income int
-)
+  income int,
+  primary key (id, zip))
 distribute by range(id, zip) split rows (('8600000US01475', '01475'), ('8600000US63121', '63121'), ('8600000US84712', '84712'))
-tblproperties (
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '127.0.0.1:7051',
-  'kudu.table_name' = '{table_name}',
-  'kudu.key_columns' = 'id, zip'
-);
+stored as kudu;
 ====
 ---- DATASET
 functional

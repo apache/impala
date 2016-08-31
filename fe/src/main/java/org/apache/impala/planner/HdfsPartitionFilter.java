@@ -52,7 +52,7 @@ public class HdfsPartitionFilter {
 
   // lhs exprs of smap used in isMatch()
   private final ArrayList<SlotRef> lhsSlotRefs_ = Lists.newArrayList();
-  // indices into Table.getColumns()
+  // indices into Table.getColumnNames()
   private final ArrayList<Integer> refdKeys_ = Lists.newArrayList();
 
   public HdfsPartitionFilter(Expr predicate, HdfsTable tbl, Analyzer analyzer) {

@@ -18,7 +18,6 @@
 package org.apache.impala.catalog;
 
 import java.util.EnumSet;
-import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;

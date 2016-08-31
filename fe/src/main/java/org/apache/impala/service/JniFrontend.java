@@ -117,7 +117,8 @@ public class JniFrontend {
    */
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
       String sentryConfigFile, String authPolicyProviderClass, int impalaLogLevel,
-      int otherLogLevel, boolean allowAuthToLocal) throws InternalException {
+      int otherLogLevel, boolean allowAuthToLocal, String defaultKuduMasterHosts)
+      throws InternalException {
     BackendConfig.setAuthToLocal(allowAuthToLocal);
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
@@ -136,7 +137,7 @@ public class JniFrontend {
     }
     LOG.info(JniUtil.getJavaVersion());
 
-    frontend_ = new Frontend(authConfig);
+    frontend_ = new Frontend(authConfig, defaultKuduMasterHosts);
   }
 
   /**

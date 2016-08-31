@@ -1,0 +1,105 @@
+====
+---- QUERY
+# This test file contains several cases for what basically amount to analysis errors,
+# but they only show up at runtime. These cases correspond to constraints enforced by
+# the Kudu storage engine.
+#
+# Incompatible column types in CTAS.
+create table t primary key (id) distribute by hash (id) into 3 buckets
+stored as kudu
+as select * from functional.alltypestiny
+---- CATCH
+ImpalaRuntimeException: Type TIMESTAMP is not supported in Kudu
+====
+---- QUERY
+create table t primary key (id) distribute by hash (id) into 3 buckets
+stored as kudu
+as select c1 as id from functional.decimal_tiny
+---- CATCH
+ImpalaRuntimeException: Type DECIMAL(10,4) is not supported in Kudu
+====
+---- QUERY
+create table t (a int, b array<string>, primary key(a)) distribute by hash (a)
+into 3 buckets stored as kudu
+---- CATCH
+ImpalaRuntimeException: Non-scalar type ARRAY<STRING> is not supported in Kudu
+====
+---- QUERY
+create table t primary key (id) distribute by hash (id) into 3 buckets
+stored as kudu
+as select id, int_col from functional.alltypestiny;
+select * from t;
+---- RESULTS
+0,0
+1,1
+2,0
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Boolean primary key column
+create table tab (x int, y boolean, primary key(x, y))
+  distribute by hash (x) into 3 buckets stored as kudu
+---- CATCH
+NonRecoverableException: Key column may not have type of BOOL, FLOAT, or DOUBLE
+====
+---- QUERY
+# Float primary key column
+create table tab (x int, y float, primary key(x, y))
+  distribute by hash (x) into 3 buckets stored as kudu
+---- CATCH
+NonRecoverableException: Key column may not have type of BOOL, FLOAT, or DOUBLE
+====
+---- QUERY
+# Primary keys should be declared first
+# TODO: See KUDU-1709 for improving Kudu error messages.
+create table tab (x int, y int, primary key(y))
+  distribute by hash (y) into 3 buckets stored as kudu
+---- CATCH
+NonRecoverableException: Got out-of-order key column: name: "y" type: INT32 is_key: true is_nullable: false cfile_block_size: 0
+====
+---- QUERY
+# Small number of hash buckets
+create table tab (a int, b int, c int, d int, primary key(a, b, c))
+  distribute by hash(a,b) into 8 buckets, hash(c) into 1 buckets stored as kudu
+---- CATCH
+NonRecoverableException: must have at least two hash buckets
+====
+---- QUERY
+# Same column in multiple hash based distributions
+create table tab (a int, b int, primary key (a))
+  distribute by hash (a) into 3 buckets, hash (a) into 2 buckets stored as kudu
+---- CATCH
+NonRecoverableException: hash bucket schema components must not contain columns in common
+====
+---- QUERY
+# Same column referenced multiple times in the same hash-based distribution
+create table tab (a int primary key) distribute by hash (a, a, a) into 3 buckets
+stored as kudu
+---- CATCH
+NonRecoverableException: hash bucket schema components must not contain columns in common
+====
+---- QUERY
+# Kudu table that uses Impala keywords as table name and column names
+create table `add`(`analytic` int, `function` int, primary key(`analytic`, `function`))
+distribute by hash (`analytic`) into 4 buckets, range (`function`) split rows ((1), (10))
+stored as kudu;
+insert into `add` select id, int_col from functional.alltypestiny;
+select * from `add`
+---- RESULTS
+0,0
+1,1
+2,0
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT,INT
+====

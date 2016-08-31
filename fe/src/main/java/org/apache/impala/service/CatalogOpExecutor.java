@@ -51,6 +51,11 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
@@ -61,7 +66,6 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnNotFoundException;
 import org.apache.impala.catalog.DataSource;
-import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
@@ -70,6 +74,7 @@ import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HiveStorageDescriptorFactory;
 import org.apache.impala.catalog.IncompleteTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
@@ -82,9 +87,6 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
-import org.apache.impala.catalog.delegates.DdlDelegate;
-import org.apache.impala.catalog.delegates.KuduDdlDelegate;
-import org.apache.impala.catalog.delegates.UnsupportedOpDelegate;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -121,7 +123,6 @@ import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
-import org.apache.impala.thrift.TDistributeParam;
 import org.apache.impala.thrift.TDropDataSourceParams;
 import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropFunctionParams;
@@ -149,11 +150,6 @@ import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.HdfsCachingUtil;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Class used to execute Catalog Operations, including DDL and refresh/invalidate
@@ -1103,8 +1099,7 @@ public class CatalogOpExecutor {
 
   /**
    * Drops a database from the metastore and removes the database's metadata from the
-   * internal cache. Re-throws any Hive Meta Store exceptions encountered during
-   * the drop.
+   * internal cache. Re-throws any HMS exceptions encountered during the drop.
    */
   private void dropDatabase(TDropDbParams params, TDdlExecResponse resp)
       throws ImpalaException {
@@ -1120,6 +1115,9 @@ public class CatalogOpExecutor {
 
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
+      // Remove all the Kudu tables of 'db' from the Kudu storage engine.
+      if (db != null && params.cascade) dropTablesFromKudu(db);
+
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().dropDatabase(
             params.getDb(), true, params.if_exists, params.cascade);
@@ -1144,6 +1142,44 @@ public class CatalogOpExecutor {
   }
 
   /**
+   * Drops all the Kudu tables of database 'db' from the Kudu storage engine. Retrieves
+   * the Kudu table name of each table in 'db' from HMS. Throws an ImpalaException if
+   * metadata for Kudu tables cannot be loaded from HMS or if an error occurs while
+   * trying to drop a table from Kudu.
+   */
+  private void dropTablesFromKudu(Db db) throws ImpalaException {
+    // If the table format isn't available, because the table hasn't been loaded yet,
+    // the metadata must be fetched from the Hive Metastore.
+    List<String> incompleteTableNames = Lists.newArrayList();
+    List<org.apache.hadoop.hive.metastore.api.Table> msTables = Lists.newArrayList();
+    for (Table table: db.getTables()) {
+      org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
+      if (msTable == null) {
+        incompleteTableNames.add(table.getName());
+      } else {
+        msTables.add(msTable);
+      }
+    }
+    if (!incompleteTableNames.isEmpty()) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        msTables.addAll(msClient.getHiveClient().getTableObjectsByName(
+            db.getName(), incompleteTableNames));
+      } catch (TException e) {
+        LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTableObjectsByName") +
+            e.getMessage());
+      }
+    }
+    for (org.apache.hadoop.hive.metastore.api.Table msTable: msTables) {
+      if (!KuduTable.isKuduTable(msTable) || Table.isExternalTable(msTable)) continue;
+      // The operation will be aborted if the Kudu table cannot be dropped. If for
+      // some reason Kudu is permanently stuck in a non-functional state, the user is
+      // expected to ALTER TABLE to either set the table to UNMANAGED or set the format
+      // to something else.
+      KuduCatalogOpExecutor.dropTable(msTable, /*if exists*/ true);
+    }
+  }
+
+  /**
    * Drops a table or view from the metastore and removes it from the catalog.
    * Also drops all associated caching requests on the table and/or table's partitions,
    * uncaching all table data. If params.purge is true, table data is permanently
@@ -1157,17 +1193,6 @@ public class CatalogOpExecutor {
 
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
-
-      // Forward the DDL operation to the specified storage backend.
-      try {
-        org.apache.hadoop.hive.metastore.api.Table msTbl = getExistingTable(
-            tableName.getDb(), tableName.getTbl()).getMetaStoreTable();
-        DdlDelegate handler = createDdlDelegate(msTbl);
-        handler.dropTable();
-      } catch (TableNotFoundException | DatabaseNotFoundException e) {
-        // Do nothing
-      }
-
       Db db = catalog_.getDb(params.getTable_name().db_name);
       if (db == null) {
         if (params.if_exists) return;
@@ -1179,6 +1204,23 @@ public class CatalogOpExecutor {
         if (params.if_exists) return;
         throw new CatalogException("Table/View does not exist: " + tableName);
       }
+
+      // Retrieve the HMS table to determine if this is a Kudu table.
+      org.apache.hadoop.hive.metastore.api.Table msTbl = existingTbl.getMetaStoreTable();
+      if (msTbl == null) {
+        Preconditions.checkState(existingTbl instanceof IncompleteTable);
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          msTbl = msClient.getHiveClient().getTable(tableName.getDb(),
+              tableName.getTbl());
+        } catch (TException e) {
+          LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
+        }
+      }
+      if (msTbl != null && KuduTable.isKuduTable(msTbl)
+          && !Table.isExternalTable(msTbl)) {
+        KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
+      }
+
       // Check to make sure we don't drop a view with "drop table" statement and
       // vice versa. is_table field is marked optional in TDropTableOrViewParams to
       // maintain catalog api compatibility.
@@ -1343,7 +1385,8 @@ public class CatalogOpExecutor {
 
   /**
    * Creates a new table in the metastore and adds an entry to the metadata cache to
-   * lazily load the new metadata on the next access. Re-throws any Hive Meta Store
+   * lazily load the new metadata on the next access. If this is a managed Kudu table,
+   * the table is also created in the Kudu storage engine. Re-throws any HMS or Kudu
    * exceptions encountered during the create.
    */
   private boolean createTable(TCreateTableParams params, TDdlExecResponse response)
@@ -1351,9 +1394,8 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(params);
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    Preconditions.checkState(params.getColumns() != null &&
-        params.getColumns().size() > 0,
-        "Null or empty column list given as argument to Catalog.createTable");
+    Preconditions.checkState(params.getColumns() != null,
+        "Null column list given as argument to Catalog.createTable");
 
     if (params.if_not_exists &&
         catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
@@ -1362,11 +1404,161 @@ public class CatalogOpExecutor {
       response.getResult().setVersion(catalog_.getCatalogVersion());
       return false;
     }
-    org.apache.hadoop.hive.metastore.api.Table tbl =
-        createMetaStoreTable(params);
+    org.apache.hadoop.hive.metastore.api.Table tbl = createMetaStoreTable(params);
     LOG.debug(String.format("Creating table %s", tableName));
-    return createTable(tbl, params.if_not_exists, params.getCache_op(),
-        params.getDistribute_by(), response);
+    if (KuduTable.isKuduTable(tbl)) return createKuduTable(tbl, params, response);
+    Preconditions.checkState(params.getColumns().size() > 0,
+        "Empty column list given as argument to Catalog.createTable");
+    return createTable(tbl, params.if_not_exists, params.getCache_op(), response);
+  }
+
+  /**
+   * Utility function that creates a hive.metastore.api.Table object based on the given
+   * TCreateTableParams.
+   * TODO: Extract metastore object creation utility functions into a separate
+   * helper/factory class.
+   */
+  public static org.apache.hadoop.hive.metastore.api.Table createMetaStoreTable(
+      TCreateTableParams params) {
+    Preconditions.checkNotNull(params);
+    TableName tableName = TableName.fromThrift(params.getTable_name());
+    org.apache.hadoop.hive.metastore.api.Table tbl =
+        new org.apache.hadoop.hive.metastore.api.Table();
+    tbl.setDbName(tableName.getDb());
+    tbl.setTableName(tableName.getTbl());
+    tbl.setOwner(params.getOwner());
+    if (params.isSetTable_properties()) {
+      tbl.setParameters(params.getTable_properties());
+    } else {
+      tbl.setParameters(new HashMap<String, String>());
+    }
+
+    if (params.getComment() != null) {
+      tbl.getParameters().put("comment", params.getComment());
+    }
+    if (params.is_external) {
+      tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
+      tbl.putToParameters("EXTERNAL", "TRUE");
+    } else {
+      tbl.setTableType(TableType.MANAGED_TABLE.toString());
+    }
+
+    tbl.setSd(createSd(params));
+    if (params.getPartition_columns() != null) {
+      // Add in any partition keys that were specified
+      tbl.setPartitionKeys(buildFieldSchemaList(params.getPartition_columns()));
+    } else {
+      tbl.setPartitionKeys(new ArrayList<FieldSchema>());
+    }
+    return tbl;
+  }
+
+  private static StorageDescriptor createSd(TCreateTableParams params) {
+    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(
+        params.getFile_format(), RowFormat.fromThrift(params.getRow_format()));
+    if (params.isSetSerde_properties()) {
+      if (sd.getSerdeInfo().getParameters() == null) {
+        sd.getSerdeInfo().setParameters(params.getSerde_properties());
+      } else {
+        sd.getSerdeInfo().getParameters().putAll(params.getSerde_properties());
+      }
+    }
+
+    if (params.getLocation() != null) sd.setLocation(params.getLocation());
+
+    // Add in all the columns
+    sd.setCols(buildFieldSchemaList(params.getColumns()));
+    return sd;
+  }
+
+  /**
+   * Creates a new Kudu table. The Kudu table is first created in the Kudu storage engine
+   * (only applicable to managed tables), then in HMS and finally in the catalog cache.
+   * Failure to add the table in HMS results in the table being dropped from Kudu.
+   * 'response' is populated with the results of this operation. Returns true if a new
+   * table was created as part of this call, false otherwise.
+   */
+  private boolean createKuduTable(org.apache.hadoop.hive.metastore.api.Table newTable,
+      TCreateTableParams params, TDdlExecResponse response) throws ImpalaException {
+    Preconditions.checkState(KuduTable.isKuduTable(newTable));
+    if (Table.isExternalTable(newTable)) {
+      KuduCatalogOpExecutor.populateColumnsFromKudu(newTable);
+    } else {
+      KuduCatalogOpExecutor.createManagedTable(newTable, params);
+    }
+    try {
+      // Add the table to the HMS and the catalog cache. Aquire metastoreDdlLock_ to
+      // ensure the atomicity of these operations.
+      synchronized (metastoreDdlLock_) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          msClient.getHiveClient().createTable(newTable);
+        }
+        // Add the table to the catalog cache
+        Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
+        addTableToCatalogUpdate(newTbl, response.result);
+      }
+    } catch (Exception e) {
+      try {
+        // Error creating the table in HMS, drop the managed table from Kudu.
+        if (!Table.isExternalTable(newTable)) {
+          KuduCatalogOpExecutor.dropTable(newTable, false);
+        }
+      } catch (Exception logged) {
+        String kuduTableName = newTable.getParameters().get(KuduTable.KEY_TABLE_NAME);
+        LOG.error(String.format("Failed to drop Kudu table '%s'", kuduTableName),
+            logged);
+        throw new RuntimeException(String.format("Failed to create the table '%s' in " +
+            " the Metastore and the newly created Kudu table '%s' could not be " +
+            " dropped. The log contains more information.", newTable.getTableName(),
+            kuduTableName), e);
+      }
+      if (e instanceof AlreadyExistsException && params.if_not_exists) return false;
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+    }
+    return true;
+  }
+
+  /**
+   * Creates a new table. The table is initially created in HMS and, if that operation
+   * succeeds, it is then added in the catalog cache. It also sets HDFS caching if
+   * 'cacheOp' is not null. 'response' is populated with the results of this operation.
+   * Returns true if a new table was created as part of this call, false otherwise.
+   */
+  private boolean createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
+      boolean if_not_exists, THdfsCachingOp cacheOp, TDdlExecResponse response)
+      throws ImpalaException {
+    Preconditions.checkState(!KuduTable.isKuduTable(newTable));
+    synchronized (metastoreDdlLock_) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        msClient.getHiveClient().createTable(newTable);
+        // If this table should be cached, and the table location was not specified by
+        // the user, an extra step is needed to read the table to find the location.
+        if (cacheOp != null && cacheOp.isSet_cached() &&
+            newTable.getSd().getLocation() == null) {
+          newTable = msClient.getHiveClient().getTable(
+              newTable.getDbName(), newTable.getTableName());
+        }
+      } catch (Exception e) {
+        if (e instanceof AlreadyExistsException && if_not_exists) return false;
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+      }
+
+      // Submit the cache request and update the table metadata.
+      if (cacheOp != null && cacheOp.isSet_cached()) {
+        short replication = cacheOp.isSetReplication() ? cacheOp.getReplication() :
+            JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
+        long id = HdfsCachingUtil.submitCacheTblDirective(newTable,
+            cacheOp.getCache_pool_name(), replication);
+        catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
+            new TTableName(newTable.getDbName(), newTable.getTableName()));
+        applyAlterTable(newTable);
+      }
+      Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
+      addTableToCatalogUpdate(newTbl, response.result);
+    }
+    return true;
   }
 
   /**
@@ -1392,7 +1584,7 @@ public class CatalogOpExecutor {
         new org.apache.hadoop.hive.metastore.api.Table();
     setViewAttributes(params, view);
     LOG.debug(String.format("Creating view %s", tableName));
-    createTable(view, params.if_not_exists, null, null, response);
+    createTable(view, params.if_not_exists, null, response);
   }
 
   /**
@@ -1423,6 +1615,8 @@ public class CatalogOpExecutor {
     Table srcTable = getExistingTable(srcTblName.getDb(), srcTblName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
+    Preconditions.checkState(!KuduTable.isKuduTable(tbl),
+        "CREATE TABLE LIKE is not supported for Kudu tables.");
     tbl.setDbName(tblName.getDb());
     tbl.setTableName(tblName.getTbl());
     tbl.setOwner(params.getOwner());
@@ -1460,7 +1654,7 @@ public class CatalogOpExecutor {
     tbl.getSd().setLocation(params.getLocation());
     if (fileFormat != null) {
       setStorageDescriptorFileFormat(tbl.getSd(), fileFormat);
-    } else if (fileFormat == null && srcTable instanceof View) {
+    } else if (srcTable instanceof View) {
       // Here, source table is a view which has no input format. So to be
       // consistent with CREATE TABLE, default input format is assumed to be
       // TEXT unless otherwise specified.
@@ -1469,85 +1663,7 @@ public class CatalogOpExecutor {
     // Set the row count of this table to unknown.
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
     LOG.debug(String.format("Creating table %s LIKE %s", tblName, srcTblName));
-    createTable(tbl, params.if_not_exists, null, null, response);
-  }
-
-  /**
-   * Creates a new table in the HMS. If ifNotExists=true, no error will be thrown if
-   * the table already exists, otherwise an exception will be thrown.
-   * Accepts an optional 'cacheOp' param, which if specified will cache the table's
-   * HDFS location according to the 'cacheOp' spec after creation.
-   * Stores details of the operations (such as the resulting catalog version) in
-   * 'response' output parameter.
-   * Returns true if a new table was created as part of this call, false otherwise.
-   */
-  private boolean createTable(org.apache.hadoop.hive.metastore.api.Table newTable,
-      boolean ifNotExists, THdfsCachingOp cacheOp, List<TDistributeParam> distribute_by,
-      TDdlExecResponse response)
-      throws ImpalaException {
-    synchronized (metastoreDdlLock_) {
-
-      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-        msClient.getHiveClient().createTable(newTable);
-        // If this table should be cached, and the table location was not specified by
-        // the user, an extra step is needed to read the table to find the location.
-        if (cacheOp != null && cacheOp.isSet_cached() &&
-            newTable.getSd().getLocation() == null) {
-          newTable = msClient.getHiveClient().getTable(newTable.getDbName(),
-              newTable.getTableName());
-        }
-      } catch (AlreadyExistsException e) {
-        if (!ifNotExists) {
-          throw new ImpalaRuntimeException(
-              String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
-        }
-        LOG.debug(String.format("Ignoring '%s' when creating table %s.%s because " +
-            "IF NOT EXISTS was specified.", e,
-            newTable.getDbName(), newTable.getTableName()));
-        return false;
-      } catch (TException e) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
-      }
-
-      // Forward the operation to a specific storage backend. If the operation fails,
-      // delete the just created hive table to avoid inconsistencies.
-      try {
-        createDdlDelegate(newTable).setDistributeParams(distribute_by).createTable();
-      } catch (ImpalaRuntimeException e) {
-        try (MetaStoreClient c = catalog_.getMetaStoreClient()) {
-          c.getHiveClient().dropTable(newTable.getDbName(), newTable.getTableName(),
-              false, ifNotExists);
-        } catch (Exception hE) {
-          throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
-              "dropTable"), hE);
-        }
-        throw e;
-      }
-
-      // Submit the cache request and update the table metadata.
-      if (cacheOp != null && cacheOp.isSet_cached()) {
-        short replication = cacheOp.isSetReplication() ? cacheOp.getReplication() :
-            JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
-        long id = HdfsCachingUtil.submitCacheTblDirective(newTable,
-            cacheOp.getCache_pool_name(), replication);
-        catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
-            new TTableName(newTable.getDbName(), newTable.getTableName()));
-        applyAlterTable(newTable);
-      }
-      Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
-      addTableToCatalogUpdate(newTbl, response.result);
-    }
-    return true;
-  }
-
-  /**
-   * Instantiate the appropriate DDL delegate for the table. If no known delegate is
-   * available for the table, returns a UnsupportedOpDelegate instance.
-   */
-  private DdlDelegate createDdlDelegate(org.apache.hadoop.hive.metastore.api.Table tab) {
-    if (KuduDdlDelegate.canHandle(tab)) return new KuduDdlDelegate(tab);
-    return new UnsupportedOpDelegate();
+    createTable(tbl, params.if_not_exists, null, response);
   }
 
   /**
@@ -1967,6 +2083,9 @@ public class CatalogOpExecutor {
       switch (params.getTarget()) {
         case TBL_PROPERTY:
           msTbl.getParameters().putAll(properties);
+          if (KuduTable.isKuduTable(msTbl)) {
+            KuduCatalogOpExecutor.validateKuduTblExists(msTbl);
+          }
           break;
         case SERDE_PROPERTY:
           msTbl.getSd().getSerdeInfo().getParameters().putAll(properties);
@@ -2120,7 +2239,6 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(cacheOp);
     Preconditions.checkNotNull(params.getPartition_spec());
     // Alter partition params.
-    final String RUNTIME_FILTER_FORMAT = "apply %s on %s";
     TableName tableName = tbl.getTableName();
     HdfsPartition partition = catalog_.getHdfsPartition(
         tableName.getDb(), tableName.getTbl(), params.getPartition_spec());
@@ -2535,16 +2653,6 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Returns a deep copy of the metastore.api.Table object for the given TableName.
-   */
-  private org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable(
-      TableName tableName) throws CatalogException {
-    Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    return getExistingTable(tableName.getDb(), tableName.getTbl())
-        .getMetaStoreTable().deepCopy();
-  }
-
-  /**
    * Returns the metastore.api.Table object from the Hive Metastore for an existing
    * fully loaded table.
    */
@@ -2608,69 +2716,12 @@ public class CatalogOpExecutor {
   /**
    * Calculates the next transient_lastDdlTime value.
    */
-  private static long calculateDdlTime(
+  public static long calculateDdlTime(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     long existingLastDdlTime = CatalogServiceCatalog.getLastDdlTime(msTbl);
     long currentTime = System.currentTimeMillis() / 1000;
     if (existingLastDdlTime == currentTime) ++currentTime;
     return currentTime;
-  }
-
-  /**
-   * Utility function that creates a hive.metastore.api.Table object based on the given
-   * TCreateTableParams.
-   * TODO: Extract metastore object creation utility functions into a separate
-   * helper/factory class.
-   */
-  public static org.apache.hadoop.hive.metastore.api.Table
-      createMetaStoreTable(TCreateTableParams params) {
-    Preconditions.checkNotNull(params);
-    TableName tableName = TableName.fromThrift(params.getTable_name());
-    org.apache.hadoop.hive.metastore.api.Table tbl =
-        new org.apache.hadoop.hive.metastore.api.Table();
-    tbl.setDbName(tableName.getDb());
-    tbl.setTableName(tableName.getTbl());
-    tbl.setOwner(params.getOwner());
-    if (params.isSetTable_properties()) {
-      tbl.setParameters(params.getTable_properties());
-    } else {
-      tbl.setParameters(new HashMap<String, String>());
-    }
-
-    if (params.getComment() != null) {
-      tbl.getParameters().put("comment", params.getComment());
-    }
-    if (params.is_external) {
-      tbl.setTableType(TableType.EXTERNAL_TABLE.toString());
-      tbl.putToParameters("EXTERNAL", "TRUE");
-    } else {
-      tbl.setTableType(TableType.MANAGED_TABLE.toString());
-    }
-
-    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(
-        params.getFile_format(), RowFormat.fromThrift(params.getRow_format()));
-
-    if (params.isSetSerde_properties()) {
-      if (sd.getSerdeInfo().getParameters() == null) {
-        sd.getSerdeInfo().setParameters(params.getSerde_properties());
-      } else {
-        sd.getSerdeInfo().getParameters().putAll(params.getSerde_properties());
-      }
-    }
-
-    if (params.getLocation() != null) {
-      sd.setLocation(params.getLocation());
-    }
-    // Add in all the columns
-    sd.setCols(buildFieldSchemaList(params.getColumns()));
-    tbl.setSd(sd);
-    if (params.getPartition_columns() != null) {
-      // Add in any partition keys that were specified
-      tbl.setPartitionKeys(buildFieldSchemaList(params.getPartition_columns()));
-    } else {
-      tbl.setPartitionKeys(new ArrayList<FieldSchema>());
-    }
-    return tbl;
   }
 
   /**

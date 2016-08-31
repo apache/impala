@@ -23,19 +23,12 @@ import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_DATA_SRC_NAME;
 import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_INIT_STRING;
 import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_LOCATION;
 
-import java.util.List;
-import java.util.Map;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DataSourceTable;
-import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.permission.FsAction;
 
 /**
@@ -46,25 +39,12 @@ import org.apache.hadoop.fs.permission.FsAction;
  */
 public class CreateTableDataSrcStmt extends CreateTableStmt {
 
-  public CreateTableDataSrcStmt(TableName tableName, List<ColumnDef> columnDefs,
-      String dataSourceName, String initString, String comment, boolean ifNotExists) {
-    super(tableName, columnDefs, Lists.<ColumnDef>newArrayList(), false, comment,
-        RowFormat.DEFAULT_ROW_FORMAT, THdfsFileFormat.TEXT, null, null, ifNotExists,
-        createInitialTableProperties(dataSourceName, initString),
-        Maps.<String, String>newHashMap(), null);
-  }
-
-  /**
-   * Creates the initial map of table properties containing the name of the data
-   * source and the table init string.
-   */
-  private static Map<String, String> createInitialTableProperties(
-      String dataSourceName, String initString) {
+  public CreateTableDataSrcStmt(CreateTableStmt createTableStmt, String dataSourceName,
+      String initString) {
+    super(createTableStmt);
     Preconditions.checkNotNull(dataSourceName);
-    Map<String, String> tableProperties = Maps.newHashMap();
-    tableProperties.put(TBL_PROP_DATA_SRC_NAME, dataSourceName.toLowerCase());
-    tableProperties.put(TBL_PROP_INIT_STRING, Strings.nullToEmpty(initString));
-    return tableProperties;
+    getTblProperties().put(TBL_PROP_DATA_SRC_NAME, dataSourceName.toLowerCase());
+    getTblProperties().put(TBL_PROP_INIT_STRING, Strings.nullToEmpty(initString));
   }
 
   @Override

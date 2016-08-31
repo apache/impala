@@ -31,8 +31,12 @@ import com.google.common.collect.Lists;
  * 2) the output format class
  * 3) the serialization library class
  * 4) whether scanning complex types from it is supported
+ * 5) whether the file format can skip complex columns in scans and just materialize
+ *    scalar typed columns
  *
  * Important note: Always keep consistent with the classes used in Hive.
+ * TODO: Kudu doesn't belong in this list. Either rename this enum or create a separate
+ * list of storage engines (see IMPALA-4178).
  */
 public enum HdfsFileFormat {
   RC_FILE("org.apache.hadoop.hive.ql.io.RCFileInputFormat",
@@ -57,7 +61,10 @@ public enum HdfsFileFormat {
   PARQUET("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
-      true, true);
+      true, true),
+  KUDU("org.apache.kudu.mapreduce.KuduTableInputFormat",
+      "org.apache.kudu.mapreduce.KuduTableOutputFormat",
+      "", false, false);
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -103,6 +110,7 @@ public enum HdfsFileFormat {
           .put(PARQUET_LEGACY_INPUT_FORMATS[0], PARQUET)
           .put(PARQUET_LEGACY_INPUT_FORMATS[1], PARQUET)
           .put(PARQUET_LEGACY_INPUT_FORMATS[2], PARQUET)
+          .put(KUDU.inputFormat(), KUDU)
           .build();
 
   /**
@@ -138,6 +146,7 @@ public enum HdfsFileFormat {
       case SEQUENCE_FILE: return HdfsFileFormat.SEQUENCE_FILE;
       case AVRO: return HdfsFileFormat.AVRO;
       case PARQUET: return HdfsFileFormat.PARQUET;
+      case KUDU: return HdfsFileFormat.KUDU;
       default:
         throw new RuntimeException("Unknown THdfsFileFormat: "
             + thriftFormat + " - should never happen!");
@@ -151,6 +160,7 @@ public enum HdfsFileFormat {
       case SEQUENCE_FILE: return THdfsFileFormat.SEQUENCE_FILE;
       case AVRO: return THdfsFileFormat.AVRO;
       case PARQUET: return THdfsFileFormat.PARQUET;
+      case KUDU: return THdfsFileFormat.KUDU;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -173,6 +183,7 @@ public enum HdfsFileFormat {
       case SEQUENCE_FILE: return "SEQUENCEFILE";
       case AVRO: return "AVRO";
       case PARQUET: return "PARQUET";
+      case KUDU: return "KUDU";
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -230,6 +241,8 @@ public enum HdfsFileFormat {
       case AVRO:
       case PARQUET:
         return true;
+      case KUDU:
+        return false;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");

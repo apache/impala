@@ -220,9 +220,8 @@ class TestDdlStatements(TestDdlBase):
   @SkipIf.kudu_not_supported
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_kudu(self, vector, unique_database):
-    self.expected_exceptions = 2
     vector.get_value('exec_option')['abort_on_error'] = False
-    self.run_test_case('QueryTest/create_kudu', vector, use_db=unique_database,
+    self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
   @UniqueDatabase.parametrize(sync_ddl=True)

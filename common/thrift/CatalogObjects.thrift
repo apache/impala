@@ -49,14 +49,20 @@ enum TTableType {
   KUDU_TABLE,
 }
 
+// TODO: Separate the storage engines (e.g. Kudu) from the file formats.
+// TODO: Make the names consistent with the file format keywords specified in
+// the parser.
 enum THdfsFileFormat {
   TEXT,
   RC_FILE,
   SEQUENCE_FILE,
   AVRO,
-  PARQUET
+  PARQUET,
+  KUDU
 }
 
+// TODO: Since compression is also enabled for Kudu columns, we should
+// rename this enum to not be Hdfs specific.
 enum THdfsCompression {
   NONE,
   DEFAULT,
@@ -337,6 +343,34 @@ struct TDataSourceTable {
   2: required string init_string
 }
 
+// Parameters needed for hash distribution
+struct TDistributeByHashParam {
+  1: required list<string> columns
+  2: required i32 num_buckets
+}
+
+struct TRangeLiteral {
+  1: optional i64 int_literal
+  2: optional string string_literal
+}
+
+struct TRangeLiteralList {
+  // TODO: Replace TRangeLiteral with Exprs.TExpr.
+  1: required list<TRangeLiteral> values
+}
+
+// A range distribution is identified by a list of columns and a series of split rows.
+struct TDistributeByRangeParam {
+  1: required list<string> columns
+  2: optional list<TRangeLiteralList> split_rows;
+}
+
+// Parameters for the DISTRIBUTE BY clause.
+struct TDistributeParam {
+  1: optional TDistributeByHashParam by_hash_param;
+  2: optional TDistributeByRangeParam by_range_param;
+}
+
 // Represents a Kudu table
 struct TKuduTable {
   1: required string table_name
@@ -346,6 +380,9 @@ struct TKuduTable {
 
   // Name of the key columns
   3: required list<string> key_columns
+
+  // Distribution schemes
+  4: required list<TDistributeParam> distribute_by
 }
 
 // Represents a table or view.

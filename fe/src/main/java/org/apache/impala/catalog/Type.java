@@ -317,6 +317,15 @@ public abstract class Type {
   }
 
   /**
+   * Checks if types t1 and t2 are assignment compatible, i.e. if both t1 and t2 can be
+   * assigned to a type t without an explicit cast and without any conversions that would
+   * result in loss of precision.
+   */
+  public static boolean areAssignmentCompatibleTypes(Type t1, Type t2) {
+    return getAssignmentCompatibleType(t1, t2, true) != ScalarType.INVALID;
+  }
+
+  /**
    * Returns true if this type exceeds the MAX_NESTING_DEPTH, false otherwise.
    */
   public boolean exceedsMaxNestingDepth() { return exceedsMaxNestingDepth(0); }
