@@ -19,8 +19,7 @@
 /// such as log files or a web ui. For example, this library could be used to log credit
 /// card numbers as XXXX-...-XXXX instead of actual numbers.
 //
-/// The java original is http://github.mtv.cloudera.com/CDH/logredactor.
-/// TODO: Replace the above link with the public version once it is available.
+/// The java original is https://github.com/cloudera/logredactor .
 
 #ifndef IMPALA_UTIL_REDACTOR_DETAIL_H_
 #define IMPALA_UTIL_REDACTOR_DETAIL_H_

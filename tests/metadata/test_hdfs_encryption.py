@@ -146,7 +146,7 @@ class TestHdfsEncryption(ImpalaTestSuite):
   def test_drop_partition_encrypt(self):
     """Verifies if alter <tbl> drop partition purge works in case
     where the Trash dir and partition dir are in different encryption
-    zones. Check CDH-31350 for details"""
+    zones. Check IMPALA-2310 for details"""
     self.client.execute("create table {0}.t1(i int) partitioned\
       by (j int)".format(TEST_DB))
     # Add three partitions (j=1), (j=2), (j=3) to table t1

@@ -3435,7 +3435,7 @@ from
     ]
 }
 ====
-# Create view statement (CDH-26149)
+# Create view statement (IMPALA-4219)
 create view test_view_lineage as select id from functional.alltypestiny
 ---- LINEAGE
 {
@@ -3468,7 +3468,7 @@ create view test_view_lineage as select id from functional.alltypestiny
     ]
 }
 ====
-# Create view with nested inline views (CDH-26149)
+# Create view with nested inline views (IMPALA-4219)
 create view test_view_lineage (a, b) as select c1, x2
 from (
   select c1, min(c2) x2
@@ -3547,7 +3547,7 @@ limit 0
     ]
 }
 ====
-# Create view with complex select statement (CDH-26149)
+# Create view with complex select statement (IMPALA-4219)
 create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
   select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
   from functional.alltypessmall c
@@ -3734,7 +3734,7 @@ create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
     ]
 }
 ====
-# Create view with select statement containing an analytic function (CDH-26149)
+# Create view with select statement containing an analytic function (IMPALA-4219)
 create view test_view_lineage as
   select * from (
     select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),
@@ -3878,7 +3878,7 @@ create view test_view_lineage as
     ]
 }
 ====
-# Alter view statement (CDH-26149)
+# Alter view statement (IMPALA-4219)
 alter view functional.alltypes_view as select id from functional.alltypestiny
 ---- LINEAGE
 {

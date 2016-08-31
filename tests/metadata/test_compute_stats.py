@@ -42,7 +42,8 @@ class TestComputeStats(ImpalaTestSuite):
   @SkipIfLocal.hdfs_blocks
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats', vector, unique_database)
-    # Test compute stats on decimal columns separately so we can vary between CDH4/5
+    # Test compute stats on decimal columns separately so we can vary between platforms
+    # with and without write support for decimals (Hive < 0.11 and >= 0.11).
     self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
 
   def test_compute_stats_incremental(self, vector, unique_database):

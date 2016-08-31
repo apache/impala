@@ -324,7 +324,7 @@ def create_new_service(api, cluster, new_name, deps, scratch_dirs, master_host):
             print "Created new role %s" % (new_role_name,)
 
 def transform_path(rcg_name, rcg_config_dict, rcg_config_name):
-    # XXX: Do a better job with paths where the role type is embedded.
+    # TODO: Do a better job with paths where the role type is embedded.
     #
     # e.g. /var/log/impalad/lineage --> /var/log/impalad2/lineage
     val = rcg_config_dict.get(rcg_config_name, None)
@@ -335,7 +335,7 @@ def transform_path(rcg_name, rcg_config_dict, rcg_config_name):
     return {rcg_config_name : new_val}
 
 def transform_port(rcg_name, rcg_config_dict, rcg_config_name):
-    # XXX: Actually resolve all port conflicts.
+    # TODO: Actually resolve all port conflicts.
     val = rcg_config_dict.get(rcg_config_name, None)
     if not val:
         raise Exception("Could not get %s config for rcg %s" %

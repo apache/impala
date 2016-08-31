@@ -123,7 +123,7 @@ table_name:widerow, constraint:exclude, table_format:hbase/none/none
 table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
 table_name:unsupported_types, constraint:exclude, table_format:hbase/none/none
 
-# On CDH4, decimal can only be tested on formats Impala can write to (text and parquet)
+# Decimal can only be tested on formats Impala can write to (text and parquet).
 # TODO: add Avro once Hive or Impala can write Avro decimals
 table_name:decimal_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:text/none/none

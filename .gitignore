@@ -40,7 +40,6 @@ tests/build
 tests/results
 tests/test-hive-udfs/target/
 
-cdh-*-hdfs-data/
 avro_schemas/
 logs/
 

@@ -91,7 +91,7 @@ struct sq_request_info {
 
 // This structure needs to be passed to sq_start(), to let squeasel know
 // which callbacks to invoke. For detailed description, see
-// https://github.mtv.cloudera.com/CDH/squeasel/blob/master/UserManual.md
+// https://github.com/cloudera/squeasel/blob/master/UserManual.md
 struct sq_callbacks {
   // Called when squeasel has received new HTTP request.
   // If callback returns non-zero,
@@ -182,7 +182,7 @@ struct sq_callbacks {
 //   };
 //   struct sq_context *ctx = sq_start(&my_func, NULL, options);
 //
-// Refer to https://github.mtv.cloudera.com/CDH/squeasel/blob/master/UserManual.md
+// Refer to https://github.com/cloudera/squeasel/blob/master/UserManual.md
 // for the list of valid option and their possible values.
 //
 // Return:

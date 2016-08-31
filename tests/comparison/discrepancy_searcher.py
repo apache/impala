@@ -247,7 +247,7 @@ class QueryResultComparator(object):
 class QueryExecutor(object):
   '''Concurrently executes queries'''
 
-  # XXX: Set to false while IMPALA-3336 is a problem. Disabling random query options
+  # TODO: Set to false while IMPALA-3336 is a problem. Disabling random query options
   # seems to reduce IMPALA-3336 occurances.
   ENABLE_RANDOM_QUERY_OPTIONS = False
 
@@ -379,9 +379,9 @@ class QueryExecutor(object):
           cursor.conn.kill()
           LOG.debug('Kill connection')
         try:
-          # XXX: Sometimes this takes a very long time causing the program to appear to
-          #      hang. Maybe this should be done in another thread so a timeout can be
-          #      applied?
+          # TODO: Sometimes this takes a very long time causing the program to appear to
+          #       hang. Maybe this should be done in another thread so a timeout can be
+          #       applied?
           cursor.close()
         except Exception as e:
           LOG.info('Error closing cursor: %s', e)

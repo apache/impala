@@ -120,7 +120,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
       self.execute_query_expect_success(client, "INSERT INTO %s"
                                         " PARTITION(p1=1, p2=3, p3=4) VALUES(1)" % TEST_TBL)
       # Would be 777 if inheritance was enabled
-      if not IS_ISILON: # CDH-27688
+      if not IS_ISILON: # IMPALA-4221
         self._check_partition_perms("p1=1/p2=3/", default_perms)
       self._check_partition_perms("p1=1/p2=3/p3=4/", default_perms)
     finally:

@@ -56,7 +56,8 @@ class SchedulerWrapper;
 /// TODO: Notice when there are duplicate statestore registrations (IMPALA-23)
 /// TODO: Track assignments (assignment_ctx in ComputeScanRangeAssignment) per query
 ///       instead of per plan node?
-/// TODO: Remove disable_cached_reads query option in CDH6
+/// TODO: Remove disable_cached_reads query option in the next compatibility-breaking
+///       release (IMPALA-2963)
 /// TODO: Replace the usage of shared_ptr with atomic_shared_ptr once compilers support
 ///       it. Alternatively consider using Kudu's rw locks.
 /// TODO: Inject global dependencies into the class (for example ExecEnv::GetInstance(),

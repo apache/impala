@@ -284,8 +284,7 @@ public class ImpalaJdbcClient {
       float seconds = (endTime - startTime) / 1000F;
       LOG.info("Returned " + rowCount + " row(s) in " + seconds + "s");
 
-      // TODO: To work around a JDBC driver issue (CDH-10035), make sure the Statement
-      // is closed after every query.
+      // Make sure the Statement is closed after every query.
       client.getStatement().close();
     }
   }

@@ -32,7 +32,7 @@ import os
 IMPALA_HOME = '/home/dev/Impala'
 CORE_PATH = '/tmp/core_files'
 DEFAULT_BRANCH_NAME = 'origin/cdh5-trunk'
-DEFAULT_DOCKER_IMAGE_NAME = 'impala-desktop.ca.cloudera.com:5000/ubuntu-14.04:cdh5-trunk'
+DEFAULT_DOCKER_IMAGE_NAME = 'cloudera/impala-dev'
 DOCKER_USER_NAME = 'dev'
 NUM_START_ATTEMPTS = 50
 NUM_FABRIC_ATTEMPTS = 50
@@ -152,10 +152,11 @@ class ImpalaDockerEnv(object):
     elif SHOULD_BUILD_IMPALA:
       build_command = (
           'docker-boot && cd {IMPALA_HOME} '
-          '&& git fetch --all && git checkout origin/cdh5-trunk '
+          '&& git fetch --all && git checkout DEFAULT_BRANCH_NAME '
           '&& source {IMPALA_HOME}/bin/impala-config.sh '
           '&& {IMPALA_HOME}/buildall.sh -notests').format(
               IMPALA_HOME = IMPALA_HOME,
+              DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME,
               CORE_PATH = CORE_PATH)
 
     if build_command:

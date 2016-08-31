@@ -85,7 +85,7 @@ AVRO_SCHEMA_DIR = "avro_schemas"
 
 GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "\
                       "--workload=%s --scale_factor=%s --verbose"
-# Load data using Hive's beeline because the Hive shell has regressed (CDH-17222).
+# Load data using Hive's beeline because the Hive shell has regressed (HIVE-5515).
 # The Hive shell is stateful, meaning that certain series of actions lead to problems.
 # Examples of problems due to the statefullness of the Hive shell:
 # - Creating an HBase table changes the replication factor to 1 for subsequent LOADs.

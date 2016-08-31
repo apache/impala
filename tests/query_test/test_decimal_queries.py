@@ -35,8 +35,9 @@ class TestDecimalQueries(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(
         TestDimension('batch_size', *TestDecimalQueries.BATCH_SIZES))
 
-    # On CDH4, hive does not support decimal so we can't run these tests against
-    # the other file formats. Enable them on C5.
+    # Hive < 0.11 does not support decimal so we can't run these tests against the other
+    # file formats.
+    # TODO: Enable them on Hive >= 0.11.
     cls.TestMatrix.add_constraint(lambda v:\
         (v.get_value('table_format').file_format == 'text' and
          v.get_value('table_format').compression_codec == 'none') or

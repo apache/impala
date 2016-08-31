@@ -3525,7 +3525,7 @@ TEST_F(ExprTest, UnaryOperators) {
 
 // TODO: I think a lot of these casts are not necessary and we should fix this
 TEST_F(ExprTest, TimestampFunctions) {
-  // Regression test for CDH-19918
+  // Regression test for IMPALA-4209
   TestStringValue("cast(from_utc_timestamp(cast(1301180400 as timestamp),"
       "'Europe/Moscow') as string)", "2011-03-27 03:00:00");
   TestStringValue("cast(from_utc_timestamp(cast(1301180399 as timestamp),"

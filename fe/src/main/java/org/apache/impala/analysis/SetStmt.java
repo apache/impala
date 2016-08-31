@@ -27,7 +27,7 @@ public class SetStmt extends StatementBase {
   private final String key_;
   private final String value_;
 
-  // This key is deprecated in CDH5.2; COMPRESSION_CODEC_KEY replaces this
+  // This key is deprecated in Impala 2.0; COMPRESSION_CODEC_KEY replaces this
   private static final String DEPRECATED_PARQUET_CODEC_KEY = "PARQUET_COMPRESSION_CODEC";
   private static final String COMPRESSION_CODEC_KEY = "COMPRESSION_CODEC";
 

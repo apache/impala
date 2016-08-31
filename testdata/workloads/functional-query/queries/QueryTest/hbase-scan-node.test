@@ -636,7 +636,7 @@ select * from alltypessmallbinary
 INT, BIGINT, BOOLEAN, STRING, DOUBLE, FLOAT, INT, INT, SMALLINT, STRING, TIMESTAMP, TINYINT, INT
 ====
 ---- QUERY
-# Scan an HBase table with multiple column families (CDH-18969)
+# Scan an HBase table with multiple column families (IMPALA-4220)
 select * from hbasecolumnfamilies
 ---- RESULTS
 0,true,0,0,0,0,'01/01/09',0,0,'0',2009-01-01 00:00:00

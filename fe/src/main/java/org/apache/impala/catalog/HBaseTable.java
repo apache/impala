@@ -126,7 +126,7 @@ public class HBaseTable extends Table {
   private final static Configuration hbaseConf_ = HBaseConfiguration.create();
 
   // Cached column families. Used primarily for speeding up row stats estimation
-  // (see CDH-19292).
+  // (see IMPALA-4211).
   private HColumnDescriptor[] columnFamilies_ = null;
 
   protected HBaseTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
@@ -715,8 +715,7 @@ public class HBaseTable extends Table {
   /**
    * This is copied from org.apache.hadoop.hbase.client.HTable. The only difference is
    * that it does not use cache when calling getRegionLocation.
-   * TODO: Remove this function and use HTable.getRegionsInRange when the non-cache
-   * version has been ported to CDH (DISTRO-477).
+   * TODO: Remove this function and use HTable.getRegionsInRange (IMPALA-4082).
    * Get the corresponding regions for an arbitrary range of keys.
    * <p>
    *

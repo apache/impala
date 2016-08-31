@@ -90,10 +90,10 @@ public class PartitionStatsUtil {
       return;
     }
 
-    // The HMS has a 4k (as of CDH5.2) limit on the length of any parameter string. The
-    // serialised version of the partition stats is often larger than this. Therefore, we
-    // naively 'chunk' the byte string into 4k pieces, and store the number of pieces in a
-    // separate parameter field.
+    // The HMS has a 4k (as of Hive 0.13, Impala 2.0) limit on the length of any parameter
+    // string.  The serialised version of the partition stats is often larger than this.
+    // Therefore, we naively 'chunk' the byte string into 4k pieces, and store the number
+    // of pieces in a separate parameter field.
     //
     // The object itself is first serialised by Thrift, and then base-64 encoded to be a
     // valid string. This inflates its length somewhat; we may want to consider a

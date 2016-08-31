@@ -630,7 +630,7 @@ class Impalad(object):
     try:
       self._request_web_page("/cancel_query", params={"query_id": id})
     except requests.exceptions.HTTPError as e:
-      # XXX: Handle losing the race
+      # TODO: Handle losing the race
       raise e
 
   def shell(self, cmd, timeout_secs=DEFAULT_TIMEOUT):

@@ -200,7 +200,7 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'Problem parsing file' in result.stderr
 
   def test_no_warnings_in_log_with_quiet_mode(self):
-    """Regression test for CDH-21036."""
+    """Regression test for IMPALA-4222."""
     args = ('-q "set abort_on_error=false;'
             ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
     result = run_impala_shell_cmd(args)

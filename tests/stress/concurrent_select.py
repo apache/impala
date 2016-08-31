@@ -335,8 +335,8 @@ class StressRunner(object):
        If a query completes without error, the result will be verified. An error
        will be raised upon a result mismatch.
     """
-    # XXX: The state from a previous run should be cleared out. This isn't really a
-    #      problem now because the one caller (main()) never calls a second time.
+    # TODO: The state from a previous run should be cleared out. This isn't really a
+    #       problem now because the one caller (main()) never calls a second time.
 
     if self.startup_queries_per_sec <= 0:
       raise Exception("Startup queries per second must be positive")

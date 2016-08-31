@@ -167,7 +167,7 @@ Status HBaseTableScanner::Init() {
     RETURN_IF_ERROR(
         JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/Cell", &cell_cl_));
   } else {
-    // Assume a non-CDH5 HBase version because the Cell class wasn't found.
+    // Assume a HBase version prior to 0.95.2 because the Cell class wasn't found.
     LOG(INFO) << "Detected HBase version < 0.95.2";
     RETURN_IF_ERROR(
         JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/KeyValue",

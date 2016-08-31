@@ -336,8 +336,8 @@ class Subquery(ValExpr):
      result set.
 
   '''
-  # XXX: So far it seems fine to use this class for both scalar/non scalar cases but
-  #      this could lead to unexpected behavior or be a silent cause of problems...
+  # TODO: So far it seems fine to use this class for both scalar/non scalar cases but
+  #       this could lead to unexpected behavior or be a silent cause of problems...
 
   def __init__(self, query):
     self.query = query
