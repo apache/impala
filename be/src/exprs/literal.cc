@@ -74,7 +74,7 @@ Literal::Literal(const TExprNode& node)
     case TYPE_VARCHAR: {
       DCHECK_EQ(node.node_type, TExprNodeType::STRING_LITERAL);
       DCHECK(node.__isset.string_literal);
-      value_ = ExprValue(node.string_literal.value);
+      value_.Init(node.string_literal.value);
       if (type_.type == TYPE_VARCHAR) {
         value_.string_val.len = min(type_.len, value_.string_val.len);
       }
@@ -91,7 +91,7 @@ Literal::Literal(const TExprNode& node)
         // Pad out literal with spaces.
         str.replace(str_len, type_.len - str_len, type_.len - str_len, ' ');
       }
-      value_ = ExprValue(str);
+      value_.Init(str);
       break;
     }
     case TYPE_DECIMAL: {
@@ -186,16 +186,14 @@ Literal::Literal(ColumnType type, double v)
   }
 }
 
-Literal::Literal(ColumnType type, const string& v)
-  : Expr(type),
-    value_(v) {
+Literal::Literal(ColumnType type, const string& v) : Expr(type) {
+  value_.Init(v);
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR || type.type == TYPE_VARCHAR)
       << type;
 }
 
-Literal::Literal(ColumnType type, const StringValue& v)
-  : Expr(type),
-    value_(v.DebugString()) {
+Literal::Literal(ColumnType type, const StringValue& v) : Expr(type) {
+  value_.Init(v.DebugString());
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR) << type;
 }
 

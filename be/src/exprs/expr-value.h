@@ -67,10 +67,9 @@ struct ExprValue {
   ExprValue(double v) : double_val(v) {}
   ExprValue(int64_t t, int64_t n) : timestamp_val(t, n) {}
 
-  /// c'tor for string values
-  ExprValue(const std::string& str)
-    : string_data(str) {
-    string_val.ptr = const_cast<char*>(string_data.data());
+  void Init(const std::string& str) {
+    string_data = str;
+    string_val.ptr = &string_data[0];
     string_val.len = string_data.size();
   }
 
@@ -198,6 +197,8 @@ struct ExprValue {
 
  private:
   std::string string_data; // Stores the data for string_val if necessary.
+
+  DISALLOW_COPY_AND_ASSIGN(ExprValue);
 };
 
 }
