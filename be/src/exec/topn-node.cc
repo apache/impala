@@ -114,9 +114,10 @@ Status TopNNode::Prepare(RuntimeState* state) {
     codegen_status.MergeStatus(Codegen(state));
     codegen_enabled = codegen_status.ok();
   }
-  AddCodegenExecOption(codegen_enabled, codegen_status);
-  priority_queue_.reset(new priority_queue<Tuple*, vector<Tuple*>,
-      ComparatorWrapper<TupleRowComparator>>(*tuple_row_less_than_));
+  runtime_profile()->AddCodegenMsg(codegen_enabled, codegen_status);
+  priority_queue_.reset(
+      new priority_queue<Tuple*, vector<Tuple*>, ComparatorWrapper<TupleRowComparator>>(
+          *tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
   return Status::OK();

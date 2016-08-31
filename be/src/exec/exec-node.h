@@ -258,12 +258,6 @@ class ExecNode {
   /// MemTracker that should be used for ExprContexts.
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;
 
-  /// Execution options that are determined at runtime.  This is added to the
-  /// runtime profile at Close().  Examples for options logged here would be
-  /// "Codegen Enabled"
-  boost::mutex exec_options_lock_;
-  std::string runtime_exec_options_;
-
   bool is_closed() const { return is_closed_; }
 
   /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
@@ -289,22 +283,6 @@ class ExecNode {
   /// Executes debug_action_ if phase matches debug_phase_.
   /// 'phase' must not be INVALID.
   Status ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state);
-
-  /// Appends option to 'runtime_exec_options_'
-  void AddRuntimeExecOption(const std::string& option);
-
-  /// Helper wrapper around AddRuntimeExecOption() for adding "Codegen Enabled" or
-  /// "Codegen Disabled" exec options. If specified, 'extra_info' is appended to the exec
-  /// option, and 'extra_label' is prepended to the exec option.
-  void AddCodegenExecOption(bool codegen_enabled, const string& extra_info = "",
-      const string& extra_label = "");
-
-  /// Helper wrapper that takes a status optionally describing why codegen was
-  /// disabled. 'codegen_status' can be OK.
-  void AddCodegenExecOption(bool codegen_enabled, const Status& codegen_status,
-      const string& extra_label = "") {
-    AddCodegenExecOption(codegen_enabled, codegen_status.GetDetail(), extra_label);
-  }
 
   /// Frees any local allocations made by expr_ctxs_to_free_ and returns the result of
   /// state->CheckQueryState(). Nodes should call this periodically, e.g. once per input

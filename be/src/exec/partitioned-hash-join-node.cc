@@ -234,10 +234,12 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       insert_codegen_status = codegen_status;
     }
   }
-  AddCodegenExecOption(build_codegen_enabled, codegen_status, "Build Side");
-  AddCodegenExecOption(probe_codegen_enabled, codegen_status, "Probe Side");
-  AddCodegenExecOption(ht_construction_codegen_enabled, codegen_status,
-      "Hash Table Construction");
+  runtime_profile()->AddCodegenMsg(
+      build_codegen_enabled, codegen_status, "Build Side");
+  runtime_profile()->AddCodegenMsg(
+      probe_codegen_enabled, codegen_status, "Probe Side");
+  runtime_profile()->AddCodegenMsg(
+      ht_construction_codegen_enabled, codegen_status, "Hash Table Construction");
   return Status::OK();
 }
 
@@ -434,7 +436,7 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
   if (!is_spilled_) {
     COUNTER_ADD(parent_->num_spilled_partitions_, 1);
     if (parent_->num_spilled_partitions_->value() == 1) {
-      parent_->AddRuntimeExecOption("Spilled");
+      parent_->runtime_profile()->AppendExecOption("Spilled");
     }
   }
 
@@ -559,13 +561,14 @@ void PartitionedHashJoinNode::PublishRuntimeFilters(RuntimeState* state,
 
   if (filters_.size() > 0) {
     if (num_enabled_filters == filters_.size()) {
-      AddRuntimeExecOption(Substitute("$0 of $0 Runtime Filter$1 Published",
-          filters_.size(), filters_.size() == 1 ? "" : "s"));
+      runtime_profile()->AppendExecOption(
+          Substitute("$0 of $0 Runtime Filter$1 Published", filters_.size(),
+              filters_.size() == 1 ? "" : "s"));
     } else {
       string exec_option = Substitute("$0 of $1 Runtime Filter$2 Published, $3 Disabled",
           num_enabled_filters, filters_.size(), filters_.size() == 1 ? "" : "s",
           filters_.size() - num_enabled_filters);
-      AddRuntimeExecOption(exec_option);
+      runtime_profile()->AppendExecOption(exec_option);
     }
   }
 }

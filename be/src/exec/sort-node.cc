@@ -58,10 +58,9 @@ Status SortNode::Prepare(RuntimeState* state) {
     codegen_status = less_than.Codegen(state);
     codegen_enabled = codegen_status.ok();
   }
-  AddCodegenExecOption(codegen_enabled, codegen_status);
+  runtime_profile()->AddCodegenMsg(codegen_enabled, codegen_status);
 
-  sorter_.reset(new Sorter(
-      less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
+  sorter_.reset(new Sorter(less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
       &row_descriptor_, mem_tracker(), runtime_profile(), state));
   RETURN_IF_ERROR(sorter_->Init());
   return Status::OK();

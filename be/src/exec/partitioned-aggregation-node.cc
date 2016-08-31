@@ -180,10 +180,10 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "HashBuckets", TUnit::UNIT);
   partitions_created_ =
       ADD_COUNTER(runtime_profile(), "PartitionsCreated", TUnit::UNIT);
-  largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
-      "LargestPartitionPercent", TUnit::UNIT);
+  largest_partition_percent_ =
+      runtime_profile()->AddHighWaterMarkCounter("LargestPartitionPercent", TUnit::UNIT);
   if (is_streaming_preagg_) {
-    AddRuntimeExecOption("Streaming Preaggregation");
+    runtime_profile()->AppendExecOption("Streaming Preaggregation");
     streaming_timer_ = ADD_TIMER(runtime_profile(), "StreamingTime");
     num_passthrough_rows_ =
         ADD_COUNTER(runtime_profile(), "RowsPassedThrough", TUnit::UNIT);
@@ -279,11 +279,11 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   bool codegen_enabled = false;
   Status codegen_status;
   if (state->codegen_enabled()) {
-    codegen_status = is_streaming_preagg_ ? CodegenProcessBatchStreaming()
-                                          : CodegenProcessBatch();
+    codegen_status =
+        is_streaming_preagg_ ? CodegenProcessBatchStreaming() : CodegenProcessBatch();
     codegen_enabled = codegen_status.ok();
   }
-  AddCodegenExecOption(codegen_enabled, codegen_status);
+  runtime_profile()->AddCodegenMsg(codegen_enabled, codegen_status);
   return Status::OK();
 }
 
@@ -891,7 +891,7 @@ Status PartitionedAggregationNode::Partition::Spill() {
 
   COUNTER_ADD(parent->num_spilled_partitions_, 1);
   if (parent->num_spilled_partitions_->value() == 1) {
-    parent->AddRuntimeExecOption("Spilled");
+    parent->runtime_profile()->AppendExecOption("Spilled");
   }
   return Status::OK();
 }

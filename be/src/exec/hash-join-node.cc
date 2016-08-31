@@ -173,8 +173,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       }
     }
   }
-  AddCodegenExecOption(build_codegen_enabled, "", "Build Side");
-  AddCodegenExecOption(probe_codegen_enabled, "", "Probe Side");
+  runtime_profile()->AddCodegenMsg(build_codegen_enabled, "", "Build Side");
+  runtime_profile()->AddCodegenMsg(probe_codegen_enabled, "", "Probe Side");
   return Status::OK();
 }
 
@@ -254,13 +254,14 @@ Status HashJoinNode::ProcessBuildInput(RuntimeState* state) {
   if (filters_.size() > 0) {
     int num_enabled_filters = hash_tbl_->AddBloomFilters();
     if (num_enabled_filters == filters_.size()) {
-      AddRuntimeExecOption(Substitute("$0 of $0 Runtime Filter$1 Published",
-              filters_.size(), filters_.size() == 1 ? "" : "s"));
+      runtime_profile()->AppendExecOption(
+          Substitute("$0 of $0 Runtime Filter$1 Published", filters_.size(),
+              filters_.size() == 1 ? "" : "s"));
     } else {
       string exec_option = Substitute("$0 of $1 Runtime Filter$2 Published, $3 Disabled",
           num_enabled_filters, filters_.size(), filters_.size() == 1 ? "" : "s",
           filters_.size() - num_enabled_filters);
-      AddRuntimeExecOption(exec_option);
+      runtime_profile()->AppendExecOption(exec_option);
     }
   }
 

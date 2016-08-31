@@ -413,6 +413,15 @@ void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
 }
 
 void RuntimeProfile::AddInfoString(const string& key, const string& value) {
+  return AddInfoStringInternal(key, value, false);
+}
+
+void RuntimeProfile::AppendInfoString(const string& key, const string& value) {
+  return AddInfoStringInternal(key, value, true);
+}
+
+void RuntimeProfile::AddInfoStringInternal(
+    const string& key, const string& value, bool append) {
   // Values may contain sensitive data, such as a query.
   const string& info = RedactCopy(value);
   lock_guard<SpinLock> l(info_strings_lock_);
@@ -421,7 +430,11 @@ void RuntimeProfile::AddInfoString(const string& key, const string& value) {
     info_strings_.insert(make_pair(key, info));
     info_strings_display_order_.push_back(key);
   } else {
-    it->second = info;
+    if (append) {
+      it->second += ", " + value;
+    } else {
+      it->second = info;
+    }
   }
 }
 
@@ -432,22 +445,30 @@ const string* RuntimeProfile::GetInfoString(const string& key) const {
   return &it->second;
 }
 
-#define ADD_COUNTER_IMPL(NAME, T) \
-  RuntimeProfile::T* RuntimeProfile::NAME(\
-      const string& name, TUnit::type unit, const string& parent_counter_name) {\
-    DCHECK_EQ(is_averaged_profile_, false);\
-    lock_guard<SpinLock> l(counter_map_lock_);\
-    if (counter_map_.find(name) != counter_map_.end()) {\
-      return reinterpret_cast<T*>(counter_map_[name]);\
-    }\
-    DCHECK(parent_counter_name == ROOT_COUNTER ||\
-           counter_map_.find(parent_counter_name) != counter_map_.end()); \
-    T* counter = pool_->Add(new T(unit));\
-    counter_map_[name] = counter;\
-    set<string>* child_counters =\
-        FindOrInsert(&child_counter_map_, parent_counter_name, set<string>());\
-    child_counters->insert(name);\
-    return counter;\
+void RuntimeProfile::AddCodegenMsg(
+    bool codegen_enabled, const string& extra_info, const string& extra_label) {
+  string str = codegen_enabled ? "Codegen Enabled" : "Codegen Disabled";
+  if (!extra_info.empty()) str = str + ": " + extra_info;
+  if (!extra_label.empty()) str = extra_label + " " + str;
+  AppendExecOption(str);
+}
+
+#define ADD_COUNTER_IMPL(NAME, T)                                                \
+  RuntimeProfile::T* RuntimeProfile::NAME(                                       \
+      const string& name, TUnit::type unit, const string& parent_counter_name) { \
+    DCHECK_EQ(is_averaged_profile_, false);                                      \
+    lock_guard<SpinLock> l(counter_map_lock_);                                   \
+    if (counter_map_.find(name) != counter_map_.end()) {                         \
+      return reinterpret_cast<T*>(counter_map_[name]);                           \
+    }                                                                            \
+    DCHECK(parent_counter_name == ROOT_COUNTER                                   \
+        || counter_map_.find(parent_counter_name) != counter_map_.end());        \
+    T* counter = pool_->Add(new T(unit));                                        \
+    counter_map_[name] = counter;                                                \
+    set<string>* child_counters =                                                \
+        FindOrInsert(&child_counter_map_, parent_counter_name, set<string>());   \
+    child_counters->insert(name);                                                \
+    return counter;                                                              \
   }
 
 ADD_COUNTER_IMPL(AddCounter, Counter);

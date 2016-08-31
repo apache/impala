@@ -582,11 +582,11 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_desc = file_desc_it->second;
     }
 
-    bool expected_local = (*scan_range_params_)[i].__isset.is_remote &&
-        !(*scan_range_params_)[i].is_remote;
+    bool expected_local =
+        (*scan_range_params_)[i].__isset.is_remote && !(*scan_range_params_)[i].is_remote;
     if (expected_local && (*scan_range_params_)[i].volume_id == -1) {
       if (!FLAGS_suppress_unknown_disk_id_warnings && !unknown_disk_id_warned_) {
-        AddRuntimeExecOption("Missing Volume Id");
+        runtime_profile()->AppendExecOption("Missing Volume Id");
         runtime_state()->LogError(ErrorMsg(TErrorCode::HDFS_SCAN_NODE_UNKNOWN_DISK));
         unknown_disk_id_warned_ = true;
       }
@@ -696,9 +696,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
     const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(format)->second;
     if (!status.ok()) {
-      AddCodegenExecOption(false, status, format_name);
+      runtime_profile()->AddCodegenMsg(false, status, format_name);
     } else {
-      AddCodegenExecOption(true, status, format_name);
+      runtime_profile()->AddCodegenMsg(true, status, format_name);
       LlvmCodeGen* codegen;
       RETURN_IF_ERROR(runtime_state_->GetCodegen(&codegen));
       codegen->AddFunctionToJit(
@@ -1370,7 +1370,8 @@ void HdfsScanNode::StopAndFinalizeCounters() {
   // Output fraction of scanners with codegen enabled
   int num_enabled = num_scanners_codegen_enabled_.Load();
   int total = num_enabled + num_scanners_codegen_disabled_.Load();
-  AddRuntimeExecOption(Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
+  runtime_profile()->AppendExecOption(
+      Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
 
   if (reader_context_ != NULL) {
     bytes_read_local_->Set(runtime_state_->io_mgr()->bytes_read_local(reader_context_));

@@ -198,27 +198,8 @@ void ExecNode::Close(RuntimeState* state) {
   }
 }
 
-void ExecNode::AddRuntimeExecOption(const string& str) {
-  lock_guard<mutex> l(exec_options_lock_);
-  if (runtime_exec_options_.empty()) {
-    runtime_exec_options_ = str;
-  } else {
-    runtime_exec_options_.append(", ");
-    runtime_exec_options_.append(str);
-  }
-  runtime_profile()->AddInfoString("ExecOption", runtime_exec_options_);
-}
-
-void ExecNode::AddCodegenExecOption(bool codegen_enabled, const string& extra_info,
-    const string& extra_label) {
-  string str = codegen_enabled ? "Codegen Enabled" : "Codegen Disabled";
-  if (!extra_info.empty()) str = str + ": " + extra_info;
-  if (!extra_label.empty()) str = extra_label + " " + str;
-  AddRuntimeExecOption(str);
-}
-
-Status ExecNode::CreateTree(RuntimeState* state, const TPlan& plan,
-    const DescriptorTbl& descs, ExecNode** root) {
+Status ExecNode::CreateTree(
+    RuntimeState* state, const TPlan& plan, const DescriptorTbl& descs, ExecNode** root) {
   if (plan.nodes.size() == 0) {
     *root = NULL;
     return Status::OK();
@@ -287,7 +268,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       // evaluation whenever possible. Turn codegen on for expr evaluation for
       // the entire fragment.
       if (tnode.hdfs_scan_node.codegen_conjuncts) state->SetCodegenExpr();
-      (*node)->AddCodegenExecOption(state->ShouldCodegenExpr(), "", "Expr Evaluation");
+      (*node)->runtime_profile()->AddCodegenMsg(
+          state->ShouldCodegenExpr(), "", "Expr Evaluation");
       break;
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode, descs));

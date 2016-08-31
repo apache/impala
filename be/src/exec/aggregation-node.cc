@@ -170,7 +170,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
       }
     }
   }
-  AddCodegenExecOption(codegen_enabled);
+  runtime_profile()->AddCodegenMsg(codegen_enabled);
   return Status::OK();
 }
 

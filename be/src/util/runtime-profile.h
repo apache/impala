@@ -24,6 +24,7 @@
 #include <iostream>
 
 #include "common/atomic.h"
+#include "common/status.h"
 #include "util/spinlock.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
@@ -190,6 +191,30 @@ class RuntimeProfile {
   /// Adds a string to the runtime profile.  If a value already exists for 'key',
   /// the value will be updated.
   void AddInfoString(const std::string& key, const std::string& value);
+
+  /// Adds a string to the runtime profile.  If a value already exists for 'key',
+  /// 'value' will be appended to the previous value, with ", " separating them.
+  void AppendInfoString(const std::string& key, const std::string& value);
+
+  /// Helper to append to the "ExecOption" info string.
+  void AppendExecOption(const std::string& option) {
+    AppendInfoString("ExecOption", option);
+  }
+
+  /// Helper to append "Codegen Enabled" or "Codegen Disabled" exec options. If
+  /// specified, 'extra_info' is appended to the exec option, and 'extra_label'
+  /// is prepended to the exec option.
+  void AddCodegenMsg(bool codegen_enabled, const std::string& extra_info = "",
+      const std::string& extra_label = "");
+
+  /// Helper wrapper for AddCodegenMsg() that takes a status instead of a string
+  /// describing why codegen was disabled. 'codegen_status' can be OK whether or
+  /// not 'codegen_enabled' is true (e.g. if codegen is disabled by a query option,
+  /// then no error occurred).
+  void AddCodegenMsg(bool codegen_enabled, const Status& codegen_status,
+      const std::string& extra_label = "") {
+    AddCodegenMsg(codegen_enabled, codegen_status.GetDetail(), extra_label);
+  }
 
   /// Creates and returns a new EventSequence (owned by the runtime
   /// profile) - unless a timer with the same 'key' already exists, in
@@ -390,6 +415,11 @@ class RuntimeProfile {
   /// this profile and its children.
   /// Called recusively.
   void ComputeTimeInProfile(int64_t total_time);
+
+  /// Implementation of AddInfoString() and AppendInfoString(). If 'append' is false,
+  /// implements AddInfoString(), otherwise implements AppendInfoString().
+  void AddInfoStringInternal(
+      const std::string& key, const std::string& value, bool append);
 
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;

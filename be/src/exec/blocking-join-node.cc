@@ -192,10 +192,10 @@ Status BlockingJoinNode::ConstructBuildAndOpenProbe(RuntimeState* state,
   // returns.
   if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
     Promise<Status> build_side_status;
-    AddRuntimeExecOption("Join Build-Side Prepared Asynchronously");
-    Thread build_thread(node_name_, "build thread",
-        bind(&BlockingJoinNode::ProcessBuildInputAsync, this, state, build_sink,
-          &build_side_status));
+    runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
+    Thread build_thread(
+        node_name_, "build thread", bind(&BlockingJoinNode::ProcessBuildInputAsync, this,
+                                        state, build_sink, &build_side_status));
     if (!state->cgroup().empty()) {
       Status status = state->exec_env()->cgroups_mgr()->AssignThreadToCgroup(
           build_thread, state->cgroup());
