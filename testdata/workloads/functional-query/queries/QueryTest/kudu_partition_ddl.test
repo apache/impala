@@ -38,19 +38,6 @@ TBLPROPERTIES(
 Expected int32 literal for column 'id' got 'abc'
 ====
 ---- QUERY
--- Test error handling for split rows with two many components
-create table simple_hash ( id int, name string, valf float, vali bigint)
-DISTRIBUTE BY RANGE(col_does_not_exist, id) SPLIT ROWS ((1, 'abc'))
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = 'simple_hash',
-'kudu.master_addresses' = '127.0.0.1',
-'kudu.key_columns' = 'id, name'
- )
----- CATCH
-Unknown column: col_does_not_exist
-====
----- QUERY
 -- Test error handling for distribute clauses
 create table simple_hash ( id int, name string, valf float, vali bigint)
 DISTRIBUTE BY RANGE(col_does_not_exist) SPLIT ROWS ((1))

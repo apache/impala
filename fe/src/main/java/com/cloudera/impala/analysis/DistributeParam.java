@@ -153,12 +153,12 @@ public class DistributeParam implements ParseNode {
   @Override
   public String toSql() {
     if (num_buckets_ == NO_BUCKETS) {
-      StringBuilder builder = new StringBuilder();
+      List<String> splitRowStrings = Lists.newArrayList();
       for (ArrayList<LiteralExpr> splitRow : splitRows_) {
-        splitRowToString(splitRow);
+        splitRowStrings.add(splitRowToString(splitRow));
       }
       return String.format("RANGE(%s) INTO RANGES(%s)", Joiner.on(", ").join(columns_),
-          builder.toString());
+          Joiner.on(", ").join(splitRowStrings));
     } else {
       return String.format("HASH(%s) INTO %d BUCKETS", Joiner.on(", ").join(columns_),
           num_buckets_);
@@ -167,13 +167,13 @@ public class DistributeParam implements ParseNode {
 
   private String splitRowToString(ArrayList<LiteralExpr> splitRow) {
     StringBuilder builder = new StringBuilder();
-    builder.append("[");
+    builder.append("(");
     List<String> rangeElementStrings = Lists.newArrayList();
     for (LiteralExpr rangeElement : splitRow) {
-      rangeElementStrings.add(rangeElement.getStringValue());
+      rangeElementStrings.add(rangeElement.toSql());
     }
-    builder.append(Joiner.on(",").join(rangeElementStrings));
-    builder.append("]");
+    builder.append(Joiner.on(", ").join(rangeElementStrings));
+    builder.append(")");
     return builder.toString();
   }
 

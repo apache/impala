@@ -51,7 +51,7 @@ do
       ;;
     -help|-h|*)
       echo "run-hive-server.sh : Starts the hive server and the metastore."
-      echo "[-metastore_only] : Only starts the hive metastore."
+      echo "[-only_metastore] : Only starts the hive metastore."
       exit 1;
       ;;
     esac

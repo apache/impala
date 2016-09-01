@@ -1811,7 +1811,20 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
         "'kudu.table_name'='tab'," +
         "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c')");
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")");
+
+    // Each split row size should equals to the number of range columns.
+    AnalysisError("create table tab (a int, b int, c int, d int) " +
+        "distribute by range(a) split rows ((1,'extra_val'),(2),(3)) " +
+        "tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")",
+        "SPLIT ROWS has different size than number of projected key columns: 1. " +
+        "Split row: (1, 'extra_val')");
 
     // No float split keys
     AnalysisError("create table tab (a int, b int, c int, d int) " +
