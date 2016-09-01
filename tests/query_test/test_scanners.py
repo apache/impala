@@ -263,13 +263,9 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
-  @pytest.mark.execute_serially
   def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # each impalad should read 1 scan range.
-    # It needs to execute serially because if there is at a time more, than one query
-    # being scheduled, the simple scheduler round robins colocated impalads across
-    # all running queries. See IMPALA-2479 for more details.
     table_name = 'functional_parquet.lineitem_multiblock'
     self._multiple_blocks_helper(table_name, 20000, ranges_per_node=1)
     table_name = 'functional_parquet.lineitem_sixblocks'
@@ -280,7 +276,6 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
-  @pytest.mark.execute_serially
   def test_multiple_blocks_one_row_group(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock_one_row_group has
     # 3 blocks but only one row group across these blocks. We test to see that only one
