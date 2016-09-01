@@ -1,10 +1,10 @@
 ====
 ---- QUERY
 # Test maximally nested struct.
-create external table max_nesting_depth.struct_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct/file.parq'
+create external table $DATABASE.struct_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct/file.parq'
 stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct/'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct/'
 ====
 ---- QUERY
 select f.
@@ -13,7 +13,7 @@ select f.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0
-from max_nesting_depth.struct_tbl
+from $DATABASE.struct_tbl
 ---- RESULTS
 42
 ---- TYPES
@@ -21,14 +21,14 @@ int
 ====
 ---- QUERY
 # Test maximally nested array.
-create external table max_nesting_depth.int_array_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_array/file.parq'
+create external table $DATABASE.int_array_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_array/file.parq'
 stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_array/'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_array/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
-select * from max_nesting_depth.int_array_tbl.f.
+select * from $DATABASE.int_array_tbl.f.
   item.item.item.item.item.item.item.item.item.item.
   item.item.item.item.item.item.item.item.item.item.
   item.item.item.item.item.item.item.item.item.item.
@@ -46,7 +46,7 @@ int
 ====
 ---- QUERY
 # Test relative ref executed with deeply nested subplans.
-select * from max_nesting_depth.int_array_tbl.f t0,
+select * from $DATABASE.int_array_tbl.f t0,
   t0.item t1, t1.item t2, t2.item t3, t3.item t4, t4.item t5,
   t5.item t6, t6.item t7, t7.item t8, t8.item t9, t9.item t10,
   t10.item t11, t11.item t12, t12.item t13, t13.item t14, t14.item t15,
@@ -74,14 +74,14 @@ int
 ====
 ---- QUERY
 # Test maximally nested array of struct.
-create external table max_nesting_depth.struct_array_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_array/file.parq'
+create external table $DATABASE.struct_array_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_array/file.parq'
 stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_array/'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_array/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
-select * from max_nesting_depth.struct_array_tbl.f.
+select * from $DATABASE.struct_array_tbl.f.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0
@@ -92,7 +92,7 @@ int
 ====
 ---- QUERY
 # Test relative ref executed with deeply nested subplans.
-select * from max_nesting_depth.struct_array_tbl.f t0,
+select * from $DATABASE.struct_array_tbl.f t0,
   t0.f0 t1, t1.f0 t2, t2.f0 t3, t3.f0 t4, t4.f0 t5,
   t5.f0 t6, t6.f0 t7, t7.f0 t8, t8.f0 t9, t9.f0 t10,
   t10.f0 t11, t11.f0 t12, t12.f0 t13, t13.f0 t14, t14.f0 t15,
@@ -110,14 +110,14 @@ int
 ====
 ---- QUERY
 # Test maximally nested map.
-create external table max_nesting_depth.int_map_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_map/file.parq'
+create external table $DATABASE.int_map_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_map/file.parq'
 stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/int_map/'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_map/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
-select t.value from max_nesting_depth.int_map_tbl.f.
+select t.value from $DATABASE.int_map_tbl.f.
   value.value.value.value.value.value.value.value.value.value.
   value.value.value.value.value.value.value.value.value.value.
   value.value.value.value.value.value.value.value.value.value.
@@ -135,7 +135,7 @@ int
 ====
 ---- QUERY
 # Test relative ref executed with deeply nested subplans.
-select t98.value from max_nesting_depth.int_map_tbl.f t0,
+select t98.value from $DATABASE.int_map_tbl.f t0,
   t0.value t1, t1.value t2, t2.value t3, t3.value t4, t4.value t5,
   t5.value t6, t6.value t7, t7.value t8, t8.value t9, t9.value t10,
   t10.value t11, t11.value t12, t12.value t13, t13.value t14, t14.value t15,
@@ -163,14 +163,14 @@ int
 ====
 ---- QUERY
 # Test maximally nested map of struct.
-create external table max_nesting_depth.struct_map_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_map/file.parq'
+create external table $DATABASE.struct_map_tbl
+like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_map/file.parq'
 stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/max_nesting_depth/struct_map/'
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_map/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
-select t.value from max_nesting_depth.struct_map_tbl.f.
+select t.value from $DATABASE.struct_map_tbl.f.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0 t
@@ -181,7 +181,7 @@ int
 ====
 ---- QUERY
 # Test relative ref executed with deeply nested subplans.
-select t49.value from max_nesting_depth.struct_map_tbl.f t0,
+select t49.value from $DATABASE.struct_map_tbl.f t0,
   t0.f0 t1, t1.f0 t2, t2.f0 t3, t3.f0 t4, t4.f0 t5,
   t5.f0 t6, t6.f0 t7, t7.f0 t8, t8.f0 t9, t9.f0 t10,
   t10.f0 t11, t11.f0 t12, t12.f0 t13, t13.f0 t14, t14.f0 t15,
