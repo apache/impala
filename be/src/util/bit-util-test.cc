@@ -113,15 +113,23 @@ void TestByteSwapSimd_Unit(const int64_t CpuFlag) {
   }
 
   DCHECK(bswap_fptr != NULL);
-  uint8_t src_buf[buf_size];
-  uint8_t dst_buf[buf_size];
-  std::iota(src_buf, src_buf + buf_size, 0);
-  bswap_fptr(src_buf, dst_buf);
+  // IMPALA-4058: test that bswap_fptr works when it reads to o writes from memory with
+  // any alignment.
+  static const size_t MAX_ALIGNMENT = 64;
+  uint8_t src_buf[buf_size + MAX_ALIGNMENT];
+  uint8_t dst_buf[buf_size + MAX_ALIGNMENT];
+  std::iota(src_buf, src_buf + buf_size + MAX_ALIGNMENT, 1);
+  for (size_t i = 0; i < MAX_ALIGNMENT; ++i) {
+    for (size_t j = 0; j < MAX_ALIGNMENT; ++j) {
+      std::fill(dst_buf, dst_buf + buf_size + MAX_ALIGNMENT, 0);
+      bswap_fptr(src_buf + i, dst_buf + j);
 
-  // Validate the swap results.
-  for (int j = 0; j < buf_size; ++j) {
-    EXPECT_EQ(dst_buf[j], buf_size - j - 1);
-    EXPECT_EQ(dst_buf[j], src_buf[buf_size - j - 1]);
+      // Validate the swap results.
+      for (int k = 0; k < buf_size; ++k) {
+        EXPECT_EQ(dst_buf[k + j], 1 + i + buf_size - k - 1);
+        EXPECT_EQ(dst_buf[k + j], src_buf[i + buf_size - k - 1]);
+      }
+    }
   }
 }
 

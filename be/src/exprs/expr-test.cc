@@ -270,7 +270,7 @@ class ExprTest : public testing::Test {
     return results;
   }
 
-  void TestNextDayFunction(){
+  void TestNextDayFunction() {
     // Sequential test cases
     TestTimestampValue("next_day('2016-05-01','Sunday')",
       TimestampValue("2016-05-08 00:00:00", 19));
@@ -2228,6 +2228,16 @@ TEST_F(ExprTest, StringFunctions) {
       TestValue("base64decode(base64encode('" + as_octal + "')) = '" + as_octal + "'",
           TYPE_BOOLEAN, true);
     }
+  }
+}
+
+TEST_F(ExprTest, LongReverse) {
+  static const int MAX_LEN = 2048;
+  string to_reverse(MAX_LEN, ' '), reversed(MAX_LEN, ' ');
+  for (int i = 0; i < MAX_LEN; ++i) {
+    to_reverse[i] = reversed[MAX_LEN - 1 - i] = 'a' + (rand() % 26);
+    TestStringValue("reverse('" + to_reverse.substr(0, i + 1) + "')",
+        reversed.substr(MAX_LEN - 1 - i));
   }
 }
 

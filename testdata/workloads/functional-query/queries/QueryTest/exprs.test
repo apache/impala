@@ -2482,3 +2482,15 @@ select cast('1.23' as double), cast('.1.23' as float), cast('123.456.' as double
 ---- TYPES
 double,float,double,double,float,double
 ====
+---- QUERY
+# IMPALA-4058: reverse assumed memory was 16-byte aligned; reverse 16, 17, 32, 33, and 64
+# byte strings
+select reverse('123456789abcdef0'), reverse('123456789abcdef01'),
+    reverse('123456789abcdef0!@#$%^&*(ABCDEF)'),
+    reverse('123456789abcdef0!@#$%^&*(ABCDEF)`'),
+    reverse('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ345678901234')
+---- RESULTS
+'0fedcba987654321','10fedcba987654321',')FEDCBA(*&^%$#@!0fedcba987654321','`)FEDCBA(*&^%$#@!0fedcba987654321','432109876543ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING
+====

@@ -155,10 +155,10 @@ inline void SimdByteSwap::ByteSwap256(const uint8_t* src, uint8_t* dst) {
     11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
   _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst), _mm256_shuffle_epi8(
       _mm256_loadu_si256(reinterpret_cast<const __m256i*>(src)), mask256i));
-  __m128i part1 = *reinterpret_cast<__m128i*>(dst);
-  __m128i part2 = *reinterpret_cast<__m128i*>(dst + 16);
-  *reinterpret_cast<__m128i*>(dst) = part2;
-  *reinterpret_cast<__m128i*>(dst + 16) = part1;
+  const __m128i part1 = _mm_loadu_si128(reinterpret_cast<__m128i*>(dst));
+  const __m128i part2 = _mm_loadu_si128(reinterpret_cast<__m128i*>(dst + 16));
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(dst), part2);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + 16), part1);
   _mm256_zeroupper();
 }
 
