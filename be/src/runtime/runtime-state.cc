@@ -247,7 +247,7 @@ void RuntimeState::LogMemLimitExceeded(const MemTracker* tracker,
   DCHECK_GE(failed_allocation_size, 0);
   DCHECK(query_mem_tracker_.get() != NULL);
   stringstream ss;
-  ss << "Memory Limit Exceeded\n";
+  ss << "Memory Limit Exceeded by fragment: " << fragment_instance_id() << endl;
   if (failed_allocation_size != 0) {
     DCHECK(tracker != NULL);
     ss << "  " << tracker->label() << " could not allocate "
