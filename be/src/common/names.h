@@ -115,7 +115,9 @@ using std::sort;
 
 #ifdef _GLIBCXX_MEMORY
 using std::make_shared;
+using std::make_unique;
 using std::shared_ptr;
+using std::unique_ptr;
 #endif
 
 #ifdef BOOST_THREAD_THREAD_COMMON_HPP

@@ -15,11 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <iostream>
-#include <algorithm>
-#include <stdlib.h>
 #include <immintrin.h>
+#include <stdlib.h>
 
+#include <algorithm>
+#include <iostream>
+#include <memory>
+
+#include "gutil/strings/substitute.h"
 #include "exec/parquet-common.h"
 #include "runtime/decimal-value.h"
 #include "util/benchmark.h"
@@ -29,29 +32,51 @@
 #include "common/names.h"
 
 using std::numeric_limits;
+using strings::Substitute;
 using namespace impala;
 
 // This benchmark is to compare the performance for all available byteswap approaches:
-// 1. OldImpala: use the old Impala routine to byte-swap the input array.
-// Corresponding performance is used as the baseline.
-// 2. FastScalar: use the ByteSwapScalar routine in bit-util.inline.h to byte-swap
+// 1. FastScalar: use the ByteSwapScalar routine in bit-util.inline.h to byte-swap
 // the input array with subdivided byte sizes, which is proposed by Zuo Wang.
-// 3. SSSE3: use the SSSE3 SIMD routine to byte-swap the input array
+// 2. SSSE3: use the SSSE3 SIMD routine to byte-swap the input array
 // without arch-selector branches;
-// 4. AVX2: use the AVX2 SIMD routine to byte-swap the input array
+// 3. AVX2: use the AVX2 SIMD routine to byte-swap the input array
 // without arch-selector branches;
-// 5. SIMD: use the comprehensive SIMD routine to byte-swap the input array
+// 4. SIMD: use the comprehensive SIMD routine to byte-swap the input array
 // with arch-selector branches;
+//
+// The benchmark is executed on both aligned and misaligned memory.
+//
 // Result:
-// I0725 20:47:02.402506  2078 bswap-benchmark.cc:117] Machine Info: Intel(R) Core(TM) i5-4460  CPU @ 3.20GHz
-// ByteSwap benchmark:        Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+// I0901 15:00:40.777019 21251 bswap-benchmark.cc:164] Machine Info: Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+// ByteSwap benchmark misalignment=0:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                          FastScalar                675      725      731         1X         1X         1X
-//                               SSSE3           6.12e+03  6.2e+03 6.23e+03      9.06X      8.55X      8.53X
-//                                AVX2           1.87e+04 1.88e+04 1.89e+04      27.7X      25.9X      25.9X
-//                                SIMD           1.82e+04 1.88e+04 1.89e+04        27X      25.9X      25.9X
-
+//                          FastScalar                940 1.06e+03 1.08e+03         1X         1X         1X
+//                               SSSE3           8.36e+03  9.8e+03 9.97e+03       8.9X      9.27X      9.26X
+//                                AVX2           2.57e+04 3.73e+04  3.8e+04      27.3X      35.3X      35.3X
+//                                SIMD            2.9e+04 3.72e+04  3.8e+04      30.8X      35.2X      35.3X
+// ByteSwap benchmark misalignment=1:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                          FastScalar                815 1.01e+03 1.07e+03         1X         1X         1X
+//                               SSSE3           5.97e+03 8.42e+03 8.97e+03      7.32X      8.35X      8.38X
+//                                AVX2           1.83e+04 2.52e+04 2.77e+04      22.5X        25X      25.9X
+//                                SIMD           1.78e+04 2.63e+04 2.75e+04      21.8X      26.1X      25.7X
+// ByteSwap benchmark misalignment=4:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                          FastScalar           1.04e+03 1.08e+03 1.12e+03         1X         1X         1X
+//                               SSSE3           7.81e+03 8.97e+03 9.09e+03       7.5X      8.33X      8.09X
+//                                AVX2           2.47e+04 2.76e+04  2.8e+04      23.7X      25.7X      24.9X
+//                                SIMD           2.62e+04 2.77e+04 2.79e+04      25.2X      25.7X      24.9X
+// ByteSwap benchmark misalignment=8:Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                          FastScalar                989 1.08e+03 1.14e+03         1X         1X         1X
+//                               SSSE3           8.06e+03 9.01e+03 9.13e+03      8.15X      8.37X      8.02X
+//                                AVX2           2.24e+04 2.77e+04 2.81e+04      22.7X      25.8X      24.7X
+//                                SIMD           2.42e+04 2.77e+04  2.8e+04      24.4X      25.7X      24.6X
 
 // Data structure used in the benchmark;
 struct TestData {
@@ -92,24 +117,45 @@ void TestSIMDSwap(int batch_size, void* d) {
   BitUtil::ByteSwap(data->outbuffer, data->inbuffer, data->num_values);
 }
 
+// Allocate 64-byte (an x86-64 cache line) aligned memory so it does not straddle cache
+// line boundaries. This is sufficient to meet alignment requirements for all SIMD
+// instructions, at least up to AVX-512.
+// Exit process if allocation fails.
+void* AllocateAligned(size_t size) {
+  void* ptr;
+  if (posix_memalign(&ptr, 64, size) != 0) {
+    LOG(FATAL) << "Failed to allocate " << size;
+  }
+  return ptr;
+}
+
 // Benchmark routine for FastScalar/"Pure" SSSE3/"Pure" AVX2/SIMD approaches
 void PerfBenchmark() {
+  // Measure perf both when memory is perfectly aligned for SIMD and also misaligned.
+  const int max_misalignment = 8;
+  const vector<int> misalignments({0, 1, 4, max_misalignment});
   const int data_len = 1 << 20;
-  Benchmark suite("ByteSwap benchmark");
-  vector<uint8_t> inbuffer_vector(data_len, 0);
-  vector<uint8_t> outbuffer_vector(data_len, 0);
-  TestData data;
 
-  data.num_values = data_len;
-  data.inbuffer = &inbuffer_vector[0];
-  data.outbuffer = &outbuffer_vector[0];
-  InitData(data.inbuffer, data_len);
+  const unique_ptr<uint8_t, decltype(free)*> inbuffer(
+      reinterpret_cast<uint8_t*>(AllocateAligned(data_len + max_misalignment)), free);
+  const unique_ptr<uint8_t, decltype(free)*> outbuffer(
+      reinterpret_cast<uint8_t*>(AllocateAligned(data_len + max_misalignment)), free);
 
-  const int baseline = suite.AddBenchmark("FastScalar", TestFastScalarSwap, &data, -1);
-  suite.AddBenchmark("SSSE3", TestSSSE3Swap, &data, baseline);
-  suite.AddBenchmark("AVX2", TestAVX2Swap, &data, baseline);
-  suite.AddBenchmark("SIMD", TestSIMDSwap, &data, baseline);
-  cout << suite.Measure();
+  for (const int misalign : misalignments) {
+    Benchmark suite(Substitute("ByteSwap benchmark misalignment=$0", misalign));
+    TestData data;
+
+    data.num_values = data_len;
+    data.inbuffer = inbuffer.get() + misalign;
+    data.outbuffer = outbuffer.get() + misalign;
+    InitData(data.inbuffer, data_len);
+
+    const int baseline = suite.AddBenchmark("FastScalar", TestFastScalarSwap, &data, -1);
+    suite.AddBenchmark("SSSE3", TestSSSE3Swap, &data, baseline);
+    suite.AddBenchmark("AVX2", TestAVX2Swap, &data, baseline);
+    suite.AddBenchmark("SIMD", TestSIMDSwap, &data, baseline);
+    cout << suite.Measure();
+  }
 }
 
 int main(int argc, char **argv) {
