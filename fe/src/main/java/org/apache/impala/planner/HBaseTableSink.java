@@ -18,6 +18,7 @@
 
 package org.apache.impala.planner;
 
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.thrift.TDataSink;
@@ -51,7 +52,7 @@ public class HBaseTableSink extends TableSink {
   @Override
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
-    TTableSink tTableSink = new TTableSink(targetTable_.getId().asInt(),
+    TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HBASE, sinkOp_.toThrift());
     result.table_sink = tTableSink;
     return result;

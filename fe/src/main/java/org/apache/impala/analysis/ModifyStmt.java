@@ -158,6 +158,8 @@ public abstract class ModifyStmt extends StatementBase {
     // Validates the assignments_ and creates the sourceStmt_.
     if (sourceStmt_ == null) createSourceStmt(analyzer);
     sourceStmt_.analyze(analyzer);
+    // Add target table to descriptor table.
+    analyzer.getDescTbl().setTargetTable(table_);
   }
 
   @Override

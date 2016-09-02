@@ -72,8 +72,8 @@ public class TableLoadingMgr {
         tbl = tblTask_.get();
       } catch (Exception e) {
         tbl = IncompleteTable.createFailedMetadataLoadTable(
-            TableId.createInvalidId(), catalog_.getDb(tblName_.getDb_name()),
-            tblName_.getTable_name(), new TableLoadingException(e.getMessage(), e));
+            catalog_.getDb(tblName_.getDb_name()), tblName_.getTable_name(),
+            new TableLoadingException(e.getMessage(), e));
       }
       Preconditions.checkState(tbl.isLoaded());
       return tbl;

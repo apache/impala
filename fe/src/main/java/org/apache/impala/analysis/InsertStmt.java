@@ -421,7 +421,7 @@ public class InsertStmt extends StatementBase {
     }
 
     // Add target table to descriptor table.
-    analyzer.getDescTbl().addReferencedTable(table_);
+    analyzer.getDescTbl().setTargetTable(table_);
   }
 
   /**

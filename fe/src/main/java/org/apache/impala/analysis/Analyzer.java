@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -289,6 +290,11 @@ public class Analyzer {
     // Bidirectional map between Integer index and TNetworkAddress.
     // Decreases the size of the scan range locations.
     private final ListMap<TNetworkAddress> hostIndex = new ListMap<TNetworkAddress>();
+
+    // The Impalad Catalog has the latest tables from the statestore. In order to use the
+    // same version of a table in a single query, we cache all referenced tables here.
+    // TODO: Investigate what to do with other catalog objects.
+    private final HashMap<TableName, Table> referencedTables_ = Maps.newHashMap();
 
     // Timeline of important events in the planning process, used for debugging /
     // profiling
@@ -2277,7 +2283,9 @@ public class Analyzer {
   }
 
   /**
-   * Returns the Catalog Table object for the given database and table name.
+   * Returns the Catalog Table object for the given database and table name. A table
+   * referenced for the first time is cached in globalState_.referencedTables_. The same
+   * table instance is returned for all subsequent references in the same query.
    * Adds the table to this analyzer's "missingTbls_" and throws an AnalysisException if
    * the table has not yet been loaded in the local catalog cache.
    * Throws an AnalysisException if the table or the db does not exist in the Catalog.
@@ -2285,7 +2293,13 @@ public class Analyzer {
    */
   public Table getTable(String dbName, String tableName)
       throws AnalysisException, TableLoadingException {
-    Table table = null;
+    TableName tblName = new TableName(dbName, tableName);
+    Table table = globalState_.referencedTables_.get(tblName);
+    if (table != null) {
+      // Return query-local version of table.
+      Preconditions.checkState(table.isLoaded());
+      return table;
+    }
     try {
       table = getCatalog().getTable(dbName, tableName);
     } catch (DatabaseNotFoundException e) {
@@ -2307,6 +2321,7 @@ public class Analyzer {
       throw new AnalysisException(
           "Table/view is missing metadata: " + table.getFullName());
     }
+    globalState_.referencedTables_.put(tblName, table);
     return table;
   }
 

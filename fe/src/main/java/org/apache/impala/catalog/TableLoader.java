@@ -72,7 +72,7 @@ public class TableLoader {
       }
 
       // Create a table of appropriate type and have it load itself
-      table = Table.fromMetastoreTable(catalog_.getNextTableId(), db, msTbl);
+      table = Table.fromMetastoreTable(db, msTbl);
       if (table == null) {
         throw new TableLoadingException(
             "Unrecognized table type for table: " + fullTblName);
@@ -80,18 +80,17 @@ public class TableLoader {
       table.load(false, msClient.getHiveClient(), msTbl);
       table.validate();
     } catch (TableLoadingException e) {
-      table = IncompleteTable.createFailedMetadataLoadTable(
-          TableId.createInvalidId(), db, tblName, e);
+      table = IncompleteTable.createFailedMetadataLoadTable(db, tblName, e);
     } catch (NoSuchObjectException e) {
       TableLoadingException tableDoesNotExist = new TableLoadingException(
           "Table " + fullTblName + " no longer exists in the Hive MetaStore. " +
           "Run 'invalidate metadata " + fullTblName + "' to update the Impala " +
           "catalog.");
       table = IncompleteTable.createFailedMetadataLoadTable(
-          TableId.createInvalidId(), db, tblName, tableDoesNotExist);
+          db, tblName, tableDoesNotExist);
     } catch (Exception e) {
       table = IncompleteTable.createFailedMetadataLoadTable(
-          catalog_.getNextTableId(), db, tblName, new TableLoadingException(
+          db, tblName, new TableLoadingException(
           "Failed to load metadata for table: " + fullTblName + ". Running " +
           "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
     }

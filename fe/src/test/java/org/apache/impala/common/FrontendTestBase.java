@@ -162,8 +162,8 @@ public class FrontendTestBase {
     Preconditions.checkState(createTableStmt.getPartitionColumnDefs().isEmpty());
     Db db = catalog_.getDb(createTableStmt.getDb());
     Preconditions.checkNotNull(db, "Test tables must be created in an existing db.");
-    HdfsTable dummyTable = new HdfsTable(null, null, db, createTableStmt.getTbl(),
-        createTableStmt.getOwner());
+    HdfsTable dummyTable = new HdfsTable(null, db,
+        createTableStmt.getTbl(), createTableStmt.getOwner());
     List<ColumnDef> columnDefs = createTableStmt.getColumnDefs();
     for (int i = 0; i < columnDefs.size(); ++i) {
       ColumnDef colDef = columnDefs.get(i);

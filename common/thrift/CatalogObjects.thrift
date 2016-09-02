@@ -399,39 +399,36 @@ struct TTable {
   // string pointing to where the metadata loading error occurred.
   3: optional Status.TStatus load_status
 
-  // Table identifier.
-  4: optional Types.TTableId id
-
   // The access level Impala has on this table (READ_WRITE, READ_ONLY, etc).
-  5: optional TAccessLevel access_level
+  4: optional TAccessLevel access_level
 
   // List of columns (excludes clustering columns)
-  6: optional list<TColumn> columns
+  5: optional list<TColumn> columns
 
   // List of clustering columns (empty list if table has no clustering columns)
-  7: optional list<TColumn> clustering_columns
+  6: optional list<TColumn> clustering_columns
 
   // Table stats data for the table.
-  8: optional TTableStats table_stats
+  7: optional TTableStats table_stats
 
   // Determines the table type - either HDFS, HBASE, or VIEW.
-  9: optional TTableType table_type
+  8: optional TTableType table_type
 
   // Set iff this is an HDFS table
-  10: optional THdfsTable hdfs_table
+  9: optional THdfsTable hdfs_table
 
   // Set iff this is an Hbase table
-  11: optional THBaseTable hbase_table
+  10: optional THBaseTable hbase_table
 
   // The Hive Metastore representation of this table. May not be set if there were
   // errors loading the table metadata
-  12: optional hive_metastore.Table metastore_table
+  11: optional hive_metastore.Table metastore_table
 
   // Set iff this is a table from an external data source
-  13: optional TDataSourceTable data_source_table
+  12: optional TDataSourceTable data_source_table
 
   // Set iff this a kudu table
-  14: optional TKuduTable kudu_table
+  13: optional TKuduTable kudu_table
 }
 
 // Represents a database.

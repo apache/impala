@@ -115,9 +115,9 @@ public class KuduTable extends Table {
   // supported.
   private final List<DistributeParam> distributeBy_ = Lists.newArrayList();
 
-  protected KuduTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
+  protected KuduTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
-    super(id, msTable, db, name, owner);
+    super(msTable, db, name, owner);
     kuduTableName_ = msTable.getParameters().get(KuduTable.KEY_TABLE_NAME);
     kuduMasters_ = msTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
   }
@@ -261,8 +261,7 @@ public class KuduTable extends Table {
   public static KuduTable createCtasTarget(Db db,
       org.apache.hadoop.hive.metastore.api.Table msTbl, List<ColumnDef> columnDefs,
       List<String> primaryKeyColumnNames, List<DistributeParam> distributeParams) {
-    KuduTable tmpTable = new KuduTable(TableId.createInvalidId(), msTbl, db,
-        msTbl.getTableName(), msTbl.getOwner());
+    KuduTable tmpTable = new KuduTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     int pos = 0;
     for (ColumnDef colDef: columnDefs) {
       tmpTable.addColumn(new Column(colDef.getColName(), colDef.getType(), pos++));
@@ -308,8 +307,8 @@ public class KuduTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
-    TTableDescriptor desc = new TTableDescriptor(id_.asInt(), TTableType.KUDU_TABLE,
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
+    TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.KUDU_TABLE,
         getTColumnDescriptors(), numClusteringCols_, kuduTableName_, db_.getName());
     desc.setKuduTable(getTKuduTable());
     return desc;

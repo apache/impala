@@ -21,6 +21,7 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.thrift.TDataSink;
@@ -76,7 +77,7 @@ public class KuduTableSink extends TableSink {
   @Override
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
-    TTableSink tTableSink = new TTableSink(targetTable_.getId().asInt(),
+    TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.KUDU, sinkOp_.toThrift());
     TKuduTableSink tKuduSink = new TKuduTableSink();
     tKuduSink.setReferenced_columns(targetColIdxs_);

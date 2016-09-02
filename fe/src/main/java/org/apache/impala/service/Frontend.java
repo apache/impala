@@ -51,6 +51,7 @@ import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
 import org.apache.impala.analysis.CreateUdfStmt;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.DropDataSrcStmt;
 import org.apache.impala.analysis.DropFunctionStmt;
 import org.apache.impala.analysis.DropStatsStmt;
@@ -86,7 +87,6 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.TableId;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -1208,7 +1208,7 @@ public class Frontend {
         TFinalizeParams finalizeParams = new TFinalizeParams();
         finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
         finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
-        finalizeParams.setTable_id(insertStmt.getTargetTable().getId().asInt());
+        finalizeParams.setTable_id(DescriptorTable.TABLE_SINK_ID);
         String db = insertStmt.getTargetTableName().getDb();
         finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
         HdfsTable hdfsTable = (HdfsTable) insertStmt.getTargetTable();
@@ -1223,38 +1223,9 @@ public class Frontend {
       result.query_exec_request.stmt_type = TStmtType.DML;
     }
 
-    validateTableIds(analysisResult.getAnalyzer(), result);
-
     timeline.markEvent("Planning finished");
     result.setTimeline(analysisResult.getAnalyzer().getTimeline().toThrift());
     return result;
-  }
-
-  /**
-   * Check that we don't have any duplicate table IDs (see IMPALA-1702).
-   * To be removed when IMPALA-1702 is resolved.
-   */
-  private void validateTableIds(Analyzer analyzer, TExecRequest result)
-      throws InternalException {
-    Map<TableId, Table> tableIds = Maps.newHashMap();
-    Collection<TupleDescriptor> tupleDescs = analyzer.getDescTbl().getTupleDescs();
-    for (TupleDescriptor desc: tupleDescs) {
-      // Skip if tuple descriptor did not come from materializing scan.
-      if (!desc.isMaterialized()) continue;
-      Table table = desc.getTable();
-      if (table == null) continue;
-      Table otherTable = tableIds.get(table.getId());
-      if (otherTable == table) continue; // Same table referenced twice
-      if (otherTable == null) {
-        tableIds.put(table.getId(), table);
-        continue;
-      }
-      LOG.error("Found duplicate table ID! id=" + table.getId() + "\ntable1=\n"
-          + table.toTCatalogObject() + "\ntable2=\n" + otherTable.toTCatalogObject()
-          + "\nexec_request=\n" + result);
-      throw new InternalException("Query encountered invalid metadata, likely due to " +
-          "IMPALA-1702. Please try rerunning the query.");
-    }
   }
 
   /**

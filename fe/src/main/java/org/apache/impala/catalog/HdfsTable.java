@@ -266,9 +266,9 @@ public class HdfsTable extends Table {
     }
   }
 
-  public HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
+  public HdfsTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
-    super(id, msTbl, db, name, owner);
+    super(msTbl, db, name, owner);
     partitionLocationCompressor_ =
         new HdfsPartitionLocationCompressor(numClusteringCols_);
   }
@@ -1567,10 +1567,10 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
     // Create thrift descriptors to send to the BE.  The BE does not
     // need any information below the THdfsPartition level.
-    TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
+    TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
         getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
     tableDesc.setHdfsTable(getTHdfsTable(false, referencedPartitions));
     return tableDesc;

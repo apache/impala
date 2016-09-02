@@ -36,7 +36,6 @@ import org.apache.impala.thrift.TDescriptorTable;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Repository for tuple (and slot) descriptors.
@@ -48,12 +47,17 @@ public class DescriptorTable {
   private final HashMap<SlotId, SlotDescriptor> slotDescs_ = Maps.newHashMap();
   private final IdGenerator<TupleId> tupleIdGenerator_ = TupleId.createGenerator();
   private final IdGenerator<SlotId> slotIdGenerator_ = SlotId.createGenerator();
-  // List of referenced tables with no associated TupleDescriptor to ship to the BE.
-  // For example, the output table of an insert query.
-  private final List<Table> referencedTables_ = Lists.newArrayList();
+  // The target table of a table sink, may be null.
+  // Table id 0 is reserved for it. Set in QueryStmt.analyze() that produces a table sink,
+  // e.g. InsertStmt.analyze(), ModifyStmt.analyze().
+  private Table targetTable_;
   // For each table, the set of partitions that are referenced by at least one scan range.
   private final HashMap<Table, HashSet<Long>> referencedPartitionsPerTable_ =
       Maps.newHashMap();
+  // 0 is reserved for table sinks
+  public static final int TABLE_SINK_ID = 0;
+  // Table id counter for a single query.
+  private int nextTableId_ = TABLE_SINK_ID + 1;
 
   public TupleDescriptor createTupleDescriptor(String debugName) {
     TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId(), debugName);
@@ -102,9 +106,8 @@ public class DescriptorTable {
   public TupleId getMaxTupleId() { return tupleIdGenerator_.getMaxId(); }
   public SlotId getMaxSlotId() { return slotIdGenerator_.getMaxId(); }
 
-  public void addReferencedTable(Table table) {
-    referencedTables_.add(table);
-  }
+  public Table getTargetTable() { return targetTable_; }
+  public void setTargetTable(Table table) { targetTable_ = table; }
 
   /**
    * Find the set of referenced partitions for the given table.  Allocates a set if
@@ -156,38 +159,55 @@ public class DescriptorTable {
     for (TupleDescriptor d: tupleDescs_.values()) d.computeMemLayout();
   }
 
+  /**
+   * Returns the thrift representation of this DescriptorTable. Assign unique ids to all
+   * distinct tables and set them in tuple descriptors as necessary.
+   */
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
-    HashSet<Table> referencedTbls = Sets.newHashSet();
-    HashSet<Table> allPartitionsTbls = Sets.newHashSet();
+    // Maps from base table to its table id used in the backend.
+    HashMap<Table, Integer> tableIdMap = Maps.newHashMap();
+    // Used to check table level consistency
+    HashMap<TableName, Table> referencedTables = Maps.newHashMap();
+
+    if (targetTable_ != null) {
+      tableIdMap.put(targetTable_, TABLE_SINK_ID);
+      referencedTables.put(targetTable_.getTableName(), targetTable_);
+    }
     for (TupleDescriptor tupleDesc: tupleDescs_.values()) {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
-      if (tupleDesc.isMaterialized()) {
-        // TODO: Ideally, we should call tupleDesc.checkIsExecutable() here, but there
-        // currently are several situations in which we send materialized tuples without
-        // a mem layout to the BE, e.g., when unnesting unions or when replacing plan
-        // trees with an EmptySetNode.
-        result.addToTupleDescriptors(tupleDesc.toThrift());
-        Table table = tupleDesc.getTable();
-        if (table != null && !(table instanceof View)) referencedTbls.add(table);
-        // Only serialize materialized slots
-        for (SlotDescriptor slotD: tupleDesc.getMaterializedSlots()) {
-          result.addToSlotDescriptors(slotD.toThrift());
+      if (!tupleDesc.isMaterialized()) continue;
+      Table table = tupleDesc.getTable();
+      Integer tableId = tableIdMap.get(table);
+      if (table != null && !(table instanceof View)) {
+        TableName tblName = table.getTableName();
+        // Verify table level consistency in the same query by checking that references to
+        // the same Table refer to the same table instance.
+        Table checkTable = referencedTables.get(tblName);
+        Preconditions.checkState(checkTable == null || table == checkTable);
+        if (tableId == null) {
+          tableId = nextTableId_++;
+          tableIdMap.put(table, tableId);
+          referencedTables.put(tblName, table);
         }
       }
-    }
-    for (Table table: referencedTables_) {
-      referencedTbls.add(table);
-      // We don't know which partitions are needed for INSERT, so include them all.
-      allPartitionsTbls.add(table);
-    }
-    for (Table tbl: referencedTbls) {
-      HashSet<Long> referencedPartitions = null; // null means include all partitions.
-      if (!allPartitionsTbls.contains(tbl)) {
-        referencedPartitions = getReferencedPartitions(tbl);
+      // TODO: Ideally, we should call tupleDesc.checkIsExecutable() here, but there
+      // currently are several situations in which we send materialized tuples without
+      // a mem layout to the BE, e.g., when unnesting unions or when replacing plan
+      // trees with an EmptySetNode.
+      result.addToTupleDescriptors(tupleDesc.toThrift(tableId));
+      // Only serialize materialized slots
+      for (SlotDescriptor slotD: tupleDesc.getMaterializedSlots()) {
+        result.addToSlotDescriptors(slotD.toThrift());
       }
-      result.addToTableDescriptors(tbl.toThriftDescriptor(referencedPartitions));
+    }
+    for (Table tbl: tableIdMap.keySet()) {
+      HashSet<Long> referencedPartitions = null; // null means include all partitions.
+      // We don't know which partitions are needed for INSERT, so do not prune partitions.
+      if (tbl != targetTable_) referencedPartitions = getReferencedPartitions(tbl);
+      result.addToTableDescriptors(
+          tbl.toThriftDescriptor(tableIdMap.get(tbl), referencedPartitions));
     }
     return result;
   }

@@ -204,15 +204,13 @@ public class TupleDescriptor {
     }
   }
 
-  public TTupleDescriptor toThrift() {
+  public TTupleDescriptor toThrift(Integer tableId) {
     TTupleDescriptor ttupleDesc =
         new TTupleDescriptor(id_.asInt(), byteSize_, numNullBytes_);
-    // do not set the table id or tuple path for views
-    if (getTable() != null && !(getTable() instanceof View)) {
-      ttupleDesc.setTableId(getTable().getId().asInt());
-      Preconditions.checkNotNull(path_);
-      ttupleDesc.setTuplePath(path_.getAbsolutePath());
-    }
+    if (tableId == null) return ttupleDesc;
+    ttupleDesc.setTableId(tableId);
+    Preconditions.checkNotNull(path_);
+    ttupleDesc.setTuplePath(path_.getAbsolutePath());
     return ttupleDesc;
   }
 

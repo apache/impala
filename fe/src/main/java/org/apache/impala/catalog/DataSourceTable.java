@@ -77,10 +77,9 @@ public class DataSourceTable extends Table {
   private String initString_;
   private TDataSource dataSource_;
 
-  protected DataSourceTable(
-      TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
+  protected DataSourceTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
-    super(id, msTable, db, name, owner);
+    super(msTable, db, name, owner);
   }
 
   /**
@@ -221,8 +220,8 @@ public class DataSourceTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
-    TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(),
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
+    TTableDescriptor tableDesc = new TTableDescriptor(tableId,
         TTableType.DATA_SOURCE_TABLE, getTColumnDescriptors(), numClusteringCols_,
         name_, db_.getName());
     tableDesc.setDataSourceTable(getDataSourceTable());
