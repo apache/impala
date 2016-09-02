@@ -28,6 +28,27 @@ using namespace impala;
 using namespace llvm;
 using namespace strings;
 
+int TupleRowComparator::CompareInterpreted(
+    const TupleRow* lhs, const TupleRow* rhs) const {
+  DCHECK_EQ(key_expr_ctxs_lhs_.size(), key_expr_ctxs_rhs_.size());
+  for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
+    void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
+    void* rhs_value = key_expr_ctxs_rhs_[i]->GetValue(rhs);
+
+    // The sort order of NULLs is independent of asc/desc.
+    if (lhs_value == NULL && rhs_value == NULL) continue;
+    if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
+    if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
+
+    int result =
+        RawValue::Compare(lhs_value, rhs_value, key_expr_ctxs_lhs_[i]->root()->type());
+    if (!is_asc_[i]) result = -result;
+    if (result != 0) return result;
+    // Otherwise, try the next Expr
+  }
+  return 0; // fully equivalent key
+}
+
 Status TupleRowComparator::Codegen(RuntimeState* state) {
   Function* fn;
   RETURN_IF_ERROR(CodegenCompare(state, &fn));

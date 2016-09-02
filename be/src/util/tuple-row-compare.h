@@ -84,35 +84,19 @@ class TupleRowComparator {
         key_expr_ctxs_rhs_(sort_key_exprs.rhs_ordering_expr_ctxs()),
         is_asc_(key_expr_ctxs_lhs_.size(), is_asc),
         nulls_first_(key_expr_ctxs_lhs_.size(), nulls_first ? -1 : 1),
-        codegend_compare_fn_(NULL) {
-  }
+        codegend_compare_fn_(NULL) {}
 
-  /// Codegens a Compare() function for this comparator that is used in the () operator.
-  /// Returns Status::OK() iff the codegen was successful.
+  /// Codegens a Compare() function for this comparator that is used in Compare().
   Status Codegen(RuntimeState* state);
 
   /// Returns a negative value if lhs is less than rhs, a positive value if lhs is greater
   /// than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_) must
   /// have been prepared and opened before calling this, i.e. 'sort_key_exprs' in the
   /// constructor must have been opened.
-  int Compare(const TupleRow* lhs, const TupleRow* rhs) const {
-    DCHECK_EQ(key_expr_ctxs_lhs_.size(), key_expr_ctxs_rhs_.size());
-    for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
-      void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
-      void* rhs_value = key_expr_ctxs_rhs_[i]->GetValue(rhs);
-
-      // The sort order of NULLs is independent of asc/desc.
-      if (lhs_value == NULL && rhs_value == NULL) continue;
-      if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
-      if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
-
-      int result = RawValue::Compare(lhs_value, rhs_value,
-          key_expr_ctxs_lhs_[i]->root()->type());
-      if (!is_asc_[i]) result = -result;
-      if (result != 0) return result;
-      // Otherwise, try the next Expr
-    }
-    return 0; // fully equivalent key
+  int ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs) const {
+    return codegend_compare_fn_ == NULL ?
+        CompareInterpreted(lhs, rhs) :
+        (*codegend_compare_fn_)(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
   }
 
   /// Returns true if lhs is strictly less than rhs.
@@ -121,10 +105,7 @@ class TupleRowComparator {
   /// Force inlining because it tends not to be always inlined at callsites, even in
   /// hot loops.
   bool ALWAYS_INLINE Less(const TupleRow* lhs, const TupleRow* rhs) const {
-    int result = codegend_compare_fn_ == NULL ? Compare(lhs, rhs) :
-        (*codegend_compare_fn_)(&key_expr_ctxs_lhs_[0], &key_expr_ctxs_rhs_[0], lhs, rhs);
-    if (result < 0) return true;
-    return false;
+    return Compare(lhs, rhs) < 0;
   }
 
   bool ALWAYS_INLINE Less(const Tuple* lhs, const Tuple* rhs) const {
@@ -140,12 +121,21 @@ class TupleRowComparator {
   }
 
  private:
+  /// Interpreted implementation of Compare().
+  int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const;
+
   /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
-  /// TODO: have codegen'd users inline this instead of calling through the () operator
+  /// TODO: inline this at codegen'd callsites instead of indirectly calling via function
+  /// pointer.
   Status CodegenCompare(RuntimeState* state, llvm::Function** fn);
 
+  /// References to ExprContexts managed by SortExecExprs. The lhs ExprContexts must
+  /// be created and prepared before the TupleRowCompator is constructed, but the rhs
+  /// ExprContexts are only created via cloning when SortExecExprs is Open()ed (which
+  /// may be after the TupleRowComparator is constructed).
   const std::vector<ExprContext*>& key_expr_ctxs_lhs_;
   const std::vector<ExprContext*>& key_expr_ctxs_rhs_;
+
   std::vector<bool> is_asc_;
   std::vector<int8_t> nulls_first_;
 
