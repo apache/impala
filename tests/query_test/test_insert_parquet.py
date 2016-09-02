@@ -26,6 +26,7 @@ from tempfile import mkdtemp as make_tmp_dir
 
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import TestDimension
@@ -63,18 +64,14 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
-  @classmethod
-  def setup_class(cls):
-    super(TestInsertParquetQueries, cls).setup_class()
-
-  @pytest.mark.execute_serially
   @SkipIfLocal.multiple_impalad
-  def test_insert_parquet(self, vector):
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_insert_parquet(self, vector, unique_database):
     vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = \
         vector.get_value('file_size')
     vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
-    self.run_test_case('insert_parquet', vector, multiple_impalad=True)
+    self.run_test_case('insert_parquet', vector, unique_database, multiple_impalad=True)
 
 class TestInsertParquetInvalidCodec(ImpalaTestSuite):
   @classmethod
@@ -93,10 +90,6 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'parquet')
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
-
-  @classmethod
-  def setup_class(cls):
-    super(TestInsertParquetInvalidCodec, cls).setup_class()
 
   @SkipIfLocal.multiple_impalad
   def test_insert_parquet_invalid_codec(self, vector):
@@ -124,40 +117,34 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
     cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
 
-  @classmethod
-  def setup_class(cls):
-    super(TestInsertParquetVerifySize, cls).setup_class()
-
-  @pytest.mark.execute_serially
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.hdfs_client
-  def test_insert_parquet_verify_size(self, vector):
-    # Test to verify that the result file size is close to what we expect.i
-    TBL = "parquet_insert_size"
-    DROP = "drop table if exists {0}".format(TBL)
-    CREATE = ("create table parquet_insert_size like tpch_parquet.orders"
-              " stored as parquet location '{0}/{1}'".format(WAREHOUSE, TBL))
-    QUERY = "insert overwrite {0} select * from tpch.orders".format(TBL)
-    DIR = get_fs_path("test-warehouse/{0}/".format(TBL))
-    BLOCK_SIZE = 40 * 1024 * 1024
+  def test_insert_parquet_verify_size(self, vector, unique_database):
+    # Test to verify that the result file size is close to what we expect.
+    tbl_name = "parquet_insert_size"
+    fq_tbl_name = unique_database + "." + tbl_name
+    location = get_fs_path("test-warehouse/{0}.db/{1}/"
+                           .format(unique_database, tbl_name))
+    create = ("create table {0} like tpch_parquet.orders stored as parquet"
+              .format(fq_tbl_name, location))
+    query = "insert overwrite {0} select * from tpch.orders".format(fq_tbl_name)
+    block_size = 40 * 1024 * 1024
 
-    self.execute_query(DROP)
-    self.execute_query(CREATE)
-
-    vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = BLOCK_SIZE
+    self.execute_query(create)
+    vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = block_size
     vector.get_value('exec_option')['COMPRESSION_CODEC'] =\
         vector.get_value('compression_codec')
     vector.get_value('exec_option')['num_nodes'] = 1
-    self.execute_query(QUERY, vector.get_value('exec_option'))
+    self.execute_query(query, vector.get_value('exec_option'))
 
     # Get the files in hdfs and verify. There can be at most 1 file that is smaller
-    # that the BLOCK_SIZE. The rest should be within 80% of it and not over.
+    # that the block_size. The rest should be within 80% of it and not over.
     found_small_file = False
-    sizes = self.filesystem_client.get_all_file_sizes(DIR)
+    sizes = self.filesystem_client.get_all_file_sizes(location)
     for size in sizes:
-      assert size < BLOCK_SIZE, "File size greater than expected.\
-          Expected: {0}, Got: {1}".format(BLOCK_SIZE, size)
-      if size < BLOCK_SIZE * 0.80:
+      assert size < block_size, "File size greater than expected.\
+          Expected: {0}, Got: {1}".format(block_size, size)
+      if size < block_size * 0.80:
         assert found_small_file == False
         found_small_file = True
 
@@ -179,7 +166,6 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     """
     table_name = "test_hdfs_parquet_table_writer"
     qualified_table_name = "%s.%s" % (unique_database, table_name)
-    self.execute_query("drop table if exists %s" % qualified_table_name)
     self.execute_query("create table %s stored as parquet as select l_linenumber from "
         "tpch_parquet.lineitem limit 180000" % qualified_table_name)
 
