@@ -48,7 +48,7 @@ done
 if [ $BUILD -eq 1 ]
 then
   pushd $IMPALA_HOME
-  make -j$CORES \
+  "${MAKE_CMD:-make}" "-j${IMPALA_BUILD_THREADS:-4}" \
       TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
   cd $IMPALA_HOME/tests/test-hive-udfs
   ${IMPALA_HOME}/bin/mvn-quiet.sh package

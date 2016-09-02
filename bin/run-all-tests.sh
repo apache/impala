@@ -101,7 +101,7 @@ fi
 LOG_DIR="${IMPALA_EE_TEST_LOGS_DIR}"
 
 # Enable core dumps
-ulimit -c unlimited
+ulimit -c unlimited || true
 
 if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
   # To properly test HBase integeration, HBase regions are split and assigned by this
