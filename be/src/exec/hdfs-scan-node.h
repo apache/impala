@@ -164,6 +164,12 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// the number of cores.
   int max_num_scanner_threads_;
 
+  /// The wait time for fetching a row batch from the row batch queue.
+  RuntimeProfile::Counter* row_batches_get_timer_;
+
+  /// The wait time for enqueuing a row batch into the row batch queue.
+  RuntimeProfile::Counter* row_batches_put_timer_;
+
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);

@@ -21,142 +21,219 @@
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <deque>
 #include <unistd.h>
 
+#include "common/atomic.h"
+#include "common/compiler-util.h"
+#include "util/condition-variable.h"
 #include "util/stopwatch.h"
 #include "util/time.h"
 
 namespace impala {
 
-/// Fixed capacity FIFO queue, where both BlockingGet and BlockingPut operations block
+/// Fixed capacity FIFO queue, where both BlockingGet() and BlockingPut() operations block
 /// if the queue is empty or full, respectively.
-
-/// TODO: Add some double-buffering so that readers do not block writers and vice versa.
-/// Or, implement a mostly lock-free blocking queue.
+///
+/// FIFO is made up of a 'get_list_' that BlockingGet() consumes from and a 'put_list_'
+/// that BlockingPut() enqueues into. They are protected by 'get_lock_' and 'put_lock_'
+/// respectively. If both locks need to be held at the same time, 'get_lock_' must be
+/// held before 'put_lock_'. When the 'get_list_' is empty, the caller of BlockingGet()
+/// will atomically swap the 'put_list_' with 'get_list_'. The swapping happens with both
+/// the 'get_lock_' and 'put_lock_' held.
 template <typename T>
 class BlockingQueue {
-
  public:
   BlockingQueue(size_t max_elements)
     : shutdown_(false),
       max_elements_(max_elements),
-      total_get_wait_time_(0),
-      total_put_wait_time_(0) {
+      total_put_wait_time_(0),
+      get_list_size_(0),
+      total_get_wait_time_(0) {
+    DCHECK_GT(max_elements_, 0);
+    // Make sure class members commonly used in BlockingPut() don't alias with class
+    // members used in BlockingGet(). 'pad_' is the point of division.
+    DCHECK_NE(offsetof(BlockingQueue, pad_) / 64,
+        offsetof(BlockingQueue, get_lock_) / 64);
   }
 
-  /// Get an element from the queue, waiting indefinitely for one to become available.
+  /// Gets an element from the queue, waiting indefinitely for one to become available.
   /// Returns false if we were shut down prior to getting the element, and there
   /// are no more elements available.
   bool BlockingGet(T* out) {
-    MonotonicStopWatch timer;
-    boost::unique_lock<boost::mutex> unique_lock(lock_);
+    boost::unique_lock<boost::mutex> read_lock(get_lock_);
 
-    while (true) {
-      if (!list_.empty()) {
-        *out = list_.front();
-        list_.pop_front();
-        total_get_wait_time_ += timer.ElapsedTime();
-        unique_lock.unlock();
-        put_cv_.notify_one();
-        return true;
+    if (UNLIKELY(get_list_.empty())) {
+      MonotonicStopWatch timer;
+      // Block off writers while swapping 'get_list_' with 'put_list_'.
+      boost::unique_lock<boost::mutex> write_lock(put_lock_);
+      while (put_list_.empty()) {
+        DCHECK(get_list_.empty());
+        if (UNLIKELY(shutdown_)) return false;
+        // Note that it's intentional to signal the writer while holding 'put_lock_' to
+        // avoid the race in which the writer may be signalled between when it checks
+        // the queue size and when it calls Wait() in BlockingGet(). NotifyAll() is not
+        // used here to avoid thundering herd which leads to contention (e.g. InitTuple()
+        // in scanner).
+        put_cv_.NotifyOne();
+        // Sleep with 'get_lock_' held to block off other readers which cannot
+        // make progress anyway.
+        timer.Start();
+        get_cv_.Wait(write_lock);
+        timer.Stop();
       }
-      if (shutdown_) return false;
-
-      timer.Start();
-      get_cv_.wait(unique_lock);
-      timer.Stop();
+      DCHECK(!put_list_.empty());
+      put_list_.swap(get_list_);
+      get_list_size_.Store(get_list_.size());
+      write_lock.unlock();
+      total_get_wait_time_ += timer.ElapsedTime();
     }
+
+    DCHECK(!get_list_.empty());
+    *out = get_list_.front();
+    get_list_.pop_front();
+    get_list_size_.Store(get_list_.size());
+    read_lock.unlock();
+    // Note that there is a race with any writer if NotifyOne() is called between when
+    // a writer checks the queue size and when it calls put_cv_.Wait(). If this race
+    // occurs, a writer can stay blocked even if the queue is not full until the next
+    // BlockingGet(). The race is benign correctness wise as BlockingGet() will always
+    // notify a writer with 'put_lock_' held when both lists are empty.
+    put_cv_.NotifyOne();
+    return true;
   }
 
   /// Puts an element into the queue, waiting indefinitely until there is space.
   /// If the queue is shut down, returns false.
   bool BlockingPut(const T& val) {
     MonotonicStopWatch timer;
-    boost::unique_lock<boost::mutex> unique_lock(lock_);
+    boost::unique_lock<boost::mutex> write_lock(put_lock_);
 
-    while (list_.size() >= max_elements_ && !shutdown_) {
+    while (SizeLocked(write_lock) >= max_elements_ && !shutdown_) {
       timer.Start();
-      put_cv_.wait(unique_lock);
+      put_cv_.Wait(write_lock);
       timer.Stop();
     }
     total_put_wait_time_ += timer.ElapsedTime();
-    if (shutdown_) return false;
+    if (UNLIKELY(shutdown_)) return false;
 
-    DCHECK_LT(list_.size(), max_elements_);
-    list_.push_back(val);
-    unique_lock.unlock();
-    get_cv_.notify_one();
+    DCHECK_LT(put_list_.size(), max_elements_);
+    put_list_.push_back(val);
+    write_lock.unlock();
+    get_cv_.NotifyOne();
     return true;
   }
 
   /// Puts an element into the queue, waiting until 'timeout_micros' elapses, if there is
-  /// no space. If the queue is shut down, or if the timeout elapsed without being able to put the
-  /// element, returns false.
+  /// no space. If the queue is shut down, or if the timeout elapsed without being able to
+  /// put the element, returns false.
   bool BlockingPutWithTimeout(const T& val, int64_t timeout_micros) {
     MonotonicStopWatch timer;
-    boost::unique_lock<boost::mutex> unique_lock(lock_);
+    boost::unique_lock<boost::mutex> write_lock(put_lock_);
     boost::system_time wtime = boost::get_system_time() +
         boost::posix_time::microseconds(timeout_micros);
+    const struct timespec timeout = boost::detail::to_timespec(wtime);
     bool notified = true;
-    while (list_.size() >= max_elements_ && !shutdown_ && notified) {
+    while (SizeLocked(write_lock) >= max_elements_ && !shutdown_ && notified) {
       timer.Start();
       // Wait until we're notified or until the timeout expires.
-      notified = put_cv_.timed_wait(unique_lock, wtime);
+      notified = put_cv_.TimedWait(write_lock, &timeout);
       timer.Stop();
     }
     total_put_wait_time_ += timer.ElapsedTime();
-    // If the list is still full or if the the queue has been shutdown, return false.
+    // If the list is still full or if the the queue has been shut down, return false.
     // NOTE: We don't check 'notified' here as it appears that pthread condition variables
     // have a weird behavior in which they can return ETIMEDOUT from timed_wait even if
     // another thread did in fact signal
-    if (list_.size() >= max_elements_ || shutdown_) return false;
-    DCHECK_LT(list_.size(), max_elements_);
-    list_.push_back(val);
-    unique_lock.unlock();
-    get_cv_.notify_one();
+    if (SizeLocked(write_lock) >= max_elements_ || shutdown_) return false;
+    DCHECK_LT(put_list_.size(), max_elements_);
+    put_list_.push_back(val);
+    write_lock.unlock();
+    get_cv_.NotifyOne();
     return true;
   }
 
   /// Shut down the queue. Wakes up all threads waiting on BlockingGet or BlockingPut.
   void Shutdown() {
     {
-      boost::lock_guard<boost::mutex> guard(lock_);
+      // No need to hold 'get_lock_' here. BlockingGet() may sleep with 'get_lock_' so
+      // it may delay the caller here if the lock is acquired.
+      boost::lock_guard<boost::mutex> write_lock(put_lock_);
       shutdown_ = true;
     }
 
-    get_cv_.notify_all();
-    put_cv_.notify_all();
+    get_cv_.NotifyAll();
+    put_cv_.NotifyAll();
   }
 
-  uint32_t GetSize() const {
-    boost::unique_lock<boost::mutex> l(lock_);
-    return list_.size();
+  uint32_t Size() const {
+    boost::unique_lock<boost::mutex> write_lock(put_lock_);
+    return SizeLocked(write_lock);
   }
 
-  /// Returns the total amount of time threads have blocked in BlockingGet.
-  uint64_t total_get_wait_time() const {
-    boost::lock_guard<boost::mutex> guard(lock_);
+  int64_t total_get_wait_time() const {
+    // Hold lock to make sure the value read is consistent (i.e. no torn read).
+    boost::lock_guard<boost::mutex> read_lock(get_lock_);
     return total_get_wait_time_;
   }
 
-  /// Returns the total amount of time threads have blocked in BlockingPut.
-  uint64_t total_put_wait_time() const {
-    boost::lock_guard<boost::mutex> guard(lock_);
+  int64_t total_put_wait_time() const {
+    // Hold lock to make sure the value read is consistent (i.e. no torn read).
+    boost::lock_guard<boost::mutex> write_lock(put_lock_);
     return total_put_wait_time_;
   }
 
  private:
+
+  uint32_t ALWAYS_INLINE SizeLocked(const boost::unique_lock<boost::mutex>& lock) const {
+    // The size of 'get_list_' is read racily to avoid getting 'get_lock_' in write path.
+    DCHECK(lock.mutex() == &put_lock_ && lock.owns_lock());
+    return get_list_size_.Load() + put_list_.size();
+  }
+
+  /// True if the BlockingQueue is being shut down. Guarded by 'put_lock_'.
   bool shutdown_;
+
+  /// Maximum total number of elements in 'get_list_' + 'put_list_'.
   const int max_elements_;
-  boost::condition_variable get_cv_;   // 'get' callers wait on this
-  boost::condition_variable put_cv_;   // 'put' callers wait on this
-  /// lock_ guards access to list_, total_get_wait_time, and total_put_wait_time
-  mutable boost::mutex lock_;
-  std::deque<T> list_;
-  uint64_t total_get_wait_time_;
-  uint64_t total_put_wait_time_;
-};
+
+  /// Guards against concurrent access to 'put_list_'.
+  /// Please see comments at the beginning of the file for lock ordering.
+  mutable boost::mutex put_lock_;
+
+  /// The queue for items enqueued by BlockingPut(). Guarded by 'put_lock_'.
+  std::deque<T> put_list_;
+
+  /// BlockingPut()/BlockingPutWithTimeout() wait on this.
+  ConditionVariable put_cv_;
+
+  /// Total amount of time threads blocked in BlockingPut(). Guarded by 'put_lock_'.
+  int64_t total_put_wait_time_;
+
+  /// Padding to avoid data structures used in BlockingGet() to share cache lines
+  /// with data structures used in BlockingPut().
+  int64_t pad_;
+
+  /// Guards against concurrent access to 'get_list_'.
+  mutable boost::mutex get_lock_;
+
+  /// The queue of items to be consumed by BlockingGet(). Guarded by 'get_lock_'.
+  std::deque<T> get_list_;
+
+  /// The size of 'get_list_'. Read without lock held so explicitly use an AtomicInt32
+  /// to make sure readers will read a consistent value on all CPU architectures.
+  AtomicInt32 get_list_size_;
+
+  /// BlockingGet() waits on this.
+  ConditionVariable get_cv_;
+
+  /// Total amount of time a thread blocked in BlockingGet(). Guarded by 'get_lock_'.
+  /// Note that a caller of BlockingGet() may sleep with 'get_lock_' held and this
+  /// variable doesn't include the time which other threads block waiting for 'get_lock_'.
+  int64_t total_get_wait_time_;
+
+} CACHE_ALIGNED;
 
 }
 

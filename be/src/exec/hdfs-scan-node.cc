@@ -101,6 +101,8 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     unique_lock<mutex> l(lock_);
     lock_guard<SpinLock> l2(file_type_counts_);
     StopAndFinalizeCounters();
+    row_batches_put_timer_->Set(materialized_row_batches_->total_put_wait_time());
+    row_batches_get_timer_->Set(materialized_row_batches_->total_get_wait_time());
   }
   return status;
 }
@@ -182,6 +184,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
   }
   scanner_thread_bytes_required_ += scanner_thread_mem_usage;
+  row_batches_get_timer_ = ADD_TIMER(runtime_profile(), "RowBatchQueueGetWaitTime");
+  row_batches_put_timer_ = ADD_TIMER(runtime_profile(), "RowBatchQueuePutWaitTime");
   return Status::OK();
 }
 
@@ -330,7 +334,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 
     // Cases 5 and 6.
     if (active_scanner_thread_counter_.value() > 0 &&
-        (materialized_row_batches_->GetSize() >= max_materialized_row_batches_ ||
+        (materialized_row_batches_->Size() >= max_materialized_row_batches_ ||
          !EnoughMemoryForScannerThread(true))) {
       break;
     }

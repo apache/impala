@@ -97,7 +97,7 @@ class ThreadPool {
   }
 
   uint32_t GetQueueSize() const {
-    return work_queue_.GetSize();
+    return work_queue_.Size();
   }
 
   /// Blocks until the work queue is empty, and then calls Shutdown to stop the worker
@@ -106,7 +106,7 @@ class ThreadPool {
   void DrainAndShutdown() {
     {
       boost::unique_lock<boost::mutex> l(lock_);
-      while (work_queue_.GetSize() != 0) {
+      while (work_queue_.Size() != 0) {
         empty_cv_.wait(l);
       }
     }
@@ -123,7 +123,7 @@ class ThreadPool {
       if (work_queue_.BlockingGet(&workitem)) {
         work_function_(thread_id, workitem);
       }
-      if (work_queue_.GetSize() == 0) {
+      if (work_queue_.Size() == 0) {
         /// Take lock to ensure that DrainAndShutdown() cannot be between checking
         /// GetSize() and wait()'ing when the condition variable is notified.
         /// (It will hang if we notify right before calling wait().)
