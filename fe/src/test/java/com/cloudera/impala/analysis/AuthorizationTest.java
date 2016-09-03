@@ -2082,7 +2082,7 @@ public class AuthorizationTest {
       fail("Expected configuration to fail.");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
-          "Sentry configuration file does not exist: /path/does/not/exist.xml");
+          "Sentry configuration file does not exist: \"/path/does/not/exist.xml\"");
     }
 
     // Invalid ResourcePolicyProvider class name.

@@ -51,8 +51,9 @@ public class SentryConfig {
 
     File configFile = new File(configFile_);
     if (!configFile.exists()) {
+      String configFilePath = "\"" + configFile_ + "\"";
       throw new RuntimeException("Sentry configuration file does not exist: " +
-          configFile_);
+          configFilePath);
     }
 
     if (!configFile.canRead()) {
