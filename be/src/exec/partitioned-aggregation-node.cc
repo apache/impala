@@ -1814,8 +1814,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
     Function* hash_fn;
-    RETURN_IF_ERROR(ht_ctx_->CodegenHashCurrentRow(state_, /* use murmur */ false,
-        &hash_fn));
+    RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(state_, /* use murmur */ false, &hash_fn));
 
     // Codegen HashTable::Equals<true>
     Function* build_equals_fn;
@@ -1830,7 +1829,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
         "EvalProbeRow");
     DCHECK_EQ(replaced, 1);
 
-    replaced = codegen->ReplaceCallSites(process_batch_fn, hash_fn, "HashCurrentRow");
+    replaced = codegen->ReplaceCallSites(process_batch_fn, hash_fn, "HashRow");
     DCHECK_EQ(replaced, 1);
 
     replaced = codegen->ReplaceCallSites(process_batch_fn, build_equals_fn, "Equals");
@@ -1888,7 +1887,7 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
 
   // We only use the top-level hash function for streaming aggregations.
   Function* hash_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashCurrentRow(state_, false, &hash_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(state_, false, &hash_fn));
 
   // Codegen HashTable::Equals
   Function* equals_fn;
@@ -1907,8 +1906,7 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
       "EvalProbeRow");
   DCHECK_EQ(replaced, 1);
 
-  replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, hash_fn,
-      "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, equals_fn, "Equals");

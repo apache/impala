@@ -155,12 +155,13 @@ class HashTableCtx {
   /// TODO: this is an awkward abstraction but aggregation node can take advantage of
   /// it and save some expr evaluation calls.
   void* ALWAYS_INLINE ExprValue(int expr_idx) const {
-    return expr_values_cache_.ExprValuePtr(expr_idx);
+    return expr_values_cache_.ExprValuePtr(
+        expr_values_cache_.cur_expr_values(), expr_idx);
   }
 
   /// Returns if the expression at 'expr_idx' is evaluated to NULL for the current row.
   bool ALWAYS_INLINE ExprValueNull(int expr_idx) const {
-    return static_cast<bool>(*expr_values_cache_.ExprValueNullPtr(expr_idx));
+    return static_cast<bool>(*(expr_values_cache_.cur_expr_values_null() + expr_idx));
   }
 
   /// Evaluate and hash the build/probe row, saving the evaluation to the current row of
@@ -170,27 +171,26 @@ class HashTableCtx {
   /// row should be rejected  (doesn't need to be processed further) because it contains
   /// NULL. These need to be inlined in the IR module so we can find and replace the
   /// calls to EvalBuildRow()/EvalProbeRow().
-  bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row);
-  bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row);
+  bool IR_ALWAYS_INLINE EvalAndHashBuild(const TupleRow* row);
+  bool IR_ALWAYS_INLINE EvalAndHashProbe(const TupleRow* row);
 
-  /// Codegen for evaluating a tuple row.  Codegen'd function matches the signature
+  /// Codegen for evaluating a tuple row. Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
   /// If build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs.
   Status CodegenEvalRow(RuntimeState* state, bool build_row, llvm::Function** fn);
 
-  /// Codegen for evaluating a TupleRow and comparing equality against
-  /// 'cur_expr_values_'.  Function signature matches HashTable::Equals().
-  /// 'force_null_equality' is true if the generated equality function should treat
-  /// all NULLs as equal. See the template parameter to HashTable::Equals().
+  /// Codegen for evaluating a TupleRow and comparing equality. Function signature
+  /// matches HashTable::Equals(). 'force_null_equality' is true if the generated
+  /// equality function should treat all NULLs as equal. See the template parameter
+  /// to HashTable::Equals().
   Status CodegenEquals(RuntimeState* state, bool force_null_equality,
       llvm::Function** fn);
 
-  /// Codegen for hashing the expr values in 'cur_expr_values_'. Function prototype
-  /// matches HashCurrentRow identically. Unlike HashCurrentRow(), the returned function
-  /// only uses a single hash function, rather than switching based on level_.
-  /// If 'use_murmur' is true, murmur hash is used, otherwise CRC is used if the hardware
-  /// supports it (see hash-util.h).
-  Status CodegenHashCurrentRow(RuntimeState* state, bool use_murmur, llvm::Function** fn);
+  /// Codegen for hashing expr values. Function prototype matches HashRow identically.
+  /// Unlike HashRow(), the returned function only uses a single hash function, rather
+  /// than switching based on level_. If 'use_murmur' is true, murmur hash is used,
+  /// otherwise CRC is used if the hardware supports it (see hash-util.h).
+  Status CodegenHashRow(RuntimeState* state, bool use_murmur, llvm::Function** fn);
 
   /// Struct that returns the number of constants replaced by ReplaceConstants().
   struct HashTableReplacedConstants {
@@ -297,17 +297,24 @@ class HashTableCtx {
     void ALWAYS_INLINE SetRowNull() { null_bitmap_.Set<false>(CurIdx(), true); }
 
     /// Returns the hash values of the current row.
-    uint32_t ALWAYS_INLINE ExprValuesHash() const { return *cur_expr_values_hash_; }
+    uint32_t ALWAYS_INLINE CurExprValuesHash() const { return *cur_expr_values_hash_; }
 
     /// Sets the hash values for the current row.
-    void ALWAYS_INLINE SetExprValuesHash(uint32_t hash) { *cur_expr_values_hash_ = hash; }
+    void ALWAYS_INLINE SetCurExprValuesHash(uint32_t hash) { *cur_expr_values_hash_ = hash; }
 
-    /// Returns a pointer to the expression value at 'expr_idx' for the current row.
-    uint8_t* ExprValuePtr(int expr_idx) const;
+    /// Returns a pointer to the expression value at 'expr_idx' in 'expr_values'.
+    uint8_t* ExprValuePtr(uint8_t* expr_values, int expr_idx) const;
+    const uint8_t* ExprValuePtr(const uint8_t* expr_values, int expr_idx) const;
 
-    /// Returns a pointer to the boolean indicating the nullness of the expression value
-    /// at 'expr_idx'.
-    uint8_t* ExprValueNullPtr(int expr_idx) const;
+    /// Returns the current row's expression buffer. The expression values in the buffer
+    /// are accessed using ExprValuePtr().
+    uint8_t* ALWAYS_INLINE cur_expr_values() const { return cur_expr_values_; }
+
+    /// Returns null indicator bytes for the current row, one per expression. Non-zero
+    /// bytes mean NULL, zero bytes mean non-NULL. Indexed by the expression index.
+    /// These are uint8_t instead of bool to simplify codegen with IRBuilder.
+    /// TODO: is there actually a valid reason why this is necessary for codegen?
+    uint8_t* ALWAYS_INLINE cur_expr_values_null() const { return cur_expr_values_null_; }
 
     /// Returns the offset into the results buffer of the expression value at 'expr_idx'.
     int ALWAYS_INLINE expr_values_offsets(int expr_idx) const {
@@ -393,46 +400,60 @@ class HashTableCtx {
   /// null bits etc. Returns error if allocation causes query memory limit to be exceeded.
   Status Init(RuntimeState* state, int num_build_tuples);
 
-  /// Compute the hash of the values in expr_values_buffer_.
+  /// Compute the hash of the values in 'expr_values' with nullness 'expr_values_null'.
   /// This will be replaced by codegen.  We don't want this inlined for replacing
   /// with codegen'd functions so the function name does not change.
-  uint32_t IR_NO_INLINE HashCurrentRow() const;
+  uint32_t IR_NO_INLINE HashRow(
+      const uint8_t* expr_values, const uint8_t* expr_values_null) const;
 
   /// Wrapper function for calling correct HashUtil function in non-codegen'd case.
   uint32_t Hash(const void* input, int len, uint32_t hash) const;
 
-  /// Evaluate 'row' over build exprs caching the results in 'cur_expr_values_' This
-  /// will be replaced by codegen.  We do not want this function inlined when cross
-  /// compiled because we need to be able to differentiate between EvalBuildRow and
-  /// EvalProbeRow by name and the build/probe exprs are baked into the codegen'd
-  /// function.
-  bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
-    return EvalRow(row, build_expr_ctxs_);
+  /// Evaluate 'row' over build exprs, storing values into 'expr_values' and nullness into
+  /// 'expr_values_null'. This will be replaced by codegen. We do not want this
+  /// function inlined when cross compiled because we need to be able to differentiate
+  /// between EvalBuildRow and EvalProbeRow by name and the build/probe exprs are baked
+  /// into the codegen'd function.
+  bool IR_NO_INLINE EvalBuildRow(
+      const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) {
+    return EvalRow(row, build_expr_ctxs_, expr_values, expr_values_null);
   }
 
-  /// Evaluate 'row' over probe exprs caching the results in 'cur_expr_values_'
-  /// This will be replaced by codegen.
-  bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
-    return EvalRow(row, probe_expr_ctxs_);
+  /// Evaluate 'row' over probe exprs, storing the values into 'expr_values' and nullness
+  /// into 'expr_values_null'. This will be replaced by codegen.
+  bool IR_NO_INLINE EvalProbeRow(
+      const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) {
+    return EvalRow(row, probe_expr_ctxs_, expr_values, expr_values_null);
   }
 
-  /// Compute the hash of the values in expr_values_buffer_ for rows with variable length
-  /// fields (e.g. strings).
-  uint32_t HashVariableLenRow() const;
+  /// Compute the hash of the values in 'expr_values' with nullness 'expr_values_null'
+  /// for a row with variable length fields (e.g. strings).
+  uint32_t HashVariableLenRow(
+      const uint8_t* expr_values, const uint8_t* expr_values_null) const;
 
-  /// Evaluate the exprs over row and cache the results in 'cur_expr_values_'.
-  /// Returns whether any expr evaluated to NULL.
-  /// This will be replaced by codegen.
-  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
+  /// Evaluate the exprs over row, storing the values into 'expr_values' and nullness into
+  /// 'expr_values_null'. Returns whether any expr evaluated to NULL. This will be
+  /// replaced by codegen.
+  bool EvalRow(const TupleRow* row, const std::vector<ExprContext*>& ctxs,
+      uint8_t* expr_values, uint8_t* expr_values_null);
 
   /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
-  /// values cached in 'cur_expr_values_'.  This will be replaced by codegen.
-  /// FORCE_NULL_EQUALITY is true if all nulls should be treated as equal, regardless
-  /// of the values of 'finds_nulls_'.
-  template<bool FORCE_NULL_EQUALITY>
-  bool IR_NO_INLINE Equals(TupleRow* build_row) const;
+  /// values in 'expr_values' with nullness 'expr_values_null'. FORCE_NULL_EQUALITY is
+  /// true if all nulls should be treated as equal, regardless of the values of
+  /// 'finds_nulls_'. This will be replaced by codegen.
+  template <bool FORCE_NULL_EQUALITY>
+  bool IR_NO_INLINE Equals(const TupleRow* build_row, const uint8_t* expr_values,
+      const uint8_t* expr_values_null) const;
 
-  /// Cross-compiled function to access member variables used in CodegenHashCurrentRow().
+  /// Helper function that calls Equals() with the current row. Always inlined so that
+  /// it does not appear in cross-compiled IR.
+  template <bool FORCE_NULL_EQUALITY>
+  bool ALWAYS_INLINE Equals(const TupleRow* build_row) const {
+    return Equals<FORCE_NULL_EQUALITY>(build_row, expr_values_cache_.cur_expr_values(),
+        expr_values_cache_.cur_expr_values_null());
+  }
+
+  /// Cross-compiled function to access member variables used in CodegenHashRow().
   uint32_t GetHashSeed() const;
 
   /// Functions to be replaced by codegen to specialize the hash table.

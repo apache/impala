@@ -455,7 +455,7 @@ class HashTableTest : public testing::Test {
     for (int build_row_val = 0; build_row_val < table_size; ++build_row_val) {
       TupleRow* row = CreateTupleRow(build_row_val);
       bool passes = ht_ctx->EvalAndHashBuild(row);
-      hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+      hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
       EXPECT_TRUE(passes);
 
       // Insert using both Insert() and FindBucket() methods.
@@ -473,7 +473,7 @@ class HashTableTest : public testing::Test {
       EXPECT_EQ(hash_table->EmptyBuckets(), table_size - build_row_val - 1);
 
       passes = ht_ctx->EvalAndHashProbe(row);
-      hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+      hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
       EXPECT_TRUE(passes);
       iter = hash_table->FindProbeRow(ht_ctx.get());
       EXPECT_FALSE(iter.AtEnd());

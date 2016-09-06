@@ -148,32 +148,33 @@ uint32_t HashTableCtx::Hash(const void* input, int len, uint32_t hash) const {
   return HashUtil::MurmurHash2_64(input, len, hash);
 }
 
-uint32_t HashTableCtx::HashCurrentRow() const {
+uint32_t HashTableCtx::HashRow(
+    const uint8_t* expr_values, const uint8_t* expr_values_null) const {
   DCHECK_LT(level_, seeds_.size());
   if (expr_values_cache_.var_result_offset() == -1) {
     /// This handles NULLs implicitly since a constant seed value was put
     /// into results buffer for nulls.
-    return Hash(expr_values_cache_.cur_expr_values_,
-        expr_values_cache_.expr_values_bytes_per_row(), seeds_[level_]);
+    return Hash(
+        expr_values, expr_values_cache_.expr_values_bytes_per_row(), seeds_[level_]);
   } else {
-    return HashTableCtx::HashVariableLenRow();
+    return HashTableCtx::HashVariableLenRow(expr_values, expr_values_null);
   }
 }
 
-bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
+bool HashTableCtx::EvalRow(const TupleRow* row, const vector<ExprContext*>& ctxs,
+    uint8_t* expr_values, uint8_t* expr_values_null) {
   bool has_null = false;
-  uint8_t* exprs_nullness = expr_values_cache_.ExprValueNullPtr(0);
   for (int i = 0; i < ctxs.size(); ++i) {
-    void* loc = expr_values_cache_.ExprValuePtr(i);
+    void* loc = expr_values_cache_.ExprValuePtr(expr_values, i);
     void* val = ctxs[i]->GetValue(row);
     if (val == NULL) {
       // If the table doesn't store nulls, no reason to keep evaluating
       if (!stores_nulls_) return true;
-      exprs_nullness[i] = true;
+      expr_values_null[i] = true;
       val = reinterpret_cast<void*>(&NULL_VALUE);
       has_null = true;
     } else {
-      exprs_nullness[i] = false;
+      expr_values_null[i] = false;
     }
     DCHECK_LE(build_expr_ctxs_[i]->root()->type().GetSlotSize(),
         sizeof(NULL_VALUE));
@@ -182,48 +183,48 @@ bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
   return has_null;
 }
 
-uint32_t HashTableCtx::HashVariableLenRow() const {
+uint32_t HashTableCtx::HashVariableLenRow(
+    const uint8_t* expr_values, const uint8_t* expr_values_null) const {
   uint32_t hash = seeds_[level_];
   int var_result_offset = expr_values_cache_.var_result_offset();
   // Hash the non-var length portions (if there are any)
   if (var_result_offset != 0) {
-    hash = Hash(expr_values_cache_.cur_expr_values_, var_result_offset, hash);
+    hash = Hash(expr_values, var_result_offset, hash);
   }
 
-  uint8_t* exprs_nullness = expr_values_cache_.ExprValueNullPtr(0);
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
-    // non-string and null slots are already part of cur_expr_values_
-    if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING &&
-        build_expr_ctxs_[i]->root()->type().type != TYPE_VARCHAR) continue;
+    // non-string and null slots are already part of 'expr_values'.
+    if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING
+        && build_expr_ctxs_[i]->root()->type().type != TYPE_VARCHAR) continue;
 
-    void* loc = expr_values_cache_.ExprValuePtr(i);
-    if (exprs_nullness[i]) {
+    const void* loc = expr_values_cache_.ExprValuePtr(expr_values, i);
+    if (expr_values_null[i]) {
       // Hash the null random seed values at 'loc'
       hash = Hash(loc, sizeof(StringValue), hash);
     } else {
       // Hash the string
       // TODO: when using CRC hash on empty string, this only swaps bytes.
-      StringValue* str = reinterpret_cast<StringValue*>(loc);
+      const StringValue* str = reinterpret_cast<const StringValue*>(loc);
       hash = Hash(str->ptr, str->len, hash);
     }
   }
   return hash;
 }
 
-template<bool FORCE_NULL_EQUALITY>
-bool HashTableCtx::Equals(TupleRow* build_row) const {
-  uint8_t* exprs_nullness = expr_values_cache_.ExprValueNullPtr(0);
+template <bool FORCE_NULL_EQUALITY>
+bool HashTableCtx::Equals(const TupleRow* build_row, const uint8_t* expr_values,
+    const uint8_t* expr_values_null) const {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     void* val = build_expr_ctxs_[i]->GetValue(build_row);
     if (val == NULL) {
       if (!(FORCE_NULL_EQUALITY || finds_nulls_[i])) return false;
-      if (!exprs_nullness[i]) return false;
+      if (!expr_values_null[i]) return false;
       continue;
     } else {
-      if (exprs_nullness[i]) return false;
+      if (expr_values_null[i]) return false;
     }
 
-    void* loc = expr_values_cache_.ExprValuePtr(i);
+    const void* loc = expr_values_cache_.ExprValuePtr(expr_values, i);
     if (!RawValue::Eq(loc, val, build_expr_ctxs_[i]->root()->type())) {
       return false;
     }
@@ -231,19 +232,21 @@ bool HashTableCtx::Equals(TupleRow* build_row) const {
   return true;
 }
 
-template bool HashTableCtx::Equals<true>(TupleRow* build_row) const;
-template bool HashTableCtx::Equals<false>(TupleRow* build_row) const;
+template bool HashTableCtx::Equals<true>(const TupleRow* build_row,
+    const uint8_t* expr_values, const uint8_t* expr_values_null) const;
+template bool HashTableCtx::Equals<false>(const TupleRow* build_row,
+    const uint8_t* expr_values, const uint8_t* expr_values_null) const;
 
 HashTableCtx::ExprValuesCache::ExprValuesCache()
-    : capacity_(0),
-      cur_expr_values_(NULL),
-      cur_expr_values_null_(NULL),
-      cur_expr_values_hash_(NULL),
-      cur_expr_values_hash_end_(NULL),
-      expr_values_array_(NULL),
-      expr_values_null_array_(NULL),
-      expr_values_hash_array_(NULL),
-      null_bitmap_(0) { }
+  : capacity_(0),
+    cur_expr_values_(NULL),
+    cur_expr_values_null_(NULL),
+    cur_expr_values_hash_(NULL),
+    cur_expr_values_hash_end_(NULL),
+    expr_values_array_(NULL),
+    expr_values_null_array_(NULL),
+    expr_values_hash_array_(NULL),
+    null_bitmap_(0) {}
 
 Status HashTableCtx::ExprValuesCache::Init(RuntimeState* state,
     MemTracker* tracker, const std::vector<ExprContext*>& build_expr_ctxs) {
@@ -312,12 +315,14 @@ int HashTableCtx::ExprValuesCache::MemUsage(int capacity,
       Bitmap::MemUsage(capacity);               // null_bitmap_
 }
 
-uint8_t* HashTableCtx::ExprValuesCache::ExprValuePtr(int expr_idx) const {
-  return cur_expr_values_ + expr_values_offsets_[expr_idx];
+uint8_t* HashTableCtx::ExprValuesCache::ExprValuePtr(
+    uint8_t* expr_values, int expr_idx) const {
+  return expr_values + expr_values_offsets_[expr_idx];
 }
 
-uint8_t* HashTableCtx::ExprValuesCache::ExprValueNullPtr(int expr_idx) const {
-  return cur_expr_values_null_ + expr_idx;
+const uint8_t* HashTableCtx::ExprValuesCache::ExprValuePtr(
+    const uint8_t* expr_values, int expr_idx) const {
+  return expr_values + expr_values_offsets_[expr_idx];
 }
 
 void HashTableCtx::ExprValuesCache::ResetIterators() {
@@ -609,65 +614,64 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
 }
 
 // Codegen for evaluating a tuple row over either build_expr_ctxs_ or probe_expr_ctxs_.
-// For a group by with (big int, string) the IR looks like
+// For a group by with (big int, string) the IR looks like:
+//
 // define i1 @EvalProbeRow(%"class.impala::HashTableCtx"* %this_ptr,
-//                         %"class.impala::TupleRow"* %row) #33 {
+//    %"class.impala::TupleRow"* %row, i8* %expr_values, i8* %expr_values_null) #34 {
 // entry:
-//   %0 = load i8*, i8** inttoptr (i64 230325056 to i8**)
-//   %1 = load i8*, i8** inttoptr (i64 230325064 to i8**)
-//   %loc_addr = getelementptr i8, i8* %0, i32 0
-//   %loc = bitcast i8* %loc_addr to i32*
-//   %result = call i64 @GetSlotRef.3(%"class.impala::ExprContext"*
-//             inttoptr (i64 158123712 to %"class.impala::ExprContext"*),
-//             %"class.impala::TupleRow"* %row)
-//   %is_null = trunc i64 %result to i1
-//   %2 = zext i1 %is_null to i8
-//   %null_byte_loc = getelementptr i8, i8* %1, i32 0
-//   store i8 %2, i8* %null_byte_loc
+//   %loc_addr = getelementptr i8, i8* %expr_values, i32 0
+//   %loc = bitcast i8* %loc_addr to i64*
+//   %result = call { i8, i64 } @GetSlotRef.2(%"class.impala::ExprContext"*
+//        inttoptr (i64 197737664 to %"class.impala::ExprContext"*),
+//        %"class.impala::TupleRow"* %row)
+//   %0 = extractvalue { i8, i64 } %result, 0
+//   %is_null = trunc i8 %0 to i1
+//   %1 = zext i1 %is_null to i8
+//   %null_byte_loc = getelementptr i8, i8* %expr_values_null, i32 0
+//   store i8 %1, i8* %null_byte_loc
 //   br i1 %is_null, label %null, label %not_null
 //
 // null:                                             ; preds = %entry
-//   store i32 -2128831035, i32* %loc
+//   store i64 2166136261, i64* %loc
 //   br label %continue
 //
 // not_null:                                         ; preds = %entry
-//   %3 = ashr i64 %result, 32
-//   %4 = trunc i64 %3 to i32
-//   store i32 %4, i32* %loc
+//   %val = extractvalue { i8, i64 } %result, 1
+//   store i64 %val, i64* %loc
 //   br label %continue
 //
 // continue:                                         ; preds = %not_null, %null
 //   %is_null_phi = phi i1 [ true, %null ], [ false, %not_null ]
 //   %has_null = or i1 false, %is_null_phi
-//   %loc_addr1 = getelementptr i8, i8* %0, i32 8
+//   %loc_addr1 = getelementptr i8, i8* %expr_values, i32 8
 //   %loc2 = bitcast i8* %loc_addr1 to %"struct.impala::StringValue"*
-//   %result6 = call { i64, i8* } @GetSlotRef.4(%"class.impala::ExprContext"*
-//              inttoptr (i64 158123904 to %"class.impala::ExprContext"*),
-//              %"class.impala::TupleRow"* %row)
-//   %5 = extractvalue { i64, i8* } %result6, 0
-//   %is_null7 = trunc i64 %5 to i1
-//   %6 = zext i1 %is_null7 to i8
-//   %null_byte_loc8 = getelementptr i8, i8* %1, i32 1
-//   store i8 %6, i8* %null_byte_loc8
+//   %result6 = call { i64, i8* } @GetSlotRef.3(%"class.impala::ExprContext"*
+//      inttoptr (i64 197738048 to %"class.impala::ExprContext"*),
+//      %"class.impala::TupleRow"* %row)
+//   %2 = extractvalue { i64, i8* } %result6, 0
+//   %is_null7 = trunc i64 %2 to i1
+//   %3 = zext i1 %is_null7 to i8
+//   %null_byte_loc8 = getelementptr i8, i8* %expr_values_null, i32 1
+//   store i8 %3, i8* %null_byte_loc8
 //   br i1 %is_null7, label %null3, label %not_null4
 //
 // null3:                                            ; preds = %continue
 //   %string_ptr = getelementptr inbounds %"struct.impala::StringValue",
-//                 %"struct.impala::StringValue"* %loc2, i32 0, i32 0
+//        %"struct.impala::StringValue"* %loc2, i32 0, i32 0
 //   %string_len = getelementptr inbounds %"struct.impala::StringValue",
-//                 %"struct.impala::StringValue"* %loc2, i32 0, i32 1
+//        %"struct.impala::StringValue"* %loc2, i32 0, i32 1
 //   store i8* inttoptr (i32 -2128831035 to i8*), i8** %string_ptr
 //   store i32 -2128831035, i32* %string_len
 //   br label %continue5
 //
 // not_null4:                                        ; preds = %continue
+//   %4 = extractvalue { i64, i8* } %result6, 0
+//   %5 = ashr i64 %4, 32
+//   %6 = trunc i64 %5 to i32
+//   %7 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %6, 1
 //   %result9 = extractvalue { i64, i8* } %result6, 1
-//   %7 = insertvalue %"struct.impala::StringValue" zeroinitializer, i8* %result9, 0
-//   %8 = extractvalue { i64, i8* } %result6, 0
-//   %9 = ashr i64 %8, 32
-//   %10 = trunc i64 %9 to i32
-//   %11 = insertvalue %"struct.impala::StringValue" %7, i32 %10, 1
-//   store %"struct.impala::StringValue" %11, %"struct.impala::StringValue"* %loc2
+//   %8 = insertvalue %"struct.impala::StringValue" %7, i8* %result9, 0
+//   store %"struct.impala::StringValue" %8, %"struct.impala::StringValue"* %loc2
 //   br label %continue5
 //
 // continue5:                                        ; preds = %not_null4, %null3
@@ -675,6 +679,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
 //   %has_null11 = or i1 %has_null, %is_null_phi10
 //   ret i1 %has_null11
 // }
+//
 // For each expr, we create 3 code blocks.  The null, not null and continue blocks.
 // Both the null and not null branch into the continue block.  The continue block
 // becomes the start of the next block for codegen (either the next expr or just the
@@ -701,28 +706,22 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
   PointerType* this_ptr_type = PointerType::get(this_type, 0);
-  PointerType* buffer_ptr_type = PointerType::get(codegen->ptr_type(), 0);
   LlvmCodeGen::FnPrototype prototype(codegen, build ? "EvalBuildRow" : "EvalProbeRow",
       codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("expr_values", codegen->ptr_type()));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("expr_values_null", codegen->ptr_type()));
 
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
-  Value* args[2];
+  Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* row = args[1];
+  Value* expr_values = args[2];
+  Value* expr_values_null = args[3];
   Value* has_null = codegen->false_value();
-
-  // Load cur_expr_values_ into a LLVM pointer.
-  Value* cur_expr_values_ptr = codegen->CastPtrToLlvmPtr(buffer_ptr_type,
-      &expr_values_cache_.cur_expr_values_);
-  Value* cur_expr_values = builder.CreateLoad(cur_expr_values_ptr);
-
-  // Load cur_expr_values_null_ into a LLVM pointer.
-  Value* cur_expr_values_null_ptr = codegen->CastPtrToLlvmPtr(buffer_ptr_type,
-      &expr_values_cache_.cur_expr_values_null_);
-  Value* cur_expr_values_null = builder.CreateLoad(cur_expr_values_null_ptr);
 
   for (int i = 0; i < ctxs.size(); ++i) {
     // TODO: refactor this to somewhere else?  This is not hash table specific except for
@@ -730,8 +729,8 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
     // vector of exprs
     // Convert result buffer to llvm ptr type
     int offset = expr_values_cache_.expr_values_offsets(i);
-    Value* loc = builder.CreateGEP(NULL, cur_expr_values,
-        codegen->GetIntConstant(TYPE_INT, offset), "loc_addr");
+    Value* loc = builder.CreateGEP(
+        NULL, expr_values, codegen->GetIntConstant(TYPE_INT, offset), "loc_addr");
     Value* llvm_loc = builder.CreatePointerCast(loc,
         codegen->GetPtrType(ctxs[i]->root()->type()), "loc");
 
@@ -758,8 +757,8 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
 
     // Set null-byte result
     Value* null_byte = builder.CreateZExt(is_null, codegen->GetType(TYPE_TINYINT));
-    Value* llvm_null_byte_loc = builder.CreateGEP(NULL, cur_expr_values_null,
-        codegen->GetIntConstant(TYPE_INT, i), "null_byte_loc");
+    Value* llvm_null_byte_loc = builder.CreateGEP(
+        NULL, expr_values_null, codegen->GetIntConstant(TYPE_INT, i), "null_byte_loc");
     builder.CreateStore(null_byte, llvm_null_byte_loc);
     builder.CreateCondBr(is_null, null_block, not_null_block);
 
@@ -800,15 +799,15 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
 
 // Codegen for hashing the current row.  In the case with both string and non-string data
 // (group by int_col, string_col), the IR looks like:
-// define i32 @HashCurrentRow(%"class.impala::HashTableCtx"* %this_ptr) #33 {
+//
+// define i32 @HashRow(%"class.impala::HashTableCtx"* %this_ptr, i8* %expr_values,
+//    i8* %expr_values_null) #34 {
 // entry:
-//   %0 = load i8*, i8** inttoptr (i64 230325056 to i8**)
-//   %1 = load i8*, i8** inttoptr (i64 230325064 to i8**)
 //   %seed = call i32 @_ZNK6impala12HashTableCtx11GetHashSeedEv(
-//           %"class.impala::HashTableCtx"* %this_ptr)
-//   %hash = call i32 @CrcHash8(i8* %0, i32 8, i32 %seed)
-//   %loc_addr = getelementptr i8, i8* %0, i32 8
-//   %null_byte_loc = getelementptr i8, i8* %1, i32 1
+//        %"class.impala::HashTableCtx"* %this_ptr)
+//   %hash = call i32 @CrcHash8(i8* %expr_values, i32 8, i32 %seed)
+//   %loc_addr = getelementptr i8, i8* %expr_values, i32 8
+//   %null_byte_loc = getelementptr i8, i8* %expr_values_null, i32 1
 //   %null_byte = load i8, i8* %null_byte_loc
 //   %is_null = icmp ne i8 %null_byte, 0
 //   br i1 %is_null, label %null, label %not_null
@@ -819,12 +818,12 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
 //
 // not_null:                                         ; preds = %entry
 //   %str_val = bitcast i8* %loc_addr to %"struct.impala::StringValue"*
-//   %2 = getelementptr inbounds %"struct.impala::StringValue",
+//   %0 = getelementptr inbounds %"struct.impala::StringValue",
 //        %"struct.impala::StringValue"* %str_val, i32 0, i32 0
-//   %3 = getelementptr inbounds %"struct.impala::StringValue",
+//   %1 = getelementptr inbounds %"struct.impala::StringValue",
 //        %"struct.impala::StringValue"* %str_val, i32 0, i32 1
-//   %ptr = load i8*, i8** %2
-//   %len = load i32, i32* %3
+//   %ptr = load i8*, i8** %0
+//   %len = load i32, i32* %1
 //   %string_hash = call i32 @IrCrcHash(i8* %ptr, i32 %len, i32 %hash)
 //   br label %continue
 //
@@ -832,12 +831,11 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
 //   %hash_phi = phi i32 [ %string_hash, %not_null ], [ %str_null, %null ]
 //   ret i32 %hash_phi
 // }
-Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
-    Function** fn) {
+Status HashTableCtx::CodegenHashRow(RuntimeState* state, bool use_murmur, Function** fn) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // Disable codegen for CHAR
     if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) {
-      return Status("HashTableCtx::CodegenHashCurrentRow(): CHAR NYI");
+      return Status("HashTableCtx::CodegenHashRow(): CHAR NYI");
     }
   }
 
@@ -848,30 +846,21 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
   PointerType* this_ptr_type = PointerType::get(this_type, 0);
-  PointerType* buffer_ptr_type = PointerType::get(codegen->ptr_type(), 0);
 
-  LlvmCodeGen::FnPrototype prototype(codegen,
-      (use_murmur ? "MurmurHashCurrentRow" : "HashCurrentRow"),
-      codegen->GetType(TYPE_INT));
+  LlvmCodeGen::FnPrototype prototype(
+      codegen, (use_murmur ? "MurmurHashRow" : "HashRow"), codegen->GetType(TYPE_INT));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("expr_values", codegen->ptr_type()));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("expr_values_null", codegen->ptr_type()));
 
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
-  Value* this_arg;
-  *fn = prototype.GeneratePrototype(&builder, &this_arg);
-
-  // Load cur_expr_values_ into a LLVM pointer.
-  Value* cur_expr_values_ptr =
-      codegen->CastPtrToLlvmPtr(buffer_ptr_type, &expr_values_cache_.cur_expr_values_);
-  Value* cur_expr_values = builder.CreateLoad(cur_expr_values_ptr);
-
-  // Load cur_expr_values_null_ into a LLVM pointer.
-  Value* cur_expr_values_null = NULL;
-  if (stores_nulls_) {
-    Value* cur_expr_values_null_ptr = codegen->CastPtrToLlvmPtr(
-        buffer_ptr_type, &expr_values_cache_.cur_expr_values_null_);
-    cur_expr_values_null = builder.CreateLoad(cur_expr_values_null_ptr);
-  }
+  Value* args[3];
+  *fn = prototype.GeneratePrototype(&builder, args);
+  Value* this_arg = args[0];
+  Value* expr_values = args[1];
+  Value* expr_values_null = args[2];
 
   // Call GetHashSeed() to get seeds_[level_]
   Function* get_hash_seed_fn =
@@ -889,8 +878,8 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
                           codegen->GetMurmurHashFunction(expr_values_bytes_per_row) :
                           codegen->GetHashFunction(expr_values_bytes_per_row);
       Value* len = codegen->GetIntConstant(TYPE_INT, expr_values_bytes_per_row);
-      hash_result = builder.CreateCall(hash_fn,
-          ArrayRef<Value*>({cur_expr_values, len, hash_result}), "hash");
+      hash_result = builder.CreateCall(
+          hash_fn, ArrayRef<Value*>({expr_values, len, hash_result}), "hash");
     }
   } else {
     if (var_result_offset > 0) {
@@ -898,8 +887,8 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
                           codegen->GetMurmurHashFunction(var_result_offset) :
                           codegen->GetHashFunction(var_result_offset);
       Value* len = codegen->GetIntConstant(TYPE_INT, var_result_offset);
-      hash_result = builder.CreateCall(hash_fn,
-          ArrayRef<Value*>({cur_expr_values, len, hash_result}), "hash");
+      hash_result = builder.CreateCall(
+          hash_fn, ArrayRef<Value*>({expr_values, len, hash_result}), "hash");
     }
 
     // Hash string slots
@@ -913,8 +902,8 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
       Value* str_null_result = NULL;
 
       int offset = expr_values_cache_.expr_values_offsets(i);
-      Value* llvm_loc = builder.CreateGEP(NULL, cur_expr_values,
-          codegen->GetIntConstant(TYPE_INT, offset), "loc_addr");
+      Value* llvm_loc = builder.CreateGEP(
+          NULL, expr_values, codegen->GetIntConstant(TYPE_INT, offset), "loc_addr");
 
       // If the hash table stores nulls, we need to check if the stringval
       // evaluated to NULL
@@ -923,7 +912,7 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
         not_null_block = BasicBlock::Create(context, "not_null", *fn);
         continue_block = BasicBlock::Create(context, "continue", *fn);
 
-        Value* llvm_null_byte_loc = builder.CreateGEP(NULL, cur_expr_values_null,
+        Value* llvm_null_byte_loc = builder.CreateGEP(NULL, expr_values_null,
             codegen->GetIntConstant(TYPE_INT, i), "null_byte_loc");
         Value* null_byte = builder.CreateLoad(llvm_null_byte_loc, "null_byte");
         Value* is_null = builder.CreateICmpNE(null_byte,
@@ -977,8 +966,8 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
   builder.CreateRet(hash_result);
   *fn = codegen->FinalizeFunction(*fn);
   if (*fn == NULL) {
-    return Status("Codegen'd HashTableCtx::HashCurrentRow() function failed "
-        "verification, see log");
+    return Status(
+        "Codegen'd HashTableCtx::HashRow() function failed verification, see log");
   }
   return Status::OK();
 }
@@ -986,67 +975,67 @@ Status HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur,
 // Codegen for HashTableCtx::Equals.  For a group by with (bigint, string),
 // the IR looks like:
 //
-// define i1 @Equals(%"class.impala::HashTableCtx"* %this_ptr,
-//                   %"class.impala::TupleRow"* %row) #33 {
+// define i1 @Equals(%"class.impala::HashTableCtx"* %this_ptr, %"class.impala::TupleRow"*
+// %row,
+//      i8* %expr_values, i8* %expr_values_null) #34 {
 // entry:
 //   %0 = alloca { i64, i8* }
-//   %1 = load i8*, i8** inttoptr (i64 230325056 to i8**)
-//   %2 = load i8*, i8** inttoptr (i64 230325064 to i8**)
-//   %result = call i64 @GetSlotRef(%"class.impala::ExprContext"* inttoptr
-//             (i64 165557504 to %"class.impala::ExprContext"*),
-//             %"class.impala::TupleRow"* %row)
-//   %is_null = trunc i64 %result to i1
-//   %null_byte_loc = getelementptr i8, i8* %2, i32 0
-//   %3 = load i8, i8* %null_byte_loc
-//   %4 = icmp ne i8 %3, 0
-//   %loc = getelementptr i8, i8* %1, i32 0
-//   %row_val = bitcast i8* %loc to i32*
+//   %result = call { i8, i64 } @GetSlotRef.2(%"class.impala::ExprContext"*
+//        inttoptr (i64 139107136 to %"class.impala::ExprContext"*),
+//        %"class.impala::TupleRow"* %row)
+//   %1 = extractvalue { i8, i64 } %result, 0
+//   %is_null = trunc i8 %1 to i1
+//   %null_byte_loc = getelementptr i8, i8* %expr_values_null, i32 0
+//   %2 = load i8, i8* %null_byte_loc
+//   %3 = icmp ne i8 %2, 0
+//   %loc = getelementptr i8, i8* %expr_values, i32 0
+//   %row_val = bitcast i8* %loc to i64*
 //   br i1 %is_null, label %null, label %not_null
 //
-// false_block:                ; preds = %cmp9, %not_null2, %null1, %cmp, %not_null, %null
+// false_block:                                      ; preds = %cmp9, %not_null2, %null1,
+//                                                             %cmp, %not_null, %null
 //   ret i1 false
 //
 // null:                                             ; preds = %entry
-//   br i1 %4, label %continue, label %false_block
+//   br i1 %3, label %continue, label %false_block
 //
 // not_null:                                         ; preds = %entry
-//   br i1 %4, label %false_block, label %cmp
+//   br i1 %3, label %false_block, label %cmp
 //
 // continue:                                         ; preds = %cmp, %null
-//   %result4 = call { i64, i8* } @GetSlotRef.2(%"class.impala::ExprContext"*
-//              inttoptr (i64 165557696 to %"class.impala::ExprContext"*),
-//              %"class.impala::TupleRow"* %row)
-//   %5 = extractvalue { i64, i8* } %result4, 0
-//   %is_null5 = trunc i64 %5 to i1
-//   %null_byte_loc6 = getelementptr i8, i8* %2, i32 1
-//   %6 = load i8, i8* %null_byte_loc6
-//   %7 = icmp ne i8 %6, 0
-//   %loc7 = getelementptr i8, i8* %1, i32 8
+//   %result4 = call { i64, i8* } @GetSlotRef.3(%"class.impala::ExprContext"*
+//        inttoptr (i64 139107328 to %"class.impala::ExprContext"*),
+//        %"class.impala::TupleRow"* %row)
+//   %4 = extractvalue { i64, i8* } %result4, 0
+//   %is_null5 = trunc i64 %4 to i1
+//   %null_byte_loc6 = getelementptr i8, i8* %expr_values_null, i32 1
+//   %5 = load i8, i8* %null_byte_loc6
+//   %6 = icmp ne i8 %5, 0
+//   %loc7 = getelementptr i8, i8* %expr_values, i32 8
 //   %row_val8 = bitcast i8* %loc7 to %"struct.impala::StringValue"*
 //   br i1 %is_null5, label %null1, label %not_null2
 //
 // cmp:                                              ; preds = %not_null
-//   %8 = load i32, i32* %row_val
-//   %9 = ashr i64 %result, 32
-//   %10 = trunc i64 %9 to i32
-//   %cmp_raw = icmp eq i32 %10, %8
+//   %7 = load i64, i64* %row_val
+//   %val = extractvalue { i8, i64 } %result, 1
+//   %cmp_raw = icmp eq i64 %val, %7
 //   br i1 %cmp_raw, label %continue, label %false_block
 //
 // null1:                                            ; preds = %continue
-//   br i1 %7, label %continue3, label %false_block
+//   br i1 %6, label %continue3, label %false_block
 //
 // not_null2:                                        ; preds = %continue
-//   br i1 %7, label %false_block, label %cmp9
+//   br i1 %6, label %false_block, label %cmp9
 //
 // continue3:                                        ; preds = %cmp9, %null1
 //   ret i1 true
 //
 // cmp9:                                             ; preds = %not_null2
 //   store { i64, i8* } %result4, { i64, i8* }* %0
-//   %11 = bitcast { i64, i8* }* %0 to %"struct.impala_udf::StringVal"*
-//   %cmp_raw10 = call i1 @_Z13StringValueEqRKN10impala_udf9StringValERKN6
-//                impala11StringValueE(%"struct.impala_udf::StringVal"* %11,
-//                %"struct.impala::StringValue"* %row_val8)
+//   %8 = bitcast { i64, i8* }* %0 to %"struct.impala_udf::StringVal"*
+//   %cmp_raw10 = call i1
+//        @_Z13StringValueEqRKN10impala_udf9StringValERKN6impala11StringValueE(
+//        %"struct.impala_udf::StringVal"* %8, %"struct.impala::StringValue"* %row_val8)
 //   br i1 %cmp_raw10, label %continue3, label %false_block
 // }
 Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality,
@@ -1068,26 +1057,20 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
   PointerType* this_ptr_type = PointerType::get(this_type, 0);
-  PointerType* buffer_ptr_type = PointerType::get(codegen->ptr_type(), 0);
   LlvmCodeGen::FnPrototype prototype(codegen, "Equals", codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("expr_values", codegen->ptr_type()));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("expr_values_null", codegen->ptr_type()));
 
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
-  Value* args[2];
+  Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* row = args[1];
-
-  // Load cur_expr_values_ into a LLVM pointer.
-  Value* cur_expr_values_ptr = codegen->CastPtrToLlvmPtr(buffer_ptr_type,
-      &expr_values_cache_.cur_expr_values_);
-  Value* cur_expr_values = builder.CreateLoad(cur_expr_values_ptr);
-
-  // Load cur_expr_values_null_ into a LLVM pointer.
-  Value* cur_expr_values_null_ptr = codegen->CastPtrToLlvmPtr(buffer_ptr_type,
-      &expr_values_cache_.cur_expr_values_null_);
-  Value* cur_expr_values_null = builder.CreateLoad(cur_expr_values_null_ptr);
+  Value* expr_values = args[2];
+  Value* expr_values_null = args[3];
 
   BasicBlock* false_block = BasicBlock::Create(context, "false_block", *fn);
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
@@ -1112,24 +1095,24 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
         build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");
     Value* is_null = result.GetIsNull();
 
-    // Determine if row is null (i.e. cur_expr_values_null_[i] == true). In
+    // Determine if row is null (i.e. expr_values_null[i] == true). In
     // the case where the hash table does not store nulls, this is always false.
     Value* row_is_null = codegen->false_value();
 
     // We consider null values equal if we are comparing build rows or if the join
     // predicate is <=>
     if (force_null_equality || finds_nulls_[i]) {
-      Value* llvm_null_byte_loc = builder.CreateGEP(NULL, cur_expr_values_null,
-          codegen->GetIntConstant(TYPE_INT, i), "null_byte_loc");
+      Value* llvm_null_byte_loc = builder.CreateGEP(
+          NULL, expr_values_null, codegen->GetIntConstant(TYPE_INT, i), "null_byte_loc");
       Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
       row_is_null = builder.CreateICmpNE(null_byte,
           codegen->GetIntConstant(TYPE_TINYINT, 0));
     }
 
-    // Get llvm value for row_val from 'cur_expr_values_'
+    // Get llvm value for row_val from 'expr_values'
     int offset = expr_values_cache_.expr_values_offsets(i);
-    Value* loc = builder.CreateGEP(NULL, cur_expr_values,
-        codegen->GetIntConstant(TYPE_INT, offset), "loc");
+    Value* loc = builder.CreateGEP(
+        NULL, expr_values, codegen->GetIntConstant(TYPE_INT, offset), "loc");
     Value* row_val = builder.CreatePointerCast(loc,
         codegen->GetPtrType(build_expr_ctxs_[i]->root()->type()), "row_val");
 

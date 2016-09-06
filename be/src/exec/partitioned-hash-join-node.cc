@@ -207,10 +207,9 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
     Function* hash_fn;
-    codegen_status = ht_ctx_->CodegenHashCurrentRow(state, false, &hash_fn);
+    codegen_status = ht_ctx_->CodegenHashRow(state, false, &hash_fn);
     Function* murmur_hash_fn;
-    codegen_status.MergeStatus(
-        ht_ctx_->CodegenHashCurrentRow(state, true, &murmur_hash_fn));
+    codegen_status.MergeStatus(ht_ctx_->CodegenHashRow(state, true, &murmur_hash_fn));
 
     // Codegen for evaluating build rows
     Function* eval_build_row_fn;
@@ -1685,13 +1684,11 @@ Status PartitionedHashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
       ConstantInt::get(Type::getInt1Ty(codegen->context()), filters_.size() > 0));
 
   // process_build_batch_fn_level0 uses CRC hash if available,
-  replaced = codegen->ReplaceCallSites(process_build_batch_fn_level0, hash_fn,
-      "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn_level0, hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
 
   // process_build_batch_fn uses murmur
-  replaced = codegen->ReplaceCallSites(process_build_batch_fn, murmur_hash_fn,
-      "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn, murmur_hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
 
   // Never build filters after repartitioning, as all rows have already been added to the
@@ -1769,11 +1766,6 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   DCHECK(process_probe_batch_fn->getLinkage() == GlobalValue::WeakODRLinkage)
       << LlvmCodeGen::Print(process_probe_batch_fn);
 
-  // Bake in %this pointer argument to process_probe_batch_fn.
-  Value* this_arg = codegen->GetArgument(process_probe_batch_fn, 0);
-  Value* this_loc = codegen->CastPtrToLlvmPtr(this_arg->getType(), this);
-  this_arg->replaceAllUsesWith(this_loc);
-
   // Replace the parameter 'prefetch_mode' with constant.
   Value* prefetch_mode_arg = codegen->GetArgument(process_probe_batch_fn, 1);
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
@@ -1781,11 +1773,6 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
   prefetch_mode_arg->replaceAllUsesWith(
       ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
-
-  // Bake in %ht_ctx pointer argument to process_probe_batch_fn
-  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 3);
-  Value* ht_ctx_loc = codegen->CastPtrToLlvmPtr(ht_ctx_arg->getType(), ht_ctx_.get());
-  ht_ctx_arg->replaceAllUsesWith(ht_ctx_loc);
 
   // Codegen HashTable::Equals
   Function* probe_equals_fn;
@@ -1868,12 +1855,10 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
 
   // process_probe_batch_fn_level0 uses CRC hash if available,
   // process_probe_batch_fn uses murmur
-  replaced = codegen->ReplaceCallSites(process_probe_batch_fn_level0, hash_fn,
-      "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn_level0, hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
 
-  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, murmur_hash_fn,
-      "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(process_probe_batch_fn, murmur_hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
 
   // Finalize ProcessProbeBatch functions
@@ -1937,9 +1922,9 @@ Status PartitionedHashJoinNode::CodegenInsertBatch(RuntimeState* state,
   Function* insert_batch_fn_level0 = codegen->CloneFunction(insert_batch_fn);
 
   // Use codegen'd hash functions
-  replaced = codegen->ReplaceCallSites(insert_batch_fn_level0, hash_fn, "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(insert_batch_fn_level0, hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
-  replaced = codegen->ReplaceCallSites(insert_batch_fn, murmur_hash_fn, "HashCurrentRow");
+  replaced = codegen->ReplaceCallSites(insert_batch_fn, murmur_hash_fn, "HashRow");
   DCHECK_EQ(replaced, 1);
 
   insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);

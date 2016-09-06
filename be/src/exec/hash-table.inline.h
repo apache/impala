@@ -26,17 +26,21 @@
 
 namespace impala {
 
-inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row) {
-  bool has_null = EvalBuildRow(row);
+inline bool HashTableCtx::EvalAndHashBuild(const TupleRow* row) {
+  uint8_t* expr_values = expr_values_cache_.cur_expr_values();
+  uint8_t* expr_values_null = expr_values_cache_.cur_expr_values_null();
+  bool has_null = EvalBuildRow(row, expr_values, expr_values_null);
   if (!stores_nulls() && has_null) return false;
-  expr_values_cache_.SetExprValuesHash(HashCurrentRow());
+  expr_values_cache_.SetCurExprValuesHash(HashRow(expr_values, expr_values_null));
   return true;
 }
 
-inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row) {
-  bool has_null = EvalProbeRow(row);
+inline bool HashTableCtx::EvalAndHashProbe(const TupleRow* row) {
+  uint8_t* expr_values = expr_values_cache_.cur_expr_values();
+  uint8_t* expr_values_null = expr_values_cache_.cur_expr_values_null();
+  bool has_null = EvalProbeRow(row, expr_values, expr_values_null);
   if (has_null && !(stores_nulls() && finds_some_nulls())) return false;
-  expr_values_cache_.SetExprValuesHash(HashCurrentRow());
+  expr_values_cache_.SetCurExprValuesHash(HashRow(expr_values, expr_values_null));
   return true;
 }
 
@@ -92,7 +96,7 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
 inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx) {
   ++num_probes_;
   bool found = false;
-  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+  uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
   int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, &found);
   DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND);
   if (found) {
@@ -135,7 +139,7 @@ inline void HashTable::PrefetchBucket(uint32_t hash) {
 inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx) {
   ++num_probes_;
   bool found = false;
-  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+  uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
   int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
   if (found) {
     return Iterator(this, ht_ctx->scratch_row(), bucket_idx,
@@ -148,7 +152,7 @@ inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx) {
 inline HashTable::Iterator HashTable::FindBuildRowBucket(
     HashTableCtx* ht_ctx, bool* found) {
   ++num_probes_;
-  uint32_t hash = ht_ctx->expr_values_cache()->ExprValuesHash();
+  uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
   int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
   DuplicateNode* duplicates = NULL;
   if (stores_duplicates() && LIKELY(bucket_idx != Iterator::BUCKET_NOT_FOUND)) {

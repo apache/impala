@@ -264,7 +264,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
     bool skip_row = false;
 
     // The hash of the expressions results for the current probe row.
-    uint32_t hash = expr_vals_cache->ExprValuesHash();
+    uint32_t hash = expr_vals_cache->CurExprValuesHash();
     // Hoist the followings out of the else statement below to speed up non-null case.
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     HashTable* hash_tbl = hash_tbls_[partition_idx];
@@ -344,7 +344,7 @@ void IR_ALWAYS_INLINE PartitionedHashJoinNode::EvalAndHashProbePrefetchGroup(
     TupleRow* row = batch_iter.Get();
     if (ht_ctx->EvalAndHashProbe(row)) {
       if (prefetch_mode != TPrefetchMode::NONE) {
-        uint32_t hash = expr_vals_cache->ExprValuesHash();
+        uint32_t hash = expr_vals_cache->CurExprValuesHash();
         const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
         HashTable* hash_tbl = hash_tbls_[partition_idx];
         if (LIKELY(hash_tbl != NULL)) hash_tbl->PrefetchBucket<true>(hash);
@@ -461,7 +461,7 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch,
         ctx.local_bloom_filter->Insert(filter_hash);
       }
     }
-    const uint32_t hash = expr_vals_cache->ExprValuesHash();
+    const uint32_t hash = expr_vals_cache->CurExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];
     const bool result = AppendRow(partition->build_rows(), build_row, &build_status_);
@@ -485,7 +485,7 @@ bool PartitionedHashJoinNode::Partition::InsertBatch(
     FOREACH_ROW_LIMIT(batch, cur_row, prefetch_size, batch_iter) {
       if (ht_ctx->EvalAndHashBuild(batch_iter.Get())) {
         if (prefetch_mode != TPrefetchMode::NONE) {
-          hash_tbl_->PrefetchBucket<false>(expr_vals_cache->ExprValuesHash());
+          hash_tbl_->PrefetchBucket<false>(expr_vals_cache->CurExprValuesHash());
         }
       } else {
         expr_vals_cache->SetRowNull();

@@ -79,7 +79,7 @@ void IR_ALWAYS_INLINE PartitionedAggregationNode::EvalAndHashPrefetchGroup(
       is_null = !ht_ctx->EvalAndHashProbe(row);
     }
     // Hoist lookups out of non-null branch to speed up non-null case.
-    const uint32_t hash = expr_vals_cache->ExprValuesHash();
+    const uint32_t hash = expr_vals_cache->CurExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     HashTable* hash_tbl = GetHashTable(partition_idx);
     if (is_null) {
@@ -98,7 +98,7 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
     HashTableCtx* __restrict__ ht_ctx) {
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   // Hoist lookups out of non-null branch to speed up non-null case.
-  const uint32_t hash = expr_vals_cache->ExprValuesHash();
+  const uint32_t hash = expr_vals_cache->CurExprValuesHash();
   const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
   if (expr_vals_cache->IsRowNull()) return Status::OK();
   // To process this row, we first see if it can be aggregated or inserted into this
@@ -188,7 +188,7 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
     FOREACH_ROW_LIMIT(in_batch, group_start, cache_size, in_batch_iter) {
       // Hoist lookups out of non-null branch to speed up non-null case.
       TupleRow* in_row = in_batch_iter.Get();
-      const uint32_t hash = expr_vals_cache->ExprValuesHash();
+      const uint32_t hash = expr_vals_cache->CurExprValuesHash();
       const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
       if (!expr_vals_cache->IsRowNull() &&
           !TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx],
