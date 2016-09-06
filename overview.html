@@ -114,11 +114,10 @@
               <li><a href="http://blog.impala.io">Developer blog</a></li>
             </ul>
           </li>
-          <li><a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/Impala/impala.html">Docs</a></li>
-          <li><a href="https://github.com/cloudera/Impala/wiki/Contributing-to-Impala">Contribute</a></li>
-          <li><a href="https://github.com/cloudera/impala">GitHub</a></li>
+          <li><a href="https://cwiki.apache.org/confluence/display/IMPALA/Contributing+to+Impala">Contribute</a></li>
+          <li><a href="https://github.com/apache/incubator-impala">GitHub</a></li>
           <li><a href="community.html">Community</a></li>
-          <li><a href="impala-books.html">Books</a></li>
+          <li><a href="impala-docs.html">Documentation</a></li>
         </ul>
       </div>
       </div>
@@ -132,7 +131,7 @@
 
 
   <h3>Architecture</h3>
-          <p>To avoid latency, Impala circumvents MapReduce to directly access the data through a specialized distributed query engine that is very similar to those found in commercial parallel RDBMSs. The result is order-of-magnitude faster performance than Hive, depending on the type of query and configuration. (See <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Impala/latest/Cloudera-Impala-Frequently-Asked-Questions/Cloudera-Impala-Frequently-Asked-Questions.html">FAQ</a> for more details.)</p>
+          <p>To avoid latency, Impala circumvents MapReduce to directly access the data through a specialized distributed query engine that is very similar to those found in commercial parallel RDBMSs. The result is order-of-magnitude faster performance than Hive, depending on the type of query and configuration.</p>
           <p align="center"><img src="img/impala.png"></p>
 
   <p>There are many advantages to this approach over alternative approaches for querying Hadoop data, including::
@@ -148,33 +147,7 @@
 <li>Only a single machine pool is needed to scale.
   </li>
   </ul>
-We encourage you to read the <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/Impala/impala.html">documentation</a> for further exploration, and <a href="http://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf">this paper</a> for details about Impala's architecture. Also, see the <a href="http://www.slideshare.net/cloudera/the-impala-cookbook-42530186">Impala Cookbook</a>, which is continually updated to reflect current user best practices.
-<h3>Roadmap (Subject to Change)</h3>
-<h5>Planned for 2015</h5>
-<ul>
-  <li>EMC Isilon support - to execute distributed queries against data in Isilon </li>
-  <li>Nested types - enabling queries on complex data structures like maps, structs, and arrays</li>
-  <li>Even greater scalability and reliability - to run at greater node and user scalability with less manual tuning</li>
-  <li>Even better predictability under concurrency - to handle greater concurrency in resource-limited situations</li>
-  <li>New Python data analysis framework - to maximize user productivity and executing natively on Impala&rsquo;s high-performance scale-out architecture (more news soon!)</li>
-</ul>
-<h5>Planned for late 2015 or early 2016</h5>
-<ul>
-  <li>Fine-grained authorization across CDH - expansion and full integration of Apache Sentry authorization across all CDH frameworks</li>
-  <li>Dynamic partition pruning - to perform data elimination of queries where the partition filters are in dimension tables instead of the fact tables</li>
-  <li>Greater node scalability for metadata propagation - finer-grain updates of metadata to enable more frequent metadata updates and greater node scalability</li>
-  <li>Improved YARN integration via Llama - for improved predictability of resource requests with dynamic resource scheduling via YARN</li>
-</ul>
-<h5>Planned for 2016</h5>
-<ul>
-  <li>Support for updates - to directly update and insert data into Hadoop</li>
-  <li>&gt;20x performance gains – via multi-core joins/aggregations, even more runtime code generation, collaboration with Intel for greater hardware efficiency gains, and more</li>
-  <li> In-memory columnar format - for more efficient, more scalable, vectorized operations on nested data types as well as to enable high-performance custom logic (UDFs/UDAs) without serialization/deserialization bottlenecks</li>
-  <li>Automated and incremental metadata refresh</li>
-  <li>Automated and incremental stats collection</li>
-  <li>Temporary tables - enabling temporary scratch locations to store interim results</li>
-  <li>Additional language extensions and data types - addition of new SQL and vendor-specific language extensions and data types based on customer feedback</li>
-</ul>
+We encourage you to read <a href="http://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper28.pdf">this paper</a> for details about Impala's architecture.
 <p>&nbsp;</p>
     </div>
 </div>
