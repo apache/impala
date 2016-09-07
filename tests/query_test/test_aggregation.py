@@ -110,14 +110,15 @@ class TestAggregationQueries(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  @pytest.mark.execute_serially
-  def test_non_codegen_tinyint_grouping(self, vector):
+  def test_non_codegen_tinyint_grouping(self, vector, unique_database):
     # Regression for IMPALA-901. The test includes an INSERT statement, so can only be run
     # on INSERT-able formats - text only in this case, since the bug doesn't depend on the
     # file format.
     if vector.get_value('table_format').file_format == 'text' \
         and vector.get_value('table_format').compression_codec == 'none':
-      self.run_test_case('QueryTest/aggregation_no_codegen_only', vector)
+      self.client.execute("create table %s.imp_901 (col tinyint)" % unique_database)
+      self.run_test_case('QueryTest/aggregation_no_codegen_only', vector,
+          unique_database)
 
   def test_aggregation(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
