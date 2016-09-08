@@ -126,4 +126,5 @@ for ((i=1; i <= HBASE_START_RETRY_ATTEMPTS; ++i)); do
   fi
 
 done
+${CLUSTER_BIN}/check-hbase-nodes.py
 echo "HBase startup scripts succeeded"
