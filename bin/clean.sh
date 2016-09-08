@@ -52,13 +52,13 @@ popd
 # clean be
 pushd $IMPALA_HOME/be
 # remove everything listed in .gitignore
-git clean -Xdfq
+git rev-parse 2>/dev/null && git clean -Xdfq
 popd
 
 # clean shell build artifacts
 pushd $IMPALA_HOME/shell
 # remove everything listed in .gitignore
-git clean -Xdfq
+git rev-parse 2>/dev/null && git clean -Xdfq
 popd
 
 # Clean stale .pyc, .pyo files and __pycache__ directories.
@@ -72,8 +72,10 @@ rm -f $IMPALA_HOME/llvm-ir/impala*.ll
 rm -f $IMPALA_HOME/be/generated-sources/impala-ir/*
 
 # Cleanup Impala-lzo
-if [ -e $IMPALA_LZO ]; then
-  pushd $IMPALA_LZO; git clean -fdx .; popd
+if [ -e "$IMPALA_LZO" ]; then
+  pushd "$IMPALA_LZO"
+  git rev-parse 2>/dev/null && git clean -fdx
+  popd
 fi
 
 # When switching to and from toolchain, make sure to remove all CMake generated files
