@@ -312,19 +312,32 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
   vector<TScanRangeParams> params;
   CreateScanRangeParams(num_cols_to_materialize, &params);
   SetUpScanner(&scanner, params);
-  bool eos = false;
   RowBatch* batch = obj_pool_->Add(
       new RowBatch(scanner.row_desc(), DEFAULT_ROWS_PER_BATCH, mem_tracker_.get()));
-  for (int i = 0; i < 2 && batch->num_rows() == 0; ++i) {
-    // Allow for up to 2 empty row batches since there are scanners created for all
-    // tablets (1 split point), and only one row was inserted.
-    ASSERT_OK(scanner.GetNext(runtime_state_.get(), batch, &eos));
-  }
-  ASSERT_EQ(1, batch->num_rows());
+  bool eos = false;
+  int total_num_rows = 0;
 
-  ASSERT_OK(scanner.GetNext(runtime_state_.get(), NULL, &eos));
+  // Need to call GetNext() a total of 3 times to allow for:
+  // 1) the row batch containing the single row
+  // 2) an empty row batch (since there are scanners created for both tablets)
+  // 3) a final call which returns eos.
+  // The first two may occur in any order and are checked in the for loop below.
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_OK(scanner.GetNext(runtime_state_.get(), batch, &eos));
+    ASSERT_FALSE(eos);
+    if (batch->num_rows() > 0) {
+      total_num_rows += batch->num_rows();
+      ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
+    }
+    batch->Reset();
+  }
+  ASSERT_EQ(1, total_num_rows);
+
+  // One last call to find the batch queue empty and GetNext() returns eos.
+  ASSERT_OK(scanner.GetNext(runtime_state_.get(), batch, &eos));
   ASSERT_TRUE(eos);
-  ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
+  ASSERT_EQ(0, batch->num_rows());
+
   scanner.Close(runtime_state_.get());
 }
 
