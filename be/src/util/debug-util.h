@@ -64,6 +64,7 @@ std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 std::string PrintTCatalogObjectType(const TCatalogObjectType::type& type);
 std::string PrintTDdlType(const TDdlType::type& type);
 std::string PrintTCatalogOpType(const TCatalogOpType::type& type);
+std::string PrintTReplicaPreference(const TReplicaPreference::type& type);
 std::string PrintTSessionType(const TSessionType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);

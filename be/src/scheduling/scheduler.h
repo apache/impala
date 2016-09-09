@@ -65,11 +65,8 @@ class SchedulerWrapper;
 /// TODO: Inject global dependencies into the class (for example ExecEnv::GetInstance(),
 ///       RNG used during scheduling, FLAGS_*)
 ///       to make it testable.
-/// TODO: Benchmark the performance of the scheduler. The tests need to include setups
-///       with:
-///         - Small and large number of executors.
-///         - Small and large query plans.
-///         - Scheduling query plans with concurrent updates to the internal executor
+/// TODO: Extend the benchmarks of the scheduler. The tests need to include setups with:
+///         - Scheduling query plans with concurrent updates to the internal backend
 ///           configuration.
 class Scheduler {
  public:
@@ -334,6 +331,7 @@ class Scheduler {
   /// the schedule's TQueryExecRequest.plan_exec_info.
   /// Unpartitioned fragments are assigned to the coordinator. Populate the schedule's
   /// fragment_exec_params_ with the resulting scan range assignment.
+  /// We have a benchmark for this method in be/src/benchmarks/scheduler-benchmark.cc.
   Status ComputeScanRangeAssignment(QuerySchedule* schedule);
 
   /// Process the list of scan ranges of a single plan node and compute scan range
