@@ -26,6 +26,10 @@
 
 using namespace impala;
 
+ExprContext* PartitionedAggregationNode::GetAggExprContext(int i) const {
+  return agg_expr_ctxs_[i];
+}
+
 Status PartitionedAggregationNode::ProcessBatchNoGrouping(RowBatch* batch) {
   Tuple* output_tuple = singleton_output_tuple_;
   FOREACH_ROW(batch, 0, batch_iter) {
@@ -202,7 +206,7 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
           DCHECK(!process_batch_status_.ok());
           return process_batch_status_;
         }
-        UpdateTuple(&agg_fn_ctxs_[0], intermediate_tuple, in_row, false);
+        UpdateTuple(&agg_fn_ctxs_[0], intermediate_tuple, in_row);
         out_batch_iterator.Get()->SetTuple(0, intermediate_tuple);
         out_batch_iterator.Next();
         out_batch->CommitLastRow();
@@ -250,7 +254,7 @@ bool PartitionedAggregationNode::TryAddToHashTable(
     }
   }
 
-  UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, in_row, false);
+  UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, in_row);
   return true;
 }
 

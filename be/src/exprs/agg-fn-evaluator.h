@@ -189,6 +189,8 @@ class AggFnEvaluator {
   /// intermediate_slot_desc_ if this agg fn has the same intermediate and output type.
   const SlotDescriptor* output_slot_desc_;
 
+  /// Expression contexts for this AggFnEvaluator. Empty if there is no
+  /// expression (e.g. count(*)).
   std::vector<ExprContext*> input_expr_ctxs_;
 
   /// The enum for some of the builtins that still require special cased logic.
@@ -270,7 +272,7 @@ inline void AggFnEvaluator::Init(const std::vector<AggFnEvaluator*>& evaluators,
   }
 }
 inline void AggFnEvaluator::Add(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst) {
+    const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Add(fn_ctxs[i], src, dst);

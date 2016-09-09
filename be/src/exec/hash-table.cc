@@ -183,8 +183,8 @@ bool HashTableCtx::EvalRow(const TupleRow* row, const vector<ExprContext*>& ctxs
   return has_null;
 }
 
-uint32_t HashTableCtx::HashVariableLenRow(
-    const uint8_t* expr_values, const uint8_t* expr_values_null) const {
+uint32_t HashTableCtx::HashVariableLenRow(const uint8_t* expr_values,
+    const uint8_t* expr_values_null) const {
   uint32_t hash = seeds_[level_];
   int var_result_offset = expr_values_cache_.var_result_offset();
   // Hash the non-var length portions (if there are any)
@@ -699,29 +699,35 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // Get types to generate function prototype
-  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-  DCHECK(tuple_row_type != NULL);
-  PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
-
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
-  PointerType* this_ptr_type = PointerType::get(this_type, 0);
+  PointerType* this_ptr_type = codegen->GetPtrType(this_type);
+  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
+  DCHECK(tuple_row_type != NULL);
+  PointerType* tuple_row_ptr_type = codegen->GetPtrType(tuple_row_type);
   LlvmCodeGen::FnPrototype prototype(codegen, build ? "EvalBuildRow" : "EvalProbeRow",
       codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("expr_values", codegen->ptr_type()));
-  prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("expr_values_null", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("expr_values_null",
+      codegen->ptr_type()));
 
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
   Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
+  Value* this_ptr = args[0];
   Value* row = args[1];
   Value* expr_values = args[2];
   Value* expr_values_null = args[3];
   Value* has_null = codegen->false_value();
+
+  IRFunction::Type get_expr_ctx_fn_name = build ?
+      IRFunction::HASH_TABLE_GET_BUILD_EXPR_CTX :
+      IRFunction::HASH_TABLE_GET_PROBE_EXPR_CTX;
+  Function* get_expr_ctx_fn = codegen->GetFunction(get_expr_ctx_fn_name, false);
+  DCHECK(get_expr_ctx_fn != NULL);
 
   for (int i = 0; i < ctxs.size(); ++i) {
     // TODO: refactor this to somewhere else?  This is not hash table specific except for
@@ -748,8 +754,8 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
           status.GetDetail()));
     }
 
-    Value* ctx_arg = codegen->CastPtrToLlvmPtr(
-        codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME), ctxs[i]);
+    Value* get_expr_ctx_args[] = { this_ptr, codegen->GetIntConstant(TYPE_INT, i) };
+    Value* ctx_arg = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args, "expr_ctx");
     Value* expr_fn_args[] = { ctx_arg, row };
     CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
         codegen, &builder, ctxs[i]->root()->type(), expr_fn, expr_fn_args, "result");
@@ -845,7 +851,7 @@ Status HashTableCtx::CodegenHashRow(RuntimeState* state, bool use_murmur, Functi
   // Get types to generate function prototype
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
-  PointerType* this_ptr_type = PointerType::get(this_type, 0);
+  PointerType* this_ptr_type = codegen->GetPtrType(this_type);
 
   LlvmCodeGen::FnPrototype prototype(
       codegen, (use_murmur ? "MurmurHashRow" : "HashRow"), codegen->GetType(TYPE_INT));
@@ -1050,13 +1056,13 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
   // Get types to generate function prototype
-  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-  DCHECK(tuple_row_type != NULL);
-  PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
-
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
-  PointerType* this_ptr_type = PointerType::get(this_type, 0);
+  PointerType* this_ptr_type = codegen->GetPtrType(this_type);
+  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
+  DCHECK(tuple_row_type != NULL);
+  PointerType* tuple_row_ptr_type = codegen->GetPtrType(tuple_row_type);
+
   LlvmCodeGen::FnPrototype prototype(codegen, "Equals", codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
@@ -1068,9 +1074,14 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
   LlvmCodeGen::LlvmBuilder builder(context);
   Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
+  Value* this_ptr = args[0];
   Value* row = args[1];
   Value* expr_values = args[2];
   Value* expr_values_null = args[3];
+
+  Function* get_expr_ctx_fn =
+      codegen->GetFunction(IRFunction::HASH_TABLE_GET_BUILD_EXPR_CTX, false);
+  DCHECK(get_expr_ctx_fn != NULL);
 
   BasicBlock* false_block = BasicBlock::Create(context, "false_block", *fn);
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
@@ -1088,8 +1099,11 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
           status.GetDetail()));
     }
 
-    Value* ctx_arg = codegen->CastPtrToLlvmPtr(
-        codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME), build_expr_ctxs_[i]);
+    // Load ExprContext* from 'build_expr_ctxs_'.
+    Value* get_expr_ctx_args[] = { this_ptr, codegen->GetIntConstant(TYPE_INT, i) };
+    Value* ctx_arg = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args, "expr_ctx");
+
+    // Evaluate the expression.
     Value* expr_fn_args[] = { ctx_arg, row };
     CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");

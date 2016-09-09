@@ -28,6 +28,14 @@ using namespace impala;
 // Functions in this file are cross compiled to IR with clang.  These functions
 // are modified at runtime with a query specific codegen'd UpdateAggTuple
 
+FunctionContext* AggregationNode::GetAggFnCtx(int i) const {
+  return agg_fn_ctxs_[i];
+}
+
+ExprContext* AggregationNode::GetAggExprCtx(int i) const {
+  return agg_expr_ctxs_[i];
+}
+
 void AggregationNode::ProcessRowBatchNoGrouping(RowBatch* batch) {
   for (int i = 0; i < batch->num_rows(); ++i) {
     UpdateTuple(singleton_intermediate_tuple_, batch->GetRow(i));

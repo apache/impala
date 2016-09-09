@@ -193,10 +193,17 @@ class PartitionedAggregationNode : public ExecNode {
   /// are doing a streaming preaggregation.
   bool is_streaming_preagg_;
 
-  /// Contains any evaluators that require the serialize step.
+  /// True if any of the evaluators require the serialize step.
   bool needs_serialize_;
 
+  /// The list of all aggregate operations for this exec node.
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
+
+  /// Cache of the ExprContexts of 'aggregate_evaluators_'. Used in the codegen'ed
+  /// version of UpdateTuple() to avoid loading aggregate_evaluators_[i] at runtime.
+  /// An entry is NULL if the aggregate evaluator is not codegen'ed or there is no Expr
+  /// in the aggregate evaluator (e.g. count(*)).
+  std::vector<ExprContext*> agg_expr_ctxs_;
 
   /// FunctionContext for each aggregate function and backing MemPool. String data
   /// returned by the aggregate functions is allocated via these contexts.
@@ -468,9 +475,9 @@ class PartitionedAggregationNode : public ExecNode {
   /// belonging to the same partition independent of whether the agg fn evaluators have
   /// is_merge() == true.
   /// This function is replaced by codegen (which is why we don't use a vector argument
-  /// for agg_fn_ctxs). Any var-len data is allocated from the FunctionContexts.
+  /// for agg_fn_ctxs).. Any var-len data is allocated from the FunctionContexts.
   void UpdateTuple(impala_udf::FunctionContext** agg_fn_ctxs, Tuple* tuple, TupleRow* row,
-                   bool is_merge = false);
+      bool is_merge = false);
 
   /// Called on the intermediate tuple of each group after all input rows have been
   /// consumed and aggregated. Computes the final aggregate values to be returned in
@@ -482,7 +489,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// TODO: Coordinate the allocation of new tuples with the release of memory
   /// so as not to make memory consumption blow up.
   Tuple* GetOutputTuple(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-                        Tuple* tuple, MemPool* pool);
+      Tuple* tuple, MemPool* pool);
 
   /// Do the aggregation for all tuple rows in the batch when there is no grouping.
   /// This function is replaced by codegen.
@@ -516,6 +523,10 @@ class PartitionedAggregationNode : public ExecNode {
   /// May spill partitions if not enough memory is available.
   template<bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, HashTableCtx* ht_ctx);
+
+  /// Accessor for the expression context of an AggFnEvaluator. Used only in codegen'ed
+  /// version of UpdateTuple().
+  ExprContext* IR_ALWAYS_INLINE GetAggExprContext(int i) const;
 
   /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
   /// the context for the partition's hash table and hash is the precomputed hash of

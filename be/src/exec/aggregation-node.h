@@ -69,11 +69,19 @@ class AggregationNode : public ExecNode {
   boost::scoped_ptr<OldHashTable> hash_tbl_;
   OldHashTable::Iterator output_iterator_;
 
+  /// The list of all aggregate operations for this exec node.
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
 
-  /// FunctionContext for each agg fn and backing pool.
+  /// FunctionContexts and backing MemPools of 'aggregate_evaluators_'.
+  /// FunctionContexts objects are stored in ObjectPool of RuntimeState.
   std::vector<impala_udf::FunctionContext*> agg_fn_ctxs_;
   boost::scoped_ptr<MemPool> agg_fn_pool_;
+
+  /// Cache of the ExprContexts of 'aggregate_evaluators_'. Used in the codegen'ed
+  /// version of UpdateTuple() to avoid loading aggregate_evaluators_[i] at runtime.
+  /// An entry is NULL if the aggregate evaluator is not codegen'ed or there is no
+  /// Expr in the aggregate evaluator (e.g. count(*)).
+  std::vector<ExprContext*> agg_expr_ctxs_;
 
   /// Exprs used to evaluate input rows
   std::vector<ExprContext*> probe_expr_ctxs_;
@@ -124,7 +132,7 @@ class AggregationNode : public ExecNode {
   Tuple* ConstructIntermediateTuple();
 
   /// Updates the aggregation intermediate tuple 'tuple' with aggregation values
-  /// computed over 'row'.
+  /// computed over 'row'. This function is replaced by codegen.
   void UpdateTuple(Tuple* tuple, TupleRow* row);
 
   /// Called on the intermediate tuple of each group after all input rows have been
@@ -134,6 +142,14 @@ class AggregationNode : public ExecNode {
   /// tuple, then a new tuple is allocated from 'pool' to hold the final result.
   /// Returns the tuple holding the final aggregate values.
   Tuple* FinalizeTuple(Tuple* tuple, MemPool* pool);
+
+  /// Accessor for the function context of an AggFnEvaluator. Used only in codegen'ed
+  /// version of the UpdateSlot().
+  FunctionContext* IR_ALWAYS_INLINE GetAggFnCtx(int i) const;
+
+  /// Accessor for the expression context of an AggFnEvaluator. Used only in codegen'ed
+  /// version of the UpdateSlot().
+  ExprContext* IR_ALWAYS_INLINE GetAggExprCtx(int i) const;
 
   /// Do the aggregation for all tuple rows in the batch
   void ProcessRowBatchNoGrouping(RowBatch* batch);

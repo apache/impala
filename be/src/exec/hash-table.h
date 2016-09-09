@@ -300,7 +300,9 @@ class HashTableCtx {
     uint32_t ALWAYS_INLINE CurExprValuesHash() const { return *cur_expr_values_hash_; }
 
     /// Sets the hash values for the current row.
-    void ALWAYS_INLINE SetCurExprValuesHash(uint32_t hash) { *cur_expr_values_hash_ = hash; }
+    void ALWAYS_INLINE SetCurExprValuesHash(uint32_t hash) {
+      *cur_expr_values_hash_ = hash;
+    }
 
     /// Returns a pointer to the expression value at 'expr_idx' in 'expr_values'.
     uint8_t* ExprValuePtr(uint8_t* expr_values, int expr_idx) const;
@@ -410,19 +412,19 @@ class HashTableCtx {
   uint32_t Hash(const void* input, int len, uint32_t hash) const;
 
   /// Evaluate 'row' over build exprs, storing values into 'expr_values' and nullness into
-  /// 'expr_values_null'. This will be replaced by codegen. We do not want this
-  /// function inlined when cross compiled because we need to be able to differentiate
-  /// between EvalBuildRow and EvalProbeRow by name and the build/probe exprs are baked
-  /// into the codegen'd function.
-  bool IR_NO_INLINE EvalBuildRow(
-      const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) {
+  /// 'expr_values_null'. This will be replaced by codegen. We do not want this function
+  /// inlined when cross compiled because we need to be able to differentiate between
+  /// EvalBuildRow and EvalProbeRow by name and the build/probe exprs are baked into the
+  /// codegen'd function.
+  bool IR_NO_INLINE EvalBuildRow(const TupleRow* row, uint8_t* expr_values,
+      uint8_t* expr_values_null) {
     return EvalRow(row, build_expr_ctxs_, expr_values, expr_values_null);
   }
 
   /// Evaluate 'row' over probe exprs, storing the values into 'expr_values' and nullness
   /// into 'expr_values_null'. This will be replaced by codegen.
-  bool IR_NO_INLINE EvalProbeRow(
-      const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) {
+  bool IR_NO_INLINE EvalProbeRow(const TupleRow* row, uint8_t* expr_values,
+      uint8_t* expr_values_null) {
     return EvalRow(row, probe_expr_ctxs_, expr_values, expr_values_null);
   }
 
@@ -454,11 +456,15 @@ class HashTableCtx {
   }
 
   /// Cross-compiled function to access member variables used in CodegenHashRow().
-  uint32_t GetHashSeed() const;
+  uint32_t IR_ALWAYS_INLINE GetHashSeed() const;
 
   /// Functions to be replaced by codegen to specialize the hash table.
   bool IR_NO_INLINE stores_nulls() const { return stores_nulls_; }
   bool IR_NO_INLINE finds_some_nulls() const { return finds_some_nulls_; }
+
+  /// Cross-compiled function to access the build/probe expression context.
+  ExprContext* IR_ALWAYS_INLINE GetBuildExprCtx(int i) const;
+  ExprContext* IR_ALWAYS_INLINE GetProbeExprCtx(int i) const;
 
   const std::vector<ExprContext*>& build_expr_ctxs_;
   const std::vector<ExprContext*>& probe_expr_ctxs_;
