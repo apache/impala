@@ -456,6 +456,15 @@ class HiveSqlWriter(SqlWriter):
 
   DIALECT = 'HIVE'
 
+  def __init__(self, *args, **kwargs):
+    super(HiveSqlWriter, self).__init__(*args, **kwargs)
+
+    self.operator_funcs.update({
+      'IsNotDistinctFrom': '({0}) <=> ({1})',
+      'IsNotDistinctFromOp': '({0}) <=> ({1})',
+      'IsDistinctFrom': 'NOT(({0}) <=> ({1}))'
+    })
+
   # Hive greatest UDF is strict on type equality
   # Hive Profile already restricts to signatures with the same types,
   # but sometimes expression with UDF's like 'count'
@@ -529,6 +538,24 @@ class HiveSqlWriter(SqlWriter):
         if func.SUPPORTS_WINDOWING and func.window_clause is None:
           options.append('rows unbounded preceding')
     return sql + ' '.join(options) + ')'
+
+  def _write_extract_year(self, func):
+    return 'YEAR(%s)' % self._write(func.args[0])
+
+  def _write_extract_month(self, func):
+    return 'MONTH(%s)' % self._write(func.args[0])
+
+  def _write_extract_day(self, func):
+    return 'DAY(%s)' % self._write(func.args[0])
+
+  def _write_extract_hour(self, func):
+    return 'HOUR(%s)' % self._write(func.args[0])
+
+  def _write_extract_minute(self, func):
+    return 'MINUTE(%s)' % self._write(func.args[0])
+
+  def _write_extract_second(self, func):
+    return 'SECOND(%s)' % self._write(func.args[0])
 
 
 class PostgresqlSqlWriter(SqlWriter):
