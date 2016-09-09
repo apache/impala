@@ -26,6 +26,10 @@ namespace impala {
 /// See https://chromium.googlesource.com/breakpad/breakpad/ for more details.
 Status RegisterMinidump(const char* cmd_line_path);
 
+/// Test helper to temporarily enable or disable minidumps, for example during death
+/// tests that deliberately trigger DCHECKs. Returns true if minidumps were previously
+/// enabled or false otherwise.
+bool EnableMinidumpsForTest(bool enabled);
 }
 
 #endif

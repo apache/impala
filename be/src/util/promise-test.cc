@@ -16,33 +16,16 @@
 // under the License.
 
 #include <boost/thread.hpp>
-#include <sys/resource.h>
 
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
+#include "testutil/death-test-util.h"
 #include "util/promise.h"
 #include "util/time.h"
 
 #include "common/names.h"
 
 namespace impala {
-
-struct ScopedLimitResetter {
- public:
-  ScopedLimitResetter() {
-    getrlimit(RLIMIT_CORE, &limit_before_);
-    rlimit limit;
-    limit.rlim_cur = limit.rlim_max = 0;
-    setrlimit(RLIMIT_CORE, &limit);
-  }
-
-  ~ScopedLimitResetter() {
-    setrlimit(RLIMIT_CORE, &limit_before_);
-  }
-
- private:
-  rlimit limit_before_;
-};
 
 void RunThread(Promise<int64_t>* promise) {
   promise->Set(100);
@@ -75,16 +58,14 @@ TEST(PromiseTest, TimeoutTest) {
 }
 
 TEST(PromiseDeathTest, RepeatedSetTest) {
-  // This test intentionally causes a crash. Don't generate core files for it.
-  ScopedLimitResetter resetter;
-
   // Hint to gtest that only one thread is being used here. Multiple threads are unsafe
   // for 'death' tests, see
   // https://code.google.com/p/googletest/wiki/AdvancedGuide#Death_Tests for more detail
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   Promise<int64_t> promise;
   promise.Set(100);
-  ASSERT_DEBUG_DEATH(promise.Set(150), "Called Set\\(\\.\\.\\) twice on the same Promise");
+  IMPALA_ASSERT_DEBUG_DEATH(
+      promise.Set(150), "Called Set\\(\\.\\.\\) twice on the same Promise");
 }
 
 }

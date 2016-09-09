@@ -56,6 +56,15 @@ namespace impala {
 /// files during process crashes, but also can be used to write minidumps directly.
 static google_breakpad::ExceptionHandler* minidump_exception_handler = NULL;
 
+/// Test helper. True if minidumps should be enabled.
+static bool minidumps_enabled = true;
+
+/// Called by the exception handler before minidump is produced. Minidump is only written
+/// if this returns true.
+static bool FilterCallback(void* context) {
+  return minidumps_enabled;
+}
+
 /// Callback for breakpad. It is called by breakpad whenever a minidump file has been
 /// written and should not be called directly. It logs the event before breakpad crashes
 /// the process. Due to the process being in a failed state we write to stdout/stderr and
@@ -225,13 +234,19 @@ Status RegisterMinidump(const char* cmd_line_path) {
 
   // Intentionally leaked. We want this to have the lifetime of the process.
   DCHECK(minidump_exception_handler == NULL);
-  minidump_exception_handler =
-      new google_breakpad::ExceptionHandler(desc, NULL, DumpCallback, NULL, true, -1);
+  minidump_exception_handler = new google_breakpad::ExceptionHandler(
+      desc, FilterCallback, DumpCallback, NULL, true, -1);
 
   // Setup signal handler for SIGUSR1.
   SetupSignalHandler();
 
   return Status::OK();
+}
+
+bool EnableMinidumpsForTest(bool enabled) {
+  bool old_value = minidumps_enabled;
+  minidumps_enabled = enabled;
+  return old_value;
 }
 
 }  // end ns impala
