@@ -1208,9 +1208,17 @@ class QueryGenerator(object):
     if not table_exprs_by_col_types:
       raise Exception('Tables have no joinable columns in common')
 
+    join_signatures = self._funcs_to_allowed_signatures(FUNCS)
+    if self.profile.only_use_equality_join_predicates():
+      join_signatures = [sig for sig in join_signatures if not
+          self.profile.is_non_equality_join_predicate(sig.func)]
+    else:
+      join_signatures = self.profile.get_allowed_join_signatures(join_signatures)
+
     root_predicate, relational_predicates = self._create_boolean_func_tree(
-        require_relational_func=True,
-        relational_col_types=table_exprs_by_col_types.keys())
+      require_relational_func=True,
+      relational_col_types=table_exprs_by_col_types.keys(),
+      allowed_signatures=join_signatures)
 
     for predicate in relational_predicates:
       left_table_expr = choice(candidiate_table_exprs)
@@ -1344,7 +1352,8 @@ class QueryGenerator(object):
     return exprs_to_funcs
 
   def _create_boolean_func_tree(self, require_relational_func=False,
-      relational_col_types=None, allow_subquery=False):
+                                relational_col_types=None, allow_subquery=False,
+                                allowed_signatures=None):
     '''Creates a function that returns a Boolean. The returned value is a
        Tuple<Function, List<Function>> where the first function is the root of the tree
        and the list contains relational functions (though other relational functions
@@ -1352,10 +1361,18 @@ class QueryGenerator(object):
        depending on the query profile in use. The leaf arguments of the tree will all be
        set to a NULL literal.
 
-       If 'require_relational_func' is True, at least one function in the tree will be
-       a relational function such as Equals, LessThanOrEquals, etc.
-       'relational_col_types' can be used to restrict the signature of the chosen
-       relational function to the given types.
+       Args:
+         require_relational_func: If True, at least one function in the tree will be a
+         relational function such as Equals, LessThanOrEquals, etc.
+
+         relational_col_types: Can be used to restrict the signature of the chosen
+         relational function to the given types.
+
+         allow_subquery: If True, a subquery may be added to the function tree.
+
+         allowed_signatures: A list of allowable signatures to be used inside the function
+         tree. This list is not definitive, functions outside this list may be added to
+         the function tree if they are explicitly added by the QueryProfile.
     '''
     # To create a realistic expression, the nodes nearest the root of the tree will be
     # ANDs and ORs, their children will be relational functions, then other number of
@@ -1404,7 +1421,8 @@ class QueryGenerator(object):
     # 'relational_col_types'.
     null_args_by_type = defaultdict(list)
 
-    signatures = self._funcs_to_allowed_signatures(FUNCS)
+    if not allowed_signatures:
+      allowed_signatures = self._funcs_to_allowed_signatures(FUNCS)
 
     if not relational_col_types:
       relational_col_types = tuple()
@@ -1419,13 +1437,9 @@ class QueryGenerator(object):
       elif relational_count > 0:
         relational_count -= 1
         is_relational = True
-        if self.profile.only_use_equality_join_predicates():
-          signature = self.profile.choose_func_signature(self._find_matching_signatures(
-              Equals.signatures(), accepts_only=tuple(relational_col_types)))
-        else:
-          relational_signatures = self._find_matching_signatures(
-              signatures, accepts_only=tuple(relational_col_types), returns=Boolean)
-          signature = self.profile.choose_relational_func_signature(relational_signatures)
+        relational_signatures = self._find_matching_signatures(
+          allowed_signatures, accepts_only=tuple(relational_col_types), returns=Boolean)
+        signature = self.profile.choose_relational_func_signature(relational_signatures)
       else:
         if not root_func or Boolean in null_args_by_type:
           # Prefer to replace Boolean leaves to get a more realistic expression.
@@ -1437,7 +1451,7 @@ class QueryGenerator(object):
         # a relational function.
         accepts = return_type if return_type in relational_col_types else None
         signature = self.profile.choose_func_signature(self._find_matching_signatures(
-            signatures, returns=return_type, accepts=accepts,
+            allowed_signatures, returns=return_type, accepts=accepts,
             allow_subquery=allow_subquery))
 
       func = signature.func(signature)

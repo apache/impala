@@ -78,6 +78,10 @@ class QueryResultComparator(object):
         flatten_dialect=flatten_dialect)
 
   @property
+  def test_db_type(self):
+    return self.test_conn.db_type
+
+  @property
   def ref_db_type(self):
     return self.ref_conn.db_type
 
@@ -85,7 +89,7 @@ class QueryResultComparator(object):
     '''Execute the query, compare the data, and return a ComparisonResult, which
        summarizes the outcome.
     '''
-    comparison_result = ComparisonResult(query, self.ref_db_type)
+    comparison_result = ComparisonResult(query, self.test_db_type, self.ref_db_type)
     (ref_sql, ref_exception, ref_data_set, ref_cursor_description), (test_sql,
         test_exception, test_data_set, test_cursor_description) = \
             self.query_executor.fetch_query_results(query)
@@ -452,8 +456,9 @@ class QueryExecutor(object):
 class ComparisonResult(object):
   '''Represents a result.'''
 
-  def __init__(self, query, ref_db_type):
+  def __init__(self, query, test_db_type, ref_db_type):
     self.query = query
+    self.test_db_type = test_db_type
     self.ref_db_type = ref_db_type
     self.ref_sql = None
     self.test_sql = None
@@ -474,8 +479,9 @@ class ComparisonResult(object):
         self._error_message = str(self.exception)
       elif (self.ref_row_count or self.test_row_count) and \
           self.ref_row_count != self.test_row_count:
-        self._error_message = 'Row counts do not match: %s Impala rows vs %s %s rows' \
+        self._error_message = 'Row counts do not match: %s %s rows vs %s %s rows' \
             % (self.test_row_count,
+               self.test_db_type,
                self.ref_db_type,
                self.ref_row_count)
       elif self.mismatch_at_row_number is not None:
@@ -489,10 +495,11 @@ class ComparisonResult(object):
             for idx, val in enumerate(self.ref_row)
             )  + ']'
         self._error_message = \
-            'Column %s in row %s does not match: %s Impala row vs %s %s row' \
+            'Column %s in row %s does not match: %s %s row vs %s %s row' \
             % (self.mismatch_at_col_number,
                self.mismatch_at_row_number,
                test_row,
+               self.test_db_type,
                ref_row,
                self.ref_db_type)
     return self._error_message

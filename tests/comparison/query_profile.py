@@ -575,6 +575,21 @@ class DefaultProfile(object):
         return False
     return True
 
+  def get_allowed_join_signatures(self, signatures):
+    """
+    Returns all the function signatures that are allowed inside a JOIN clause. This
+    method is mutually exclusive with only_use_equality_join_predicates. This results of
+    this method are ignored if only_use_equality_join_predicates return True.
+    """
+    return signatures
+
+  def is_non_equality_join_predicate(self, func):
+    """
+    Returns True if the given func is considered a non-equality join condition.
+    """
+    return func in (GreaterThan, GreaterThanOrEquals, In,
+                    IsNotDistinctFrom, IsNotDistinctFromOp, LessThan,
+                    LessThanOrEquals, NotEquals, NotIn)
 
 class ImpalaNestedTypesProfile(DefaultProfile):
 
@@ -644,6 +659,19 @@ class HiveProfile(DefaultProfile):
             return False
     return DefaultProfile.allow_func_signature(self, signature)
 
+  def get_allowed_join_signatures(self, signatures):
+    """
+    Restricts the function signatures inside a JOIN clause to either be an Equals
+    operator, an And operator, or any operator that only takes in one argument. The reason
+    is that Hive only supports equi-joins, does not allow OR operators inside a JOIN, and
+    does not allow any other operator that operates over multiple columns.
+
+    The reason ONLY_USE_EQUALITY_JOIN_PREDICATES is not sufficient to guarantee this is
+    that Hive needs to restrict the functions used based on the argument size of a
+    function.
+    """
+    return [signature for signature in signatures if
+            signature.func in (Equals, And) or len(signature.args) == 1]
 
 PROFILES = [var for var in locals().values()
             if isinstance(var, type) and var.__name__.endswith('Profile')]
