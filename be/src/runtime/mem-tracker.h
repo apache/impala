@@ -140,6 +140,7 @@ class MemTracker {
       DCHECK(!all_trackers_[i]->has_limit());
       all_trackers_[i]->consumption_->Add(bytes);
     }
+    DCHECK(false) << "end_tracker is not an ancestor";
   }
 
   void ReleaseLocal(int64_t bytes, MemTracker* end_tracker) {

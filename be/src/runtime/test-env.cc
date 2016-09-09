@@ -37,7 +37,6 @@ TestEnv::TestEnv() {
   exec_env_.reset(new ExecEnv);
   exec_env_->InitForFeTests();
   io_mgr_tracker_.reset(new MemTracker(-1));
-  block_mgr_parent_tracker_.reset(new MemTracker(-1));
   exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
   InitMetrics();
   tmp_file_mgr_.reset(new TmpFileMgr);
@@ -59,7 +58,6 @@ void TestEnv::InitTmpFileMgr(const std::vector<std::string>& tmp_dirs,
 TestEnv::~TestEnv() {
   // Queries must be torn down first since they are dependent on global state.
   TearDownQueryStates();
-  block_mgr_parent_tracker_.reset();
   exec_env_.reset();
   io_mgr_tracker_.reset();
   tmp_file_mgr_.reset();
@@ -82,12 +80,13 @@ Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_si
     return Status("Unexpected error creating RuntimeState");
   }
 
+  (*runtime_state)->InitMemTrackers(TUniqueId(), NULL, -1);
+
   shared_ptr<BufferedBlockMgr> mgr;
   RETURN_IF_ERROR(BufferedBlockMgr::Create(*runtime_state,
-      block_mgr_parent_tracker_.get(), (*runtime_state)->runtime_profile(),
+      (*runtime_state)->query_mem_tracker(), (*runtime_state)->runtime_profile(),
       tmp_file_mgr_.get(), CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
   (*runtime_state)->set_block_mgr(mgr);
-  (*runtime_state)->InitMemTrackers(TUniqueId(), NULL, -1);
 
   query_states_.push_back(shared_ptr<RuntimeState>(*runtime_state));
   return Status::OK();
@@ -116,4 +115,11 @@ int64_t TestEnv::CalculateMemLimit(int max_buffers, int block_size) {
   return max_buffers * static_cast<int64_t>(block_size);
 }
 
+int64_t TestEnv::TotalQueryMemoryConsumption() {
+  int64_t total = 0;
+  for (shared_ptr<RuntimeState>& query_state : query_states_) {
+    total += query_state->query_mem_tracker()->consumption();
+  }
+  return total;
+}
 }

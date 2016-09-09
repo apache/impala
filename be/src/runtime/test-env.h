@@ -54,8 +54,10 @@ class TestEnv {
   /// If max_buffers is -1, no memory limit will apply.
   int64_t CalculateMemLimit(int max_buffers, int block_size);
 
+  /// Return total of mem tracker consumption for all queries.
+  int64_t TotalQueryMemoryConsumption();
+
   ExecEnv* exec_env() { return exec_env_.get(); }
-  MemTracker* block_mgr_parent_tracker() { return block_mgr_parent_tracker_.get(); }
   MemTracker* io_mgr_tracker() { return io_mgr_tracker_.get(); }
   MetricGroup* metrics() { return metrics_.get(); }
   TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
@@ -72,7 +74,6 @@ class TestEnv {
   /// Global state for test environment.
   static boost::scoped_ptr<MetricGroup> static_metrics_;
   boost::scoped_ptr<ExecEnv> exec_env_;
-  boost::scoped_ptr<MemTracker> block_mgr_parent_tracker_;
   boost::scoped_ptr<MemTracker> io_mgr_tracker_;
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;

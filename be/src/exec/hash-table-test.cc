@@ -184,11 +184,13 @@ class HashTableTest : public testing::Test {
   bool CreateHashTable(bool quadratic, int64_t initial_num_buckets,
       scoped_ptr<HashTable>* table, int block_size = 8 * 1024 * 1024,
       int max_num_blocks = 100, int reserved_blocks = 10) {
-    EXPECT_TRUE(test_env_->CreateQueryState(0, max_num_blocks, block_size,
-        &runtime_state_).ok());
+    EXPECT_OK(
+        test_env_->CreateQueryState(0, max_num_blocks, block_size, &runtime_state_));
+    MemTracker* client_tracker = pool_.Add(
+        new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
     BufferedBlockMgr::Client* client;
-    EXPECT_TRUE(runtime_state_->block_mgr()->RegisterClient("", reserved_blocks, false,
-        &tracker_, runtime_state_, &client).ok());
+    EXPECT_OK(runtime_state_->block_mgr()->RegisterClient(
+        "", reserved_blocks, false, client_tracker, runtime_state_, &client));
 
     // Initial_num_buckets must be a power of two.
     EXPECT_EQ(initial_num_buckets, BitUtil::RoundUpToPowerOfTwo(initial_num_buckets));
