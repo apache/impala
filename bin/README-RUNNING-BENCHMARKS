@@ -1,5 +1,5 @@
-To run the benchmark tests you first need to load the benchmark data. This can be done
-via the 'load-benchmark-data.sh' script. There are currently 3 different classes of
+To run the Impala benchmark tests you first need to load the benchmark data. This can be
+done via the 'load-benchmark-data.sh' script. There are currently 3 different classes of
 benchmark tests and data sets:
 
    core - All data sets, all use text file format, no compression.

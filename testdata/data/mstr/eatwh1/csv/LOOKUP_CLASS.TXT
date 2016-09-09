@@ -1,7 +1,0 @@
-1,Dresses,1,1
-2,Blouses,1,1
-3,Shirts,2,1
-4,Slacks,2,1
-5,Basketball,3,2
-6,Football,3,2
-7,Baseball,3,2

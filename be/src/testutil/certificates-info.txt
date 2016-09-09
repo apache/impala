@@ -1,4 +1,4 @@
-The following SSL certificates are used in our tests. This lists what each certificate is
+The following SSL certificates are used in Impala tests. This lists what each certificate is
 responsible for and how they were created:
 
   1) wildcardCA.pem & wildcardCA.key:

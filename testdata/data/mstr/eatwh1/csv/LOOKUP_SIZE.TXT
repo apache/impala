@@ -1,5 +1,0 @@
-1,Petite
-2,Small
-3,Medium
-4,Large
-5,X-Large

@@ -28,7 +28,7 @@
 #    pushd "${IMPALA_HOME}"
 #    export SANDBOX=$(mktemp -d) # Just a place to put files for testing
 #    echo "${SANDBOX}"
-#    git archive -o "${SANDBOX}/test-impala.tar.gz" HEAD # Make the tarball to check
+#    git --prefix=foo/ archive -o "${SANDBOX}/test-impala.tar.gz" HEAD # Make tarball
 #    java -jar ~/Downloads/apache-rat-0.12/apache-rat-0.12.jar -x \
 #        "${SANDBOX}/test-impala.tar.gz" >"${SANDBOX}/rat.xml"
 #    bin/check-rat-report.py bin/rat_exclude_files.txt "${SANDBOX}/rat.xml"

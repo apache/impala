@@ -1,4 +1,0 @@
-1,Mid-Atlantic,1
-2,New England,1
-3,Carolinas,2
-4,Deep South,2

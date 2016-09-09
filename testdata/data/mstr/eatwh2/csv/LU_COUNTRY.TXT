@@ -1,7 +1,0 @@
-1,USA
-2,Spain
-3,England
-4,France
-5,Germany
-6,Canada
-7,Web

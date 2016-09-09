@@ -1,3 +1,0 @@
-1,Winter
-2,Summer
-3,Spring/Fall

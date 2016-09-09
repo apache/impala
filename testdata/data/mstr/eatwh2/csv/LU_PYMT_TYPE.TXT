@@ -1,5 +1,0 @@
-1,Visa
-2,Amex
-3,Check
-4,MC
-5,Money Order
