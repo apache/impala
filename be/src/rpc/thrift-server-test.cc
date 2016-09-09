@@ -21,7 +21,6 @@
 #include "rpc/thrift-client.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
-#include "common/init.h"
 #include "gen-cpp/StatestoreService.h"
 #include "gutil/strings/substitute.h"
 
@@ -171,8 +170,4 @@ TEST(SslTest, ClientBeforeServer) {
     ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
 }
 
-int main(int argc, char** argv) {
-  InitCommonRuntime(argc, argv, false);
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

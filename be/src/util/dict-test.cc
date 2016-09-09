@@ -19,13 +19,10 @@
 #include <stdio.h>
 #include <iostream>
 
-#include <gtest/gtest.h>
-
-#include "common/init.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
-#include "testutil/test-macros.h"
+#include "testutil/gtest-util.h"
 #include "util/dict-encoding.h"
 
 #include "common/names.h"
@@ -165,11 +162,6 @@ TEST(DictTest, TestStringBufferOverrun) {
   ASSERT_FALSE(decoder.Reset(buffer, sizeof(buffer), 0));
 }
 
-
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

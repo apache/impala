@@ -15,15 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
+#include <boost/scoped_ptr.hpp>
 
-#include "testutil/gtest-util.h"
 #include "rpc/thrift-client.h"
-#include "service/impala-server.h"
-#include "testutil/in-process-servers.h"
-#include "common/init.h"
 #include "service/fe-support.h"
+#include "service/impala-server.h"
+#include "testutil/gtest-util.h"
+#include "testutil/in-process-servers.h"
 #include "util/impalad-metrics.h"
 #include "util/time.h"
 
@@ -99,8 +98,8 @@ TEST(SessionTest, TestExpiry) {
 }
 
 int main(int argc, char** argv) {
-  InitCommonRuntime(argc, argv, true);
-  InitFeSupport();
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  InitFeSupport();
   return RUN_ALL_TESTS();
 }

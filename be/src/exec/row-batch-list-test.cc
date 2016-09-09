@@ -20,17 +20,15 @@
 #include <iostream>
 #include <vector>
 
-#include <gtest/gtest.h>
-
 #include "exec/row-batch-list.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
-#include "util/cpu-info.h"
 #include "util/runtime-profile-counters.h"
 #include "testutil/desc-tbl-builder.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -141,8 +139,5 @@ TEST_F(RowBatchListTest, MultipleRowBatchesTest) {
 
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();
+

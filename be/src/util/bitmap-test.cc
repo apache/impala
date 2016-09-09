@@ -19,11 +19,10 @@
 #include <stdio.h>
 #include <iostream>
 #include <limits.h>
-
 #include <boost/utility.hpp>
-#include <gtest/gtest.h>
+
+#include "testutil/gtest-util.h"
 #include "util/bitmap.h"
-#include "util/cpu-info.h"
 
 #include "common/names.h"
 
@@ -176,8 +175,4 @@ TEST(Bitmap, MemUsage) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

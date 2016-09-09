@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <gtest/gtest.h>
 
+#include "testutil/gtest-util.h"
 #include "util/pretty-printer.h"
 
 #include "common/names.h"
@@ -134,9 +134,4 @@ TEST(PrettyPrinterTest, StringList) {
 
 }
 
-int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

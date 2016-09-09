@@ -17,14 +17,13 @@
 
 #include "exec/hdfs-avro-scanner.h"
 
-#include <gtest/gtest.h>
 #include <limits.h>
 
-#include "common/init.h"
 #include "exec/read-write-util.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
+#include "testutil/gtest-util.h"
 
 // TODO: IMPALA-3658: complete CHAR unit tests.
 // TODO: IMPALA-3658: complete VARCHAR unit tests.
@@ -462,8 +461,4 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

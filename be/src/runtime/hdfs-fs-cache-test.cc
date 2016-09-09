@@ -16,13 +16,13 @@
 // under the License.
 
 #include <string>
-#include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
 
 #include "runtime/hdfs-fs-cache.h"
+#include "testutil/gtest-util.h"
 #include "common/names.h"
 
-using namespace strings;
+using strings::Substitute;
 
 namespace impala {
 void ValidateNameNode(const string& path, const string& expected_namenode,
@@ -65,8 +65,4 @@ TEST(HdfsFsCacheTest, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-
+IMPALA_TEST_MAIN();

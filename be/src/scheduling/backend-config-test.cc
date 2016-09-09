@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
-
 #include "scheduling/backend-config.h"
 
 #include "common/logging.h"
 #include "common/names.h"
+#include "testutil/gtest-util.h"
 #include "util/network-util.h"
 #include "util/thread.h"
 
@@ -91,10 +90,4 @@ TEST(BackendConfigTest, RemoveBackendOnSameHost) {
 
 }  // end namespace impala
 
-int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
-  impala::CpuInfo::Init();
-  impala::InitThreading();
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

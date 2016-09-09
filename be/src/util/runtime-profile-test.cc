@@ -18,10 +18,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <gtest/gtest.h>
 #include <boost/bind.hpp>
+
 #include "common/object-pool.h"
-#include "util/cpu-info.h"
+#include "testutil/gtest-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
 #include "util/streaming-sampler.h"
@@ -690,10 +690,4 @@ TEST(TimerCounterTest, CountersTestRandom) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitThreading();
-  impala::CpuInfo::Init();
-  impala::OsInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

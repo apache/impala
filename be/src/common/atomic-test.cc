@@ -16,10 +16,10 @@
 // under the License.
 
 #include <string>
-#include <gtest/gtest.h>
 #include <boost/thread.hpp>
 
 #include "common/atomic.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -252,7 +252,4 @@ TEST(AtomicTest, MultipleTreadsAcquireReleaseLoadStoreInt64) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

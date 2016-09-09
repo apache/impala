@@ -17,10 +17,8 @@
 
 #include "redactor.h"
 #include "redactor.detail.h"
-
-#include <gtest/gtest.h>
-
 #include "redactor-test-utils.h"
+#include "testutil/gtest-util.h"
 
 namespace impala {
 
@@ -184,7 +182,4 @@ TEST(ParserTest, RuleNumberInErrorMessage) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

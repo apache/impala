@@ -16,11 +16,10 @@
 // under the License.
 
 #include <iostream>
-#include <gtest/gtest.h>
 
-#include "common/init.h"
 #include "common/logging.h"
 #include "udf/uda-test-harness.h"
+#include "testutil/gtest-util.h"
 #include "testutil/test-udas.h"
 
 #include "common/names.h"
@@ -314,8 +313,4 @@ TEST(MemTest, Basic) {
   EXPECT_FALSE(test_leak.Execute(input, BigIntVal(100))) << test.GetErrorMsg();
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

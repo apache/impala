@@ -17,9 +17,9 @@
 
 #include <string>
 #include <boost/bind.hpp>
-#include <gtest/gtest.h>
 
 #include "runtime/mem-tracker.h"
+#include "testutil/gtest-util.h"
 #include "util/metrics.h"
 
 #include "common/names.h"
@@ -219,7 +219,4 @@ TEST(MemTestTest, GcFunctions) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

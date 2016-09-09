@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <string>
+#include <sstream>
 #include "common/logging.h"
 #include "gutil/bits.h"
 #include "runtime/mem-pool.h"

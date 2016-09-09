@@ -20,10 +20,9 @@
 #include <iostream>
 
 #include <boost/utility.hpp>
-#include <gtest/gtest.h>
 #include <math.h>
 
-#include "common/init.h"
+#include "testutil/gtest-util.h"
 #include "util/rle-encoding.h"
 #include "util/bit-stream-utils.inline.h"
 
@@ -447,9 +446,4 @@ TEST(Rle, ZeroLiteralOrRepeatCount) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
-
+IMPALA_TEST_MAIN();

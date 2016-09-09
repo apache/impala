@@ -345,8 +345,8 @@ TEST(Webserver, NullCharTest) {
 
 
 int main(int argc, char **argv) {
-  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   ::testing::InitGoogleTest(&argc, argv);
+  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   FLAGS_webserver_port = 27890;
   return RUN_ALL_TESTS();
 }

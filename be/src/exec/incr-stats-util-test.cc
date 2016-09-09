@@ -20,7 +20,7 @@
 #include <limits>
 #include <cmath>
 
-#include "common/logging.h"
+#include "testutil/gtest-util.h"
 #include "exprs/aggregate-functions.h"
 
 #include "common/names.h"
@@ -73,8 +73,4 @@ TEST(RleTest, TestEncode) {
 }
 
 
-int main(int argc, char** argv) {
-  //InitCommonRuntime(argc, argv, true);
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

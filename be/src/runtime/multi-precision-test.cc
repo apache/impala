@@ -16,11 +16,10 @@
 // under the License.
 
 #include <string>
-#include <gtest/gtest.h>
 
 #include <boost/math/constants/constants.hpp>
-#include "common/logging.h"
 #include "runtime/multi-precision.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -140,7 +139,4 @@ TEST(MultiPrecisionFloatTest, Example) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

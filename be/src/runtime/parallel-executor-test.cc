@@ -19,8 +19,8 @@
 #include <string>
 #include <boost/bind.hpp>
 
-#include "testutil/gtest-util.h"
 #include "runtime/parallel-executor.h"
+#include "testutil/gtest-util.h"
 #include "util/thread.h"
 
 #include "common/names.h"
@@ -79,8 +79,4 @@ TEST(ParallelExecutorTest, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitThreading();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

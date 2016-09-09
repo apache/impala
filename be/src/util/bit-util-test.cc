@@ -22,9 +22,9 @@
 #include <limits.h>
 
 #include <boost/utility.hpp>
-#include <gtest/gtest.h>
 
 #include "gutil/bits.h"
+#include "testutil/gtest-util.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
 
@@ -267,8 +267,4 @@ TEST(BitUtil, RoundUpDown) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

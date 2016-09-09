@@ -18,11 +18,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <gtest/gtest.h>
 
 #include "common/object-pool.h"
+#include "testutil/gtest-util.h"
 #include "util/benchmark.h"
-#include "util/cpu-info.h"
 
 #include "common/names.h"
 
@@ -73,8 +72,4 @@ TEST(BenchmarkTest, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  impala::CpuInfo::Init();
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

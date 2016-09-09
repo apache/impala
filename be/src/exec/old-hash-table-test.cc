@@ -20,7 +20,6 @@
 #include <iostream>
 #include <vector>
 
-#include "testutil/gtest-util.h"
 #include "common/compiler-util.h"
 #include "exec/old-hash-table.inline.h"
 #include "exprs/expr.h"
@@ -30,6 +29,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
+#include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
 #include "util/runtime-profile-counters.h"
 
@@ -323,8 +323,4 @@ TEST_F(OldHashTableTest, GrowTableTest) {
 
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

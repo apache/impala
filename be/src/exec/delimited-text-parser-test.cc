@@ -16,10 +16,9 @@
 // under the License.
 
 #include <string>
-#include <gtest/gtest.h>
 
 #include "exec/delimited-text-parser.inline.h"
-#include "util/cpu-info.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -187,8 +186,4 @@ TEST(DelimitedTextParser, SpecialDelimiters) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <iostream>
 
-#include <gtest/gtest.h>
+#include "testutil/gtest-util.h"
 #include "util/debug-util.h"
 
 #include "common/names.h"
@@ -91,7 +91,4 @@ TEST(DebugUtil, PreCDH5QueryIdParsing) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

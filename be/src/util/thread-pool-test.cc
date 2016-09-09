@@ -18,11 +18,10 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <glog/logging.h>
-#include <gtest/gtest.h>
 #include <unistd.h>
 
-#include "common/init.h"
 #include "common/logging.h"
+#include "testutil/gtest-util.h"
 #include "util/thread-pool.h"
 
 #include "common/names.h"
@@ -70,8 +69,4 @@ TEST(ThreadPoolTest, BasicTest) {
 
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

@@ -19,11 +19,10 @@
 #include <stdio.h>
 #include <iostream>
 #include <limits.h>
-#include <gtest/gtest.h>
 #include "common/status.h"
 #include "exec/read-write-util.h"
-#include "util/cpu-info.h"
 #include "util/hash-util.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -164,8 +163,5 @@ TEST(ZigzagTest, Weird) {
 }
 }
 
-int main(int argc, char **argv) {
-  impala::CpuInfo::Init();
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();
+

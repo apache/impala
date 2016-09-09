@@ -20,9 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <gtest/gtest.h>
-
-#include "common/init.h"
+#include "testutil/gtest-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 
@@ -117,8 +115,4 @@ TEST(ParseMemSpecs, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  impala::InitCommonRuntime(argc, argv, false);
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

@@ -19,7 +19,6 @@
 
 #include <boost/lexical_cast.hpp>
 #include <inttypes.h>
-#include <gtest/gtest.h>
 #include <string>
 #include <gutil/strings/substitute.h>
 
@@ -135,8 +134,4 @@ TEST(QueryOptions, ParseQueryOptions) {
   }
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  MemInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

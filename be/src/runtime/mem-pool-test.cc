@@ -16,10 +16,10 @@
 // under the License.
 
 #include <string>
-#include <gtest/gtest.h>
 
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "testutil/gtest-util.h"
 #include "util/bit-util.h"
 
 #include "common/names.h"
@@ -489,7 +489,4 @@ TEST(MemPoolTest, ReturnAllocationThenFailedAllocation) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

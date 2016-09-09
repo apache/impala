@@ -25,7 +25,6 @@
 
 #include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
-#include "common/init.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/collection-value.h"

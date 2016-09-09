@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include <iostream>
 
+#include "rpc/thrift-util.h"
 #include "testutil/gtest-util.h"
 #include "util/network-util.h"
-#include "rpc/thrift-util.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
 
@@ -82,7 +82,4 @@ TEST(ThriftUtil, TNetworkAddressComparator) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

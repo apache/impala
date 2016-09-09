@@ -20,9 +20,8 @@
 #include <boost/filesystem.hpp>
 #include <sys/stat.h>
 
-#include "testutil/gtest-util.h"
-#include "common/init.h"
 #include "common/logging.h"
+#include "testutil/gtest-util.h"
 #include "util/test-info.h"
 
 #include "common/names.h"
@@ -65,7 +64,4 @@ TEST(FilesystemUtil, RemoveAndCreateDirectory) {
   filesystem::remove_all(dir);
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

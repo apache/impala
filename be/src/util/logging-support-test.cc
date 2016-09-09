@@ -16,14 +16,12 @@
 // under the License.
 
 #include <iostream>
-
-#include "logging-support.h"
-
 #include <boost/filesystem.hpp>
 #include <ctime>
 
 #include "testutil/gtest-util.h"
 #include "util/filesystem-util.h"
+#include "util/logging-support.h"
 
 using namespace impala;
 namespace filesystem = boost::filesystem;
@@ -95,7 +93,4 @@ TEST(LoggingSupport, DeleteOldLogs) {
   filesystem::remove_all(dir);
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

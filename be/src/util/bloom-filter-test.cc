@@ -21,9 +21,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <gtest/gtest.h>
-
-#include "util/cpu-info.h"
+#include "testutil/gtest-util.h"
 
 using namespace std;
 
@@ -287,9 +285,4 @@ TEST(BloomFilter, ThriftOr) {
 
 }  // namespace impala
 
-int main(int argc, char** argv) {
-  using namespace impala;
-  CpuInfo::Init();
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

@@ -17,9 +17,9 @@
 
 #include <string>
 #include <boost/bind.hpp>
-#include <gtest/gtest.h>
 
 #include "runtime/thread-resource-mgr.h"
+#include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
 
 #include "common/names.h"
@@ -166,8 +166,4 @@ TEST(ThreadResourceMgr, MultiCallbacks) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

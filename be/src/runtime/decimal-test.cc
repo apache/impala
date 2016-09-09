@@ -19,10 +19,10 @@
 #include <stdio.h>
 #include <iostream>
 #include <limits>
-#include <gtest/gtest.h>
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include "runtime/decimal-value.inline.h"
+#include "testutil/gtest-util.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
@@ -798,8 +798,4 @@ TEST(DecimalArithmetic, RandTesting) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::DecimalUtil::InitMaxUnscaledDecimal16();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

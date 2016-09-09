@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <limits.h>
-#include <gtest/gtest.h>
+
 #include "exec/read-write-util.h"
-#include "util/cpu-info.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -45,7 +45,7 @@ TEST(ReadWriteUtil, BigEndian) {
   TestBigEndian<uint32_t>(0xffff);
   TestBigEndian<uint32_t>(0xffffff);
   TestBigEndian<uint32_t>(0xffffffff);
-  
+
   TestBigEndian<uint64_t>(0);
   TestBigEndian<uint64_t>(0xff);
   TestBigEndian<uint64_t>(0xffff);
@@ -58,8 +58,4 @@ TEST(ReadWriteUtil, BigEndian) {
 
 }
 
-int main(int argc, char **argv) {
-  impala::CpuInfo::Init();
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

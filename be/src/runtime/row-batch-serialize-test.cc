@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/init.h"
 #include "testutil/gtest-util.h"
 #include "runtime/collection-value.h"
 #include "runtime/collection-value-builder.h"
@@ -646,7 +647,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   uint32_t seed = time(NULL);
   cout << "seed = " << seed << endl;
   srand(seed);

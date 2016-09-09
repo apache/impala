@@ -18,9 +18,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <gtest/gtest.h>
 
 #include "common/logging.h"
+#include "testutil/gtest-util.h"
 #include "util/coding-util.h"
 
 #include "common/names.h"
@@ -120,7 +120,4 @@ TEST(HtmlEscapingTest, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

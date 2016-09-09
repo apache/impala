@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <gtest/gtest.h>
 
+#include "testutil/gtest-util.h"
 #include "util/symbols-util.h"
 
 #include "common/names.h"
@@ -324,7 +324,4 @@ TEST(SymbolsUtil, ManglingPrepareOrClose) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

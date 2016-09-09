@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
-#include "util/cpu-info.h"
+#include "testutil/gtest-util.h"
 #include "util/fixed-size-hash-table.h"
 
 #include "common/names.h"
@@ -80,8 +79,4 @@ TEST(FixedSizeHash, TestAllOperations) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

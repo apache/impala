@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <limits>
-#include <gtest/gtest.h>
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
+#include "testutil/gtest-util.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
@@ -505,7 +505,4 @@ TEST(StringToBool, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

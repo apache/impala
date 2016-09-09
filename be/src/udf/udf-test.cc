@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
 #include <iostream>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include "common/init.h"
 #include "common/logging.h"
 #include "runtime/multi-precision.h"
 #include "testutil/test-udfs.h"
+#include "testutil/gtest-util.h"
 #include "udf/udf-test-harness.h"
 
 #include "common/names.h"
@@ -281,8 +280,4 @@ TEST(UdfTest, MemTest) {
 
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

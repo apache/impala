@@ -20,13 +20,12 @@
 #include <boost/assign/list_of.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <gtest/gtest.h>
 
-#include "common/init.h"
 #include "common/status.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
+#include "testutil/gtest-util.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
@@ -626,8 +625,4 @@ TEST(TimestampTest, Basic) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

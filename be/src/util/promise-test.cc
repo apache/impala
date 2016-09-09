@@ -16,10 +16,10 @@
 // under the License.
 
 #include <boost/thread.hpp>
-#include <gtest/gtest.h>
-#include <runtime/timestamp-value.h>
 #include <sys/resource.h>
 
+#include "runtime/timestamp-value.h"
+#include "testutil/gtest-util.h"
 #include "util/promise.h"
 #include "util/time.h"
 
@@ -90,6 +90,8 @@ TEST(PromiseDeathTest, RepeatedSetTest) {
 }
 
 int main(int argc, char **argv) {
+  // TODO: This test does not log into the logs/be_tests directory, but using the
+  // standard via InitCommonRuntime() causes the test to fail.
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

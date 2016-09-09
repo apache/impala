@@ -16,17 +16,15 @@
 // under the License.
 
 #include <iostream>
-#include <gtest/gtest.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 
-#include "common/init.h"
-#include "common/logging.h"
 #include "exprs/aggregate-functions.h"
 #include "runtime/multi-precision.h"
+#include "testutil/gtest-util.h"
 #include "udf/udf.h"
 #include "udf/uda-test-harness.h"
 #include "util/decimal-util.h"
@@ -165,8 +163,4 @@ TEST(HistogramTest, TestString) {
   EXPECT_TRUE(test.Execute(input, StringVal(&expected[0]))) << test.GetErrorMsg();
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

@@ -19,12 +19,13 @@
 #include <stdio.h>
 #include <iostream>
 
-#include "testutil/gtest-util.h"
+#include "gen-cpp/Descriptors_types.h"
+
 #include "runtime/mem-tracker.h"
 #include "runtime/mem-pool.h"
+#include "testutil/gtest-util.h"
 #include "util/decompress.h"
 #include "util/compress.h"
-#include "gen-cpp/Descriptors_types.h"
 
 #include "common/names.h"
 
@@ -375,6 +376,7 @@ TEST_F(DecompressorTest, Impala1506) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   int rand_seed = time(NULL);
   LOG(INFO) << "rand_seed: " << rand_seed;
   srand(rand_seed);

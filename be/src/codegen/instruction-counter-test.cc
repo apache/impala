@@ -16,7 +16,6 @@
 // under the License.
 
 #include <boost/thread/thread.hpp>
-#include <gtest/gtest.h>
 #include <string>
 
 #include "llvm/IR/Module.h"
@@ -27,6 +26,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "codegen/instruction-counter.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 using namespace llvm;
@@ -173,8 +173,5 @@ TEST_F(InstructionCounterTest, TestMemInstrCount) {
 
 }  // namespace impala
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();
 

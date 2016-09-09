@@ -19,6 +19,7 @@
 #define IMPALA_TESTUTIL_GTEST_UTIL_H_
 
 #include <gtest/gtest.h>
+#include "common/init.h"
 #include "common/status.h"
 
 namespace impala {
@@ -27,6 +28,15 @@ namespace impala {
 #define EXPECT_OK(status) EXPECT_TRUE(status.ok()) << "Error: " << status.GetDetail();
 #define ASSERT_OK(status) ASSERT_TRUE(status.ok()) << "Error: " << status.GetDetail();
 #define EXPECT_ERROR(status, err) EXPECT_EQ(status.code(), err);
+
+// Basic main() function to be used in gtest unit tests. Does not start a JVM and does
+// not initialize the FE.
+#define IMPALA_TEST_MAIN() \
+  int main(int argc, char** argv) { \
+    ::testing::InitGoogleTest(&argc, argv); \
+    impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST); \
+    return RUN_ALL_TESTS(); \
+  } \
 
 }
 #endif // IMPALA_TESTUTIL_GTEST_UTIL_H_

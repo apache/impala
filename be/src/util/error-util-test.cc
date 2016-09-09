@@ -15,12 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
 
-#include "error-util.h"
 #include "gen-cpp/Status_types.h"
 #include "gen-cpp/ErrorCodes_types.h"
+
+#include "error-util.h"
+#include "testutil/gtest-util.h"
 
 namespace impala {
 
@@ -134,7 +135,4 @@ TEST(ErrorMsg, PrintMap) {
 
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

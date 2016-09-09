@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
-
 #include "runtime/collection-value-builder.h"
 #include "runtime/mem-tracker.h"
 #include "testutil/desc-tbl-builder.h"
@@ -68,8 +66,4 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
   pool.FreeAll();
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-
+IMPALA_TEST_MAIN();

@@ -19,11 +19,10 @@
 
 #include <string>
 #include <utility>
-#include <gtest/gtest.h>
 
 #include "common/init.h"
-
 #include "common/names.h"
+#include "testutil/gtest-util.h"
 
 using namespace impala;
 using namespace std;
@@ -160,7 +159,4 @@ TEST(PrintTColumnValueTest, TestAllTypes) {
 }
 
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

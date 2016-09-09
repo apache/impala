@@ -22,13 +22,14 @@
 #include <cmath>
 #include <sstream>
 
-#include "common/compiler-util.h"
-#include "common/logging.h"
-#include "service/hs2-util.h"
-#include "udf/udf.h"
 #include "gen-cpp/CatalogService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"
+
+#include "common/compiler-util.h"
+#include "common/logging.h"
 #include "exprs/aggregate-functions.h"
+#include "service/hs2-util.h"
+#include "udf/udf.h"
 
 #include "common/names.h"
 

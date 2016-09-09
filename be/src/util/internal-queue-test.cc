@@ -22,6 +22,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include "common/init.h"
 #include "common/atomic.h"
 #include "util/internal-queue.h"
 
@@ -302,7 +303,7 @@ int main(int argc, char **argv) {
   cerr << "Internal Queue Test Skipped" << endl;
   return 0;
 #endif
-  google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

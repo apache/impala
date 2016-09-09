@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
 #include <string>
 
 #include "experiments/string-search-sse.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -113,7 +113,4 @@ TEST(StringSearchTest, Basic) {
 }
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

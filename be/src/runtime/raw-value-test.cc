@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
 #include <sstream>
 #include "runtime/raw-value.inline.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -194,9 +194,4 @@ TEST_F(RawValueTest, TemplatizedHash) {
 
 }
 
-int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::CpuInfo::Init();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

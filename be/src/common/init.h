@@ -23,8 +23,8 @@
 namespace impala {
 
 /// Initialises logging, flags, and, if init_jvm is true, an embedded JVM.
-/// Tests can initialize indicating if they are a FE or BE test if they require
-/// different behavior (most BE tests don't.).
+/// Tests must indicate if they are a FE or BE test to output logs to the appropriate
+/// logging directory, and enable special test-specific behavior.
 /// Callers that want to override default gflags variables should do so before calling
 /// this method. No logging should be performed until after this method returns.
 void InitCommonRuntime(int argc, char** argv, bool init_jvm,

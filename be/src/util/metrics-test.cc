@@ -16,13 +16,12 @@
 // under the License.
 
 #include <cmath>
-#include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
 #include <limits>
 #include <map>
 
+#include "testutil/gtest-util.h"
 #include "util/collection-metrics.h"
-#include "util/jni-util.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/thread.h"
@@ -379,11 +378,8 @@ TEST_F(MetricsTest, MetricGroupJson) {
 
 }
 
-int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitThreading();
-  impala::JniUtil::Init();
-
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

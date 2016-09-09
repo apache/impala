@@ -19,10 +19,9 @@
 
 #include <boost/thread.hpp>
 #include <glog/logging.h>
-#include <gtest/gtest.h>
 
-#include "common/init.h"
 #include "common/logging.h"
+#include "testutil/gtest-util.h"
 #include "util/test-info.h"
 
 #include "common/names.h"
@@ -152,7 +151,4 @@ TEST(FifoMultimap, PopShouldPopMostRecent) {
   ASSERT_EQ(0, c.size());
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();
