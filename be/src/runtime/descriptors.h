@@ -204,6 +204,7 @@ class TableDescriptor {
   const std::string& name() const { return name_; }
   const std::string& database() const { return database_; }
   int id() const { return id_; }
+  TTableType::type type() const { return type_; }
   const std::vector<ColumnDescriptor>& col_descs() const { return col_descs_; }
 
   /// Returns "<database>.<name>"
@@ -213,6 +214,7 @@ class TableDescriptor {
   std::string name_;
   std::string database_;
   TableId id_;
+  TTableType::type type_;
   int num_clustering_cols_;
   std::vector<ColumnDescriptor> col_descs_;
 };
@@ -222,25 +224,23 @@ class HdfsPartitionDescriptor {
  public:
   HdfsPartitionDescriptor(const THdfsTable& thrift_table,
       const THdfsPartition& thrift_partition, ObjectPool* pool);
+
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
   char escape_char() const { return escape_char_; }
   THdfsFileFormat::type file_format() const { return file_format_; }
-  const std::vector<ExprContext*>& partition_key_value_ctxs() const {
-    return partition_key_value_ctxs_;
-  }
   int block_size() const { return block_size_; }
   const std::string& location() const { return location_; }
   int64_t id() const { return id_; }
-
-  /// Calls Prepare()/Open()/Close() on all partition key exprs. Idempotent (this is
-  /// because both HdfsScanNode and HdfsTableSink may both use the same partition desc).
-  Status PrepareExprs(RuntimeState* state);
-  Status OpenExprs(RuntimeState* state);
-  void CloseExprs(RuntimeState* state);
-
   std::string DebugString() const;
+
+  /// It is safe to evaluate the returned expr contexts concurrently from multiple
+  /// threads because all exprs are literals, after the descriptor table has been
+  /// opened.
+  const std::vector<ExprContext*>& partition_key_value_ctxs() const {
+    return partition_key_value_ctxs_;
+  }
 
  private:
   char line_delim_;
@@ -253,13 +253,12 @@ class HdfsPartitionDescriptor {
   std::string location_;
   int64_t id_;
 
-  /// True if PrepareExprs has been called, to prevent repeating expensive codegen
-  bool exprs_prepared_;
-  bool exprs_opened_;
-  bool exprs_closed_;
-
   /// List of literal (and therefore constant) expressions for each partition key. Their
   /// order corresponds to the first num_clustering_cols of the parent table.
+  /// The Prepare()/Open()/Close() cycle is controlled by the containing descriptor table
+  /// because the same partition descriptor may be used by multiple exec nodes with
+  /// different lifetimes.
+  /// TODO: Move these into the new query-wide state, indexed by partition id.
   std::vector<ExprContext*> partition_key_value_ctxs_;
 
   /// The format (e.g. text, sequence file etc.) of data in the files in this partition
@@ -434,6 +433,12 @@ class DescriptorTbl {
   /// Returns OK on success, otherwise error (in which case 'tbl' will be unset).
   static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
                        DescriptorTbl** tbl);
+
+  /// Prepares and opens partition exprs of Hdfs tables.
+  Status PrepareAndOpenPartitionExprs(RuntimeState* state) const;
+
+  /// Closes partition exprs of Hdfs tables.
+  void ClosePartitionExprs(RuntimeState* state) const;
 
   TableDescriptor* GetTableDescriptor(TableId id) const;
   TupleDescriptor* GetTupleDescriptor(TupleId id) const;

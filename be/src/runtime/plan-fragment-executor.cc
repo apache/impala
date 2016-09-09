@@ -326,6 +326,9 @@ void PlanFragmentExecutor::PrintVolumeIds(
 Status PlanFragmentExecutor::Open() {
   VLOG_QUERY << "Open(): instance_id="
       << runtime_state_->fragment_instance_id();
+
+  RETURN_IF_ERROR(runtime_state_->desc_tbl().PrepareAndOpenPartitionExprs(runtime_state_.get()));
+
   // we need to start the profile-reporting thread before calling Open(), since it
   // may block
   if (!report_status_cb_.empty() && FLAGS_status_report_interval > 0) {
@@ -589,6 +592,7 @@ void PlanFragmentExecutor::Close() {
       runtime_state_->io_mgr()->UnregisterContext(context);
     }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
+    runtime_state_->desc_tbl().ClosePartitionExprs(runtime_state_.get());
     runtime_state_->filter_bank()->Close();
   }
   if (mem_usage_sampled_counter_ != NULL) {

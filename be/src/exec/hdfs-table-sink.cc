@@ -101,13 +101,6 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   DCHECK_GE(output_expr_ctxs_.size(),
       table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
 
-  // Prepare literal partition key exprs
-  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
-       table_desc_->partition_descriptors()) {
-    HdfsPartitionDescriptor* partition = id_to_desc.second;
-    RETURN_IF_ERROR(partition->PrepareExprs(state));
-  }
-
   return Status::OK();
 }
 
@@ -161,12 +154,6 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
 Status HdfsTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(partition_key_expr_ctxs_, state));
-  // Open literal partition key exprs
-  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
-       table_desc_->partition_descriptors()) {
-    HdfsPartitionDescriptor* partition = id_to_desc.second;
-    RETURN_IF_ERROR(partition->OpenExprs(state));
-  }
 
   // Get file format for default partition in table descriptor, and build a map from
   // partition key values to partition descriptor for multiple output format support. The
@@ -667,12 +654,6 @@ void HdfsTableSink::Close(RuntimeState* state) {
   }
   partition_keys_to_output_partitions_.clear();
 
-  // Close literal partition key exprs
-  for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
-       table_desc_->partition_descriptors()) {
-    HdfsPartitionDescriptor* partition = id_to_desc.second;
-    partition->CloseExprs(state);
-  }
   Expr::Close(output_expr_ctxs_, state);
   Expr::Close(partition_key_expr_ctxs_, state);
   DataSink::Close(state);

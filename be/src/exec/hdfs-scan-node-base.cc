@@ -283,16 +283,6 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
             try_cache, expected_local, file_desc->mtime));
   }
 
-  // Prepare all the partitions scanned by the scan node
-  for (int64_t partition_id: partition_ids_) {
-    HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    // This is IMPALA-1702, but will have been caught earlier in this method.
-    DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
-                                   << " partition_id=" << partition_id
-                                   << "\n" << PrintThrift(state->fragment_params());
-    RETURN_IF_ERROR(partition_desc->PrepareExprs(state));
-  }
-
   // Update server wide metrics for number of scan ranges and ranges that have
   // incomplete metadata.
   ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params_->size());
@@ -373,19 +363,14 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
 
   for (FilterContext& filter: filter_ctxs_) RETURN_IF_ERROR(filter.expr->Open(state));
 
-  // Open all the partition exprs used by the scan node and create template tuples.
+  // Create template tuples for all partitions.
   for (int64_t partition_id: partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
                                    << " partition_id=" << partition_id
                                    << "\n" << PrintThrift(state->fragment_params());
-    RETURN_IF_ERROR(partition_desc->OpenExprs(state));
-    vector<ExprContext*> partition_key_value_ctxs;
-    RETURN_IF_ERROR(Expr::CloneIfNotExists(
-        partition_desc->partition_key_value_ctxs(), state, &partition_key_value_ctxs));
-    partition_template_tuple_map_[partition_id] =
-        InitTemplateTuple(partition_key_value_ctxs, scan_node_pool_.get(), state);
-    Expr::Close(partition_key_value_ctxs, state);
+    partition_template_tuple_map_[partition_id] = InitTemplateTuple(
+        partition_desc->partition_key_value_ctxs(), scan_node_pool_.get(), state);
   }
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterContext(
@@ -476,20 +461,7 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
 
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
-  // Close all the partitions scanned by the scan node
-  for (int64_t partition_id: partition_ids_) {
-    HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    if (partition_desc == NULL) {
-      // TODO: Revert when IMPALA-1702 is fixed.
-      LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
-                 << " partition_id=" << partition_id
-                 << "\n" << PrintThrift(state->fragment_params());
-      continue;
-    }
-    partition_desc->CloseExprs(state);
-  }
-
-  // Open collection conjuncts
+  // Close collection conjuncts
   for (const auto& tid_conjunct: conjuncts_map_) {
     // conjuncts_ are already closed in ExecNode::Close()
     if (tid_conjunct.first == tuple_id_) continue;
@@ -680,9 +652,6 @@ Tuple* HdfsScanNodeBase::InitTemplateTuple(const vector<ExprContext*>& value_ctx
   for (int i = 0; i < partition_key_slots_.size(); ++i) {
     const SlotDescriptor* slot_desc = partition_key_slots_[i];
     ExprContext* value_ctx = value_ctxs[slot_desc->col_pos()];
-    /// This function may be called from multiple threads, and we expect each
-    /// thread to pass in their own cloned value contexts.
-    DCHECK(value_ctx->is_clone());
     // Exprs guaranteed to be literals, so can safely be evaluated without a row.
     RawValue::Write(value_ctx->GetValue(NULL), template_tuple, slot_desc, NULL);
   }

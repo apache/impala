@@ -118,14 +118,10 @@ Status HdfsScanner::Open(ScannerContext* context) {
   scanner_conjunct_ctxs_ = &scanner_conjuncts_map_[scan_node_->tuple_desc()->id()];
 
   // Initialize the template_tuple_.
-  vector<ExprContext*> partition_key_value_ctxs;
-  RETURN_IF_ERROR(Expr::CloneIfNotExists(
-      context_->partition_descriptor()->partition_key_value_ctxs(), state_,
-      &partition_key_value_ctxs));
-  template_tuple_ = scan_node_->InitTemplateTuple(partition_key_value_ctxs,
+  template_tuple_ = scan_node_->InitTemplateTuple(
+      context_->partition_descriptor()->partition_key_value_ctxs(),
       template_tuple_pool_.get(), state_);
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
-  Expr::Close(partition_key_value_ctxs, state_);
 
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   return Status::OK();

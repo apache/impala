@@ -145,6 +145,7 @@ TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
   : name_(tdesc.tableName),
     database_(tdesc.dbName),
     id_(tdesc.id),
+    type_(tdesc.tableType),
     num_clustering_cols_(tdesc.numClusteringCols) {
   for (int i = 0; i < tdesc.columnDescriptors.size(); ++i) {
     col_descs_.push_back(ColumnDescriptor(tdesc.columnDescriptors[i]));
@@ -176,9 +177,6 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsTable& thrift_table,
     escape_char_(thrift_partition.escapeChar),
     block_size_(thrift_partition.blockSize),
     id_(thrift_partition.id),
-    exprs_prepared_(false),
-    exprs_opened_(false),
-    exprs_closed_(false),
     file_format_(thrift_partition.fileFormat),
     object_pool_(pool) {
   DecompressLocation(thrift_table, thrift_partition, &location_);
@@ -190,29 +188,6 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsTable& thrift_table,
     DCHECK(status.ok());
     partition_key_value_ctxs_.push_back(ctx);
   }
-}
-
-Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
-  if (!exprs_prepared_) {
-    // TODO: RowDescriptor should arguably be optional in Prepare for known literals
-    exprs_prepared_ = true;
-    // Partition exprs are not used in the codegen case.  Don't codegen them.
-    RETURN_IF_ERROR(Expr::Prepare(partition_key_value_ctxs_, state, RowDescriptor(),
-                                  state->instance_mem_tracker()));
-  }
-  return Status::OK();
-}
-
-Status HdfsPartitionDescriptor::OpenExprs(RuntimeState* state) {
-  if (exprs_opened_) return Status::OK();
-  exprs_opened_ = true;
-  return Expr::Open(partition_key_value_ctxs_, state);
-}
-
-void HdfsPartitionDescriptor::CloseExprs(RuntimeState* state) {
-  if (exprs_closed_ || !exprs_prepared_) return;
-  exprs_closed_ = true;
-  Expr::Close(partition_key_value_ctxs_, state);
 }
 
 string HdfsPartitionDescriptor::DebugString() const {
@@ -238,13 +213,11 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
     null_partition_key_value_(tdesc.hdfsTable.nullPartitionKeyValue),
     null_column_value_(tdesc.hdfsTable.nullColumnValue),
     object_pool_(pool) {
-  map<int64_t, THdfsPartition>::const_iterator it;
-  for (it = tdesc.hdfsTable.partitions.begin(); it != tdesc.hdfsTable.partitions.end();
-       ++it) {
+  for (const auto& entry : tdesc.hdfsTable.partitions) {
     HdfsPartitionDescriptor* partition =
-        new HdfsPartitionDescriptor(tdesc.hdfsTable, it->second, pool);
+        new HdfsPartitionDescriptor(tdesc.hdfsTable, entry.second, pool);
     object_pool_->Add(partition);
-    partition_descriptors_[it->first] = partition;
+    partition_descriptors_[entry.first] = partition;
   }
   avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
 }
@@ -530,6 +503,31 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     parent->AddSlot(slot_d);
   }
   return Status::OK();
+}
+
+Status DescriptorTbl::PrepareAndOpenPartitionExprs(RuntimeState* state) const {
+  for (const auto& tbl_entry : tbl_desc_map_) {
+    if (tbl_entry.second->type() != TTableType::HDFS_TABLE) continue;
+    HdfsTableDescriptor* hdfs_tbl = static_cast<HdfsTableDescriptor*>(tbl_entry.second);
+    for (const auto& part_entry : hdfs_tbl->partition_descriptors()) {
+      // TODO: RowDescriptor should arguably be optional in Prepare for known literals
+      // Partition exprs are not used in the codegen case.  Don't codegen them.
+      RETURN_IF_ERROR(Expr::Prepare(part_entry.second->partition_key_value_ctxs(), state,
+          RowDescriptor(), state->instance_mem_tracker()));
+      RETURN_IF_ERROR(Expr::Open(part_entry.second->partition_key_value_ctxs(), state));
+    }
+  }
+  return Status::OK();
+}
+
+void DescriptorTbl::ClosePartitionExprs(RuntimeState* state) const {
+  for (const auto& tbl_entry: tbl_desc_map_) {
+    if (tbl_entry.second->type() != TTableType::HDFS_TABLE) continue;
+    HdfsTableDescriptor* hdfs_tbl = static_cast<HdfsTableDescriptor*>(tbl_entry.second);
+    for (const auto& part_entry: hdfs_tbl->partition_descriptors()) {
+      Expr::Close(part_entry.second->partition_key_value_ctxs(), state);
+    }
+  }
 }
 
 TableDescriptor* DescriptorTbl::GetTableDescriptor(TableId id) const {
