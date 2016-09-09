@@ -1,4 +1,0 @@
-1,Super Malls
-2,Strip Malls
-3,Retail Only
-4,Wholesale Only

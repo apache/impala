@@ -1,7 +1,0 @@
-1,Electronics
-2,Food
-3,Gifts
-4,Health & Beauty
-5,Household
-6,Kid's Korner
-7,Travel

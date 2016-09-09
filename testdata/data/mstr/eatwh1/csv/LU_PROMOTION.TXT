@@ -1,7 +1,0 @@
-1,Valentine's Day,2
-2,Post-Christmas,1
-3,Spring Readiness,1
-4,Summer Fun,2
-5,Back to School,1
-6,Fall Days,2
-9,Pampered Pets,2

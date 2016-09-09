@@ -1,4 +1,0 @@
-1,Casual Clothing
-2,Athletics
-3,US 
-4,US 

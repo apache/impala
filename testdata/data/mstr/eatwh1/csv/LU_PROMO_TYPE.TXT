@@ -1,2 +1,0 @@
-1,Recurring Sales
-2,One-time Sales

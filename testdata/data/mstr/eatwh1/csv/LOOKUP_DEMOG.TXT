@@ -1,7 +1,0 @@
-1,Caucasian
-2,African American
-3,Hispanic
-4,Asian
-5,Native American
-6,Alien
-7,Other

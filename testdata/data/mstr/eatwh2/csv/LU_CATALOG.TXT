@@ -1,8 +1,0 @@
-1,Spring 2000,,
-2,Summer 2000,,
-3,Fall 2000,,
-4,Winter 2000,,
-5,Spring 2001,,
-6,Summer 2001,,
-7,Fall 2001,,
-8,Winter 2001,,
