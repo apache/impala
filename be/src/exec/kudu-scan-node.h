@@ -101,8 +101,10 @@ class KuduScanNode : public ScanNode {
 
   RuntimeProfile::Counter* kudu_read_timer_;
   RuntimeProfile::Counter* kudu_round_trips_;
+  RuntimeProfile::Counter* kudu_remote_tokens_;
   static const std::string KUDU_READ_TIMER;
   static const std::string KUDU_ROUND_TRIPS;
+  static const std::string KUDU_REMOTE_TOKENS;
 
   /// The id of the callback added to the thread resource manager when a thread
   /// is available. Used to remove the callback before this scan node is destroyed.

@@ -62,6 +62,7 @@ namespace impala {
 
 const string KuduScanNode::KUDU_READ_TIMER = "TotalKuduReadTime";
 const string KuduScanNode::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
+const string KuduScanNode::KUDU_REMOTE_TOKENS = "KuduRemoteScanTokens";
 
 KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
@@ -97,6 +98,7 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
   kudu_read_timer_ = ADD_CHILD_TIMER(runtime_profile(), KUDU_READ_TIMER,
       SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
+  kudu_remote_tokens_ = ADD_COUNTER(runtime_profile(), KUDU_REMOTE_TOKENS, TUnit::UNIT);
 
   DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
 
@@ -104,9 +106,12 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
 
   // Initialize the list of scan tokens to process from the TScanRangeParams.
   DCHECK(scan_range_params_ != NULL);
+  int num_remote_tokens = 0;
   for (const TScanRangeParams& params: *scan_range_params_) {
+    if (params.__isset.is_remote && params.is_remote) ++num_remote_tokens;
     scan_tokens_.push_back(params.scan_range.kudu_scan_token);
   }
+  COUNTER_SET(kudu_remote_tokens_, num_remote_tokens);
   return Status::OK();
 }
 
