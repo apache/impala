@@ -391,6 +391,49 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Checks if the Hive function 'fn' is Impala compatible. A function is Impala
+   * compatible iff
+   *
+   * 1. The function is JAVA based,
+   * 2. Has exactly one binary resource associated (We don't support loading
+   *    dependencies yet) and
+   * 3. The binary is of type JAR.
+   *
+   * Returns true if compatible and false otherwise. In case of incompatible
+   * functions 'incompatMsg' has the reason for the incompatibility.
+   * */
+   public static boolean isFunctionCompatible(
+       org.apache.hadoop.hive.metastore.api.Function fn, StringBuilder incompatMsg) {
+    boolean isCompatible = true;
+    if (fn.getFunctionType() != FunctionType.JAVA) {
+      isCompatible = false;
+      incompatMsg.append("Function type: " + fn.getFunctionType().name()
+          + " is not supported. Only " + FunctionType.JAVA.name() + " functions "
+          + "are supported.");
+    } else if (fn.getResourceUrisSize() == 0) {
+      isCompatible = false;
+      incompatMsg.append("No executable binary resource (like a JAR file) is " +
+          "associated with this function. To fix this, recreate the function by " +
+          "specifying a 'location' in the function create statement.");
+    } else if (fn.getResourceUrisSize() != 1) {
+      isCompatible = false;
+      List<String> resourceUris = Lists.newArrayList();
+      for (ResourceUri resource: fn.getResourceUris()) {
+        resourceUris.add(resource.getUri());
+      }
+      incompatMsg.append("Impala does not support multiple Jars for dependencies."
+          + "(" + Joiner.on(",").join(resourceUris) + ") ");
+    } else if (fn.getResourceUris().get(0).getResourceType() != ResourceType.JAR) {
+      isCompatible = false;
+      incompatMsg.append("Function binary type: " +
+        fn.getResourceUris().get(0).getResourceType().name()
+        + " is not supported. Only " + ResourceType.JAR.name()
+        + " type is supported.");
+    }
+    return isCompatible;
+  }
+
+  /**
    * Returns a list of Impala Functions, one per compatible "evaluate" method in the UDF
    * class referred to by the given Java function. This method copies the UDF Jar
    * referenced by "function" to a temporary file in "LOCAL_LIBRARY_PATH" and loads it
@@ -404,32 +447,9 @@ public class CatalogServiceCatalog extends Catalog {
       throws ImpalaRuntimeException{
     List<Function> result = Lists.newArrayList();
     List<String> addedSignatures = Lists.newArrayList();
-    boolean compatible = true;
     StringBuilder warnMessage = new StringBuilder();
-    if (function.getFunctionType() != FunctionType.JAVA) {
-      compatible = false;
-      warnMessage.append("Function type: " + function.getFunctionType().name()
-          + " is not supported. Only " + FunctionType.JAVA.name() + " functions "
-          + "are supported.");
-    }
-    if (function.getResourceUrisSize() != 1) {
-      compatible = false;
-      List<String> resourceUris = Lists.newArrayList();
-      for (ResourceUri resource: function.getResourceUris()) {
-        resourceUris.add(resource.getUri());
-      }
-      warnMessage.append("Impala does not support multiple Jars for dependencies."
-          + "(" + Joiner.on(",").join(resourceUris) + ") ");
-    }
-    if (function.getResourceUris().get(0).getResourceType() != ResourceType.JAR) {
-      compatible = false;
-      warnMessage.append("Function binary type: " +
-        function.getResourceUris().get(0).getResourceType().name()
-        + " is not supported. Only " + ResourceType.JAR.name()
-        + " type is supported.");
-    }
-    if (!compatible) {
-      LOG.warn("Skipping load of incompatible Java function: " +
+    if (!isFunctionCompatible(function, warnMessage)) {
+      LOG.warn("Skipping load of incompatible function: " +
           function.getFunctionName() + ". " + warnMessage.toString());
       return result;
     }
