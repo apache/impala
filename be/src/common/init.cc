@@ -26,6 +26,14 @@
 #include "exprs/expr.h"
 #include "exprs/timezone_db.h"
 #include "gutil/atomicops.h"
+#include "rpc/authentication.h"
+#include "rpc/thrift-util.h"
+#include "runtime/decimal-value.h"
+#include "runtime/exec-env.h"
+#include "runtime/hdfs-fs-cache.h"
+#include "runtime/lib-cache.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/timestamp-parse-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/decimal-util.h"
@@ -34,20 +42,13 @@
 #include "util/mem-info.h"
 #include "util/minidump.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 #include "util/os-info.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
 #include "util/test-info.h"
 #include "util/thread.h"
 #include "util/time.h"
-#include "runtime/decimal-value.h"
-#include "runtime/exec-env.h"
-#include "runtime/hdfs-fs-cache.h"
-#include "runtime/lib-cache.h"
-#include "runtime/mem-tracker.h"
-#include "runtime/timestamp-parse-util.h"
-#include "rpc/authentication.h"
-#include "rpc/thrift-util.h"
 
 #include "common/names.h"
 
@@ -191,6 +192,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   AtomicOps_x86CPUFeaturesInit();
   impala::InitThreading();
   impala::TimestampParser::Init();
+  impala::SeedOpenSSLRNG();
   ABORT_IF_ERROR(impala::TimezoneDatabase::Initialize());
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 

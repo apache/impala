@@ -34,7 +34,6 @@
 #include "common/names.h"
 
 using namespace impala;
-using strings::Substitute;
 
 DEFINE_bool(require_username, false, "Requires that a user be provided in order to "
     "schedule requests. If enabled and a user is not provided, requests will be "

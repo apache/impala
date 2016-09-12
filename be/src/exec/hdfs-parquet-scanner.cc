@@ -47,7 +47,6 @@
 #include "common/names.h"
 
 using llvm::Function;
-using strings::Substitute;
 using namespace impala;
 
 DEFINE_double(parquet_min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "

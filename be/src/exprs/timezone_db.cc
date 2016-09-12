@@ -28,7 +28,6 @@
 using boost::local_time::tz_database;
 using boost::local_time::time_zone_ptr;
 using boost::local_time::posix_time_zone;
-using strings::Substitute;
 
 namespace impala {
 

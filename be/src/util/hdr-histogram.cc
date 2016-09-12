@@ -26,12 +26,13 @@
 
 #include "common/status.h"
 
+#include "common/names.h"
+
 using base::subtle::Atomic64;
 using base::subtle::NoBarrier_AtomicIncrement;
 using base::subtle::NoBarrier_Store;
 using base::subtle::NoBarrier_Load;
 using base::subtle::NoBarrier_CompareAndSwap;
-using strings::Substitute;
 
 using namespace impala;
 

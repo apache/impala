@@ -30,11 +30,8 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 
-using std::endl;
-using std::string;
-using std::stringstream;
-using std::vector;
-using strings::Substitute;
+#include "common/names.h"
+
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
 using boost::algorithm::token_compress_on;

@@ -27,8 +27,6 @@
 
 #include "common/names.h"
 
-using strings::Substitute;
-
 namespace impala {
 
 ReservationTracker::ReservationTracker() : initialized_(false), mem_tracker_(NULL) {}

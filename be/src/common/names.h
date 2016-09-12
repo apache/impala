@@ -178,3 +178,7 @@ using boost::function;
 using boost::bind;
 using boost::mem_fn;
 #endif
+
+#ifdef STRINGS_SUBSTITUTE_H_
+using strings::Substitute;
+#endif

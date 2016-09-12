@@ -22,8 +22,6 @@
 #include "testutil/gtest-util.h"
 #include "common/names.h"
 
-using strings::Substitute;
-
 namespace impala {
 void ValidateNameNode(const string& path, const string& expected_namenode,
     const string& expected_error) {

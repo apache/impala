@@ -33,8 +33,6 @@
 
 #include "common/names.h"
 
-using strings::Substitute;
-
 namespace impala {
 
 class BufferPoolTest : public ::testing::Test {

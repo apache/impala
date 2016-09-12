@@ -57,7 +57,6 @@ using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
 using kudu::client::KuduValue;
 using kudu::Slice;
-using strings::Substitute;
 
 namespace impala {
 

@@ -28,8 +28,6 @@
 
 #include "common/names.h"
 
-using strings::Substitute;
-
 namespace impala {
 
 class ReservationTrackerTest : public ::testing::Test {

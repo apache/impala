@@ -35,17 +35,12 @@
 
 #include "common/logging.h"
 
+#include "common/names.h"
+
 namespace impala {
 
 using rapidjson::Document;
 using rapidjson::Value;
-using std::endl;
-using std::map;
-using std::ostream;
-using std::ostringstream;
-using std::string;
-using std::vector;
-using strings::Substitute;
 
 typedef re2::RE2 Regex;
 

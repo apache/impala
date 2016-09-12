@@ -23,12 +23,13 @@
 
 #include "util/bit-util.h"
 
+#include "common/names.h"
+
 using namespace impala_udf;
 
 using boost::make_unsigned;
 
 using impala::BitUtil;
-using strings::Substitute;
 
 namespace impala {
 

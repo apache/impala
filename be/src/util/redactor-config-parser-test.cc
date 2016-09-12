@@ -20,10 +20,9 @@
 #include "redactor-test-utils.h"
 #include "testutil/gtest-util.h"
 
-namespace impala {
+#include "common/names.h"
 
-using std::string;
-using strings::Substitute;
+namespace impala {
 
 extern std::vector<Rule>* g_rules;
 

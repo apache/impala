@@ -41,8 +41,6 @@
 
 #include "common/names.h"
 
-using strings::Substitute;
-
 // Provide a workaround for IMPALA-1658.
 DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
     "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "

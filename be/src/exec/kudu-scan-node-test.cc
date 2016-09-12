@@ -37,12 +37,13 @@
 #include "util/cpu-info.h"
 #include "util/test-info.h"
 
+#include "common/names.h"
+
 DEFINE_bool(skip_delete_table, false, "Skips deleting the tables at the end of the tests.");
 DEFINE_string(use_existing_table, "", "The name of the existing table to use.");
 DECLARE_bool(pick_only_leaders_for_tests);
 
 using apache::thrift::ThriftDebugString;
-using strings::Substitute;
 
 namespace impala {
 

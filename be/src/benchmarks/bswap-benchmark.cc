@@ -32,7 +32,6 @@
 #include "common/names.h"
 
 using std::numeric_limits;
-using strings::Substitute;
 using namespace impala;
 
 // This benchmark is to compare the performance for all available byteswap approaches:

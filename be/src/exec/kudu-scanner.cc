@@ -42,7 +42,6 @@ using kudu::client::KuduClient;
 using kudu::client::KuduScanBatch;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
-using strings::Substitute;
 
 DEFINE_bool(pick_only_leaders_for_tests, false,
             "Whether to pick only leader replicas, for tests purposes only.");

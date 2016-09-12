@@ -42,12 +42,8 @@
 
 using namespace llvm;
 using namespace llvm::object;
-using std::fstream;
 using std::hex;
-using std::ofstream;
 using std::rename;
-using std::unique_ptr;
-using strings::Substitute;
 
 namespace impala {
 

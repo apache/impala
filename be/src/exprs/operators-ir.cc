@@ -16,14 +16,15 @@
 // under the License.
 
 #include "exprs/operators.h"
+
+#include <boost/cstdint.hpp>
+
 #include "exprs/anyval-util.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 
-#include <boost/cstdint.hpp>
-#include <gutil/strings/substitute.h>
-
-using strings::Substitute;
+#include "common/names.h"
 
 #define BINARY_OP_FN(NAME, TYPE, OP) \
   TYPE Operators::NAME##_##TYPE##_##TYPE(\

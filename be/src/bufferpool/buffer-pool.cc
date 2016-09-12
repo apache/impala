@@ -27,8 +27,6 @@
 #include "util/bit-util.h"
 #include "util/uid-util.h"
 
-using strings::Substitute;
-
 namespace impala {
 
 /// The internal representation of a page, which can be pinned or unpinned. If the

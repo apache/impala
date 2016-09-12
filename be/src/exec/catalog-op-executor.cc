@@ -38,7 +38,6 @@
 using namespace impala;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
-using strings::Substitute;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);

@@ -49,7 +49,6 @@
 
 using boost::filesystem::directory_iterator;
 using boost::filesystem::remove;
-using strings::Substitute;
 
 // Note: This is the default scratch dir created by impala.
 // FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.
@@ -389,8 +388,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
   void TestRandomInternalImpl(RuntimeState* state, BufferedBlockMgr* block_mgr,
       int num_buffers, int tid) {
     ASSERT_TRUE(block_mgr != NULL);
-    const int num_iterations = 100000;
-    const int iters_before_close = num_iterations - 5000;
+    const int num_iterations = 10000;
+    const int iters_before_close = num_iterations - 1000;
     bool close_called = false;
     unordered_map<BufferedBlockMgr::Block*, int> pinned_block_map;
     vector<pair<BufferedBlockMgr::Block*, int32_t>> pinned_blocks;
