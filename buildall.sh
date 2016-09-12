@@ -344,7 +344,7 @@ echo "Creating shell tarball"
 
 if [ "$FORMAT_CLUSTER" -eq 1 ]; then
   "$IMPALA_HOME/testdata/bin/run-all.sh" -format
-elif [ "$TESTDATA_ACTION" -eq 1 ] || [ "$TESTS_ACTION "-eq 1 ]; then
+elif [ "$TESTDATA_ACTION" -eq 1 ] || [ "$TESTS_ACTION" -eq 1 ]; then
   "$IMPALA_HOME/testdata/bin/run-all.sh"
 fi
 
