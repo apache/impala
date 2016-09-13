@@ -21,8 +21,8 @@ from time import time
 
 from tests.common.errors import Timeout
 
-from common import Column, Table
-from db_types import BigInt, String
+from tests.comparison.common import Column, Table
+from tests.comparison.db_types import BigInt, String
 
 class TestCluster(object):
 
@@ -83,8 +83,8 @@ class TestModel(object):
     table = Table("some_test_table")
     cursor.drop_table(table.name, if_exists=True)
     table.storage_format = 'textfile'
-    table.cols.append(Column(table, "bigint_col", BigInt))
-    table.cols.append(Column(table, "string_col", String))
+    table.add_col(Column(table, "bigint_col", BigInt))
+    table.add_col(Column(table, "string_col", String))
     cursor.create_table(table)
     try:
       other = hive_cursor.describe_table(table.name)
