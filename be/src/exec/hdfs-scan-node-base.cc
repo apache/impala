@@ -625,6 +625,19 @@ HdfsFileDesc* HdfsScanNodeBase::GetFileDesc(const string& filename) {
   return file_descs_[filename];
 }
 
+void HdfsScanNodeBase::SetFileMetadata(const string& filename, void* metadata) {
+  unique_lock<mutex> l(metadata_lock_);
+  DCHECK(per_file_metadata_.find(filename) == per_file_metadata_.end());
+  per_file_metadata_[filename] = metadata;
+}
+
+void* HdfsScanNodeBase::GetFileMetadata(const string& filename) {
+  unique_lock<mutex> l(metadata_lock_);
+  map<string, void*>::iterator it = per_file_metadata_.find(filename);
+  if (it == per_file_metadata_.end()) return NULL;
+  return it->second;
+}
+
 void* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
   CodegendFnMap::iterator it = codegend_fn_map_.find(type);
   if (it == codegend_fn_map_.end()) return NULL;

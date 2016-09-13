@@ -85,16 +85,6 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
-  /// Sets the scanner specific metadata for 'filename'.
-  /// This is thread safe.
-  void SetFileMetadata(const std::string& filename, void* metadata);
-
-  /// Gets scanner specific metadata for 'filename'.  Scanners can use this to store
-  /// file header information.
-  /// Returns NULL if there is no metadata.
-  /// This is thread safe.
-  void* GetFileMetadata(const std::string& filename);
-
   /// Called by scanners when a range is complete. Used to record progress and set done_.
   /// This *must* only be called after a scanner has completely finished its
   /// scan range (i.e. context->Flush()), and has added the final row batch to the row
@@ -114,11 +104,6 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// left (due to limits) is less than this value, we won't start up optional
   /// scanner threads.
   int64_t scanner_thread_bytes_required_;
-
-  /// Scanner specific per file metadata (e.g. header information) and associated lock.
-  /// This lock cannot be taken together with any other locks except lock_.
-  boost::mutex metadata_lock_;
-  std::map<std::string, void*> per_file_metadata_;
 
   /// Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;

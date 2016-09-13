@@ -404,7 +404,8 @@ Status HdfsParquetScanner::ProcessSplit() {
   DCHECK(scan_node_->HasRowBatchQueue());
   HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
   do {
-    StartNewParquetRowBatch();
+    batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
+        scan_node_->mem_tracker());
     RETURN_IF_ERROR(GetNextInternal(batch_));
     scan_node->AddMaterializedRowBatch(batch_);
     ++row_batches_produced_;
@@ -414,7 +415,8 @@ Status HdfsParquetScanner::ProcessSplit() {
   } while (!eos_ && !scan_node_->ReachedLimit());
 
   // Transfer the remaining resources to this new batch in Close().
-  StartNewParquetRowBatch();
+  batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
+      scan_node_->mem_tracker());
   return Status::OK();
 }
 
@@ -974,12 +976,6 @@ Status HdfsParquetScanner::AssembleRows(
   }
 
   return Status::OK();
-}
-
-void HdfsParquetScanner::StartNewParquetRowBatch() {
-  DCHECK(scan_node_->HasRowBatchQueue());
-  batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
-      scan_node_->mem_tracker());
 }
 
 Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {

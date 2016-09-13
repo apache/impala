@@ -36,8 +36,6 @@ using namespace impala;
 int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size,
     FieldLocation* fields, int num_tuples, int max_added_tuples,
     int slots_per_tuple, int row_idx_start) {
-
-  DCHECK(scan_node_->HasRowBatchQueue());
   DCHECK(tuple_ != NULL);
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(tuple_row);
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(tuple_);

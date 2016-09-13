@@ -257,8 +257,9 @@ class ScannerContext {
     /// If 'batch' is not NULL and 'contains_tuple_data_' is true, attaches all completed
     /// io buffers and the boundary mem pool to 'batch'. If 'done' is set, all in-flight
     /// resources are also attached or released.
-    /// If 'batch' is NULL then 'done' must be true. Such a call will release all
-    /// completed and in-flight resources.
+    /// If 'batch' is NULL then 'done' must be true or 'contains_tuple_data_' false. Such
+    /// a call will release all completed resources. If 'done' is true all in-flight
+    /// resources are also freed.
     void ReleaseCompletedResources(RowBatch* batch, bool done);
 
     /// Error-reporting functions.

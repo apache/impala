@@ -45,7 +45,8 @@ Status HdfsScanNodeMt::Prepare(RuntimeState* state) {
   // Return an error if this scan node has been assigned a range that is not supported
   // because the scanner of the corresponding file format does implement GetNext().
   for (const auto& files: per_type_files_) {
-    if (!files.second.empty() && files.first != THdfsFileFormat::PARQUET) {
+    if (!files.second.empty() && files.first != THdfsFileFormat::PARQUET
+        && files.first != THdfsFileFormat::TEXT) {
       stringstream msg;
       msg << "Unsupported file format with HdfsScanNodeMt: " << files.first;
       return Status(msg.str());

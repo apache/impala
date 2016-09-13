@@ -239,19 +239,6 @@ void HdfsScanNode::Close(RuntimeState* state) {
   HdfsScanNodeBase::Close(state);
 }
 
-void HdfsScanNode::SetFileMetadata(const string& filename, void* metadata) {
-  unique_lock<mutex> l(metadata_lock_);
-  DCHECK(per_file_metadata_.find(filename) == per_file_metadata_.end());
-  per_file_metadata_[filename] = metadata;
-}
-
-void* HdfsScanNode::GetFileMetadata(const string& filename) {
-  unique_lock<mutex> l(metadata_lock_);
-  map<string, void*>::iterator it = per_file_metadata_.find(filename);
-  if (it == per_file_metadata_.end()) return NULL;
-  return it->second;
-}
-
 void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
     const std::vector<THdfsCompression::type>& compression_type) {
   lock_guard<SpinLock> l(file_type_counts_);

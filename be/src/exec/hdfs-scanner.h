@@ -322,13 +322,23 @@ class HdfsScanner {
   Status GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
       Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows);
 
-  /// Commit num_rows to the current row batch.  If this completes, the row batch is
-  /// enqueued with the scan node and StartNewRowBatch() is called.
-  /// Returns Status::OK if the query is not cancelled and hasn't exceeded any mem limits.
-  /// Scanner can call this with 0 rows to flush any pending resources (attached pools
-  /// and io buffers) to minimize memory consumption.
-  /// Only valid to call if the parent scan node is multi-threaded.
-  Status CommitRows(int num_rows);
+  /// Commits 'num_rows' to 'row_batch'. Advances 'tuple_mem_' and 'tuple_' accordingly.
+  /// Attaches completed resources from 'context_' to 'row_batch' if necessary.
+  /// Frees local expr allocations.
+  /// If 'enqueue_if_full' is true and 'row_batch' is at capacity after committing the
+  /// rows, then 'row_batch' is added to the queue, and a new batch is created with
+  /// StartNewRowBatch(). It is only valid to pass true for 'enqueue_if_full' if the
+  /// parent parent scan node is multi-threaded.
+  /// Returns non-OK if 'context_' is cancelled or the query status in 'state_' is
+  /// non-OK.
+  Status CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row_batch);
+
+  /// Calls the above CommitRows() passing true for 'queue_if_full', and 'batch_' as the
+  /// row batch. Only valid to call if the parent scan node is multi-threaded.
+  Status CommitRows(int num_rows) {
+    DCHECK(scan_node_->HasRowBatchQueue());
+    return CommitRows(num_rows, true, batch_);
+  }
 
   /// Release all memory in 'pool' to batch_. If 'commit_batch' is true, the row batch
   /// will be committed. 'commit_batch' should be true if the attached pool is expected

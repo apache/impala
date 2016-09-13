@@ -92,7 +92,7 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
 }
 
 void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool done) {
-  DCHECK(batch != nullptr || done);
+  DCHECK(batch != nullptr || done || !contains_tuple_data_);
   if (done) {
     // Mark any pending resources as completed
     if (io_buffer_ != nullptr) {

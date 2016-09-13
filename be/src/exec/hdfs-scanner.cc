@@ -192,26 +192,30 @@ Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool
   return Status::OK();
 }
 
-// TODO(skye): have this check scan_node_->ReachedLimit() and get rid of manual check?
-Status HdfsScanner::CommitRows(int num_rows) {
-  DCHECK(scan_node_->HasRowBatchQueue());
-  DCHECK(batch_ != NULL);
-  DCHECK_LE(num_rows, batch_->capacity() - batch_->num_rows());
-  batch_->CommitRows(num_rows);
+Status HdfsScanner::CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row_batch) {
+  DCHECK(batch_ != NULL || !scan_node_->HasRowBatchQueue());
+  DCHECK(batch_ == row_batch || !scan_node_->HasRowBatchQueue());
+  DCHECK(!enqueue_if_full || scan_node_->HasRowBatchQueue());
+  DCHECK_LE(num_rows, row_batch->capacity() - row_batch->num_rows());
+  row_batch->CommitRows(num_rows);
   tuple_mem_ += static_cast<int64_t>(scan_node_->tuple_desc()->byte_size()) * num_rows;
+  tuple_ = reinterpret_cast<Tuple*>(tuple_mem_);
 
   // We need to pass the row batch to the scan node if there is too much memory attached,
   // which can happen if the query is very selective. We need to release memory even
   // if no rows passed predicates.
-  if (batch_->AtCapacity() || context_->num_completed_io_buffers() > 0) {
-    context_->ReleaseCompletedResources(batch_, /* done */ false);
-    static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(batch_);
-    RETURN_IF_ERROR(StartNewRowBatch());
+  if (row_batch->AtCapacity() || context_->num_completed_io_buffers() > 0) {
+    context_->ReleaseCompletedResources(row_batch, /* done */ false);
+    if (enqueue_if_full) {
+      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
+      RETURN_IF_ERROR(StartNewRowBatch());
+    }
   }
   if (context_->cancelled()) return Status::CANCELLED;
   // Check for UDF errors.
   RETURN_IF_ERROR(state_->GetQueryStatus());
-  // Free local expr allocations for this thread
+  // Free local expr allocations for this thread to avoid accumulating too much
+  // memory from evaluating the scanner conjuncts.
   for (const auto& entry: scanner_conjuncts_map_) {
     ExprContext::FreeLocalAllocations(entry.second);
   }

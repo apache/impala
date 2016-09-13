@@ -221,7 +221,9 @@ public class HdfsScanNode extends ScanNode {
     // is currently only supported for Parquet.
     if (analyzer.getQueryOptions().isSetMt_dop() &&
         analyzer.getQueryOptions().mt_dop > 0 &&
-        fileFormats.size() == 1 && fileFormats.contains(HdfsFileFormat.PARQUET)) {
+        fileFormats.size() == 1 &&
+        (fileFormats.contains(HdfsFileFormat.PARQUET)
+          || fileFormats.contains(HdfsFileFormat.TEXT))) {
       useMtScanNode_ = true;
     } else {
       useMtScanNode_ = false;

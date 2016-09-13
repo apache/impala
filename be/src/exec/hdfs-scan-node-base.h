@@ -233,6 +233,14 @@ class HdfsScanNodeBase : public ScanNode {
   /// Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
   HdfsFileDesc* GetFileDesc(const std::string& filename);
 
+  /// Sets the scanner specific metadata for 'filename'. Scanners can use this to store
+  /// file header information. Thread safe.
+  void SetFileMetadata(const std::string& filename, void* metadata);
+
+  /// Returns the scanner specific metadata for 'filename'. Returns NULL if there is no
+  /// metadata. Thread safe.
+  void* GetFileMetadata(const std::string& filename);
+
   /// Called by scanners when a range is complete. Used to record progress.
   /// This *must* only be called after a scanner has completely finished its
   /// scan range (i.e. context->Flush()), and has returned the final row batch.
@@ -335,6 +343,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// File format => file descriptors.
   typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*>> FileFormatsMap;
   FileFormatsMap per_type_files_;
+
+  /// Scanner specific per file metadata (e.g. header information) and associated lock.
+  /// TODO: Remove this lock when removing the legacy scanners and scan nodes.
+  boost::mutex metadata_lock_;
+  std::map<std::string, void*> per_file_metadata_;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.
