@@ -116,8 +116,10 @@ export USE_KUDU_DEBUG_BUILD
 # Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
 # into the backend. The frontend build is OS independent since it is Java.
 if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
-  KUDU_IS_SUPPORTED=true
-  if [[ -z "$KUDU_BUILD_DIR" ]]; then
+  if [[ -n "$KUDU_BUILD_DIR" ]]; then
+    KUDU_IS_SUPPORTED=true
+  else
+    KUDU_IS_SUPPORTED=false
     if ! $IS_OSX; then
       if ! which lsb_release &>/dev/null; then
         echo Unable to find the 'lsb_release' command. \
@@ -132,9 +134,8 @@ if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
       # Remove spaces, trim minor versions, and convert to lowercase.
       DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
       case "$DISTRO_VERSION" in
-        # "enterprise" is Oracle
-        centos5 | debian* | enterprise*5 | redhat*5 | suse* | ubuntu*12)
-            KUDU_IS_SUPPORTED=false;;
+        centos6 | centos7 | debian7 | debian8 | ubuntu* )
+            KUDU_IS_SUPPORTED=true;;
       esac
     fi
   fi
@@ -259,7 +260,7 @@ export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2-p2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
-export IMPALA_KUDU_VERSION=0.10.0-RC1
+export IMPALA_KUDU_VERSION=1.0.0-RC1
 export IMPALA_LLVM_VERSION=3.8.0-p1
 export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
 # Debug builds should use the release+asserts build to get additional coverage.
