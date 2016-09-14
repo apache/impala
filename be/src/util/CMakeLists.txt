@@ -105,6 +105,7 @@ target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 
 ADD_BE_TEST(benchmark-test)
 ADD_BE_TEST(bitmap-test)
+ADD_BE_TEST(bit-packing-test)
 ADD_BE_TEST(bit-util-test)
 ADD_BE_TEST(blocking-queue-test)
 ADD_BE_TEST(bloom-filter-test)

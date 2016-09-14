@@ -25,6 +25,7 @@
 #include "gutil/strings/substitute.h"
 #include "exec/parquet-common.h"
 #include "runtime/decimal-value.h"
+#include "testutil/mem-util.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/bit-util.h"
@@ -116,18 +117,6 @@ void TestSIMDSwap(int batch_size, void* d) {
   BitUtil::ByteSwap(data->outbuffer, data->inbuffer, data->num_values);
 }
 
-// Allocate 64-byte (an x86-64 cache line) aligned memory so it does not straddle cache
-// line boundaries. This is sufficient to meet alignment requirements for all SIMD
-// instructions, at least up to AVX-512.
-// Exit process if allocation fails.
-void* AllocateAligned(size_t size) {
-  void* ptr;
-  if (posix_memalign(&ptr, 64, size) != 0) {
-    LOG(FATAL) << "Failed to allocate " << size;
-  }
-  return ptr;
-}
-
 // Benchmark routine for FastScalar/"Pure" SSSE3/"Pure" AVX2/SIMD approaches
 void PerfBenchmark() {
   // Measure perf both when memory is perfectly aligned for SIMD and also misaligned.
@@ -135,18 +124,16 @@ void PerfBenchmark() {
   const vector<int> misalignments({0, 1, 4, max_misalignment});
   const int data_len = 1 << 20;
 
-  const unique_ptr<uint8_t, decltype(free)*> inbuffer(
-      reinterpret_cast<uint8_t*>(AllocateAligned(data_len + max_misalignment)), free);
-  const unique_ptr<uint8_t, decltype(free)*> outbuffer(
-      reinterpret_cast<uint8_t*>(AllocateAligned(data_len + max_misalignment)), free);
+  AlignedAllocation inbuffer(data_len + max_misalignment);
+  AlignedAllocation outbuffer(data_len + max_misalignment);
 
   for (const int misalign : misalignments) {
     Benchmark suite(Substitute("ByteSwap benchmark misalignment=$0", misalign));
     TestData data;
 
     data.num_values = data_len;
-    data.inbuffer = inbuffer.get() + misalign;
-    data.outbuffer = outbuffer.get() + misalign;
+    data.inbuffer = inbuffer.data() + misalign;
+    data.outbuffer = outbuffer.data() + misalign;
     InitData(data.inbuffer, data_len);
 
     const int baseline = suite.AddBenchmark("FastScalar", TestFastScalarSwap, &data, -1);

@@ -98,13 +98,19 @@ class BitWriter {
 class BitReader {
  public:
   /// 'buffer' is the buffer to read from.  The buffer's length is 'buffer_len'.
-  BitReader(uint8_t* buffer, int buffer_len) {
-    Reset(buffer, buffer_len);
-  }
+  /// Does not take ownership of the buffer.
+  BitReader(const uint8_t* buffer, int buffer_len) { Reset(buffer, buffer_len); }
 
   BitReader() : buffer_(NULL), max_bytes_(0) {}
 
-  void Reset(uint8_t* buffer, int buffer_len) {
+  // The implicit copy constructor is left defined. If a BitReader is copied, the
+  // two copies do not share any state. Invoking functions on either copy continues
+  // reading from the current read position without modifying the state of the other
+  // copy.
+
+  /// Resets the read to start reading from the start of 'buffer'. The buffer's
+  /// length is 'buffer_len'. Does not take ownership of the buffer.
+  void Reset(const uint8_t* buffer, int buffer_len) {
     buffer_ = buffer;
     max_bytes_ = buffer_len;
     byte_offset_ = 0;
@@ -141,7 +147,7 @@ class BitReader {
   static const int MAX_BITWIDTH = 32;
 
  private:
-  uint8_t* buffer_;
+  const uint8_t* buffer_;
   int max_bytes_;
 
   /// Bytes are memcpy'd from buffer_ and values are read from this variable. This is

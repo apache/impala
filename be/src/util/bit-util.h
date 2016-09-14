@@ -41,17 +41,17 @@ using boost::make_unsigned;
 class BitUtil {
  public:
   /// Returns the ceil of value/divisor
-  static inline int64_t Ceil(int64_t value, int64_t divisor) {
+  constexpr static inline int64_t Ceil(int64_t value, int64_t divisor) {
     return value / divisor + (value % divisor != 0);
   }
 
   /// Returns 'value' rounded up to the nearest multiple of 'factor'
-  static inline int64_t RoundUp(int64_t value, int64_t factor) {
+  constexpr static inline int64_t RoundUp(int64_t value, int64_t factor) {
     return (value + (factor - 1)) / factor * factor;
   }
 
   /// Returns 'value' rounded down to the nearest multiple of 'factor'
-  static inline int64_t RoundDown(int64_t value, int64_t factor) {
+  constexpr static inline int64_t RoundDown(int64_t value, int64_t factor) {
     return (value / factor) * factor;
   }
 
@@ -85,34 +85,28 @@ class BitUtil {
   /// Specialized round up and down functions for frequently used factors,
   /// like 8 (bits->bytes), 32 (bits->i32), and 64 (bits->i64).
   /// Returns the rounded up number of bytes that fit the number of bits.
-  static inline uint32_t RoundUpNumBytes(uint32_t bits) {
+  constexpr static inline uint32_t RoundUpNumBytes(uint32_t bits) {
     return (bits + 7) >> 3;
   }
 
   /// Returns the rounded down number of bytes that fit the number of bits.
-  static inline uint32_t RoundDownNumBytes(uint32_t bits) {
-    return bits >> 3;
-  }
+  constexpr static inline uint32_t RoundDownNumBytes(uint32_t bits) { return bits >> 3; }
 
   /// Returns the rounded up to 32 multiple. Used for conversions of bits to i32.
-  static inline uint32_t RoundUpNumi32(uint32_t bits) {
+  constexpr static inline uint32_t RoundUpNumi32(uint32_t bits) {
     return (bits + 31) >> 5;
   }
 
   /// Returns the rounded up 32 multiple.
-  static inline uint32_t RoundDownNumi32(uint32_t bits) {
-    return bits >> 5;
-  }
+  constexpr static inline uint32_t RoundDownNumi32(uint32_t bits) { return bits >> 5; }
 
   /// Returns the rounded up to 64 multiple. Used for conversions of bits to i64.
-  static inline uint32_t RoundUpNumi64(uint32_t bits) {
+  constexpr static inline uint32_t RoundUpNumi64(uint32_t bits) {
     return (bits + 63) >> 6;
   }
 
   /// Returns the rounded down to 64 multiple.
-  static inline uint32_t RoundDownNumi64(uint32_t bits) {
-    return bits >> 6;
-  }
+  constexpr static inline uint32_t RoundDownNumi64(uint32_t bits) { return bits >> 6; }
 
   /// Non hw accelerated pop count.
   /// TODO: we don't use this in any perf sensitive code paths currently.  There
@@ -172,51 +166,51 @@ class BitUtil {
   /// swap for len > 16.
   static void ByteSwap(void* dest, const void* source, int len);
 
-  /// Converts to big endian format (if not already in big endian) from the
-  /// machine's native endian format.
+/// Converts to big endian format (if not already in big endian) from the
+/// machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  static inline int64_t  ToBigEndian(int64_t value)  { return ByteSwap(value); }
+  static inline int64_t ToBigEndian(int64_t value) { return ByteSwap(value); }
   static inline uint64_t ToBigEndian(uint64_t value) { return ByteSwap(value); }
-  static inline int32_t  ToBigEndian(int32_t value)  { return ByteSwap(value); }
+  static inline int32_t ToBigEndian(int32_t value) { return ByteSwap(value); }
   static inline uint32_t ToBigEndian(uint32_t value) { return ByteSwap(value); }
-  static inline int16_t  ToBigEndian(int16_t value)  { return ByteSwap(value); }
+  static inline int16_t ToBigEndian(int16_t value) { return ByteSwap(value); }
   static inline uint16_t ToBigEndian(uint16_t value) { return ByteSwap(value); }
 #else
-  static inline int64_t  ToBigEndian(int64_t val)  { return val; }
+  static inline int64_t ToBigEndian(int64_t val) { return val; }
   static inline uint64_t ToBigEndian(uint64_t val) { return val; }
-  static inline int32_t  ToBigEndian(int32_t val)  { return val; }
+  static inline int32_t ToBigEndian(int32_t val) { return val; }
   static inline uint32_t ToBigEndian(uint32_t val) { return val; }
-  static inline int16_t  ToBigEndian(int16_t val)  { return val; }
+  static inline int16_t ToBigEndian(int16_t val) { return val; }
   static inline uint16_t ToBigEndian(uint16_t val) { return val; }
 #endif
 
-  /// Converts from big endian format to the machine's native endian format.
+/// Converts from big endian format to the machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  static inline int64_t  FromBigEndian(int64_t value)  { return ByteSwap(value); }
+  static inline int64_t FromBigEndian(int64_t value) { return ByteSwap(value); }
   static inline uint64_t FromBigEndian(uint64_t value) { return ByteSwap(value); }
-  static inline int32_t  FromBigEndian(int32_t value)  { return ByteSwap(value); }
+  static inline int32_t FromBigEndian(int32_t value) { return ByteSwap(value); }
   static inline uint32_t FromBigEndian(uint32_t value) { return ByteSwap(value); }
-  static inline int16_t  FromBigEndian(int16_t value)  { return ByteSwap(value); }
+  static inline int16_t FromBigEndian(int16_t value) { return ByteSwap(value); }
   static inline uint16_t FromBigEndian(uint16_t value) { return ByteSwap(value); }
 #else
-  static inline int64_t  FromBigEndian(int64_t val)  { return val; }
+  static inline int64_t FromBigEndian(int64_t val) { return val; }
   static inline uint64_t FromBigEndian(uint64_t val) { return val; }
-  static inline int32_t  FromBigEndian(int32_t val)  { return val; }
+  static inline int32_t FromBigEndian(int32_t val) { return val; }
   static inline uint32_t FromBigEndian(uint32_t val) { return val; }
-  static inline int16_t  FromBigEndian(int16_t val)  { return val; }
+  static inline int16_t FromBigEndian(int16_t val) { return val; }
   static inline uint16_t FromBigEndian(uint16_t val) { return val; }
 #endif
 
   /// Returns true if 'value' is a non-negative 32-bit integer.
-  static inline bool IsNonNegative32Bit(int64_t value) {
+  constexpr static inline bool IsNonNegative32Bit(int64_t value) {
     return static_cast<uint64_t>(value) <= std::numeric_limits<int32_t>::max();
   }
 
   /// Logical right shift for signed integer types
   /// This is needed because the C >> operator does arithmetic right shift
   /// Negative shift amounts lead to undefined behavior
-  template<typename T>
-  static T ShiftRightLogical(T v, int shift) {
+  template <typename T>
+  constexpr static T ShiftRightLogical(T v, int shift) {
     // Conversion to unsigned ensures most significant bits always filled with 0's
     return static_cast<typename make_unsigned<T>::type>(v) >> shift;
   }
@@ -230,15 +224,15 @@ class BitUtil {
 
   /// Set a specific bit to 1
   /// Behavior when bitpos is negative is undefined
-  template<typename T>
-  static T SetBit(T v, int bitpos) {
+  template <typename T>
+  constexpr static T SetBit(T v, int bitpos) {
     return v | (static_cast<T>(0x1) << bitpos);
   }
 
   /// Set a specific bit to 0
   /// Behavior when bitpos is negative is undefined
-  template<typename T>
-  static T UnsetBit(T v, int bitpos) {
+  template <typename T>
+  constexpr static T UnsetBit(T v, int bitpos) {
     return v & ~(static_cast<T>(0x1) << bitpos);
   }
 };

@@ -86,7 +86,7 @@ inline bool BitWriter::PutVlqInt(int32_t v) {
 
 template<typename T>
 inline bool BitReader::GetValue(int num_bits, T* v) {
-  DCHECK(buffer_ != NULL);
+  DCHECK(num_bits == 0 || buffer_ != NULL);
   // TODO: revisit this limit if necessary
   DCHECK_LE(num_bits, MAX_BITWIDTH);
   DCHECK_LE(num_bits, sizeof(T) * 8);

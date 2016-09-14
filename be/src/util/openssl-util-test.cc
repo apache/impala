@@ -15,17 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <random>
+
 #include <gtest/gtest.h>
 #include <openssl/rand.h>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_int.hpp>
 
 #include "common/init.h"
 #include "testutil/gtest-util.h"
 #include "util/openssl-util.h"
 
-using boost::uniform_int;
-using boost::mt19937_64;
+using std::uniform_int_distribution;
+using std::mt19937_64;
 
 namespace impala {
 
@@ -40,7 +40,7 @@ class OpenSSLUtilTest : public ::testing::Test {
     DCHECK_EQ(len % 8, 0);
     for (int64_t i = 0; i < len; i += sizeof(uint64_t)) {
       *(reinterpret_cast<uint64_t*>(&data[i])) =
-          uniform_int<uint64_t>(0, numeric_limits<uint64_t>::max())(rng_);
+          uniform_int_distribution<uint64_t>(0, numeric_limits<uint64_t>::max())(rng_);
     }
   }
 
