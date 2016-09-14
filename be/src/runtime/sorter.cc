@@ -822,9 +822,13 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       // that we don't attach resources to the batch on eos.
       DCHECK_EQ(NumNonNullBlocks(fixed_len_blocks_), 0);
       DCHECK_EQ(NumNonNullBlocks(var_len_blocks_), 0);
+
+      // Flush resources in case we are in a subplan and need to allocate more blocks
+      // when the node is reopened.
+      output_batch->MarkFlushResources();
     } else {
       // We held onto the last fixed or var len blocks without transferring them to the
-      // caller. We signalled MarkNeedToReturn() to the caller, so we can safely delete
+      // caller. We signalled MarkNeedsDeepCopy() to the caller, so we can safely delete
       // them now to free memory.
       if (!fixed_len_blocks_.empty()) DCHECK_EQ(NumNonNullBlocks(fixed_len_blocks_), 1);
       if (!var_len_blocks_.empty()) DCHECK_EQ(NumNonNullBlocks(var_len_blocks_), 1);
@@ -866,7 +870,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       // this block for the next in the next GetNext() call. So therefore we must hold
       // onto the current var-len block and signal to the caller that the block is going
       // to be deleted.
-      output_batch->MarkNeedToReturn();
+      output_batch->MarkNeedsDeepCopy();
       end_of_var_len_block_ = true;
       break;
     }
@@ -880,14 +884,15 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
     // Reached the block boundary, need to move to the next block.
     if (is_pinned_) {
       // Attach block to batch. Caller can delete the block when it wants to.
-      output_batch->AddBlock(fixed_len_blocks_[fixed_len_blocks_index_]);
+      output_batch->AddBlock(fixed_len_blocks_[fixed_len_blocks_index_],
+          RowBatch::FlushMode::NO_FLUSH_RESOURCES);
       fixed_len_blocks_[fixed_len_blocks_index_] = NULL;
 
       // Attach the var-len blocks at eos once no more rows will reference the blocks.
       if (fixed_len_blocks_index_ == fixed_len_blocks_.size() - 1) {
         for (BufferedBlockMgr::Block* var_len_block: var_len_blocks_) {
           DCHECK(var_len_block != NULL);
-          output_batch->AddBlock(var_len_block);
+          output_batch->AddBlock(var_len_block, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
         }
         var_len_blocks_.clear();
       }
@@ -895,7 +900,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
       // To iterate over unpinned runs, we need to exchange this block for the next
       // in the next GetNext() call, so we need to hold onto the block and signal to
       // the caller that the block is going to be deleted.
-      output_batch->MarkNeedToReturn();
+      output_batch->MarkNeedsDeepCopy();
     }
     end_of_fixed_len_block_ = true;
   }

@@ -22,7 +22,6 @@
 
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
-#include "runtime/row-batch.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
@@ -191,9 +190,13 @@ Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
   return status;
 }
 
-void BufferedTupleStream::Close() {
+void BufferedTupleStream::Close(RowBatch* batch, RowBatch::FlushMode flush) {
   for (BufferedBlockMgr::Block* block : blocks_) {
-    block->Delete();
+    if (batch != NULL && block->is_pinned()) {
+      batch->AddBlock(block, flush);
+    } else {
+      block->Delete();
+    }
   }
   blocks_.clear();
   num_pinned_ = 0;
@@ -645,11 +648,11 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   batch->CommitRows(rows_to_fill);
   rows_returned_ += rows_to_fill;
   *eos = (rows_returned_ == num_rows_);
-  if ((!pinned_ || delete_on_read_) &&
-      rows_returned_curr_block + rows_to_fill == (*read_block_)->num_rows()) {
-    // No more data in this block. Mark this batch as needing to return so
-    // the caller can pass the rows up the operator tree.
-    batch->MarkNeedToReturn();
+  if ((!pinned_ || delete_on_read_)
+      && rows_returned_curr_block + rows_to_fill == (*read_block_)->num_rows()) {
+    // No more data in this block. The batch must be immediately returned up the operator
+    // tree and deep copied so that NextReadBlock() can reuse the read block's buffer.
+    batch->MarkNeedsDeepCopy();
   }
   if (FILL_INDICES) DCHECK_EQ(indices->size(), rows_to_fill);
   DCHECK_LE(read_ptr_, read_end_ptr_);

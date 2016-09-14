@@ -23,13 +23,13 @@
 
 #include "common/status.h"
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/row-batch.h"
 
 namespace impala {
 
 class BufferedBlockMgr;
 class RuntimeProfile;
 class RuntimeState;
-class RowBatch;
 class RowDescriptor;
 class SlotDescriptor;
 class TupleRow;
@@ -128,7 +128,7 @@ class TupleRow;
 /// Memory lifetime of rows read from stream:
 /// If the stream is pinned, it is valid to access any tuples returned via
 /// GetNext() or GetRows() until the stream is unpinned. If the stream is unpinned, and
-/// the batch returned from GetNext() has the need_to_return flag set, any tuple memory
+/// the batch returned from GetNext() has the needs_deep_copy flag set, any tuple memory
 /// returned so far from the stream may be freed on the next call to GetNext().
 ///
 /// Manual construction of rows with AllocateRow():
@@ -305,8 +305,11 @@ class BufferedTupleStream {
   /// *got_rows is false if the stream could not be pinned.
   Status GetRows(boost::scoped_ptr<RowBatch>* batch, bool* got_rows);
 
-  /// Must be called once at the end to cleanup all resources. Idempotent.
-  void Close();
+  /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
+  /// attaches any pinned blocks to the batch and deletes unpinned blocks. Otherwise
+  /// deletes all blocks. Does nothing if the stream was already closed. The 'flush'
+  /// mode is forwarded to RowBatch::AddBlock() when attaching blocks.
+  void Close(RowBatch* batch, RowBatch::FlushMode flush);
 
   /// Number of rows in the stream.
   int64_t num_rows() const { return num_rows_; }
@@ -321,6 +324,7 @@ class BufferedTupleStream {
   /// If ignore_current is true, the write_block_ memory is not included.
   int64_t bytes_in_mem(bool ignore_current) const;
 
+  bool is_closed() const { return closed_; }
   bool is_pinned() const { return pinned_; }
   int blocks_pinned() const { return num_pinned_; }
   int blocks_unpinned() const { return blocks_.size() - num_pinned_ - num_small_blocks_; }

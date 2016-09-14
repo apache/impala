@@ -331,7 +331,7 @@ class SimpleTupleStreamTest : public testing::Test {
     // Verify result
     VerifyResults<T>(*desc, results, num_rows * num_batches, gen_null);
 
-    stream.Close();
+    stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
 
   void TestIntValuesInterleaved(int num_batches, int num_batches_before_read,
@@ -372,11 +372,13 @@ class SimpleTupleStreamTest : public testing::Test {
 
       VerifyResults<int>(*int_desc_, results, BATCH_SIZE * num_batches, false);
 
-      stream.Close();
+      stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     }
   }
 
   void TestUnpinPin(bool varlen_data);
+
+  void TestTransferMemory(bool pinned_stream, bool read_write);
 
   scoped_ptr<TestEnv> test_env_;
   RuntimeState* runtime_state_;
@@ -614,7 +616,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
   // until the stream is closed.
   ASSERT_EQ(stream.bytes_in_mem(false), buffer_size);
 
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 
   ASSERT_EQ(stream.bytes_in_mem(false), 0);
 }
@@ -672,7 +674,64 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
 
   // TODO: Test for IMPALA-2330. In case SwitchToIoBuffers() fails to get buffer then
   // using_small_buffers() should still return true.
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+}
+
+void SimpleTupleStreamTest::TestTransferMemory(bool pin_stream, bool read_write) {
+  // Use smaller buffers so that the explicit FLUSH_RESOURCES flag is required to
+  // make the batch at capacity.
+  int buffer_size = 4 * 1024;
+  InitBlockMgr(100 * buffer_size, buffer_size);
+
+  BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
+      client_, false, read_write);
+  ASSERT_OK(stream.Init(-1, NULL, pin_stream));
+  bool got_write_buffer;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
+  ASSERT_TRUE(got_write_buffer);
+  RowBatch* batch = CreateIntBatch(0, 1024, false);
+
+  // Construct a stream with 4 blocks.
+  const int total_num_blocks = 4;
+  while (stream.byte_size() < total_num_blocks * buffer_size) {
+    Status status;
+    for (int i = 0; i < batch->num_rows(); ++i) {
+      bool ret = stream.AddRow(batch->GetRow(i), &status);
+      EXPECT_TRUE(ret);
+      ASSERT_OK(status);
+    }
+  }
+
+  bool got_read_buffer;
+  ASSERT_OK(stream.PrepareForRead(true, &got_read_buffer));
+  ASSERT_TRUE(got_read_buffer);
+
+  batch->Reset();
+  stream.Close(batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+  if (pin_stream) {
+    DCHECK_EQ(total_num_blocks, batch->num_blocks());
+  } else if (read_write) {
+    // Read and write block should be attached.
+    DCHECK_EQ(2, batch->num_blocks());
+  } else {
+    // Read block should be attached.
+    DCHECK_EQ(1, batch->num_blocks());
+  }
+  DCHECK(batch->AtCapacity()); // Flush resources flag should have been set.
+  batch->Reset();
+  DCHECK_EQ(0, batch->num_blocks());
+}
+
+/// Test attaching memory to a row batch from a pinned stream.
+TEST_F(SimpleTupleStreamTest, TransferMemoryFromPinnedStream) {
+  TestTransferMemory(true, true);
+  TestTransferMemory(true, false);
+}
+
+/// Test attaching memory to a row batch from an unpinned stream.
+TEST_F(SimpleTupleStreamTest, TransferMemoryFromUnpinnedStream) {
+  TestTransferMemory(false, true);
+  TestTransferMemory(false, false);
 }
 
 // Test that tuple stream functions if it references strings outside stream. The
@@ -720,7 +779,7 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
     VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
   }
 
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 // Construct a big row by stiching together many tuples so the total row size
@@ -761,7 +820,7 @@ TEST_F(SimpleTupleStreamTest, BigRow) {
       runtime_state_->block_mgr(), client_, false, false);
   Status status = nullable_stream.Init(-1, NULL, true);
   ASSERT_FALSE(status.ok());
-  nullable_stream.Close();
+  nullable_stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 // Test for IMPALA-3923: overflow of 32-bit int in GetRows().
@@ -779,7 +838,7 @@ TEST_F(SimpleTupleStreamTest, TestGetRowsOverflow) {
   bool got_rows;
   scoped_ptr<RowBatch> overflow_batch;
   ASSERT_FALSE(stream.GetRows(&overflow_batch, &got_rows).ok());
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 // Basic API test. No data should be going to disk.
@@ -913,7 +972,7 @@ TEST_F(MultiTupleStreamTest, MultiTupleAllocateRow) {
     VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
   }
 
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 // Test with rows with multiple nullable tuples.
@@ -1003,7 +1062,7 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   sv->len = 1234;
   EXPECT_EQ(expected_len, stream.ComputeRowSize(row.get()));
 
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 /// Test that deep copy works with arrays by copying into a BufferedTupleStream, freeing
@@ -1112,7 +1171,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     rows_read += batch.num_rows();
   } while (!eos);
   ASSERT_EQ(NUM_ROWS, rows_read);
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 /// Test that ComputeRowSize handles nulls
@@ -1180,7 +1239,7 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   tuple0->SetNull(array_slot->null_indicator_offset());
   EXPECT_EQ(array_desc_->GetRowSize(), stream.ComputeRowSize(row.get()));
 
-  stream.Close();
+  stream.Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 // TODO: more tests.

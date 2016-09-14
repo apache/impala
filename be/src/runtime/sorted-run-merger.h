@@ -43,9 +43,9 @@ class RuntimeProfile;
 /// and transfers resource ownership from the input batches to the output batch when
 /// an input batch is processed.
 ///
-/// SortedRunMerger cannot handle the 'need_to_return' resource-transfer model so
-/// if the RunBatchSupplierFn can return batches with the 'need_to_return' flag set,
-/// the merger must have 'deep_copy_input'. TODO: once 'need_to_return' is deprecated,
+/// SortedRunMerger cannot handle the 'needs_deep_copy' resource-transfer model so
+/// if the RunBatchSupplierFn can return batches with the 'needs_deep_copy' flag set,
+/// the merger must have 'deep_copy_input' set. TODO: once 'needs_deep_copy' is removed
 /// this is no longer a problem.
 class SortedRunMerger {
  public:

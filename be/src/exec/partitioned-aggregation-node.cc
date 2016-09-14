@@ -382,19 +382,20 @@ Status PartitionedAggregationNode::HandleOutputStrings(RowBatch* row_batch,
   if (!needs_finalize_ && !needs_serialize_) return Status::OK();
   // String data returned by Serialize() or Finalize() is from local expr allocations in
   // the agg function contexts, and will be freed on the next GetNext() call by
-  // FreeLocalAllocations(). The data either needs to be copied out or sent up the plan
-  // tree via MarkNeedToReturn(). (See IMPALA-3311)
+  // FreeLocalAllocations(). The data either needs to be copied out now or sent up the
+  // plan and copied out by a blocking ancestor. (See IMPALA-3311)
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     const SlotDescriptor* slot_desc = aggregate_evaluators_[i]->output_slot_desc();
     DCHECK(!slot_desc->type().IsCollectionType()) << "producing collections NYI";
     if (!slot_desc->type().IsVarLenStringType()) continue;
     if (IsInSubplan()) {
       // Copy string data to the row batch's pool. This is more efficient than
-      // MarkNeedToReturn() in a subplan since we are likely producing many small batches.
-      RETURN_IF_ERROR(CopyStringData(slot_desc, row_batch, first_row_idx,
-              row_batch->tuple_data_pool()));
+      // MarkNeedsDeepCopy() in a subplan since we are likely producing many small
+      // batches.
+      RETURN_IF_ERROR(CopyStringData(
+          slot_desc, row_batch, first_row_idx, row_batch->tuple_data_pool()));
     } else {
-      row_batch->MarkNeedToReturn();
+      row_batch->MarkNeedsDeepCopy();
       break;
     }
   }
@@ -524,7 +525,7 @@ Status PartitionedAggregationNode::GetRowsFromPartition(RuntimeState* state,
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   partition_eos_ = ReachedLimit();
-  if (output_iterator_.AtEnd()) row_batch->MarkNeedToReturn();
+  if (output_iterator_.AtEnd()) row_batch->MarkNeedsDeepCopy();
 
   return Status::OK();
 }
@@ -718,7 +719,9 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
   if (ht_ctx_.get() != NULL) ht_ctx_->Close();
-  if (serialize_stream_.get() != NULL) serialize_stream_->Close();
+  if (serialize_stream_.get() != NULL) {
+    serialize_stream_->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+  }
 
   if (block_mgr_client_ != NULL) {
     state->block_mgr()->ClearReservations(block_mgr_client_);
@@ -840,14 +843,14 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
       parent->CleanupHashTbl(agg_fn_ctxs, it);
       hash_tbl->Close();
       hash_tbl.reset();
-      aggregated_row_stream->Close();
+      aggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
       RETURN_IF_ERROR(status);
       return parent->state_->block_mgr()->MemLimitTooLowError(parent->block_mgr_client_,
           parent->id());
     }
     DCHECK(status.ok());
 
-    aggregated_row_stream->Close();
+    aggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     aggregated_row_stream.swap(parent->serialize_stream_);
     // Recreate the serialize_stream (and reserve 1 buffer) now in preparation for
     // when we need to spill again. We need to have this available before we need
@@ -943,10 +946,12 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
       // should have been finalized/serialized in Spill().
       parent->CleanupHashTbl(agg_fn_ctxs, hash_tbl->Begin(parent->ht_ctx_.get()));
     }
-    aggregated_row_stream->Close();
+    aggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
   if (hash_tbl.get() != NULL) hash_tbl->Close();
-  if (unaggregated_row_stream.get() != NULL) unaggregated_row_stream->Close();
+  if (unaggregated_row_stream.get() != NULL) {
+    unaggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+  }
 
   for (int i = 0; i < agg_fn_ctxs.size(); ++i) {
     agg_fn_ctxs[i]->impl()->Close();
@@ -1333,7 +1338,7 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
       batch.Reset();
     } while (!eos);
   }
-  input_stream->Close();
+  input_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   return Status::OK();
 }
 

@@ -333,10 +333,10 @@ class AnalyticEvalNode : public ExecNode {
   /// no order by clause) to a single row (e.g. ROWS windows). When the amount of
   /// buffered data exceeds the available memory in the underlying BufferedBlockMgr,
   /// input_stream_ is unpinned (i.e., possibly spilled to disk if necessary).
-  /// The input stream owns tuple data backing rows returned in GetNext(), and is
-  /// attached to an output row batch on eos or ReachedLimit().
+  /// The input stream owns tuple data backing rows returned in GetNext(). The blocks
+  /// with tuple data are attached to an output row batch on eos or ReachedLimit().
   /// TODO: Consider re-pinning unpinned streams when possible.
-  BufferedTupleStream* input_stream_;
+  boost::scoped_ptr<BufferedTupleStream> input_stream_;
 
   /// Pool used for O(1) allocations that live until Close() or Reset().
   /// Does not own data backing tuples returned in GetNext(), so it does not

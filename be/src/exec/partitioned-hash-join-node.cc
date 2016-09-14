@@ -230,7 +230,7 @@ void PartitionedHashJoinNode::CloseAndDeletePartitions() {
   }
   output_build_partitions_.clear();
   if (null_probe_rows_ != NULL) {
-    null_probe_rows_->Close();
+    null_probe_rows_->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     null_probe_rows_.reset();
   }
 }
@@ -275,11 +275,8 @@ Status PartitionedHashJoinNode::ProbePartition::PrepareForRead() {
 void PartitionedHashJoinNode::ProbePartition::Close(RowBatch* batch) {
   if (IsClosed()) return;
   if (probe_rows_ != NULL) {
-    if (batch == NULL) {
-      probe_rows_->Close();
-    } else {
-      batch->AddTupleStream(probe_rows_.release());
-    }
+    // Flush out the resources to free up memory for subsequent partitions.
+    probe_rows_->Close(batch, RowBatch::FlushMode::FLUSH_RESOURCES);
     probe_rows_.reset();
   }
 }
@@ -699,7 +696,9 @@ Status PartitionedHashJoinNode::OutputNullAwareNullProbe(RuntimeState* state,
       builder_->CloseNullAwarePartition(out_batch);
       null_aware_probe_partition_->Close(out_batch);
       null_aware_probe_partition_.reset();
-      out_batch->AddTupleStream(null_probe_rows_.release());
+      // Flush out the resources to free up memory.
+      null_probe_rows_->Close(out_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+      null_probe_rows_.reset();
       return Status::OK();
     }
   }
@@ -747,7 +746,7 @@ Status PartitionedHashJoinNode::InitNullAwareProbePartition() {
 error:
   DCHECK(!status.ok());
   // Ensure the temporary 'probe_rows' stream is closed correctly on error.
-  probe_rows->Close();
+  probe_rows->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   return status;
 }
 

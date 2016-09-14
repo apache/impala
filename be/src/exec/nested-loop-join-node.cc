@@ -161,7 +161,7 @@ Status NestedLoopJoinNode::ConstructSingularBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
   DCHECK_EQ(batch->num_rows(), 1);
   DCHECK(eos);
-  DCHECK(!batch->need_to_return());
+  DCHECK(!batch->needs_deep_copy());
   builder_->AddBuildBatch(batch);
   if (matching_build_rows_ != NULL) {
     DCHECK_EQ(matching_build_rows_->num_bits(), 1);

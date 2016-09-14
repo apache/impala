@@ -65,8 +65,9 @@ class SortedRunMerger::SortedRunWrapper {
     do {
       // Make sure to transfer resources from every batch received from 'sorted_run_'.
       if (transfer_batch != NULL) {
-        DCHECK(!input_row_batch_->need_to_return()) << "Run batch suppliers that set the "
-          "need_to_return flag must use a deep-copying merger";
+        DCHECK(!input_row_batch_->needs_deep_copy())
+            << "Run batch suppliers that set the "
+               "needs_deep_copy flag must use a deep-copying merger";
         input_row_batch_->TransferResourceOwnership(transfer_batch);
       }
 
