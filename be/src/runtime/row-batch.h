@@ -279,6 +279,12 @@ class RowBatch {
   int ALWAYS_INLINE num_rows() const { return num_rows_; }
   int ALWAYS_INLINE capacity() const { return capacity_; }
 
+  // The maximum value that capacity_ ever took, before MarkCapacity() might have changed
+  // it.
+  int ALWAYS_INLINE InitialCapacity() const {
+    return tuple_ptrs_size_ / (num_tuples_per_row_ * sizeof(Tuple*));
+  }
+
   const RowDescriptor& row_desc() const { return row_desc_; }
 
   /// Max memory that this row batch can accumulate before it is considered at capacity.
@@ -351,7 +357,7 @@ class RowBatch {
 
   const int num_tuples_per_row_;
 
-  /// Array of pointers with capacity_ * num_tuples_per_row_ elements.
+  /// Array of pointers with InitialCapacity() * num_tuples_per_row_ elements.
   /// The memory ownership depends on whether legacy joins and aggs are enabled.
   ///
   /// Memory is malloc'd and owned by RowBatch:
