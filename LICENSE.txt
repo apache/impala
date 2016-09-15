@@ -428,9 +428,12 @@ Parts of be/src/util/coding-util.cc: Boost Software License V1.0
 
 --------------------------------------------------------------------------------
 
-www/bootstrap: MIT license
-tests/comparison/leopard/static/css/bootstrap.*: MIT license
-tests/comparison/leopard/static/js/bootstrap.*: MIT license
+www/bootstrap/css/bootstrap*: MIT license
+www/bootstrap/js/bootstrap*: MIT license
+www/bootstrap/fonts/glyphicons-halflings*: MIT license
+tests/comparison/leopard/static/css/bootstrap*: MIT license
+tests/comparison/leopard/static/js/bootstrap*: MIT license
+tests/comparison/leopard/static/fonts/glyphicons-halflings*: MIT license
 
   The MIT License (MIT)
 
@@ -456,6 +459,8 @@ tests/comparison/leopard/static/js/bootstrap.*: MIT license
 --------------------------------------------------------------------------------
 
 www/highlight: 3-clause BSD
+tests/comparison/leopard/static/css/hljs.css: 3-clause BSD
+tests/comparison/leopard/static/js/highlight.pack.js: 3-clause BSD
 
   Copyright (c) 2006, Ivan Sagalaev
   All rights reserved.
