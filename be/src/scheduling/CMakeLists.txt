@@ -28,6 +28,7 @@ add_library(Scheduling STATIC
   backend-config.cc
   query-schedule.cc
   request-pool-service.cc
+  simple-scheduler-test-util.cc
   simple-scheduler.cc
 )
 add_dependencies(Scheduling thrift-deps)

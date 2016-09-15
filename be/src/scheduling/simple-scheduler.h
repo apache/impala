@@ -42,7 +42,9 @@ namespace impala {
 
 class Coordinator;
 
+namespace test {
 class SchedulerWrapper;
+}
 
 /// Performs simple scheduling by matching between a list of backends configured
 /// either from the statestore, or from a static list of addresses, and a list
@@ -434,7 +436,7 @@ class SimpleScheduler : public Scheduler {
   int FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
       const TQueryExecRequest& exec_request);
 
-  friend class impala::SchedulerWrapper;
+  friend class impala::test::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomNonCached);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomDiskLocal);
