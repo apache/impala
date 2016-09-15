@@ -249,7 +249,8 @@ class QueryGenerator(object):
     with_clause_inline_views = TableExprList()
     for with_clause_inline_view_idx \
         in xrange(self.profile.get_with_clause_table_ref_count()):
-      query = self.create_query(table_exprs)
+      query = self.create_query(table_exprs,
+                                allow_with_clause=self.profile.use_nested_with())
       with_clause_alias_count = getattr(self.root_query, 'with_clause_alias_count', 0) + 1
       self.root_query.with_clause_alias_count = with_clause_alias_count
       with_clause_inline_view = \
@@ -1116,7 +1117,8 @@ class QueryGenerator(object):
 
   def _create_inline_view(self, table_exprs, required_type=None):
     return InlineView(self.create_query(
-      table_exprs, required_select_item_type=required_type))
+      table_exprs, required_select_item_type=required_type,
+      allow_with_clause=self.profile.use_nested_with()))
 
   def _create_join_clause(self, from_clause, table_exprs):
     join_type = self.profile.choose_join_type(JoinClause.JOINS_TYPES)
