@@ -17,9 +17,11 @@
 
 package com.cloudera.impala.planner;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TRuntimeFilterMode;
@@ -247,21 +249,34 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testKudu() { runPlannerTestFile("kudu"); }
+  public void testKudu() {
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    runPlannerTestFile("kudu");
+  }
 
   @Test
-  public void testKuduUpdate() { runPlannerTestFile("kudu-update"); }
+  public void testKuduUpdate() {
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    runPlannerTestFile("kudu-update");
+  }
 
   @Test
-  public void testKuduDelete() { runPlannerTestFile("kudu-delete"); }
+  public void testKuduDelete() {
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    runPlannerTestFile("kudu-delete");
+  }
 
   @Test
   public void testKuduSelectivity() {
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.VERBOSE);
     runPlannerTestFile("kudu-selectivity", options);
   }
 
   @Test
-  public void testKuduTpch() { runPlannerTestFile("tpch-kudu"); }
+  public void testKuduTpch() {
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    runPlannerTestFile("tpch-kudu");
+  }
 }
