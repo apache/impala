@@ -148,7 +148,7 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
   # strange, but making these symlinks also results in data loading
   # failures in the non-kerberized case.  Without these, mapreduce
   # jobs die in a kerberized cluster because they can't find their
-  # kerberos principals.  Obviously this has to be sorted out before
+  # kerberos principals. Obviously this has to be sorted out before
   # a kerberized cluster can load data.
   echo "Linking yarn and mapred from local cluster"
   ln -s ${CLUSTER_HADOOP_CONF_DIR}/yarn-site.xml

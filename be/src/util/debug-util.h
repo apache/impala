@@ -32,7 +32,6 @@
 #include "gen-cpp/RuntimeProfile_types.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/parquet_types.h"
-#include "gen-cpp/Llama_types.h"
 
 #include "runtime/descriptors.h" // for SchemaPath
 

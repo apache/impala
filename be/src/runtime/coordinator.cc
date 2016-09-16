@@ -62,7 +62,6 @@
 #include "util/error-util.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
-#include "util/llama-util.h"
 #include "util/network-util.h"
 #include "util/pretty-printer.h"
 #include "util/summary-util.h"
@@ -486,7 +485,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
         runtime_state()->obj_pool(), request.fragments[0].output_exprs,
         output_expr_ctxs));
     MemTracker* output_expr_tracker = runtime_state()->obj_pool()->Add(new MemTracker(
-        -1, -1, "Output exprs", runtime_state()->instance_mem_tracker(), false));
+        -1, "Output exprs", runtime_state()->instance_mem_tracker(), false));
     RETURN_IF_ERROR(Expr::Prepare(
         *output_expr_ctxs, runtime_state(), row_desc(), output_expr_tracker));
   } else {
@@ -503,12 +502,12 @@ Status Coordinator::Exec(QuerySchedule& schedule,
     MemTracker* pool_tracker = MemTracker::GetRequestPoolMemTracker(
         schedule.request_pool(), exec_env_->process_mem_tracker());
     query_mem_tracker_ =
-        MemTracker::GetQueryMemTracker(query_id_, query_limit, -1, pool_tracker, NULL);
+        MemTracker::GetQueryMemTracker(query_id_, query_limit, pool_tracker);
 
     executor_.reset(NULL);
   }
-  filter_mem_tracker_.reset(new MemTracker(-1, -1, "Runtime Filter (Coordinator)",
-      query_mem_tracker(), false));
+  filter_mem_tracker_.reset(
+      new MemTracker(-1, "Runtime Filter (Coordinator)", query_mem_tracker(), false));
 
   // Initialize the execution profile structures.
   InitExecProfile(request);
@@ -1900,20 +1899,6 @@ void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
   SetExecPlanDescriptorTable(fragment, rpc_params);
 
   TNetworkAddress exec_host = params.hosts[fragment_instance_idx];
-  if (schedule.HasReservation()) {
-    // The reservation has already have been validated at this point.
-    TNetworkAddress resource_hostport;
-    schedule.GetResourceHostport(exec_host, &resource_hostport);
-    map<TNetworkAddress, llama::TAllocatedResource>::const_iterator it =
-        schedule.reservation()->allocated_resources.find(resource_hostport);
-    // Only set reserved resource if we actually have one for this plan
-    // fragment. Otherwise, don't set it (usually this the coordinator fragment), and it
-    // won't participate in dynamic RM controls.
-    if (it != schedule.reservation()->allocated_resources.end()) {
-      fragment_instance_ctx.__set_reserved_resource(it->second);
-      fragment_instance_ctx.__set_local_resource_address(resource_hostport);
-    }
-  }
   FragmentScanRangeAssignment::const_iterator it =
       params.scan_range_assignment.find(exec_host);
   // Scan ranges may not always be set, so use an empty structure if so.

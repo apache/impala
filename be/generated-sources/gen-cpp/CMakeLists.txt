@@ -37,10 +37,6 @@ set(SRC_FILES
   ImpalaService_constants.cpp
   ImpalaService_types.cpp
   ImpalaHiveServer2Service.cpp
-  Llama_constants.cpp
-  Llama_types.cpp
-  LlamaAMService.cpp
-  LlamaNotificationService.cpp
   beeswax_constants.cpp
   beeswax_types.cpp
   BeeswaxService.cpp
@@ -79,10 +75,6 @@ set(SRC_FILES
   NetworkTestService.cpp
   PlanNodes_constants.cpp
   PlanNodes_types.cpp
-  ResourceBrokerNotificationService.cpp
-  ResourceBrokerService_constants.cpp
-  ResourceBrokerService_types.cpp
-  ResourceBrokerService.cpp
   Results_constants.cpp
   Results_types.cpp
   Partitions_constants.cpp

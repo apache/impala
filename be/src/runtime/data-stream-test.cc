@@ -112,9 +112,7 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 
 class DataStreamTest : public testing::Test {
  protected:
-  DataStreamTest()
-    : runtime_state_(TExecPlanFragmentParams(), "", &exec_env_),
-      next_val_(0) {
+  DataStreamTest() : runtime_state_(TExecPlanFragmentParams(), &exec_env_), next_val_(0) {
     // Initialize Mem trackers for use by the data stream receiver.
     exec_env_.InitForFeTests();
     runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
@@ -482,7 +480,7 @@ class DataStreamTest : public testing::Test {
 
   void Sender(int sender_num, int channel_buffer_size,
               TPartitionType::type partition_type) {
-    RuntimeState state(TExecPlanFragmentParams(), "", &exec_env_);
+    RuntimeState state(TExecPlanFragmentParams(), &exec_env_);
     state.set_desc_tbl(desc_tbl_);
     state.InitMemTrackers(TUniqueId(), NULL, -1);
     VLOG_QUERY << "create sender " << sender_num;
@@ -596,7 +594,7 @@ TEST_F(DataStreamTest, BasicTest) {
 // TODO: Make lifecycle requirements more explicit.
 TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   scoped_ptr<RuntimeState> runtime_state(
-      new RuntimeState(TExecPlanFragmentParams(), "", &exec_env_));
+      new RuntimeState(TExecPlanFragmentParams(), &exec_env_));
   runtime_state->InitMemTrackers(TUniqueId(), NULL, -1);
 
   scoped_ptr<RuntimeProfile> profile(new RuntimeProfile(&obj_pool_, "TestReceiver"));

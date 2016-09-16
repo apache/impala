@@ -64,7 +64,7 @@ TEST(MemTestTest, ConsumptionMetric) {
   UIntGauge metric(md, 0);
   EXPECT_EQ(metric.value(), 0);
 
-  MemTracker t(&metric, 100, -1, "");
+  MemTracker t(&metric, 100, "");
   EXPECT_TRUE(t.has_limit());
   EXPECT_EQ(t.consumption(), 0);
 
@@ -112,8 +112,8 @@ TEST(MemTestTest, ConsumptionMetric) {
 
 TEST(MemTestTest, TrackerHierarchy) {
   MemTracker p(100);
-  MemTracker c1(80, -1, "", &p);
-  MemTracker c2(50, -1, "", &p);
+  MemTracker c1(80, "", &p);
+  MemTracker c2(50, "", &p);
 
   // everything below limits
   c1.Consume(60);

@@ -21,7 +21,6 @@
 
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
-#include "resourcebroker/resource-broker.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -48,7 +47,6 @@ using namespace strings;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
-DECLARE_bool(enable_rm);
 DECLARE_int64(max_result_cache_size);
 
 namespace impala {
@@ -428,34 +426,16 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
   DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
 
-  if (FLAGS_enable_rm) {
-    DCHECK(exec_env_->resource_broker() != NULL);
-  }
   schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
       exec_request_.query_options, &summary_profile_, query_events_));
   coord_.reset(new Coordinator(exec_request_.query_options, exec_env_, query_events_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
-  if (FLAGS_enable_rm) {
-    if (status.ok()) {
-      stringstream reservation_request_ss;
-      reservation_request_ss << schedule_->reservation_request();
-      summary_profile_.AddInfoString("Resource reservation request",
-          reservation_request_ss.str());
-    }
-  }
 
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
 
-  if (FLAGS_enable_rm && schedule_->HasReservation()) {
-    // Add the granted reservation to the query profile.
-    stringstream reservation_ss;
-    reservation_ss << *schedule_->reservation();
-    summary_profile_.AddInfoString("Granted resource reservation", reservation_ss.str());
-    query_events_->MarkEvent("Resources reserved");
-  }
   status = coord_->Exec(*schedule_, &output_expr_ctxs_);
   {
     lock_guard<mutex> l(lock_);

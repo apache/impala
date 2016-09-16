@@ -387,6 +387,7 @@ struct TQueryExecRequest {
 
   // Estimated per-host CPU requirements in YARN virtual cores.
   // Used for resource management.
+  // TODO: Remove this and associated code in Planner.
   11: optional i16 per_host_vcores
 
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.

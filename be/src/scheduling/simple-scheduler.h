@@ -36,12 +36,10 @@
 #include "scheduling/admission-controller.h"
 #include "scheduling/backend-config.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
-#include "gen-cpp/ResourceBrokerService_types.h"
 #include "rapidjson/rapidjson.h"
 
 namespace impala {
 
-class ResourceBroker;
 class Coordinator;
 
 class SchedulerWrapper;
@@ -78,22 +76,18 @@ class SimpleScheduler : public Scheduler {
   ///  - backend_address - the address that this backend listens on
   SimpleScheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
       const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
-      ResourceBroker* resource_broker, RequestPoolService* request_pool_service);
+      RequestPoolService* request_pool_service);
 
   /// Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   /// backends is fixed and will not be updated.
   SimpleScheduler(const std::vector<TNetworkAddress>& backends, MetricGroup* metrics,
-      Webserver* webserver, ResourceBroker* resource_broker,
-      RequestPoolService* request_pool_service);
+      Webserver* webserver, RequestPoolService* request_pool_service);
 
   /// Register with the subscription manager if required
   virtual impala::Status Init();
 
   virtual Status Schedule(Coordinator* coord, QuerySchedule* schedule);
   virtual Status Release(QuerySchedule* schedule);
-  virtual void HandlePreemptedReservation(const TUniqueId& reservation_id);
-  virtual void HandlePreemptedResource(const TUniqueId& client_resource_id);
-  virtual void HandleLostResource(const TUniqueId& client_resource_id);
 
  private:
   /// Map from a host's IP address to the next backend to be round-robin scheduled for
@@ -306,27 +300,6 @@ class SimpleScheduler : public Scheduler {
   /// Current number of backends
   IntGauge* num_fragment_instances_metric_;
 
-  /// Protect active_reservations_ and active_client_resources_.
-  boost::mutex active_resources_lock_;
-
-  /// Map from a Llama reservation id to the coordinator of the query using that
-  /// reservation. The map is used to cancel queries whose reservation has been preempted.
-  /// Entries are added in Schedule() calls that result in granted resource allocations.
-  /// Entries are removed in Release().
-  typedef boost::unordered_map<TUniqueId, Coordinator*> ActiveReservationsMap;
-  ActiveReservationsMap active_reservations_;
-
-  /// Map from client resource id to the coordinator of the query using that resource.
-  /// The map is used to cancel queries whose resource(s) have been preempted.
-  /// Entries are added in Schedule() calls that result in granted resource allocations.
-  /// Entries are removed in Release().
-  typedef boost::unordered_map<TUniqueId, Coordinator*> ActiveClientResourcesMap;
-  ActiveClientResourcesMap active_client_resources_;
-
-  /// Resource broker that mediates resource requests between Impala and the Llama.
-  /// Set to NULL if resource management is disabled.
-  ResourceBroker* resource_broker_;
-
   /// Used for user-to-pool resolution and looking up pool configurations. Not owned by
   /// us.
   RequestPoolService* request_pool_service_;
@@ -338,16 +311,6 @@ class SimpleScheduler : public Scheduler {
   /// protecting the access with backend_config_lock_.
   BackendConfigPtr GetBackendConfig() const;
   void SetBackendConfig(const BackendConfigPtr& backend_config);
-
-  /// Add the granted reservation and resources to the active_reservations_ and
-  /// active_client_resources_ maps, respectively.
-  void AddToActiveResourceMaps(
-      const TResourceBrokerReservationResponse& reservation, Coordinator* coord);
-
-  /// Remove the given reservation and resources from the active_reservations_ and
-  /// active_client_resources_ maps, respectively.
-  void RemoveFromActiveResourceMaps(
-      const TResourceBrokerReservationResponse& reservation);
 
   /// Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,

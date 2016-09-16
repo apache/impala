@@ -25,7 +25,6 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
-#include "util/cgroups-mgr.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
@@ -196,13 +195,6 @@ Status BlockingJoinNode::ConstructBuildAndOpenProbe(RuntimeState* state,
     Thread build_thread(
         node_name_, "build thread", bind(&BlockingJoinNode::ProcessBuildInputAsync, this,
                                         state, build_sink, &build_side_status));
-    if (!state->cgroup().empty()) {
-      Status status = state->exec_env()->cgroups_mgr()->AssignThreadToCgroup(
-          build_thread, state->cgroup());
-      // If AssignThreadToCgroup() failed, we still need to wait for the build-side
-      // thread to complete before returning, so just log that error.
-      if (!status.ok()) state->LogError(status.msg());
-    }
     // Open the left child so that it may perform any initialisation in parallel.
     // Don't exit even if we see an error, we still need to wait for the build thread
     // to finish.

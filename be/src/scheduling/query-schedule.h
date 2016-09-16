@@ -26,12 +26,10 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
-#include "scheduling/query-resource-mgr.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/ResourceBrokerService_types.h"
 
 namespace impala {
 
@@ -74,30 +72,19 @@ class QuerySchedule {
       const TQueryOptions& query_options, RuntimeProfile* summary_profile,
       RuntimeProfile::EventSequence* query_events);
 
-  /// Returns OK if reservation_ contains a matching resource for each
-  /// of the hosts in fragment_exec_params_. Returns an error otherwise.
-  Status ValidateReservation();
-
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
   const std::string& request_pool() const { return request_pool_; }
   void set_request_pool(const std::string& pool_name) { request_pool_ = pool_name; }
-  bool HasReservation() const { return !reservation_.allocated_resources.empty(); }
 
-  /// Granted or timed out reservations need to be released. In both such cases,
-  /// the reservation_'s reservation_id is set.
-  bool NeedsRelease() const { return reservation_.__isset.reservation_id; }
-
-  /// Gets the estimated memory (bytes) and vcores per-node. Returns the user specified
-  /// estimate (MEM_LIMIT query parameter) if provided or the estimate from planning if
-  /// available, but is capped at the amount of physical memory to avoid problems if
-  /// either estimate is unreasonably large.
+  /// Gets the estimated memory (bytes) per-node. Returns the user specified estimate
+  /// (MEM_LIMIT query parameter) if provided or the estimate from planning if available,
+  /// but is capped at the amount of physical memory to avoid problems if either estimate
+  /// is unreasonably large.
   int64_t GetPerHostMemoryEstimate() const;
-  int16_t GetPerHostVCores() const;
   /// Total estimated memory for all nodes. set_num_hosts() must be set before calling.
   int64_t GetClusterMemoryEstimate() const;
-  void GetResourceHostport(const TNetworkAddress& src, TNetworkAddress* dst);
 
   /// Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
@@ -116,20 +103,12 @@ class QuerySchedule {
   const boost::unordered_set<TNetworkAddress>& unique_hosts() const {
     return unique_hosts_;
   }
-  TResourceBrokerReservationResponse* reservation() { return &reservation_; }
-  const TResourceBrokerReservationRequest& reservation_request() const {
-    return reservation_request_;
-  }
   bool is_admitted() const { return is_admitted_; }
   void set_is_admitted(bool is_admitted) { is_admitted_ = is_admitted; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
   void SetUniqueHosts(const boost::unordered_set<TNetworkAddress>& unique_hosts);
-
-  /// Populates reservation_request_ ready to submit a query to Llama for all initial
-  /// resources required for this query.
-  void PrepareReservationRequest(const std::string& pool, const std::string& user);
 
  private:
 
@@ -165,18 +144,9 @@ class QuerySchedule {
   /// Request pool to which the request was submitted for admission.
   std::string request_pool_;
 
-  /// Reservation request to be submitted to Llama. Set in PrepareReservationRequest().
-  TResourceBrokerReservationRequest reservation_request_;
-
-  /// Fulfilled reservation request. Populated by scheduler.
-  TResourceBrokerReservationResponse reservation_;
-
   /// Indicates if the query has been admitted for execution.
   bool is_admitted_;
 
-  /// Resolves unique_hosts_ to node mgr addresses. Valid only after SetUniqueHosts() has
-  /// been called.
-  boost::scoped_ptr<ResourceResolver> resource_resolver_;
 };
 
 }

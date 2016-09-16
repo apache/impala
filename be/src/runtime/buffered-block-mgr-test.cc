@@ -553,8 +553,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
     const int num_threads = 8;
     thread_group workers;
     // Create a shared RuntimeState with no BufferedBlockMgr.
-    RuntimeState* shared_state = new RuntimeState(TExecPlanFragmentParams(), "",
-        test_env_->exec_env());
+    RuntimeState* shared_state =
+        new RuntimeState(TExecPlanFragmentParams(), test_env_->exec_env());
     for (int i = 0; i < num_threads; ++i) {
       thread* t = new thread(bind(
           &BufferedBlockMgrTest::CreateDestroyThread, this, shared_state));

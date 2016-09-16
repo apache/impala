@@ -40,7 +40,7 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
   CollectionValue coll_value;
   int64_t initial_capacity = (INT_MAX / 8) + 1;
   int64_t mem_limit = initial_capacity * 4 * 4;
-  MemTracker tracker(mem_limit, mem_limit);
+  MemTracker tracker(mem_limit);
   MemPool pool(&tracker);
   CollectionValueBuilder coll_value_builder(
       &coll_value, tuple_desc, &pool, NULL, initial_capacity);

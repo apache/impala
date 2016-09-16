@@ -29,7 +29,6 @@
 namespace impala {
 
 class CallableThreadPool;
-class CgroupsMgr;
 class DataStreamMgr;
 class DiskIoMgr;
 class FragmentMgr;
@@ -42,7 +41,6 @@ class MemTracker;
 class MetricGroup;
 class QueryResourceMgr;
 class RequestPoolService;
-class ResourceBroker;
 class Scheduler;
 class StatestoreSubscriber;
 class TestExecEnv;
@@ -89,7 +87,6 @@ class ExecEnv {
   MetricGroup* metrics() { return metrics_.get(); }
   MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
-  CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
   TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
   CallableThreadPool* fragment_exec_thread_pool() {
@@ -102,7 +99,6 @@ class ExecEnv {
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
-  ResourceBroker* resource_broker() { return resource_broker_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
@@ -119,11 +115,6 @@ class ExecEnv {
   /// differently.
   bool is_fe_tests() { return is_fe_tests_; }
 
-  /// Returns true if the Llama in use is pseudo-distributed, used for development
-  /// purposes. The pseudo-distributed version has special requirements for specifying
-  /// resource locations.
-  bool is_pseudo_distributed_llama() { return is_pseudo_distributed_llama_; }
-
   /// Returns the configured defaultFs set in core-site.xml
   string default_fs() { return default_fs_; }
 
@@ -131,7 +122,6 @@ class ExecEnv {
   /// Leave protected so that subclasses can override
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
-  boost::scoped_ptr<ResourceBroker> resource_broker_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
   boost::scoped_ptr<ImpalaBackendClientCache> impalad_client_cache_;
@@ -141,7 +131,6 @@ class ExecEnv {
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
-  boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
@@ -161,16 +150,8 @@ class ExecEnv {
   /// Address of the Impala backend server instance
   TNetworkAddress backend_address_;
 
-  /// True if the cluster has set 'yarn.scheduler.include-port-in-node-name' to true,
-  /// indicating that this cluster is pseudo-distributed. Should not be true in real
-  /// deployments.
-  bool is_pseudo_distributed_llama_;
-
   /// fs.defaultFs value set in core-site.xml
   std::string default_fs_;
-
-  /// Initialise cgroups manager, detect test RM environment and init resource broker.
-  void InitRm();
 };
 
 } // namespace impala

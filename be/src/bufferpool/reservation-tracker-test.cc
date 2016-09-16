@@ -235,8 +235,8 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationTwoLevel) {
   // of different code paths.
   root_.InitRootTracker(NewProfile(), MIN_BUFFER_LEN * 100);
   MemTracker root_mem_tracker;
-  MemTracker child_mem_tracker1(-1, -1, "Child 1", &root_mem_tracker);
-  MemTracker child_mem_tracker2(MIN_BUFFER_LEN * 50, -1, "Child 2", &root_mem_tracker);
+  MemTracker child_mem_tracker1(-1, "Child 1", &root_mem_tracker);
+  MemTracker child_mem_tracker2(MIN_BUFFER_LEN * 50, "Child 2", &root_mem_tracker);
   ReservationTracker child_reservations1, child_reservations2;
   child_reservations1.InitChildTracker(
       NewProfile(), &root_, &child_mem_tracker1, 500 * MIN_BUFFER_LEN);
@@ -317,7 +317,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
   reservations[0].InitRootTracker(NewProfile(), 500);
   for (int i = 1; i < HIERARCHY_DEPTH; ++i) {
     mem_trackers[i].reset(new MemTracker(
-        mem_limits[i], -1, Substitute("Child $0", i), mem_trackers[i - 1].get()));
+        mem_limits[i], Substitute("Child $0", i), mem_trackers[i - 1].get()));
     reservations[i].InitChildTracker(
         NewProfile(), &reservations[i - 1], mem_trackers[i].get(), 500);
   }

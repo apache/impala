@@ -44,6 +44,7 @@ static const string DEFAULT_USER = "default";
 
 DEFINE_string(fair_scheduler_allocation_path, "", "Path to the fair scheduler "
     "allocation file (fair-scheduler.xml).");
+// TODO: Rename / cleanup now that Llama is removed (see IMPALA-4159).
 DEFINE_string(llama_site_path, "", "Path to the Llama configuration file "
     "(llama-site.xml). If set, fair_scheduler_allocation_path must also be set.");
 
@@ -74,7 +75,6 @@ DEFINE_bool(disable_pool_mem_limits, false, "Disables all per-pool mem limits.")
 DEFINE_bool(disable_pool_max_requests, false, "Disables all per-pool limits on the "
     "maximum number of running requests.");
 
-DECLARE_bool(enable_rm);
 
 // Pool name used when the configuration files are not specified.
 static const string DEFAULT_POOL_NAME = "default-pool";
@@ -94,12 +94,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   resolve_pool_ms_metric_ =
       StatsMetric<double>::CreateAndRegister(metrics, RESOLVE_POOL_METRIC_NAME);
 
-  if (FLAGS_fair_scheduler_allocation_path.empty() &&
-      FLAGS_llama_site_path.empty()) {
-    if (FLAGS_enable_rm) {
-      CLEAN_EXIT_WITH_ERROR("If resource management is enabled, "
-          "-fair_scheduler_allocation_path is required.");
-    }
+  if (FLAGS_fair_scheduler_allocation_path.empty()) {
     default_pool_only_ = true;
     bool is_percent; // not used
     int64_t bytes_limit = ParseUtil::ParseMemSpec(FLAGS_default_pool_mem_limit,

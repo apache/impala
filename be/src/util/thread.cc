@@ -26,7 +26,6 @@
 #include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
-#include "util/cgroups-mgr.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/os-util.h"
@@ -321,24 +320,11 @@ void Thread::SuperviseThread(const string& name, const string& category,
 
 Status ThreadGroup::AddThread(Thread* thread) {
   threads_.push_back(thread);
-  if (!cgroup_path_.empty()) {
-    DCHECK(cgroups_mgr_ != NULL);
-    RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(*thread, cgroup_path_));
-  }
   return Status::OK();
 }
 
 void ThreadGroup::JoinAll() {
   for (const Thread& thread: threads_) thread.Join();
-}
-
-Status ThreadGroup::SetCgroup(const string& cgroup) {
-  DCHECK(cgroups_mgr_ != NULL);
-  cgroup_path_ = cgroup;
-  for (const Thread& t: threads_) {
-    RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(t, cgroup));
-  }
-  return Status::OK();
 }
 
 }

@@ -370,9 +370,9 @@ DiskIoMgr::~DiskIoMgr() {
 Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   DCHECK(process_mem_tracker != NULL);
   free_buffer_mem_tracker_.reset(
-      new MemTracker(-1, -1, "Free Disk IO Buffers", process_mem_tracker, false));
+      new MemTracker(-1, "Free Disk IO Buffers", process_mem_tracker, false));
   unowned_buffer_mem_tracker_.reset(
-      new MemTracker(-1, -1, "Untracked Disk IO Buffers", process_mem_tracker, false));
+      new MemTracker(-1, "Untracked Disk IO Buffers", process_mem_tracker, false));
   // If we hit the process limit, see if we can reclaim some memory by removing
   // previously allocated (but unused) io buffers.
   process_mem_tracker->AddGcFunction(bind(&DiskIoMgr::GcIoBuffers, this));

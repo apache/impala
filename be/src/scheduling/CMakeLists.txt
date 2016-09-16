@@ -26,7 +26,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 add_library(Scheduling STATIC
   admission-controller.cc
   backend-config.cc
-  query-resource-mgr.cc
   query-schedule.cc
   request-pool-service.cc
   simple-scheduler.cc

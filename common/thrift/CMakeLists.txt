@@ -162,7 +162,6 @@ set (SRC_FILES
   ImpalaService.thrift
   JniCatalog.thrift
   LineageGraph.thrift
-  Llama.thrift
   Logging.thrift
   NetworkTest.thrift
   MetricDefs.thrift
@@ -171,7 +170,6 @@ set (SRC_FILES
   Planner.thrift
   Partitions.thrift
   parquet.thrift
-  ResourceBrokerService.thrift
   Results.thrift
   RuntimeProfile.thrift
   StatestoreService.thrift

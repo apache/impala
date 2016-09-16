@@ -85,7 +85,7 @@ class KuduScanNodeTest : public testing::Test {
       exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
     }
 
-    runtime_state_.reset(new RuntimeState(TExecPlanFragmentParams(), "", exec_env_.get()));
+    runtime_state_.reset(new RuntimeState(TExecPlanFragmentParams(), exec_env_.get()));
     runtime_state_->InitMemTrackers(TUniqueId(), NULL, -1);
 
     TKuduScanNode kudu_scan_node_;

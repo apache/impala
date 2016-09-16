@@ -39,7 +39,6 @@ namespace impala {
 
 class ReservationTrackerCounters;
 class MemTracker;
-class QueryResourceMgr;
 
 /// A MemTracker tracks memory consumption; it contains an optional limit
 /// and can be arranged into a tree structure such that the consumption tracked
@@ -66,19 +65,17 @@ class MemTracker {
   /// 'label' is the label used in the usage string (LogUsage())
   /// If 'log_usage_if_zero' is false, this tracker (and its children) will not be included
   /// in LogUsage() output if consumption is 0.
-  MemTracker(int64_t byte_limit = -1, int64_t rm_reserved_limit = -1,
-      const std::string& label = std::string(), MemTracker* parent = NULL,
-      bool log_usage_if_zero = true);
+  MemTracker(int64_t byte_limit = -1, const std::string& label = std::string(),
+      MemTracker* parent = NULL, bool log_usage_if_zero = true);
 
   /// C'tor for tracker for which consumption counter is created as part of a profile.
   /// The counter is created with name COUNTER_NAME.
-  MemTracker(RuntimeProfile* profile, int64_t byte_limit, int64_t rm_reserved_limit = -1,
+  MemTracker(RuntimeProfile* profile, int64_t byte_limit,
       const std::string& label = std::string(), MemTracker* parent = NULL);
 
   /// C'tor for tracker that uses consumption_metric as the consumption value.
   /// Consume()/Release() can still be called. This is used for the process tracker.
-  MemTracker(UIntGauge* consumption_metric,
-      int64_t byte_limit = -1, int64_t rm_reserved_limit = -1,
+  MemTracker(UIntGauge* consumption_metric, int64_t byte_limit = -1,
       const std::string& label = std::string());
 
   ~MemTracker();
@@ -98,9 +95,8 @@ class MemTracker {
   /// 'parent' as the parent tracker.
   /// byte_limit and parent must be the same for all GetMemTracker() calls with the
   /// same id.
-  static std::shared_ptr<MemTracker> GetQueryMemTracker(const TUniqueId& id,
-      int64_t byte_limit, int64_t rm_reserved_limit, MemTracker* parent,
-      QueryResourceMgr* res_mgr);
+  static std::shared_ptr<MemTracker> GetQueryMemTracker(
+      const TUniqueId& id, int64_t byte_limit, MemTracker* parent);
 
   /// Returns a MemTracker object for request pool 'pool_name'. Calling this with the same
   /// 'pool_name' will return the same MemTracker object. This is used to track the local
@@ -111,14 +107,6 @@ class MemTracker {
   /// created trackers will always have a limit of -1.
   static MemTracker* GetRequestPoolMemTracker(const std::string& pool_name,
       MemTracker* parent);
-
-  /// Returns the minimum of limit and rm_reserved_limit
-  int64_t effective_limit() const {
-    // TODO: maybe no limit should be MAX_LONG?
-    DCHECK(rm_reserved_limit_ <= limit_ || limit_ == -1);
-    if (rm_reserved_limit_ == -1) return limit_;
-    return rm_reserved_limit_;
-  }
 
   /// Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
@@ -166,49 +154,33 @@ class MemTracker {
     if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
     if (UNLIKELY(bytes <= 0)) return true;
     int i;
-    // Walk the tracker tree top-down, to avoid expanding a limit on a child whose parent
-    // won't accommodate the change.
+    // Walk the tracker tree top-down.
     for (i = all_trackers_.size() - 1; i >= 0; --i) {
       MemTracker* tracker = all_trackers_[i];
-      int64_t limit = tracker->effective_limit();
+      const int64_t limit = tracker->limit();
       if (limit < 0) {
         tracker->consumption_->Add(bytes); // No limit at this tracker.
       } else {
-        // If TryConsume fails, we can try to GC or expand the RM reservation, but we may
-        // need to try several times if there are concurrent consumers because we don't
-        // take a lock before trying to update consumption_.
+        // If TryConsume fails, we can try to GC, but we may need to try several times if
+        // there are concurrent consumers because we don't take a lock before trying to
+        // update consumption_.
         while (true) {
           if (LIKELY(tracker->consumption_->TryAdd(bytes, limit))) break;
 
           VLOG_RPC << "TryConsume failed, bytes=" << bytes
                    << " consumption=" << tracker->consumption_->current_value()
-                   << " limit=" << limit << " attempting to GC and expand reservation";
-          // TODO: This may not be right if more than one tracker can actually change its
-          // RM reservation limit.
-          if (UNLIKELY(tracker->GcMemory(limit - bytes) &&
-                  !tracker->ExpandRmReservation(bytes))) {
+                   << " limit=" << limit << " attempting to GC";
+          if (UNLIKELY(tracker->GcMemory(limit - bytes))) {
             DCHECK_GE(i, 0);
             // Failed for this mem tracker. Roll back the ones that succeeded.
-            // TODO: this doesn't roll it back completely since the max values for
-            // the updated trackers aren't decremented. The max values are only used
-            // for error reporting so this is probably okay. Rolling those back is
-            // pretty hard; we'd need something like 2PC.
-            //
-            // TODO: This might leave us with an allocated resource that we can't use.
-            // Specifically, the RM reservation of some ancestors' trackers may have been
-            // expanded only to fail at the current tracker. This may be wasteful as
-            // subsequent TryConsume() never gets to use the reserved resources. Consider
-            // adjusting the reservation of the ancestors' trackers.
             for (int j = all_trackers_.size() - 1; j > i; --j) {
               all_trackers_[j]->consumption_->Add(-bytes);
             }
             return false;
           }
-          VLOG_RPC << "GC or expansion succeeded, TryConsume bytes=" << bytes
+          VLOG_RPC << "GC succeeded, TryConsume bytes=" << bytes
                    << " consumption=" << tracker->consumption_->current_value()
-                   << " new limit=" << tracker->effective_limit() << " prev=" << limit;
-          // Need to update the limit if the RM reservation was expanded.
-          limit = tracker->effective_limit();
+                   << " limit=" << limit;
         }
       }
     }
@@ -363,11 +335,6 @@ class MemTracker {
   /// can cause us to go way over mem limits.
   void GcTcmalloc();
 
-  /// Set the resource mgr to allow expansion of limits (if NULL, no expansion is possible)
-  void SetQueryResourceMgr(QueryResourceMgr* context) {
-    query_resource_mgr_ = context;
-  }
-
   /// Walks the MemTracker hierarchy and populates all_trackers_ and
   /// limit_trackers_
   void Init();
@@ -377,11 +344,6 @@ class MemTracker {
 
   static std::string LogUsage(const std::string& prefix,
       const std::list<MemTracker*>& trackers);
-
-  /// Try to expand the limit (by asking the resource broker for more memory) by at least
-  /// 'bytes'. Returns false if not possible, true if the request succeeded. May allocate
-  /// more memory than was requested.
-  bool ExpandRmReservation(int64_t bytes);
 
   /// Size, in bytes, that is considered a large value for Release() (or Consume() with
   /// a negative value). If tcmalloc is used, this can trigger it to GC.
@@ -424,11 +386,6 @@ class MemTracker {
   /// Hard limit on memory consumption, in bytes. May not be exceeded. If limit_ == -1,
   /// there is no consumption limit.
   int64_t limit_;
-
-  /// If > -1, when RM is enabled this is the limit after which this memtracker needs to
-  /// acquire more memory from Llama.
-  /// This limit is always less than or equal to the hard limit.
-  int64_t rm_reserved_limit_;
 
   std::string label_;
   MemTracker* parent_;
@@ -475,14 +432,6 @@ class MemTracker {
   /// If false, this tracker (and its children) will not be included in LogUsage() output
   /// if consumption is 0.
   bool log_usage_if_zero_;
-
-  /// Lock is taken during ExpandRmReservation() to prevent concurrent acquisition of new
-  /// resources.
-  boost::mutex resource_acquisition_lock_;
-
-  /// If non-NULL, contains all the information required to expand resource reservations if
-  /// required.
-  QueryResourceMgr* query_resource_mgr_;
 
   /// The number of times the GcFunctions were called.
   IntCounter* num_gcs_metric_;

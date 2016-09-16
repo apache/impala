@@ -36,7 +36,6 @@ add_library(Util
   bitmap.cc
   bit-util.cc
   bloom-filter.cc
-  cgroups-mgr.cc
   coding-util.cc
   codec.cc
   compress.cc
@@ -54,7 +53,6 @@ add_library(Util
   hdr-histogram.cc
   impalad-metrics.cc
   jni-util.cc
-  llama-util.cc
   logging-support.cc
   mem-info.cc
   memory-metrics.cc

@@ -43,7 +43,6 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-buffer.h"
-#include "scheduling/query-resource-mgr.h"
 #include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"

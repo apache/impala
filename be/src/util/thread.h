@@ -31,7 +31,6 @@ namespace impala {
 
 class MetricGroup;
 class Webserver;
-class CgroupsMgr;
 
 /// Thin wrapper around boost::thread that can register itself with the singleton
 /// ThreadMgr (a private class implemented in thread.cc entirely, which tracks all live
@@ -165,39 +164,19 @@ class ThreadGroup {
  public:
   ThreadGroup() {}
 
-  ThreadGroup(CgroupsMgr* cgroups_mgr, const std::string& cgroup)
-        : cgroups_mgr_(cgroups_mgr), cgroup_path_(cgroup) { }
-
   /// Adds a new Thread to this group. The ThreadGroup takes ownership of the Thread, and
   /// will destroy it when the ThreadGroup is destroyed.  Threads will linger until that
   /// point (even if terminated), however, so callers should be mindful of the cost of
   /// placing very many threads in this set.
-  /// If cgroup_path_ / cgroup_prefix_ are set, the thread will be added to the specified
-  /// cgroup and an error will be returned if that operation fails.
   Status AddThread(Thread* thread);
 
   /// Waits for all threads to finish. DO NOT call this from a thread inside this set;
   /// deadlock will predictably ensue.
   void JoinAll();
 
-  /// Assigns all current and future threads to the given cgroup managed by cgroups_mgr_.
-  /// Must be called after SetCgroupsMgr() if groups_mgr_ has not been set already.
-  /// Returns an error if any assignment was not possible, but does not undo previously
-  /// successful assignments.
-  Status SetCgroup(const std::string& cgroup);
-
-  void SetCgroupsMgr(CgroupsMgr* cgroups_mgr) { cgroups_mgr_ = cgroups_mgr; }
-
  private:
   /// All the threads grouped by this set.
   boost::ptr_vector<Thread> threads_;
-
-  /// Cgroups manager for assigning threads in this group to cgroups. Not owned.
-  CgroupsMgr* cgroups_mgr_;
-
-  /// If not empty, every thread added to this group will also be placed in the
-  /// cgroup_path_ managed by the cgroups_mgr_.
-  std::string cgroup_path_;
 };
 
 /// Initialises the threading subsystem. Must be called before a Thread is created.

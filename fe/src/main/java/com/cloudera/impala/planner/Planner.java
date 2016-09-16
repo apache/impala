@@ -292,6 +292,7 @@ public class Planner {
    * Optionally excludes the requirements for unpartitioned fragments.
    * TODO: The LOG.warn() messages should eventually become Preconditions checks
    * once resource estimation is more robust.
+   * TODO: Revisit and possibly remove during MT work, particularly references to vcores.
    */
   public void computeResourceReqs(List<PlanFragment> fragments,
       boolean excludeUnpartitionedFragments,

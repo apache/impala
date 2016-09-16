@@ -31,7 +31,6 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
-#include "gen-cpp/ResourceBrokerService_types.h"
 
 namespace impala {
 
@@ -56,21 +55,6 @@ class Scheduler {
 
   /// Releases the reserved resources (if any) from the given schedule.
   virtual Status Release(QuerySchedule* schedule) = 0;
-
-  /// Notifies this scheduler that a resource reservation has been preempted by the
-  /// central scheduler (Yarn via Llama). All affected queries are cancelled
-  /// via their coordinator.
-  virtual void HandlePreemptedReservation(const TUniqueId& reservation_id) = 0;
-
-  /// Notifies this scheduler that a single resource with the given client resource id
-  /// has been preempted by the central scheduler (Yarn via Llama). All affected queries
-  /// are cancelled via their coordinator.
-  virtual void HandlePreemptedResource(const TUniqueId& client_resource_id) = 0;
-
-  /// Notifies this scheduler that a single resource with the given client resource id
-  /// has been lost by the central scheduler (Yarn via Llama). All affected queries
-  /// are cancelled via their coordinator.
-  virtual void HandleLostResource(const TUniqueId& client_resource_id) = 0;
 
   /// Initialises the scheduler, acquiring all resources needed to make
   /// scheduling decisions once this method returns.

@@ -55,7 +55,7 @@ export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 
 if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
   # The check above indicates that the regular mini-cluster is in use.
-  SUPPORTED_SERVICES=(hdfs yarn llama kms)
+  SUPPORTED_SERVICES=(hdfs yarn kms)
 else
   # Either a remote distributed file system or a local non-distributed file system is
   # in use. Currently the only service that is expected to work is Kudu, though in theory
@@ -87,9 +87,6 @@ export KUDU_WEBUI_PORT=8051   # same as default
 # easier to maintain them here.
 EMPTY_NODE_DIRS=$(echo data/dfs/{dn,nn} var/{run,lib/hadoop-hdfs,log} \
     var/{log,run}/kudu/{master,ts} var/lib/kudu/{master,ts}/{wal,data})
-if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
-  EMPTY_NODE_DIRS+=" /var/log/llama"
-fi
 
 EASY_ACCESS_LOG_DIR="$IMPALA_CLUSTER_LOGS_DIR"
 MINIKDC_INIT=${IMPALA_HOME}/testdata/bin/minikdc.sh
@@ -226,10 +223,7 @@ function create_cluster {
     fi
   fi
 
-  # For consistency, the first node will host all the master roles, including llama. Llama
-  # needs to know the ports of the datanodes and nodemanagers. The ports are generated
-  # below as part of setting up each node. The slave nodes are created first so the ports
-  # will be known when it is time to configure llama.
+  # For consistency, the first node will host all the master roles.
   for ((NODE_IDX=$NODE_COUNT; NODE_IDX >= 1; NODE_IDX--)); do
     NODE=${NODE_PREFIX}$NODE_IDX
     NODE_DIR=$(get_node_dir $NODE)
@@ -244,7 +238,7 @@ function create_cluster {
     if [[ $NODE_IDX -gt 1 ]]; then
       # Remove master role scripts from slave nodes
       rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager} \
-            "$NODE_DIR/etc/init.d/"{llama-application,kms,kudu-master}
+            "$NODE_DIR/etc/init.d/"{kms,kudu-master}
     fi
     for EMPTY_NODE_DIR in $EMPTY_NODE_DIRS; do
       mkdir -p "$NODE_DIR/$EMPTY_NODE_DIR"

@@ -39,7 +39,6 @@
 
 #include "common/names.h"
 
-DECLARE_string(cgroup_hierarchy_path);
 DEFINE_bool(enable_probe_side_filtering, true, "Deprecated.");
 
 using namespace impala;

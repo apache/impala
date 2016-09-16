@@ -167,7 +167,6 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/be/src/common/
     ${CMAKE_SOURCE_DIR}/be/src/exec/
     ${CMAKE_SOURCE_DIR}/be/src/exprs/
-    ${CMAKE_SOURCE_DIR}/be/src/resourcebroker/
     ${CMAKE_SOURCE_DIR}/be/src/runtime/
     ${CMAKE_SOURCE_DIR}/be/src/scheduling/
     ${CMAKE_SOURCE_DIR}/be/src/service/
@@ -267,7 +266,6 @@ set (IMPALA_LINK_LIBS
   Exprs
   GlobalFlags
   ImpalaThrift
-  ResourceBroker
   Rpc
   Runtime
   Scheduling
@@ -295,7 +293,6 @@ if (BUILD_SHARED_LIBS)
     Statestore
     Scheduling
     Catalog
-    ResourceBroker
     ImpalaThrift
     GlobalFlags
     Common
@@ -423,7 +420,6 @@ add_subdirectory(src/catalog)
 add_subdirectory(src/codegen)
 add_subdirectory(src/common)
 add_subdirectory(src/exec)
-add_subdirectory(src/resourcebroker)
 add_subdirectory(src/exprs)
 add_subdirectory(src/runtime)
 add_subdirectory(src/scheduling)

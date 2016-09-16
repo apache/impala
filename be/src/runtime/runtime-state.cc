@@ -67,18 +67,15 @@ static const int64_t BLOCK_MGR_MEM_MIN_REMAINING = 100 * 1024 * 1024;
 
 namespace impala {
 
-RuntimeState::RuntimeState(const TExecPlanFragmentParams& fragment_params,
-    const string& cgroup, ExecEnv* exec_env)
+RuntimeState::RuntimeState(
+    const TExecPlanFragmentParams& fragment_params, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     fragment_params_(fragment_params),
-    now_(new TimestampValue(query_ctx().now_string.c_str(),
-        query_ctx().now_string.size())),
-    cgroup_(cgroup),
+    now_(new TimestampValue(
+        query_ctx().now_string.c_str(), query_ctx().now_string.size())),
     codegen_expr_(false),
-    profile_(obj_pool_.get(),
-        "Fragment " + PrintId(fragment_ctx().fragment_instance_id)),
+    profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_ctx().fragment_instance_id)),
     is_cancelled_(false),
-    query_resource_mgr_(NULL),
     root_node_id_(-1) {
   Status status = Init(exec_env);
   DCHECK(status.ok()) << status.GetDetail();
@@ -92,7 +89,6 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     codegen_expr_(false),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
-    query_resource_mgr_(NULL),
     root_node_id_(-1) {
   fragment_params_.__set_query_ctx(query_ctx);
   fragment_params_.query_ctx.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
@@ -147,18 +143,17 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
   return Status::OK();
 }
 
-void RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* pool_name,
-    int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes) {
+void RuntimeState::InitMemTrackers(
+    const TUniqueId& query_id, const string* pool_name, int64_t query_bytes_limit) {
   MemTracker* query_parent_tracker = exec_env_->process_mem_tracker();
   if (pool_name != NULL) {
     query_parent_tracker = MemTracker::GetRequestPoolMemTracker(*pool_name,
         query_parent_tracker);
   }
   query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit,
-          query_rm_reservation_limit_bytes, query_parent_tracker, query_resource_mgr());
-  instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, -1,
-      runtime_profile()->name(), query_mem_tracker_.get()));
+      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit, query_parent_tracker);
+  instance_mem_tracker_.reset(new MemTracker(
+      runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker_.get()));
 }
 
 void RuntimeState::InitFilterBank() {

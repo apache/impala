@@ -830,8 +830,8 @@ class SchedulerWrapper {
     scheduler_backend_address.hostname = scheduler_host.ip;
     scheduler_backend_address.port = scheduler_host.be_port;
 
-    scheduler_.reset(new SimpleScheduler(NULL, scheduler_backend_id,
-        scheduler_backend_address, &metrics_, NULL, NULL, NULL));
+    scheduler_.reset(new SimpleScheduler(
+        NULL, scheduler_backend_id, scheduler_backend_address, &metrics_, NULL, NULL));
     scheduler_->Init();
     // Initialize the scheduler backend maps.
     SendFullMembershipMap();

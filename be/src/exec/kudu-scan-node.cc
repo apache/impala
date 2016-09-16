@@ -35,7 +35,6 @@
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
-#include "scheduling/query-resource-mgr.h"
 #include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
@@ -248,10 +247,6 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
     VLOG_RPC << "Thread started: " << name;
     scanner_threads_.AddThread(new Thread("kudu-scan-node", name,
         &KuduScanNode::RunScannerThread, this, name, token));
-
-    if (runtime_state_->query_resource_mgr() != NULL) {
-      runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
-    }
   }
 }
 

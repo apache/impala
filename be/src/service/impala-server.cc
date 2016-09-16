@@ -60,7 +60,6 @@
 #include "service/query-exec-state.h"
 #include "scheduling/simple-scheduler.h"
 #include "util/bit-util.h"
-#include "util/cgroups-mgr.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -177,9 +176,9 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
     "QUERY_TIMEOUT_S overrides this setting, but, if set, --idle_query_timeout represents"
     " the maximum allowable timeout.");
 
-DEFINE_string(local_nodemanager_url, "", "The URL of the local Yarn Node Manager's HTTP "
-    "interface, used to detect if the Node Manager fails");
-DECLARE_bool(enable_rm);
+// TODO: Remove for Impala 3.0.
+DEFINE_string(local_nodemanager_url, "", "Deprecated");
+
 DECLARE_bool(compact_catalog_topic);
 
 namespace impala {
@@ -360,12 +359,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   query_expiration_thread_.reset(new Thread("impala-server", "query-expirer",
       bind<void>(&ImpalaServer::ExpireQueries, this)));
-
-  is_offline_ = false;
-  if (FLAGS_enable_rm) {
-    nm_failure_detection_thread_.reset(new Thread("impala-server", "nm-failure-detector",
-            bind<void>(&ImpalaServer::DetectNmFailures, this)));
-  }
 
   exec_env_->SetImpalaServer(this);
 }
@@ -783,9 +776,7 @@ Status ImpalaServer::ExecuteInternal(
     shared_ptr<QueryExecState>* exec_state) {
   DCHECK(session_state != NULL);
   *registered_exec_state = false;
-  if (IsOffline()) {
-    return Status("This Impala server is offline. Please retry your query later.");
-  }
+
   exec_state->reset(new QueryExecState(query_ctx, exec_env_, exec_env_->frontend(),
       this, session_state));
 
@@ -1936,81 +1927,6 @@ shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
     if (lock) i->second->lock()->lock();
     return i->second;
   }
-}
-
-void ImpalaServer::SetOffline(bool is_offline) {
-  lock_guard<mutex> l(is_offline_lock_);
-  is_offline_ = is_offline;
-  ImpaladMetrics::IMPALA_SERVER_READY->set_value(is_offline);
-}
-
-void ImpalaServer::DetectNmFailures() {
-  DCHECK(FLAGS_enable_rm);
-  if (FLAGS_local_nodemanager_url.empty()) {
-    LOG(WARNING) << "No NM address set (--nm_addr is empty), no NM failure detection "
-                 << "thread started";
-    return;
-  }
-  // We only want a network address to open a socket to, for now. Get rid of http(s)://
-  // prefix, and split the string into hostname:port.
-  if (istarts_with(FLAGS_local_nodemanager_url, "http://")) {
-    FLAGS_local_nodemanager_url =
-        FLAGS_local_nodemanager_url.substr(string("http://").size());
-  } else if (istarts_with(FLAGS_local_nodemanager_url, "https://")) {
-    FLAGS_local_nodemanager_url =
-        FLAGS_local_nodemanager_url.substr(string("https://").size());
-  }
-  vector<string> components;
-  split(components, FLAGS_local_nodemanager_url, is_any_of(":"));
-  if (components.size() < 2) {
-    LOG(ERROR) << "Could not parse network address from --local_nodemanager_url, no NM"
-               << " failure detection thread started";
-    return;
-  }
-  DCHECK_GE(components.size(), 2);
-  TNetworkAddress nm_addr =
-      MakeNetworkAddress(components[0], atoi(components[1].c_str()));
-
-  MissedHeartbeatFailureDetector failure_detector(MAX_NM_MISSED_HEARTBEATS,
-      MAX_NM_MISSED_HEARTBEATS / 2);
-  struct addrinfo* addr;
-  if (getaddrinfo(nm_addr.hostname.c_str(), components[1].c_str(), NULL, &addr)) {
-    LOG(WARNING) << "Could not resolve NM address: " << nm_addr << ". Error was: "
-                 << GetStrErrMsg();
-    return;
-  }
-  LOG(INFO) << "Starting NM failure-detection thread, NM at: " << nm_addr;
-  // True if the last time through the loop Impala had failed, otherwise false. Used to
-  // only change the offline status when there's a change in state.
-  bool last_failure_state = false;
-  while (true) {
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd >= 0) {
-      if (connect(sockfd, addr->ai_addr, sizeof(sockaddr)) < 0) {
-        failure_detector.UpdateHeartbeat(FLAGS_local_nodemanager_url, false);
-      } else {
-        failure_detector.UpdateHeartbeat(FLAGS_local_nodemanager_url, true);
-      }
-      ::close(sockfd);
-    } else {
-      LOG(ERROR) << "Could not create socket! Error was: " << GetStrErrMsg();
-    }
-    bool is_failed = (failure_detector.GetPeerState(FLAGS_local_nodemanager_url) ==
-        FailureDetector::FAILED);
-    if (is_failed != last_failure_state) {
-      if (is_failed) {
-        LOG(WARNING) <<
-            "ImpalaServer is going offline while local node-manager connectivity is bad";
-      } else {
-        LOG(WARNING) <<
-            "Node-manager connectivity has been restored. ImpalaServer is now online";
-      }
-      SetOffline(is_failed);
-    }
-    last_failure_state = is_failed;
-    SleepForMs(2000);
-  }
-  freeaddrinfo(addr);
 }
 
 void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,

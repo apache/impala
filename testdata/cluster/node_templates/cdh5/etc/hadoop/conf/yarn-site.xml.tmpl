@@ -1,22 +1,11 @@
 <?xml version="1.0"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 
+<!-- TODO: Remove any Llama-related configuration. Can this file be removed entirely? -->
 <configuration>
   <property>
     <name>yarn.resourcemanager.webapp.address</name>
     <value>0.0.0.0:${YARN_WEBUI_PORT}</value>
-  </property>
-
-  <!-- Min value of 0 is required by llama -->
-  <property>
-    <name>yarn.scheduler.minimum-allocation-mb</name>
-    <value>0</value>
-  </property>
-
-  <!-- Min value of 0 is required by llama -->
-  <property>
-    <name>yarn.scheduler.minimum-allocation-vcores</name>
-    <value>0</value>
   </property>
 
   <property>

@@ -65,8 +65,7 @@ typedef std::map<std::string, std::string> FileMoveMap;
 /// query and shared across all execution nodes of that query.
 class RuntimeState {
  public:
-  RuntimeState(const TExecPlanFragmentParams& fragment_params,
-      const std::string& cgroup, ExecEnv* exec_env);
+  RuntimeState(const TExecPlanFragmentParams& fragment_params, ExecEnv* exec_env);
 
   /// RuntimeState for executing expr in fe-support.
   RuntimeState(const TQueryCtx& query_ctx);
@@ -81,7 +80,7 @@ class RuntimeState {
   /// tracker (in the fifth level). If 'request_pool' is null, no request pool mem
   /// tracker is set up, i.e. query pools will have the process mem pool as the parent.
   void InitMemTrackers(const TUniqueId& query_id, const std::string* request_pool,
-      int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes = -1);
+      int64_t query_bytes_limit);
 
   /// Initializes the runtime filter bank. Must be called after InitMemTrackers().
   void InitFilterBank();
@@ -124,7 +123,6 @@ class RuntimeState {
   const TUniqueId& fragment_instance_id() const {
     return fragment_ctx().fragment_instance_id;
   }
-  const std::string& cgroup() const { return cgroup_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HBaseTableFactory* htable_factory() { return exec_env_->htable_factory(); }
@@ -262,9 +260,6 @@ class RuntimeState {
   /// execution doesn't continue if the query terminates abnormally.
   Status CheckQueryState();
 
-  QueryResourceMgr* query_resource_mgr() const { return query_resource_mgr_; }
-  void SetQueryResourceMgr(QueryResourceMgr* res_mgr) { query_resource_mgr_ = res_mgr; }
-
  private:
   /// Allow TestEnv to set block_mgr manually for testing.
   friend class TestEnv;
@@ -301,9 +296,6 @@ class RuntimeState {
   /// Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
 
-  /// The Impala-internal cgroup into which execution threads are assigned.
-  /// If empty, no RM is enabled.
-  std::string cgroup_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 
@@ -350,10 +342,6 @@ class RuntimeState {
   /// will not necessarily be set in all error cases.
   SpinLock query_status_lock_;
   Status query_status_;
-
-  /// Query-wide resource manager for resource expansion etc. Not owned by us; owned by
-  /// the ResourceBroker instead.
-  QueryResourceMgr* query_resource_mgr_;
 
   /// Reader contexts that need to be closed when the fragment is closed.
   std::vector<DiskIoRequestContext*> reader_contexts_;

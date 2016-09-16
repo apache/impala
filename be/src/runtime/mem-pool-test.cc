@@ -224,8 +224,8 @@ TEST(MemPoolTest, ReturnPartial) {
 
 TEST(MemPoolTest, Limits) {
   MemTracker limit3(4 * MemPoolTest::INITIAL_CHUNK_SIZE);
-  MemTracker limit1(2 * MemPoolTest::INITIAL_CHUNK_SIZE, -1, "", &limit3);
-  MemTracker limit2(3 * MemPoolTest::INITIAL_CHUNK_SIZE, -1, "", &limit3);
+  MemTracker limit1(2 * MemPoolTest::INITIAL_CHUNK_SIZE, "", &limit3);
+  MemTracker limit2(3 * MemPoolTest::INITIAL_CHUNK_SIZE, "", &limit3);
 
   MemPool* p1 = new MemPool(&limit1);
   EXPECT_FALSE(limit1.AnyLimitExceeded());

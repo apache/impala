@@ -22,7 +22,7 @@
 # that we can deduce the version settings of the dependencies from the environment.
 # IMPALA_TOOLCHAIN indicates the location where the prebuilt artifacts should be extracted
 # to. If DOWNLOAD_CDH_COMPONENTS is set to true, this script will also download and extract
-# the CDH components (i.e. Hadoop, Hive, HBase, Llama, Llama-minikdc and Sentry) into
+# the CDH components (i.e. Hadoop, Hive, HBase and Sentry) into
 # CDH_COMPONENTS_HOME.
 #
 # The script is called as follows without any additional parameters:

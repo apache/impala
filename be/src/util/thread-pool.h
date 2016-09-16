@@ -114,10 +114,6 @@ class ThreadPool {
     Join();
   }
 
-  Status AssignToCgroup(const std::string& cgroup) {
-    return threads_.SetCgroup(cgroup);
-  }
-
  private:
   /// Driver method for each thread in the pool. Continues to read work from the queue
   /// until the pool is shutdown.

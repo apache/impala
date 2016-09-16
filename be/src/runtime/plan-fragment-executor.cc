@@ -32,26 +32,21 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
-#include "resourcebroker/resource-broker.h"
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/mem-tracker.h"
-#include "scheduling/query-resource-mgr.h"
-#include "util/cgroups-mgr.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/container-util.h"
 #include "util/parse-util.h"
 #include "util/mem-info.h"
 #include "util/periodic-counter-updater.h"
-#include "util/llama-util.h"
 #include "util/pretty-printer.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DEFINE_int32(status_report_interval, 5, "interval between profile reports; in seconds");
-DECLARE_bool(enable_rm);
 
 #include "common/names.h"
 
@@ -76,9 +71,6 @@ PlanFragmentExecutor::PlanFragmentExecutor(ExecEnv* exec_env,
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
   Close();
-  if (is_prepared_ && runtime_state_->query_resource_mgr() != NULL) {
-    exec_env_->resource_broker()->UnregisterQueryResourceMgr(query_id_);
-  }
   // at this point, the report thread should have been stopped
   DCHECK(!report_thread_active_);
 }
@@ -100,57 +92,14 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   VLOG(2) << "fragment_instance_ctx:\n" << ThriftDebugString(fragment_instance_ctx);
 
   DCHECK(request.__isset.fragment_ctx);
-  bool request_has_reserved_resource =
-      request.fragment_instance_ctx.__isset.reserved_resource;
-  if (request_has_reserved_resource) {
-    VLOG_QUERY << "Executing fragment in reserved resource:\n"
-               << request.fragment_instance_ctx.reserved_resource;
-  }
-
-  string cgroup = "";
-  if (FLAGS_enable_rm && request_has_reserved_resource) {
-    cgroup = exec_env_->cgroups_mgr()->UniqueIdToCgroup(PrintId(query_id_, "_"));
-  }
 
   // Prepare() must not return before runtime_state_ is set if is_prepared_ was
   // set. Having runtime_state_.get() != NULL is a postcondition of this method in that
   // case. Do not call RETURN_IF_ERROR or explicitly return before this line.
-  runtime_state_.reset(new RuntimeState(request, cgroup, exec_env_));
+  runtime_state_.reset(new RuntimeState(request, exec_env_));
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
-
-  // Register after setting runtime_state_ to ensure proper cleanup.
-  if (FLAGS_enable_rm && !cgroup.empty() && request_has_reserved_resource) {
-    bool is_first;
-    RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
-        request.fragment_instance_ctx.fragment_instance_id, cgroup, &is_first));
-    // The first fragment using cgroup sets the cgroup's CPU shares based on the reserved
-    // resource.
-    if (is_first) {
-      DCHECK(request_has_reserved_resource);
-      int32_t cpu_shares = exec_env_->cgroups_mgr()->VirtualCoresToCpuShares(
-          request.fragment_instance_ctx.reserved_resource.v_cpu_cores);
-      RETURN_IF_ERROR(exec_env_->cgroups_mgr()->SetCpuShares(cgroup, cpu_shares));
-    }
-  }
-
-  // TODO: Find the reservation id when the resource request is not set
-  if (FLAGS_enable_rm && request_has_reserved_resource) {
-    TUniqueId reservation_id;
-    reservation_id << request.fragment_instance_ctx.reserved_resource.reservation_id;
-
-    // TODO: Combine this with RegisterFragment() etc.
-    QueryResourceMgr* res_mgr;
-    bool is_first = exec_env_->resource_broker()->GetQueryResourceMgr(query_id_,
-        reservation_id, request.fragment_instance_ctx.local_resource_address, &res_mgr);
-    DCHECK(res_mgr != NULL);
-    runtime_state_->SetQueryResourceMgr(res_mgr);
-    if (is_first) {
-      runtime_state_->query_resource_mgr()->InitVcoreAcquisition(
-          request.fragment_instance_ctx.reserved_resource.v_cpu_cores);
-    }
-  }
 
   // reservation or a query option.
   int64_t bytes_limit = -1;
@@ -161,36 +110,14 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
                << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
   }
 
-  int64_t rm_reservation_size_bytes = -1;
-  if (request_has_reserved_resource &&
-      request.fragment_instance_ctx.reserved_resource.memory_mb > 0) {
-    int64_t rm_reservation_size_mb =
-      static_cast<int64_t>(request.fragment_instance_ctx.reserved_resource.memory_mb);
-    rm_reservation_size_bytes = rm_reservation_size_mb * 1024L * 1024L;
-    // Queries that use more than the hard limit will be killed, so it's not useful to
-    // have a reservation larger than the hard limit. Clamp reservation bytes limit to the
-    // hard limit (if it exists).
-    if (rm_reservation_size_bytes > bytes_limit && bytes_limit != -1) {
-      runtime_state_->LogError(ErrorMsg(TErrorCode::FRAGMENT_EXECUTOR,
-          PrettyPrinter::PrintBytes(rm_reservation_size_bytes),
-          PrettyPrinter::PrintBytes(bytes_limit)));
-      rm_reservation_size_bytes = bytes_limit;
-    }
-    VLOG_QUERY << "Using RM reservation memory limit from resource reservation: "
-               << PrettyPrinter::Print(rm_reservation_size_bytes, TUnit::BYTES);
-  }
-
   DCHECK(!fragment_instance_ctx.request_pool.empty());
-  runtime_state_->InitMemTrackers(query_id_, &fragment_instance_ctx.request_pool,
-      bytes_limit, rm_reservation_size_bytes);
+  runtime_state_->InitMemTrackers(
+      query_id_, &fragment_instance_ctx.request_pool, bytes_limit);
   RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
   runtime_state_->InitFilterBank();
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
-  if (runtime_state_->query_resource_mgr() != NULL) {
-    runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
-  }
   has_thread_token_ = true;
 
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
@@ -266,8 +193,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
         obj_pool(), request.fragment_ctx.fragment.output_sink,
         request.fragment_ctx.fragment.output_exprs,
         fragment_instance_ctx, row_desc(), &sink_));
-    sink_mem_tracker_.reset(new MemTracker(-1, -1, sink_->GetName(),
-        runtime_state_->instance_mem_tracker(), true));
+    sink_mem_tracker_.reset(new MemTracker(
+        -1, sink_->GetName(), runtime_state_->instance_mem_tracker(), true));
     RETURN_IF_ERROR(sink_->Prepare(runtime_state(), sink_mem_tracker_.get()));
 
     RuntimeProfile* sink_profile = sink_->profile();
@@ -565,9 +492,6 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
   if (has_thread_token_) {
     has_thread_token_ = false;
     runtime_state_->resource_pool()->ReleaseThreadToken(true);
-    if (runtime_state_->query_resource_mgr() != NULL) {
-      runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
-    }
     PeriodicCounterUpdater::StopSamplingCounter(average_thread_tokens_);
     PeriodicCounterUpdater::StopTimeSeriesCounter(
         thread_usage_sampled_counter_);
@@ -583,10 +507,6 @@ void PlanFragmentExecutor::Close() {
   }
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
-    if (runtime_state_->query_resource_mgr() != NULL) {
-      exec_env_->cgroups_mgr()->UnregisterFragment(
-          runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
-    }
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
     for (DiskIoRequestContext* context: *runtime_state_->reader_contexts()) {
       runtime_state_->io_mgr()->UnregisterContext(context);

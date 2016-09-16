@@ -153,7 +153,7 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   DCHECK(mem_tracker != NULL);
   profile_ = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(), GetName()));
   mem_tracker_ = mem_tracker;
-  expr_mem_tracker_.reset(new MemTracker(-1, -1, "Exprs", mem_tracker, false));
+  expr_mem_tracker_.reset(new MemTracker(-1, "Exprs", mem_tracker, false));
   return Status::OK();
 }
 

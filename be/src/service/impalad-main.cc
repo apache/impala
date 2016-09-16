@@ -54,6 +54,7 @@ DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
 DECLARE_string(principal);
+DECLARE_bool(enable_rm);
 
 int ImpaladMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
@@ -65,6 +66,13 @@ int ImpaladMain(int argc, char** argv) {
   ABORT_IF_ERROR(HBaseTableWriter::InitJNI());
   ABORT_IF_ERROR(HiveUdfCall::Init());
   InitFeSupport();
+
+  if (FLAGS_enable_rm) {
+    // TODO: Remove in Impala 3.0.
+    LOG(WARNING) << "*****************************************************************";
+    LOG(WARNING) << "Llama support has been deprecated. FLAGS_enable_rm has no effect.";
+    LOG(WARNING) << "*****************************************************************";
+  }
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;

@@ -635,7 +635,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     DiskIoMgr io_mgr(1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
     ASSERT_OK(io_mgr.Init(&root_mem_tracker));
-    MemTracker reader_mem_tracker(-1, -1, "Reader", &root_mem_tracker);
+    MemTracker reader_mem_tracker(-1, "Reader", &root_mem_tracker);
     DiskIoRequestContext* reader;
     ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 
@@ -950,7 +950,7 @@ TEST_F(DiskIoMgrTest, Buffers) {
   ASSERT_OK(io_mgr.Init(&root_mem_tracker));
   ASSERT_EQ(root_mem_tracker.consumption(), 0);
 
-  MemTracker reader_mem_tracker(-1, -1, "Reader", &root_mem_tracker);
+  MemTracker reader_mem_tracker(-1, "Reader", &root_mem_tracker);
   DiskIoRequestContext* reader;
   ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
 

@@ -29,7 +29,6 @@
 
 #include "common/logging.h"
 #include "util/metrics.h"
-#include "resourcebroker/resource-broker.h"
 #include "runtime/exec-env.h"
 #include "runtime/coordinator.h"
 #include "service/impala-server.h"
@@ -43,11 +42,9 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
-#include "util/llama-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/runtime-profile-counters.h"
-#include "gen-cpp/ResourceBrokerService_types.h"
 
 #include "common/names.h"
 
@@ -58,9 +55,6 @@ using namespace strings;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
-DECLARE_bool(enable_rm);
-DECLARE_int32(rm_default_cpu_vcores);
-DECLARE_string(rm_default_memory);
 
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
 
@@ -79,8 +73,7 @@ const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
-    MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
-    RequestPoolService* request_pool_service)
+    MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
   : backend_config_(std::make_shared<const BackendConfig>()),
     metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     webserver_(webserver),
@@ -90,7 +83,6 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialized_(NULL),
-    resource_broker_(resource_broker),
     request_pool_service_(request_pool_service) {
   local_backend_descriptor_.address = backend_address;
 
@@ -99,32 +91,10 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     admission_controller_.reset(
         new AdmissionController(request_pool_service_, metrics, backend_address));
   }
-
-  if (FLAGS_enable_rm) {
-    if (FLAGS_rm_default_cpu_vcores <= 0) {
-      LOG(ERROR) << "Bad value for --rm_default_cpu_vcores (must be postive): "
-                 << FLAGS_rm_default_cpu_vcores;
-      exit(1);
-    }
-    bool is_percent;
-    int64_t mem_bytes =
-        ParseUtil::ParseMemSpec(
-            FLAGS_rm_default_memory, &is_percent, MemInfo::physical_mem());
-    if (mem_bytes <= 1024 * 1024) {
-      LOG(ERROR) << "Bad value for --rm_default_memory (must be larger than 1M):"
-                 << FLAGS_rm_default_memory;
-      exit(1);
-    } else if (is_percent) {
-      LOG(ERROR) << "Must use absolute value for --rm_default_memory: "
-                 << FLAGS_rm_default_memory;
-      exit(1);
-    }
-  }
 }
 
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
-    MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
-    RequestPoolService* request_pool_service)
+    MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
   : backend_config_(std::make_shared<const BackendConfig>(backends)),
     metrics_(metrics),
     webserver_(webserver),
@@ -133,7 +103,6 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialized_(NULL),
-    resource_broker_(resource_broker),
     request_pool_service_(request_pool_service) {
   DCHECK(backends.size() > 0);
   local_backend_descriptor_.address = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
@@ -289,10 +258,7 @@ void SimpleScheduler::UpdateMembership(
 
     // If this impalad is not in our view of the membership list, we should add it and
     // tell the statestore.
-    bool is_offline = ExecEnv::GetInstance() &&
-        ExecEnv::GetInstance()->impala_server()->IsOffline();
-    if (!is_offline &&
-        current_membership_.find(local_backend_id_) == current_membership_.end()) {
+    if (current_membership_.find(local_backend_id_) == current_membership_.end()) {
       VLOG(1) << "Registering local backend with statestore";
       subscriber_topic_updates->push_back(TTopicDelta());
       TTopicDelta& update = subscriber_topic_updates->back();
@@ -308,13 +274,6 @@ void SimpleScheduler::UpdateMembership(
                      << " " << status.GetDetail();
         subscriber_topic_updates->pop_back();
       }
-    } else if (is_offline &&
-        current_membership_.find(local_backend_id_) != current_membership_.end()) {
-      LOG(WARNING) << "Removing offline ImpalaServer from statestore";
-      subscriber_topic_updates->push_back(TTopicDelta());
-      TTopicDelta& update = subscriber_topic_updates->back();
-      update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
-      update.topic_deletions.push_back(local_backend_id_);
     }
     if (metrics_ != NULL) {
       num_fragment_instances_metric_->set_value(current_membership_.size());
@@ -626,7 +585,6 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
   for (const FragmentExecParams& exec_params: *fragment_exec_params) {
     unique_hosts.insert(exec_params.hosts.begin(), exec_params.hosts.end());
   }
-
   schedule->SetUniqueHosts(unique_hosts);
 }
 
@@ -723,37 +681,11 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   schedule->set_request_pool(resolved_pool);
   schedule->summary_profile()->AddInfoString("Request Pool", resolved_pool);
 
-  if (ExecEnv::GetInstance()->impala_server()->IsOffline()) {
-    return Status("This Impala server is offline. Please retry your query later.");
-  }
-
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
   if (!FLAGS_disable_admission_control) {
     RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
-  }
-  if (!FLAGS_enable_rm) return Status::OK();
-  string user = GetEffectiveUser(schedule->request().query_ctx.session);
-  if (user.empty()) user = "default";
-  schedule->PrepareReservationRequest(resolved_pool, user);
-  const TResourceBrokerReservationRequest& reservation_request =
-      schedule->reservation_request();
-  if (!reservation_request.resources.empty()) {
-    Status status = resource_broker_->Reserve(
-        reservation_request, schedule->reservation());
-    if (!status.ok()) {
-      // Warn about missing table and/or column stats if necessary.
-      const TQueryCtx& query_ctx = schedule->request().query_ctx;
-      if (!query_ctx.__isset.parent_query_id &&
-          query_ctx.__isset.tables_missing_stats &&
-          !query_ctx.tables_missing_stats.empty()) {
-        status.AddDetail(GetTablesMissingStatsWarning(query_ctx.tables_missing_stats));
-      }
-      return status;
-    }
-    RETURN_IF_ERROR(schedule->ValidateReservation());
-    AddToActiveResourceMaps(*schedule->reservation(), coord);
   }
   return Status::OK();
 }
@@ -762,104 +694,7 @@ Status SimpleScheduler::Release(QuerySchedule* schedule) {
   if (!FLAGS_disable_admission_control) {
     RETURN_IF_ERROR(admission_controller_->ReleaseQuery(schedule));
   }
-  if (FLAGS_enable_rm && schedule->NeedsRelease()) {
-    DCHECK(resource_broker_ != NULL);
-    Status status = resource_broker_->ReleaseReservation(
-        schedule->reservation()->reservation_id);
-    // Remove the reservation from the active-resource maps even if there was an error
-    // releasing the reservation because the query running in the reservation is done.
-    RemoveFromActiveResourceMaps(*schedule->reservation());
-    RETURN_IF_ERROR(status);
-  }
   return Status::OK();
-}
-
-void SimpleScheduler::AddToActiveResourceMaps(
-    const TResourceBrokerReservationResponse& reservation, Coordinator* coord) {
-  lock_guard<mutex> l(active_resources_lock_);
-  active_reservations_[reservation.reservation_id] = coord;
-  map<TNetworkAddress, llama::TAllocatedResource>::const_iterator iter;
-  for (iter = reservation.allocated_resources.begin();
-      iter != reservation.allocated_resources.end();
-      ++iter) {
-    TUniqueId client_resource_id;
-    client_resource_id << iter->second.client_resource_id;
-    active_client_resources_[client_resource_id] = coord;
-  }
-}
-
-void SimpleScheduler::RemoveFromActiveResourceMaps(
-    const TResourceBrokerReservationResponse& reservation) {
-  lock_guard<mutex> l(active_resources_lock_);
-  active_reservations_.erase(reservation.reservation_id);
-  map<TNetworkAddress, llama::TAllocatedResource>::const_iterator iter;
-  for (iter = reservation.allocated_resources.begin();
-      iter != reservation.allocated_resources.end();
-      ++iter) {
-    TUniqueId client_resource_id;
-    client_resource_id << iter->second.client_resource_id;
-    active_client_resources_.erase(client_resource_id);
-  }
-}
-
-// TODO: Refactor the Handle*{Reservation,Resource} functions to avoid code duplication.
-void SimpleScheduler::HandlePreemptedReservation(const TUniqueId& reservation_id) {
-  VLOG_QUERY << "HandlePreemptedReservation client_id=" << reservation_id;
-  Coordinator* coord = NULL;
-  {
-    lock_guard<mutex> l(active_resources_lock_);
-    ActiveReservationsMap::iterator it = active_reservations_.find(reservation_id);
-    if (it != active_reservations_.end()) coord = it->second;
-  }
-  if (coord == NULL) {
-    LOG(WARNING) << "Ignoring preempted reservation id " << reservation_id
-                 << " because no active query using it was found.";
-  } else {
-    stringstream err_msg;
-    err_msg << "Reservation " << reservation_id << " was preempted";
-    Status status(err_msg.str());
-    coord->Cancel(&status);
-  }
-}
-
-void SimpleScheduler::HandlePreemptedResource(const TUniqueId& client_resource_id) {
-  VLOG_QUERY << "HandlePreemptedResource client_id=" << client_resource_id;
-  Coordinator* coord = NULL;
-  {
-    lock_guard<mutex> l(active_resources_lock_);
-    ActiveClientResourcesMap::iterator it =
-        active_client_resources_.find(client_resource_id);
-    if (it != active_client_resources_.end()) coord = it->second;
-  }
-  if (coord == NULL) {
-    LOG(WARNING) << "Ignoring preempted client resource id " << client_resource_id
-                 << " because no active query using it was found.";
-  } else {
-    stringstream err_msg;
-    err_msg << "Resource " << client_resource_id << " was preempted";
-    Status status(err_msg.str());
-    coord->Cancel(&status);
-  }
-}
-
-void SimpleScheduler::HandleLostResource(const TUniqueId& client_resource_id) {
-  VLOG_QUERY << "HandleLostResource preempting client_id=" << client_resource_id;
-  Coordinator* coord = NULL;
-  {
-    lock_guard<mutex> l(active_resources_lock_);
-    ActiveClientResourcesMap::iterator it =
-        active_client_resources_.find(client_resource_id);
-    if (it != active_client_resources_.end()) coord = it->second;
-  }
-  if (coord == NULL) {
-    LOG(WARNING) << "Ignoring lost client resource id " << client_resource_id
-                 << " because no active query using it was found.";
-  } else {
-    stringstream err_msg;
-    err_msg << "Resource " << client_resource_id << " was lost";
-    Status status(err_msg.str());
-    coord->Cancel(&status);
-  }
 }
 
 SimpleScheduler::AssignmentCtx::AssignmentCtx(

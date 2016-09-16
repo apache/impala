@@ -33,7 +33,6 @@ include "DataSinks.thrift"
 include "Results.thrift"
 include "RuntimeProfile.thrift"
 include "ImpalaService.thrift"
-include "Llama.thrift"
 
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
@@ -366,12 +365,6 @@ struct TPlanFragmentInstanceCtx {
 
   // Id of this fragment in its role as a sender.
   11: optional i32 sender_id
-
-  // Resource reservation to run this plan fragment in.
-  12: optional Llama.TAllocatedResource reserved_resource
-
-  // Address of local node manager (used for expanding resource allocations)
-  13: optional Types.TNetworkAddress local_resource_address
 }
 
 

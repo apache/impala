@@ -71,7 +71,6 @@ CONFIG_FILE = '''-beeswax_port=21000
 -max_lineage_log_file_size=5000
 -hostname=vb0204.halxg.cloudera.com
 -state_store_host=vb0202.halxg.cloudera.com
--enable_rm=false
 -state_store_port=24000
 -catalog_service_host=vb0202.halxg.cloudera.com
 -catalog_service_port=26000

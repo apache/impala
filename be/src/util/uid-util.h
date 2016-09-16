@@ -37,10 +37,7 @@ inline std::size_t hash_value(const impala::TUniqueId& id) {
   return seed;
 }
 
-/// Templated so that this method is not namespace-specific (since we also call this on
-/// llama::TUniqueId)
-template <typename T>
-inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, T* unique_id) {
+inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, TUniqueId* unique_id) {
   memcpy(&(unique_id->hi), &uuid.data[0], 8);
   memcpy(&(unique_id->lo), &uuid.data[8], 8);
 }

@@ -27,7 +27,6 @@
 #include "runtime/runtime-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
-#include "scheduling/query-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/runtime-profile-counters.h"
@@ -154,12 +153,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(HdfsScanNodeBase::Prepare(state));
 
-  // Assign scanner thread group to cgroup, if any.
-  if (!state->cgroup().empty()) {
-    scanner_threads_.SetCgroupsMgr(state->exec_env()->cgroups_mgr());
-    scanner_threads_.SetCgroup(state->cgroup());
-  }
-
   // Compute the minimum bytes required to start a new thread. This is based on the
   // file format.
   // The higher the estimate, the less likely it is the query will fail but more likely
@@ -212,12 +205,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   thread_avail_cb_id_ = runtime_state_->resource_pool()->AddThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
 
-  if (runtime_state_->query_resource_mgr() != NULL) {
-    rm_callback_id_ = runtime_state_->query_resource_mgr()->AddVcoreAvailableCb(
-        bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this,
-            runtime_state_->resource_pool()));
-  }
-
   return Status::OK();
 }
 
@@ -227,9 +214,6 @@ void HdfsScanNode::Close(RuntimeState* state) {
 
   if (thread_avail_cb_id_ != -1) {
     state->resource_pool()->RemoveThreadAvailableCb(thread_avail_cb_id_);
-  }
-  if (state->query_resource_mgr() != NULL && rm_callback_id_ != -1) {
-    state->query_resource_mgr()->RemoveVcoreAvailableCb(rm_callback_id_);
   }
 
   scanner_threads_.JoinAll();
@@ -326,8 +310,6 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  6. Don't start up a thread if there isn't enough memory left to run it.
   //  7. Don't start up more than maximum number of scanner threads configured.
   //  8. Don't start up if there are no thread tokens.
-  //  9. Don't start up if we are running too many threads for our vcore allocation
-  //  (unless the thread is reserved, in which case it has to run).
 
   // Case 4. We have not issued the initial ranges so don't start a scanner thread.
   // Issuing ranges will call this function and we'll start the scanner threads then.
@@ -360,25 +342,12 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
       break;
     }
 
-    // Case 9.
-    if (!is_reserved) {
-      if (runtime_state_->query_resource_mgr() != NULL &&
-          runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
-        pool->ReleaseThreadToken(false);
-        break;
-      }
-    }
-
     COUNTER_ADD(&active_scanner_thread_counter_, 1);
     COUNTER_ADD(num_scanner_threads_started_counter_, 1);
     stringstream ss;
     ss << "scanner-thread(" << num_scanner_threads_started_counter_->value() << ")";
     scanner_threads_.AddThread(
         new Thread("hdfs-scan-node", ss.str(), &HdfsScanNode::ScannerThread, this));
-
-    if (runtime_state_->query_resource_mgr() != NULL) {
-      runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
-    }
   }
 }
 
@@ -411,9 +380,6 @@ void HdfsScanNode::ScannerThread() {
           // Unlock before releasing the thread token to avoid deadlock in
           // ThreadTokenAvailableCb().
           l.unlock();
-          if (runtime_state_->query_resource_mgr() != NULL) {
-            runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
-          }
           runtime_state_->resource_pool()->ReleaseThreadToken(false);
           if (filter_status.ok()) {
             for (auto& ctx: filter_ctxs) {
@@ -495,9 +461,6 @@ void HdfsScanNode::ScannerThread() {
   }
 
   COUNTER_ADD(&active_scanner_thread_counter_, -1);
-  if (runtime_state_->query_resource_mgr() != NULL) {
-    runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
-  }
   runtime_state_->resource_pool()->ReleaseThreadToken(false);
 }
 
