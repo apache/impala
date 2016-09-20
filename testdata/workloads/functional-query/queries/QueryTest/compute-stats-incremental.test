@@ -324,27 +324,47 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that incremental stats queries handle partitions with keyword names
-create table incremental_keyword_part_key(col int) partitioned by
-(`date` int);
-insert into incremental_keyword_part_key partition(`date`=1) values(2);
+create table incremental_keyword_part_key(col int)
+partitioned by (`date` int, `table` string);
+insert into incremental_keyword_part_key
+partition(`date`=1, `table`='a') values(2);
 compute incremental stats incremental_keyword_part_key
-partition(`date`=1);
+partition(`date`=1, `table`='a');
 show table stats incremental_keyword_part_key;
 ---- RESULTS
-'1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
-'Total',1,1,'2B','0B','','','',''
+'1','a',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',1,1,'2B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-4170: Check that incremental stats queries handles
+# new partitions with keyword names.
+insert into incremental_keyword_part_key
+partition(`date`=2, `table`='b') values(3);
+insert into incremental_keyword_part_key
+partition(`date`=NULL, `table`='') values(4);
+compute incremental stats incremental_keyword_part_key;
+show table stats incremental_keyword_part_key;
+---- RESULTS
+'NULL','NULL',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'1','a',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2','b',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',3,3,'6B','0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop stats incremental_keyword_part_key;
 compute incremental stats incremental_keyword_part_key;
 show table stats incremental_keyword_part_key;
 ---- RESULTS
-'1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
-'Total',1,1,'2B','0B','','','',''
+'NULL','NULL',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'1','a',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2','b',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',3,3,'6B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 create table incremental_string_part_value(col int) partitioned by

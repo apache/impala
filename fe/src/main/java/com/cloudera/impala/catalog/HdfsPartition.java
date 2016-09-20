@@ -44,11 +44,11 @@ import com.cloudera.impala.thrift.THdfsCompression;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
-import com.cloudera.impala.thrift.THdfsPartitionLocation;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionStats;
 import com.cloudera.impala.thrift.TTableStats;
 import com.cloudera.impala.util.HdfsCachingUtil;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -57,7 +57,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -337,25 +336,23 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   /**
    * Utility method which returns a string of conjuncts of equality exprs to exactly
    * select this partition (e.g. ((month=2009) AND (year=2012)).
-   * TODO: Remove this when TODO elsewhere in this file to save and expose the list of
-   * TPartitionKeyValues has been resolved.
+   * TODO: Remove this when the TODO elsewhere in this file to save and expose the
+   * list of TPartitionKeyValues has been resolved.
    */
   public String getConjunctSql() {
-    List<String> partitionCols = Lists.newArrayList();
-    for (int i = 0; i < getTable().getNumClusteringCols(); ++i) {
-      partitionCols.add(ToSqlUtils.getIdentSql(getTable().getColumns().get(i).getName()));
+    List<String> partColSql = Lists.newArrayList();
+    for (Column partCol: getTable().getClusteringColumns()) {
+      partColSql.add(ToSqlUtils.getIdentSql(partCol.getName()));
     }
 
     List<String> conjuncts = Lists.newArrayList();
-    for (int i = 0; i < partitionCols.size(); ++i) {
-      LiteralExpr expr = getPartitionValues().get(i);
-      String sql = expr.toSql();
-      if (expr instanceof NullLiteral || sql.isEmpty()) {
-        conjuncts.add(ToSqlUtils.getIdentSql(partitionCols.get(i))
-            + " IS NULL");
+    for (int i = 0; i < partColSql.size(); ++i) {
+      LiteralExpr partVal = getPartitionValues().get(i);
+      String partValSql = partVal.toSql();
+      if (partVal instanceof NullLiteral || partValSql.isEmpty()) {
+        conjuncts.add(partColSql.get(i) + " IS NULL");
       } else {
-        conjuncts.add(ToSqlUtils.getIdentSql(partitionCols.get(i))
-            + "=" + sql);
+        conjuncts.add(partColSql.get(i) + "=" + partValSql);
       }
     }
     return "(" + Joiner.on(" AND " ).join(conjuncts) + ")";
