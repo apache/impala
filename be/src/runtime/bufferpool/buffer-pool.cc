@@ -35,36 +35,10 @@ DEFINE_int32(concurrent_scratch_ios_per_device, 2,
 
 namespace impala {
 
-BufferPool::BufferHandle::BufferHandle() {
-  Reset();
-}
-
-BufferPool::BufferHandle::BufferHandle(BufferHandle&& src) {
-  Reset();
-  *this = std::move(src);
-}
-
-BufferPool::BufferHandle& BufferPool::BufferHandle::operator=(BufferHandle&& src) {
-  DCHECK(!is_open());
-  // Copy over all members then close src.
-  client_ = src.client_;
-  data_ = src.data_;
-  len_ = src.len_;
-  src.Reset();
-  return *this;
-}
-
-void BufferPool::BufferHandle::Open(
-    const ClientHandle* client, uint8_t* data, int64_t len) {
-  client_ = client;
+void BufferPool::BufferHandle::Open(uint8_t* data, int64_t len) {
+  client_ = nullptr;
   data_ = data;
   len_ = len;
-}
-
-void BufferPool::BufferHandle::Reset() {
-  client_ = NULL;
-  data_ = NULL;
-  len_ = -1;
 }
 
 BufferPool::PageHandle::PageHandle() {
@@ -245,14 +219,13 @@ Status BufferPool::AllocateBufferInternal(
     int64_t to_evict = len - delta;
     RETURN_IF_ERROR(EvictCleanPages(to_evict));
   }
-  uint8_t* data;
-  Status status = allocator_->Allocate(len, &data);
+  Status status = allocator_->Allocate(len, buffer);
   if (!status.ok()) {
     buffer_bytes_remaining_.Add(len);
     return status;
   }
-  DCHECK(data != NULL);
-  buffer->Open(client, data, len);
+  DCHECK(buffer->is_open());
+  buffer->client_ = client;
   return Status::OK();
 }
 
@@ -265,8 +238,9 @@ void BufferPool::FreeBuffer(ClientHandle* client, BufferHandle* handle) {
 
 void BufferPool::FreeBufferInternal(BufferHandle* handle) {
   DCHECK(handle->is_open());
-  allocator_->Free(handle->data(), handle->len());
-  buffer_bytes_remaining_.Add(handle->len());
+  int64_t buffer_len = handle->len();
+  allocator_->Free(move(*handle));
+  buffer_bytes_remaining_.Add(buffer_len);
   handle->Reset();
 }
 
@@ -329,10 +303,7 @@ Status BufferPool::EvictCleanPages(int64_t bytes_to_evict) {
 
   // Free buffers after releasing all the locks. Do this regardless of success to avoid
   // leaking buffers.
-  for (BufferHandle& buffer : buffers) {
-    allocator_->Free(buffer.data(), buffer.len());
-    buffer.Reset();
-  }
+  for (BufferHandle& buffer : buffers) allocator_->Free(move(buffer));
   if (bytes_found < bytes_to_evict) {
     // The buffer pool should not be overcommitted so this should only happen if there
     // is an accounting error. Add any freed buffers back to 'buffer_bytes_remaining_'

@@ -50,7 +50,7 @@ double Benchmark::Measure(BenchmarkFunction function, void* args,
     // in 20% increments.
     // TODO: we can make this more sophisticated if need to be dynamically ramp up and
     // ramp down the sizes.
-    batch_size = (iters_guess - iters) / 5;
+    batch_size = max<int>(1, (iters_guess - iters) / 5);
   }
 
   while (sw.ElapsedTime() < target_cycles) {
@@ -85,7 +85,7 @@ int Benchmark::AddBenchmark(const string& name, BenchmarkFunction fn, void* args
   return benchmarks_.size() - 1;
 }
 
-string Benchmark::Measure() {
+string Benchmark::Measure(int max_time, int initial_batch_size) {
   if (benchmarks_.empty()) return "";
 
   // Run a warmup to iterate through the data
@@ -116,7 +116,8 @@ string Benchmark::Measure() {
   stringstream ss;
   for (int j = 0; j < NUM_REPS; ++j) {
     for (int i = 0; i < benchmarks_.size(); ++i) {
-      benchmarks_[i].rates.push_back(Measure(benchmarks_[i].fn, benchmarks_[i].args));
+      benchmarks_[i].rates.push_back(
+          Measure(benchmarks_[i].fn, benchmarks_[i].args, max_time, initial_batch_size));
     }
   }
 

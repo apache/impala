@@ -30,5 +30,6 @@ add_library(BufferPool
 add_dependencies(BufferPool thrift-deps)
 
 ADD_BE_TEST(buffer-pool-test)
+ADD_BE_TEST(free-list-test)
 ADD_BE_TEST(reservation-tracker-test)
 ADD_BE_TEST(suballocator-test)

@@ -39,7 +39,7 @@ struct MemcpyData {
 class BenchmarkTest {
  public:
   static double Measure(Benchmark::BenchmarkFunction fn, void* data) {
-    return Benchmark::Measure(fn, data);
+    return Benchmark::Measure(fn, data, 50, 10);
   }
 };
 

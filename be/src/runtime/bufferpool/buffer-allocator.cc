@@ -24,16 +24,18 @@ namespace impala {
 BufferAllocator::BufferAllocator(int64_t min_buffer_len)
   : min_buffer_len_(min_buffer_len) {}
 
-Status BufferAllocator::Allocate(int64_t len, uint8_t** buffer) {
+Status BufferAllocator::Allocate(int64_t len, BufferPool::BufferHandle* buffer) {
   DCHECK_GE(len, min_buffer_len_);
   DCHECK_EQ(len, BitUtil::RoundUpToPowerOfTwo(len));
 
-  *buffer = reinterpret_cast<uint8_t*>(malloc(len));
-  if (*buffer == NULL) return Status(TErrorCode::BUFFER_ALLOCATION_FAILED, len);
+  uint8_t* alloc = reinterpret_cast<uint8_t*>(malloc(len));
+  if (alloc == NULL) return Status(TErrorCode::BUFFER_ALLOCATION_FAILED, len);
+  buffer->Open(alloc, len);
   return Status::OK();
 }
 
-void BufferAllocator::Free(uint8_t* buffer, int64_t len) {
-  free(buffer);
+void BufferAllocator::Free(BufferPool::BufferHandle&& buffer) {
+  free(buffer.data());
+  buffer.Reset(); // Avoid DCHECK in ~BufferHandle().
 }
 }

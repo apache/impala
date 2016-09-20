@@ -20,6 +20,8 @@
 
 #include "common/status.h"
 
+#include "runtime/bufferpool/buffer-pool.h"
+
 namespace impala {
 
 /// The underlying memory allocator for the buffer pool. All buffers are allocated through
@@ -35,10 +37,10 @@ class BufferAllocator {
 
   /// Allocate memory for a buffer of 'len' bytes. 'len' must be a power-of-two multiple
   /// of the minimum buffer length.
-  Status Allocate(int64_t len, uint8_t** buffer) WARN_UNUSED_RESULT;
+  Status Allocate(int64_t len, BufferPool::BufferHandle* buffer) WARN_UNUSED_RESULT;
 
   /// Free the memory for a previously-allocated buffer.
-  void Free(uint8_t* buffer, int64_t len);
+  void Free(BufferPool::BufferHandle&& buffer);
 
  private:
   const int64_t min_buffer_len_;

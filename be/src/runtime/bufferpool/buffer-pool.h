@@ -360,15 +360,16 @@ class BufferPool::ClientHandle {
 /// BufferPool methods with the BufferHandle as an argument is not supported.
 class BufferPool::BufferHandle {
  public:
-  BufferHandle();
+  BufferHandle() { Reset(); }
   ~BufferHandle() { DCHECK(!is_open()); }
 
-  /// Allow move construction of handles, to support std::move().
-  BufferHandle(BufferHandle&& src);
+  /// Allow move construction of handles, to support std::move(). Inline to make moving
+  /// efficient.
+  inline BufferHandle(BufferHandle&& src);
 
   /// Allow move assignment of handles, to support STL classes like std::vector.
-  /// Destination must be uninitialized.
-  BufferHandle& operator=(BufferHandle&& src);
+  /// Destination must be uninitialized. Inline to make moving efficient.
+  inline BufferHandle& operator=(BufferHandle&& src);
 
   bool is_open() const { return data_ != NULL; }
   int64_t len() const {
@@ -388,12 +389,14 @@ class BufferPool::BufferHandle {
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferHandle);
   friend class BufferPool;
+  friend class BufferAllocator;
 
   /// Internal helper to set the handle to an opened state.
-  void Open(const ClientHandle* client, uint8_t* data, int64_t len);
+  void Open(uint8_t* data, int64_t len);
 
-  /// Internal helper to reset the handle to an unopened state.
-  void Reset();
+  /// Internal helper to reset the handle to an unopened state. Inlined to make moving
+  /// efficient.
+  inline void Reset();
 
   /// The client the buffer handle belongs to, used to validate that the correct client
   /// is provided in BufferPool method calls.
@@ -460,6 +463,28 @@ class BufferPool::PageHandle {
   /// is being used.
   const ClientHandle* client_;
 };
+
+inline BufferPool::BufferHandle::BufferHandle(BufferHandle&& src) {
+  Reset();
+  *this = std::move(src);
+}
+
+inline BufferPool::BufferHandle& BufferPool::BufferHandle::operator=(
+    BufferHandle&& src) {
+  DCHECK(!is_open());
+  // Copy over all members then close src.
+  client_ = src.client_;
+  data_ = src.data_;
+  len_ = src.len_;
+  src.Reset();
+  return *this;
+}
+
+inline void BufferPool::BufferHandle::Reset() {
+  client_ = NULL;
+  data_ = NULL;
+  len_ = -1;
+}
 }
 
 #endif
