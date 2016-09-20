@@ -67,7 +67,8 @@ for r in resources:
       break
   if not excluded:
     typename = r.findall('type')[0].attrib['name']
-    if not (clean_name[0:9] == 'testdata/' and typename in ['archive', 'binary']):
+    if not (clean_name[0:9] == 'testdata/' and typename in ['archive', 'binary']
+            and clean_name[-4:] <> '.jar'):
       sys.stderr.write(
           "%s: %s\n" %
           ('UNAPPROVED' if approvals else "NO APPROVALS; " + typename, clean_name))

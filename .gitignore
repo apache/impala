@@ -52,3 +52,6 @@ toolchain/
 core
 core.*
 hs_err_pid*.log
+
+# Binaries disallowed by ASF rules
+*.jar
