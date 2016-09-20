@@ -21,8 +21,9 @@ import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.io.Text;
 
 /**
- * Simple UDF for testing updating a UDF in HDFS. This file is built and
- * the old version of the jar is saved to $IMPALA_HOME/testdata/udfs/
+ * Simple UDF for testing updating a UDF in HDFS. This file is built
+ * twice, with one version of the jar having TestUpdateUdf.evaluate()
+ * return "Old UDF" and the other "New UDF".
  *
  * The build produces a new version of the UDF. The tests make sure the
  * jar can be updated without having to restart Impalad.
@@ -32,13 +33,6 @@ public class TestUpdateUdf extends UDF {
   }
 
   public Text evaluate() {
-    return new Text("New UDF");
-  }
-
-  // Use this function instead of the other evaluate to regenerate the checked in jar.
-  /*
-  public Text evaluate() {
     return new Text("Old UDF");
   }
-  */
 }

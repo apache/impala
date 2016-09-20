@@ -1,7 +1,5 @@
-Most of the test UDFs are generated as part of the build. This folder
-contains prebuilt UDFs to facilitate tests that verify the UDF binary
-can be upgraded.
-
-The jar is generated from $IMPALA_HOME/tests/test-hive-udfs.
+Most of the test UDFs are generated as part of the build. After
+copy-udfs-udas.sh is run, This folder contains prebuilt UDFs to
+facilitate tests that verify the UDF binary can be upgraded.
 
 This is used by test_udfs.py.

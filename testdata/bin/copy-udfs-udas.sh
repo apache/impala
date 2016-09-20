@@ -26,7 +26,7 @@ if [ x${JAVA_HOME} == x ]; then
   echo JAVA_HOME not set
   exit 1
 fi
-. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
+. "${IMPALA_HOME}/bin/impala-config.sh" > /dev/null 2>&1
 
 BUILD=0
 
@@ -47,11 +47,19 @@ done
 
 if [ $BUILD -eq 1 ]
 then
-  pushd $IMPALA_HOME
-  make -j$CORES \
+  pushd "${IMPALA_HOME}"
+  "${MAKE_CMD:-make}" "-j${IMPALA_BUILD_THREADS:-4}" \
       TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
-  cd $IMPALA_HOME/tests/test-hive-udfs
-  ${IMPALA_HOME}/bin/mvn-quiet.sh package
+  cd "${IMPALA_HOME}/tests/test-hive-udfs"
+  "${IMPALA_HOME}/bin/mvn-quiet.sh" package
+  cp target/test-hive-udfs-1.0.jar "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs.jar"
+  # Change one of the Java files to make a new jar for testing
+  # purposes, then change it back
+  find . -type f -name 'TestUpdateUdf.java' -execdir \
+       bash -c "sed -i s/'Old UDF'/'New UDF'/g '{}'" \;
+  "${IMPALA_HOME}/bin/mvn-quiet.sh" package
+  find . -type f -name 'TestUpdateUdf.java' -execdir \
+       bash -c "sed -i s/'New UDF'/'Old UDF'/g '{}'" \;
   popd
 fi
 
@@ -63,27 +71,27 @@ fi
 #   impala-hive-udfs.jar
 #   test-udfs.ll
 #   udf/uda samples (.so/.ll)
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/testutil/libTestUdas.so\
-    ${FILESYSTEM_PREFIX}/test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so\
-    ${FILESYSTEM_PREFIX}/test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so\
-    ${FILESYSTEM_PREFIX}/test-warehouse/libTestUdfs.SO
-hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/udf_test
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so\
-    ${FILESYSTEM_PREFIX}/test-warehouse/udf_test/libTestUdfs.so
-hadoop fs -put -f ${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar\
-  ${FILESYSTEM_PREFIX}/test-warehouse/hive-exec.jar
-hadoop fs -put -f ${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar\
-    ${FILESYSTEM_PREFIX}/test-warehouse/impala-hive-udfs.jar
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/testutil/test-udfs.ll\
-    ${FILESYSTEM_PREFIX}/test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/udf_samples/libudfsample.so\
-    ${FILESYSTEM_PREFIX}/test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/udf_samples/udf-sample.ll\
-    ${FILESYSTEM_PREFIX}/test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/udf_samples/libudasample.so\
-    ${FILESYSTEM_PREFIX}/test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/latest/udf_samples/uda-sample.ll\
-    ${FILESYSTEM_PREFIX}/test-warehouse
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdas.so"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so"\
+    "${FILESYSTEM_PREFIX}/test-warehouse/libTestUdfs.SO"
+hadoop fs -mkdir -p "${FILESYSTEM_PREFIX}/test-warehouse/udf_test"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so"\
+    "${FILESYSTEM_PREFIX}/test-warehouse/udf_test/libTestUdfs.so"
+hadoop fs -put -f "${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar"\
+  "${FILESYSTEM_PREFIX}/test-warehouse/hive-exec.jar"
+hadoop fs -put -f "${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar"\
+    "${FILESYSTEM_PREFIX}/test-warehouse/impala-hive-udfs.jar"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/test-udfs.ll"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/libudfsample.so"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/udf-sample.ll"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/libudasample.so"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
+hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/uda-sample.ll"\
+    "${FILESYSTEM_PREFIX}/test-warehouse"
 echo "Done copying udf/uda libraries."
