@@ -19,6 +19,7 @@
 #ifndef IMPALA_RUNTIME_DISK_IO_MGR_STRESS_H
 #define IMPALA_RUNTIME_DISK_IO_MGR_STRESS_H
 
+#include <memory>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
@@ -57,8 +58,8 @@ class DiskIoMgrStress {
   /// during the test
   std::vector<File> files_;
 
-  /// Dummy mem tracker
-  MemTracker dummy_tracker_;
+  /// Root mem tracker.
+  MemTracker mem_tracker_;
 
   /// io manager
   boost::scoped_ptr<DiskIoMgr> io_mgr_;
@@ -69,6 +70,9 @@ class DiskIoMgrStress {
   /// Array of clients
   int num_clients_;
   Client* clients_;
+
+  /// Client MemTrackers, one per client.
+  std::vector<std::unique_ptr<MemTracker>> client_mem_trackers_;
 
   /// If true, tests cancelling readers
   bool includes_cancellation_;

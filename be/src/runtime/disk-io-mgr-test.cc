@@ -62,7 +62,7 @@ class DiskIoMgrTest : public testing::Test {
     if (status.ok()) {
       DiskIoMgr::ScanRange* scan_range = pool_->Add(new DiskIoMgr::ScanRange());
       scan_range->Reset(NULL, (*written_range)->file(), (*written_range)->len(),
-          (*written_range)->offset(), 0, false, false, DiskIoMgr::ScanRange::NEVER_CACHE);
+          (*written_range)->offset(), 0, false, DiskIoMgr::BufferOpts::Uncached());
       ValidateSyncRead(io_mgr, reader, scan_range, reinterpret_cast<const char*>(data),
           sizeof(int32_t));
     }
@@ -161,10 +161,16 @@ class DiskIoMgrTest : public testing::Test {
     }
   }
 
+  DiskIoMgr::ScanRange* AllocateRange(int num_buffers) {
+    return pool_->Add(new DiskIoMgr::ScanRange(num_buffers));
+  }
+
   DiskIoMgr::ScanRange* InitRange(int num_buffers, const char* file_path, int offset,
-      int len, int disk_id, int64_t mtime, void* meta_data = NULL, bool is_cached = false) {
-    DiskIoMgr::ScanRange* range = pool_->Add(new DiskIoMgr::ScanRange(num_buffers));
-    range->Reset(NULL, file_path, len, offset, disk_id, is_cached, true, mtime, meta_data);
+      int len, int disk_id, int64_t mtime, void* meta_data = NULL,
+      bool is_cached = false) {
+    DiskIoMgr::ScanRange* range = AllocateRange(num_buffers);
+    range->Reset(NULL, file_path, len, offset, disk_id, true,
+        DiskIoMgr::BufferOpts(is_cached, mtime), meta_data);
     EXPECT_EQ(mtime, range->mtime());
     return range;
   }
@@ -242,7 +248,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   DiskIoMgr io_mgr(1, 1, 1, 10);
   ASSERT_OK(io_mgr.Init(&mem_tracker));
   DiskIoRequestContext* writer;
-  ASSERT_OK(io_mgr.RegisterContext(&writer));
+  ASSERT_OK(io_mgr.RegisterContext(&writer, NULL));
   int32_t* data = pool_->Add(new int32_t);
   *data = rand();
 
@@ -784,7 +790,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
         DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
         io_mgr.Init(&mem_tracker);
         for (int file_index = 0; file_index < num_contexts; ++file_index) {
-          ASSERT_OK(io_mgr.RegisterContext(&contexts[file_index]));
+          ASSERT_OK(io_mgr.RegisterContext(&contexts[file_index], &mem_tracker));
         }
         pool_.reset(new ObjectPool);
         int read_offset = 0;
@@ -898,7 +904,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           EXPECT_OK(io_mgr.Init(&mem_tracker));
 
           for (int i = 0; i < NUM_READERS; ++i) {
-            ASSERT_OK(io_mgr.RegisterContext(&readers[i], NULL));
+            ASSERT_OK(io_mgr.RegisterContext(&readers[i], &mem_tracker));
 
             vector<DiskIoMgr::ScanRange*> ranges;
             for (int j = 0; j < DATA_LEN; ++j) {
@@ -1042,9 +1048,51 @@ TEST_F(DiskIoMgrTest, PartialRead) {
   EXPECT_EQ(mem_tracker.consumption(), 0);
 }
 
+// Test reading into a client-allocated buffer.
+TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  int len = strlen(data);
+  int read_len = 4; // Make buffer size smaller than client-provided buffer.
+  CreateTempFile(tmp_file, data);
+
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, read_len, read_len));
+
+  ASSERT_OK(io_mgr->Init(&mem_tracker));
+  // Reader doesn't need to provide mem tracker if it's providing buffers.
+  MemTracker* reader_mem_tracker = NULL;
+  DiskIoRequestContext* reader;
+  ASSERT_OK(io_mgr->RegisterContext(&reader, reader_mem_tracker));
+
+  for (int buffer_len : vector<int>({len - 1, len, len + 1})) {
+    vector<uint8_t> client_buffer(buffer_len);
+    int scan_len = min(len, buffer_len);
+    DiskIoMgr::ScanRange* range = AllocateRange(1);
+    range->Reset(NULL, tmp_file, scan_len, 0, 0, true,
+        DiskIoMgr::BufferOpts::ReadInto(&client_buffer[0], buffer_len));
+    ASSERT_OK(io_mgr->AddScanRange(reader, range, true));
+
+    DiskIoMgr::BufferDescriptor* io_buffer;
+    ASSERT_OK(range->GetNext(&io_buffer));
+    ASSERT_TRUE(io_buffer->eosr());
+    ASSERT_EQ(scan_len, io_buffer->len());
+    ASSERT_EQ(client_buffer.data(), io_buffer->buffer());
+    ASSERT_EQ(memcmp(io_buffer->buffer(), data, scan_len), 0);
+
+    // DiskIoMgr should not have allocated memory.
+    EXPECT_EQ(mem_tracker.consumption(), 0);
+    io_buffer->Return();
+  }
+
+  io_mgr->UnregisterContext(reader);
+  pool_.reset();
+  io_mgr.reset();
+  EXPECT_EQ(mem_tracker.consumption(), 0);
+}
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();

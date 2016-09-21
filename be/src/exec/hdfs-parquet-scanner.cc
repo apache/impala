@@ -108,13 +108,14 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
           footer_range = scan_node->AllocateScanRange(files[i]->fs,
               files[i]->filename.c_str(), footer_size, footer_start,
               split_metadata->partition_id, footer_split->disk_id(),
-              footer_split->try_cache(), footer_split->expected_local(), files[i]->mtime,
-              split);
+              footer_split->expected_local(),
+              DiskIoMgr::BufferOpts(footer_split->try_cache(), files[i]->mtime), split);
         } else {
           // If we did not find the last split, we know it is going to be a remote read.
-          footer_range = scan_node->AllocateScanRange(files[i]->fs,
-              files[i]->filename.c_str(), footer_size, footer_start,
-              split_metadata->partition_id, -1, false, false, files[i]->mtime, split);
+          footer_range =
+              scan_node->AllocateScanRange(files[i]->fs, files[i]->filename.c_str(),
+                  footer_size, footer_start, split_metadata->partition_id, -1, false,
+                  DiskIoMgr::BufferOpts::Uncached(), split);
         }
 
         footer_ranges.push_back(footer_range);
@@ -841,8 +842,8 @@ Status HdfsParquetScanner::ProcessFooter() {
   uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
   uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
   uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
-  // If the metadata was too big, we need to stitch it before deserializing it.
-  // In that case, we stitch the data in this buffer.
+  // If the metadata was too big, we need to read it into a contiguous buffer before
+  // deserializing it.
   ScopedBuffer metadata_buffer(scan_node_->mem_tracker());
 
   DCHECK(metadata_range_ != NULL);
@@ -854,45 +855,34 @@ Status HdfsParquetScanner::ProcessFooter() {
     DCHECK(file_desc != NULL);
     // The start of the metadata is:
     // file_length - 4-byte metadata size - footer-size - metadata size
-    int64_t metadata_start = file_desc->file_length -
-      sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
-    int64_t metadata_bytes_to_read = metadata_size;
+    int64_t metadata_start = file_desc->file_length - sizeof(int32_t)
+        - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
     if (metadata_start < 0) {
       return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
           "footer: $1 bytes. File size: $2 bytes.", filename(), metadata_size,
           file_desc->file_length));
     }
-    // IoMgr can only do a fixed size Read(). The metadata could be larger
-    // so we stitch it here.
-    // TODO: consider moving this stitching into the scanner context. The scanner
-    // context usually handles the stitching but no other scanner need this logic
-    // now.
 
     if (!metadata_buffer.TryAllocate(metadata_size)) {
       return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
           "metadata for file '$1'.", metadata_size, filename()));
     }
     metadata_ptr = metadata_buffer.buffer();
-    int64_t copy_offset = 0;
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
-    while (metadata_bytes_to_read > 0) {
-      int64_t to_read = ::min<int64_t>(io_mgr->max_read_buffer_size(),
-          metadata_bytes_to_read);
-      DiskIoMgr::ScanRange* range = scan_node_->AllocateScanRange(
-          metadata_range_->fs(), filename(), to_read, metadata_start + copy_offset, -1,
-          metadata_range_->disk_id(), metadata_range_->try_cache(),
-          metadata_range_->expected_local(), file_desc->mtime);
+    // Read the header into the metadata buffer.
+    DiskIoMgr::ScanRange* metadata_range = scan_node_->AllocateScanRange(
+        metadata_range_->fs(), filename(), metadata_size, metadata_start, -1,
+        metadata_range_->disk_id(), metadata_range_->expected_local(),
+        DiskIoMgr::BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
 
-      DiskIoMgr::BufferDescriptor* io_buffer = NULL;
-      RETURN_IF_ERROR(io_mgr->Read(scan_node_->reader_context(), range, &io_buffer));
-      memcpy(metadata_ptr + copy_offset, io_buffer->buffer(), io_buffer->len());
-      io_buffer->Return();
-
-      metadata_bytes_to_read -= to_read;
-      copy_offset += to_read;
-    }
-    DCHECK_EQ(metadata_bytes_to_read, 0);
+    DiskIoMgr::BufferDescriptor* io_buffer;
+    RETURN_IF_ERROR(
+        io_mgr->Read(scan_node_->reader_context(), metadata_range, &io_buffer));
+    DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());
+    DCHECK_EQ(io_buffer->len(), metadata_size);
+    DCHECK(io_buffer->eosr());
+    io_buffer->Return();
   }
 
   // Deserialize file header
@@ -1153,14 +1143,13 @@ Status HdfsParquetScanner::InitColumns(
         static_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
 
     // Determine if the column is completely contained within a local split.
-    bool column_range_local = split_range->expected_local() &&
-                              col_start >= split_range->offset() &&
-                              col_end <= split_range->offset() + split_range->len();
-
-    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
-        metadata_range_->fs(), filename(), col_len, col_start, scalar_reader->col_idx(),
-        split_range->disk_id(), split_range->try_cache(), column_range_local,
-        file_desc->mtime);
+    bool col_range_local = split_range->expected_local()
+        && col_start >= split_range->offset()
+        && col_end <= split_range->offset() + split_range->len();
+    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
+        filename(), col_len, col_start, scalar_reader->col_idx(), split_range->disk_id(),
+        col_range_local,
+        DiskIoMgr::BufferOpts(split_range->try_cache(), file_desc->mtime));
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column
