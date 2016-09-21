@@ -748,7 +748,7 @@
     ],
     "label": "$0 RPC Call Duration",
     "units": "TIME_MS",
-    "kind": "STATS",
+    "kind": "HISTOGRAM",
     "key": "rpc-method.$0.call_duration"
   },
   {

@@ -33,7 +33,7 @@ using namespace rapidjson;
 using namespace strings;
 
 // Metric key format for rpc call duration metrics.
-const string RPC_TIME_STATS_METRIC_KEY = "rpc-method.$0.call_duration";
+const string RPC_PROCESSING_TIME_DISTRIBUTION_METRIC_KEY = "rpc-method.$0.call_duration";
 
 // Singleton class to keep track of all RpcEventHandlers, and to render them to a
 // web-based summary page.
@@ -123,14 +123,14 @@ void RpcEventHandler::Reset(const string& method_name) {
   lock_guard<mutex> l(method_map_lock_);
   MethodMap::iterator it = method_map_.find(method_name);
   if (it == method_map_.end()) return;
-  it->second->time_stats->Reset();
+  it->second->processing_time_distribution->Reset();
   it->second->num_in_flight.Store(0L);
 }
 
 void RpcEventHandler::ResetAll() {
   lock_guard<mutex> l(method_map_lock_);
   for (const MethodMap::value_type& method: method_map_) {
-    method.second->time_stats->Reset();
+    method.second->processing_time_distribution->Reset();
     method.second->num_in_flight.Store(0L);
   }
 }
@@ -149,7 +149,8 @@ void RpcEventHandler::ToJson(Value* server, Document* document) {
     Value method(kObjectType);
     Value method_name(rpc.first.c_str(), document->GetAllocator());
     method.AddMember("name", method_name, document->GetAllocator());
-    const string& human_readable = rpc.second->time_stats->ToHumanReadable();
+    const string& human_readable =
+        rpc.second->processing_time_distribution->ToHumanReadable();
     Value summary(human_readable.c_str(), document->GetAllocator());
     method.AddMember("summary", summary, document->GetAllocator());
     method.AddMember("in_flight", rpc.second->num_in_flight.Load(),
@@ -171,9 +172,14 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
     if (it == method_map_.end()) {
       MethodDescriptor* descriptor = new MethodDescriptor();
       descriptor->name = fn_name;
-      const string& rpc_name = Substitute("$0.$1", server_name_, descriptor->name);
-      descriptor->time_stats = StatsMetric<double>::CreateAndRegister(metrics_,
-          RPC_TIME_STATS_METRIC_KEY, rpc_name);
+      const string& rpc_name = Substitute(RPC_PROCESSING_TIME_DISTRIBUTION_METRIC_KEY,
+          Substitute("$0.$1", server_name_, descriptor->name));
+      const TMetricDef& def =
+          MakeTMetricDef(rpc_name, TMetricKind::HISTOGRAM, TUnit::TIME_MS);
+      constexpr int32_t SIXTY_MINUTES_IN_MS = 60 * 1000 * 60;
+      // Store processing times of up to 60 minutes with 3 sig. fig.
+      descriptor->processing_time_distribution =
+          metrics_->RegisterMetric(new HistogramMetric(def, SIXTY_MINUTES_IN_MS, 3));
       it = method_map_.insert(make_pair(descriptor->name, descriptor)).first;
     }
   }
@@ -197,5 +203,5 @@ void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) 
   MethodDescriptor* descriptor = rpc_ctx->method_descriptor;
   delete rpc_ctx;
   descriptor->num_in_flight.Add(-1);
-  descriptor->time_stats->Update(elapsed_time);
+  descriptor->processing_time_distribution->Update(elapsed_time);
 }

@@ -18,8 +18,8 @@
 #ifndef IMPALA_RPC_RPC_TRACE_H
 #define IMPALA_RPC_RPC_TRACE_H
 
-#include "util/collection-metrics.h"
 #include "rpc/thrift-server.h"
+#include "util/histogram-metric.h"
 #include "util/internal-queue.h"
 
 #include <thrift/TProcessor.h>
@@ -83,8 +83,8 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
     /// Name of the method
     std::string name;
 
-    /// Summary statistics for the time taken to respond to this method
-    StatsMetric<double>* time_stats;
+    /// Distribution of the time taken to process this RPC.
+    HistogramMetric* processing_time_distribution;
 
     /// Number of invocations in flight
     AtomicInt32 num_in_flight;
