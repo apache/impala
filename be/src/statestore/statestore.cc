@@ -626,21 +626,19 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     VLOG(3) << "Sending " << hb_type << " message to: " << update.second
             << " (deadline accuracy: " << diff_ms << "ms)";
 
-    if (diff_ms > DEADLINE_MISS_THRESHOLD_MS) {
-      // TODO: This should be a healthcheck in a monitored metric in CM, which would
-      // require a 'rate' metric type.
-      const string& msg = Substitute("Missed subscriber ($0) $1 deadline by $2ms, "
-          "consider increasing --$3 (currently $4)", update.second, hb_type, diff_ms,
-          is_heartbeat ? "statestore_heartbeat_frequency_ms" :
-              "statestore_update_frequency_ms",
-          is_heartbeat ? FLAGS_statestore_heartbeat_frequency_ms :
-              FLAGS_statestore_update_frequency_ms);
-      if (is_heartbeat) {
-        LOG(WARNING) << msg;
-      } else {
-        VLOG_QUERY << msg;
-      }
+    if (diff_ms > DEADLINE_MISS_THRESHOLD_MS && is_heartbeat) {
+      const string& msg = Substitute(
+          "Missed subscriber ($0) $1 deadline by $2ms, "
+          "consider increasing --statestore_heartbeat_frequency_ms (currently $3) on "
+          "this Statestore, and --statestore_subscriber_timeout_seconds "
+          "on subscribers (Impala daemons and the Catalog Server)",
+          update.second, hb_type, diff_ms, FLAGS_statestore_heartbeat_frequency_ms);
+      LOG(WARNING) << msg;
     }
+    // Don't warn for topic updates - they can be slow and still correct. Recommending an
+    // increase in update period will just confuse (as will increasing the thread pool
+    // size) because it's hard for users to pick a good value, they may still see these
+    // messages and it won't be a correctness problem.
   } else {
     // The first update is scheduled immediately and has a deadline of 0. There's no need
     // to wait.
