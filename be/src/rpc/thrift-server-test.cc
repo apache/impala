@@ -170,4 +170,27 @@ TEST(SslTest, ClientBeforeServer) {
     ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
 }
 
+/// Test disabled because requires a high ulimit -n on build machines. Since the test does
+/// not always fail, we don't lose much coverage by disabling it until we fix the build
+/// infra issue.
+TEST(ConcurrencyTest, DISABLED_ManyConcurrentConnections) {
+  // Test that a large number of concurrent connections will all succeed and not time out
+  // waiting to be accepted. (IMPALA-4135)
+  // Note that without the fix for IMPALA-4135, this test won't always fail, depending on
+  // the hardware that it is run on.
+  int port = GetServerPort();
+  ThriftServer* server = new ThriftServer("DummyServer", MakeProcessor(), port);
+  ASSERT_OK(server->Start());
+
+  ThreadPool<int64_t> pool(
+      "group", "test", 256, 10000, [port](int tid, const int64_t& item) {
+        using Client = ThriftClient<ImpalaInternalServiceClient>;
+        Client* client = new Client("127.0.0.1", port, "", NULL, false);
+        Status status = client->Open();
+        ASSERT_OK(status);
+      });
+  for (int i = 0; i < 1024 * 16; ++i) pool.Offer(i);
+  pool.DrainAndShutdown();
+}
+
 IMPALA_TEST_MAIN();

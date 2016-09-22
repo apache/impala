@@ -610,6 +610,16 @@
     "key": "impala.thrift-server.CatalogService.total-connections"
   },
   {
+    "description": "The number of connections to the Catalog Service that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Service Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.CatalogService.connection-setup-queue-size"
+  },
+  {
     "description": "The number of active connections to this StateStore's StateStore service.",
     "contexts": [
       "STATESTORE"
@@ -630,6 +640,16 @@
     "key": "impala.thrift-server.StatestoreService.total-connections"
   },
   {
+    "description": "The number of connections to the Statestore Service that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Statestore Service Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.StatestoreService.connection-setup-queue-size"
+  },
+  {
     "description": "The number of active Impala Backend client connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"
@@ -648,6 +668,16 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "impala.thrift-server.backend.total-connections"
+  },
+  {
+    "description": "The number of connections to the Impala Backend Server that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Server Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.backend.connection-setup-queue-size"
   },
   {
     "description": "The number of active Beeswax API connections to this Impala Daemon.",

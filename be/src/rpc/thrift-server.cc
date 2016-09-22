@@ -33,7 +33,9 @@
 #include <thrift/transport/TServerSocket.h>
 #include <gflags/gflags.h>
 
+#include <sstream>
 #include "gen-cpp/Types_types.h"
+#include "rpc/TAcceptQueueServer.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-thread.h"
@@ -41,7 +43,6 @@
 #include "util/network-util.h"
 #include "util/os-util.h"
 #include "util/uid-util.h"
-#include <sstream>
 
 #include "common/names.h"
 
@@ -60,6 +61,7 @@ using namespace apache::thrift;
 DEFINE_int32(rpc_cnxn_attempts, 10, "Deprecated");
 DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");
 
+DECLARE_bool(enable_accept_queue_server);
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
 DECLARE_string(ssl_client_ca_certificate);
@@ -296,17 +298,18 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
 ThriftServer::ThriftServer(const string& name,
     const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
     MetricGroup* metrics, int num_worker_threads, ServerType server_type)
-    : started_(false),
-      port_(port),
-      ssl_enabled_(false),
-      num_worker_threads_(num_worker_threads),
-      server_type_(server_type),
-      name_(name),
-      server_thread_(NULL),
-      server_(NULL),
-      processor_(processor),
-      connection_handler_(NULL),
-      auth_provider_(auth_provider) {
+  : started_(false),
+    port_(port),
+    ssl_enabled_(false),
+    num_worker_threads_(num_worker_threads),
+    server_type_(server_type),
+    name_(name),
+    server_thread_(NULL),
+    server_(NULL),
+    processor_(processor),
+    connection_handler_(NULL),
+    metrics_(NULL),
+    auth_provider_(auth_provider) {
   if (auth_provider_ == NULL) {
     auth_provider_ = AuthManager::GetInstance()->GetInternalAuthProvider();
   }
@@ -318,6 +321,7 @@ ThriftServer::ThriftServer(const string& name,
     stringstream max_ss;
     max_ss << "impala.thrift-server." << name << ".total-connections";
     total_connections_metric_ = metrics->AddCounter<int64_t>(max_ss.str(), 0);
+    metrics_ = metrics;
   } else {
     metrics_enabled_ = false;
   }
@@ -416,8 +420,19 @@ Status ThriftServer::Start() {
       }
       break;
     case Threaded:
-      server_.reset(new TThreadedServer(processor_, server_socket,
-          transport_factory, protocol_factory, thread_factory));
+      if (FLAGS_enable_accept_queue_server) {
+        server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
+            protocol_factory, thread_factory));
+        if (metrics_ != NULL) {
+          stringstream key_prefix_ss;
+          key_prefix_ss << "impala.thrift-server." << name_;
+          (static_cast<TAcceptQueueServer*>(server_.get()))
+              ->InitMetrics(metrics_, key_prefix_ss.str());
+        }
+      } else {
+        server_.reset(new TThreadedServer(processor_, server_socket, transport_factory,
+            protocol_factory, thread_factory));
+      }
       break;
     default:
       stringstream error_msg;

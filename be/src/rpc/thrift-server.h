@@ -211,6 +211,9 @@ class ThriftServer {
       ConnectionContextSet;
   ConnectionContextSet connection_contexts_;
 
+  /// Metrics subsystem access
+  MetricGroup* metrics_;
+
   /// True if metrics are enabled
   bool metrics_enabled_;
 
