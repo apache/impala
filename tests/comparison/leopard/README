@@ -1,13 +1,77 @@
+Summary
+-------
+
 This package runs the query generator continuously. Compares Impala and Postgres results
 for a randomly generated query and produces several reports per day. Reports are
 displayed on a web page which allows the user to conveniently examine the discovered
 issues. The user can also start a custom run against a private Impala branch using the
 web interface.
 
-Requirements:
+Requirements
+------------
 
-Docker -- A docker image with Impala and Postgres installed and functional database
-    loaded into Postgres.
+Docker -- A docker image with Impala and PostgresQL installed and at
+    least one reference database loaded into PostgresQL. data_generator.py is a useful
+    tool to migrate data from Impala into PostgresQL.
 
 To get started, run ./controller.py and ./front_end.py. You should be able to view the
 web page at http://localhost:5000. Results and logs are saved to /tmp/query_gen
+
+
+Basic Configuration
+-------------------
+
+The following are useful environment variables for running the
+controller and Docker images within it.
+
+DOCKER_USER - user *within* the Impala Docker container who owns the
+Impala source tree and test data.
+
+DOCKER_PASSWORD - password for the user *within* the Impala Docker
+container.
+
+TARGET_HOST - host system on which Docker Engine is running. This is the
+host that the controller will use to issue Docker commands like "docker
+run".
+
+TARGET_HOST_USERNAME - username for controller process to use to SSH
+into TARGET_HOST. Via Fabric, one can either type a password or use SSH
+keys.
+
+DOCKER_IMAGE_NAME - image to pull via "docker pull"
+
+
+External Volume Configuration
+-----------------------------
+
+To run Leopard against Impala with Kudu, we need to work around
+KUDU-1419. KUDU-1419 is likely to occur if your Docker Storage Engine is
+AUFS, or maybe others.  The easiest way to overcome this is to mount an
+external Docker volume that contain the necessary test data.  To try to
+handle this automatically, you can export any or all of the environment
+variables, depending on your host and container setups:
+
+DOCKER_IMPALA_USER_UID, DOCKER_IMPALA_USER_GID - numeric UID and GID for
+the owner of the Impala test data (testdata/cluster from an Impala
+source checkout) within your Docker container. Numeric IDs are needed,
+because there is no guarantee the symbolic owner and group on the
+container match the IDs on the target host.
+
+HOST_TESTDATA_EXTERNAL_VOLUME_PATH - path on TARGET_HOST where the
+external volume will reside. This is the destination for rsync to warm
+the volume and the left-hand side of "docker run -v".
+
+DOCKER_TESTDATA_VOLUME_PATH - path on your Docker container to the
+testdata/cluster Impala directory. This is source for rsync to warm the
+volume and the right-hand side of "docker run -v".
+
+HOST_TO_DOCKER_SSH_KEY - name of private key on TARGET_HOST for use with
+rsync so as to "warm" the external volume automatically.
+
+You are encouraged to configure your container in such a way that rsync
+with passwordless SSH is possible so as to create the external volume
+using the environment variables above.
+
+To do that, this is a handy guide on how to use rsync with SSH keys:
+
+https://www.guyrutenberg.com/2014/01/14/restricting-ssh-access-to-rsync/
