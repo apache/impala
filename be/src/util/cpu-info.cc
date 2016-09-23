@@ -45,6 +45,21 @@ DEFINE_int32(num_cores, 0, "(Advanced) If > 0, it sets the number of cores avail
     " Impala. Setting it to 0 means Impala will use all available cores on the machine"
     " according to /proc/cpuinfo.");
 
+namespace {
+// Helper function to warn if a given file does not contain an expected string as its
+// first line. If the file cannot be opened, no error is reported.
+void WarnIfFileNotEqual(
+    const string& filename, const string& expected, const string& warning_text) {
+  ifstream file(filename);
+  if (!file) return;
+  string line;
+  getline(file, line);
+  if (line != expected) {
+    LOG(ERROR) << "Expected " << expected << ", actual " << line << endl << warning_text;
+  }
+}
+} // end anonymous namespace
+
 namespace impala {
 
 bool CpuInfo::initialized_ = false;
@@ -90,7 +105,7 @@ void CpuInfo::Init() {
   int num_cores = 0;
 
   // Read from /proc/cpuinfo
-  ifstream cpuinfo("/proc/cpuinfo", ios::in);
+  ifstream cpuinfo("/proc/cpuinfo");
   while (cpuinfo) {
     getline(cpuinfo, line);
     size_t colon = line.find(':');
@@ -115,7 +130,6 @@ void CpuInfo::Init() {
       }
     }
   }
-  if (cpuinfo.is_open()) cpuinfo.close();
 
   if (max_mhz != 0) {
     cycles_per_ms_ = max_mhz * 1000;
@@ -140,6 +154,27 @@ void CpuInfo::VerifyCpuRequirements() {
     LOG(ERROR) << "CPU does not support the Supplemental SSE3 (SSSE3) instruction set. "
                << "This setup is generally unsupported and Impala might be unstable.";
   }
+}
+
+void CpuInfo::VerifyPerformanceGovernor() {
+  for (int cpu_id = 0; cpu_id < CpuInfo::num_cores(); ++cpu_id) {
+    const string governor_file =
+        Substitute("/sys/devices/system/cpu/cpu$0/cpufreq/scaling_governor", cpu_id);
+    const string warning_text = Substitute(
+        "WARNING: CPU $0 is not using 'performance' governor. Note that changing the "
+        "governor to 'performance' will reset the no_turbo setting to 0.",
+        cpu_id);
+    WarnIfFileNotEqual(governor_file, "performance", warning_text);
+  }
+}
+
+void CpuInfo::VerifyTurboDisabled() {
+  WarnIfFileNotEqual("/sys/devices/system/cpu/intel_pstate/no_turbo", "1",
+      "WARNING: CPU turbo is enabled. This setting can change the clock frequency of CPU "
+      "cores during the benchmark run, which can lead to inaccurate results. You can "
+      "disable CPU turbo by writing a 1 to "
+      "/sys/devices/system/cpu/intel_pstate/no_turbo. Note that changing the governor to "
+      "'performance' will reset this to 0.");
 }
 
 void CpuInfo::EnableFeature(long flag, bool enable) {

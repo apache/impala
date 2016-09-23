@@ -68,6 +68,8 @@ Benchmark::Benchmark(const string& name) : name_(name) {
 #ifndef NDEBUG
   LOG(ERROR) << "WARNING: Running benchmark in DEBUG mode.";
 #endif
+  CpuInfo::VerifyPerformanceGovernor();
+  CpuInfo::VerifyTurboDisabled();
 }
 
 int Benchmark::AddBenchmark(const string& name, BenchmarkFunction fn, void* args,

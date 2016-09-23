@@ -53,6 +53,13 @@ class CpuInfo {
   /// and terminate.
   static void VerifyCpuRequirements();
 
+  /// Determine if the CPU scaling governor is set to 'performance' and if not, issue an
+  /// error.
+  static void VerifyPerformanceGovernor();
+
+  /// Determine if CPU turbo is disabled and if not, issue an error.
+  static void VerifyTurboDisabled();
+
   /// Returns all the flags for this cpu
   static int64_t hardware_flags() {
     DCHECK(initialized_);
