@@ -100,8 +100,9 @@ TEST_F(TmpFileMgrTest, TestFileAllocation) {
     EXPECT_EQ(next_offset, boost::filesystem::file_size(file->path()));
   }
   // Check that cleanup is correct.
+  string file_path = file->path();
   file_group.Close();
-  EXPECT_FALSE(boost::filesystem::exists(file->path()));
+  EXPECT_FALSE(boost::filesystem::exists(file_path));
   CheckMetrics(&tmp_file_mgr);
 }
 
