@@ -4409,3 +4409,47 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
     ]
 }
 ====
+# IMPALA-4206: Test creating a view whose definition has a subquery and a view reference.
+create view test_view_lineage as
+select id from functional.alltypes_view v
+where not exists (select 1 from functional.alltypes a where v.id = a.id)
+---- LINEAGE
+{
+    "queryText":"create view test_view_lineage as\nselect id from functional.alltypes_view v\nwhere not exists (select 1 from functional.alltypes a where v.id = a.id)",
+    "hash":"e79b8abc8a682d9e0f6b2c30a6c885f3",
+    "user":"dev",
+    "timestamp":1475094005,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.id"
+        }
+    ]
+}
+====
