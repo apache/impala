@@ -120,8 +120,7 @@ Type* CodegenAnyVal::GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type
   return GetUnloweredType(cg, type)->getPointerTo();
 }
 
-Value* CodegenAnyVal::CreateCall(
-    LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder, Function* fn,
+Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder, Function* fn,
     ArrayRef<Value*> args, const char* name, Value* result_ptr) {
   if (fn->getReturnType()->isVoidTy()) {
     // Void return type indicates that this function returns a DecimalVal via the first
@@ -152,20 +151,15 @@ Value* CodegenAnyVal::CreateCall(
   }
 }
 
-CodegenAnyVal CodegenAnyVal::CreateCallWrapped(
-    LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type,
-    Function* fn, ArrayRef<Value*> args, const char* name) {
+CodegenAnyVal CodegenAnyVal::CreateCallWrapped(LlvmCodeGen* cg, LlvmBuilder* builder,
+    const ColumnType& type, Function* fn, ArrayRef<Value*> args, const char* name) {
   Value* v = CreateCall(cg, builder, fn, args, name);
   return CodegenAnyVal(cg, builder, type, v, name);
 }
 
-CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* builder,
-                             const ColumnType& type, Value* value, const char* name)
-  : type_(type),
-    value_(value),
-    name_(name),
-    codegen_(codegen),
-    builder_(builder) {
+CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const ColumnType& type, Value* value, const char* name)
+  : type_(type), value_(value), name_(name), codegen_(codegen), builder_(builder) {
   Type* value_type = GetLoweredType(codegen, type);
   if (value_ == NULL) {
     // No Value* was specified, so allocate one on the stack and load it.
@@ -175,7 +169,7 @@ CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* bui
   DCHECK_EQ(value_->getType(), value_type);
 }
 
-Value* CodegenAnyVal::GetIsNull(const char* name) {
+Value* CodegenAnyVal::GetIsNull(const char* name) const {
   switch (type_.type) {
     case TYPE_BIGINT:
     case TYPE_DOUBLE: {
@@ -448,23 +442,28 @@ void CodegenAnyVal::SetDate(Value* date) {
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
 }
 
-Value* CodegenAnyVal::GetUnloweredPtr() {
-  Value* value_ptr = codegen_->CreateEntryBlockAlloca(*builder_, value_->getType());
-  builder_->CreateStore(value_, value_ptr);
-  return builder_->CreateBitCast(value_ptr, GetUnloweredPtrType(codegen_, type_));
+Value* CodegenAnyVal::GetLoweredPtr(const string& name) const {
+  Value* lowered_ptr =
+      codegen_->CreateEntryBlockAlloca(*builder_, value_->getType(), name.c_str());
+  builder_->CreateStore(GetLoweredValue(), lowered_ptr);
+  return lowered_ptr;
 }
 
-void CodegenAnyVal::SetFromRawPtr(Value* raw_ptr) {
-  Value* val_ptr =
-      builder_->CreateBitCast(raw_ptr, codegen_->GetPtrType(type_), "val_ptr");
-  Value* val = builder_->CreateLoad(val_ptr);
-  SetFromRawValue(val);
+Value* CodegenAnyVal::GetUnloweredPtr(const string& name) const {
+  // Get an unlowered pointer by creating a lowered pointer then bitcasting it.
+  // TODO: if the original value was unlowered, this generates roundabout code that
+  // lowers the value and casts it back. Generally LLVM's optimiser can reason
+  // about what's going on and undo our shenanigans to generate sane code, but it
+  // would be nice to just emit reasonable code in the first place.
+  return builder_->CreateBitCast(
+      GetLoweredPtr(), GetUnloweredPtrType(codegen_, type_), name);
 }
 
 void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
   DCHECK_EQ(raw_val->getType(), codegen_->GetType(type_))
-      << endl << LlvmCodeGen::Print(raw_val)
-      << endl << type_ << " => " << LlvmCodeGen::Print(codegen_->GetType(type_));
+      << endl
+      << LlvmCodeGen::Print(raw_val) << endl
+      << type_ << " => " << LlvmCodeGen::Print(codegen_->GetType(type_));
   switch (type_.type) {
     case TYPE_STRING:
     case TYPE_VARCHAR: {
@@ -614,9 +613,7 @@ void CodegenAnyVal::WriteToSlot(const SlotDescriptor& slot_desc, Value* tuple,
 
   // Null block: set null bit
   builder_->SetInsertPoint(null_block);
-  Function* set_null_fn = slot_desc.GetUpdateNullFn(codegen_, true);
-  DCHECK(set_null_fn != NULL);
-  builder_->CreateCall(set_null_fn, tuple);
+  slot_desc.CodegenSetNullIndicator(codegen_, builder_, tuple, codegen_->true_value());
   builder_->CreateBr(insert_before);
 
   // Leave builder_ after conditional blocks
@@ -704,6 +701,14 @@ Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
   return builder_->CreateCall(compare_fn, args, name);
 }
 
+void CodegenAnyVal::CodegenBranchIfNull(LlvmBuilder* builder, BasicBlock* null_block) {
+  Value* is_null = GetIsNull();
+  BasicBlock* not_null_block = BasicBlock::Create(
+      codegen_->context(), "not_null", builder->GetInsertBlock()->getParent());
+  builder->CreateCondBr(is_null, null_block, not_null_block);
+  builder->SetInsertPoint(not_null_block);
+}
+
 Value* CodegenAnyVal::GetHighBits(int num_bits, Value* v, const char* name) {
   DCHECK_EQ(v->getType()->getIntegerBitWidth(), num_bits * 2);
   Value* shifted = builder_->CreateAShr(v, num_bits);
@@ -762,8 +767,8 @@ Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, Type* val_type) {
   return ConstantInt::get(val_type, 1);
 }
 
-CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen,
-    LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type, const char* name) {
+CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const ColumnType& type, const char* name) {
   Type* val_type = GetLoweredType(codegen, type);
   // All zeros => 'is_null' = false
   Value* value = Constant::getNullValue(val_type);

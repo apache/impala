@@ -41,3 +41,31 @@ true
 ---- TYPES
 boolean
 ====
+---- QUERY
+# Test with even number of input rows.
+select toggle_null(id), count(*)
+from functional_parquet.alltypesagg
+---- RESULTS
+NULL,11000
+---- TYPES
+int,bigint
+====
+---- QUERY
+# Test with odd number of input rows.
+select toggle_null(id), count(*)
+from functional_parquet.alltypesagg
+where id <= 9998
+---- RESULTS
+1,10999
+---- TYPES
+int,bigint
+====
+---- QUERY
+# Test that input NULLs are passed to aggregate functions ok.
+select count_nulls(tinyint_col), count(*)
+from functional.alltypesagg
+---- RESULTS
+2000,11000
+---- TYPES
+bigint,bigint
+====

@@ -671,7 +671,7 @@ Status LlvmCodeGen::MaterializeFunction(Function *fn) {
   return MaterializeFunctionHelper(fn);
 }
 
-Function* LlvmCodeGen::GetFunction(const string& symbol) {
+Function* LlvmCodeGen::GetFunction(const string& symbol, bool clone) {
   Function* fn = module_->getFunction(symbol.c_str());
   if (fn == NULL) {
     LOG(ERROR) << "Unable to locate function " << symbol;
@@ -679,6 +679,7 @@ Function* LlvmCodeGen::GetFunction(const string& symbol) {
   }
   Status status = MaterializeFunction(fn);
   if (UNLIKELY(!status.ok())) return NULL;
+  if (clone) return CloneFunction(fn);
   return fn;
 }
 
@@ -1335,15 +1336,15 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_BIGINT));
       int i = 0;
       while (num_bytes >= 8) {
-        Value* index[] = { GetIntConstant(TYPE_INT, i++) };
-        Value* d = builder.CreateLoad(builder.CreateGEP(ptr, index));
+        Value* index[] = {GetIntConstant(TYPE_INT, i++)};
+        Value* d = builder.CreateLoad(builder.CreateInBoundsGEP(ptr, index));
         result_64 = builder.CreateCall(crc64_fn, ArrayRef<Value*>({result_64, d}));
         num_bytes -= 8;
       }
       result = builder.CreateTrunc(result_64, GetType(TYPE_INT));
-      Value* index[] = { GetIntConstant(TYPE_INT, i * 8) };
+      Value* index[] = {GetIntConstant(TYPE_INT, i * 8)};
       // Update data to past the 8-byte chunks
-      data = builder.CreateGEP(data, index);
+      data = builder.CreateInBoundsGEP(data, index);
     }
 
     if (num_bytes >= 4) {
@@ -1351,8 +1352,8 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_INT));
       Value* d = builder.CreateLoad(ptr);
       result = builder.CreateCall(crc32_fn, ArrayRef<Value*>({result, d}));
-      Value* index[] = { GetIntConstant(TYPE_INT, 4) };
-      data = builder.CreateGEP(data, index);
+      Value* index[] = {GetIntConstant(TYPE_INT, 4)};
+      data = builder.CreateInBoundsGEP(data, index);
       num_bytes -= 4;
     }
 
@@ -1361,8 +1362,8 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_SMALLINT));
       Value* d = builder.CreateLoad(ptr);
       result = builder.CreateCall(crc16_fn, ArrayRef<Value*>({result, d}));
-      Value* index[] = { GetIntConstant(TYPE_INT, 2) };
-      data = builder.CreateGEP(data, index);
+      Value* index[] = {GetIntConstant(TYPE_INT, 2)};
+      data = builder.CreateInBoundsGEP(data, index);
       num_bytes -= 2;
     }
 

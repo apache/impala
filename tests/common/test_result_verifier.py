@@ -482,3 +482,25 @@ def verify_runtime_profile(expected, actual):
   assert len(unmatched_lines) == 0, ("Did not find matches for lines in runtime profile:"
       "\nEXPECTED LINES:\n%s\n\nACTUAL PROFILE:\n%s" % ('\n'.join(unmatched_lines),
         actual))
+
+def get_node_exec_options(profile_string, exec_node_id):
+  """ Return a list with all of the ExecOption strings for the given exec node id. """
+  results = []
+  matched_node = False
+  id_string = "(id={0})".format(exec_node_id)
+  for line in profile_string.splitlines():
+    if matched_node and line.strip().startswith("ExecOption:"):
+      results.append(line.strip())
+    matched_node = False
+    if id_string in line:
+      # Check for the ExecOption string on the next line.
+      matched_node = True
+  return results
+
+def assert_codegen_enabled(profile_string, exec_node_ids):
+  """ Check that codegen is enabled for the given exec node ids by parsing the text
+  runtime profile in 'profile_string'"""
+  for exec_node_id in exec_node_ids:
+    for exec_options in get_node_exec_options(profile_string, exec_node_id):
+      assert 'Codegen Enabled' in exec_options
+      assert not 'Codegen Disabled' in exec_options

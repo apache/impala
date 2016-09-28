@@ -1,130 +1,99 @@
 ====
 ---- QUERY
-drop function if exists udf_test.hive_pi();
-drop function if exists udf_test.hive_round(double);
-drop function if exists udf_test.hive_floor(double);
-drop function if exists udf_test.hive_mod(int, int);
-drop function if exists udf_test.hive_bin(bigint);
-drop function if exists udf_test.hive_lower(string);
-
-drop function if exists udf_test.identity(boolean);
-drop function if exists udf_test.identity(tinyint);
-drop function if exists udf_test.identity(smallint);
-drop function if exists udf_test.identity(int);
-drop function if exists udf_test.identity(bigint);
-drop function if exists udf_test.identity(float);
-drop function if exists udf_test.identity(double);
-drop function if exists udf_test.identity(string);
-drop function if exists udf_test.identity(string, string);
-drop function if exists udf_test.identity(string, string, string);
-drop function if exists udf_test.identity(timestamp);
-
-drop function if exists udf_test.hive_add(int, int);
-drop function if exists udf_test.hive_add(float, float);
-drop function if exists udf_test.hive_add(double, double);
-drop function if exists udf_test.hive_add(smallint, smallint);
-drop function if exists udf_test.hive_add(boolean, boolean);
-
-drop function if exists udf_test.throws_exception();
-
-drop function if exists java_udfs_test.identity;
-
-drop function if exists udf_test.replace_string(string);
-
-create function udf_test.hive_pi() returns double
+create function hive_pi() returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
 
-create function udf_test.hive_round(double) returns double
+create function hive_round(double) returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFRound';
 
-create function udf_test.hive_floor(double) returns bigint
+create function hive_floor(double) returns bigint
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFFloor';
 
-create function udf_test.hive_mod(int, int) returns int
+create function hive_mod(int, int) returns int
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPosMod';
 
-create function udf_test.hive_bin(bigint) returns string
+create function hive_bin(bigint) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFBin';
 
-create function udf_test.hive_lower(string) returns string
+create function hive_lower(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
 
 # Used to test persistent java functions
-create function java_udfs_test.identity
+create function identity_anytype
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(boolean) returns boolean
+create function identity(boolean) returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(tinyint) returns tinyint
+create function identity(tinyint) returns tinyint
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(smallint) returns smallint
+create function identity(smallint) returns smallint
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(int) returns int
+create function identity(int) returns int
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(bigint) returns bigint
+create function identity(bigint) returns bigint
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(float) returns float
+create function identity(float) returns float
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(double) returns double
+create function identity(double) returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(string) returns string
+create function identity(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(string, string) returns string
+create function identity(string, string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.identity(string, string, string) returns string
+create function identity(string, string, string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.hive_add(int, int) returns int
+create function hive_add(int, int) returns int
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.hive_add(smallint, smallint) returns smallint
+create function hive_add(smallint, smallint) returns smallint
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.hive_add(float, float) returns float
+create function hive_add(float, float) returns float
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.hive_add(double, double) returns double
+create function hive_add(double, double) returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.hive_add(boolean, boolean) returns boolean
+create function hive_add(boolean, boolean) returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdf';
 
-create function udf_test.throws_exception() returns boolean
+create function throws_exception() returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdfException';
 
-create function udf_test.replace_string(string) returns string
+create function replace_string(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.ReplaceStringUdf';
 ====

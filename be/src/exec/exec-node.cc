@@ -519,7 +519,7 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
       LlvmCodeGen::NamedVariable("num_ctxs", codegen->GetType(TYPE_INT)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[3];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* ctxs_arg = args[0];

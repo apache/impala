@@ -196,7 +196,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   }
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
 
   Value* args[2];
   Function* function = CreateIrFunctionPrototype(codegen, "CaseExpr", &args);

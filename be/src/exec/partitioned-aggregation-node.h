@@ -30,13 +30,17 @@
 #include "runtime/string-value.h"
 
 namespace llvm {
-  class Function;
+class BasicBlock;
+class Function;
+class Value;
 }
 
 namespace impala {
 
 class AggFnEvaluator;
+class CodegenAnyVal;
 class LlvmCodeGen;
+class LlvmBuilder;
 class RowBatch;
 class RuntimeState;
 struct StringValue;
@@ -203,7 +207,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// version of UpdateTuple() to avoid loading aggregate_evaluators_[i] at runtime.
   /// An entry is NULL if the aggregate evaluator is not codegen'ed or there is no Expr
   /// in the aggregate evaluator (e.g. count(*)).
-  std::vector<ExprContext*> agg_expr_ctxs_;
+  std::vector<ExprContext* const*> agg_expr_ctxs_;
 
   /// FunctionContext for each aggregate function and backing MemPool. String data
   /// returned by the aggregate functions is allocated via these contexts.
@@ -520,12 +524,13 @@ class PartitionedAggregationNode : public ExecNode {
   /// This function processes each individual row in ProcessBatch(). Must be inlined into
   /// ProcessBatch for codegen to substitute function calls with codegen'd versions.
   /// May spill partitions if not enough memory is available.
-  template<bool AGGREGATED_ROWS>
+  template <bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE ProcessRow(TupleRow* row, HashTableCtx* ht_ctx);
 
-  /// Accessor for the expression context of an AggFnEvaluator. Used only in codegen'ed
+  /// Accessor for the expression contexts of an AggFnEvaluator. Returns an array of
+  /// pointers the the AggFnEvaluator's expression contexts. Used only in codegen'ed
   /// version of UpdateTuple().
-  ExprContext* IR_ALWAYS_INLINE GetAggExprContext(int i) const;
+  ExprContext* const* IR_ALWAYS_INLINE GetAggExprContexts(int i) const;
 
   /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
   /// the context for the partition's hash table and hash is the precomputed hash of
@@ -639,6 +644,16 @@ class PartitionedAggregationNode : public ExecNode {
   /// Assumes is_merge = false;
   Status CodegenUpdateSlot(LlvmCodeGen* codegen, AggFnEvaluator* evaluator,
       SlotDescriptor* slot_desc, llvm::Function** fn);
+
+  /// Codegen a call to a function implementing the UDA interface with input values
+  /// from 'input_vals'. 'dst_val' should contain the previous value of the aggregate
+  /// function, and 'updated_dst_val' is set to the new value after the Update or Merge
+  /// operation is applied. The instruction sequence for the UDA call is inserted at
+  /// the insert position of 'builder'.
+  Status CodegenCallUda(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      AggFnEvaluator* evaluator, llvm::Value* agg_fn_ctx,
+      const std::vector<CodegenAnyVal>& input_vals, const CodegenAnyVal& dst_val,
+      CodegenAnyVal* updated_dst_val);
 
   /// Codegen UpdateTuple(). Returns non-OK status if codegen is unsuccessful.
   Status CodegenUpdateTuple(LlvmCodeGen* codegen, llvm::Function** fn);

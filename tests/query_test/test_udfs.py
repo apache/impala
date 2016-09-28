@@ -24,7 +24,7 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
-    create_single_exec_option_dimension,
+    create_exec_option_dimension,
     create_uncompressed_text_dimension)
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, IS_S3
@@ -37,48 +37,46 @@ class TestUdfs(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUdfs, cls).add_test_dimensions()
-    # Without limiting the test suite to a single exec option, the tests will fail
-    # because the same test case may be executed in parallel with different exec option
-    # values leading to conflicting DDL ops.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.TestMatrix.add_dimension(
+      create_exec_option_dimension(disable_codegen_options=[False, True]))
 
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  def test_native_functions(self, vector):
-    database = 'native_function_test'
-
+  def test_native_functions(self, vector, unique_database):
     self.__load_functions(
-      self.create_udfs_template, vector, database,
+      self.create_udfs_template, vector, unique_database,
       get_fs_path('/test-warehouse/libTestUdfs.so'))
     self.__load_functions(
-      self.create_sample_udas_template, vector, database,
+      self.create_sample_udas_template, vector, unique_database,
       get_fs_path('/test-warehouse/libudasample.so'))
     self.__load_functions(
-      self.create_test_udas_template, vector, database,
+      self.create_test_udas_template, vector, unique_database,
       get_fs_path('/test-warehouse/libTestUdas.so'))
 
-    self.run_test_case('QueryTest/udf', vector, use_db=database)
-    if not IS_S3: # S3 doesn't support INSERT
-      self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
-    self.run_test_case('QueryTest/uda', vector, use_db=database)
+    self.run_test_case('QueryTest/udf', vector, use_db=unique_database)
+    if not vector.get_value('exec_option')['disable_codegen']:
+      self.run_test_case('QueryTest/udf-codegen-required', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/udf-init-close', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/uda', vector, use_db=unique_database)
 
-  def test_ir_functions(self, vector):
-    database = 'ir_function_test'
+  def test_ir_functions(self, vector, unique_database):
+    if vector.get_value('exec_option')['disable_codegen']:
+      # IR functions require codegen to be enabled.
+      return
     self.__load_functions(
-      self.create_udfs_template, vector, database,
+      self.create_udfs_template, vector, unique_database,
       get_fs_path('/test-warehouse/test-udfs.ll'))
-    self.run_test_case('QueryTest/udf', vector, use_db=database)
-    if not IS_S3: # S3 doesn't support INSERT
-      self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
+    self.run_test_case('QueryTest/udf', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/udf-init-close', vector, use_db=unique_database)
 
-  def test_udf_errors(self, vector):
+  def test_udf_errors(self, vector, unique_database):
     # Disable codegen to force interpretation path to be taken.
     # Aim to exercise two failure cases:
     # 1. too many arguments
     # 2. IR UDF
     vector.get_value('exec_option')['disable_codegen'] = 1
-    self.run_test_case('QueryTest/udf-errors', vector)
+    self.run_test_case('QueryTest/udf-errors', vector, use_db=unique_database)
 
   def test_udf_invalid_symbol(self, vector):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
@@ -98,17 +96,9 @@ class TestUdfs(ImpalaTestSuite):
     finally:
       self.client.execute(drop_fn_stmt)
 
-  def test_java_udfs(self, vector):
-    self.client.execute("create database if not exists java_udfs_test "
-        "location '%s'" % get_fs_path('/test-warehouse/java_udf_test.db'))
-    self.client.execute("create database if not exists udf_test "
-        "location '%s'" % get_fs_path('/test-warehouse/udf_test.db'))
-    try:
-      self.run_test_case('QueryTest/load-java-udfs', vector)
-      self.run_test_case('QueryTest/java-udf', vector)
-    finally:
-      self.client.execute("drop database if exists java_udfs_test cascade")
-      self.client.execute("drop database if exists udf_test cascade")
+  def test_java_udfs(self, vector, unique_database):
+    self.run_test_case('QueryTest/load-java-udfs', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/java-udf', vector, use_db=unique_database)
 
   @SkipIfLocal.multiple_impalad
   def test_hive_udfs_missing_jar(self, vector, unique_database):
@@ -150,13 +140,8 @@ class TestUdfs(ImpalaTestSuite):
     except ImpalaBeeswaxException, e:
       assert "Failed to get file info" in str(e)
 
-  def test_libs_with_same_filenames(self, vector):
-    self.client.execute("create database if not exists same_lib_filename_udf_test "
-        "location '%s'" % get_fs_path('/test-warehouse/same_lib_filename_udf_test.db'))
-    try:
-      self.run_test_case('QueryTest/libs_with_same_filenames', vector)
-    finally:
-      self.client.execute("drop database if exists same_lib_filename_udf_test cascade")
+  def test_libs_with_same_filenames(self, vector, unique_database):
+    self.run_test_case('QueryTest/libs_with_same_filenames', vector, use_db=unique_database)
 
   def test_udf_update_via_drop(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Dropping
@@ -263,19 +248,19 @@ class TestUdfs(ImpalaTestSuite):
   # Run serially because this will blow the process limit, potentially causing other
   # queries to fail
   @pytest.mark.execute_serially
-  def test_mem_limits(self, vector):
+  def test_mem_limits(self, vector, unique_database):
     # Set the mem limit high enough that a simple scan can run
     mem_limit = 1024 * 1024
     vector.get_value('exec_option')['mem_limit'] = mem_limit
 
     try:
-      self.run_test_case('QueryTest/udf-mem-limit', vector)
+      self.run_test_case('QueryTest/udf-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
       self.__check_exception(e)
 
     try:
-      self.run_test_case('QueryTest/uda-mem-limit', vector)
+      self.run_test_case('QueryTest/uda-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
       self.__check_exception(e)
@@ -330,6 +315,8 @@ returns decimal(9,2) location '{location}' update_fn='SumSmallDecimalUpdate';
   create_test_udas_template = """
 drop function if exists {database}.trunc_sum(double);
 drop function if exists {database}.arg_is_const(int, int);
+drop function if exists {database}.toggle_null(int);
+drop function if exists {database}.count_nulls(bigint);
 
 create database if not exists {database};
 
@@ -341,6 +328,14 @@ serialize_fn='TruncSumSerialize' finalize_fn='TruncSumFinalize';
 create aggregate function {database}.arg_is_const(int, int)
 returns boolean location '{location}'
 init_fn='ArgIsConstInit' update_fn='ArgIsConstUpdate' merge_fn='ArgIsConstMerge';
+
+create aggregate function {database}.toggle_null(int)
+returns int location '{location}'
+update_fn='ToggleNullUpdate' merge_fn='ToggleNullMerge';
+
+create aggregate function {database}.count_nulls(bigint)
+returns bigint location '{location}'
+update_fn='CountNullsUpdate' merge_fn='CountNullsMerge';
 """
 
   # Create test UDF functions in {database} from library {location}

@@ -164,11 +164,9 @@ StringVal ToStringVal(FunctionContext* context, T val) {
   stringstream ss;
   ss << val;
   const string &str = ss.str();
-  return StringVal::CopyFrom(context, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
+  return StringVal::CopyFrom(
+      context, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
 }
-
-// Delimiter to use if the separator is NULL.
-static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
 
 constexpr int AggregateFunctions::HLL_PRECISION;
 constexpr int AggregateFunctions::HLL_LEN;
@@ -627,15 +625,21 @@ void AggregateFunctions::Max(FunctionContext*,
 // StringConcatUpdate().
 typedef int StringConcatHeader;
 
-void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
-    const StringVal& src, StringVal* result) {
-  StringConcatUpdate(ctx, src, DEFAULT_STRING_CONCAT_DELIM, result);
+// Delimiter to use if the separator is not provided.
+static inline StringVal ALWAYS_INLINE DefaultStringConcatDelim() {
+  return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(", ")), 2);
 }
 
-void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
-    const StringVal& src, const StringVal& separator, StringVal* result) {
+void AggregateFunctions::StringConcatUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* result) {
+  StringConcatUpdate(ctx, src, DefaultStringConcatDelim(), result);
+}
+
+void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx, const StringVal& src,
+    const StringVal& separator, StringVal* result) {
   if (src.is_null) return;
-  const StringVal* sep = separator.is_null ? &DEFAULT_STRING_CONCAT_DELIM : &separator;
+  const StringVal default_delim = DefaultStringConcatDelim();
+  const StringVal* sep = separator.is_null ? &default_delim : &separator;
   if (result->is_null) {
     // Header of the intermediate state holds the length of the first separator.
     const int header_len = sizeof(StringConcatHeader);

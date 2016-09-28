@@ -163,13 +163,28 @@ struct ColumnType {
     return thrift_type;
   }
 
+  inline bool IsBooleanType() const { return type == TYPE_BOOLEAN; }
+
+  inline bool IsIntegerType() const {
+    return type == TYPE_TINYINT || type == TYPE_SMALLINT || type == TYPE_INT
+        || type == TYPE_BIGINT;
+  }
+
+  inline bool IsFloatingPointType() const {
+    return type == TYPE_FLOAT || type == TYPE_DOUBLE;
+  }
+
+  inline bool IsDecimalType() const { return type == TYPE_DECIMAL; }
+
   inline bool IsStringType() const {
     return type == TYPE_STRING || type == TYPE_VARCHAR || type == TYPE_CHAR;
   }
 
+  inline bool IsTimestampType() const { return type == TYPE_TIMESTAMP; }
+
   inline bool IsVarLenStringType() const {
-    return type == TYPE_STRING || type == TYPE_VARCHAR ||
-        (type == TYPE_CHAR && len > MAX_CHAR_INLINE_LENGTH);
+    return type == TYPE_STRING || type == TYPE_VARCHAR
+        || (type == TYPE_CHAR && len > MAX_CHAR_INLINE_LENGTH);
   }
 
   inline bool IsComplexType() const {

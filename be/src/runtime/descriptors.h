@@ -35,19 +35,21 @@ namespace llvm {
   class Function;
   class PointerType;
   class StructType;
+  class Value;
 };
 
 namespace impala {
 
+class Expr;
+class ExprContext;
+class LlvmBuilder;
 class LlvmCodeGen;
 class ObjectPool;
+class RuntimeState;
 class TDescriptorTable;
 class TSlotDescriptor;
 class TTable;
 class TTupleDescriptor;
-class Expr;
-class ExprContext;
-class RuntimeState;
 
 /// A path into a table schema (e.g. a vector of ColumnTypes) pointing to a particular
 /// column/field. The i-th element of the path is the ordinal position of the column/field
@@ -133,9 +135,22 @@ class SlotDescriptor {
 
   std::string DebugString() const;
 
-  /// Codegen for: void SetNull(Tuple* tuple) / void SetNotNull(Tuple* tuple)
-  /// The codegen'd IR function is cached.
-  llvm::Function* GetUpdateNullFn(LlvmCodeGen*, bool set_null) const;
+  /// Generate LLVM code at the insert position of 'builder' that returns a boolean value
+  /// represented as a LLVM i1 indicating whether this slot is null in 'tuple'.
+  llvm::Value* CodegenIsNull(
+      LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Value* tuple) const;
+
+  /// Generate LLVM code at the insert position of 'builder' that returns a boolean value
+  /// represented as a LLVM i1 with value of the NULL bit at 'null_indicator_offset' in
+  /// 'tuple'.
+  static llvm::Value* CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple);
+
+  /// Generate LLVM code at the insert position of 'builder' to set this slot's
+  /// NULL bit in the given 'tuple' to the value 'is_null'. 'tuple' is a pointer
+  /// to the tuple, and 'is_null' is an boolean value represented as a LLVM i1.
+  void CodegenSetNullIndicator(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Value* tuple, llvm::Value* is_null) const;
 
  private:
   friend class DescriptorTbl;
@@ -163,13 +178,16 @@ class SlotDescriptor {
   /// any padding bytes.
   int llvm_field_idx_;
 
-  /// Cached codegen'd functions
-  mutable llvm::Function* set_not_null_fn_;
-  mutable llvm::Function* set_null_fn_;
-
   /// collection_item_descriptor should be non-NULL iff this is a collection slot
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
-                 const TupleDescriptor* collection_item_descriptor);
+      const TupleDescriptor* collection_item_descriptor);
+
+  /// Generate LLVM code at the insert position of 'builder' to get the i8 value of the
+  /// the byte containing 'null_indicator_offset' in 'tuple'. If 'null_byte_ptr' is
+  /// non-NULL, sets that to a pointer to the null byte.
+  static llvm::Value* CodegenGetNullByte(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple,
+      llvm::Value** null_byte_ptr);
 };
 
 class ColumnDescriptor {

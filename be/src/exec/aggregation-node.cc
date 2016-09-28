@@ -550,6 +550,10 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
   PointerType* expr_ctx_ptr_type = codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME);
   StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
+  if (tuple_struct == NULL) {
+    VLOG_QUERY << "Could not codegen UpdateSlot(): could not generate tuple struct.";
+    return NULL;
+  }
   PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_struct);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
 
@@ -560,7 +564,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[4];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
   Value* fn_ctx_arg = args[0];
@@ -588,8 +592,8 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 
   if (slot_desc->is_nullable()) {
     // Dst is NULL, just update dst slot to src slot and clear null bit
-    Function* clear_null_fn = slot_desc->GetUpdateNullFn(codegen, false);
-    builder.CreateCall(clear_null_fn, ArrayRef<Value*>({agg_tuple_arg}));
+    slot_desc->CodegenSetNullIndicator(
+        codegen, &builder, agg_tuple_arg, codegen->false_value());
   }
 
   // Update the slot
@@ -630,32 +634,23 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 
       // Create pointer to src_anyval to pass to HllUpdate() function. We must use the
       // unlowered type.
-      Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          fn, LlvmCodeGen::NamedVariable("src_lowered_ptr", src.value()->getType()));
-      builder.CreateStore(src.value(), src_lowered_ptr);
-      Type* unlowered_ptr_type =
-          CodegenAnyVal::GetUnloweredType(codegen, input_expr->type())->getPointerTo();
-      Value* src_unlowered_ptr =
-          builder.CreateBitCast(src_lowered_ptr, unlowered_ptr_type, "src_unlowered_ptr");
+      Value* src_unlowered_ptr = src.GetUnloweredPtr("src_unlowered_ptr");
 
       // Create StringVal* intermediate argument from dst_value
-      CodegenAnyVal dst_stringval = CodegenAnyVal::GetNonNullVal(
-          codegen, &builder, TYPE_STRING, "dst_stringval");
+      CodegenAnyVal dst_stringval =
+          CodegenAnyVal::GetNonNullVal(codegen, &builder, TYPE_STRING, "dst_stringval");
       dst_stringval.SetFromRawValue(dst_value);
       // Create pointer to dst_stringval to pass to HllUpdate() function. We must use
       // the unlowered type.
-      Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr",
-                                         dst_stringval.value()->getType()));
-      builder.CreateStore(dst_stringval.value(), dst_lowered_ptr);
-      unlowered_ptr_type =
+      Value* dst_lowered_ptr = dst_stringval.GetLoweredPtr("dst_lowered_ptr");
+      Type* dst_unlowered_ptr_type =
           codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, TYPE_STRING));
-      Value* dst_unlowered_ptr =
-          builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
+      Value* dst_unlowered_ptr = builder.CreateBitCast(
+          dst_lowered_ptr, dst_unlowered_ptr_type, "dst_unlowered_ptr");
 
       // Call 'hll_fn'
-      builder.CreateCall(hll_fn,
-          ArrayRef<Value*>({fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr}));
+      builder.CreateCall(
+          hll_fn, ArrayRef<Value*>({fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr}));
 
       // Convert StringVal intermediate 'dst_arg' back to StringValue
       Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
@@ -765,13 +760,17 @@ Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
   //     ExprContext** expr_ctx, Tuple* tuple, TupleRow* row)
   // This signature needs to match the non-codegen'd signature exactly.
   StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
+  if (tuple_struct == NULL) {
+    VLOG_QUERY << "Could not codegen UpdateSlot(): could not generate tuple struct.";
+    return NULL;
+  }
   PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateTuple", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", agg_node_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", agg_tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple_row", tuple_row_ptr_type));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 

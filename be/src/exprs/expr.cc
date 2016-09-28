@@ -684,10 +684,10 @@ Status Expr::GetCodegendComputeFnWrapper(LlvmCodeGen* codegen, Function** fn) {
   ir_compute_fn_ = CreateIrFunctionPrototype(codegen, "CodegenComputeFnWrapper", &args);
   BasicBlock* entry_block =
       BasicBlock::Create(codegen->context(), "entry", ir_compute_fn_);
-  LlvmCodeGen::LlvmBuilder builder(entry_block);
+  LlvmBuilder builder(entry_block);
   Value* this_ptr =
       codegen->CastPtrToLlvmPtr(codegen->GetPtrType(Expr::LLVM_CLASS_NAME), this);
-  Value* compute_fn_args[] = { this_ptr, args[0], args[1] };
+  Value* compute_fn_args[] = {this_ptr, args[0], args[1]};
   Value* ret = CodegenAnyVal::CreateCall(
       codegen, &builder, static_getval_fn, compute_fn_args, "ret");
   builder.CreateRet(ret);

@@ -319,7 +319,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   Value* expr_ctx = args[0];
   Value* row = args[1];
   BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);
-  LlvmCodeGen::LlvmBuilder builder(block);
+  LlvmBuilder builder(block);
 
   // Populate UDF arguments
   vector<Value*> udf_args;
@@ -482,7 +482,7 @@ Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, Function** udf) {
   } else if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
     // In this path, we're running a builtin with the UDF interface. The IR is
     // in the llvm module.
-    *udf = codegen->GetFunction(fn_.scalar_fn.symbol);
+    *udf = codegen->GetFunction(fn_.scalar_fn.symbol, false);
     if (*udf == NULL) {
       // Builtins symbols should exist unless there is a version mismatch.
       stringstream ss;
@@ -502,11 +502,11 @@ Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, Function** udf) {
   } else {
     // We're running an IR UDF.
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
-    *udf = codegen->GetFunction(fn_.scalar_fn.symbol);
+    *udf = codegen->GetFunction(fn_.scalar_fn.symbol, false);
     if (*udf == NULL) {
       stringstream ss;
-      ss << "Unable to locate function " << fn_.scalar_fn.symbol
-         << " from LLVM module " << fn_.hdfs_location;
+      ss << "Unable to locate function " << fn_.scalar_fn.symbol << " from LLVM module "
+         << fn_.hdfs_location;
       return Status(ss.str());
     }
     *udf = codegen->FinalizeFunction(*udf);
@@ -527,7 +527,7 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     LlvmCodeGen* codegen = state->codegen();
     DCHECK(codegen != NULL);
-    Function* ir_fn = codegen->GetFunction(symbol);
+    Function* ir_fn = codegen->GetFunction(symbol, false);
     if (ir_fn == NULL) {
       stringstream ss;
       ss << "Unable to locate function " << symbol << " from LLVM module "

@@ -385,7 +385,7 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "Literal", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
-  LlvmCodeGen::LlvmBuilder builder(entry_block);
+  LlvmBuilder builder(entry_block);
 
   CodegenAnyVal v = CodegenAnyVal::GetNonNullVal(codegen, &builder, type_);
   switch (type_.type) {
@@ -439,7 +439,7 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
       return Status(ss.str());
   }
 
-  builder.CreateRet(v.value());
+  builder.CreateRet(v.GetLoweredValue());
   *fn = codegen->FinalizeFunction(*fn);
   ir_compute_fn_ = *fn;
   return Status::OK();
