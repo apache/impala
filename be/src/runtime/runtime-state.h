@@ -138,7 +138,6 @@ class RuntimeState {
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
-  std::vector<DiskIoRequestContext*>* reader_contexts() { return &reader_contexts_; }
 
   void set_fragment_root_id(PlanNodeId id) {
     DCHECK_EQ(root_node_id_, -1) << "Should not set this twice.";
@@ -162,6 +161,14 @@ class RuntimeState {
   /// Returns true if the codegen object has been created. Note that this may return false
   /// even when codegen is enabled if nothing has been codegen'd.
   bool codegen_created() const { return codegen_.get() != NULL; }
+
+  /// Takes ownership of a scan node's reader context and plan fragment executor will call
+  /// UnregisterReaderContexts() to unregister it when the fragment is closed. The IO
+  /// buffers may still be in use and thus the deferred unregistration.
+  void AcquireReaderContext(DiskIoRequestContext* reader_context);
+
+  /// Unregisters all reader contexts acquired through AcquireReaderContext().
+  void UnregisterReaderContexts();
 
   /// Returns codegen_ in 'codegen'. If 'initialize' is true, codegen_ will be created if
   /// it has not been initialized by a previous call already. If 'initialize' is false,
@@ -344,6 +351,9 @@ class RuntimeState {
   Status query_status_;
 
   /// Reader contexts that need to be closed when the fragment is closed.
+  /// Synchronization is needed if there are multiple scan nodes in a plan fragment and
+  /// Close() may be called on them concurrently (see IMPALA-4180).
+  SpinLock reader_contexts_lock_;
   std::vector<DiskIoRequestContext*> reader_contexts_;
 
   /// BufferedBlockMgr object used to allocate and manage blocks of input data in memory

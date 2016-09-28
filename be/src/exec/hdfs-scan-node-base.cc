@@ -446,7 +446,7 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
     // There may still be io buffers used by parent nodes so we can't unregister the
     // reader context yet. The runtime state keeps a list of all the reader contexts and
     // they are unregistered when the fragment is closed.
-    state->reader_contexts()->push_back(reader_context_);
+    state->AcquireReaderContext(reader_context_);
     // Need to wait for all the active scanner threads to finish to ensure there is no
     // more memory tracked by this scan node's mem tracker.
     state->io_mgr()->CancelContext(reader_context_, true);

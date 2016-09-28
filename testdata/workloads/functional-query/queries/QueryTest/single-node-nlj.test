@@ -149,7 +149,6 @@ group by id) v2;
 ---- TYPES
 TINYINT,INT,BIGINT
 ====
-====
 ---- QUERY
 # Regression test for IMPALA-561: Multiple scan nodes in a plan fragment.
 select count(*)
@@ -159,6 +158,18 @@ left join functional.alltypes a2 on a2.tinyint_col >= 1
 47961000
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-4180: a single node plan with blocking join node
+# and multiple top-n + scan nodes to trigger concurrent Close() on scan nodes.
+with t as (select int_col x from functional.alltypestiny order by id limit 2)
+select * from t t1 left join t t2 on t1.x > 0
+---- RESULTS
+0,NULL
+1,0
+1,1
+---- TYPES
+INT,INT
 ====
 ---- QUERY
 # Right non-equi-join with empty build.

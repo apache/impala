@@ -508,9 +508,7 @@ void PlanFragmentExecutor::Close() {
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
-    for (DiskIoRequestContext* context: *runtime_state_->reader_contexts()) {
-      runtime_state_->io_mgr()->UnregisterContext(context);
-    }
+    runtime_state_->UnregisterReaderContexts();
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
     runtime_state_->desc_tbl().ClosePartitionExprs(runtime_state_.get());
     runtime_state_->filter_bank()->Close();
