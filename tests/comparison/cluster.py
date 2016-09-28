@@ -54,6 +54,9 @@ LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 DEFAULT_HIVE_HOST = '127.0.0.1'
 DEFAULT_HIVE_PORT = 11050
+DEFAULT_HIVE_USER = 'hive'
+DEFAULT_HIVE_PASSWORD = 'hive'
+
 DEFAULT_TIMEOUT = 300
 
 class Cluster(object):
