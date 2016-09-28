@@ -33,6 +33,7 @@
 #include "exec/partitioned-hash-join-node-ir.cc"
 #include "exec/topn-node-ir.cc"
 #include "exprs/aggregate-functions-ir.cc"
+#include "exprs/bit-byte-functions-ir.cc"
 #include "exprs/cast-functions-ir.cc"
 #include "exprs/compound-predicates-ir.cc"
 #include "exprs/conditional-functions-ir.cc"
