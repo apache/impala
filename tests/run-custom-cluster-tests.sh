@@ -27,18 +27,21 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 # TODO: Combine with run-process-failure-tests.sh
 export HEAPCHECK=
 
-AUX_CUSTOM_DIR=""
-if [ -n ${IMPALA_AUX_TEST_HOME} ]; then
-    AUX_CUSTOM_DIR=${IMPALA_AUX_TEST_HOME}/tests/aux_custom_cluster_tests/
-fi
-
-export LOG_DIR=${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}
-RESULTS_DIR=${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}/results
-mkdir -p ${RESULTS_DIR}
+export LOG_DIR="${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
+RESULTS_DIR="${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}/results"
+mkdir -p "${RESULTS_DIR}"
 
 # KERBEROS TODO We'll want to pass kerberos status in here.
-cd ${IMPALA_HOME}/tests
-. ${IMPALA_HOME}/bin/set-classpath.sh &> /dev/null
-impala-py.test custom_cluster/ authorization/ ${AUX_CUSTOM_DIR} \
-    --junitxml="${RESULTS_DIR}/TEST-impala-custom-cluster.xml" \
-    --resultlog="${RESULTS_DIR}/TEST-impala-custom-cluster.log" "$@"
+cd "${IMPALA_HOME}/tests"
+. "${IMPALA_HOME}/bin/set-classpath.sh" &> /dev/null
+
+AUX_CUSTOM_DIR="${IMPALA_AUX_TEST_HOME}/tests/aux_custom_cluster_tests/"
+ARGS=(custom_cluster/ authorization/)
+if [[ -d "${AUX_CUSTOM_DIR}" ]]
+then
+  ARGS+=("${AUX_CUSTOM_DIR}")
+fi
+ARGS+=('--junitxml="${RESULTS_DIR}/TEST-impala-custom-cluster.xml"')
+ARGS+=('--resultlog="${RESULTS_DIR}/TEST-impala-custom-cluster.log"')
+ARGS+=("$@")
+impala-py.test "${ARGS[@]}"
