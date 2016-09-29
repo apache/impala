@@ -1,6 +1,5 @@
 *~
 *.pyc
-.*.swp
 derby.log
 thirdparty
 compile_commands.json
@@ -55,3 +54,8 @@ hs_err_pid*.log
 
 # Binaries disallowed by ASF rules
 *.jar
+
+# Vim related files
+.*.swp
+.vimrc
+be/.ycm_extra_conf.py
