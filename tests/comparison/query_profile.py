@@ -27,6 +27,15 @@ from db_types import (
     TYPES,
     Timestamp)
 from funcs import (
+    AnalyticAvg,
+    AnalyticCount,
+    AnalyticFirstValue,
+    AnalyticLag,
+    AnalyticLastValue,
+    AnalyticLead,
+    AnalyticMax,
+    AnalyticMin,
+    AnalyticSum,
     And,
     Coalesce,
     Equals,
@@ -591,6 +600,13 @@ class DefaultProfile(object):
                     IsNotDistinctFrom, IsNotDistinctFromOp, LessThan,
                     LessThanOrEquals, NotEquals, NotIn)
 
+  def get_analytic_funcs_that_cannot_contain_aggs(self):
+    """
+    Returns a list of analytic functions that should not contain aggregate functions
+    """
+    return None
+
+
 class ImpalaNestedTypesProfile(DefaultProfile):
 
   def __init__(self):
@@ -633,7 +649,8 @@ class TestFunctionProfile(DefaultProfile):
 
 class HiveProfile(DefaultProfile):
   def __init__(self):
-      super(HiveProfile, self).__init__()
+    super(HiveProfile, self).__init__()
+    self._probabilities['MISC']['ONLY_USE_EQUALITY_JOIN_PREDICATES'] = 0
 
   def use_having_without_groupby(self):
     return False
@@ -672,6 +689,14 @@ class HiveProfile(DefaultProfile):
     """
     return [signature for signature in signatures if
             signature.func in (Equals, And) or len(signature.args) == 1]
+
+  def get_analytic_funcs_that_cannot_contain_aggs(self):
+    """
+    Hive does not support aggregate functions inside AVG, COUNT, FIRSTVALUE, LAG,
+    LASTVALUE, LEAD, MAX, MIN, or SUM functions
+    """
+    return (AnalyticAvg, AnalyticCount, AnalyticFirstValue, AnalyticLag,
+            AnalyticLastValue, AnalyticLead, AnalyticMax, AnalyticMin, AnalyticSum)
 
 PROFILES = [var for var in locals().values()
             if isinstance(var, type) and var.__name__.endswith('Profile')]
