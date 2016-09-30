@@ -473,3 +473,25 @@ select * from (select count(distinct int_col) cd from functional.alltypes group 
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-4042: count(distinct NULL) fails on a view
+select count(distinct null) from functional.alltypes_view
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(NULL)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(NULL)
+|
+04:AGGREGATE
+|  group by: NULL
+|
+03:EXCHANGE [HASH(NULL)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: NULL
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

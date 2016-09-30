@@ -335,7 +335,9 @@ public class AggregateInfo extends AggregateInfoBase {
    */
   public void substitute(ExprSubstitutionMap smap, Analyzer analyzer)
       throws InternalException {
-    groupingExprs_ = Expr.substituteList(groupingExprs_, smap, analyzer, false);
+
+    // Preserve the root type for NULL literals.
+    groupingExprs_ = Expr.substituteList(groupingExprs_, smap, analyzer, true);
     LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs_));
 
     // The smap in this case should not substitute the aggs themselves, only
