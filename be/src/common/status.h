@@ -99,6 +99,10 @@ class Status {
     if (UNLIKELY(status.msg_ != NULL)) CopyMessageFrom(status);
   }
 
+  /// Move constructor that moves the error message (if any) and resets 'other' to the
+  /// default OK Status.
+  ALWAYS_INLINE Status(Status&& other) : msg_(other.msg_) { other.msg_ = NULL; }
+
   /// Status using only the error code as a parameter. This can be used for error messages
   /// that don't take format parameters.
   Status(TErrorCode::type code);
@@ -150,6 +154,15 @@ class Status {
     // Take the slow path if either Status objects have non-NULL messages (unless they
     // are aliases).
     if (UNLIKELY(msg_ != status.msg_)) CopyMessageFrom(status);
+    return *this;
+  }
+
+  /// Move assignment that moves the error message (if any) and resets 'other' to the
+  /// default OK Status.
+  ALWAYS_INLINE Status& operator=(Status&& other) {
+    if (UNLIKELY(msg_ != NULL)) FreeMessage();
+    msg_ = other.msg_;
+    other.msg_ = NULL;
     return *this;
   }
 
@@ -244,20 +257,11 @@ class Status {
 };
 
 /// some generally useful macros
-#define RETURN_IF_ERROR(stmt) \
-  do { \
-    Status __status__ = (stmt); \
-    if (UNLIKELY(!__status__.ok())) return __status__; \
+#define RETURN_IF_ERROR(stmt)                                     \
+  do {                                                            \
+    Status __status__ = (stmt);                                   \
+    if (UNLIKELY(!__status__.ok())) return std::move(__status__); \
   } while (false)
-
-#define RETURN_IF_ERROR_PREPEND(expr, prepend) \
-  do { \
-    Status __status__ = (stmt); \
-    if (UNLIKELY(!__status__.ok())) { \
-      return Status(strings::Substitute("$0: $1", prepend, __status__.GetDetail())); \
-    } \
-  } while (false)
-
 
 #define ABORT_IF_ERROR(stmt) \
   do { \

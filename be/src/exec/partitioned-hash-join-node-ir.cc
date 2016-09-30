@@ -149,10 +149,11 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
       // build side. For those rows, we need to process the remaining join
       // predicates later.
       if (builder_->null_aware_partition()->build_rows()->num_rows() != 0) {
-        if (num_other_join_conjuncts > 0) {
-          *status = AppendProbeRow(
-              null_aware_probe_partition_->probe_rows(), current_probe_row_);
-          if (UNLIKELY(!status->ok())) return false;
+        if (num_other_join_conjuncts > 0
+            && UNLIKELY(!AppendProbeRow(null_aware_probe_partition_->probe_rows(),
+                   current_probe_row_, status))) {
+          DCHECK(!status->ok());
+          return false;
         }
         return true;
       }
@@ -217,7 +218,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
   return true;
 }
 
-template<int const JoinOp>
+template <int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRow(
     ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
     ExprContext* const* conjunct_ctxs, int num_conjuncts,
@@ -282,8 +283,11 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
           skip_row = true;
         } else {
           // Condition 3 above.
-          *status = AppendProbeRow(null_probe_rows_.get(), current_probe_row_);
-          if (UNLIKELY(!status->ok())) return false;
+          if (UNLIKELY(
+                  !AppendProbeRow(null_probe_rows_.get(), current_probe_row_, status))) {
+            DCHECK(!status->ok());
+            return false;
+          }
           matched_null_probe_.push_back(false);
           skip_row = true;
         }
@@ -306,8 +310,10 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
           // Skip the current row if we manage to append to the spilled partition's BTS.
           // Otherwise, we need to bail out and report the failure.
           BufferedTupleStream* probe_rows = probe_partition->probe_rows();
-          *status = AppendProbeRow(probe_rows, current_probe_row_);
-          if (UNLIKELY(!status->ok())) return false;
+          if (UNLIKELY(!AppendProbeRow(probe_rows, current_probe_row_, status))) {
+            DCHECK(!status->ok());
+            return false;
+          }
           skip_row = true;
         }
       }
@@ -426,15 +432,12 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
   return num_rows_added;
 }
 
-inline Status PartitionedHashJoinNode::AppendProbeRow(
-    BufferedTupleStream* stream, TupleRow* row) {
+inline bool PartitionedHashJoinNode::AppendProbeRow(
+    BufferedTupleStream* stream, TupleRow* row, Status* status) {
   DCHECK(stream->has_write_block());
   DCHECK(!stream->using_small_buffers());
   DCHECK(!stream->is_pinned());
-  Status status;
-  if (LIKELY(stream->AddRow(row, &status))) return Status::OK();
-  DCHECK(!status.ok());
-  return status;
+  return stream->AddRow(row, status);
 }
 
 template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::INNER_JOIN>(

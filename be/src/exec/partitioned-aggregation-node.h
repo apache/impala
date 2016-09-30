@@ -444,14 +444,13 @@ class PartitionedAggregationNode : public ExecNode {
   /// full, it will attempt to switch to IO-buffers.
   Tuple* ConstructIntermediateTuple(
       const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-      BufferedTupleStream* stream, Status* status);
+      BufferedTupleStream* stream, Status* status) noexcept;
 
   /// Constructs intermediate tuple, allocating memory from pool instead of the stream.
   /// Returns NULL and sets status if there is not enough memory to allocate the tuple.
   Tuple* ConstructIntermediateTuple(
-      const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-      MemPool* pool, Status* status);
-
+      const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs, MemPool* pool,
+      Status* status) noexcept;
 
   /// Returns the number of bytes of variable-length data for the grouping values stored
   /// in 'ht_ctx_'.
@@ -477,7 +476,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// This function is replaced by codegen (which is why we don't use a vector argument
   /// for agg_fn_ctxs).. Any var-len data is allocated from the FunctionContexts.
   void UpdateTuple(impala_udf::FunctionContext** agg_fn_ctxs, Tuple* tuple, TupleRow* row,
-      bool is_merge = false);
+      bool is_merge = false) noexcept;
 
   /// Called on the intermediate tuple of each group after all input rows have been
   /// consumed and aggregated. Computes the final aggregate values to be returned in

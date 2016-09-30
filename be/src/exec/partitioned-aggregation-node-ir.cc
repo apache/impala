@@ -153,7 +153,7 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* __restrict__ 
       insert_it.SetTuple(intermediate_tuple, hash);
       return Status::OK();
     } else if (!process_batch_status_.ok()) {
-      return process_batch_status_;
+      return std::move(process_batch_status_);
     }
 
     // We did not have enough memory to add intermediate_tuple to the stream.
@@ -198,13 +198,13 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
           !TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx],
             GetHashTable(partition_idx), in_row, hash, &remaining_capacity[partition_idx],
             &process_batch_status_)) {
-        RETURN_IF_ERROR(process_batch_status_);
+        RETURN_IF_ERROR(std::move(process_batch_status_));
         // Tuple is not going into hash table, add it to the output batch.
         Tuple* intermediate_tuple = ConstructIntermediateTuple(agg_fn_ctxs_,
             out_batch->tuple_data_pool(), &process_batch_status_);
         if (UNLIKELY(intermediate_tuple == NULL)) {
           DCHECK(!process_batch_status_.ok());
-          return process_batch_status_;
+          return std::move(process_batch_status_);
         }
         UpdateTuple(&agg_fn_ctxs_[0], intermediate_tuple, in_row);
         out_batch_iterator.Get()->SetTuple(0, intermediate_tuple);

@@ -149,7 +149,7 @@ uint32_t HashTableCtx::Hash(const void* input, int len, uint32_t hash) const {
 }
 
 uint32_t HashTableCtx::HashRow(
-    const uint8_t* expr_values, const uint8_t* expr_values_null) const {
+    const uint8_t* expr_values, const uint8_t* expr_values_null) const noexcept {
   DCHECK_LT(level_, seeds_.size());
   if (expr_values_cache_.var_result_offset() == -1) {
     /// This handles NULLs implicitly since a constant seed value was put
@@ -162,7 +162,7 @@ uint32_t HashTableCtx::HashRow(
 }
 
 bool HashTableCtx::EvalRow(const TupleRow* row, const vector<ExprContext*>& ctxs,
-    uint8_t* expr_values, uint8_t* expr_values_null) {
+    uint8_t* expr_values, uint8_t* expr_values_null) noexcept {
   bool has_null = false;
   for (int i = 0; i < ctxs.size(); ++i) {
     void* loc = expr_values_cache_.ExprValuePtr(expr_values, i);
@@ -213,7 +213,7 @@ uint32_t HashTableCtx::HashVariableLenRow(const uint8_t* expr_values,
 
 template <bool FORCE_NULL_EQUALITY>
 bool HashTableCtx::Equals(const TupleRow* build_row, const uint8_t* expr_values,
-    const uint8_t* expr_values_null) const {
+    const uint8_t* expr_values_null) const noexcept {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     void* val = build_expr_ctxs_[i]->GetValue(build_row);
     if (val == NULL) {
@@ -331,7 +331,7 @@ void HashTableCtx::ExprValuesCache::ResetIterators() {
   cur_expr_values_hash_ = expr_values_hash_array_.get();
 }
 
-void HashTableCtx::ExprValuesCache::Reset() {
+void HashTableCtx::ExprValuesCache::Reset() noexcept {
   ResetIterators();
   // Set the end pointer after resetting the other pointers so they point to
   // the same location.

@@ -260,23 +260,26 @@ Status PhjBuilder::CreateHashPartitions(int level) {
   return Status::OK();
 }
 
-Status PhjBuilder::AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row) {
-  Status status;
+bool PhjBuilder::AppendRowStreamFull(
+    BufferedTupleStream* stream, TupleRow* row, Status* status) noexcept {
   while (true) {
     // Check if the stream is still using small buffers and try to switch to IO-buffers.
     if (stream->using_small_buffers()) {
       bool got_buffer;
-      RETURN_IF_ERROR(stream->SwitchToIoBuffers(&got_buffer));
+      *status = stream->SwitchToIoBuffers(&got_buffer);
+      if (!status->ok()) return false;
+
       if (got_buffer) {
-        if (LIKELY(stream->AddRow(row, &status))) return Status::OK();
-        RETURN_IF_ERROR(status);
+        if (LIKELY(stream->AddRow(row, status))) return true;
+        if (!status->ok()) return false;
       }
     }
     // We ran out of memory. Pick a partition to spill. If we ran out of unspilled
     // partitions, SpillPartition() will return an error status.
-    RETURN_IF_ERROR(SpillPartition(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
-    if (stream->AddRow(row, &status)) return Status::OK();
-    RETURN_IF_ERROR(status);
+    *status = SpillPartition(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+    if (!status->ok()) return false;
+    if (stream->AddRow(row, status)) return true;
+    if (!status->ok()) return false;
     // Spilling one partition does not guarantee we can append a row. Keep
     // spilling until we can append this row.
   }

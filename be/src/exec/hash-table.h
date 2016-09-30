@@ -256,7 +256,7 @@ class HashTableCtx {
     void Close(MemTracker* tracker);
 
     /// Resets the cache states (iterators, end pointers etc) before writing.
-    void Reset();
+    void Reset() noexcept;
 
     /// Resets the iterators to the start before reading. Will record the current position
     /// of the iterators in end pointer before resetting so AtEnd() can determine if all
@@ -406,7 +406,7 @@ class HashTableCtx {
   /// This will be replaced by codegen.  We don't want this inlined for replacing
   /// with codegen'd functions so the function name does not change.
   uint32_t IR_NO_INLINE HashRow(
-      const uint8_t* expr_values, const uint8_t* expr_values_null) const;
+      const uint8_t* expr_values, const uint8_t* expr_values_null) const noexcept;
 
   /// Wrapper function for calling correct HashUtil function in non-codegen'd case.
   uint32_t Hash(const void* input, int len, uint32_t hash) const;
@@ -416,15 +416,15 @@ class HashTableCtx {
   /// inlined when cross compiled because we need to be able to differentiate between
   /// EvalBuildRow and EvalProbeRow by name and the build/probe exprs are baked into the
   /// codegen'd function.
-  bool IR_NO_INLINE EvalBuildRow(const TupleRow* row, uint8_t* expr_values,
-      uint8_t* expr_values_null) {
+  bool IR_NO_INLINE EvalBuildRow(
+      const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) noexcept {
     return EvalRow(row, build_expr_ctxs_, expr_values, expr_values_null);
   }
 
   /// Evaluate 'row' over probe exprs, storing the values into 'expr_values' and nullness
   /// into 'expr_values_null'. This will be replaced by codegen.
-  bool IR_NO_INLINE EvalProbeRow(const TupleRow* row, uint8_t* expr_values,
-      uint8_t* expr_values_null) {
+  bool IR_NO_INLINE EvalProbeRow(
+      const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) noexcept {
     return EvalRow(row, probe_expr_ctxs_, expr_values, expr_values_null);
   }
 
@@ -437,7 +437,7 @@ class HashTableCtx {
   /// 'expr_values_null'. Returns whether any expr evaluated to NULL. This will be
   /// replaced by codegen.
   bool EvalRow(const TupleRow* row, const std::vector<ExprContext*>& ctxs,
-      uint8_t* expr_values, uint8_t* expr_values_null);
+      uint8_t* expr_values, uint8_t* expr_values_null) noexcept;
 
   /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
   /// values in 'expr_values' with nullness 'expr_values_null'. FORCE_NULL_EQUALITY is
@@ -445,7 +445,7 @@ class HashTableCtx {
   /// 'finds_nulls_'. This will be replaced by codegen.
   template <bool FORCE_NULL_EQUALITY>
   bool IR_NO_INLINE Equals(const TupleRow* build_row, const uint8_t* expr_values,
-      const uint8_t* expr_values_null) const;
+      const uint8_t* expr_values_null) const noexcept;
 
   /// Helper function that calls Equals() with the current row. Always inlined so that
   /// it does not appear in cross-compiled IR.

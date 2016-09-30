@@ -965,7 +965,7 @@ Tuple* PartitionedAggregationNode::ConstructSingletonOutputTuple(
 }
 
 Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
-    const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool, Status* status) {
+    const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool, Status* status) noexcept {
   const int fixed_size = intermediate_tuple_desc_->byte_size();
   const int varlen_size = GroupingExprsVarlenSize();
   const int tuple_data_size = fixed_size + varlen_size;
@@ -985,8 +985,8 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
 }
 
 Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
-    const vector<FunctionContext*>& agg_fn_ctxs,
-    BufferedTupleStream* stream, Status* status) {
+    const vector<FunctionContext*>& agg_fn_ctxs, BufferedTupleStream* stream,
+    Status* status) noexcept {
   DCHECK(stream != NULL && status != NULL);
   // Allocate space for the entire tuple in the stream.
   const int fixed_size = intermediate_tuple_desc_->byte_size();
@@ -1090,8 +1090,8 @@ void PartitionedAggregationNode::InitAggSlots(
   }
 }
 
-void PartitionedAggregationNode::UpdateTuple(FunctionContext** agg_fn_ctxs,
-    Tuple* tuple, TupleRow* row, bool is_merge) {
+void PartitionedAggregationNode::UpdateTuple(
+    FunctionContext** agg_fn_ctxs, Tuple* tuple, TupleRow* row, bool is_merge) noexcept {
   DCHECK(tuple != NULL || aggregate_evaluators_.empty());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     if (is_merge) {

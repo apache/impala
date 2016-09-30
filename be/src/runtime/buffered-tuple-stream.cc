@@ -222,8 +222,8 @@ Status BufferedTupleStream::UnpinBlock(BufferedBlockMgr::Block* block) {
   return Status::OK();
 }
 
-Status BufferedTupleStream::NewWriteBlock(int64_t block_len, int64_t null_indicators_size,
-    bool* got_block) {
+Status BufferedTupleStream::NewWriteBlock(
+    int64_t block_len, int64_t null_indicators_size, bool* got_block) noexcept {
   DCHECK(!closed_);
   DCHECK_GE(null_indicators_size, 0);
   *got_block = false;
@@ -282,7 +282,8 @@ Status BufferedTupleStream::NewWriteBlock(int64_t block_len, int64_t null_indica
   return Status::OK();
 }
 
-Status BufferedTupleStream::NewWriteBlockForRow(int64_t row_size, bool* got_block) {
+Status BufferedTupleStream::NewWriteBlockForRow(
+    int64_t row_size, bool* got_block) noexcept {
   int64_t block_len;
   int64_t null_indicators_size;
   if (use_small_buffers_) {
@@ -694,7 +695,7 @@ void BufferedTupleStream::FixUpCollectionsForRead(const vector<SlotDescriptor*>&
   }
 }
 
-int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
+int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const noexcept {
   int64_t size = 0;
   if (has_nullable_tuple_) {
     for (int i = 0; i < fixed_tuple_sizes_.size(); ++i) {
@@ -733,7 +734,15 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
   return size;
 }
 
-bool BufferedTupleStream::DeepCopy(TupleRow* row) {
+bool BufferedTupleStream::AddRowSlow(TupleRow* row, Status* status) noexcept {
+  bool got_block;
+  int64_t row_size = ComputeRowSize(row);
+  *status = NewWriteBlockForRow(row_size, &got_block);
+  if (!status->ok() || !got_block) return false;
+  return DeepCopy(row);
+}
+
+bool BufferedTupleStream::DeepCopy(TupleRow* row) noexcept {
   if (has_nullable_tuple_) {
     return DeepCopyInternal<true>(row);
   } else {
@@ -744,7 +753,7 @@ bool BufferedTupleStream::DeepCopy(TupleRow* row) {
 // TODO: this really needs codegen
 // TODO: in case of duplicate tuples, this can redundantly serialize data.
 template <bool HasNullableTuple>
-bool BufferedTupleStream::DeepCopyInternal(TupleRow* row) {
+bool BufferedTupleStream::DeepCopyInternal(TupleRow* row) noexcept {
   if (UNLIKELY(write_block_ == NULL)) return false;
   DCHECK_GE(write_block_null_indicators_size_, 0);
   DCHECK(write_block_->is_pinned()) << DebugString() << std::endl

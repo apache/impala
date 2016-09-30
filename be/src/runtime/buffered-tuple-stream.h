@@ -238,15 +238,17 @@ class BufferedTupleStream {
   /// Must be called for streams using small buffers to switch to IO-sized buffers.
   /// If it fails to get a buffer (i.e. the switch fails) it resets the use_small_buffers_
   /// back to false.
-  /// TODO: this does not seem like the best mechanism.
+  /// TODO: IMPALA-3200: remove this when small buffers are removed.
   Status SwitchToIoBuffers(bool* got_buffer);
 
-  /// Adds a single row to the stream. Returns false and sets *status if an error
-  /// occurred. BufferedTupleStream will do a deep copy of the memory in the row.
-  /// After AddRow returns false, it should not be called again, unless
-  /// using_small_buffers_ is true, in which case it is valid to call SwitchToIoBuffers()
-  /// then AddRow() again.
-  bool AddRow(TupleRow* row, Status* status);
+  /// Adds a single row to the stream. Returns true if the append succeeded, returns false
+  /// and sets 'status' to OK if appending failed but can be retried or returns false and
+  /// sets 'status' to an error if an error occurred.
+  /// BufferedTupleStream will do a deep copy of the memory in the row. After AddRow()
+  /// returns an error, it should not be called again. If appending failed without an
+  /// error and the stream is using small buffers, it is valid to call
+  /// SwitchToIoBuffers() then AddRow() again.
+  bool AddRow(TupleRow* row, Status* status) noexcept;
 
   /// Allocates space to store a row of with fixed length 'fixed_size' and variable
   /// length data 'varlen_size'. If successful, returns the pointer where fixed length
@@ -458,11 +460,15 @@ class BufferedTupleStream {
   RuntimeProfile::Counter* unpin_timer_;
   RuntimeProfile::Counter* get_new_block_timer_;
 
+  /// The slow path for AddRow() that is called if there is not sufficient space in
+  /// the current block.
+  bool AddRowSlow(TupleRow* row, Status* status) noexcept;
+
   /// Copies 'row' into write_block_. Returns false if there is not enough space in
   /// 'write_block_'. After returning false, write_ptr_ may be left pointing to the
   /// partially-written row, and no more data can be written to write_block_.
   template <bool HAS_NULLABLE_TUPLE>
-  bool DeepCopyInternal(TupleRow* row);
+  bool DeepCopyInternal(TupleRow* row) noexcept;
 
   /// Helper function to copy strings in string_slots from tuple into write_block_.
   /// Updates write_ptr_ to the end of the string data added. Returns false if the data
@@ -480,7 +486,7 @@ class BufferedTupleStream {
       const std::vector<SlotDescriptor*>& collection_slots);
 
   /// Wrapper of the templated DeepCopyInternal() function.
-  bool DeepCopy(TupleRow* row);
+  bool DeepCopy(TupleRow* row) noexcept;
 
   /// Gets a new block of 'block_len' bytes from the block_mgr_, updating write_block_,
   /// write_tuple_idx_, write_ptr_ and write_end_ptr_. 'null_indicators_size' is the
@@ -488,12 +494,13 @@ class BufferedTupleStream {
   /// *got_block is set to true if a block was successfully acquired. Null indicators
   /// (if any) will also be reserved and initialized. If there are no blocks available,
   /// *got_block is set to false and write_block_ is unchanged.
-  Status NewWriteBlock(int64_t block_len, int64_t null_indicators_size, bool* got_block);
+  Status NewWriteBlock(
+      int64_t block_len, int64_t null_indicators_size, bool* got_block) noexcept;
 
   /// A wrapper around NewWriteBlock(). 'row_size' is the size of the tuple row to be
   /// appended to this block. This function determines the block size required in order
   /// to fit the row and null indicators.
-  Status NewWriteBlockForRow(int64_t row_size, bool* got_block);
+  Status NewWriteBlockForRow(int64_t row_size, bool* got_block) noexcept;
 
   /// Reads the next block from the block_mgr_. This blocks if necessary.
   /// Updates read_block_, read_ptr_, read_tuple_idx_ and read_end_ptr_.
@@ -502,7 +509,7 @@ class BufferedTupleStream {
   /// Returns the total additional bytes that this row will consume in write_block_ if
   /// appended to the block. This includes the fixed length part of the row and the
   /// data for inlined_string_slots_ and inlined_coll_slots_.
-  int64_t ComputeRowSize(TupleRow* row) const;
+  int64_t ComputeRowSize(TupleRow* row) const noexcept;
 
   /// Unpins block if it is an IO-sized block and updates tracking stats.
   Status UnpinBlock(BufferedBlockMgr::Block* block);

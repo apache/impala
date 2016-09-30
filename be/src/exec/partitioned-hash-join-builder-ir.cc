@@ -29,15 +29,16 @@
 
 using namespace impala;
 
-inline Status PhjBuilder::AppendRow(BufferedTupleStream* stream, TupleRow* row) {
-  Status status;
-  if (LIKELY(stream->AddRow(row, &status))) return Status::OK();
-  RETURN_IF_ERROR(status);
-  return AppendRowStreamFull(stream, row);
+inline bool PhjBuilder::AppendRow(
+    BufferedTupleStream* stream, TupleRow* row, Status* status) {
+  if (LIKELY(stream->AddRow(row, status))) return true;
+  if (UNLIKELY(!status->ok())) return false;
+  return AppendRowStreamFull(stream, row, status);
 }
 
 Status PhjBuilder::ProcessBuildBatch(
     RowBatch* build_batch, HashTableCtx* ctx, bool build_filters) {
+  Status status;
   HashTableCtx::ExprValuesCache* expr_vals_cache = ctx->expr_values_cache();
   expr_vals_cache->Reset();
   FOREACH_ROW(build_batch, 0, build_batch_iter) {
@@ -47,7 +48,10 @@ Status PhjBuilder::ProcessBuildBatch(
         // TODO: remove with codegen/template
         // If we are NULL aware and this build row has NULL in the eq join slot,
         // append it to the null_aware partition. We will need it later.
-        RETURN_IF_ERROR(AppendRow(null_aware_partition_->build_rows(), build_row));
+        if (UNLIKELY(
+                !AppendRow(null_aware_partition_->build_rows(), build_row, &status))) {
+          return std::move(status);
+        }
       }
       continue;
     }
@@ -66,7 +70,9 @@ Status PhjBuilder::ProcessBuildBatch(
     const uint32_t hash = expr_vals_cache->CurExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];
-    RETURN_IF_ERROR(AppendRow(partition->build_rows(), build_row));
+    if (UNLIKELY(!AppendRow(partition->build_rows(), build_row, &status))) {
+      return std::move(status);
+    }
   }
   return Status::OK();
 }

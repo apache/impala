@@ -261,14 +261,18 @@ class PhjBuilder : public DataSink {
 
   /// Append 'row' to 'stream'. In the common case, appending the row to the stream
   /// immediately succeeds. Otherwise this function falls back to the slower path of
-  /// AppendRowStreamFull(), which may spill partitions to free memory. Returns an error
-  /// if it was unable to append the row, even after spilling partitions.
-  Status AppendRow(BufferedTupleStream* stream, TupleRow* row);
+  /// AppendRowStreamFull(), which may spill partitions to free memory. Returns false
+  /// and sets 'status' if it was unable to append the row, even after spilling
+  /// partitions. This odd return convention is used to avoid emitting unnecessary code
+  /// for ~Status in perf-critical code.
+  bool AppendRow(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Slow path for AppendRow() above. It is called when the stream has failed to append
   /// the row. We need to find more memory by either switching to IO-buffers, in case the
-  /// stream still uses small buffers, or spilling a partition.
-  Status AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row);
+  /// stream still uses small buffers, or spilling a partition. Returns false and sets
+  /// 'status' if it was unable to append the row, even after spilling partitions.
+  bool AppendRowStreamFull(
+      BufferedTupleStream* stream, TupleRow* row, Status* status) noexcept;
 
   /// Frees memory by spilling one of the hash partitions. The 'mode' argument is passed
   /// to the Spill() call for the selected partition. The current policy is to spill the

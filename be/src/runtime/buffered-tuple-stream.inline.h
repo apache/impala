@@ -25,14 +25,10 @@
 
 namespace impala {
 
-inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) {
+inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) noexcept {
   DCHECK(!closed_);
   if (LIKELY(DeepCopy(row))) return true;
-  bool got_block;
-  int64_t row_size = ComputeRowSize(row);
-  *status = NewWriteBlockForRow(row_size, &got_block);
-  if (!status->ok() || !got_block) return false;
-  return DeepCopy(row);
+  return AddRowSlow(row, status);
 }
 
 inline uint8_t* BufferedTupleStream::AllocateRow(int fixed_size, int varlen_size,

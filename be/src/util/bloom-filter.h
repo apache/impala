@@ -25,9 +25,9 @@
 
 #include <immintrin.h>
 
-#include "gutil/macros.h"
-
+#include "common/compiler-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gutil/macros.h"
 #include "runtime/buffered-block-mgr.h"
 
 namespace impala {
@@ -173,7 +173,7 @@ class BloomFilter {
 // the advantage of requiring fewer random bits: log2(32) * 8 = 5 * 8 = 40 random bits for
 // a split Bloom filter, but log2(256) * 8 = 64 random bits for a standard Bloom filter.
 
-inline void BloomFilter::Insert(const uint32_t hash) {
+inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) {
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     BucketInsertAVX2(bucket_idx, hash);
@@ -182,7 +182,7 @@ inline void BloomFilter::Insert(const uint32_t hash) {
   }
 }
 
-inline bool BloomFilter::Find(const uint32_t hash) const {
+inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const {
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     return BucketFindAVX2(bucket_idx, hash);
@@ -191,78 +191,6 @@ inline bool BloomFilter::Find(const uint32_t hash) const {
   }
 }
 
-// The SIMD reinterpret_casts technically violate C++'s strict aliasing rules. However, we
-// compile with -fno-strict-aliasing.
-
-inline void BloomFilter::BucketInsert(const uint32_t bucket_idx, const uint32_t hash) {
-  // new_bucket will be all zeros except for eight 1-bits, one in each 32-bit word. It is
-  // 16-byte aligned so it can be read as a __m128i using aligned SIMD loads in the second
-  // part of this method.
-  uint32_t new_bucket[8] __attribute__((aligned(16)));
-  for (int i = 0; i < 8; ++i) {
-    // Rehash 'hash' and use the top LOG_BUCKET_WORD_BITS bits, following Dietzfelbinger.
-    new_bucket[i] =
-        (REHASH[i] * hash) >> ((1 << LOG_BUCKET_WORD_BITS) - LOG_BUCKET_WORD_BITS);
-    new_bucket[i] = 1U << new_bucket[i];
-  }
-  for (int i = 0; i < 2; ++i) {
-    __m128i new_bucket_sse =
-        _mm_load_si128(reinterpret_cast<__m128i*>(new_bucket + 4 * i));
-    __m128i* existing_bucket = reinterpret_cast<__m128i*>(&directory_[bucket_idx][4 * i]);
-    *existing_bucket = _mm_or_si128(*existing_bucket, new_bucket_sse);
-  }
-}
-
-inline __m256i BloomFilter::MakeMask(const uint32_t hash) {
-   const __m256i ones = _mm256_set1_epi32(1);
-   const __m256i rehash = _mm256_setr_epi32(IMPALA_BLOOM_HASH_CONSTANTS);
-  // Load hash into a YMM register, repeated eight times
-  __m256i hash_data = _mm256_set1_epi32(hash);
-  // Multiply-shift hashing ala Dietzfelbinger et al.: multiply 'hash' by eight different
-  // odd constants, then keep the 5 most significant bits from each product.
-  hash_data = _mm256_mullo_epi32(rehash, hash_data);
-  hash_data = _mm256_srli_epi32(hash_data, 27);
-  // Use these 5 bits to shift a single bit to a location in each 32-bit lane
-  return _mm256_sllv_epi32(ones, hash_data);
-}
-
-inline void BloomFilter::BucketInsertAVX2(
-    const uint32_t bucket_idx, const uint32_t hash) {
-  const __m256i mask = MakeMask(hash);
-  __m256i* const bucket = &reinterpret_cast<__m256i*>(directory_)[bucket_idx];
-  _mm256_store_si256(bucket, _mm256_or_si256(*bucket, mask));
-  // For SSE compatibility, unset the high bits of each YMM register so SSE instructions
-  // dont have to save them off before using XMM registers.
-  _mm256_zeroupper();
-}
-
-inline bool BloomFilter::BucketFindAVX2(
-    const uint32_t bucket_idx, const uint32_t hash) const {
-  const __m256i mask = MakeMask(hash);
-  const __m256i bucket = reinterpret_cast<__m256i*>(directory_)[bucket_idx];
-  // We should return true if 'bucket' has a one wherever 'mask' does. _mm256_testc_si256
-  // takes the negation of its first argument and ands that with its second argument. In
-  // our case, the result is zero everywhere iff there is a one in 'bucket' wherever
-  // 'mask' is one. testc returns 1 if the result is 0 everywhere and returns 0 otherwise.
-  const bool result = _mm256_testc_si256(bucket, mask);
-  _mm256_zeroupper();
-  return result;
-}
-
-inline bool BloomFilter::BucketFind(
-    const uint32_t bucket_idx, const uint32_t hash) const {
-  for (int i = 0; i < BUCKET_WORDS; ++i) {
-    BucketWord hval =
-        (REHASH[i] * hash) >> ((1 << LOG_BUCKET_WORD_BITS) - LOG_BUCKET_WORD_BITS);
-    hval = 1U << hval;
-    if (!(directory_[bucket_idx][i] & hval)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 }  // namespace impala
 
-#undef IMPALA_BLOOM_HASH_CONSTANTS
 #endif  // IMPALA_UTIL_BLOOM_H

@@ -54,8 +54,8 @@ class RawValue {
 
   /// Returns hash value for 'v' interpreted as 'type'.  The resulting hash value
   /// is combined with the seed value.
-  static inline uint32_t GetHashValue(const void* v, const ColumnType& type,
-      uint32_t seed = 0);
+  static uint32_t GetHashValue(
+      const void* v, const ColumnType& type, uint32_t seed = 0) noexcept;
 
   /// Templatized version of GetHashValue, use if type is known ahead. GetHashValue
   /// handles nulls.
@@ -74,8 +74,7 @@ class RawValue {
   /// GetHashValue() does not have this property and cannot be safely used as the first
   /// step in data repartitioning. However, GetHashValue() can be significantly faster.
   /// TODO: fix GetHashValue
-  static inline uint32_t GetHashValueFnv(const void* v, const ColumnType& type,
-      uint32_t seed);
+  static uint32_t GetHashValueFnv(const void* v, const ColumnType& type, uint32_t seed);
 
   /// Compares both values.
   /// Return value is < 0  if v1 < v2, 0 if v1 == v2, > 0 if v1 > v2.

@@ -166,7 +166,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Append the probe row 'row' to 'stream'. The stream must be unpinned and must have
   /// a write buffer allocated, so this will succeed unless an error is encountered.
-  Status AppendProbeRow(BufferedTupleStream* stream, TupleRow* row);
+  /// Returns false and sets 'status' to an error if an error is encountered. This odd
+  /// return convention is used to avoid emitting unnecessary code for ~Status in perf-
+  /// critical code.
+  bool AppendProbeRow(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Probes the hash table for rows matching the current probe row and appends
   /// all the matching build rows (with probe row) to output batch. Returns true
@@ -267,8 +270,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// probe_batch_ is entirely consumed.
   /// For RIGHT_ANTI_JOIN, all this function does is to mark whether each build row
   /// had a match.
-  /// Returns the number of rows added to out_batch; -1 on error (and *status will be
-  /// set). This function doesn't commit rows to the output batch so it's the caller's
+  /// Returns the number of rows added to out_batch; -1 on error (and *status will
+  /// be set). This function doesn't commit rows to the output batch so it's the caller's
   /// responsibility to do so.
   template<int const JoinOp>
   int ProcessProbeBatch(TPrefetchMode::type, RowBatch* out_batch, HashTableCtx* ht_ctx,
