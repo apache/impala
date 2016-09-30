@@ -61,7 +61,6 @@ be/src/testutil/*.pem
 fe/src/test/resources/*.xml
 fe/src/test/resources/hbase-jaas-client.conf.template
 fe/src/test/resources/hbase-jaas-server.conf.template
-llvm-ir/test-loop.bc
 testdata/AllTypesError/*.txt
 testdata/AllTypesErrorNoNulls/*.txt
 *.avsc

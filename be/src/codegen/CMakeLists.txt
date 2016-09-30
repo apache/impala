@@ -99,5 +99,12 @@ add_custom_command(
   DEPENDS ${IR_NO_SSE_OUTPUT_FILE}
 )
 
+# Run the clang compiler to generate BC for llvm-codegen-test
+add_custom_target(test-loop.bc
+  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-loop.bc
+  SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc
+)
+
 ADD_BE_TEST(llvm-codegen-test)
+add_dependencies(llvm-codegen-test test-loop.bc)
 ADD_BE_TEST(instruction-counter-test)
