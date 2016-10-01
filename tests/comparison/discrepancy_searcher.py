@@ -47,6 +47,7 @@ from db_connection import (
 from model_translator import SqlWriter
 from query_flattener import QueryFlattener
 from query_generator import QueryGenerator
+from tests.comparison import db_connection
 
 LOG = getLogger(__name__)
 
@@ -111,27 +112,35 @@ class QueryResultComparator(object):
       # "known errors" will be ignored
       error_message = str(test_exception)
       known_error = None
-      if 'Expressions in the ORDER BY clause must not be constant' in error_message \
-          or 'Expressions in the PARTITION BY clause must not be consta' in error_message:
-        # It's too much work to avoid this bug. Just ignore it if it comes up.
-        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1354')
-      elif 'GROUP BY expression must not contain aggregate functions' in error_message \
-          or 'select list expression not produced by aggregation output' in error_message:
-        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1423')
-      elif ('max(' in error_message or 'min(' in error_message) \
-          and 'only supported with an UNBOUNDED PRECEDING start bound' in error_message:
-        # This analytic isn't supported and ignoring this here is much easier than not
-        # generating the query...
-        known_error = KnownError('MAX UNBOUNDED PRECISION')
-      elif 'IN and/or EXISTS subquery predicates are not supported in binary predicates' \
-          in error_message:
-        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1418')
-      elif 'Unsupported predicate with subquery' in error_message:
-        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1950')
-      elif 'RIGHT OUTER JOIN type with no equi-join' in error_message:
-        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-3063')
-      elif 'Operation is in ERROR_STATE' in error_message:
-        known_error = KnownError('Mem limit exceeded')
+
+      if self.test_db_type is db_connection.IMPALA:
+        if 'Expressions in the ORDER BY clause must not be constant' in error_message \
+            or 'Expressions in the PARTITION BY clause must not be consta' in error_message:
+          # It's too much work to avoid this bug. Just ignore it if it comes up.
+          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1354')
+        elif 'GROUP BY expression must not contain aggregate functions' in error_message \
+            or 'select list expression not produced by aggregation output' in error_message:
+          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1423')
+        elif ('max(' in error_message or 'min(' in error_message) \
+            and 'only supported with an UNBOUNDED PRECEDING start bound' in error_message:
+          # This analytic isn't supported and ignoring this here is much easier than not
+          # generating the query...
+          known_error = KnownError('MAX UNBOUNDED PRECISION')
+        elif 'IN and/or EXISTS subquery predicates are not supported in binary predicates' \
+            in error_message:
+          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1418')
+        elif 'Unsupported predicate with subquery' in error_message:
+          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1950')
+        elif 'RIGHT OUTER JOIN type with no equi-join' in error_message:
+          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-3063')
+        elif 'Operation is in ERROR_STATE' in error_message:
+          known_error = KnownError('Mem limit exceeded')
+      elif self.test_db_type is db_connection.HIVE:
+        if 'ParseException line' in error_message and 'missing ) at' in \
+              error_message and query.select_clause and \
+              query.select_clause.analytic_items:
+          known_error = KnownError("https://issues.apache.org/jira/browse/HIVE-14871")
+
       if known_error:
         comparison_result.exception = known_error
       else:
