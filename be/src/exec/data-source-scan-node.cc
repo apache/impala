@@ -175,6 +175,7 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
           ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
         return Status(ERROR_INVALID_DECIMAL);
       }
+      break;
     }
     case 8: {
       Decimal8Value* val = reinterpret_cast<Decimal8Value*>(slot);
