@@ -1,15 +1,36 @@
+---
+Language: Cpp
 BasedOnStyle: Google
-AlignAfterOpenBracket: 'false'
-AlignOperands: 'false'
-AllowShortCaseLabelsOnASingleLine: 'true'
-AllowShortFunctionsOnASingleLine: 'Inline'
-AllowShortIfStatementsOnASingleLine: 'true'
-BreakBeforeBinaryOperators: 'NonAssignment'
-BreakBeforeTernaryOperators: 'false'
-ColumnLimit: '90'
-ConstructorInitializerIndentWidth: '2'
-ContinuationIndentWidth: '4'
-DerivePointerAlignment: 'false'
-PenaltyBreakBeforeFirstCallParameter: '99999999'
-SpacesBeforeTrailingComments: '1'
-Standard: 'Cpp11'
+AlignAfterOpenBracket: DontAlign
+AlignOperands: false
+AlignTrailingComments: false
+AllowShortFunctionsOnASingleLine: Inline
+AlwaysBreakBeforeMultilineStrings: false
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: false
+ColumnLimit: 90
+ConstructorInitializerIndentWidth: 2
+DerivePointerAlignment: false
+IncludeCategories:
+- Priority: 3
+  Regex: '^<.*/' # Like <boost/lexical_cast.hpp>
+- Priority: 1
+  Regex: '^<.*\.' # Like <fcntl.h>
+- Priority: 2
+  Regex: '^<' # Like <vector>
+- Priority: 4
+  Regex: '^"' # Like "util/auth-util.h"
+SpacesBeforeTrailingComments: 1
+Standard: Cpp11
+---
+Language: Java
+BasedOnStyle: Chromium
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AlwaysBreakBeforeMultilineStrings: true
+BreakBeforeTernaryOperators: false
+ColumnLimit: 90
+ContinuationIndentWidth: 4
+IndentWidth: 2
+IndentWrappedFunctionNames: true
+SortIncludes: true
