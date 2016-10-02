@@ -85,6 +85,10 @@ ImpalaServer::QueryExecState::QueryExecState(
     frontend_(frontend),
     parent_server_(server),
     start_time_(TimestampValue::LocalTime()) {
+#ifndef NDEBUG
+  profile_.AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
+      "DEBUG build of Impala. Use RELEASE builds to measure query performance.");
+#endif
   row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
   client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
   query_events_ = summary_profile_.AddEventSequence("Query Timeline");
