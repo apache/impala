@@ -60,7 +60,7 @@ public class HdfsStorageDescriptorTest {
         "parquet.hive.MapredParquetInputFormat",
         "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"};
     String [] outputFormats = new String [] {
-        "org.apache.impala.hive.serde.ParquetOutputFormat",
+        "com.cloudera.impala.hive.serde.ParquetOutputFormat",
         "parquet.hive.DeprecatedParquetOutputFormat",
         "parquet.hive.MapredParquetOutputFormat",
         "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"};
