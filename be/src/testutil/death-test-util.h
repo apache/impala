@@ -24,11 +24,21 @@
 
 // Wrapper around gtest's ASSERT_DEBUG_DEATH that prevents coredumps and minidumps
 // being generated as the result of the death test.
+#ifndef NDEBUG
 #define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)    \
   do {                                        \
     ScopedCoredumpDisabler disable_coredumps; \
     ASSERT_DEBUG_DEATH(fn, msg);              \
   } while (false);
+#else
+// Gtest's ASSERT_DEBUG_DEATH macro has peculiar semantics where in debug builds it
+// executes the code in a forked process, so it has no visible side-effects, but in
+// release builds it executes the code as normal. This makes it difficult to write
+// death tests that work in both debug and release builds. To avoid this problem, update
+// our wrapper macro to simply omit the death test expression in release builds, where we
+// can't actually test DCHECKs anyway.
+#define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)
+#endif
 
 namespace impala {
 
