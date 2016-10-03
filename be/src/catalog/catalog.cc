@@ -30,6 +30,7 @@ using namespace impala;
 
 DECLARE_bool(load_auth_to_local_rules);
 DECLARE_string(principal);
+DECLARE_string(local_library_dir);
 
 DEFINE_bool(load_catalog_in_background, false,
     "If true, loads catalog metadata in the background. If false, metadata is loaded "
@@ -44,7 +45,8 @@ DECLARE_int32(non_impala_java_vlog);
 
 Catalog::Catalog() {
   JniMethodDescriptor methods[] = {
-    {"<init>", "(ZILjava/lang/String;IIZLjava/lang/String;)V", &catalog_ctor_},
+    {"<init>", "(ZILjava/lang/String;IIZLjava/lang/String;Ljava/lang/String;)V",
+        &catalog_ctor_},
     {"updateCatalog", "([B)[B", &update_metastore_id_},
     {"execDdl", "([B)[B", &exec_ddl_id_},
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
@@ -74,10 +76,11 @@ Catalog::Catalog() {
   // and impala is kerberized.
   jboolean auth_to_local = FLAGS_load_auth_to_local_rules && !FLAGS_principal.empty();
   jstring principal = jni_env->NewStringUTF(FLAGS_principal.c_str());
+  jstring local_library_dir = jni_env->NewStringUTF(FLAGS_local_library_dir.c_str());
   jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_,
       load_in_background, num_metadata_loading_threads, sentry_config,
       FlagToTLogLevel(FLAGS_v), FlagToTLogLevel(FLAGS_non_impala_java_vlog),
-      auth_to_local, principal);
+      auth_to_local, principal, local_library_dir);
   EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }

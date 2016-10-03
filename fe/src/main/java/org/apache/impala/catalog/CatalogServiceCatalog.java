@@ -145,15 +145,15 @@ public class CatalogServiceCatalog extends Catalog {
   private final SentryProxy sentryProxy_;
 
   // Local temporary directory to copy UDF Jars.
-  private static final String LOCAL_LIBRARY_PATH = new String("file://" +
-      System.getProperty("java.io.tmpdir"));
+  private static String localLibraryPath_;
 
   /**
    * Initialize the CatalogServiceCatalog. If loadInBackground is true, table metadata
    * will be loaded in the background
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal) {
+      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal,
+      String localLibraryPath) {
     super(true);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
@@ -173,6 +173,7 @@ public class CatalogServiceCatalog extends Catalog {
     } else {
       sentryProxy_ = null;
     }
+    localLibraryPath_ = new String("file://" + localLibraryPath);
   }
 
   /**
@@ -428,7 +429,7 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Returns a list of Impala Functions, one per compatible "evaluate" method in the UDF
    * class referred to by the given Java function. This method copies the UDF Jar
-   * referenced by "function" to a temporary file in "LOCAL_LIBRARY_PATH" and loads it
+   * referenced by "function" to a temporary file in localLibraryPath_ and loads it
    * into the jvm. Then we scan all the methods in the class using reflection and extract
    * those methods and create corresponding Impala functions. Currently Impala supports
    * only "JAR" files for symbols and also a single Jar containing all the dependent
@@ -447,9 +448,9 @@ public class CatalogServiceCatalog extends Catalog {
     }
     String jarUri = function.getResourceUris().get(0).getUri();
     Class<?> udfClass = null;
+    Path localJarPath = null;
     try {
-      Path localJarPath = new Path(LOCAL_LIBRARY_PATH,
-          UUID.randomUUID().toString() + ".jar");
+      localJarPath = new Path(localLibraryPath_, UUID.randomUUID().toString() + ".jar");
       try {
         FileSystemUtil.copyToLocal(new Path(jarUri), localJarPath);
       } catch (IOException e) {
@@ -501,6 +502,8 @@ public class CatalogServiceCatalog extends Catalog {
           function.getFunctionName();
       LOG.error(errorMsg);
       throw new ImpalaRuntimeException(errorMsg, e);
+    } finally {
+      if (localJarPath != null) FileSystemUtil.deleteIfExists(localJarPath);
     }
     return result;
   }

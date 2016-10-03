@@ -377,6 +377,19 @@ public class FileSystemUtil {
   }
 
   /**
+   * Delete the file at 'path' if it exists.
+   */
+  public static void deleteIfExists(Path path) {
+    try {
+      FileSystem fs = path.getFileSystem(CONF);
+      if (!fs.exists(path)) return;
+      fs.delete(path);
+    } catch (IOException e) {
+      LOG.warn("Encountered an exception deleting file at path " + path.toString(), e);
+    }
+  }
+
+  /**
    * Returns true if the given path is a location which supports caching (e.g. HDFS).
    */
   public static boolean isPathCacheable(Path path) {
