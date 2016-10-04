@@ -181,3 +181,14 @@ where t.c <= cast('1995-01-01 00:00:00' as timestamp) order by c
    predicates: CAST(o_orderdate AS TIMESTAMP) <= CAST('1995-01-01 00:00:00' AS TIMESTAMP)
    kudu predicates: o_orderkey < 10
 ====
+# IMPALA-4213: Planner not pushing some predicates with constant exprs to Kudu
+select count(*) from functional_kudu.alltypes
+where id < 1475059765 + 10
+and 1475059765 + 100 < id
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: id < 1475059775, id > 1475059865
+====

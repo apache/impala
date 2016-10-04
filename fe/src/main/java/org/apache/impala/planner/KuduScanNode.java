@@ -22,18 +22,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
-import org.apache.kudu.ColumnSchema;
-import org.apache.kudu.Schema;
-import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduClient.KuduClientBuilder;
-import org.apache.kudu.client.KuduPredicate;
-import org.apache.kudu.client.KuduPredicate.ComparisonOp;
-import org.apache.kudu.client.KuduScanToken;
-import org.apache.kudu.client.KuduScanToken.KuduScanTokenBuilder;
-import org.apache.kudu.client.LocatedTablet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
@@ -46,6 +34,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
@@ -55,7 +44,20 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduClient.KuduClientBuilder;
+import org.apache.kudu.client.KuduPredicate;
+import org.apache.kudu.client.KuduPredicate.ComparisonOp;
+import org.apache.kudu.client.KuduScanToken;
+import org.apache.kudu.client.KuduScanToken.KuduScanTokenBuilder;
+import org.apache.kudu.client.LocatedTablet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -283,9 +285,9 @@ public class KuduScanNode extends ScanNode {
     BinaryPredicate predicate = (BinaryPredicate) expr;
 
     // TODO KUDU-931 look into handling implicit/explicit casts on the SlotRef.
-    predicate = BinaryPredicate.normalizeSlotRefComparison(predicate, analyzer);
+    predicate = normalizeSlotRefComparison(predicate, analyzer);
     if (predicate == null) return false;
-    ComparisonOp op = getKuduOperator(((BinaryPredicate)predicate).getOp());
+    ComparisonOp op = getKuduOperator(predicate.getOp());
     if (op == null) return false;
 
     SlotRef ref = (SlotRef) predicate.getChild(0);
@@ -354,5 +356,40 @@ public class KuduScanNode extends ScanNode {
       case EQ: return ComparisonOp.EQUAL;
       default: return null;
     }
+  }
+
+
+  /**
+   * Normalizes and returns a copy of 'predicate' consisting of an uncast SlotRef and a
+   * constant Expr into the following form: <SlotRef> <Op> <LiteralExpr>
+   * If 'predicate' cannot be expressed in this way, null is returned.
+   */
+  private static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
+      Analyzer analyzer) {
+    try {
+      predicate = (BinaryPredicate) predicate.clone();
+      predicate.foldConstantChildren(analyzer);
+    } catch (AnalysisException ex) {
+      // Throws if the expression cannot be evaluated by the BE.
+      return null;
+    }
+
+    SlotRef ref = null;
+    if (predicate.getChild(0) instanceof SlotRef) {
+      ref = (SlotRef) predicate.getChild(0);
+    } else if (predicate.getChild(1) instanceof SlotRef) {
+      ref = (SlotRef) predicate.getChild(1);
+    }
+
+    if (ref == null) return null;
+    if (ref != predicate.getChild(0)) {
+      Preconditions.checkState(ref == predicate.getChild(1));
+      predicate = new BinaryPredicate(predicate.getOp().converse(), ref,
+          predicate.getChild(0));
+      predicate.analyzeNoThrow(analyzer);
+    }
+
+    if (!(predicate.getChild(1) instanceof LiteralExpr)) return null;
+    return predicate;
   }
 }

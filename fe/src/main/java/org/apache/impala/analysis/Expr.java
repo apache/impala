@@ -24,9 +24,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -37,6 +34,9 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -1192,9 +1192,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * For children of 'this' that are constant expressions and the type of which has a
    * LiteralExpr subclass, evaluate them in the BE and substitute the child with the
-   * resulting LiteralExpr. Modifies 'this' in place and does not re-analyze it. Hence,
-   * it is not safe to evaluate the modified expr in the BE as the resolved fn_ may be
-   * incorrect given the new arguments.
+   * resulting LiteralExpr. Modifies 'this' in place. If any children are folded, this
+   * Expr is reset and re-analyzed.
    *
    * Throws an AnalysisException if the evaluation fails in the BE.
    *
@@ -1203,14 +1202,21 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public void foldConstantChildren(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(isAnalyzed_);
     Preconditions.checkNotNull(analyzer);
+
+    int numFolded = 0;
     for (int i = 0; i < children_.size(); ++i) {
       Expr child = getChild(i);
       if (child.isLiteral() || !child.isConstant()) continue;
       LiteralExpr literalExpr = LiteralExpr.create(child, analyzer.getQueryCtx());
       if (literalExpr == null) continue;
       setChild(i, literalExpr);
+      ++numFolded;
     }
-    isAnalyzed_ = false;
+
+    if (numFolded > 0) {
+      reset();
+      analyze(analyzer);
+    }
   }
 
   /**
