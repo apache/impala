@@ -15,13 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <unistd.h>
+#include <chrono>
+#include <thread>
 
 #include "util/time.h"
 
 using namespace impala;
+using namespace std;
 
 void impala::SleepForMs(const int64_t duration_ms) {
-  // TODO: Replace with sleep_for when we upgrade to recent boost / C++11?
-  usleep(duration_ms * 1000L);
+  this_thread::sleep_for(chrono::milliseconds(duration_ms));
 }
