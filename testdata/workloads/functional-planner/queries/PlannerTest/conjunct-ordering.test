@@ -45,7 +45,7 @@ where a.int_col = a.tinyint_col and
 ---- PLAN
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   predicates: a.int_col = a.tinyint_col, (CASE a.tinyint_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END), (CASE a.int_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END)
+   predicates: a.int_col = a.tinyint_col, (CASE a.int_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END), (CASE a.tinyint_col WHEN 0 THEN TRUE WHEN 1 THEN TRUE WHEN 2 THEN TRUE ELSE FALSE END)
 ====
 # Check that a LIKE with only leading/trailing wildcards costs less then LIKE with
 # non-leading/trailing wildcards.

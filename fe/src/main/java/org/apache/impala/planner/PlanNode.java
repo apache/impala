@@ -702,6 +702,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         if (cost < smallestCost) {
           smallestCost = cost;
           bestConjunct = e;
+        } else if (cost == smallestCost) {
+          // Break ties based on toSql() to get a consistent display in explain plans.
+          if (e.toSql().compareTo(bestConjunct.toSql()) < 0) {
+            smallestCost = cost;
+            bestConjunct = e;
+          }
         }
       }
 

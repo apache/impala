@@ -530,7 +530,7 @@ where a.id > 10 and b.id > 20
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: id != 1, functional.alltypes.id > 10
+   predicates: functional.alltypes.id > 10, id != 1
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer a.id->b.id is legal.
@@ -557,7 +557,7 @@ where a.id > 10 and b.id > 20
 |
 02:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
-   predicates: functional.alltypessmall.id != 1, id != 2, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20
+   predicates: functional.alltypessmall.id != 1, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20, id != 2
    runtime filters: RF000 -> id
 ====
 # Test value transfers for outer-joined inline views with a limit.
@@ -577,7 +577,7 @@ where a.id > 10 and b.id > 20
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
-|     predicates: id != 2, functional.alltypessmall.id > 20
+|     predicates: functional.alltypessmall.id > 20, id != 2
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -610,7 +610,7 @@ where a.id > 10 and b.id > 20
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: id != 1, functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20
+   predicates: functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20, id != 1
    runtime filters: RF000 -> id
 ====
 # IMPALA-3450: limits on select nodes are reflected in cardinality estimates. The test for

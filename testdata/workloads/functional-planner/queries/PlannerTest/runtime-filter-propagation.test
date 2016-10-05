@@ -143,7 +143,7 @@ and t1.int_col = 1 and 1 = t2.bigint_col
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
-|  other predicates: t1.year = t1.month + t2.int_col, t1.year + t2.smallint_col = t2.tinyint_col, t1.year + t2.int_col = t1.month + t2.tinyint_col
+|  other predicates: t1.year + t2.smallint_col = t2.tinyint_col, t1.year = t1.month + t2.int_col, t1.year + t2.int_col = t1.month + t2.tinyint_col
 |  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypesnopart t2]
@@ -262,8 +262,8 @@ where t1.year = v.int_col and t1.year = v.id and t1.month = v.tinyint_col
 |  runtime filters: RF000 <- t2.int_col, RF001 <- t4.tinyint_col
 |
 |--05:HASH JOIN [INNER JOIN]
-|  |  hash predicates: t3.int_col = t4.int_col, t2.tinyint_col = t4.tinyint_col
-|  |  runtime filters: RF002 <- t4.int_col, RF003 <- t4.tinyint_col
+|  |  hash predicates: t2.tinyint_col = t4.tinyint_col, t3.int_col = t4.int_col
+|  |  runtime filters: RF002 <- t4.tinyint_col, RF003 <- t4.int_col
 |  |
 |  |--03:SCAN HDFS [functional.alltypesnopart t4]
 |  |     partitions=1/1 files=0 size=0B
@@ -274,12 +274,12 @@ where t1.year = v.int_col and t1.year = v.id and t1.month = v.tinyint_col
 |  |
 |  |--02:SCAN HDFS [functional.alltypesnopart t3]
 |  |     partitions=1/1 files=0 size=0B
-|  |     runtime filters: RF002 -> t3.int_col
+|  |     runtime filters: RF003 -> t3.int_col
 |  |
 |  01:SCAN HDFS [functional.alltypesnopart t2]
 |     partitions=1/1 files=0 size=0B
 |     predicates: t2.int_col = t2.id
-|     runtime filters: RF003 -> t2.tinyint_col, RF004 -> t2.id
+|     runtime filters: RF002 -> t2.tinyint_col, RF004 -> t2.id
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
@@ -328,8 +328,8 @@ where t1.year = t2.id and t2.int_col = t3.tinyint_col and t3.month = t4.bigint_c
   and t4.smallint_col = t5.smallint_col and t5.id = t1.month
 ---- PLAN
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: t4.smallint_col = t5.smallint_col, t1.month = t5.id
-|  runtime filters: RF000 <- t5.smallint_col, RF001 <- t5.id
+|  hash predicates: t1.month = t5.id, t4.smallint_col = t5.smallint_col
+|  runtime filters: RF000 <- t5.id, RF001 <- t5.smallint_col
 |
 |--04:SCAN HDFS [functional.alltypesnopart t5]
 |     partitions=1/1 files=0 size=0B
@@ -340,7 +340,7 @@ where t1.year = t2.id and t2.int_col = t3.tinyint_col and t3.month = t4.bigint_c
 |
 |--03:SCAN HDFS [functional.alltypesnopart t4]
 |     partitions=1/1 files=0 size=0B
-|     runtime filters: RF000 -> t4.smallint_col
+|     runtime filters: RF001 -> t4.smallint_col
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.int_col = t3.tinyint_col
@@ -360,7 +360,7 @@ where t1.year = t2.id and t2.int_col = t3.tinyint_col and t3.month = t4.bigint_c
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
-   runtime filters: RF001 -> t1.month, RF004 -> t1.year
+   runtime filters: RF000 -> t1.month, RF004 -> t1.year
 ====
 # Two-way left outer join query; no runtime filters should be generated from the
 # ON-clause equi-join predicate
@@ -632,7 +632,7 @@ select straight_join * from
 where v1.year = t2.id and v1.int_col = t2.int_col and t2.smallint_col = 1
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: year = t2.id, int_col = t2.int_col
+|  hash predicates: int_col = t2.int_col, year = t2.id
 |
 |--02:SCAN HDFS [functional.alltypesnopart t2]
 |     partitions=1/1 files=0 size=0B
@@ -1213,7 +1213,7 @@ from big_six
 36:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--28:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  |  hash predicates: a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.id = b.id, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
 |  |
 |  |--27:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -1224,7 +1224,7 @@ from big_six
 35:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--25:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id, a.bool_col = b.bool_col, a.tinyint_col = b.tinyint_col
+|  |  hash predicates: a.bool_col = b.bool_col, a.id = b.id, a.tinyint_col = b.tinyint_col
 |  |
 |  |--24:SCAN HDFS [functional.alltypes b]
 |  |     partitions=24/24 files=24 size=478.45KB
@@ -1235,7 +1235,7 @@ from big_six
 34:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--22:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  |  hash predicates: a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.id = b.id, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
 |  |
 |  |--21:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -1273,20 +1273,20 @@ from big_six
 31:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--11:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
-|  |  runtime filters: RF017 <- b.bigint_col, RF016 <- b.id, RF019 <- b.double_col, RF018 <- b.bool_col, RF021 <- b.int_col, RF020 <- b.float_col, RF023 <- b.tinyint_col, RF022 <- b.smallint_col
+|  |  hash predicates: a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.id = b.id, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  |  runtime filters: RF017 <- b.bool_col, RF016 <- b.bigint_col, RF019 <- b.float_col, RF018 <- b.double_col, RF021 <- b.int_col, RF020 <- b.id, RF023 <- b.tinyint_col, RF022 <- b.smallint_col
 |  |
 |  |--10:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  09:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF017 -> a.bigint_col, RF016 -> a.id, RF019 -> a.double_col, RF018 -> a.bool_col, RF021 -> a.int_col, RF020 -> a.float_col, RF023 -> a.tinyint_col, RF022 -> a.smallint_col
+|     runtime filters: RF017 -> a.bool_col, RF016 -> a.bigint_col, RF019 -> a.float_col, RF018 -> a.double_col, RF021 -> a.int_col, RF020 -> a.id, RF023 -> a.tinyint_col, RF022 -> a.smallint_col
 |
 30:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--08:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id, a.bool_col = b.bool_col, a.double_col = b.double_col, a.smallint_col = b.smallint_col, a.timestamp_col = b.timestamp_col, a.tinyint_col = b.tinyint_col, a.string_col = b.string_col, a.date_string_col = b.date_string_col
+|  |  hash predicates: a.bool_col = b.bool_col, a.double_col = b.double_col, a.id = b.id, a.smallint_col = b.smallint_col, a.timestamp_col = b.timestamp_col, a.tinyint_col = b.tinyint_col, a.string_col = b.string_col, a.date_string_col = b.date_string_col
 |  |
 |  |--07:SCAN HDFS [functional.alltypes b]
 |  |     partitions=24/24 files=24 size=478.45KB
@@ -1297,18 +1297,18 @@ from big_six
 29:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--05:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id, a.bool_col = b.bool_col
-|  |  runtime filters: RF006 <- b.id, RF007 <- b.bool_col
+|  |  hash predicates: a.bool_col = b.bool_col, a.id = b.id
+|  |  runtime filters: RF006 <- b.bool_col, RF007 <- b.id
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  03:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF006 -> a.id, RF007 -> a.bool_col
+|     runtime filters: RF006 -> a.bool_col, RF007 -> a.id
 |
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  hash predicates: a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.id = b.id, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB

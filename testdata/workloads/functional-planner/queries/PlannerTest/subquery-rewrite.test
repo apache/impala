@@ -41,7 +41,7 @@ and a.int_col < 100
 ---- PLAN
 02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: a.int_col = int_col
-|  other join predicates: g.bigint_col < a.bigint_col, a.id = g.id
+|  other join predicates: a.id = g.id, g.bigint_col < a.bigint_col
 |
 |--01:SCAN HDFS [functional.alltypesagg g]
 |     partitions=11/11 files=11 size=814.73KB
@@ -77,8 +77,8 @@ and bool_col = false
 |  output: count(*)
 |
 02:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: int_col = int_col, a.id = g.id
-|  runtime filters: RF000 <- int_col, RF001 <- g.id
+|  hash predicates: a.id = g.id, int_col = int_col
+|  runtime filters: RF000 <- g.id, RF001 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypesagg g]
 |     partitions=11/11 files=11 size=814.73KB
@@ -87,7 +87,7 @@ and bool_col = false
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    predicates: bool_col = FALSE
-   runtime filters: RF000 -> int_col, RF001 -> a.id
+   runtime filters: RF000 -> a.id, RF001 -> int_col
 ====
 # Complex expression in the IN predicate
 select *
@@ -174,8 +174,8 @@ and a.int_col < 10
 |  output: count(*)
 |
 04:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: a.id = s.id, a.bool_col = s.bool_col
-|  runtime filters: RF000 <- s.id, RF001 <- s.bool_col
+|  hash predicates: a.bool_col = s.bool_col, a.id = s.id
+|  runtime filters: RF000 <- s.bool_col, RF001 <- s.id
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s.int_col = t.int_col
@@ -191,7 +191,7 @@ and a.int_col < 10
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
    predicates: a.int_col < 10
-   runtime filters: RF000 -> a.id, RF001 -> a.bool_col
+   runtime filters: RF000 -> a.bool_col, RF001 -> a.id
 ====
 # Outer join between the tables in the outer query block
 select count(*)
@@ -451,15 +451,15 @@ where id in
 |  runtime filters: RF000 <- id, RF001 <- a.int_col
 |
 |--03:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: a.tinyint_col = tinyint_col, a.bigint_col = s.bigint_col
-|  |  runtime filters: RF002 <- tinyint_col, RF003 <- s.bigint_col
+|  |  hash predicates: a.bigint_col = s.bigint_col, a.tinyint_col = tinyint_col
+|  |  runtime filters: RF002 <- s.bigint_col, RF003 <- tinyint_col
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny s]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
-|     runtime filters: RF002 -> a.tinyint_col, RF003 -> a.bigint_col
+|     runtime filters: RF002 -> a.bigint_col, RF003 -> a.tinyint_col
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
@@ -477,15 +477,15 @@ where id in
 |  runtime filters: RF000 <- id
 |
 |--03:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: a.int_col = int_col, a.bigint_col = s.bigint_col
-|  |  runtime filters: RF001 <- int_col, RF002 <- s.bigint_col
+|  |  hash predicates: a.bigint_col = s.bigint_col, a.int_col = int_col
+|  |  runtime filters: RF001 <- s.bigint_col, RF002 <- int_col
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny s]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
-|     runtime filters: RF001 -> a.int_col, RF002 -> a.bigint_col
+|     runtime filters: RF001 -> a.bigint_col, RF002 -> a.int_col
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
@@ -517,8 +517,8 @@ where t.int_col < 10 and t.int_col in
   (select int_col from functional.alltypessmall s where s.id = t.id)
 ---- PLAN
 04:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: t.int_col = int_col, t.id = s.id
-|  runtime filters: RF000 <- int_col, RF001 <- s.id
+|  hash predicates: t.id = s.id, t.int_col = int_col
+|  runtime filters: RF000 <- s.id, RF001 <- int_col
 |
 |--02:SCAN HDFS [functional.alltypessmall s]
 |     partitions=4/4 files=4 size=6.32KB
@@ -531,11 +531,11 @@ where t.int_col < 10 and t.int_col in
 |--01:SCAN HDFS [functional.alltypes t]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: t.int_col < 10
-|     runtime filters: RF000 -> t.int_col, RF001 -> t.id
+|     runtime filters: RF000 -> t.id, RF001 -> t.int_col
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 files=11 size=814.73KB
-   runtime filters: RF001 -> a.id, RF002 -> a.id
+   runtime filters: RF000 -> a.id, RF002 -> a.id
 ====
 # Correlated EXISTS
 select count(*)
@@ -1852,12 +1852,12 @@ select 1 from functional.alltypes t where id in
 ---- PLAN
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
-|  other join predicates: t.float_col >= a.float_col, a.tinyint_col >= t.tinyint_col, t.float_col <= a.double_col, a.smallint_col <= t.int_col, a.tinyint_col <= t.smallint_col, a.double_col <= CAST(t.string_col AS INT), t.string_col >= a.string_col, a.double_col >= round(acos(t.float_col), 2)
+|  other join predicates: a.tinyint_col >= t.tinyint_col, t.float_col >= a.float_col, a.smallint_col <= t.int_col, a.tinyint_col <= t.smallint_col, t.float_col <= a.double_col, a.double_col <= CAST(t.string_col AS INT), t.string_col >= a.string_col, a.double_col >= round(acos(t.float_col), 2)
 |  runtime filters: RF000 <- id
 |
 |--01:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
-|     predicates: a.smallint_col >= 10, 20 <= a.int_col
+|     predicates: 20 <= a.int_col, a.smallint_col >= 10
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB

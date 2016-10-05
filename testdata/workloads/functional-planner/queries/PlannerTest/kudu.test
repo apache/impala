@@ -96,7 +96,7 @@ where id >= 10 and zip <= 5 and 20 >= id and 'foo' = name and zip >= 0 and 30 >=
 and zip > 1 and zip < 50
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip > 1, zip < 50, name = 'foo'
+   kudu predicates: id <= 20, zip <= 30, id >= 10, zip < 50, zip <= 5, zip > 1, zip >= 0, name = 'foo'
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
@@ -104,7 +104,7 @@ NODE 0:
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id >= 10, zip <= 5, id <= 20, zip >= 0, zip <= 30, zip > 1, zip < 50, name = 'foo'
+   kudu predicates: id <= 20, zip <= 30, id >= 10, zip < 50, zip <= 5, zip > 1, zip >= 0, name = 'foo'
 ====
 # Test constant folding.
 select * from functional_kudu.testtbl
@@ -112,7 +112,7 @@ where id < 10 + 30  and cast(sin(id) as boolean) = true and 20 * 3 >= id and 10 
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id < 40, id <= 60, id < 103
+   kudu predicates: id <= 60, id < 40, id < 103
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
@@ -121,7 +121,7 @@ NODE 0:
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id < 40, id <= 60, id < 103
+   kudu predicates: id <= 60, id < 40, id < 103
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
@@ -190,5 +190,5 @@ and 1475059765 + 100 < id
 |  output: count(*)
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   kudu predicates: id < 1475059775, id > 1475059865
+   kudu predicates: id > 1475059865, id < 1475059775
 ====

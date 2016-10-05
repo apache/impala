@@ -700,7 +700,7 @@ limit 100
 |
 |--00:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk >= 2451484, tpcds.date_dim.d_date_sk <= 2451513
+|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -765,7 +765,7 @@ limit 100
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk >= 2451484, tpcds.date_dim.d_date_sk <= 2451513
+|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -844,7 +844,7 @@ limit 100
 |  |
 |  00:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk >= 2451484, tpcds.date_dim.d_date_sk <= 2451513
+|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -1161,7 +1161,7 @@ limit 100000
 |--07:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) >= 15, count(*) <= 20
+|  |  having: count(*) <= 20, count(*) >= 15
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
@@ -1211,7 +1211,7 @@ limit 100000
 |  15:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) >= 15, count(*) <= 20
+|  |  having: count(*) <= 20, count(*) >= 15
 |  |
 |  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |  |
@@ -1277,7 +1277,7 @@ limit 100000
 |  15:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) >= 15, count(*) <= 20
+|  |  having: count(*) <= 20, count(*) >= 15
 |  |
 |  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |  |
@@ -2525,7 +2525,7 @@ limit 100
 |  |
 |  |--13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
+|  |     predicates: d_month_seq <= 1185 + 23, d_month_seq >= 1185 + 12
 |  |
 |  11:AGGREGATE [FINALIZE]
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -2606,7 +2606,7 @@ limit 100
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
+|  |     predicates: d_month_seq <= 1185 + 23, d_month_seq >= 1185 + 12
 |  |
 |  27:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -2725,7 +2725,7 @@ limit 100
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
+|  |     predicates: d_month_seq <= 1185 + 23, d_month_seq >= 1185 + 12
 |  |
 |  27:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -2897,7 +2897,7 @@ limit 100
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk >= 2451911, tpcds.date_dim.d_date_sk <= 2452275, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
    runtime filters: RF001 -> d_date_sk
 ---- DISTRIBUTEDPLAN
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2958,7 +2958,7 @@ limit 100
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk >= 2451911, tpcds.date_dim.d_date_sk <= 2452275, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
    runtime filters: RF001 -> d_date_sk
 ---- PARALLELPLANS
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3031,7 +3031,7 @@ limit 100
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk >= 2451911, tpcds.date_dim.d_date_sk <= 2452275, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
    runtime filters: RF001 -> d_date_sk
 ====
 # TPCDS-Q65
@@ -3444,7 +3444,7 @@ limit 100
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date >= '1999-01-01', d_date <= '1999-03-31'
+|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |
 |  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -3522,7 +3522,7 @@ limit 100
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date >= '1999-01-01', d_date <= '1999-03-31'
+|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |
 |  05:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -3622,7 +3622,7 @@ limit 100
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date >= '1999-01-01', d_date <= '1999-03-31'
+|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |
 |  05:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -3695,7 +3695,7 @@ limit 1000
 |--07:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) >= 1, count(*) <= 5
+|  |  having: count(*) <= 5, count(*) >= 1
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
@@ -3744,7 +3744,7 @@ limit 1000
 |  16:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) >= 1, count(*) <= 5
+|  |  having: count(*) <= 5, count(*) >= 1
 |  |
 |  15:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |  |
@@ -3811,7 +3811,7 @@ limit 1000
 |  16:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) >= 1, count(*) <= 5
+|  |  having: count(*) <= 5, count(*) >= 1
 |  |
 |  15:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |  |
@@ -3931,7 +3931,7 @@ limit 100
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date >= '1999-01-01', d_date <= '1999-03-31'
+|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |
 |  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
@@ -3939,7 +3939,7 @@ limit 100
 |  |
 |  |--02:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_number_employees >= 200, store.s_number_employees <= 295
+|  |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -3988,7 +3988,7 @@ limit 100
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date >= '1999-01-01', d_date <= '1999-03-31'
+|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |
 |  13:EXCHANGE [HASH(store_sales.ss_sold_date_sk)]
 |  |
@@ -4000,7 +4000,7 @@ limit 100
 |  |  |
 |  |  02:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_number_employees >= 200, store.s_number_employees <= 295
+|  |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -4059,7 +4059,7 @@ limit 100
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date >= '1999-01-01', d_date <= '1999-03-31'
+|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
 |  |
 |  13:EXCHANGE [HASH(store_sales.ss_sold_date_sk)]
 |  |
@@ -4075,7 +4075,7 @@ limit 100
 |  |  |
 |  |  02:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_number_employees >= 200, store.s_number_employees <= 295
+|  |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -4159,7 +4159,7 @@ limit 100) tmp2
 |
 |--02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk >= 2451545, tpcds.date_dim.d_date_sk <= 2451910
+|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk <= 2451910, tpcds.date_dim.d_date_sk >= 2451545
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -4217,7 +4217,7 @@ limit 100) tmp2
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk >= 2451545, tpcds.date_dim.d_date_sk <= 2451910
+|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk <= 2451910, tpcds.date_dim.d_date_sk >= 2451545
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -4285,7 +4285,7 @@ limit 100) tmp2
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk >= 2451545, tpcds.date_dim.d_date_sk <= 2451910
+|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk <= 2451910, tpcds.date_dim.d_date_sk >= 2451545
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -4512,7 +4512,7 @@ limit 1000
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk >= 2451911, tpcds.date_dim.d_date_sk <= 2451941, d_date >= '2001-01-01', d_date <= '2001-01-31'
+   predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
    runtime filters: RF000 -> d_date_sk
 ---- DISTRIBUTEDPLAN
 13:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4561,7 +4561,7 @@ limit 1000
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk >= 2451911, tpcds.date_dim.d_date_sk <= 2451941, d_date >= '2001-01-01', d_date <= '2001-01-31'
+   predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
    runtime filters: RF000 -> d_date_sk
 ---- PARALLELPLANS
 13:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4618,7 +4618,7 @@ limit 1000
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk >= 2451911, tpcds.date_dim.d_date_sk <= 2451941, d_date >= '2001-01-01', d_date <= '2001-01-31'
+   predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
    runtime filters: RF000 -> d_date_sk
 ====
 # TPCD-Q6

@@ -19,13 +19,13 @@ UPDATE KUDU [functional_kudu.testtbl]
 |  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: zip > 94549, id = 5
+   kudu predicates: id = 5, zip > 94549
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: zip > 94549, id = 5
+   kudu predicates: id = 5, zip > 94549
 ====
 # Mixing predicate and value assignment
 update functional_kudu.testtbl set zip = 94546 where zip > 94549

@@ -243,8 +243,8 @@ limit 100
 |     runtime filters: RF000 -> n_regionkey
 |
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|  runtime filters: RF002 <- s_suppkey, RF003 <- s_nationkey
+|  hash predicates: c_nationkey = s_nationkey, l_suppkey = s_suppkey
+|  runtime filters: RF002 <- s_nationkey, RF003 <- s_suppkey
 |
 |--03:SCAN HDFS [tpch.supplier s]
 |     partitions=1/1 files=1 size=1.33MB
@@ -256,7 +256,7 @@ limit 100
 |
 |--00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
-|     runtime filters: RF001 -> tpch.customer.c_nationkey, RF003 -> c_nationkey
+|     runtime filters: RF001 -> tpch.customer.c_nationkey, RF002 -> c_nationkey
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
@@ -264,12 +264,12 @@ limit 100
 |
 |--01:SCAN HDFS [tpch.orders o]
 |     partitions=1/1 files=1 size=162.56MB
-|     predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
+|     predicates: o_orderdate < '1995-01-01', o_orderdate >= '1994-01-01'
 |     runtime filters: RF004 -> o_custkey
 |
 02:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 files=1 size=718.94MB
-   runtime filters: RF002 -> l_suppkey, RF005 -> l_orderkey
+   runtime filters: RF003 -> l_suppkey, RF005 -> l_orderkey
 ---- DISTRIBUTEDPLAN
 20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
@@ -309,8 +309,8 @@ limit 100
 |     runtime filters: RF000 -> n_regionkey
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|  runtime filters: RF002 <- s_suppkey, RF003 <- s_nationkey
+|  hash predicates: c_nationkey = s_nationkey, l_suppkey = s_suppkey
+|  runtime filters: RF002 <- s_nationkey, RF003 <- s_suppkey
 |
 |--15:EXCHANGE [BROADCAST]
 |  |
@@ -326,7 +326,7 @@ limit 100
 |  |
 |  00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
-|     runtime filters: RF001 -> tpch.customer.c_nationkey, RF003 -> c_nationkey
+|     runtime filters: RF001 -> tpch.customer.c_nationkey, RF002 -> c_nationkey
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
@@ -336,12 +336,12 @@ limit 100
 |  |
 |  01:SCAN HDFS [tpch.orders o]
 |     partitions=1/1 files=1 size=162.56MB
-|     predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
+|     predicates: o_orderdate < '1995-01-01', o_orderdate >= '1994-01-01'
 |     runtime filters: RF004 -> o_custkey
 |
 02:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 files=1 size=718.94MB
-   runtime filters: RF002 -> l_suppkey, RF005 -> l_orderkey
+   runtime filters: RF003 -> l_suppkey, RF005 -> l_orderkey
 ====
 # Q2 - Minimum Cost Supplier Query
 select
@@ -482,7 +482,7 @@ limit 10
 |
 |--00:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
-|     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
+|     predicates: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
 |
 01:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
@@ -514,7 +514,7 @@ limit 10
 |  |
 |  00:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
-|     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
+|     predicates: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
 |
 05:EXCHANGE [HASH(l_orderkey)]
 |
@@ -1335,7 +1335,7 @@ where a.int_col = b.int_col and b.bigint_col < a.tinyint_col
 ---- PLAN
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = b.id
-|  other predicates: a.int_col = b.int_col, b.tinyint_col = c.tinyint_col, b.bool_col != c.bool_col, b.bigint_col < a.tinyint_col
+|  other predicates: a.int_col = b.int_col, b.bool_col != c.bool_col, b.tinyint_col = c.tinyint_col, b.bigint_col < a.tinyint_col
 |  runtime filters: RF000 <- b.tinyint_col
 |
 |--03:HASH JOIN [RIGHT OUTER JOIN]
@@ -1365,7 +1365,7 @@ where b.tinyint_col = c.tinyint_col and b.bool_col != c.bool_col
 ---- PLAN
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = b.id
-|  other predicates: b.tinyint_col = c.tinyint_col, b.bool_col != c.bool_col
+|  other predicates: b.bool_col != c.bool_col, b.tinyint_col = c.tinyint_col
 |  runtime filters: RF000 <- b.tinyint_col
 |
 |--03:HASH JOIN [INNER JOIN]
